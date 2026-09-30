@@ -15,8 +15,6 @@ data class CameraCapabilities(
     val maxZoom: Float,
     /** Zoom chips shown on both phones, e.g. [0.6, 1, 2, 3] within [minZoom, maxZoom]. */
     val zoomStops: List<Float>,
-    val hasFlash: Boolean,
-    val supportsFocus: Boolean,
 )
 
 /** Receives camera frames for streaming. Must copy the image and close it before returning. */
@@ -34,14 +32,11 @@ interface CameraController {
     /** Zoom ratio actually applied. */
     val zoom: StateFlow<Float>
 
-    /** Binds Preview, ImageCapture, and ImageAnalysis with one 3:4 viewport (AD-12). */
+    /** Binds Preview, ImageCapture, and ImageAnalysis with one 3:4 viewport (AD-10). */
     fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider)
 
     /** Clamped to [CameraCapabilities.minZoom, CameraCapabilities.maxZoom]. */
     fun setZoom(ratio: Float)
-
-    /** Normalized frame point, 0..1 (FR-1.4, Iteration 2). */
-    fun focusAt(x: Float, y: Float)
 
     /** Full resolution to Pictures/Pix, never with the guide (FR-1.5). */
     suspend fun takePhoto(): Result<Uri>

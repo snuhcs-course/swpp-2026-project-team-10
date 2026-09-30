@@ -21,7 +21,4 @@ interface PixApi {
         @Part("templateId") templateId: RequestBody,
         @Part("seed") seed: RequestBody,
     ): PoseResponseDto
-
-    // Iteration 2: auth/google, me/pix-id, me/device, users/by-pix-id, friend-requests,
-    // friends, invitations, ice-servers (Design 2.5.3).
 }

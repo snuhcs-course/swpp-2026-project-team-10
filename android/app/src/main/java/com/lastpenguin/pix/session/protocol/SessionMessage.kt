@@ -9,11 +9,10 @@ import kotlinx.serialization.Serializable
 
 const val PROTOCOL_VERSION = 1
 
-enum class ShutterError { NOT_ALLOWED, SAVE_FAILED, CANCELLED }
-
 /**
  * Data channel messages between the two phones (Design 2.5.1).
  * The @SerialName is the `t` field of the JSON envelope in Design 2.5.1.
+ * Only the photographer takes photos; the subject sends zoom requests.
  */
 @Serializable
 sealed interface SessionMessage {
@@ -69,24 +68,6 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("camera.state")
     data class CameraStateUpdate(val zoom: Float, val by: Role, val final: Boolean) : SessionMessage
-
-    /** [countdown] is 0 in Iteration 1 and 3 from Iteration 2. */
-    @Serializable
-    @SerialName("camera.shutter.request")
-    data class ShutterRequest(val requestId: String, val countdown: Int) : SessionMessage
-
-    @Serializable
-    @SerialName("camera.countdown")
-    data class Countdown(val requestId: String, val remaining: Int) : SessionMessage
-
-    @Serializable
-    @SerialName("camera.shutter.result")
-    data class ShutterResult(val requestId: String, val ok: Boolean, val error: ShutterError? = null) : SessionMessage
-
-    /** Iteration 2 (FR-7.5). */
-    @Serializable
-    @SerialName("control.permission")
-    data class ControlPermission(val allowed: Boolean) : SessionMessage
 
     @Serializable
     @SerialName("session.leave")

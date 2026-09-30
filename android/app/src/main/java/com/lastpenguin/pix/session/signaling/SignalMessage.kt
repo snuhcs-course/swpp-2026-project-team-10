@@ -31,16 +31,6 @@ sealed interface SignalMessage {
     @SerialName("room.join")
     data class RoomJoin(val code: String) : SignalMessage
 
-    /** Iteration 2: first message after connecting. */
-    @Serializable
-    @SerialName("auth")
-    data class Auth(val token: String) : SignalMessage
-
-    /** Iteration 2: join after an invitation is accepted, or when reconnecting. */
-    @Serializable
-    @SerialName("session.join")
-    data class SessionJoin(val sessionId: String) : SignalMessage
-
     @Serializable
     @SerialName("leave")
     data object Leave : SignalMessage
@@ -64,6 +54,7 @@ sealed interface SignalMessage {
         val iceServers: List<IceServer> = emptyList(),
     ) : SignalMessage
 
+    /** [peer] is empty in Iteration 1; the other phone's name arrives in `hello`. */
     @Serializable
     @SerialName("session.joined")
     data class SessionJoined(
@@ -75,13 +66,13 @@ sealed interface SignalMessage {
 
     @Serializable
     @SerialName("peer.joined")
-    data class PeerJoined(val peer: PeerInfo) : SignalMessage
+    data class PeerJoined(val peer: PeerInfo? = null) : SignalMessage
 
     @Serializable
     @SerialName("peer.left")
     data class PeerLeft(val reason: EndReason = EndReason.PEER_LEFT) : SignalMessage
 
-    /** code: NOT_FOUND, FULL, EXPIRED, UNAUTHORIZED, UNKNOWN_TYPE. */
+    /** code: NOT_FOUND, FULL, EXPIRED, UNKNOWN_TYPE. */
     @Serializable
     @SerialName("error")
     data class ServerError(val code: String, val message: String = "") : SignalMessage

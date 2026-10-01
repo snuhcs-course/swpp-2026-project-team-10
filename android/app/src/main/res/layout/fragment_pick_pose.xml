@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pick a pose (R&S 6.3). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/pick_pose_title"
+        android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+    <!-- TODO(#7): 2×2 grid of candidates with labels; the selected one is highlighted. -->
+    <TextView
+        android:id="@+id/candidateGrid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginVertical="16dp"
+        android:layout_weight="1"
+        android:background="#33333333"
+        android:gravity="center"
+        android:text="@string/candidates_placeholder" />
+
+    <Button
+        android:id="@+id/usePoseButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/use_this_pose" />
+
+    <Button
+        android:id="@+id/tryOtherButton"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/try_other_poses" />
+</LinearLayout>

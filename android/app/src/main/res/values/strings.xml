@@ -1,4 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pix</string>
+
+    <!-- Common -->
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+    <string name="back_to_camera">Back to camera</string>
+    <string name="try_again">Try again</string>
+    <string name="failure_label">FAILURE</string>
+    <string name="same_wifi">Both phones need to be on the same Wi-Fi.</string>
+
+    <!-- Flow 1: Camera -->
+    <string name="shoot_together">Shoot together</string>
+    <string name="camera_preview_placeholder">Camera preview (#3)</string>
+    <string name="zoom_chips_placeholder">Zoom chips (#3)</string>
+    <string name="hint_add_guide">Tap Guide to add a pose</string>
+    <string name="guide">Guide</string>
+    <string name="shutter">Shutter</string>
+    <string name="gallery">Gallery</string>
+    <string name="style_toggle">Cutout / Outline</string>
+    <string name="remove_guide">Remove</string>
+    <string name="live_badge">Live · %1$s connected</string>
+    <string name="end_session">End session</string>
+
+    <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
+    <string name="add_guide_title">Add a pose guide</string>
+    <string name="add_guide_body">Choose how to get a reference for this shot.</string>
+    <string name="upload_reference">Upload a reference</string>
+    <string name="generate_poses">Generate poses here</string>
+    <string name="reference_title">Reference</string>
+    <string name="reference_placeholder">Separated person (#5)</string>
+    <string name="cutout">Cutout</string>
+    <string name="outline">Outline</string>
+    <string name="person_found">Person found</string>
+    <string name="use_this_guide">Use this guide</string>
+    <string name="choose_another_photo">Choose another photo</string>
+    <string name="no_person_title">No person found</string>
+    <string name="no_person_message">Pick a photo where one person is clearly visible.</string>
+    <string name="temp_no_person">(temp) No person found</string>
+
+    <!-- Flow 2: Pose generation -->
+    <string name="generating_title">Generating poses</string>
+    <string name="generating_body">Pix keeps the same person and place and changes only the pose.</string>
+    <string name="candidates_placeholder">Four candidate slots (#7)</string>
+    <string name="ready_count">%1$d of 4 ready</string>
+    <string name="generating_wait">This can take up to 30 seconds.</string>
+    <string name="pick_pose_title">Pick a pose</string>
+    <string name="use_this_pose">Use this pose</string>
+    <string name="try_other_poses">Try other poses</string>
+    <string name="generation_failed_title">Couldn\'t create poses</string>
+    <string name="generation_failed_message">The request failed or took longer than 30 seconds. Your photo is kept, so you can try again.</string>
+    <string name="temp_poses_ready">(temp) Poses ready</string>
+    <string name="temp_generation_failed">(temp) Generation failed</string>
+
+    <!-- Flow 6: Room code -->
+    <string name="room_code_body">Ask your friend to open Pix, tap Shoot together, and enter this code.</string>
+    <string name="room_code_placeholder">––– –––</string>
+    <string name="waiting_for_friend">Waiting for your friend…</string>
+    <string name="code_expiry">The code expires in 10 minutes if nobody joins.</string>
+    <string name="join_instead">Join with a code instead</string>
+    <string name="join_title">Join with a code</string>
+    <string name="join_body">Enter the 6-digit code shown on your friend\'s camera.</string>
+    <string name="room_code_label">Room code</string>
+    <string name="join">Join</string>
+    <string name="session_not_found_title">Session not found</string>
+    <string name="session_not_found_message">Check the code with your friend and try again.</string>
+    <string name="temp_friend_joined">(temp) Friend joined</string>
+    <string name="temp_code_not_found">(temp) Code not found</string>
+
+    <!-- Flow 5: Subject view, Connection lost -->
+    <string name="subject_title">%1$s\'s camera</string>
+    <string name="subject_title_placeholder">Photographer\'s camera</string>
+    <string name="subject_zoom_placeholder">Zoom chips (#10)</string>
+    <string name="live_view_placeholder">Photographer\'s live view (#8)</string>
+    <string name="leave">Leave</string>
+    <string name="subject_caption">Only the photographer takes the photo.</string>
+    <string name="connection_lost_title">Connection lost</string>
+    <string name="connection_lost_message">Video stopped. Check that both phones are on the same Wi-Fi, then reconnect.</string>
+    <string name="reconnect">Reconnect</string>
+    <string name="temp_connection_lost">(temp) Connection lost</string>
 </resources>

@@ -1,23 +1,37 @@
-# Pix signaling server
+# Pix server
 
-Iteration 1's FastAPI signaling hub. It creates anonymous room-code sessions and relays WebRTC SDP and ICE messages between one photographer and one subject. Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. The server has no database, accounts, image-generation endpoints, or media storage.
+FastAPI backend for Pix. The server's responsibilities include session signaling and planned APIs for friend invitations, pose generation, and other features as the project develops.
 
-The wire contract comes from [Design Documentation §2.5.2](../wiki/Design-Documentation.md) and Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt). Room behavior follows [FR-8 and FR-6](../wiki/Requirements-and-Specifications.md).
+The current implementation provides iteration 1 signaling: anonymous room-code sessions and WebRTC SDP/ICE relay between one photographer and one subject. Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. Database support, account and friend APIs, and pose generation are not implemented yet.
+
+The wire contract comes from [Design Documentation §2.5.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt). Room behavior follows [FR-8 and FR-6](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications).
+
+## Setup
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the repository root:
+
+```sh
+cd server
+uv sync --locked
+```
+
+Optional settings are listed in `.env.example`. Copy it to `.env` in `server/` to override defaults, or export `PIX_` environment variables. The default waiting-room TTL is 600 seconds, empty-session TTL is 60 seconds, and cleanup runs every second. Expiry is also checked during message handling. If changing `PIX_MAX_MESSAGE_BYTES`, keep Uvicorn's `--ws-max-size` consistent.
 
 ## Run on the test Wi-Fi
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then from `server/`:
+From `server/`, start the server:
 
 ```sh
-uv sync --locked
 uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 65536
 ```
 
 Use **one worker and one server instance**: room membership is process-local and is lost when the server restarts. For development, `--reload` can replace `--workers 1`; a reload ends existing sessions.
 
-Put the laptop and both phones on the same Wi-Fi. Connect Android to `ws://<laptop-Wi-Fi-IP>:8000/ws` (a phone's `localhost` refers to that phone). The network must allow device-to-device traffic and inbound TCP port 8000 on the laptop. Iteration 1 uses the debug-build HTTP/WS exception in Design §2.8. `iceServers` is always `[]`; STUN/TURN and cellular connectivity belong to later iterations. `GET /health` returns `{"status":"ok"}`.
+Put the laptop and both phones on the same Wi-Fi. Connect Android to `ws://<laptop-Wi-Fi-IP>:8000/ws` (a phone's `localhost` refers to that phone). The network must allow device-to-device traffic and inbound TCP port 8000 on the laptop. Iteration 1 uses the debug-build HTTP/WS exception in Design §2.8. `iceServers` is always `[]`; STUN/TURN and cellular connectivity belong to later iterations.
 
-Optional settings are listed in `.env.example`. Copy it to `.env` in this directory to override defaults, or export `PIX_` environment variables. The default waiting-room TTL is 600 seconds, empty-session TTL is 60 seconds, and cleanup runs every second. Expiry is also checked during message handling. If changing `PIX_MAX_MESSAGE_BYTES`, keep Uvicorn's `--ws-max-size` consistent. Uvicorn's WebSocket ping/pong detects dead connections; no application heartbeat message is required.
+Uvicorn's WebSocket ping/pong detects dead connections; no application heartbeat message is required.
+
+`GET /health` returns `{"status":"ok"}`.
 
 ## WebSocket protocol
 
@@ -53,7 +67,7 @@ Errors leave the socket usable. Text messages larger than 64 KiB close the socke
 
 ## Verify
 
-From `server/`:
+Check the server's lint, formatting, and tests. From `server/`:
 
 ```sh
 uv run ruff check .
@@ -61,18 +75,6 @@ uv run ruff format --check .
 uv run pytest
 ```
 
-With the server running, exercise the NFR-18 capacity target using real sockets:
-
-```sh
-uv run python scripts/load_signaling.py --sessions 50
-```
-
-The script holds 50 two-phone sessions open simultaneously, checks independent SDP/ICE exchanges, then leaves each session. It checks the signaling server; camera/video latency and phone-to-phone WebRTC connectivity need the Android apps on the test devices.
-
 ## Continuous integration
 
 Server CI has two independent workflows: [server-lint](../.github/workflows/server-lint.yml) (Ruff lint and formatting) and [server-test](../.github/workflows/server-test.yml) (pytest). Each runs on pull requests, pushes to `dev` and `main`, merge queues, and manual dispatch, using Python from `.python-version` and dependencies from `uv.lock`. Their check names match their workflow names. New commits to a PR cancel its older runs.
-
-To enforce these checks, configure a GitHub branch ruleset for `dev` and `main`: require a pull request, require both `server-lint` and `server-test` to pass, and require branches to be up to date before merging. Enable the rules after the workflows have run successfully on GitHub so their checks are available to select. Keep required-check names aligned with these workflows when they are renamed or consolidated. Adding workflow files alone does not configure merge protection. See [GitHub's ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository).
-
-The workflows deliberately have no PR path filters: GitHub can leave a required check pending when an entire workflow is skipped, blocking an Android-only or documentation-only PR. The current checks are inexpensive enough to run for every PR. If they become costly, use change detection inside each workflow while retaining an always-reported required check. See [GitHub's guidance on skipped required checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).

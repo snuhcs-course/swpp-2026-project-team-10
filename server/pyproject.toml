@@ -1,7 +1,7 @@
 [project]
 name = "pix-server"
 version = "0.1.0"
-description = "Server for Pix"
+description = "Pix server"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

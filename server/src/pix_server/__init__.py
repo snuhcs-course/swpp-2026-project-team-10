@@ -1,1 +1,1 @@
-"""Pix signaling server."""
+"""Pix server."""

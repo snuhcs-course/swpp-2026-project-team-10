@@ -34,7 +34,7 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
                 await cleanup_task
             registry.shutdown()
 
-    app = FastAPI(title="Pix signaling hub", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Pix server", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
 
     @app.get("/health")

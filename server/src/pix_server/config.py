@@ -1,4 +1,4 @@
-"""Environment configuration for the single-process signaling hub."""
+"""Environment configuration for the Pix server."""
 
 from pydantic import PositiveFloat, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict

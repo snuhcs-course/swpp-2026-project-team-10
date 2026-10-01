@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Iteration 1 screens and transitions, following the wireframe (R&S 6.2, 6.3, 6.6, 6.7).
+    "Back to camera" pops the back stack to cameraFragment instead of using an action.
+-->
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/cameraFragment">
+
+    <!-- Flow 1: Camera (also Camera + guide, Photo saved, and the photographer's live badge) -->
+    <fragment
+        android:id="@+id/cameraFragment"
+        android:name="com.lastpenguin.pix.ui.camera.CameraFragment"
+        android:label="Camera">
+        <action
+            android:id="@+id/action_camera_to_addGuide"
+            app:destination="@id/addGuideSheet" />
+        <action
+            android:id="@+id/action_camera_to_roomCode"
+            app:destination="@id/roomCodeSheet" />
+    </fragment>
+
+    <!-- Flow 1: Add a pose guide -->
+    <dialog
+        android:id="@+id/addGuideSheet"
+        android:name="com.lastpenguin.pix.ui.guide.AddGuideSheet"
+        android:label="Add a pose guide">
+        <action
+            android:id="@+id/action_addGuide_to_referenceConfirm"
+            app:destination="@id/referenceConfirmFragment"
+            app:popUpTo="@id/addGuideSheet"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_addGuide_to_generating"
+            app:destination="@id/generatingFragment"
+            app:popUpTo="@id/addGuideSheet"
+            app:popUpToInclusive="true" />
+    </dialog>
+
+    <fragment
+        android:id="@+id/referenceConfirmFragment"
+        android:name="com.lastpenguin.pix.ui.guide.ReferenceConfirmFragment"
+        android:label="Reference confirm">
+        <action
+            android:id="@+id/action_referenceConfirm_to_noPersonFound"
+            app:destination="@id/noPersonFoundFragment"
+            app:popUpTo="@id/referenceConfirmFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/noPersonFoundFragment"
+        android:name="com.lastpenguin.pix.ui.guide.NoPersonFoundFragment"
+        android:label="No person found">
+        <action
+            android:id="@+id/action_noPersonFound_to_referenceConfirm"
+            app:destination="@id/referenceConfirmFragment"
+            app:popUpTo="@id/noPersonFoundFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- Flow 2: Pose generation -->
+    <fragment
+        android:id="@+id/generatingFragment"
+        android:name="com.lastpenguin.pix.ui.generation.GeneratingFragment"
+        android:label="Generating poses">
+        <action
+            android:id="@+id/action_generating_to_pickPose"
+            app:destination="@id/pickPoseFragment"
+            app:popUpTo="@id/generatingFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_generating_to_generationFailed"
+            app:destination="@id/generationFailedFragment"
+            app:popUpTo="@id/generatingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/pickPoseFragment"
+        android:name="com.lastpenguin.pix.ui.generation.PickPoseFragment"
+        android:label="Pick a pose">
+        <action
+            android:id="@+id/action_pickPose_to_referenceConfirm"
+            app:destination="@id/referenceConfirmFragment"
+            app:popUpTo="@id/pickPoseFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_pickPose_to_generating"
+            app:destination="@id/generatingFragment"
+            app:popUpTo="@id/pickPoseFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/generationFailedFragment"
+        android:name="com.lastpenguin.pix.ui.generation.GenerationFailedFragment"
+        android:label="Couldn't create poses">
+        <action
+            android:id="@+id/action_generationFailed_to_generating"
+            app:destination="@id/generatingFragment"
+            app:popUpTo="@id/generationFailedFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- Flow 6: Room code (photographer) -->
+    <dialog
+        android:id="@+id/roomCodeSheet"
+        android:name="com.lastpenguin.pix.ui.session.RoomCodeSheet"
+        android:label="Room code">
+        <action
+            android:id="@+id/action_roomCode_to_joinCode"
+            app:destination="@id/joinCodeFragment"
+            app:popUpTo="@id/roomCodeSheet"
+            app:popUpToInclusive="true" />
+    </dialog>
+
+    <!-- Flow 6: Join with code (subject) -->
+    <fragment
+        android:id="@+id/joinCodeFragment"
+        android:name="com.lastpenguin.pix.ui.session.JoinCodeFragment"
+        android:label="Join with code">
+        <action
+            android:id="@+id/action_joinCode_to_subject"
+            app:destination="@id/subjectFragment"
+            app:popUpTo="@id/joinCodeFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_joinCode_to_sessionNotFound"
+            app:destination="@id/sessionNotFoundFragment"
+            app:popUpTo="@id/joinCodeFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/sessionNotFoundFragment"
+        android:name="com.lastpenguin.pix.ui.session.SessionNotFoundFragment"
+        android:label="Session not found">
+        <action
+            android:id="@+id/action_sessionNotFound_to_joinCode"
+            app:destination="@id/joinCodeFragment"
+            app:popUpTo="@id/sessionNotFoundFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- Flow 5: Subject view -->
+    <fragment
+        android:id="@+id/subjectFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectFragment"
+        android:label="Subject view">
+        <action
+            android:id="@+id/action_subject_to_connectionLost"
+            app:destination="@id/connectionLostFragment"
+            app:popUpTo="@id/subjectFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/connectionLostFragment"
+        android:name="com.lastpenguin.pix.ui.session.ConnectionLostFragment"
+        android:label="Connection lost">
+        <action
+            android:id="@+id/action_connectionLost_to_subject"
+            app:destination="@id/subjectFragment"
+            app:popUpTo="@id/connectionLostFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+</navigation>

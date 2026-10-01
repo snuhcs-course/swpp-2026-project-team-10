@@ -4,16 +4,20 @@ import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.Role
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonClassDiscriminator
 
 const val PROTOCOL_VERSION = 1
 
 /**
  * Data channel messages between the two phones (Design 2.5.1).
- * The @SerialName is the `t` field of the JSON envelope in Design 2.5.1.
- * Only the photographer takes photos; the subject sends zoom requests.
+ * The @SerialName goes into `t`, the class discriminator; the other fields form the body `b` of the
+ * JSON envelope in Design 2.5.1. Only the photographer takes photos; the subject sends zoom requests.
  */
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator("t")
 @Serializable
 sealed interface SessionMessage {
 

@@ -24,8 +24,8 @@ enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CAN
 sealed interface SessionState {
     data object Idle : SessionState
 
-    /** Photographer: code shown, waiting for the subject. */
-    data class Waiting(val entry: SessionEntry) : SessionState
+    /** Photographer: the room code from the server is shown, waiting for the subject. */
+    data class Waiting(val code: String) : SessionState
 
     data class Connecting(val sessionId: String?) : SessionState
 

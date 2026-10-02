@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
@@ -34,6 +36,16 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    testOptions {
+        unitTests.all {
+            // Print why a test failed, so a CI failure can be read from its log.
+            it.testLogging.exceptionFormat = TestExceptionFormat.FULL
+        }
+    }
+    lint {
+        // Pix runs on phones only. This check wants the camera marked optional for ChromeOS, but Pix needs it.
+        disable += "PermissionImpliesUnsupportedChromeOsHardware"
     }
 }
 

@@ -41,6 +41,7 @@ class AppContainer(context: Context) {
     val cameraController: CameraController = CameraXController(appContext, PhotoSaver(appContext))
 
     // ---- Guide (#5, #6) -------------------------------------------------------
+
     /** The photographer's guide. */
     val guideRepository: GuideRepository = InMemoryGuideRepository()
 

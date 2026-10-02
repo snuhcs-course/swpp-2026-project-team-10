@@ -14,11 +14,16 @@ android/.idea/
 .cxx/
 
 # Python server
-server/.venv/
+.venv/
+.env
 __pycache__/
 *.pyc
 .pytest_cache/
-server/.env
+.ruff_cache/
+dist/
+*.egg-info/
+.coverage
+htmlcov/
 
 # IDEs
 .idea/

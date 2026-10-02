@@ -60,3 +60,18 @@ The failure screens share `fragment_failure.xml`.
 - **Contracts.** Change a contract only through a pull request that the affected owners review, and update the Design Documentation in the same change.
 - **Libraries.** Versions are in `gradle/libs.versions.toml`. Add the ones your module needs to `app/build.gradle.kts`.
 - **Server address.** `BuildConfig.SERVER_URL` in `app/build.gradle.kts`. Set it to the laptop's address on the test Wi-Fi (#4).
+
+## Lint, format, and test
+
+Run these from `android/` before you push. On every pull request, the `android-lint` workflow runs the two checks and the `android-test` workflow runs the unit tests.
+
+| Command | What it does |
+|---|---|
+| `./gradlew spotlessApply` | Formats Kotlin and Gradle files with ktlint. |
+| `./gradlew spotlessCheck` | Fails if a file is not formatted or breaks a ktlint rule. |
+| `./gradlew :app:lintDebug` | Android Lint. Errors fail; warnings are only listed in `app/build/reports/lint-results-debug.html`. |
+| `./gradlew :app:testDebugUnitTest` | Unit tests in `app/src/test/`. They run on the JVM, without a phone or an emulator. |
+
+- **Rules.** ktlint rules are in `.editorconfig`, which Android Studio's formatter also reads. After you change that file, run `./gradlew clean` once, or Spotless keeps using the old rules.
+- **Suppressing.** For one place, use `@Suppress("ktlint:standard:<rule>")` or `@SuppressLint("<LintId>")` with a comment that says why. To turn off an Android Lint check for the whole app, add it to `lint { disable += ... }` in `app/build.gradle.kts`.
+- **Tests.** Put a test next to its class, in the same package under `app/src/test/java/`. Add tests in the pull request that writes the code. Unit tests cannot call the Android framework, so keep logic you want to test in plain Kotlin.

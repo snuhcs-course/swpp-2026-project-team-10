@@ -1,0 +1,20 @@
+# Read by ktlint (through Spotless) and by Android Studio's formatter.
+root = true
+
+[*.{kt,kts}]
+# Android Kotlin style guide, the same rules as Android Studio's default formatter.
+ktlint_code_style = android_studio
+# Same limit as the server (ruff.toml).
+max_line_length = 120
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+
+# Trailing commas in multi-line lists, as the code already has.
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# These two rules join a wrapped signature into one line whenever it fits in max_line_length.
+# Off, so the author decides where a class header or a `fun f() =` body wraps.
+ktlint_standard_class-signature = disabled
+ktlint_standard_function-signature = disabled

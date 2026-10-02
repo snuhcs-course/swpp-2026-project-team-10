@@ -20,6 +20,9 @@ okhttp = "4.12.0"
 retrofit = "2.11.0"
 datastore = "1.1.7"
 junit = "4.13.2"
+# Formatting and style checks: Spotless runs ktlint (see build.gradle.kts and .editorconfig).
+spotless = "8.10.3"
+ktlint = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -48,3 +51,4 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

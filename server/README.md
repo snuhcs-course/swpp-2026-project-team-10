@@ -65,16 +65,17 @@ Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active ro
 
 Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. Request bodies, room codes, and signaling payloads are not logged by the app.
 
-## Verify
+## Lint, format, and test
 
-Check the server's lint, formatting, and tests. From `server/`:
+Run these from `server/` before you push. On every pull request, the [server-lint](../.github/workflows/server-lint.yml) workflow runs the two checks and the [server-test](../.github/workflows/server-test.yml) workflow runs the tests.
 
-```sh
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest
-```
+| Command | What it does |
+| --- | --- |
+| `uv run ruff format .` | Formats Python files with Ruff. |
+| `uv run ruff format --check .` | Fails if a file is not formatted. |
+| `uv run ruff check .` | Ruff lint. Add `--fix` to apply the fixes Ruff can make, such as import order. |
+| `uv run pytest` | Tests in `tests/`. They run in one process, without a running server or a phone. |
 
-## Continuous integration
-
-Server CI has two independent workflows: [server-lint](../.github/workflows/server-lint.yml) (Ruff lint and formatting) and [server-test](../.github/workflows/server-test.yml) (pytest). Each runs on pull requests, pushes to `dev` and `main`, merge queues, and manual dispatch, using Python from `.python-version` and dependencies from `uv.lock`. Their check names match their workflow names. New commits to a PR cancel its older runs.
+- **Rules.** Ruff rules are in `ruff.toml`: a 120-character line limit and the lint rule sets `E4`, `E7`, `E9`, `F`, and `I`.
+- **Suppressing.** For one line, use `# noqa: <rule>` with a comment that says why. To turn off a rule for some files or for the whole server, add it to `per-file-ignores` or `ignore` in `ruff.toml`.
+- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `async def` tests need no marker, and a test fails after 15 seconds.

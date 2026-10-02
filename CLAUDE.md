@@ -1,4 +1,4 @@
-# AGENTS.md
+# CLAUDE.md
 
 ## Project instructions
 
@@ -8,14 +8,12 @@
 
 ## Maintaining this file
 
-Treat `AGENTS.md` as persistent context for future coding-agent sessions.
-
-Before starting work, read the applicable `AGENTS.md` files and follow their instructions.
+Treat `CLAUDE.md` as persistent context for future coding-agent sessions.
 
 Maintain only these three files:
-- `/AGENTS.md` for repository-wide context
-- `/android/AGENTS.md` for Android-specific context
-- `/server/AGENTS.md` for server-specific context
+- `/CLAUDE.md` for repository-wide context
+- `/android/CLAUDE.md` for Android-specific context
+- `/server/CLAUDE.md` for server-specific context
 
 Update the appropriate file only when you discover or establish durable, non-obvious information that future agents need to work correctly.
 
@@ -27,8 +25,8 @@ Record things such as:
 - recurring pitfalls or environment requirements;
 - pointers to more detailed documentation.
 
-Do not use `AGENTS.md` as a task log or scratchpad. Do not record temporary progress, debugging notes, speculative ideas, obvious implementation details, secrets, or machine-specific information.
+Do not use `CLAUDE.md` as a task log or scratchpad. Do not record temporary progress, debugging notes, speculative ideas, obvious implementation details, secrets, or machine-specific information.
 
 Keep the files concise and current. Update or remove outdated information instead of continually appending. Avoid duplicating detailed documentation; link to it instead. Keep each Markdown paragraph and list item on one source line; do not manually wrap prose. Preserve line breaks required for Markdown structure and code blocks.
 
-Before finishing a task, consider whether it introduced durable knowledge that belongs in one of the three `AGENTS.md` files. If not, leave them unchanged.
+Before finishing a task, consider whether it introduced durable knowledge that belongs in one of the three `CLAUDE.md` files. If not, leave them unchanged.

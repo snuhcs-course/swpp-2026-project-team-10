@@ -4,6 +4,8 @@ import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
 import com.lastpenguin.pix.session.signaling.IceCandidate
 import com.lastpenguin.pix.session.signaling.IceServer
 import com.lastpenguin.pix.session.signaling.SessionDescription
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.SharedFlow
 import org.webrtc.EglBase
 import org.webrtc.VideoSink
@@ -13,6 +15,24 @@ data class PeerConfig(val role: Role, val iceServers: List<IceServer>)
 
 /** The peer connection's own state, reduced to what the session cares about. */
 enum class LinkState { CONNECTING, CONNECTED, DISCONNECTED, FAILED, CLOSED }
+
+/** A snapshot of the video link from WebRTC's statistics, for the `stats` line in the Timings log (NFR-5, 6, 12). */
+data class LinkStats(
+    val codec: String?,
+    val width: Int?,
+    val height: Int?,
+    val framesPerSecond: Double?,
+    val bitrateKbps: Double?,
+    val roundTripMs: Double?,
+) {
+    fun summary(): String = listOfNotNull(
+        codec?.let { "codec=$it" },
+        if (width != null && height != null) "${width}x$height" else null,
+        framesPerSecond?.let { String.format(Locale.US, "%.1ffps", it) },
+        bitrateKbps?.let { "${it.roundToInt()}kbps" },
+        roundTripMs?.let { "rtt=${it.roundToInt()}ms" },
+    ).joinToString(" ")
+}
 
 /** What happens on one peer connection. */
 sealed interface PeerEvent {
@@ -54,6 +74,9 @@ interface PeerConnectionClient {
     fun send(channel: Channel, text: String): Boolean
 
     fun bufferedAmount(channel: Channel): Long
+
+    /** The current link statistics, or null when none are available yet. */
+    suspend fun stats(): LinkStats?
 
     /** Subject: receives the photographer's video once the track arrives. */
     fun addVideoSink(sink: VideoSink)

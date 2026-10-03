@@ -371,8 +371,16 @@ class RtcSessionManager(
             while (true) {
                 delay(PING_INTERVAL_MS)
                 sendNow(SessionMessage.Ping(clock()))
+                logStats()
             }
         }
+    }
+
+    /** One `stats` line per ping: codec, size, fps, bitrate, and RTT, so NFR-5, 6, and 12 can be read from logcat. */
+    private suspend fun logStats() {
+        val client = peer ?: return
+        val stats = runCatching { client.stats() }.getOrNull() ?: return
+        Timings.mark("stats", stats.summary())
     }
 
     private fun onPeerMessage(text: String) {

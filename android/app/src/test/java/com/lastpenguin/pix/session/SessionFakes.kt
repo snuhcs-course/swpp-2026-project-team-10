@@ -69,6 +69,14 @@ class FakePeerConnectionClient(val config: PeerConfig) : PeerConnectionClient {
 
     override fun bufferedAmount(channel: Channel): Long = buffered
 
+    var stats: LinkStats? = null
+    var statsRequests = 0
+
+    override suspend fun stats(): LinkStats? {
+        statsRequests++
+        return stats
+    }
+
     override fun addVideoSink(sink: VideoSink) {
         sinks += sink
     }

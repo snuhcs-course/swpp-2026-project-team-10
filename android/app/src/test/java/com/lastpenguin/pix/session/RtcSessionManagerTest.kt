@@ -143,9 +143,11 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
 
+        peer.stats = LinkStats("video/H264", 720, 960, 29.8, 2100.0, 12.0)
         advanceTimeBy(2_100)
         runCurrent()
         assertTrue("ping" in peer.sentTypes())
+        assertEquals(1, peer.statsRequests)
 
         manager.leave(EndReason.LEFT)
         runCurrent()

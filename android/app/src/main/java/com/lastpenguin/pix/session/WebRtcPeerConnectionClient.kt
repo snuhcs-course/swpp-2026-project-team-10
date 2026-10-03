@@ -21,6 +21,7 @@ import org.webrtc.MediaStream
 import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.RTCStatsReport
 import org.webrtc.RtpParameters
 import org.webrtc.RtpSender
 import org.webrtc.RtpTransceiver
@@ -51,6 +52,8 @@ class WebRtcPeerConnectionClient(
     private var remoteTrack: VideoTrack? = null
     private var videoSource: VideoSource? = null
     private var closed = false
+    private var lastBytes: Long? = null
+    private var lastStatsTimestampUs = 0.0
 
     private val observer = object : PeerConnection.Observer {
         override fun onIceCandidate(candidate: RtcIceCandidate) {
@@ -184,6 +187,45 @@ class WebRtcPeerConnectionClient(
     override fun bufferedAmount(channel: Channel): Long {
         val dataChannel = synchronized(lock) { if (closed) null else channels[channel] } ?: return 0L
         return dataChannel.bufferedAmount()
+    }
+
+    override suspend fun stats(): LinkStats? {
+        synchronized(lock) { if (closed) return null }
+        val report = suspendCancellableCoroutine { continuation ->
+            peerConnection.getStats { report -> continuation.resume(report) }
+        }
+        return parse(report)
+    }
+
+    /** Reads the video RTP stream, its codec, and the nominated candidate pair; bitrate comes from byte deltas. */
+    private fun parse(report: RTCStatsReport): LinkStats? {
+        val all = report.statsMap.values
+        val rtp = all.firstOrNull {
+            (it.type == "outbound-rtp" || it.type == "inbound-rtp") && it.members["kind"] == "video"
+        } ?: return null
+        val members = rtp.members
+        val bytes = ((members["bytesSent"] ?: members["bytesReceived"]) as? Number)?.toLong()
+        val codec = (members["codecId"] as? String)?.let { report.statsMap[it]?.members?.get("mimeType") as? String }
+        val pair = all.firstOrNull { it.type == "candidate-pair" && it.members["nominated"] == true }
+            ?: all.firstOrNull { it.type == "candidate-pair" && it.members["state"] == "succeeded" }
+        val roundTripMs = (pair?.members?.get("currentRoundTripTime") as? Number)?.toDouble()?.times(1000)
+        val now: Double = rtp.timestampUs
+        val previousBytes = lastBytes
+        val bitrateKbps = if (bytes != null && previousBytes != null && now > lastStatsTimestampUs) {
+            (bytes - previousBytes) * 8.0 / ((now - lastStatsTimestampUs) / 1_000_000.0) / 1000.0
+        } else {
+            null
+        }
+        lastBytes = bytes
+        lastStatsTimestampUs = now
+        return LinkStats(
+            codec = codec,
+            width = (members["frameWidth"] as? Number)?.toInt(),
+            height = (members["frameHeight"] as? Number)?.toInt(),
+            framesPerSecond = (members["framesPerSecond"] as? Number)?.toDouble(),
+            bitrateKbps = bitrateKbps,
+            roundTripMs = roundTripMs,
+        )
     }
 
     override fun addVideoSink(sink: VideoSink) {

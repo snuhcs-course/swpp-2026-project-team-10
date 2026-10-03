@@ -1,9 +1,21 @@
+import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// Iteration 1: the Pix server runs on a laptop on the test Wi-Fi (Design 2.8). Set its address as
+// `pix.serverUrl=http://192.168.0.10:8000/` in local.properties (never committed) or pass -Ppix.serverUrl=...
+// The default, 10.0.2.2, is the host machine as seen from the emulator.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val serverUrl: String = providers.gradleProperty("pix.serverUrl").orNull
+    ?: localProperties.getProperty("pix.serverUrl")
+    ?: "http://10.0.2.2:8000/"
 
 android {
     namespace = "com.lastpenguin.pix"
@@ -18,8 +30,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        // Iteration 1: the laptop's address on the test Wi-Fi (#4). 10.0.2.2 is the host machine from the emulator.
-        buildConfigField("String", "SERVER_URL", "\"http://10.0.2.2:8000/\"")
+        buildConfigField("String", "SERVER_URL", "\"$serverUrl\"")
     }
 
     buildTypes {
@@ -38,6 +49,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     testOptions {
+        // Android framework stubs (Log, SystemClock) return defaults in JVM tests instead of throwing.
+        unitTests.isReturnDefaultValues = true
         unitTests.all {
             // Print why a test failed, so a CI failure can be read from its log.
             it.testLogging.exceptionFormat = TestExceptionFormat.FULL
@@ -67,8 +80,14 @@ dependencies {
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.retrofit.kotlinx.serialization)
 
+    // Real-time session (#8): WebRTC, and lifecycle-aware flow collection in Fragments.
+    implementation(libs.webrtc)
+    implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -16,11 +16,13 @@ import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SubjectSegmenter
 import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.GuideSyncer
-import com.lastpenguin.pix.session.PeerConnectionClient
+import com.lastpenguin.pix.session.OkHttpSignalingClient
 import com.lastpenguin.pix.session.RemoteControlHandler
+import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.RtcSessionManager
+import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
-import com.lastpenguin.pix.session.SignalingClient
+import com.lastpenguin.pix.session.WebRtcRuntime
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import kotlinx.serialization.json.Json
@@ -61,13 +63,23 @@ class AppContainer(context: Context) {
     val poseGenerator: PoseGenerator = RemotePoseGenerator(pixApi)
 
     // ---- Session, guide sync, remote zoom (#8, #9, #10) -------------------------
-    val sessionManager: SessionManager = RtcSessionManager(
-        signaling = SignalingClient(),
-        peer = PeerConnectionClient(appContext),
-        frameSource = CameraFrameSource(),
+    private val frameSource = CameraFrameSource()
+
+    private val rtcSessionManager = RtcSessionManager(
+        signaling = OkHttpSignalingClient(),
+        // Loads the native WebRTC library on the first session, not at app start.
+        peers = WebRtcRuntime(appContext, frameSource),
+        frameSource = frameSource,
         codec = MessageCodec(),
         router = ChannelRouter(),
+        serverUrl = BuildConfig.SERVER_URL,
+        identity = SessionIdentity.of(appContext, BuildConfig.VERSION_NAME),
     )
+
+    val sessionManager: SessionManager = rtcSessionManager
+
+    /** The photographer's live video for the Subject view. */
+    val remoteVideo: RemoteVideo = rtcSessionManager
 
     val guideSyncer = GuideSyncer(sessionManager, guideRepository, mirrorGuideRepository)
 

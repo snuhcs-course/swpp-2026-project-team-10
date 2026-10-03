@@ -31,7 +31,9 @@ object PixViewModels {
                 container.remoteControlHandler,
             )
         }
-        initializer { SubjectViewModel(container.sessionManager, container.mirrorGuideRepository) }
+        initializer {
+            SubjectViewModel(container.sessionManager, container.mirrorGuideRepository, container.remoteVideo)
+        }
     }
 
     private val CreationExtras.container: AppContainer

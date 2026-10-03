@@ -17,7 +17,7 @@ class SessionNotFoundFragment : Fragment(R.layout.fragment_failure) {
 
         binding.primaryButton.setText(R.string.try_again)
         binding.primaryButton.setOnClickListener {
-            // TODO(#8): keep the entered code for editing (FR-8.3).
+            // Join with code prefills the code kept in SessionViewModel (FR-8.3).
             findNavController().navigate(R.id.action_sessionNotFound_to_joinCode)
         }
         binding.secondaryButton.setText(R.string.back)

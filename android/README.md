@@ -45,7 +45,7 @@ The failure screens share `fragment_failure.xml`.
 | `guide/` | `InMemoryGuideRepository`, `GuideGeometry`, `GuideOverlayView` | #6 |
 | `guide/` | `MlKitReferenceGuideMaker`, `SubjectSegmenter`, `OutlineExtractor` | #5 |
 | `generation/` | `RemotePoseGenerator` | #7 |
-| `session/` | `RtcSessionManager`, `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, `protocol/MessageCodec`, `protocol/ChannelRouter` | #8 |
+| `session/` | `RtcSessionManager`, `SignalingClient` + `OkHttpSignalingClient`, `PeerConnectionClient` + `WebRtcPeerConnectionClient`, `WebRtcRuntime`, `CameraFrameSource` + `YuvToNv21`, `RemoteVideo`, `SessionIdentity`, `protocol/MessageCodec`, `protocol/ChannelRouter`, `signaling/SignalCodec` | #8 |
 | `session/` | `GuideSyncer` | #9 |
 | `session/` | `RemoteControlHandler` | #10 |
 | `core/` | `AppContainer` (creates every module), `Timings` (Design 2.8) | #3 |
@@ -59,7 +59,19 @@ The failure screens share `fragment_failure.xml`.
 - **Fakes.** To work before another owner's module is ready, write a fake of the interface and use it in `core/AppContainer.kt`.
 - **Contracts.** Change a contract only through a pull request that the affected owners review, and update the Design Documentation in the same change.
 - **Libraries.** Versions are in `gradle/libs.versions.toml`. Add the ones your module needs to `app/build.gradle.kts`.
-- **Server address.** `BuildConfig.SERVER_URL` in `app/build.gradle.kts`. Set it to the laptop's address on the test Wi-Fi (#4).
+- **Server address.** `BuildConfig.SERVER_URL` defaults to `http://10.0.2.2:8000/`, the host machine as seen from the emulator. For a real phone, put the laptop's address on the test Wi-Fi in `local.properties` as `pix.serverUrl=http://192.168.0.10:8000/` (the file is not committed), or pass `-Ppix.serverUrl=...` to Gradle. Debug builds allow this plain `http://` and `ws://` traffic (`src/debug/AndroidManifest.xml`); release builds do not.
+
+## Real-time session (#8)
+
+Two phones connect with a room code over the Pix server and then stream phone to phone with WebRTC (Design 1.1.4, 2.5, 2.6.4). The prebuilt library is `io.github.webrtc-sdk:android` (`org.webrtc` package).
+
+- **Run it.** Start the server on the laptop (`server/README.md`), set `pix.serverUrl` as above, install the debug build on both phones, and put the laptop and both phones on one Wi-Fi that allows device-to-device traffic (campus networks usually do not; a phone hotspot does). *Shoot together* on one phone shows the code; *Shoot together › Join with a code instead* on the other joins it.
+- **Watch it.** `adb logcat -s PixTimings PixSession PixSignaling PixPeer` shows the session steps (`room.created`, `peer.joined`, `offer.sent`, `ice.connected`, `session.connected`), the ping round-trip time (`rtt`), and why a session ended.
+- **States.** `SessionManager.state` follows Design 2.4 with one addition: when the subject leaves or drops, the photographer closes the peer connection and goes back to `Waiting(code)` with the same code, so the subject's *Reconnect* can join again. The subject sees `Ended(CONNECTION_LOST)` and the Connection lost screen.
+- **Screens.** Screens draw from `SessionViewModel.state` and navigate on `SessionViewModel.transitions`, a one-shot stream of state changes, so returning to a screen never replays an old navigation. "Junhyeong left" notices come from `SessionViewModel.notices`.
+- **Hooks for #9 and #10.** Send with `SessionManager.send` and read `SessionManager.incoming`; both data channels are open while the state is `Connected`, `hello` has been exchanged, and `camera.capabilities` is sent by `SessionViewModel`. The reliable channel queues messages while its buffer is above 256 KiB, so image chunks can be sent without checking. Stale realtime values are already dropped by `seq`. The subject's renderer attaches through `RemoteVideo`.
+- **Camera frames.** `CameraFrameSource` expects YUV_420_888 `ImageProxy` frames from `CameraController.setFrameSink` (#3) and honors `cropRect` and `rotationDegrees`. Until #3 lands, a session connects and exchanges messages but the live view stays black.
+- **Tests.** `app/src/test/.../session/` covers the envelope codec, the channel table, the signaling JSON against the server's examples, the NV21 packing for every plane layout, and the session state machine with fake signaling and peer clients (`SessionFakes.kt`). A manager test that ends while connected must call `leave`, or the virtual-time ping loop keeps `runTest` from finishing.
 
 ## Lint, format, and test
 

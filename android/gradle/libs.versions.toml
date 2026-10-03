@@ -1,7 +1,7 @@
 # Versions for the libraries in Design 1.2. Only some are applied in app/build.gradle.kts so far;
 # add the others there when your module needs them, using these entries.
 [versions]
-agp = "9.3.2"
+agp = "9.3.3"
 # AGP 9 compiles Kotlin itself (built-in Kotlin 2.2.10); compiler plugins must use the same version.
 kotlin = "2.2.10"
 coreKtx = "1.16.0"
@@ -41,6 +41,7 @@ androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycl
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }

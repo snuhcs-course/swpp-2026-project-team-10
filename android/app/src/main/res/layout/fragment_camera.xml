@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Camera, Camera + guide, Photo saved, and the photographer's side of a session (R&S 6.2, 6.5). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -23,21 +24,60 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:background="#000000">
 
-        <!-- TODO(#3): replace with a PreviewView. -->
-        <TextView
-            android:id="@+id/previewPlaceholder"
+        <androidx.camera.view.PreviewView
+            android:id="@+id/previewView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#33333333"
-            android:gravity="center"
-            android:text="@string/camera_preview_placeholder" />
+            android:layout_height="match_parent" />
 
         <com.lastpenguin.pix.guide.GuideOverlayView
             android:id="@+id/guideOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <ProgressBar
+            android:id="@+id/cameraProgress"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:contentDescription="@string/starting_camera" />
+
+        <LinearLayout
+            android:id="@+id/cameraMessagePanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/colorSurface"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/cameraMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
+                android:gravity="center"
+                android:text="@string/camera_permission_message"
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+            <Button
+                android:id="@+id/cameraActionButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/open_settings" />
+
+            <Button
+                android:id="@+id/requestPermissionButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/allow_camera"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <!-- Shown while a subject is connected (FR-6.8). -->
         <TextView
@@ -62,13 +102,37 @@
             tools:visibility="visible" />
     </FrameLayout>
 
-    <TextView
-        android:id="@+id/zoomChips"
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/zoomChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                app:singleLine="true"
+                app:singleSelection="true" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/captureStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:accessibilityLiveRegion="polite"
         android:gravity="center"
-        android:padding="8dp"
-        android:text="@string/zoom_chips_placeholder" />
+        android:paddingHorizontal="16dp"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:visibility="gone" />
 
     <!-- Shown while a guide is on the camera (R&S 6.2, Camera + guide). -->
     <LinearLayout
@@ -129,12 +193,15 @@
             android:layout_marginHorizontal="24dp"
             android:text="@string/shutter" />
 
-        <Button
+        <ImageButton
             android:id="@+id/galleryButton"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/gallery" />
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/open_last_photo"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_photo" />
     </LinearLayout>
 
     <!-- Shown while a subject is connected (FR-6.10). -->

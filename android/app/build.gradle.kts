@@ -56,6 +56,9 @@ dependencies {
 
     // Needed by the shared contracts (interfaces, models, messages, API).
     implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
@@ -64,6 +67,7 @@ dependencies {
     // App shell: one activity, Navigation, Fragments with ViewModels (#2).
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.retrofit.kotlinx.serialization)
 
@@ -71,4 +75,5 @@ dependencies {
     // Add them here when your module starts using them.
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

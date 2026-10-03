@@ -17,16 +17,26 @@ data class CameraCapabilities(
     val zoomStops: List<Float>,
 )
 
-/** Receives camera frames for streaming. Must copy the image and close it before returning. */
+/**
+ * Receives YUV_420_888 frames on the camera's serial analysis thread, never the main thread.
+ * Copy the image (respecting its cropRect and imageInfo.rotationDegrees) and close it before returning.
+ * Do not retain the ImageProxy or its planes, or perform blocking network work here.
+ */
 fun interface FrameSink {
     fun onFrame(image: ImageProxy)
 }
+
+/** READY requires an open camera and its first analysis frame. IDLE means no active lifecycle owner. */
+enum class CameraStatus { IDLE, STARTING, READY, UNAVAILABLE }
 
 /**
  * The only owner of the camera (Design AD-4, 2.1).
  * Owner: Camera/Overlay.
  */
 interface CameraController {
+    /** Starts IDLE; binding/opening failures become UNAVAILABLE. Calling bind again retries. */
+    val status: StateFlow<CameraStatus>
+
     val capabilities: StateFlow<CameraCapabilities?>
 
     /** Zoom ratio actually applied. */
@@ -41,7 +51,10 @@ interface CameraController {
     /** Full resolution to Pictures/Pix, never with the guide (FR-1.5). */
     suspend fun takePhoto(): Result<Uri>
 
-    /** The latest frame, rotated upright. Used as the scene photo for pose generation (FR-4.1). */
+    /**
+     * Copies the latest live frame before suspending, then crops and rotates it upright (FR-4.1).
+     * Call before leaving the camera screen; the caller owns the returned bitmap.
+     */
     suspend fun grabFrame(): Result<Bitmap>
 
     /** Frames go to [sink] while it is set; null stops streaming. */

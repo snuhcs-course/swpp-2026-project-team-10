@@ -18,9 +18,12 @@ import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
+import org.webrtc.VideoFrame
+import org.webrtc.VideoSink
 
 /**
  * Subject view (R&S 6.6): the photographer's live video, fitted to the 3:4 frame, with their name and *Leave*.
@@ -31,6 +34,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private val viewModel: SubjectViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private var renderer: SurfaceViewRenderer? = null
+    private var watchdog: FrameWatchdog? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
@@ -41,8 +45,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         live.init(viewModel.video.eglContext, null)
         live.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
         live.setEnableHardwareScaler(true)
-        viewModel.video.attach(live)
+        val frames = FrameWatchdog(live)
+        viewModel.video.attach(frames)
         renderer = live
+        watchdog = frames
 
         binding.leaveButton.setOnClickListener { leaveNow() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
@@ -59,8 +65,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     }
                 }
                 launch {
-                    sessionViewModel.state.collect { state ->
-                        binding.connectingText.isVisible = state !is SessionState.Connected
+                    // "Connecting…" until the session is up, then "camera paused" whenever frames stop (Design 2.8).
+                    while (true) {
+                        val connected = sessionViewModel.state.value is SessionState.Connected
+                        val stalled = connected && frames.nanosSinceLastFrame() > STALL_NANOS
+                        binding.connectingText.isVisible = !connected || stalled
+                        binding.connectingText.setText(if (connected) R.string.camera_paused else R.string.connecting)
+                        delay(STALL_CHECK_MS)
                     }
                 }
                 launch {
@@ -71,10 +82,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onDestroyView() {
-        renderer?.let {
-            viewModel.video.detach(it)
-            it.release()
-        }
+        watchdog?.let(viewModel.video::detach)
+        watchdog = null
+        renderer?.release()
         renderer = null
         super.onDestroyView()
     }
@@ -118,5 +128,26 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     private fun backToCamera() {
         findNavController().popBackStack(R.id.cameraFragment, false)
+    }
+
+    /** Passes frames to the renderer and remembers when the last one came, to detect a paused camera. */
+    private class FrameWatchdog(private val renderer: VideoSink) : VideoSink {
+        private val createdNanos = System.nanoTime()
+
+        @Volatile
+        private var lastFrameNanos = 0L
+
+        override fun onFrame(frame: VideoFrame) {
+            lastFrameNanos = System.nanoTime()
+            renderer.onFrame(frame)
+        }
+
+        /** Since the last frame, or since the watchdog was created if none came yet. */
+        fun nanosSinceLastFrame(): Long = System.nanoTime() - maxOf(lastFrameNanos, createdNanos)
+    }
+
+    private companion object {
+        const val STALL_NANOS = 2_000_000_000L
+        const val STALL_CHECK_MS = 500L
     }
 }

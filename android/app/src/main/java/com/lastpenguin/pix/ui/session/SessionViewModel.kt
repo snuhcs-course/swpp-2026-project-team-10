@@ -1,5 +1,8 @@
 package com.lastpenguin.pix.ui.session
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
@@ -12,6 +15,7 @@ import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,10 +61,25 @@ class SessionViewModel(
     private var peerName: String? = null
     private var streaming = false
     private var connectedJob: Job? = null
+    private var backgroundJob: Job? = null
+
+    /** The whole app in the background: the camera is released by its lifecycle, so the video pauses. */
+    private val processObserver = LifecycleEventObserver { _, event ->
+        when (event) {
+            Lifecycle.Event.ON_STOP -> onAppBackground(true)
+            Lifecycle.Event.ON_START -> onAppBackground(false)
+            else -> Unit
+        }
+    }
 
     init {
         viewModelScope.launch { session.state.collect { onState(it) } }
         viewModelScope.launch { session.incoming.collect { onMessage(it) } }
+        ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
+    }
+
+    override fun onCleared() {
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(processObserver)
     }
 
     /** Photographer: *Shoot together* → a new room code, unless a room is already open or live. */
@@ -122,9 +141,27 @@ class SessionViewModel(
         }
     }
 
+    /**
+     * A live session survives the photographer's app being in the background for a while, with the subject's video
+     * paused; after [BACKGROUND_LIMIT_MS] the photographer ends it (Design 2.8, Lifecycle).
+     */
+    private fun onAppBackground(background: Boolean) {
+        backgroundJob?.cancel()
+        backgroundJob = null
+        if (!background || role != Role.PHOTOGRAPHER || state.value !is SessionState.Connected) return
+        backgroundJob = viewModelScope.launch {
+            delay(BACKGROUND_LIMIT_MS)
+            if (state.value is SessionState.Connected) session.leave(EndReason.LEFT)
+        }
+    }
+
     private fun onMessage(message: SessionMessage) {
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
         _notices.tryEmit(PeerNotice(name, message.reason))
+    }
+
+    private companion object {
+        const val BACKGROUND_LIMIT_MS = 60_000L
     }
 }

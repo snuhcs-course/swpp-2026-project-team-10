@@ -330,7 +330,10 @@ class RtcSessionManager(
 
             is PeerEvent.ChannelOpen -> {
                 openChannels += event.channel
-                if (openChannels.size == 2 && !helloSent) sendHello()
+                if (openChannels.size == 2 && !helloSent) {
+                    sendHello()
+                    drainReliable()
+                }
                 maybeConnected()
             }
 
@@ -344,15 +347,15 @@ class RtcSessionManager(
 
     // ---- Phase 3: the running session ------------------------------------------------
 
+    /** The first message on the reliable channel, ahead of anything queued while the channels were opening. */
     private fun sendHello() {
         helloSent = true
-        sendNow(
-            SessionMessage.Hello(
-                appVersion = identity.appVersion,
-                role = checkNotNull(role),
-                name = identity.name,
-            ),
+        val hello = SessionMessage.Hello(
+            appVersion = identity.appVersion,
+            role = checkNotNull(role),
+            name = identity.name,
         )
+        peer?.send(Channel.RELIABLE, codec.encode(hello))
     }
 
     /** Connected once both channels are open and the other phone said hello, which carries its name (Design 2.4). */
@@ -404,6 +407,10 @@ class RtcSessionManager(
         }
     }
 
+    /**
+     * Realtime messages go out at once or not at all. Reliable messages wait in order until hello has gone out and
+     * the channel's buffer is below the limit (Design 2.8, Backpressure).
+     */
     private fun sendNow(message: SessionMessage): Boolean {
         val client = peer ?: return false
         val text = codec.encode(message)
@@ -411,7 +418,9 @@ class RtcSessionManager(
             Channel.REALTIME -> client.send(Channel.REALTIME, text)
 
             Channel.RELIABLE -> {
-                if (reliableQueue.isNotEmpty() || client.bufferedAmount(Channel.RELIABLE) >= BACKPRESSURE_BYTES) {
+                val wait = !helloSent || reliableQueue.isNotEmpty() ||
+                    client.bufferedAmount(Channel.RELIABLE) >= BACKPRESSURE_BYTES
+                if (wait) {
                     reliableQueue.addLast(text)
                     true
                 } else {
@@ -424,6 +433,7 @@ class RtcSessionManager(
     /** Sends queued reliable messages while the channel's buffer is below the limit (Design 2.8, Backpressure). */
     private fun drainReliable() {
         val client = peer ?: return
+        if (!helloSent) return
         while (reliableQueue.isNotEmpty() && client.bufferedAmount(Channel.RELIABLE) < BACKPRESSURE_BYTES) {
             client.send(Channel.RELIABLE, reliableQueue.removeFirst())
         }

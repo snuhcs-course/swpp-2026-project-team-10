@@ -125,10 +125,16 @@ class RtcSessionManagerTest {
             },
         )
 
+        // A reliable message sent before the channels open waits, and goes out right after hello.
+        manager.send(SessionMessage.GuideClear)
+        runCurrent()
+        assertTrue(peer.sent.isEmpty())
+
         peer.open()
         runCurrent()
-        val hello = peer.sentMessages().single() as SessionMessage.Hello
-        assertEquals(Channel.RELIABLE, peer.sent.single().first)
+        assertEquals(listOf("hello", "guide.clear"), peer.sentTypes())
+        val hello = peer.sentMessages().first() as SessionMessage.Hello
+        assertEquals(Channel.RELIABLE, peer.sent.first().first)
         assertEquals("Dongje", hello.name)
         assertEquals(Role.PHOTOGRAPHER, hello.role)
         assertEquals(SessionState.Connecting("s_1"), manager.state.value)

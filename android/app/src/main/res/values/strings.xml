@@ -14,8 +14,12 @@
 
     <!-- Flow 1: Camera -->
     <string name="shoot_together">Shoot together</string>
-    <string name="camera_preview_placeholder">Camera preview (#3)</string>
-    <string name="zoom_chips_placeholder">Zoom chips (#3)</string>
+    <string name="camera_permission_message">Pix needs the camera to show the preview and take photos.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="zoom_chip">%1$s×</string>
+    <string name="photo_saved">Saved without the guide</string>
+    <string name="photo_save_failed">Couldn\'t save the photo. Free up storage and try again.</string>
+    <string name="no_gallery_app">No app can open the photo.</string>
     <string name="hint_add_guide">Tap Guide to add a pose</string>
     <string name="guide">Guide</string>
     <string name="shutter">Shutter</string>

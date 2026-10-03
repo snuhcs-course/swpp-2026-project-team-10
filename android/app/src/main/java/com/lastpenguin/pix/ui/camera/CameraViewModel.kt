@@ -4,13 +4,19 @@ import android.net.Uri
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /** Everything the Camera screen shows (R&S 6.2: Camera, Camera + guide, Photo saved). */
 data class CameraUiState(
@@ -20,9 +26,14 @@ data class CameraUiState(
     val guideState: GuideState = GuideState(),
     /** The last saved photo, for the thumbnail and "Saved without the guide". */
     val lastPhoto: Uri? = null,
-    /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
-    val notice: String? = null,
 )
+
+/** A short, one-time notice on the Camera screen (FR-1.6, FR-1.7; remote actions come from #10, FR-7.4). */
+sealed interface CameraNotice {
+    data object PhotoSaved : CameraNotice
+
+    data class SaveFailed(val message: String?) : CameraNotice
+}
 
 /**
  * Camera screen (Design 2.2, Figure 6).
@@ -36,16 +47,36 @@ class CameraViewModel(
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
 
+    private val _notices = MutableSharedFlow<CameraNotice>(extraBufferCapacity = 8)
+    val notices: SharedFlow<CameraNotice> = _notices.asSharedFlow()
+
+    init {
+        viewModelScope.launch {
+            camera.capabilities.collect { caps -> _uiState.update { it.copy(zoomStops = caps?.zoomStops.orEmpty()) } }
+        }
+        viewModelScope.launch {
+            camera.zoom.collect { zoom -> _uiState.update { it.copy(zoom = zoom) } }
+        }
+        // TODO(#6): guides.guide and guides.state → uiState.guide and guideState.
+    }
+
     fun bindCamera(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
-        // TODO(#3): camera.bind(owner, surfaceProvider).
+        camera.bind(owner, surfaceProvider)
     }
 
     fun onShutter() {
-        // TODO(#3): camera.takePhoto(), then update lastPhoto.
+        viewModelScope.launch {
+            camera.takePhoto()
+                .onSuccess { uri ->
+                    _uiState.update { it.copy(lastPhoto = uri) }
+                    _notices.tryEmit(CameraNotice.PhotoSaved)
+                }
+                .onFailure { _notices.tryEmit(CameraNotice.SaveFailed(it.message)) }
+        }
     }
 
     fun onZoomChip(ratio: Float) {
-        // TODO(#3): camera.setZoom(ratio).
+        camera.setZoom(ratio)
     }
 
     /** From GuideOverlayView.onGesture. */

@@ -1,10 +1,8 @@
 package com.lastpenguin.pix.ui.session
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
-import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -28,8 +26,9 @@ data class PeerNotice(val name: String, val reason: EndReason)
  * Starts, joins, and ends a room-code session (R&S 6.7, Design 2.4). Shared by the session screens
  * and the Camera screen's live badge (activity scope).
  *
- * While the photographer is connected, the camera's frames go to the session and the camera's capabilities
- * are sent to the subject. Guide sync (#9) and remote zoom (#10) hook in at the same place.
+ * On the photographer's phone, camera frames go to the session from the moment a subject starts connecting,
+ * and the camera's capabilities are sent once the data channels are up. Guide sync (#9) and remote zoom (#10)
+ * hook in at the same place.
  *
  * Owner: Real-time (#8), with guide sync (#9) and remote zoom (#10).
  */
@@ -54,9 +53,10 @@ class SessionViewModel(
     var lastCode: String? = null
         private set
 
+    private var role: Role? = null
     private var peerName: String? = null
     private var streaming = false
-    private var capabilitiesJob: Job? = null
+    private var connectedJob: Job? = null
 
     init {
         viewModelScope.launch { session.state.collect { onState(it) } }
@@ -71,6 +71,7 @@ class SessionViewModel(
         ) {
             return
         }
+        role = Role.PHOTOGRAPHER
         viewModelScope.launch { session.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER) }
     }
 
@@ -82,6 +83,7 @@ class SessionViewModel(
     /** Subject: *Join* with 6 digits. */
     fun joinRoom(code: String) {
         lastCode = code
+        role = Role.SUBJECT
         viewModelScope.launch { session.start(SessionEntry.RoomCode(code), Role.SUBJECT) }
     }
 
@@ -99,37 +101,24 @@ class SessionViewModel(
         _transitions.tryEmit(state)
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
-        val photographerLive = connected?.role == Role.PHOTOGRAPHER
-        if (photographerLive && !streaming) {
-            startStreaming()
-        } else if (!photographerLive && streaming) {
-            stopStreaming()
+
+        // Frames start while the peer connection is still being set up, so the first video arrives sooner.
+        val streamingNow = role == Role.PHOTOGRAPHER && (state is SessionState.Connecting || connected != null)
+        if (streamingNow && !streaming) camera.setFrameSink(session.videoSink())
+        if (!streamingNow && streaming) camera.setFrameSink(null)
+        streaming = streamingNow
+
+        val liveNow = connected?.role == Role.PHOTOGRAPHER
+        if (liveNow && connectedJob == null) {
+            connectedJob = viewModelScope.launch {
+                camera.capabilities.filterNotNull().collect { session.send(SessionMessage.Capabilities(it)) }
+            }
+            // TODO(#9): guideSyncer.startAsSender(...) while connected.
+            // TODO(#10): session.incoming → remoteControl.handle while connected.
         }
-    }
-
-    private fun startStreaming() {
-        streaming = true
-        setFrameSink(session.videoSink())
-        capabilitiesJob = viewModelScope.launch {
-            camera.capabilities.filterNotNull().collect { session.send(SessionMessage.Capabilities(it)) }
-        }
-        // TODO(#9): guideSyncer.startAsSender(...) while connected.
-        // TODO(#10): session.incoming → remoteControl.handle while connected.
-    }
-
-    private fun stopStreaming() {
-        streaming = false
-        capabilitiesJob?.cancel()
-        capabilitiesJob = null
-        setFrameSink(null)
-    }
-
-    private fun setFrameSink(sink: FrameSink?) {
-        try {
-            camera.setFrameSink(sink)
-        } catch (e: NotImplementedError) {
-            // Until the camera module (#3) lands, a session runs without video frames.
-            Log.w(TAG, "No camera frames yet: ${e.message}")
+        if (!liveNow) {
+            connectedJob?.cancel()
+            connectedJob = null
         }
     }
 
@@ -137,9 +126,5 @@ class SessionViewModel(
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
         _notices.tryEmit(PeerNotice(name, message.reason))
-    }
-
-    private companion object {
-        const val TAG = "PixSession"
     }
 }

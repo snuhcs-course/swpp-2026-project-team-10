@@ -3,6 +3,7 @@ package com.lastpenguin.pix.session
 import android.graphics.ImageFormat
 import androidx.camera.core.ImageProxy
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.core.Timings
 import java.util.concurrent.ArrayBlockingQueue
 import org.webrtc.CapturerObserver
 import org.webrtc.NV21Buffer
@@ -22,6 +23,7 @@ class CameraFrameSource(private val clock: () -> Long = System::nanoTime) : Fram
     var observer: CapturerObserver? = null
 
     private val pool = ArrayBlockingQueue<ByteArray>(POOL_SIZE)
+    private var frames = 0L
 
     override fun onFrame(image: ImageProxy) {
         try {
@@ -51,6 +53,13 @@ class CameraFrameSource(private val clock: () -> Long = System::nanoTime) : Fram
             val frame = VideoFrame(buffer, image.imageInfo.rotationDegrees, clock())
             observer.onFrameCaptured(frame)
             frame.release()
+            if (++frames == 1L || frames % LOG_EVERY == 0L) {
+                val rotation = image.imageInfo.rotationDegrees
+                Timings.mark(
+                    "frames",
+                    "n=$frames ${width}x$height crop=${crop.width()}x${crop.height()} rotation=$rotation",
+                )
+            }
         } finally {
             image.close()
         }
@@ -60,5 +69,6 @@ class CameraFrameSource(private val clock: () -> Long = System::nanoTime) : Fram
 
     private companion object {
         const val POOL_SIZE = 3
+        const val LOG_EVERY = 300L
     }
 }

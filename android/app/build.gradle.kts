@@ -69,6 +69,11 @@ dependencies {
 
     // Needed by the shared contracts (interfaces, models, messages, API).
     implementation(libs.androidx.camera.core)
+
+    // Camera (#3): CameraX on camera2, bound to the lifecycle, PreviewView.
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)

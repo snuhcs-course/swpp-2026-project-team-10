@@ -1,7 +1,6 @@
 """Compare image-editing models on OpenRouter for pose generation (Design Documentation 2.6.3).
 
-Standalone: it does not import pix_server and carries its own dependencies, so run it through uv
-from server/ with OPENROUTER_API_KEY set:
+It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY set:
 
     uv run scripts/compare_image_edit_apis.py scene1.jpg scene2.jpg
     uv run scripts/compare_image_edit_apis.py scene.jpg --models openai/gpt-image-2@low qwen/qwen-image-3

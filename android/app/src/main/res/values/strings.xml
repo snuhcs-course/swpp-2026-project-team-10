@@ -24,6 +24,9 @@
     <string name="pinch_to_zoom">Pinch to zoom</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
+    <string name="camera_grid_description">Camera composition grid</string>
+    <string name="camera_level_aligned">Camera is level</string>
+    <string name="camera_level_tilted">Tilt camera to align the center bar with the horizontal markers</string>
     <string name="saving_photo">Saving…</string>
     <string name="photo_saved">Saved without the guide</string>
     <string name="photo_save_failed">Couldn\'t take or save the photo. Please try again.</string>

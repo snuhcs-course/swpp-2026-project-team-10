@@ -858,6 +858,8 @@ view  → frame:  cx = (x − ox) / (W · s)      cy = (y − oy) / (H · s)
 guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 ```
 
+**Photographer composition aids (FR-1.9–1.10).** `CameraCompositionView` uses this same fit-centered image rectangle to draw lines at one-third and two-thirds in each direction. A short horizon bar is centered in the middle cell, with fixed horizontal end markers and a middle segment that counter-rotates with device roll. `CameraLevelMonitor` reads the gravity sensor, falling back to the accelerometer, while the view is resumed. It smooths gravity vectors before computing the screen-relative angle; level enters within ±2° and exits beyond ±3°. When level, the bar aligns horizontally and turns dark yellow (`#D4AC24`). Invalid sensor readings or an almost face-up/down phone hide the bar. These are non-interactive local View overlays and do not enter photos, analysis frames, or the WebRTC stream. Photographer zoom uses continuous preview pinch and an applied-ratio readout; the subject's remote zoom chips continue to use `CameraCapabilities.zoomStops`.
+
 **Gestures.** The photographer's pan and zoom deltas are converted with *view → frame* and applied to `GuideState`. `height` is limited to 0.21–2.1, and `cx`, `cy` are limited so that at least 20% of the guide's width and height stay inside the frame (FR-3.2, FR-3.3). Because only frame coordinates are sent, the subject's phone places the guide on the same part of the image regardless of its screen size (FR-3.7, NFR-8).
 
 #### 2.6.3 Pose generation

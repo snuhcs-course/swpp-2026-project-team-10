@@ -36,6 +36,16 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
+        <com.lastpenguin.pix.ui.camera.CameraCompositionView
+            android:id="@+id/compositionOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="yes"
+            android:visibility="invisible"
+            tools:visibility="visible" />
+
         <ProgressBar
             android:id="@+id/cameraProgress"
             android:layout_width="48dp"

@@ -18,6 +18,8 @@ The camera screen requests camera permission, shows a rear-camera preview, suppo
 
 Camera UI state observes the camera's applied zoom, rather than assuming requested zoom succeeded, so remote zoom can use the same controller. The guide and session implementations remain in their owners' issues.
 
+The photographer's viewfinder has a thin 3×3 grid fitted to the actual 3:4 image, excluding letterbox bars. All nine cells have the same width and height. A horizon bar sits at the center of the middle cell: its middle segment counter-rotates with device roll, while two fixed end markers show the horizontal target. Within ±2° it aligns and turns dark yellow (`#D4AC24`); it leaves that state beyond ±3° to avoid flickering. A smoothed gravity sensor (accelerometer fallback) drives the bar only while the screen is resumed. With no usable sensor or when the phone points almost straight up/down, only the grid remains. These aids do not consume pinch/guide gestures and are absent from saved photos and streamed video.
+
 #### Camera verification
 
 Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`. On a phone or camera-enabled emulator, check:
@@ -27,6 +29,7 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 3. Tap the shutter repeatedly while saving: one capture should be in flight, followed by a Pix album image, a new thumbnail, and “Saved without the guide.” Open the thumbnail.
 4. Open/close the guide and room-code sheets, open the gallery, background/foreground the app, and return from a full-screen destination; the camera should resume.
 5. On the S22 and S23 Ultra, compare preview, saved image, and `grabFrame()` framing/rotation. Verify file-write/camera failures keep the shutter usable for retry.
+6. Check that the grid divides only the camera image into equal thirds, including after a save message changes the preview area. Tilt the phone left/right: the center bar should rotate, then align in dark yellow near level. Point it straight down/up: the ambiguous level bar should disappear. Confirm pinch still works through the grid, photos omit the aids, and the bar resumes after returning from the gallery.
 
 `PixTimings` logcat events include `app.start`, `camera.preview`, and camera capture events. Emulator smoke checks do not establish real-device resolution, startup latency, or frame rate.
 

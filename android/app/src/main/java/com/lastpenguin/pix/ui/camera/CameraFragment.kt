@@ -21,7 +21,9 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
@@ -77,6 +79,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         setupPinchZoom(controls.previewView)
         setupZoomAccessibility(controls.zoomRatio)
+        setupCompositionLevel(controls.compositionOverlay)
         controls.cameraActionButton.setOnClickListener {
             if (hasCameraPermission()) {
                 bindCamera()
@@ -245,11 +248,31 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         ) { _, _ -> adjust(1f / 1.1f) }
     }
 
+    private fun setupCompositionLevel(overlay: CameraCompositionView) {
+        // This is a view-scoped sensor adapter, like ScaleGestureDetector, not shared camera state.
+        val monitor = CameraLevelMonitor(requireContext())
+        viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
+                monitor.start(overlay::setLevel)
+            }
+
+            override fun onPause(owner: LifecycleOwner) {
+                monitor.stop()
+                overlay.setLevel(null)
+            }
+
+            override fun onDestroy(owner: LifecycleOwner) {
+                monitor.stop()
+            }
+        })
+    }
+
     private fun render(state: CameraUiState) {
         val controls = binding ?: return
         val granted = hasCameraPermission()
         val ready = granted && state.cameraStatus == CameraStatus.READY
         val unavailable = state.cameraStatus == CameraStatus.UNAVAILABLE
+        controls.compositionOverlay.isVisible = ready
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)

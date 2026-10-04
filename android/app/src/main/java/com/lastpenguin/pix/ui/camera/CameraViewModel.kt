@@ -117,7 +117,12 @@ class CameraViewModel(
     }
 
     fun onZoomChanged(ratio: Float) {
-        if (camera.status.value == CameraStatus.READY && ratio.isFinite()) camera.setZoom(ratio)
+        val status = camera.status.value
+        if ((status == CameraStatus.READY || status == CameraStatus.STARTING) &&
+            camera.capabilities.value != null && ratio.isFinite()
+        ) {
+            camera.setZoom(ratio)
+        }
     }
 
     /** From GuideOverlayView.onGesture. */

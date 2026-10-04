@@ -129,7 +129,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 |---|---|---|---|
 | FR-1.1 | Pix opens directly to the rear-camera preview. No sign-in, menu, or splash screen comes before it. | Must | It 1 |
 | FR-1.2 | On first launch Pix asks for camera permission. If it is denied, Pix explains why the camera is needed and shows a button that opens the system settings. | Must | It 1 |
-| FR-1.3 | The camera screen has a shutter button and continuous two-finger pinch zoom within the phone's supported range. The currently applied zoom is displayed, and accessibility actions allow zooming in and out. | Must | It 1 |
+| FR-1.3 | The camera screen has a shutter button and continuous two-finger pinch zoom within the phone's supported range, including 0.5× when the phone exposes that capability. The actual hardware minimum applies otherwise (for example 0.6× or 1×). Zoom is relative to the primary rear camera across lens switches. The currently applied zoom is displayed, and accessibility actions allow zooming in and out. | Must | It 1 |
 | FR-1.4 | Tapping the preview focuses and sets exposure at that point. | Should | It 2 |
 | FR-1.5 | Photos are saved at the camera's full resolution to a "Pix" album in the gallery. No guide or on-screen control is included. | Must | It 1 |
 | FR-1.6 | After saving, "Saved without the guide" appears and the thumbnail updates. Tapping the thumbnail opens the photo in the gallery. | Must | It 1 |

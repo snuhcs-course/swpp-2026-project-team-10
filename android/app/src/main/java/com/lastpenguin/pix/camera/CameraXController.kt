@@ -68,6 +68,10 @@ class CameraXController(
     // CameraX resets ZoomState when its lifecycle stops. Preserve only a successfully applied
     // request separately, so that the reset is still published without replacing the user's framing.
     private var retainedZoom = 1f
+    private var pendingZoom: Float? = null
+    private var zoomPlan: CameraZoomPlan? = null
+    private var primarySelector = CameraSelector.DEFAULT_BACK_CAMERA
+    private var ultrawideSelector: CameraSelector? = null
 
     override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
         mainExecutor.execute {
@@ -82,52 +86,90 @@ class CameraXController(
                 return@execute
             }
             releaseBinding()
-            val current = Binding(owner, surfaceProvider)
-            binding = current
-            current.lifecycleObserver = LifecycleEventObserver { _, event ->
-                if (binding !== current) return@LifecycleEventObserver
-                when (event) {
-                    Lifecycle.Event.ON_STOP -> {
-                        current.active = false
-                        current.open = false
-                        current.restoreZoomOnOpen = true
-                        current.restoringZoom = false
-                        current.zoomRequestId++
-                        current.frames.clear()
-                        refreshStatus(current)
-                    }
+            startBinding(owner, surfaceProvider)
+        }
+    }
 
-                    Lifecycle.Event.ON_DESTROY -> releaseBinding()
-
-                    Lifecycle.Event.ON_START -> {
-                        current.active = true
-                        restoreZoomIfNeeded(current)
-                        refreshStatus(current)
-                    }
-
-                    else -> Unit
+    private fun startBinding(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
+        val current = Binding(owner, surfaceProvider)
+        binding = current
+        current.lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (binding !== current) return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    current.active = false
+                    current.open = false
+                    current.restoreZoomOnOpen = true
+                    current.restoringZoom = false
+                    current.zoomRequestId++
+                    pendingZoom = null
+                    current.frames.clear()
+                    refreshStatus(current)
                 }
-            }
-            owner.lifecycle.addObserver(current.lifecycleObserver!!)
-            refreshStatus(current)
-            try {
-                val future = ProcessCameraProvider.getInstance(context)
-                future.addListener({
-                    if (binding !== current || owner.lifecycle.currentState == Lifecycle.State.DESTROYED) {
-                        return@addListener
-                    }
-                    try {
-                        val cameraProvider = future.get()
-                        provider = cameraProvider
-                        bindUseCases(cameraProvider, current, current.surfaceProvider)
-                    } catch (error: Exception) {
-                        failBinding(current, error)
-                    }
-                }, mainExecutor)
-            } catch (error: Exception) {
-                failBinding(current, error)
+
+                Lifecycle.Event.ON_DESTROY -> releaseBinding()
+
+                Lifecycle.Event.ON_START -> {
+                    current.active = true
+                    restoreZoomIfNeeded(current)
+                    refreshStatus(current)
+                }
+
+                else -> Unit
             }
         }
+        owner.lifecycle.addObserver(current.lifecycleObserver!!)
+        refreshStatus(current)
+        try {
+            val future = ProcessCameraProvider.getInstance(context)
+            future.addListener({
+                if (binding !== current || owner.lifecycle.currentState == Lifecycle.State.DESTROYED) {
+                    return@addListener
+                }
+                try {
+                    val cameraProvider = future.get()
+                    provider = cameraProvider
+                    if (zoomPlan == null) discoverZoomPlan(cameraProvider)
+                    val plan = checkNotNull(zoomPlan)
+                    current.lens = plan.lensFor(plan.clamp(pendingZoom ?: retainedZoom)!!)
+                    current.range = plan.rangeFor(current.lens)
+                    bindUseCases(cameraProvider, current, current.surfaceProvider)
+                } catch (error: Exception) {
+                    failBinding(current, error)
+                }
+            }, mainExecutor)
+        } catch (error: Exception) {
+            failBinding(current, error)
+        }
+    }
+
+    private fun discoverZoomPlan(cameraProvider: ProcessCameraProvider) {
+        val infos = cameraProvider.availableCameraInfos
+        val primary = CameraSelector.DEFAULT_BACK_CAMERA.filter(infos).firstOrNull()
+            ?: error("No rear camera is available")
+        primarySelector = primary.cameraSelector
+        val primaryState = checkNotNull(primary.zoomState.value) { "Rear camera has no zoom range" }
+        val primaryRange = checkNotNull(LensZoomRange.create(1f, primaryState.minZoomRatio, primaryState.maxZoomRatio))
+        // A logical camera may already expose zoom-out. Prefer that route wherever supported;
+        // otherwise use only independently selectable rear lenses, never nested physicalCameraInfos.
+        val ultrawide = infos.mapNotNull { info ->
+            try {
+                if (info === primary || info.lensFacing != CameraSelector.LENS_FACING_BACK) return@mapNotNull null
+                val intrinsic = info.intrinsicZoomRatio
+                if (intrinsic >= 1f) return@mapNotNull null
+                val state = info.zoomState.value ?: return@mapNotNull null
+                val range = LensZoomRange.create(intrinsic, state.minZoomRatio, state.maxZoomRatio)
+                    ?: return@mapNotNull null
+                if (CameraZoomPlan(primaryRange, range).ultrawide == null) return@mapNotNull null
+                info.cameraSelector to range
+            } catch (error: Exception) {
+                Log.w(TAG, "Ignoring unavailable ultrawide camera", error)
+                null
+            }
+        }.minByOrNull { it.second.minZoom }
+        ultrawideSelector = ultrawide?.first
+        zoomPlan = CameraZoomPlan(primaryRange, ultrawide?.second)
+        publishCapabilities()
     }
 
     private fun bindUseCases(
@@ -135,7 +177,6 @@ class CameraXController(
         current: Binding,
         surfaceProvider: Preview.SurfaceProvider,
     ) {
-        check(cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) { "No rear camera is available" }
         // Pix is portrait-only. All outputs describe the same 3:4 field of view (AD-10).
         val rotation = Surface.ROTATION_0
         val aspect = AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
@@ -181,10 +222,11 @@ class CameraXController(
             .addUseCase(capture)
             .addUseCase(analysis)
             .build()
-        val camera = cameraProvider.bindToLifecycle(current.owner, CameraSelector.DEFAULT_BACK_CAMERA, group)
+        val selector = if (current.lens == ZoomLens.PRIMARY) primarySelector else checkNotNull(ultrawideSelector)
+        val camera = cameraProvider.bindToLifecycle(current.owner, selector, group)
         current.camera = camera
         current.zoomObserver = Observer { state ->
-            if (binding === current) publishZoom(state)
+            if (binding === current) publishZoom(current, state)
         }
         camera.cameraInfo.zoomState.observe(current.owner, current.zoomObserver!!)
         current.stateObserver = Observer { state ->
@@ -201,7 +243,10 @@ class CameraXController(
                 // Keep retry/settings guidance visible while waiting; a later OPEN recovers automatically.
                 current.failed = state.error != null || state.type == CameraState.Type.PENDING_OPEN
                 if (!current.open || current.failed) current.frames.clear()
-                state.error?.let { Log.w(TAG, "Camera state error ${it.code}", it.cause) }
+                state.error?.let {
+                    Log.w(TAG, "Camera state error ${it.code}", it.cause)
+                    if (recoverPrimary(current)) return@Observer
+                }
                 restoreZoomIfNeeded(current)
                 refreshStatus(current)
             }
@@ -212,33 +257,68 @@ class CameraXController(
     override fun setZoom(ratio: Float) {
         mainExecutor.execute {
             val current = binding ?: return@execute
-            val range = _capabilities.value ?: return@execute
-            val requested = clampedCameraZoom(ratio, range.minZoom, range.maxZoom) ?: return@execute
-            if (_status.value != CameraStatus.READY) return@execute
+            val requested = zoomPlan?.clamp(ratio) ?: return@execute
+            if (!current.active || current.failed) return@execute
+            // Keep the latest gesture delta while a lens opens or a photo finishes saving.
+            pendingZoom = requested
+            drainZoom(current)
+        }
+    }
+
+    private fun drainZoom(current: Binding) {
+        if (binding !== current || _status.value != CameraStatus.READY || current.capturesInFlight > 0) return
+        val requested = pendingZoom ?: return
+        val plan = zoomPlan ?: return
+        if (plan.lensFor(requested) != current.lens) {
+            switchLens(current)
+        } else {
+            pendingZoom = null
             applyZoom(current, requested)
         }
+    }
+
+    private fun switchLens(current: Binding) {
+        if (binding !== current) return
+        // Invalidate old callbacks, but retain the combined range and the latest pinch target.
+        releaseBinding(preserveZoomPlan = true)
+        startBinding(current.owner, current.surfaceProvider)
     }
 
     private fun restoreZoomIfNeeded(current: Binding) {
         if (!current.active || !current.open || current.failed || !current.restoreZoomOnOpen) return
         val state = current.camera?.cameraInfo?.zoomState?.value ?: return
-        val requested = retainedZoom.coerceIn(state.minZoomRatio, state.maxZoomRatio)
+        val range = current.range ?: return
+        val plan = zoomPlan ?: return
+        val requested = plan.clamp(pendingZoom ?: retainedZoom)!!
         current.restoreZoomOnOpen = false
-        if (state.zoomRatio == requested) return
+        if (plan.lensFor(requested) != current.lens) {
+            // A reversal or lifecycle stop can leave the new binding on the wrong lens. Queue
+            // the correct one without overwriting retained framing with a temporary clamped ratio.
+            pendingZoom = requested
+            return
+        }
+        pendingZoom = null
+        val native = range.nativeZoom(requested)
+        if (state.zoomRatio == native) {
+            retainedZoom = range.appZoom(state.zoomRatio)
+            return
+        }
         current.restoringZoom = true
-        applyZoom(current, requested)
+        applyZoom(current, range.appZoom(native))
     }
 
     private fun applyZoom(current: Binding, requested: Float) {
         val camera = current.camera ?: return
+        val range = current.range ?: return
         val requestId = ++current.zoomRequestId
         val restoring = current.restoringZoom
         val future = try {
-            camera.cameraControl.setZoomRatio(requested)
+            camera.cameraControl.setZoomRatio(range.nativeZoom(requested))
         } catch (error: Exception) {
             current.restoringZoom = false
             if (restoring) current.failed = true
             Log.w(TAG, "Zoom request could not start", error)
+            if (restoring && recoverPrimary(current)) return
             refreshStatus(current)
             return
         }
@@ -246,9 +326,9 @@ class CameraXController(
             if (binding !== current || current.zoomRequestId != requestId) return@addListener
             try {
                 future.get()
-                // Successful completion confirms this ratio was applied. A reset to 1x delivered
-                // by the lifecycle's ZoomState observer must never replace this retained value.
+                // Ratios remain relative to the primary camera across lens changes and lifecycle resets.
                 retainedZoom = requested
+                if (restoring) current.frames.clear()
             } catch (_: CancellationException) {
                 // A newer gesture or unbind supersedes the previous request.
                 if (restoring) current.failed = true
@@ -257,18 +337,28 @@ class CameraXController(
                 Log.w(TAG, "Zoom request was not applied", error)
             }
             current.restoringZoom = false
-            // Never echo the retained/requested value: CameraX's observed zoom is authoritative.
-            camera.cameraInfo.zoomState.value?.let(::publishZoom)
+            if (current.failed && recoverPrimary(current)) return@addListener
+            // Never echo a requested value: normalize only CameraX's observed zoom.
+            camera.cameraInfo.zoomState.value?.let { publishZoom(current, it) }
             refreshStatus(current)
         }, mainExecutor)
     }
 
     override suspend fun takePhoto(): Result<Uri> = withContext(Dispatchers.Main.immediate) {
-        val capture = binding?.capture
+        val current = binding
+        val capture = current?.capture
         if (_status.value != CameraStatus.READY || capture == null) {
             return@withContext Result.failure(IllegalStateException("The camera is not ready"))
         }
         suspendCancellableCoroutine { continuation ->
+            current.capturesInFlight++
+            var finished = false
+            fun finishCapture() {
+                if (finished) return
+                finished = true
+                current.capturesInFlight--
+                drainZoom(current)
+            }
             try {
                 Timings.mark("camera.capture.start")
                 capture.takePicture(
@@ -283,17 +373,20 @@ class CameraXController(
                             } else {
                                 Timings.mark("camera.capture.failed", "missing_uri")
                             }
+                            finishCapture()
                             if (continuation.isActive) continuation.resume(result)
                         }
 
                         override fun onError(exception: ImageCaptureException) {
                             Timings.mark("camera.capture.failed", "code=${exception.imageCaptureError}")
+                            finishCapture()
                             if (continuation.isActive) continuation.resume(Result.failure(exception))
                         }
                     },
                 )
             } catch (error: Exception) {
                 Timings.mark("camera.capture.failed", error.javaClass.simpleName)
+                finishCapture()
                 if (continuation.isActive) continuation.resume(Result.failure(error))
             }
             // CameraX cannot cancel a dispatched save; a cancelled caller must not receive a late callback.
@@ -329,7 +422,7 @@ class CameraXController(
                 return
             }
             if (_status.value != CameraStatus.READY) mainExecutor.execute { refreshStatus(current) }
-            frameSink?.onFrame(frame)
+            if (binding === current && _status.value == CameraStatus.READY) frameSink?.onFrame(frame)
         } catch (error: Exception) {
             Log.e(TAG, "Could not process camera frame", error)
         } finally {
@@ -337,13 +430,14 @@ class CameraXController(
         }
     }
 
-    private fun publishZoom(state: ZoomState) {
-        _capabilities.value = CameraCapabilities(
-            state.minZoomRatio,
-            state.maxZoomRatio,
-            cameraZoomStops(state.minZoomRatio, state.maxZoomRatio),
-        )
-        _zoom.value = state.zoomRatio
+    private fun publishCapabilities() {
+        val plan = zoomPlan ?: return
+        _capabilities.value =
+            CameraCapabilities(plan.minZoom, plan.maxZoom, cameraZoomStops(plan.minZoom, plan.maxZoom))
+    }
+
+    private fun publishZoom(current: Binding, state: ZoomState) {
+        _zoom.value = current.range?.appZoom(state.zoomRatio) ?: return
     }
 
     private fun refreshStatus(current: Binding) {
@@ -355,22 +449,41 @@ class CameraXController(
             current.open && current.frames.hasFrame() -> CameraStatus.READY
             else -> CameraStatus.STARTING
         }
+        drainZoom(current)
     }
 
     private fun failBinding(current: Binding, error: Exception) {
         if (binding !== current) return
         Log.e(TAG, "Could not bind rear camera", error)
+        if (recoverPrimary(current)) return
         releaseBinding()
         _status.value = CameraStatus.UNAVAILABLE
     }
 
+    private fun recoverPrimary(current: Binding): Boolean {
+        val plan = zoomPlan ?: return false
+        if (binding !== current || current.lens != ZoomLens.ULTRAWIDE || plan.ultrawide == null) return false
+        Log.w(TAG, "Ultrawide unavailable; restoring the primary camera")
+        zoomPlan = CameraZoomPlan(plan.primary)
+        ultrawideSelector = null
+        pendingZoom = zoomPlan!!.clamp(pendingZoom ?: retainedZoom)
+        publishCapabilities()
+        switchLens(current)
+        return true
+    }
+
     /** Main thread only. Unbind just our three use cases; do not reset the process-wide provider. */
-    private fun releaseBinding() {
+    private fun releaseBinding(preserveZoomPlan: Boolean = false) {
         val current = binding ?: return
         binding = null
         current.active = false
-        _status.value = CameraStatus.IDLE
-        _capabilities.value = null
+        _status.value = if (preserveZoomPlan) CameraStatus.STARTING else CameraStatus.IDLE
+        if (!preserveZoomPlan) {
+            _capabilities.value = null
+            zoomPlan = null
+            ultrawideSelector = null
+            pendingZoom = null
+        }
         current.lifecycleObserver?.let { current.owner.lifecycle.removeObserver(it) }
         current.zoomObserver?.let { current.camera?.cameraInfo?.zoomState?.removeObserver(it) }
         current.stateObserver?.let { current.camera?.cameraInfo?.cameraState?.removeObserver(it) }
@@ -393,6 +506,9 @@ class CameraXController(
         var analysis: ImageAnalysis? = null
         var executor: ExecutorService? = null
         var camera: Camera? = null
+        var lens = ZoomLens.PRIMARY
+        var range: LensZoomRange? = null
+        var capturesInFlight = 0
         var lifecycleObserver: LifecycleEventObserver? = null
         var zoomObserver: Observer<ZoomState>? = null
         var stateObserver: Observer<CameraState>? = null

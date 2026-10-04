@@ -242,9 +242,9 @@ These interfaces are the contracts between owners. Each owner starts with a fake
 ```kotlin
 interface CameraController {
     val capabilities: StateFlow<CameraCapabilities?>
-    val zoom: StateFlow<Float>                        // zoom ratio actually applied
+    val zoom: StateFlow<Float>                        // applied ratio relative to primary rear camera
     fun bind(owner: LifecycleOwner, surface: Preview.SurfaceProvider)
-    fun setZoom(ratio: Float)                          // clamped to [minZoom, maxZoom]
+    fun setZoom(ratio: Float)                          // primary-relative, clamped to [minZoom, maxZoom]
     suspend fun takePhoto(): Result<Uri>               // full resolution, Pictures/Pix, no overlay
     suspend fun grabFrame(): Result<Bitmap>            // latest frame, upright: the scene photo (FR-4.1)
     fun setFrameSink(sink: FrameSink?)                 // null stops streaming frames
@@ -289,7 +289,7 @@ classDiagram
   class CameraViewModel {
     +uiState StateFlow~CameraUiState~
     +onShutter()
-    +onZoomChip(ratio)
+    +onZoomChanged(ratio)
     +onGuideGesture(pan, zoom, final)
   }
   class CameraController {
@@ -474,8 +474,8 @@ data class GuideState(            // everything needed to place the guide, in fr
 
 // ---- Camera ---------------------------------------------------------------
 data class CameraCapabilities(
-    val minZoom: Float, val maxZoom: Float,
-    val zoomStops: List<Float>,   // chips shown to both users, e.g. [0.6, 1, 2, 3] within [min, max]
+    val minZoom: Float, val maxZoom: Float, // relative to the primary rear camera's 1x
+    val zoomStops: List<Float>,   // subject chips: [0.5, 0.6, 1, 2, 3] filtered to [min, max]
 )
 
 // ---- Session --------------------------------------------------------------
@@ -903,7 +903,8 @@ Ten other model configurations were screened with one image each and left out, a
 
 #### 2.6.5 Remote control
 
-- **Zoom.** The subject's chip selection is shown immediately (optimistic) and sent as `camera.zoom.set`. The photographer clamps the value, calls `CameraControl.setZoomRatio`, and echoes `camera.state`, and the subject then snaps to the echoed value. The zoom stops come from the camera's `ZoomState` range: 0.6 only if `minZoom` is below 1, and 2 and 3 only if they are within `maxZoom`.
+- **Zoom.** The subject's chip selection is shown immediately (optimistic) and sent as `camera.zoom.set`. The photographer clamps the request to the advertised range, applies it through the shared camera controller, and echoes the observed `camera.state`; the subject then snaps to the echoed value. Capabilities, requests, and echoed zoom all use the primary rear camera's 1× as their reference. The subject's stops are `[0.5, 0.6, 1, 2, 3]` filtered to that range; the photographer uses continuous pinch with an applied-ratio readout.
+- **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing it. The minimum follows hardware capabilities, such as 0.5×, 0.6×, or 1×; no unsupported 0.5× capability is inferred. Lens switches may briefly pause preview while the same 3:4 use-case group rebinds. An ongoing pinch retains the latest target during that transition, lens changes wait for in-flight photo capture, and an ultrawide bind failure falls back to the primary camera with updated capabilities.
 - **Photos.** Only the photographer takes photos, with the camera screen's own shutter. The subject adjusts the zoom, and the photographer decides when to take the photo.
 - **Notices.** The photographer's UI shows a toast for each applied remote action, using the `by` field (FR-7.4).
 

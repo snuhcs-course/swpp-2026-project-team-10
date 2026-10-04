@@ -128,6 +128,62 @@ class CameraViewModelTest {
     }
 
     @Test
+    fun pinchRequestsContinueAcrossLensTransitionAndReadoutWaitsForAppliedZoom() = runTest {
+        camera.capabilities.value = CameraCapabilities(0.5f, 4f, listOf(0.5f, 0.6f, 1f, 2f, 3f))
+        runCurrent()
+        model.onZoomChanged(0.9f)
+        camera.status.value = CameraStatus.STARTING
+        model.onZoomChanged(0.7f)
+        model.onZoomChanged(0.5f)
+        runCurrent()
+
+        assertEquals(listOf(0.9f, 0.7f, 0.5f), camera.zoomRequests)
+        assertEquals(1f, model.uiState.value.zoom)
+        assertEquals(0.5f, model.uiState.value.minZoom)
+        assertEquals(CameraStatus.STARTING, model.uiState.value.cameraStatus)
+
+        camera.zoom.value = 0.5f
+        camera.status.value = CameraStatus.READY
+        runCurrent()
+        assertEquals(0.5f, model.uiState.value.zoom)
+        assertEquals(CameraStatus.READY, model.uiState.value.cameraStatus)
+
+        // A normalized remote change must use the same readout as the photographer's pinch.
+        camera.zoom.value = 0.75f
+        runCurrent()
+        assertEquals(0.75f, model.uiState.value.zoom)
+    }
+
+    @Test
+    fun zoomCannotStartUntilTheCameraRangeIsKnown() = runTest {
+        camera.capabilities.value = null
+        camera.status.value = CameraStatus.STARTING
+        model.onZoomChanged(0.5f)
+        camera.status.value = CameraStatus.READY
+        model.onZoomChanged(1.5f)
+        runCurrent()
+        assertTrue(camera.zoomRequests.isEmpty())
+    }
+
+    @Test
+    fun idleCameraRejectsZoomEvenWithRetainedCapabilities() = runTest {
+        camera.status.value = CameraStatus.IDLE
+        model.onZoomChanged(0.5f)
+        runCurrent()
+        assertTrue(camera.zoomRequests.isEmpty())
+    }
+
+    @Test
+    fun startingCameraRejectsNonFiniteRequests() = runTest {
+        camera.status.value = CameraStatus.STARTING
+        model.onZoomChanged(Float.NaN)
+        model.onZoomChanged(Float.POSITIVE_INFINITY)
+        model.onZoomChanged(Float.NEGATIVE_INFINITY)
+        runCurrent()
+        assertTrue(camera.zoomRequests.isEmpty())
+    }
+
+    @Test
     fun cancellationDoesNotShowSaveFailure() = runTest {
         model.onShutter()
         runCurrent()

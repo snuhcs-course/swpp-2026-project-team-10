@@ -203,11 +203,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     override fun onScale(detector: ScaleGestureDetector): Boolean {
                         val state = viewModel.uiState.value
                         val factor = detector.scaleFactor
-                        if (state.cameraStatus != CameraStatus.READY || !factor.isFinite() || factor <= 0f) {
+                        val acceptsZoom = state.cameraStatus == CameraStatus.READY ||
+                            state.cameraStatus == CameraStatus.STARTING
+                        val validRange = state.minZoom.isFinite() && state.maxZoom.isFinite() &&
+                            state.minZoom > 0f && state.maxZoom >= state.minZoom
+                        if (!acceptsZoom || !validRange || !factor.isFinite() || factor <= 0f) {
                             return false
                         }
                         // Accumulate gesture deltas without waiting for CameraX's asynchronous state
-                        // or snapping to preset stops. Clamp each step so reversing at a limit responds immediately.
+                        // even while crossing lenses. Clamp each step so reversing at a limit responds immediately.
                         requestedZoom = (requestedZoom * factor).coerceIn(state.minZoom, state.maxZoom)
                         viewModel.onZoomChanged(requestedZoom)
                         return true

@@ -2,8 +2,9 @@
 
 ## Project instructions
 
-- Always refer to the [design documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and [requirements and specifications](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications) for detailed information on the project specifications and design considerations.
+- Always refer to the [design documentation](wiki/Design-Documentation.md) and [requirements and specifications](wiki/Requirements-and-Specifications.md) for detailed information on the project specifications and design considerations.
 - These documents may be updated over time, so check them regularly for the latest information. If any text referencing these documents is outdated, update it to reflect the current state of the documentation.
+- The `wiki/` folder is the source of the GitHub wiki. Edit the pages there, through a pull request like any other change; the `wiki-sync` workflow mirrors the folder to the wiki on every push to `dev`, deletions included, and overwrites anything edited on GitHub directly. Every file in `wiki/` becomes a wiki page or asset, so keep notes and READMEs out of it.
 - Do not make git commits or pushes to the repository on your own. Only make commits and pushes when instructed to do so by a human.
 
 ## Maintaining this file

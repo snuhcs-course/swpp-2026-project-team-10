@@ -1,6 +1,6 @@
 # Server context
 
-- Consult the current [design documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and [requirements and specifications](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications) before server changes. Recheck relevant requirements instead of treating this file or an earlier iteration's scope as a fixed specification.
+- Consult the current [design documentation](../wiki/Design-Documentation.md) and [requirements and specifications](../wiki/Requirements-and-Specifications.md) before server changes. Recheck relevant requirements instead of treating this file or an earlier iteration's scope as a fixed specification.
 - Work from `server/` with uv and the Python version declared in `pyproject.toml`. `uv sync --locked` installs the locked environment. Run `uv run ruff check .`, `uv run ruff format --check .`, and `uv run pytest` after code changes. `ruff.toml` is copied from the root.
 - Start with `uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 65536`. While sessions remain process-local, run only one worker and one server instance.
 - Keep the server's signaling protocol aligned with Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt) and the current design documentation. When the protocol changes, update the affected implementations, tests, and documentation together.

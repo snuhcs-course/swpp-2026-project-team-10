@@ -69,8 +69,6 @@ dependencies {
 
     // Needed by the shared contracts (interfaces, models, messages, API).
     implementation(libs.androidx.camera.core)
-
-    // Camera (#3): CameraX on camera2, bound to the lifecycle, PreviewView.
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
@@ -82,13 +80,13 @@ dependencies {
     // App shell: one activity, Navigation, Fragments with ViewModels (#2).
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.retrofit.kotlinx.serialization)
 
     // Real-time session (#8): WebRTC, and lifecycle-aware flow collection in Fragments.
     implementation(libs.webrtc)
     implementation(libs.androidx.activity.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
 
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.

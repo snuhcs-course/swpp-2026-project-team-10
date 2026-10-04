@@ -27,43 +27,56 @@
         android:layout_weight="1"
         android:background="#000000">
 
-        <!-- The whole 3:4 frame, fitted (AD-10), so the guide maps to the same part of the image on both phones. -->
         <androidx.camera.view.PreviewView
             android:id="@+id/previewView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:scaleType="fitCenter" />
+            android:layout_height="match_parent" />
 
         <com.lastpenguin.pix.guide.GuideOverlayView
             android:id="@+id/guideOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <!-- Camera permission denied (FR-1.2). -->
-        <LinearLayout
-            android:id="@+id/permissionDenied"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+        <ProgressBar
+            android:id="@+id/cameraProgress"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_gravity="center"
+            android:contentDescription="@string/starting_camera" />
+
+        <LinearLayout
+            android:id="@+id/cameraMessagePanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/colorSurface"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="24dp"
-            android:visibility="gone"
-            tools:visibility="visible">
+            android:visibility="gone">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/cameraMessage"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
                 android:gravity="center"
                 android:text="@string/camera_permission_message"
-                android:textColor="#FFFFFF" />
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
 
             <Button
-                android:id="@+id/openSettingsButton"
+                android:id="@+id/cameraActionButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="16dp"
                 android:text="@string/open_settings" />
+
+            <Button
+                android:id="@+id/requestPermissionButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/allow_camera"
+                android:visibility="gone" />
         </LinearLayout>
 
         <!-- Shown while a subject is connected (FR-6.8). -->
@@ -73,35 +86,53 @@
             android:layout_height="wrap_content"
             android:layout_gravity="top|center_horizontal"
             android:layout_margin="12dp"
-            android:textColor="#FFFFFF"
             android:visibility="gone"
             tools:text="Live · Junhyeong connected"
             tools:visibility="visible" />
 
-        <!-- Notices: "Saved without the guide", "Junhyeong left", "Junhyeong set zoom to 2×" (FR-1.6, FR-6.10, FR-7.4). -->
+        <!-- Remote action notice, such as "Junhyeong set zoom to 2×" (FR-7.4). -->
         <TextView
             android:id="@+id/noticeText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
             android:layout_margin="12dp"
-            android:textColor="#FFFFFF"
             android:visibility="gone"
             tools:text="Junhyeong set zoom to 2×"
             tools:visibility="visible" />
     </FrameLayout>
 
-    <!-- One chip per zoom stop the camera supports (FR-1.3); filled by CameraFragment. -->
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/zoomChips"
-        android:layout_width="wrap_content"
+    <HorizontalScrollView
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="4dp"
-        app:selectionRequired="false"
-        app:singleLine="true"
-        app:singleSelection="true" />
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/zoomChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                app:singleLine="true"
+                app:singleSelection="true" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/captureStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:accessibilityLiveRegion="polite"
+        android:gravity="center"
+        android:paddingHorizontal="16dp"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:visibility="gone" />
 
     <!-- Shown while a guide is on the camera (R&S 6.2, Camera + guide). -->
     <LinearLayout
@@ -162,14 +193,15 @@
             android:layout_marginHorizontal="24dp"
             android:text="@string/shutter" />
 
-        <!-- Opens the last photo in the gallery (FR-1.6); enabled once one is saved. -->
-        <Button
+        <ImageButton
             android:id="@+id/galleryButton"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:enabled="false"
-            android:text="@string/gallery" />
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/open_last_photo"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_photo" />
     </LinearLayout>
 
     <!-- Shown while a subject is connected (FR-6.10). -->

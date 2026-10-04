@@ -4,17 +4,19 @@
 |----|----|----|
 | 0.1 | 2026-09-30 | Initial draft: system architecture, external libraries, architectural decisions, Android app structure and module interfaces, class diagrams, data models, state machines, protocols and APIs, algorithms, database schema, implementation decisions, module ownership, and the Iteration 1 build order. The shared contracts (interfaces, models, messages, API) are also in `android/`. |
 | 0.2 | 2026-09-30 | Iteration 1 design developed: a JSON example for every data channel message, signaling message, and REST endpoint (2.5); the Iteration 1 test setup, with both phones and the server (a laptop) on the same Wi-Fi (Figure 1); the remote zoom flow (Figure 3); guide sync and remote control as separate modules (2.9). Added the plan for Iterations 2–5 with the target architecture (1.4): friends and invitations, cellular connections, more remote controls, saved guides, an offline connection with a QR code, and guides that keep the background. The photographer takes every photo. |
+| 0.3 | 2026-10-04 | Pose generation as built: the image-editing API is OpenRouter's Image API with the model as a server setting, and the selection result is recorded (2.6.3); a prompt that lets the model re-place the person (2.6.3); the server validates the scene photo and does not resize it (1.1.2, 2.2); `400 INVALID_REQUEST` and a 1 MiB request limit (2.5.3); a 30 s upstream timeout, and the server cancels the image API call when the phone disconnects (2.6.3, 2.8); rate limiting per client address (2.8). |
 
 Audience: the development team. This page describes the Iteration 1 design in detail; each later iteration adds the design for the features it builds (1.4). **TBD** marks an open decision. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page. Testing plans are in the Testing Documentation.
 
 **Decided (2026-09-30):** XML Views with ViewBinding and the Navigation component · FastAPI (Python) server · package `com.lastpenguin.pix` · minSdk 29 (Android 10), target and compile SDK 36 · Iteration 1 test setup: both phones and the server, which runs on a laptop, on the same Wi-Fi network.
+
+**Decided (2026-10-04):** the image-editing API is OpenRouter's Image API, with the model as a server setting; the default is GPT Image 2.5 Flare at low quality (2.6.3).
 
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | WebRTC build for Android | A maintained prebuilt of libwebrtc (Google no longer publishes an official Android artifact) | Real-time | 10/2 |
-| Image-editing API | Chosen in the backend task with the criteria in 2.6.3 | Server/AI/Sync | 10/2 |
 | Detailed design of later features (1.4) | Designed at the start of the iteration that builds each feature | Team | Start of each iteration |
 
 **Contents**
@@ -59,15 +61,15 @@ Pix is one Android app that runs in two roles, **photographer** and **subject**,
 | **Pix app, photographer role** | Android | Owns the camera. Builds and edits the guide, captures photos, requests pose generation, streams video, and applies remote commands. | CameraX; ML Kit; WebRTC (sends video); data channels; REST; signaling |
 | **Pix app, subject role** | Android | Shows the live video with a locally drawn copy of the guide and sends zoom requests. | WebRTC (receives video); data channels; signaling |
 | **Signaling hub** | Pix server | Creates room-code sessions and relays SDP offers, answers, and ICE candidates. It never sees media. | WebSocket, JSON (2.5.2) |
-| **Pose proxy** | Pix server | Holds the API key, validates and resizes the scene photo, calls the image-editing API with a template prompt, and enforces the 25 s upstream timeout and rate limits. | REST `POST /api/v1/poses` (2.5.3) |
-| **Image-editing API** | External | Generates the same person in the same scene with a different pose. | Vendor HTTPS API (**TBD**) |
+| **Pose proxy** | Pix server | Holds the API key, validates the scene photo, calls the image-editing API with a template prompt, enforces the 30 s upstream timeout and rate limits, and cancels the upstream call when the phone drops the request. | REST `POST /api/v1/poses` (2.5.3) |
+| **Image-editing API** | External | Generates the same person in the same scene with a different pose. | OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`); the model is a server setting, `openai/gpt-image-2.5-flare@low` by default (2.6.3) |
 
 #### 1.1.3 Key data flows
 
 | Flow | Path | Transport | Latency budget |
 |----|----|----|----|
 | **Reference photo → guide** | Photo picker → downscale → ML Kit segmentation → cutout and outline → guide store | On device only | ≤ 2 s (NFR-3) |
-| **Pose generation** | Camera frame → JPEG (EXIF removed) → 4 parallel requests → pose proxy → image API → candidates → reference flow | HTTPS | First ≤ 20 s, all ≤ 30 s (NFR-4) |
+| **Pose generation** | Camera frame → JPEG (resized on the phone, EXIF removed) → 4 parallel requests → pose proxy → image API → candidates → reference flow | HTTPS | First ≤ 20 s, all ≤ 30 s (NFR-4) |
 | **Session setup** | Room code → signaling → SDP and ICE exchange → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
 | **Live view** | CameraX frames → I420 → WebRTC encoder → peer → subject renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi (NFR-5) |
 | **Guide sync** | Guide store (photographer) → `guide.state` → subject's guide store → overlay | Data channel | ≤ 0.3 s (NFR-7) |
@@ -137,8 +139,8 @@ sequenceDiagram
 | OkHttp (+ Retrofit for REST) | WebSocket signaling and HTTPS requests | App |
 | kotlinx.serialization (JSON) | Data channel, signaling, and REST payloads | App |
 | Jetpack DataStore | Small preferences: consent given, last zoom | App |
-| FastAPI, Uvicorn, pydantic-settings, Pillow (Python) | One process that serves WebSocket signaling and the REST API; settings from environment variables; image resizing | Server |
-| Image-editing API (**TBD**) | Pose candidate generation | Server |
+| FastAPI, Uvicorn, pydantic-settings, python-multipart, httpx2, Pillow (Python) | One process that serves WebSocket signaling and the REST API; settings from environment variables; multipart uploads; calls to the image API; checking the scene photo and converting candidates to JPEG | Server |
+| OpenRouter Image API | Pose candidate generation with an image-editing model chosen by a server setting (2.6.3) | Server |
 
 ### 1.3 Architectural decisions
 
@@ -445,7 +447,7 @@ classDiagram
 | Module | Responsibility |
 |----|----|
 | `signaling` | WebSocket hub; `SessionRegistry` (in-memory map of sessionId → up to two peers, room codes, and TTLs); relays `signal` messages |
-| `poses` | `PoseController` (validation, resizing, EXIF removal); an `ImageEditProvider` interface with one adapter per vendor; the template catalog; rate limiting |
+| `poses` | The REST endpoints (scene photo validation, rate limiting, cancelling when the phone disconnects); `PoseGenerator`, the one client of OpenRouter's Image API, with the model as a setting; the template catalog and prompt |
 
 ### 2.3 Data models
 
@@ -786,12 +788,12 @@ A session is removed when the photographer leaves, or 60 s after its last phone 
 
 #### 2.5.3 REST API (phone ↔ server)
 
-Base URL `http://<laptop address>:8000/api/v1`, JSON responses. Errors use one shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`.
+Base URL `http://<laptop address>:8000/api/v1`, JSON responses. Errors use one shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. The one exception is a request over 1 MiB, which is refused with a plain `413` before it is read.
 
 | Endpoint | Purpose | Errors |
 |----|----|----|
 | `GET /pose-templates` | The pose templates, so they can change without an app update | — |
-| `POST /poses` | One pose candidate for one template; the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
+| `POST /poses` | One pose candidate for one template; the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `400 INVALID_REQUEST`, `413`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
 
 <details>
 <summary><code>GET /pose-templates</code></summary>
@@ -812,19 +814,21 @@ Base URL `http://<laptop address>:8000/api/v1`, JSON responses. Errors use one s
 <summary><code>POST /poses</code></summary>
 
 ```jsonc
-// request: multipart/form-data
-//   image       scene.jpg (JPEG, long side ≤ 1024 px, no metadata)
+// request: multipart/form-data, at most 1 MiB in total
+//   image       scene.jpg (JPEG, long side ≤ 1024 px, no EXIF)
 //   templateId  "wave"
-//   seed        "1829304756"
+//   seed        "1829304756" (an integer)
 
 // response 200
 { "templateId": "wave", "image": "/9j/4AAQSkZJRgABAQAAAQABAAD...", "elapsedMs": 11840 }
 
 // response 504
-{ "error": { "code": "UPSTREAM_TIMEOUT", "message": "The image service did not answer within 25 s" } }
+{ "error": { "code": "UPSTREAM_TIMEOUT", "message": "The image service did not answer within 30 s" } }
 ```
 
 `image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9).
+
+The server checks the photo and does not repair it: one that is not a readable JPEG, is over 1024 px on its long side, or has EXIF gets `INVALID_IMAGE`. `INVALID_REQUEST` means that a part is missing or that `seed` is not an integer. The server reduces `seed` to 0…2³¹−1, the range the image models accept.
 
 </details>
 
@@ -858,20 +862,35 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 
 #### 2.6.3 Pose generation
 
-1.  **Scene photo.** Take the latest analysis frame (or a still from ImageCapture), rotate it to portrait, resize so the long side is 1024 px, and encode it as JPEG (quality 85). Location and other metadata are removed.
-2.  **Requests.** Send one `POST /poses` per template (4 in parallel), each with a new random `seed`. *Try other poses* repeats the same templates with new seeds.
-3.  **Server prompt.** Each template holds a pose description. The server wraps it in a fixed prompt: *"Keep the same person (face, hair, clothing), the same background, camera angle, and lighting. Change only the person's pose to: {pose}. Full body, photorealistic."*
+1.  **Scene photo, prepared on the phone.** The app takes the latest analysis frame (or a still from ImageCapture), rotates it to portrait, resizes it so the long side is at most 1024 px, and encodes it as JPEG (quality 85), which leaves out location and other metadata. This preparation is the app's job: the server checks the photo but does not resize or repair it, and rejects one that is not prepared this way (2.5.3). Doing it on the phone keeps the four uploads small and keeps location data on the phone.
+2.  **Requests.** Send one `POST /poses` per template (4 in parallel), each with a new random `seed`. *Try other poses* repeats the same templates with new seeds. A model without seed support ignores the seed, and its results still differ from one request to the next.
+3.  **Server prompt.** Each template holds a pose description. The server wraps it in a fixed prompt, which lets the model move the person to a better spot while the camera framing stays fixed: *"Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting exactly as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer would: judge whether the person is too far, too close, or poorly placed, and if so move them to a better spot and distance in this scene. Change the person's pose to: {pose}. Show the full body, standing on the ground at a natural scale. Photorealistic."*
 4.  **Progressive results.** The app maps each response to a `CandidateEvent`. The screen fills its slots as events arrive and moves to *Pick a pose* when all are done, or at 30 s if at least one is ready. Zero candidates means *Couldn't create poses* (FR-4.7).
-5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server also stops waiting for the upstream API after 25 s.
+5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices that the phone closed its connection and cancels its own call to the image API, which then does not bill that image. The server also stops waiting for the image API after 30 s.
 
-**API selection criteria** (the result and rationale are recorded here after the backend task):
+**API selection.** Poses are generated through OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), which gives one request format, one key, and one bill for every vendor's models. The model is the server setting `PIX_POSE_MODEL`, so it changes without a code change. The default is `openai/gpt-image-2.5-flare@low`, GPT Image 2.5 Flare at low quality.
 
-- identity and background preservation, judged on 10 test scenes
-- latency (median ≤ 15 s)
-- cost per image and free quota
-- rate limits
-- support for Korean prompts
-- content policy for photos of people
+**Why this model.** GPT Image 2.5 Flare at low quality, Seedream 5.0 Flash, and Gemini 3.1 Flash have similar latency, and all three gave decent results. Among them cost decided: GPT Image 2.5 Flare is the cheapest, at $0.012 per image against $0.018 for Seedream and $0.068 for Gemini.
+
+The models were compared on 2026-10-03 and 2026-10-04 with `server/scripts/compare_image_edit_apis.py`, on eight real photos with all four pose templates (32 images per model):
+
+| Model | Median | Slowest | Within 25 s | Cost per image |
+|----|----|----|----|----|
+| `openai/gpt-image-2.5-flare` at low quality (default) | 14.8 s | 25.1 s | 31/32 | $0.012 |
+| `bytedance-seed/seedream-5-0-flash` | 11.4 s | 21.0 s | 32/32 | $0.018 |
+| `google/gemini-3.1-flash-image` | 11.5 s | 13.0 s | 32/32 | $0.068 |
+| `google/gemini-3.1-flash-lite-image` | 6.2 s | 8.3 s | 32/32 | $0.034 |
+
+Results against the selection criteria:
+
+- **Identity and background preservation.** Judged on eight real photos and three generated ones. All kept faces close to the original. Gemini kept the camera framing most consistently, and GPT moved the person farther back in a few candidates. Gemini 3.1 Flash Lite changed faces and re-framed scenes.
+- **Pose quality.** All four produced well-posed candidates, while GPT Image 2.5 Flare at low quality in general gave the most natural and appealing results. Gemini 3.1 Flash Lite produced some candidates with unnatural poses.
+- **Latency (median ≤ 15 s).** All four meet the median requirement. GPT Image 2.5 Flare at low quality was the slowest on one photo, but still under 30 s.
+- **Cost per image and free quota.** GPT Image 2.5 Flare at low quality is the cheapest, about $0.05 for a set of four.
+- **Rate limits.** OpenRouter sets no request cap for paid models; 16 simultaneous requests ran without a rate-limit error.
+- **Support for Korean prompts.** The one free-text Korean pose that was tried was followed by all four models.
+
+Ten other model configurations were screened with one image each and left out, among them FLUX.3, Qwen Image 3, and GPT Image 2 at medium quality, which took over 30 s. Seedream 5.0 Flash and Gemini 3.1 Flash are the alternatives.
 
 #### 2.6.4 Video pipeline
 
@@ -901,9 +920,9 @@ Iteration 1 has no database. The server keeps room codes and sessions in memory,
 | **Caching** | The current guide and the last candidate set are kept in memory for the app process only; no gallery or generated images are written to disk. The template list is cached in memory after the first call. The subject keeps the last received guide image by `guideId`, so a reconnect does not resend it. |
 | **Lifecycle** | The camera binds to the lifecycle of the camera screen; ViewModels keep UI state across rotation. If the photographer's app goes to the background, the camera is released and the video pauses. The session stays open for 60 s, and the subject sees that the camera is paused. No foreground service is used in Iteration 1. |
 | **Error handling** | Module interfaces return `Result` with typed errors (`NoPersonFound`, `GenerationError`, `EndReason`). ViewModels map them to the failure screens in the wireframe, and each maps to exactly one screen. |
-| **Timeouts** | Pose request: 30 s on the client, 25 s from server to API. Session connecting: 15 s. Room code: 10 min. |
-| **Configuration and secrets** | The server URL is set per build type in `BuildConfig`. In Iteration 1 it is the laptop's address on the test Wi-Fi, and only debug builds allow the plain HTTP and WebSocket traffic to it. The image-editing API key is a server environment variable and is never committed; `.env.example` lists their names. |
-| **Privacy** | The server does not log request bodies or images, and discards scene photos after responding (NFR-13). `POST /poses` is rate-limited per device or user, for example 20 per hour, to control cost. |
+| **Timeouts** | Pose request: 30 s on the client and 30 s from server to API. Because the two are equal, the phone's own timeout usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. Room code: 10 min. |
+| **Configuration and secrets** | The server URL is set per build type in `BuildConfig`. In Iteration 1 it is the laptop's address on the test Wi-Fi, and only debug builds allow the plain HTTP and WebSocket traffic to it. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. `.env.example` lists the names. |
+| **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, counting only requests sent to the image API, to control cost. |
 | **Measurement hooks** | `Timings` logs named timestamps with a shared tag, so NFR latencies can be read from logcat without extra tools. Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping. |
 | **SDK vs in-house** | **Use SDKs** for segmentation (ML Kit) and real-time media (WebRTC). These are hard problems with mature solutions. **Build in-house** the parts that make Pix different: guide geometry and sync, the message protocol, remote control, and the pose prompt pipeline. |
 

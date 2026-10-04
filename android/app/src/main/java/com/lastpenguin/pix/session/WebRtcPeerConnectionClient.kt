@@ -21,6 +21,7 @@ import org.webrtc.MediaStream
 import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.RTCStats
 import org.webrtc.RTCStatsReport
 import org.webrtc.RtpParameters
 import org.webrtc.RtpSender
@@ -200,11 +201,12 @@ class WebRtcPeerConnectionClient(
     /** Reads the video RTP stream, its codec, and the nominated candidate pair; bitrate comes from byte deltas. */
     private fun parse(report: RTCStatsReport): LinkStats? {
         val all = report.statsMap.values
-        val rtp = all.firstOrNull {
-            (it.type == "outbound-rtp" || it.type == "inbound-rtp") && it.members["kind"] == "video"
-        } ?: return null
+        // A transceiver reports both directions; the one carrying bytes is the live video stream.
+        val rtp =
+            all.filter { (it.type == "outbound-rtp" || it.type == "inbound-rtp") && it.members["kind"] == "video" }
+                .maxByOrNull { it.bytes() ?: -1L } ?: return null
         val members = rtp.members
-        val bytes = ((members["bytesSent"] ?: members["bytesReceived"]) as? Number)?.toLong()
+        val bytes = rtp.bytes()
         val codec = (members["codecId"] as? String)?.let { report.statsMap[it]?.members?.get("mimeType") as? String }
         val pair = all.firstOrNull { it.type == "candidate-pair" && it.members["nominated"] == true }
             ?: all.firstOrNull { it.type == "candidate-pair" && it.members["state"] == "succeeded" }
@@ -227,6 +229,8 @@ class WebRtcPeerConnectionClient(
             roundTripMs = roundTripMs,
         )
     }
+
+    private fun RTCStats.bytes(): Long? = ((members["bytesSent"] ?: members["bytesReceived"]) as? Number)?.toLong()
 
     override fun addVideoSink(sink: VideoSink) {
         synchronized(lock) {

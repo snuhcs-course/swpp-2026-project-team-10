@@ -79,3 +79,51 @@ Run these from `server/` before you push. On every pull request, the [server-lin
 - **Rules.** Ruff rules are in `ruff.toml`: a 120-character line limit and the lint rule sets `E4`, `E7`, `E9`, `F`, and `I`.
 - **Suppressing.** For one line, use `# noqa: <rule>` with a comment that says why. To turn off a rule for some files or for the whole server, add it to `per-file-ignores` or `ignore` in `ruff.toml`.
 - **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `async def` tests need no marker, and a test fails after 15 seconds.
+
+## Compare image-editing models
+
+[`scripts/compare_image_edit_apis.py`](scripts/compare_image_edit_apis.py) sends scene photos to image-editing models through [OpenRouter](https://openrouter.ai/) and reports latency, cost, and the resulting images side by side. It is not part of the server: it does not import `pix_server`, and it declares its own dependencies inline, so `uv run` fetches them on the first run without touching `pyproject.toml` or `uv.lock`.
+
+Set `OPENROUTER_API_KEY` in your shell to an OpenRouter key with credits (the script reads the environment only, not `.env`), then run it from `server/` with one or more photos:
+
+```sh
+export OPENROUTER_API_KEY=<your key>
+uv run scripts/compare_image_edit_apis.py photo1.jpg photo2.jpg
+```
+
+With no options, each photo goes to four models with all four pose templates: 16 images per photo, which takes about a minute and cost about $0.50 in October 2026. Each photo is first prepared the way the app sends it (upright, long side 1024 px, JPEG quality 85, no EXIF), and the poses for one model are requested in parallel, like the app's four `POST /poses` calls.
+
+The terminal prints one line per image, then a summary table, the total cost, and the report path. Results go to `scripts/out/<timestamp>/`:
+
+| File | Contents |
+| --- | --- |
+| `report.html` | The summary table, then one table per photo: models as rows, the original and each pose as columns. Red marks a failed request or one slower than the server's 25-second upstream timeout (Design §2.8). Click an image to see it at full size. |
+| `results.json` | Every request's latency, cost, parameters, and error, plus the prompt and poses used. |
+| `<photo>/<model>/<pose>.*` | The returned images, next to the prepared `scene.jpg`. |
+
+| Option | What it does |
+| --- | --- |
+| `--models ID ...` | Models to compare. Add `@low` or `@medium` to a model that has quality tiers, for example `openai/gpt-image-2@low`. |
+| `--list-models` | Lists every model that can edit an image, with current prices. It needs no key or photo and costs nothing. |
+| `--poses NAME ...` | A subset of `hands_on_hips`, `wave`, `walking`, and `arms_crossed`. |
+| `--pose-text "..."` | A free-text pose in Korean or English (FR-4.8) instead of the templates. Repeat it for several poses. |
+| `--prompt "..."` | Another prompt to try. It must contain `{pose}`, which is replaced with the pose description. |
+| `--concurrency N` | Runs N photo-and-model combinations at once. The default, 1, matches one user generating. |
+| `--out DIR` | The output folder, instead of the timestamped one. |
+| `--timeout S` | Gives up on a request after S seconds. The default is 60. |
+
+```sh
+# Smoke test: one image from one model
+uv run scripts/compare_image_edit_apis.py photo.jpg --models bytedance-seed/seedream-5-0-flash --poses wave
+
+# Many photos, two models, several combinations at once
+uv run scripts/compare_image_edit_apis.py photos/*.jpg --models google/gemini-3.1-flash-image bytedance-seed/seedream-5-0-flash --concurrency 4
+
+# A free-text pose
+uv run scripts/compare_image_edit_apis.py photo.jpg --pose-text "벽에 기대서 한 손은 주머니에"
+```
+
+- **Cost.** A run requests photos × models × poses images. Only returned images are billed; failed and timed-out requests are not. If lines show `Insufficient credits`, the OpenRouter account is empty.
+- **Photos.** Use JPEG, PNG, or WebP with the whole person in the frame; HEIC does not open. Portrait 3:4 matches the app's frame.
+- **Privacy.** Photos are sent to OpenRouter and the model's provider. `scripts/out/` holds the photos and results and is git-ignored; do not commit them.
+- **Defaults.** The default models, prompt, and pose descriptions are `DEFAULT_MODELS`, `PROMPT`, and `POSES` at the top of the script.

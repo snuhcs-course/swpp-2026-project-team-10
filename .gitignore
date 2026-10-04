@@ -24,6 +24,7 @@ dist/
 *.egg-info/
 .coverage
 htmlcov/
+server/scripts/out/
 
 # IDEs
 .idea/

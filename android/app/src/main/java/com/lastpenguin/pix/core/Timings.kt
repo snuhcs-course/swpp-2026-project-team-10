@@ -1,5 +1,8 @@
 package com.lastpenguin.pix.core
 
+import android.os.SystemClock
+import android.util.Log
+
 /**
  * Named timestamps in logcat under one tag, so the NFR latencies can be read without extra tools (Design 2.8).
  * Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, `rtt`.
@@ -9,6 +12,6 @@ object Timings {
 
     /** Logs [name] with the current time and an optional [detail]. */
     fun mark(name: String, detail: String? = null) {
-        // TODO(#3): Log.d(TAG, ...) with SystemClock.elapsedRealtime().
+        Log.d(TAG, "${SystemClock.elapsedRealtime()} $name${detail?.let { " $it" }.orEmpty()}")
     }
 }

@@ -14,6 +14,19 @@ class ChannelRouter {
         RELIABLE,
     }
 
-    fun channelFor(message: SessionMessage): Channel =
-        TODO("#8")
+    fun channelFor(message: SessionMessage): Channel = when (message) {
+        is SessionMessage.GuideStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+        is SessionMessage.CameraStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+        is SessionMessage.ZoomSet, is SessionMessage.Ping, is SessionMessage.Pong -> Channel.REALTIME
+        else -> Channel.RELIABLE
+    }
+
+    /**
+     * True for messages where only the newest value matters. A receiver drops one whose `seq` is not newer than
+     * the last one applied for that type, whichever channel it came on (Design 2.5.1).
+     */
+    fun latestOnly(message: SessionMessage): Boolean = when (message) {
+        is SessionMessage.GuideStateUpdate, is SessionMessage.CameraStateUpdate, is SessionMessage.ZoomSet -> true
+        else -> false
+    }
 }

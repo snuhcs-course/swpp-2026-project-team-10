@@ -28,11 +28,15 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -48,6 +52,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var permissionRequested = false
     private var renderedZoomStops: List<Float>? = null
     private var previewLogged = false
+    private var noticeJob: Job? = null
 
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (binding != null) {
@@ -96,12 +101,30 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         // TODO(#6): wire opacitySlider and render guide controls when overlay editing is implemented.
         controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
-        // TODO(#8): show liveBadge and endSessionButton from session state.
 
         val resolver = requireContext().contentResolver
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
+                // The photographer's side of a session: the live badge, End session, and "left" notices (FR-6.8, FR-6.10).
+                launch {
+                    sessionViewModel.state.collect { state ->
+                        val connected = state as? SessionState.Connected
+                        controls.liveBadge.isVisible = connected != null
+                        controls.endSessionButton.isVisible = connected != null
+                        connected?.let { controls.liveBadge.text = getString(R.string.live_badge, it.peer.displayName) }
+                        view.keepScreenOn = connected != null
+                    }
+                }
+                launch {
+                    sessionViewModel.notices.collect { notice ->
+                        val text = when (notice.reason) {
+                            EndReason.CONNECTION_LOST -> R.string.peer_disconnected
+                            else -> R.string.peer_left
+                        }
+                        showNotice(controls, getString(text, notice.name))
+                    }
+                }
                 launch {
                     viewModel.uiState.map { it.lastPhoto }.distinctUntilChanged().collectLatest { uri ->
                         val thumbnail = if (uri == null) {
@@ -241,6 +264,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    private fun showNotice(controls: FragmentCameraBinding, text: String) {
+        controls.noticeText.text = text
+        controls.noticeText.isVisible = true
+        noticeJob?.cancel()
+        noticeJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(NOTICE_MS)
+            controls.noticeText.isVisible = false
+        }
+    }
+
     private fun openLastPhoto() {
         val uri = viewModel.uiState.value.lastPhoto ?: return
         try {
@@ -259,5 +292,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     companion object {
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
+        private const val NOTICE_MS = 3_000L
     }
 }

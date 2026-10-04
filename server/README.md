@@ -1,10 +1,10 @@
 # Pix server
 
-FastAPI backend for Pix. The server's responsibilities include session signaling and planned APIs for friend invitations, pose generation, and other features as the project develops.
+FastAPI backend for Pix. The server's responsibilities include session signaling, pose generation, and planned APIs for friend invitations and other features as the project develops.
 
-The current implementation provides iteration 1 signaling: anonymous room-code sessions and WebRTC SDP/ICE relay between one photographer and one subject. Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. Database support, account and friend APIs, and pose generation are not implemented yet.
+The current implementation provides iteration 1 signaling (anonymous room-code sessions and WebRTC SDP/ICE relay between one photographer and one subject) and the pose generation REST API, which turns a scene photo into pose candidates through an image-editing model on [OpenRouter](https://openrouter.ai/). Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. Database support and account and friend APIs are not implemented yet.
 
-The wire contract comes from [Design Documentation §2.5.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt). Room behavior follows [FR-8 and FR-6](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications).
+The wire contract comes from [Design Documentation §2.5.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt). Room behavior follows [FR-8 and FR-6](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications). The REST contract comes from Design Documentation §2.5.3 and Android's [PixApi.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/PixApi.kt) and [ApiModels.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/ApiModels.kt); pose generation follows §2.6.3 and FR-4.
 
 ## Setup
 
@@ -17,6 +17,8 @@ uv sync --locked
 
 Optional settings are listed in `.env.example`. Copy it to `.env` in `server/` to override defaults, or export `PIX_` environment variables. The default waiting-room TTL is 600 seconds, empty-session TTL is 60 seconds, and cleanup runs every second. Expiry is also checked during message handling. If changing `PIX_MAX_MESSAGE_BYTES`, keep Uvicorn's `--ws-max-size` consistent.
 
+Pose generation needs `OPENROUTER_API_KEY`, an OpenRouter key with credits, in `.env` or the environment. Without it the server still runs, and `POST /poses` answers `UPSTREAM_ERROR`.
+
 ## Run on the test Wi-Fi
 
 From `server/`, start the server:
@@ -27,7 +29,7 @@ uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-m
 
 Use **one worker and one server instance**: room membership is process-local and is lost when the server restarts. For development, `--reload` can replace `--workers 1`; a reload ends existing sessions.
 
-Put the laptop and both phones on the same Wi-Fi. Connect Android to `ws://<laptop-Wi-Fi-IP>:8000/ws` (a phone's `localhost` refers to that phone). The network must allow device-to-device traffic and inbound TCP port 8000 on the laptop. Iteration 1 uses the debug-build HTTP/WS exception in Design §2.8. `iceServers` is always `[]`; STUN/TURN and cellular connectivity belong to later iterations.
+Put the laptop and both phones on the same Wi-Fi. Connect Android to `ws://<laptop-Wi-Fi-IP>:8000/ws` for signaling and `http://<laptop-Wi-Fi-IP>:8000/api/v1` for the REST API (a phone's `localhost` refers to that phone). The network must allow device-to-device traffic and inbound TCP port 8000 on the laptop. Iteration 1 uses the debug-build HTTP/WS exception in Design §2.8. `iceServers` is always `[]`; STUN/TURN and cellular connectivity belong to later iterations.
 
 Uvicorn's WebSocket ping/pong detects dead connections; no application heartbeat message is required.
 
@@ -65,6 +67,49 @@ Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active ro
 
 Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. Request bodies, room codes, and signaling payloads are not logged by the app.
 
+## REST API
+
+The base URL is `http://<laptop-Wi-Fi-IP>:8000/api/v1`.
+
+| Endpoint | Result |
+| --- | --- |
+| `GET /pose-templates` | `[{"id":"hands_on_hips","label":"Hands on hips"}, …]` with the four templates `hands_on_hips`, `wave`, `walking`, and `arms_crossed`. The pose descriptions stay on the server. |
+| `POST /poses` | One candidate for one template: `{"templateId":"wave","image":"<Base64 JPEG>","elapsedMs":9961}`. The app sends one request per template in parallel. |
+
+`POST /poses` takes `multipart/form-data` with three parts: `image` (a JPEG with a long side of at most 1024 px, no EXIF, and at most 1 MiB), `templateId`, and `seed` (an integer).
+
+```sh
+curl -F "image=@scene.jpg" -F templateId=wave -F seed=1829304756 http://localhost:8000/api/v1/poses
+```
+
+The server wraps the template's pose description in the prompt in [templates.py](src/pix_server/poses/templates.py) and sends it with the photo to OpenRouter's Image API. `PIX_POSE_MODEL` chooses the model; it defaults to `bytedance-seed/seedream-5-0-flash` and takes any OpenRouter image model id, with `@low`, `@medium`, or `@high` appended for a model that has quality tiers. The seed is reduced to 0…2³¹−1, the range the default model accepts, and a candidate that arrives in another format is converted to JPEG. The server waits at most `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (25) for the image service.
+
+When the phone cancels a request by closing its connection (Design §2.6.3), the server stops its call to the image service within a quarter of a second, and OpenRouter does not bill the unfinished image. A cancelled request still counts toward the rate limit and leaves no line in the access log. A phone that loses its network without closing the connection is not noticed; the 25-second timeout ends that call.
+
+Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose template with this id"}}`.
+
+| Status and code | Meaning |
+| --- | --- |
+| `400 INVALID_IMAGE` | Not a readable JPEG, a long side over 1024 px, EXIF metadata, or more than 1 MiB. |
+| `400 UNKNOWN_TEMPLATE` | No template has that `templateId`. |
+| `400 INVALID_REQUEST` | A part is missing or `seed` is not an integer. This code is not in Design §2.5.3; it replaces FastAPI's default 422, which this API uses for `REJECTED`. |
+| `422 REJECTED` | The image service declined the photo or pose (a content filter or a model refusal). |
+| `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600). Requests refused before that point are not counted. |
+| `502 UPSTREAM_ERROR` | The image service failed, could not be reached, or gave an unreadable answer, or `OPENROUTER_API_KEY` is not set. The server log gives the reason, for example insufficient credits. |
+| `504 UPSTREAM_TIMEOUT` | The image service did not answer in time. |
+
+The rate limit is counted per client IP address in memory, so it resets when the server restarts; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). OpenRouter bills each generated image.
+
+## Before moving to a public host
+
+In Iteration 1 the phones reach the laptop directly. Behind a reverse proxy, a tunnel, or a hosting platform, the pose API depends on the following, so check each one:
+
+- **Cancelled requests must reach the server.** The server learns that a phone cancelled only when its own incoming connection closes, so the proxy has to close its connection to the server when the phone closes its side. nginx does this by default (`proxy_ignore_client_abort off`). A proxy that lets the request run on hides the cancel, and the image is generated and billed. To check, cancel a request through the public address, for example `curl --max-time 3 -F "image=@scene.jpg" -F templateId=wave -F seed=1 https://<host>/api/v1/poses`, and watch the server's access log: no line for that request means the cancel arrived, and a `POST /api/v1/poses` line with `200` about ten seconds later means it did not.
+- **The rate limit needs each phone's address.** It uses the client address that Uvicorn reports. Uvicorn takes that address from `X-Forwarded-For` only when the request comes from an address listed in `--forwarded-allow-ips`, which defaults to `127.0.0.1`. A proxy on the same machine therefore only has to set `X-Forwarded-For`; for a proxy on another machine, also pass its address in `--forwarded-allow-ips`. Otherwise every phone appears as the proxy and shares one limit. Phones behind one carrier or Wi-Fi gateway share an address too, so limit per user once accounts exist.
+- **Uploads need a little over 1 MiB.** The whole multipart request is slightly larger than the photo. nginx rejects bodies over exactly 1 MiB by default (`client_max_body_size`) with its own non-JSON 413. A proxy may also write an upload to a temporary file on its disk (nginx does for a body larger than `client_body_buffer_size`); raise that buffer or turn off request buffering to keep scene photos in memory (FR-4.9, NFR-13).
+- **Slow answers must be allowed.** A pose can take up to the 25-second upstream timeout, and the app waits 30 seconds. Set the proxy's or platform's response timeout above that.
+- **One process.** The rate limit, like the sessions, lives in the memory of one process, so keep one worker and one instance. Serve HTTPS and WSS (NFR-14).
+
 ## Lint, format, and test
 
 Run these from `server/` before you push. On every pull request, the [server-lint](../.github/workflows/server-lint.yml) workflow runs the two checks and the [server-test](../.github/workflows/server-test.yml) workflow runs the tests.
@@ -78,11 +123,11 @@ Run these from `server/` before you push. On every pull request, the [server-lin
 
 - **Rules.** Ruff rules are in `ruff.toml`: a 120-character line limit and the lint rule sets `E4`, `E7`, `E9`, `F`, and `I`.
 - **Suppressing.** For one line, use `# noqa: <rule>` with a comment that says why. To turn off a rule for some files or for the whole server, add it to `per-file-ignores` or `ignore` in `ruff.toml`.
-- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `async def` tests need no marker, and a test fails after 15 seconds.
+- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `client` also replaces OpenRouter with the fake `image_api`, which records requests and returns what the test sets, so tests never call the real service or need a key; `make_image` builds test photos. `async def` tests need no marker, and a test fails after 15 seconds.
 
 ## Compare image-editing models
 
-[`scripts/compare_image_edit_apis.py`](scripts/compare_image_edit_apis.py) sends scene photos to image-editing models through [OpenRouter](https://openrouter.ai/) and reports latency, cost, and the resulting images side by side. It is not part of the server: it does not import `pix_server`, and it declares its own dependencies inline, so `uv run` fetches them on the first run without touching `pyproject.toml` or `uv.lock`.
+[`scripts/compare_image_edit_apis.py`](scripts/compare_image_edit_apis.py) sends scene photos to image-editing models through [OpenRouter](https://openrouter.ai/) and reports latency, cost, and the resulting images side by side. It is not part of the server, and it does not import `pix_server`.
 
 Set `OPENROUTER_API_KEY` in your shell to an OpenRouter key with credits (the script reads the environment only, not `.env`), then run it from `server/` with one or more photos:
 

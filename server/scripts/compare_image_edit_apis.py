@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx2>=2.13", "pillow>=11"]
-# ///
 """Compare image-editing models on OpenRouter for pose generation (Design Documentation 2.6.3).
 
 Standalone: it does not import pix_server and carries its own dependencies, so run it through uv

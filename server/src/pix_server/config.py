@@ -1,6 +1,6 @@
 """Environment configuration for the Pix server."""
 
-from pydantic import PositiveFloat, PositiveInt
+from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,3 +13,11 @@ class Settings(BaseSettings):
     max_message_bytes: PositiveInt = 65_536
     outbound_queue_size: PositiveInt = 128
     send_timeout_seconds: PositiveFloat = 5
+
+    # The vendor's own variable name, without the PIX_ prefix. Pose requests fail with UPSTREAM_ERROR while it is unset.
+    openrouter_api_key: SecretStr | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
+    # An OpenRouter image model id; append @low, @medium, or @high for a model that has quality tiers.
+    pose_model: str = "bytedance-seed/seedream-5-0-flash"
+    pose_upstream_timeout_seconds: PositiveFloat = 25
+    pose_rate_limit: PositiveInt = 20
+    pose_rate_window_seconds: PositiveFloat = 3600

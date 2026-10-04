@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 API_URL = "https://openrouter.ai/api/v1/images"
 MAX_SCENE_SIDE = 1024
-SEED_LIMIT = 2**31  # Seedream rejects seeds above 2**31 - 1, and the app sends a 64-bit value
+SEED_LIMIT = 2**31  # the app sends a 64-bit value, and a model such as Seedream rejects seeds above 2**31 - 1
 RESULT_JPEG_QUALITY = 90
 
 

@@ -82,9 +82,9 @@ The base URL is `http://<laptop-Wi-Fi-IP>:8000/api/v1`.
 curl -F "image=@scene.jpg" -F templateId=wave -F seed=1829304756 http://localhost:8000/api/v1/poses
 ```
 
-The server wraps the template's pose description in the prompt in [templates.py](src/pix_server/poses/templates.py) and sends it with the photo to OpenRouter's Image API. `PIX_POSE_MODEL` chooses the model; it defaults to `bytedance-seed/seedream-5-0-flash` and takes any OpenRouter image model id, with `@low`, `@medium`, or `@high` appended for a model that has quality tiers. The seed is reduced to 0…2³¹−1, the range the default model accepts, and a candidate that arrives in another format is converted to JPEG. The server waits at most `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (25) for the image service.
+The server wraps the template's pose description in the prompt in [templates.py](src/pix_server/poses/templates.py) and sends it with the photo to OpenRouter's Image API. `PIX_POSE_MODEL` chooses the model; it defaults to `openai/gpt-image-2.5-flare@low` and takes any OpenRouter image model id, with `@low`, `@medium`, or `@high` appended for a model that has quality tiers. The seed is reduced to 0…2³¹−1, the range a model such as Seedream accepts; a model without seed support, like the default one, ignores it. A candidate that arrives in another format is converted to JPEG. The server waits at most `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (30) for the image service.
 
-When the phone cancels a request by closing its connection (Design §2.6.3), the server stops its call to the image service within a quarter of a second, and OpenRouter does not bill the unfinished image. A cancelled request still counts toward the rate limit and leaves no line in the access log. A phone that loses its network without closing the connection is not noticed; the 25-second timeout ends that call.
+When the phone cancels a request by closing its connection (Design §2.6.3), the server stops its call to the image service within a quarter of a second, and OpenRouter does not bill the unfinished image. A cancelled request still counts toward the rate limit and leaves no line in the access log. A phone that loses its network without closing the connection is not noticed; the 30-second timeout ends that call.
 
 Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose template with this id"}}`.
 
@@ -108,7 +108,7 @@ In Iteration 1 the phones reach the laptop directly. Behind a reverse proxy, a t
 - **Cancelled requests must reach the server.** The server learns that a phone cancelled only when its own incoming connection closes, so the proxy has to close its connection to the server when the phone closes its side. nginx does this by default (`proxy_ignore_client_abort off`). A proxy that lets the request run on hides the cancel, and the image is generated and billed. To check, cancel a request through the public address, for example `curl --max-time 3 -F "image=@scene.jpg" -F templateId=wave -F seed=1 https://<host>/api/v1/poses`, and watch the server's access log: no line for that request means the cancel arrived, and a `POST /api/v1/poses` line with `200` about ten seconds later means it did not.
 - **The rate limit needs each phone's address.** It uses the client address that Uvicorn reports. Uvicorn takes that address from `X-Forwarded-For` only when the request comes from an address listed in `--forwarded-allow-ips`, which defaults to `127.0.0.1`. A proxy on the same machine therefore only has to set `X-Forwarded-For`; for a proxy on another machine, also pass its address in `--forwarded-allow-ips`. Otherwise every phone appears as the proxy and shares one limit. Phones behind one carrier or Wi-Fi gateway share an address too, so limit per user once accounts exist.
 - **Uploads stay small and in memory.** The server refuses a request over 1 MiB, which is also nginx's default limit (`client_max_body_size`); nginx answers a larger one with its own 413. A proxy may write an upload to a temporary file on its disk (nginx does for a body larger than `client_body_buffer_size`); raise that buffer or turn off request buffering to keep scene photos in memory (FR-4.9, NFR-13).
-- **Slow answers must be allowed.** A pose can take up to the 25-second upstream timeout, and the app waits 30 seconds. Set the proxy's or platform's response timeout above that.
+- **Slow answers must be allowed.** A pose can take up to the 30-second upstream timeout. Set the proxy's or platform's response timeout above that.
 - **One process.** The rate limit, like the sessions, lives in the memory of one process, so keep one worker and one instance. Serve HTTPS and WSS (NFR-14).
 
 ## Lint, format, and test
@@ -143,7 +143,7 @@ The terminal prints one line per image, then a summary table, the total cost, an
 
 | File | Contents |
 | --- | --- |
-| `report.html` | The summary table, then one table per photo: models as rows, the original and each pose as columns. Red marks a failed request or one slower than the server's 25-second upstream timeout (Design §2.8). Click an image to see it at full size. |
+| `report.html` | The summary table, then one table per photo: models as rows, the original and each pose as columns. Red marks a failed request or one slower than the server's 30-second upstream timeout. Click an image to see it at full size. |
 | `results.json` | Every request's latency, cost, parameters, and error, plus the prompt and poses used. |
 | `<photo>/<model>/<pose>.*` | The returned images, next to the prepared `scene.jpg`. |
 

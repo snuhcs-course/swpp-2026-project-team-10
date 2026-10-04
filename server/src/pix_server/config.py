@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # The vendor's own variable name, without the PIX_ prefix. Pose requests fail with UPSTREAM_ERROR while it is unset.
     openrouter_api_key: SecretStr | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
     # An OpenRouter image model id; append @low, @medium, or @high for a model that has quality tiers.
-    pose_model: str = "bytedance-seed/seedream-5-0-flash"
-    pose_upstream_timeout_seconds: PositiveFloat = 25
+    pose_model: str = "openai/gpt-image-2.5-flare@low"
+    pose_upstream_timeout_seconds: PositiveFloat = 30
     pose_rate_limit: PositiveInt = 20
     pose_rate_window_seconds: PositiveFloat = 3600

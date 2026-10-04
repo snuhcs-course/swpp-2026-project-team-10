@@ -64,7 +64,7 @@ POSES = {
 
 SCENE_LONG_SIDE = 1024
 SCENE_JPEG_QUALITY = 85
-UPSTREAM_BUDGET = 25.0  # the server stops waiting for the image API after this (Design Documentation 2.8)
+UPSTREAM_BUDGET = 30.0  # the server stops waiting for the image API after this (PIX_POSE_UPSTREAM_TIMEOUT_SECONDS)
 RESOLUTIONS = ["1K", "1.5K", "2K", "4K"]  # first match wins: candidates only need to match the 1024 px scene
 
 

@@ -1,0 +1,60 @@
+name: wiki-sync
+
+# Publishes the wiki/ folder to the repository's GitHub wiki. wiki/ is the source: an edit made on
+# GitHub's wiki pages is overwritten by the next run, though it stays in the wiki's own Git history.
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "wiki/**"
+      - ".github/workflows/wiki-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Runs queue instead of cancelling, so a publish is never stopped halfway through a push.
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: wiki-sync
+    # A manual run from another branch must not publish that branch's pages.
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # The wiki is a separate Git repository that the repository's own token may push to.
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repository
+          persist-credentials: false
+
+      - name: Check out wiki
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: published
+          # Kept so that the push below can authenticate.
+          persist-credentials: true
+
+      - name: Publish wiki/
+        working-directory: published
+        run: |
+          # Mirror the folder, including deletions, without touching the wiki's own .git directory.
+          rsync --archive --delete --exclude=.git/ ../repository/wiki/ ./
+          git add --all
+          if git diff --cached --quiet; then
+            echo "The wiki already matches wiki/."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet --message "Sync wiki/ from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git push origin HEAD
+          git show --stat --format="Published %h: %s" HEAD

@@ -46,7 +46,7 @@ DEFAULT_MODELS = [
     "google/gemini-3.1-flash-lite-image",
 ]
 
-# Wraps each template's pose description. Unlike the pose-only wording in Design Documentation 2.6.3, it lets the
+# The server's prompt (Design Documentation 2.6.3), which wraps each template's pose description. It lets the
 # model re-place the person, and pins the camera framing so the candidate still lines up with the live view.
 PROMPT = (
     "Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting "

@@ -45,15 +45,16 @@
     <string name="upload_reference">Upload a reference</string>
     <string name="generate_poses">Generate poses here</string>
     <string name="reference_title">Reference</string>
-    <string name="reference_placeholder">Separated person (#5)</string>
+    <string name="reference_preview_description">The person from the reference photo</string>
     <string name="cutout">Cutout</string>
     <string name="outline">Outline</string>
+    <string name="finding_person">Finding the person…</string>
     <string name="person_found">Person found</string>
+    <string name="couldnt_use_photo">Couldn\'t use this photo. Try another one.</string>
     <string name="use_this_guide">Use this guide</string>
     <string name="choose_another_photo">Choose another photo</string>
     <string name="no_person_title">No person found</string>
     <string name="no_person_message">Pick a photo where one person is clearly visible.</string>
-    <string name="temp_no_person">(temp) No person found</string>
 
     <!-- Flow 2: Pose generation -->
     <string name="generating_title">Generating poses</string>

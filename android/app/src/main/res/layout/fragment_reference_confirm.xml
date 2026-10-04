@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Reference confirm (R&S 6.2). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -12,21 +13,38 @@
         android:text="@string/reference_title"
         android:textAppearance="?attr/textAppearanceTitleLarge" />
 
-    <!-- TODO(#5): show the cutout or outline. -->
-    <TextView
-        android:id="@+id/referencePreview"
+    <!-- The cutout or the outline. Dark, so the light outline stroke stands out as it does on the camera. -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginVertical="16dp"
         android:layout_weight="1"
-        android:background="#33333333"
-        android:gravity="center"
-        android:text="@string/reference_placeholder" />
+        android:background="#FF202124">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+        <ImageView
+            android:id="@+id/referenceImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/reference_preview_description"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/referenceProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/styleToggle"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center">
+        android:layout_gravity="center_horizontal"
+        app:selectionRequired="true"
+        app:singleSelection="true">
 
         <Button
             android:id="@+id/cutoutButton"
@@ -40,21 +58,23 @@
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
             android:text="@string/outline" />
-    </LinearLayout>
+    </com.google.android.material.button.MaterialButtonToggleGroup>
 
     <TextView
+        android:id="@+id/referenceStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:padding="8dp"
-        android:text="@string/person_found" />
+        android:text="@string/finding_person"
+        android:visibility="invisible" />
 
     <Button
         android:id="@+id/useGuideButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:enabled="false"
         android:text="@string/use_this_guide" />
 
     <Button
@@ -63,12 +83,4 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/choose_another_photo" />
-
-    <!-- TODO(#5): remove when ReferenceViewModel moves to No person found. -->
-    <Button
-        android:id="@+id/tempNoPersonButton"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/temp_no_person" />
 </LinearLayout>

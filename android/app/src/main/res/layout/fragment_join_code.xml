@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Join with code, subject (R&S 6.7, FR-8.2, FR-8.3, FR-8.5). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -25,13 +26,15 @@
         android:labelFor="@id/codeInput"
         android:text="@string/room_code_label" />
 
-    <!-- TODO(#8): six digit boxes; Join stays disabled until 6 digits (FR-8.2). -->
+    <!-- Digits only; Join stays disabled until 6 digits are entered (FR-8.2). -->
     <EditText
         android:id="@+id/codeInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:autofillHints="none"
+        android:digits="0123456789"
         android:fontFamily="monospace"
+        android:imeOptions="actionDone"
         android:inputType="number"
         android:maxLength="6"
         android:textSize="26sp" />
@@ -42,6 +45,16 @@
         android:layout_marginTop="8dp"
         android:text="@string/same_wifi" />
 
+    <!-- "Connecting…" while joining, or why the join failed (FR-8.5). -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        tools:text="Connecting…"
+        tools:visibility="visible" />
+
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -51,6 +64,7 @@
         android:id="@+id/joinButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:enabled="false"
         android:text="@string/join" />
 
     <Button
@@ -59,12 +73,4 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/back" />
-
-    <!-- TODO(#8): remove when an unknown or expired code (NOT_FOUND, EXPIRED) moves to Session not found. -->
-    <Button
-        android:id="@+id/tempNotFoundButton"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/temp_code_not_found" />
 </LinearLayout>

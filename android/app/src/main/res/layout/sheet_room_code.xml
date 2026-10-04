@@ -18,7 +18,7 @@
         android:layout_marginTop="4dp"
         android:text="@string/room_code_body" />
 
-    <!-- TODO(#8): the code from SessionState.Waiting. -->
+    <!-- The code from SessionState.Waiting; a placeholder until it arrives. -->
     <TextView
         android:id="@+id/codeText"
         android:layout_width="match_parent"
@@ -29,10 +29,12 @@
         android:text="@string/room_code_placeholder"
         android:textSize="34sp" />
 
+    <!-- Getting a code, waiting, connecting, expired, or the same-Wi-Fi message (FR-8.5). -->
     <TextView
+        android:id="@+id/statusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/waiting_for_friend" />
+        android:text="@string/getting_code" />
 
     <TextView
         android:layout_width="match_parent"
@@ -60,12 +62,4 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/cancel" />
-
-    <!-- TODO(#8): remove when the sheet closes on SessionState.Connected. -->
-    <Button
-        android:id="@+id/tempFriendJoinedButton"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/temp_friend_joined" />
 </LinearLayout>

@@ -11,7 +11,7 @@
         android:gravity="center_vertical"
         android:padding="12dp">
 
-        <!-- TODO(#8): "<name>'s camera" with the name from hello. -->
+        <!-- "<name>'s camera" with the name from hello (FR-6.6). -->
         <TextView
             android:id="@+id/photographerName"
             android:layout_width="0dp"
@@ -30,16 +30,23 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:background="#000000">
 
-        <!-- TODO(#8): the photographer's live video, aspect-fit (Design 2.6.4). -->
-        <TextView
-            android:id="@+id/liveViewPlaceholder"
+        <!-- The photographer's live video, aspect-fit so the whole 3:4 frame is visible (Design 2.6.4, AD-10). -->
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/liveView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#33333333"
-            android:gravity="center"
-            android:text="@string/live_view_placeholder" />
+            android:layout_height="match_parent" />
+
+        <!-- Shown until the peer connection is up. -->
+        <TextView
+            android:id="@+id/connectingText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/connecting"
+            android:textColor="#FFFFFF" />
 
         <!-- The synced guide (#9). The subject cannot move or resize it in Iteration 1. -->
         <com.lastpenguin.pix.guide.GuideOverlayView
@@ -63,12 +70,4 @@
         android:gravity="center"
         android:padding="8dp"
         android:text="@string/subject_caption" />
-
-    <!-- TODO(#8): remove when SessionState.Ended(CONNECTION_LOST) moves to Connection lost. -->
-    <Button
-        android:id="@+id/tempConnectionLostButton"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/temp_connection_lost" />
 </LinearLayout>

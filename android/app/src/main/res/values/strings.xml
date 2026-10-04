@@ -9,11 +9,25 @@
     <string name="try_again">Try again</string>
     <string name="failure_label">FAILURE</string>
     <string name="same_wifi">Both phones need to be on the same Wi-Fi.</string>
+    <string name="connecting">Connecting…</string>
+    <string name="couldnt_connect_wifi">Couldn\'t connect. Make sure both phones are on the same Wi-Fi.</string>
 
     <!-- Flow 1: Camera -->
     <string name="shoot_together">Shoot together</string>
-    <string name="camera_preview_placeholder">Camera preview (#3)</string>
-    <string name="zoom_chips_placeholder">Zoom chips (#3)</string>
+    <string name="camera_permission_message">Pix needs camera access to show the viewfinder and take photos. Allow camera access in Settings.</string>
+    <string name="camera_unavailable">Camera unavailable. Close other apps using the camera, check camera access, then try again.</string>
+    <string name="starting_camera">Starting camera</string>
+    <string name="open_settings">Open settings</string>
+    <string name="allow_camera">Allow camera</string>
+    <string name="zoom_ratio">%1$s×</string>
+    <string name="saving_photo">Saving…</string>
+    <string name="photo_saved">Saved without the guide</string>
+    <string name="photo_save_failed">Couldn\'t take or save the photo. Please try again.</string>
+    <string name="photo_storage_failed">Couldn\'t write the photo. Check available storage and try again.</string>
+    <string name="photo_camera_closed">The camera closed before the photo was taken. Return to the camera and try again.</string>
+    <string name="open_last_photo">Open last saved photo in gallery</string>
+    <string name="gallery_unavailable">No app is available to open this photo.</string>
+    <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
     <string name="hint_add_guide">Tap Guide to add a pose</string>
     <string name="guide">Guide</string>
     <string name="shutter">Shutter</string>
@@ -22,6 +36,8 @@
     <string name="remove_guide">Remove</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
+    <string name="peer_left">%1$s left</string>
+    <string name="peer_disconnected">%1$s disconnected</string>
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>
@@ -56,7 +72,10 @@
     <!-- Flow 6: Room code -->
     <string name="room_code_body">Ask your friend to open Pix, tap Shoot together, and enter this code.</string>
     <string name="room_code_placeholder">––– –––</string>
+    <string name="getting_code">Getting a code…</string>
     <string name="waiting_for_friend">Waiting for your friend…</string>
+    <string name="friend_joined_connecting">Your friend joined · connecting…</string>
+    <string name="code_expired">The code expired. Tap Shoot together again for a new one.</string>
     <string name="code_expiry">The code expires in 10 minutes if nobody joins.</string>
     <string name="join_instead">Join with a code instead</string>
     <string name="join_title">Join with a code</string>
@@ -65,18 +84,18 @@
     <string name="join">Join</string>
     <string name="session_not_found_title">Session not found</string>
     <string name="session_not_found_message">Check the code with your friend and try again.</string>
-    <string name="temp_friend_joined">(temp) Friend joined</string>
-    <string name="temp_code_not_found">(temp) Code not found</string>
 
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s\'s camera</string>
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="subject_zoom_placeholder">Zoom chips (#10)</string>
-    <string name="live_view_placeholder">Photographer\'s live view (#8)</string>
     <string name="leave">Leave</string>
+    <string name="leave_session_title">Leave the session?</string>
     <string name="subject_caption">Only the photographer takes the photo.</string>
+    <string name="peer_ended_session">%1$s ended the session</string>
+    <string name="camera_paused">The photographer\'s camera is paused.</string>
+    <string name="session_ended">The session has ended.</string>
     <string name="connection_lost_title">Connection lost</string>
     <string name="connection_lost_message">Video stopped. Check that both phones are on the same Wi-Fi, then reconnect.</string>
     <string name="reconnect">Reconnect</string>
-    <string name="temp_connection_lost">(temp) Connection lost</string>
 </resources>

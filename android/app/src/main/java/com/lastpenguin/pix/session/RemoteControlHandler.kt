@@ -1,18 +1,112 @@
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import kotlin.math.abs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+
+/** A remote action the photographer's phone applied, for "Junhyeong set zoom to 2×" (FR-7.4). */
+sealed interface RemoteAction {
+    data class Zoom(val ratio: Float) : RemoteAction
+}
 
 /**
- * Photographer: applies the subject's remote zoom and echoes the result (Design 2.6.5).
+ * Photographer: applies the subject's remote zoom and echoes the applied zoom (Design 2.6.5, Figure 3).
+ *
+ * The echo follows the camera's *applied* zoom, not the request, so the subject also sees the photographer's own
+ * zoom changes and both phones always end on the same value (FR-7.6). A request that the camera does not apply
+ * within [ECHO_TIMEOUT_MS] is answered with the current zoom, so the subject's chip snaps back.
  * Owner: Real-time (#10).
  */
 class RemoteControlHandler(
     private val session: SessionManager,
     private val camera: CameraController,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    /** Handles `camera.zoom.set`: clamp, camera.setZoom, then reply with `camera.state`. */
+    private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
+
+    /** Applied remote actions, for the notice on the photographer's screen. */
+    val actions: SharedFlow<RemoteAction> = _actions.asSharedFlow()
+
+    private var scope: CoroutineScope? = null
+    private var zoomJob: Job? = null
+    private var finalJob: Job? = null
+    private var timeoutJob: Job? = null
+    private var pending: PendingZoom? = null
+
+    /** Echoes every applied zoom while [scope] is active, starting with the current one. */
+    fun start(scope: CoroutineScope) {
+        stop()
+        this.scope = scope
+        zoomJob = scope.launch { camera.zoom.collect { zoom -> onApplied(zoom) } }
+    }
+
+    fun stop() {
+        zoomJob?.cancel()
+        finalJob?.cancel()
+        timeoutJob?.cancel()
+        zoomJob = null
+        finalJob = null
+        timeoutJob = null
+        pending = null
+        scope = null
+    }
+
+    /** Handles `camera.zoom.set`: clamp, camera.setZoom, then reply with `camera.state`. Other messages are ignored. */
     fun handle(message: SessionMessage) {
-        TODO("#10")
+        val request = message as? SessionMessage.ZoomSet ?: return
+        val caps = camera.capabilities.value
+        val ratio = if (caps == null) request.ratio else request.ratio.coerceIn(caps.minZoom, caps.maxZoom)
+        if (!ratio.isFinite()) return
+        Timings.mark("zoom.received", "$ratio")
+        pending = PendingZoom(ratio, clock())
+        camera.setZoom(ratio)
+        timeoutJob?.cancel()
+        timeoutJob = scope?.launch {
+            delay(ECHO_TIMEOUT_MS)
+            if (pending != null) {
+                // The camera did not apply it (not ready, or already at that zoom): tell the subject where we are.
+                pending = null
+                send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
+            }
+        }
+    }
+
+    private fun onApplied(zoom: Float) {
+        val request = pending
+        val bySubject = request != null && abs(zoom - request.ratio) < ZOOM_MATCH && clock() - request.at <= PENDING_MS
+        if (bySubject) {
+            pending = null
+            timeoutJob?.cancel()
+            _actions.tryEmit(RemoteAction.Zoom(zoom))
+            Timings.mark("zoom.applied", "$zoom")
+        }
+        val by = if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER
+        send(zoom, by, final = false)
+        finalJob?.cancel()
+        finalJob = scope?.launch {
+            delay(FINAL_DELAY_MS)
+            send(zoom, by, final = true)
+        }
+    }
+
+    private fun send(zoom: Float, by: Role, final: Boolean) {
+        session.send(SessionMessage.CameraStateUpdate(zoom = zoom, by = by, final = final))
+    }
+
+    private class PendingZoom(val ratio: Float, val at: Long)
+
+    private companion object {
+        const val ZOOM_MATCH = 0.01f
+        const val PENDING_MS = 1_000L
+        const val ECHO_TIMEOUT_MS = 500L
+        const val FINAL_DELAY_MS = 100L
     }
 }

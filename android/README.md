@@ -10,7 +10,7 @@ Kotlin, XML Views with ViewBinding. minSdk 29, targetSdk 36. Open this `android/
 
 ### Camera
 
-The camera screen now requests camera permission, shows a rear-camera preview, exposes supported zoom chips and pinch zoom, and saves JPEGs to `Pictures/Pix` through MediaStore. Saved images contain only the camera image. The most recent photo has a thumbnail and opens in the system gallery; failed captures leave the camera and guide state intact.
+The camera screen requests camera permission, shows a rear-camera preview, supports continuous two-finger pinch zoom with an applied-ratio readout, and saves JPEGs to `Pictures/Pix` through MediaStore. Spread two fingers on the preview to zoom in and bring them together to zoom out. The readout also exposes Zoom in / Zoom out accessibility actions. Saved images contain only the camera image. The most recent photo has a thumbnail and opens in the system gallery; failed captures leave the camera and guide state intact.
 
 `Preview`, full-resolution `ImageCapture`, and YUV `ImageAnalysis` share a portrait 3:4 viewport. The preview uses fit-center scaling. `CameraController.status` is an added local contract: `IDLE`, `STARTING`, `READY`, or `UNAVAILABLE`; screens enable capture only when ready and offer a retry on initialization/opening failure. Include this addition in the affected owners' contract review and the Design Documentation update when preparing the PR.
 
@@ -23,7 +23,7 @@ Camera UI state observes the camera's applied zoom, rather than assuming request
 Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`. On a phone or camera-enabled emulator, check:
 
 1. Fresh launch: grant camera permission; verify the entire 3:4 preview appears. Deny permission on another launch and use Open settings to grant it, then return.
-2. Tap every supported zoom chip and pinch the preview; check the displayed selection follows the applied zoom.
+2. Spread and bring together two fingers on the preview; verify continuous zoom and an updated ratio such as 1.7×. Reach each zoom limit, then reverse direction without lifting your fingers; zoom should respond immediately. One-finger swipes should not zoom. With TalkBack, focus the ratio and use its Zoom in / Zoom out actions.
 3. Tap the shutter repeatedly while saving: one capture should be in flight, followed by a Pix album image, a new thumbnail, and “Saved without the guide.” Open the thumbnail.
 4. Open/close the guide and room-code sheets, open the gallery, background/foreground the app, and return from a full-screen destination; the camera should resume.
 5. On the S22 and S23 Ultra, compare preview, saved image, and `grabFrame()` framing/rotation. Verify file-write/camera failures keep the shutter usable for retry.

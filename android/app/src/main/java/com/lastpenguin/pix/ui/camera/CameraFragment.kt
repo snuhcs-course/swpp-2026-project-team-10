@@ -9,11 +9,14 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Size
+import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -22,7 +25,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import com.google.android.material.chip.Chip
 import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.CameraStatus
@@ -33,7 +35,6 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.text.DecimalFormat
-import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -50,7 +51,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private var binding: FragmentCameraBinding? = null
     private var permissionRequested = false
-    private var renderedZoomStops: List<Float>? = null
+    private val zoomFormat = DecimalFormat("0.0")
     private var previewLogged = false
     private var noticeJob: Job? = null
 
@@ -75,6 +76,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             }
         }
         setupPinchZoom(controls.previewView)
+        setupZoomAccessibility(controls.zoomRatio)
         controls.cameraActionButton.setOnClickListener {
             if (hasCameraPermission()) {
                 bindCamera()
@@ -168,7 +170,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     override fun onDestroyView() {
         binding = null
-        renderedZoomStops = null
         previewLogged = false
         super.onDestroyView()
     }
@@ -183,7 +184,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     // Attach pinch to the preview, not its parent: #6's overlay can own guide gestures.
-    @SuppressLint("ClickableViewAccessibility") // Zoom chips provide accessible equivalents to pinch.
+    @SuppressLint("ClickableViewAccessibility") // The zoom readout exposes accessible zoom actions.
     private fun setupPinchZoom(preview: PreviewView) {
         var requestedZoom = 1f
         val detector =
@@ -191,22 +192,57 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 requireContext(),
                 object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                        requestedZoom = viewModel.uiState.value.zoom
-                        return viewModel.uiState.value.cameraStatus == CameraStatus.READY
+                        val state = viewModel.uiState.value
+                        requestedZoom = state.zoom
+                        return state.cameraStatus == CameraStatus.READY && state.maxZoom > state.minZoom
                     }
 
                     override fun onScale(detector: ScaleGestureDetector): Boolean {
                         val state = viewModel.uiState.value
-                        requestedZoom = (requestedZoom * detector.scaleFactor).coerceIn(state.minZoom, state.maxZoom)
-                        viewModel.onZoomChip(requestedZoom)
+                        val factor = detector.scaleFactor
+                        if (state.cameraStatus != CameraStatus.READY || !factor.isFinite() || factor <= 0f) {
+                            return false
+                        }
+                        // Accumulate gesture deltas without waiting for CameraX's asynchronous state
+                        // or snapping to preset stops. Clamp each step so reversing at a limit responds immediately.
+                        requestedZoom = (requestedZoom * factor).coerceIn(state.minZoom, state.maxZoom)
+                        viewModel.onZoomChanged(requestedZoom)
                         return true
                     }
                 },
-            )
+            ).apply {
+                isQuickScaleEnabled = false
+                isStylusScaleEnabled = false
+            }
         preview.setOnTouchListener { _, event ->
             detector.onTouchEvent(event)
+            preview.parent.requestDisallowInterceptTouchEvent(
+                detector.isInProgress && event.actionMasked != MotionEvent.ACTION_UP &&
+                    event.actionMasked != MotionEvent.ACTION_CANCEL,
+            )
             true
         }
+    }
+
+    private fun setupZoomAccessibility(readout: View) {
+        fun adjust(factor: Float): Boolean {
+            val state = viewModel.uiState.value
+            if (state.cameraStatus != CameraStatus.READY) return false
+            val ratio = (state.zoom * factor).coerceIn(state.minZoom, state.maxZoom)
+            if (ratio == state.zoom) return false
+            viewModel.onZoomChanged(ratio)
+            return true
+        }
+        ViewCompat.replaceAccessibilityAction(
+            readout,
+            AccessibilityActionCompat.ACTION_SCROLL_FORWARD,
+            getString(R.string.zoom_in),
+        ) { _, _ -> adjust(1.1f) }
+        ViewCompat.replaceAccessibilityAction(
+            readout,
+            AccessibilityActionCompat.ACTION_SCROLL_BACKWARD,
+            getString(R.string.zoom_out),
+        ) { _, _ -> adjust(1f / 1.1f) }
     }
 
     private fun render(state: CameraUiState) {
@@ -226,30 +262,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
 
-        if (renderedZoomStops != state.zoomStops) {
-            renderedZoomStops = state.zoomStops
-            controls.zoomChips.removeAllViews()
-            state.zoomStops.forEach { ratio ->
-                controls.zoomChips.addView(
-                    Chip(requireContext()).apply {
-                        text = getString(R.string.zoom_ratio, DecimalFormat("0.#").format(ratio))
-                        isCheckable = true
-                        tag = ratio
-                        setEnsureMinTouchTargetSize(true)
-                        setOnClickListener {
-                            viewModel.onZoomChip(ratio)
-                            render(viewModel.uiState.value)
-                        }
-                    },
-                )
-            }
-        }
-        for (index in 0 until controls.zoomChips.childCount) {
-            (controls.zoomChips.getChildAt(index) as Chip).apply {
-                isEnabled = ready
-                isChecked = abs((tag as Float) - state.zoom) < 0.01f
-            }
-        }
+        val ratio = zoomFormat.format(state.zoom)
+        controls.zoomRatio.text = getString(R.string.zoom_ratio, ratio)
+        controls.zoomRatio.contentDescription = getString(R.string.camera_zoom_description, ratio)
+        controls.zoomRatio.isEnabled = ready && state.maxZoom > state.minZoom
         controls.captureStatus.isVisible = state.captureNotice != null
         state.captureNotice?.let {
             controls.captureStatus.setText(

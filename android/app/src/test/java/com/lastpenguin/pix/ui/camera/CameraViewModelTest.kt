@@ -102,8 +102,8 @@ class CameraViewModelTest {
     @Test
     fun zoomDisplayFollowsAppliedCameraStateIncludingRemoteChanges() = runTest {
         runCurrent()
-        model.onZoomChip(2f)
-        assertEquals(listOf(2f), camera.zoomRequests)
+        model.onZoomChanged(1.73f)
+        assertEquals(listOf(1.73f), camera.zoomRequests)
         // A request is not yet the applied value; the camera remains authoritative.
         assertEquals(1f, model.uiState.value.zoom)
         camera.zoom.value = 1.8f
@@ -116,10 +116,10 @@ class CameraViewModelTest {
 
     @Test
     fun invalidZoomAndUnavailableCameraDoNotIssueCommands() = runTest {
-        model.onZoomChip(Float.NaN)
-        model.onZoomChip(Float.POSITIVE_INFINITY)
+        model.onZoomChanged(Float.NaN)
+        model.onZoomChanged(Float.POSITIVE_INFINITY)
         camera.status.value = CameraStatus.UNAVAILABLE
-        model.onZoomChip(2f)
+        model.onZoomChanged(2f)
         model.onShutter()
         runCurrent()
         assertTrue(camera.zoomRequests.isEmpty())

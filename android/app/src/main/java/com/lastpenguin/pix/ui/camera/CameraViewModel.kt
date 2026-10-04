@@ -37,7 +37,6 @@ internal fun captureFailureNotice(error: Throwable): CaptureNotice = when {
 /** Everything the Camera screen shows (R&S 6.2: Camera, Camera + guide, Photo saved). */
 data class CameraUiState(
     val cameraStatus: CameraStatus = CameraStatus.IDLE,
-    val zoomStops: List<Float> = emptyList(),
     val minZoom: Float = 1f,
     val maxZoom: Float = 1f,
     val zoom: Float = 1f,
@@ -71,7 +70,6 @@ class CameraViewModel(
             camera.capabilities.collect { capabilities ->
                 _uiState.update {
                     it.copy(
-                        zoomStops = capabilities?.zoomStops.orEmpty(),
                         minZoom = capabilities?.minZoom ?: 1f,
                         maxZoom = capabilities?.maxZoom ?: 1f,
                     )
@@ -118,7 +116,7 @@ class CameraViewModel(
         }
     }
 
-    fun onZoomChip(ratio: Float) {
+    fun onZoomChanged(ratio: Float) {
         if (camera.status.value == CameraStatus.READY && ratio.isFinite()) camera.setZoom(ratio)
     }
 

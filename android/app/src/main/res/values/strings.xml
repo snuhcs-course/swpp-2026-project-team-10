@@ -88,7 +88,6 @@
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s\'s camera</string>
     <string name="subject_title_placeholder">Photographer\'s camera</string>
-    <string name="subject_zoom_placeholder">Zoom chips (#10)</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
     <string name="subject_caption">Only the photographer takes the photo.</string>

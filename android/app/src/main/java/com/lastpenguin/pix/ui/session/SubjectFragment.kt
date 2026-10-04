@@ -18,6 +18,7 @@ import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.ZoomChips
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
@@ -61,7 +62,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
                         // TODO(#9): binding.guideOverlay.render(ui.guide, ui.guideState).
-                        // TODO(#10): zoom chips from ui.zoomStops and ui.zoom → viewModel.onZoomChip.
+                        ZoomChips.render(binding.zoomChips, ui.zoomStops, ui.zoom, ui.connected, viewModel::onZoomChip)
                     }
                 }
                 launch {

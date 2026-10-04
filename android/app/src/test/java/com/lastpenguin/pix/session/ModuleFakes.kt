@@ -8,13 +8,20 @@ import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.guide.GuideChange
+import com.lastpenguin.pix.guide.GuideRepository
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.webrtc.EglBase
+import org.webrtc.VideoSink
 
 /** A session that records what is sent and lets a test deliver incoming messages. */
 class FakeSessionManager : SessionManager {
@@ -82,5 +89,43 @@ class FakeCameraController(
 
     override fun setFrameSink(sink: FrameSink?) {
         this.sink = sink
+    }
+}
+
+/** A guide store that only remembers what it was given. */
+class FakeGuideRepository : GuideRepository {
+    private val _guide = MutableStateFlow<ReferenceGuide?>(null)
+    override val guide: StateFlow<ReferenceGuide?> = _guide.asStateFlow()
+
+    private val _state = MutableStateFlow(GuideState())
+    override val state: StateFlow<GuideState> = _state.asStateFlow()
+
+    private val _changes = MutableSharedFlow<GuideChange>(extraBufferCapacity = 64)
+    override val changes: SharedFlow<GuideChange> = _changes.asSharedFlow()
+
+    override fun setGuide(guide: ReferenceGuide?) {
+        _guide.value = guide
+    }
+
+    override fun update(final: Boolean, change: (GuideState) -> GuideState) {
+        _state.value = change(_state.value)
+        _changes.tryEmit(GuideChange(_state.value, final))
+    }
+}
+
+/** Video that goes nowhere. */
+class FakeRemoteVideo : RemoteVideo {
+    override val eglContext: EglBase.Context = object : EglBase.Context {
+        override fun getNativeEglContext(): Long = 0L
+    }
+
+    val sinks = mutableListOf<VideoSink>()
+
+    override fun attach(sink: VideoSink) {
+        sinks += sink
+    }
+
+    override fun detach(sink: VideoSink) {
+        sinks -= sink
     }
 }

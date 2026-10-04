@@ -2,10 +2,12 @@ package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.RemoteVideo
+import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -19,9 +21,11 @@ import kotlinx.coroutines.launch
 data class SubjectUiState(
     /** For "Dongje's camera"; arrives in `hello`. */
     val photographerName: String? = null,
+    /** Both data channels are up, so remote zoom can be used. */
+    val connected: Boolean = false,
     /** From `camera.capabilities`. */
     val zoomStops: List<Float> = emptyList(),
-    /** From `camera.state`. */
+    /** The zoom to show: the chip just tapped, until the photographer echoes the applied zoom in `camera.state`. */
     val zoom: Float = 1f,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
@@ -43,10 +47,12 @@ class SubjectViewModel(
     init {
         viewModelScope.launch {
             session.state.collect { state ->
-                if (state is SessionState.Connected) {
-                    _uiState.update {
-                        it.copy(photographerName = state.peer.displayName)
-                    }
+                val connected = state as? SessionState.Connected
+                _uiState.update {
+                    it.copy(
+                        connected = connected != null,
+                        photographerName = connected?.peer?.displayName ?: it.photographerName,
+                    )
                 }
             }
         }
@@ -57,7 +63,10 @@ class SubjectViewModel(
                         it.copy(zoomStops = message.capabilities.zoomStops)
                     }
 
-                    is SessionMessage.CameraStateUpdate -> _uiState.update { it.copy(zoom = message.zoom) }
+                    is SessionMessage.CameraStateUpdate -> {
+                        _uiState.update { it.copy(zoom = message.zoom) }
+                        if (message.by == Role.SUBJECT && message.final) Timings.mark("zoom.echo", "${message.zoom}")
+                    }
 
                     else -> Unit
                 }
@@ -66,7 +75,11 @@ class SubjectViewModel(
         // TODO(#9): mirror.guide and mirror.state → uiState.guide and guideState.
     }
 
+    /** Shows the chip at once, asks the photographer, and snaps to the echoed `camera.state` (Design 2.6.5). */
     fun onZoomChip(ratio: Float) {
-        // TODO(#10): show it at once, send camera.zoom.set, then snap to the echoed camera.state (Design 2.6.5).
+        if (!ratio.isFinite() || !_uiState.value.connected) return
+        _uiState.update { it.copy(zoom = ratio) }
+        session.send(SessionMessage.ZoomSet(ratio))
+        Timings.mark("zoom.sent", "$ratio")
     }
 }

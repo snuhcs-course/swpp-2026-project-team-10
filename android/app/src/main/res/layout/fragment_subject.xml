@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1). No shutter: only the photographer takes photos. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -55,14 +56,28 @@
             android:layout_height="match_parent" />
     </FrameLayout>
 
-    <!-- TODO(#10): chips for the photographer's zoom stops. -->
-    <TextView
-        android:id="@+id/zoomChips"
+    <!-- One chip per zoom stop of the photographer's camera; enabled while connected (FR-7.1). -->
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:padding="8dp"
-        android:text="@string/subject_zoom_placeholder" />
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/zoomChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                app:singleLine="true"
+                app:singleSelection="true" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
     <TextView
         android:layout_width="match_parent"

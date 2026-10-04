@@ -65,6 +65,17 @@ Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active ro
 
 Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. Request bodies, room codes, and signaling payloads are not logged by the app.
 
+## Testing the photographer's phone without a second phone
+
+`tools/fake_subject.py` is a subject phone made of Python. It joins a room code, answers the WebRTC offer with [aiortc](https://github.com/aiortc/aiortc), exchanges `hello` on the data channels, counts the video frames it receives, optionally sends `camera.zoom.set`, and prints the echoed `camera.state` with its delay. It is a development tool and not part of the server; its two dependencies are not in `pyproject.toml`.
+
+```sh
+pip install websockets aiortc
+python tools/fake_subject.py 482915 --seconds 20 --zoom 2.0
+```
+
+Start the server, open Pix on one phone or emulator (an emulator reaches the laptop at `http://10.0.2.2:8000/`), tap *Shoot together*, and pass the code. The phone shows "Live · fake-subject connected", and the script reports the first video frame, a frame count, and the `camera.state` that answers the zoom request.
+
 ## Lint, format, and test
 
 Run these from `server/` before you push. On every pull request, the [server-lint](../.github/workflows/server-lint.yml) workflow runs the two checks and the [server-test](../.github/workflows/server-test.yml) workflow runs the tests.

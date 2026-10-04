@@ -76,7 +76,7 @@ The base URL is `http://<laptop-Wi-Fi-IP>:8000/api/v1`.
 | `GET /pose-templates` | `[{"id":"hands_on_hips","label":"Hands on hips"}, …]` with the four templates `hands_on_hips`, `wave`, `walking`, and `arms_crossed`. The pose descriptions stay on the server. |
 | `POST /poses` | One candidate for one template: `{"templateId":"wave","image":"<Base64 JPEG>","elapsedMs":9961}`. The app sends one request per template in parallel. |
 
-`POST /poses` takes `multipart/form-data` with three parts: `image` (a JPEG with a long side of at most 1024 px, no EXIF, and at most 1 MiB), `templateId`, and `seed` (an integer).
+`POST /poses` takes `multipart/form-data` with three parts: `image` (a JPEG with a long side of at most 1024 px and no EXIF), `templateId`, and `seed` (an integer). The whole request may be at most 1 MiB; a photo prepared as Design §2.6.3 describes is a few hundred KB.
 
 ```sh
 curl -F "image=@scene.jpg" -F templateId=wave -F seed=1829304756 http://localhost:8000/api/v1/poses
@@ -90,15 +90,16 @@ Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose tem
 
 | Status and code | Meaning |
 | --- | --- |
-| `400 INVALID_IMAGE` | Not a readable JPEG, a long side over 1024 px, EXIF metadata, or more than 1 MiB. |
+| `400 INVALID_IMAGE` | Not a readable JPEG, a long side over 1024 px, or EXIF metadata. |
 | `400 UNKNOWN_TEMPLATE` | No template has that `templateId`. |
 | `400 INVALID_REQUEST` | A part is missing or `seed` is not an integer. This code is not in Design §2.5.3; it replaces FastAPI's default 422, which this API uses for `REJECTED`. |
+| `413` | The request is larger than 1 MiB. It is refused before the upload is read, so it carries Starlette's own body (`Content Too Large`) and not the error shape above. |
 | `422 REJECTED` | The image service declined the photo or pose (a content filter or a model refusal). |
 | `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600). Requests refused before that point are not counted. |
-| `502 UPSTREAM_ERROR` | The image service failed, could not be reached, or gave an unreadable answer, or `OPENROUTER_API_KEY` is not set. The server log gives the reason, for example insufficient credits. |
+| `502 UPSTREAM_ERROR` | The image service failed, could not be reached, or gave an unreadable answer, or `OPENROUTER_API_KEY` is not set. The server log gives OpenRouter's status code, for example 402 when the credits run out, and never the text of its answer. |
 | `504 UPSTREAM_TIMEOUT` | The image service did not answer in time. |
 
-The rate limit is counted per client IP address in memory, so it resets when the server restarts; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). OpenRouter bills each generated image.
+The rate limit is counted per client IP address in memory, so it resets when the server restarts; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
 
 ## Before moving to a public host
 
@@ -106,7 +107,7 @@ In Iteration 1 the phones reach the laptop directly. Behind a reverse proxy, a t
 
 - **Cancelled requests must reach the server.** The server learns that a phone cancelled only when its own incoming connection closes, so the proxy has to close its connection to the server when the phone closes its side. nginx does this by default (`proxy_ignore_client_abort off`). A proxy that lets the request run on hides the cancel, and the image is generated and billed. To check, cancel a request through the public address, for example `curl --max-time 3 -F "image=@scene.jpg" -F templateId=wave -F seed=1 https://<host>/api/v1/poses`, and watch the server's access log: no line for that request means the cancel arrived, and a `POST /api/v1/poses` line with `200` about ten seconds later means it did not.
 - **The rate limit needs each phone's address.** It uses the client address that Uvicorn reports. Uvicorn takes that address from `X-Forwarded-For` only when the request comes from an address listed in `--forwarded-allow-ips`, which defaults to `127.0.0.1`. A proxy on the same machine therefore only has to set `X-Forwarded-For`; for a proxy on another machine, also pass its address in `--forwarded-allow-ips`. Otherwise every phone appears as the proxy and shares one limit. Phones behind one carrier or Wi-Fi gateway share an address too, so limit per user once accounts exist.
-- **Uploads need a little over 1 MiB.** The whole multipart request is slightly larger than the photo. nginx rejects bodies over exactly 1 MiB by default (`client_max_body_size`) with its own non-JSON 413. A proxy may also write an upload to a temporary file on its disk (nginx does for a body larger than `client_body_buffer_size`); raise that buffer or turn off request buffering to keep scene photos in memory (FR-4.9, NFR-13).
+- **Uploads stay small and in memory.** The server refuses a request over 1 MiB, which is also nginx's default limit (`client_max_body_size`); nginx answers a larger one with its own 413. A proxy may write an upload to a temporary file on its disk (nginx does for a body larger than `client_body_buffer_size`); raise that buffer or turn off request buffering to keep scene photos in memory (FR-4.9, NFR-13).
 - **Slow answers must be allowed.** A pose can take up to the 25-second upstream timeout, and the app waits 30 seconds. Set the proxy's or platform's response timeout above that.
 - **One process.** The rate limit, like the sessions, lives in the memory of one process, so keep one worker and one instance. Serve HTTPS and WSS (NFR-14).
 

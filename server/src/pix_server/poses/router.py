@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, Request, UploadFile
 from pydantic import BaseModel
 
 from pix_server.errors import ApiError
-from pix_server.poses.generator import MAX_SCENE_BYTES, PoseGenerator, check_scene
+from pix_server.poses.generator import PoseGenerator, check_scene
 from pix_server.poses.limiter import RateLimiter
 from pix_server.poses.templates import TEMPLATES
 
@@ -45,7 +45,7 @@ async def create_pose(
     template = TEMPLATES.get(template_id)
     if template is None:
         raise ApiError(400, "UNKNOWN_TEMPLATE", "No pose template with this id")
-    scene = await image.read(MAX_SCENE_BYTES + 1)
+    scene = await image.read()
     check_scene(scene)
 
     # Only requests that reach the image API count, because the limit exists to control its cost.

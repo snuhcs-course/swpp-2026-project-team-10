@@ -1,14 +1,16 @@
 import asyncio
 import base64
 import io
+import tempfile
 
 import httpx2
 import pytest
 import uvicorn
 from PIL import Image
 from pydantic import SecretStr
+from starlette.formparsers import MultiPartParser
 
-from pix_server.main import create_app
+from pix_server.main import MAX_REQUEST_BYTES, create_app
 from pix_server.poses.limiter import RateLimiter
 from pix_server.poses.templates import TEMPLATES
 
@@ -121,7 +123,7 @@ def test_image_outside_the_contract_is_invalid(client, image_api, make_image):
     too_large = make_image(size=(1025, 768))
     with_metadata = make_image(exif=True)
     truncated = make_image()[:-200]
-    for image in (make_image("PNG"), too_large, with_metadata, truncated, make_image() + b"\0" * 1024 * 1024):
+    for image in (make_image("PNG"), too_large, with_metadata, truncated):
         assert_error(create_pose(client, image), 400, "INVALID_IMAGE")
     assert "1024 px" in assert_error(create_pose(client, too_large), 400, "INVALID_IMAGE")
     assert "EXIF" in assert_error(create_pose(client, with_metadata), 400, "INVALID_IMAGE")
@@ -235,3 +237,60 @@ def test_request_that_stays_connected_is_not_cancelled(client, image_api, make_i
     image_api.delay = 0.6
     assert create_pose(client, make_image()).status_code == 200
     assert not image_api.cancelled.is_set()
+
+
+@pytest.fixture
+def spooled_to_disk(monkeypatch):
+    """Records every upload that Starlette moves from memory to a temporary file."""
+    rollovers = []
+    rollover = tempfile.SpooledTemporaryFile.rollover
+
+    def record(file):
+        rollovers.append(file)
+        rollover(file)
+
+    monkeypatch.setattr(tempfile.SpooledTemporaryFile, "rollover", record)
+    return rollovers
+
+
+def test_oversized_request_is_refused_before_it_is_parsed(client, image_api, make_image, spooled_to_disk):
+    response = create_pose(client, make_image() + b"\0" * MAX_REQUEST_BYTES)
+    assert response.status_code == 413
+    assert spooled_to_disk == []
+    assert image_api.requests == []
+
+
+def test_oversized_request_without_a_declared_length_is_refused(client, image_api, make_image, spooled_to_disk):
+    upload = httpx2.Request(
+        "POST",
+        "http://testserver/api/v1/poses",
+        files={"image": ("scene.jpg", make_image() + b"\0" * 4 * MAX_REQUEST_BYTES, "image/jpeg")},
+        data={"templateId": "wave", "seed": "1"},
+    )
+    body = upload.read()
+    chunks = (body[start : start + 65_536] for start in range(0, len(body), 65_536))
+    response = client.post("/api/v1/poses", content=chunks, headers={"Content-Type": upload.headers["Content-Type"]})
+    assert "content-length" not in response.request.headers
+    assert response.status_code == 413
+    assert spooled_to_disk == []
+    assert image_api.requests == []
+
+
+def test_largest_accepted_upload_stays_in_memory(client, make_image, spooled_to_disk):
+    # A valid JPEG followed by padding still decodes, so this request is parsed and reaches the image API.
+    image = make_image()
+    image += b"\0" * (MAX_REQUEST_BYTES - len(image) - 2048)
+    response = create_pose(client, image)
+    assert int(response.request.headers["content-length"]) > MAX_REQUEST_BYTES - 2048
+    assert response.status_code == 200
+    assert spooled_to_disk == []
+    assert MAX_REQUEST_BYTES <= MultiPartParser.spool_max_size
+
+
+@pytest.mark.parametrize("status", [200, 400, 502])
+def test_upstream_body_is_not_logged(client, image_api, make_image, caplog, status):
+    image_api.fails(status, "invalid prompt: SECRET-PROMPT data:image/jpeg;base64,SECRET-PHOTO")
+    assert_error(create_pose(client, make_image()), 502, "UPSTREAM_ERROR")
+    assert "OpenRouter answered" in caplog.text
+    assert str(status) in caplog.text
+    assert "SECRET" not in caplog.text

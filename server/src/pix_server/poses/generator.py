@@ -4,6 +4,7 @@ import asyncio
 import base64
 import io
 import logging
+from http import HTTPStatus
 
 import httpx2
 from PIL import Image
@@ -15,7 +16,6 @@ from pix_server.poses.templates import PROMPT, PoseTemplate
 logger = logging.getLogger(__name__)
 
 API_URL = "https://openrouter.ai/api/v1/images"
-MAX_SCENE_BYTES = 1024 * 1024  # also Starlette's in-memory limit for an upload, so an accepted photo never touches disk
 MAX_SCENE_SIDE = 1024
 SEED_LIMIT = 2**31  # Seedream rejects seeds above 2**31 - 1, and the app sends a 64-bit value
 RESULT_JPEG_QUALITY = 90
@@ -23,8 +23,6 @@ RESULT_JPEG_QUALITY = 90
 
 def check_scene(data: bytes) -> None:
     """Accept only what the app sends (Design Documentation 2.5.3): a JPEG, long side at most 1024 px, no EXIF."""
-    if len(data) > MAX_SCENE_BYTES:
-        raise ApiError(400, "INVALID_IMAGE", f"The image must be at most {MAX_SCENE_BYTES // 1024} KiB")
     try:
         with Image.open(io.BytesIO(data), formats=["JPEG"]) as image:
             if max(image.size) > MAX_SCENE_SIDE:
@@ -35,6 +33,13 @@ def check_scene(data: bytes) -> None:
             image.load()
     except (OSError, Image.DecompressionBombError) as exc:
         raise ApiError(400, "INVALID_IMAGE", "The image must be a readable JPEG") from exc
+
+
+def status_phrase(status: int) -> str:
+    try:
+        return HTTPStatus(status).phrase
+    except ValueError:
+        return "unrecognized status"
 
 
 def as_jpeg(data: bytes) -> bytes:
@@ -89,13 +94,14 @@ class PoseGenerator:
             raise ApiError(502, "UPSTREAM_ERROR", "The image service could not be reached") from exc
 
         if response.status_code == 403:
-            # OpenRouter's status for a content filter or a model refusal. The body may quote the input: do not log it.
+            # OpenRouter's status for a content filter or a model refusal.
             logger.warning("OpenRouter declined a pose request")
             raise ApiError(422, "REJECTED", "The image service declined this request")
         try:
             body = response.json()
             if response.status_code != 200 or "error" in body:
-                logger.warning("OpenRouter answered %s: %s", response.status_code, body["error"]["message"])
+                # An upstream body can quote the prompt or the photo, so only the status reaches the log.
+                logger.warning("OpenRouter answered %s (%s)", response.status_code, status_phrase(response.status_code))
                 raise ApiError(502, "UPSTREAM_ERROR", "The image service failed")
             image = base64.b64decode(body["data"][0]["b64_json"])
             return await asyncio.to_thread(as_jpeg, image)

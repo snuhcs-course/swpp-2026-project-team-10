@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
@@ -15,6 +16,7 @@ import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -23,8 +25,14 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
-/** The other phone left or dropped: "Junhyeong left" on the photographer's camera (FR-6.10, FR-6.11). */
-data class PeerNotice(val name: String, val reason: EndReason)
+/** Short notices for the photographer's camera screen. */
+sealed interface SessionNotice {
+    /** The other phone left or dropped: "Junhyeong left" (FR-6.10, FR-6.11). */
+    data class PeerGone(val name: String, val reason: EndReason) : SessionNotice
+
+    /** The subject changed the zoom: "Junhyeong set zoom to 2×" (FR-7.4). */
+    data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
+}
 
 /**
  * Starts, joins, and ends a room-code session (R&S 6.7, Design 2.4). Shared by the session screens
@@ -50,8 +58,8 @@ class SessionViewModel(
     /** Every state change from the moment a screen subscribes, for one-shot navigation. Screens draw from [state]. */
     val transitions: SharedFlow<SessionState> = _transitions.asSharedFlow()
 
-    private val _notices = MutableSharedFlow<PeerNotice>(extraBufferCapacity = 16)
-    val notices: SharedFlow<PeerNotice> = _notices.asSharedFlow()
+    private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
+    val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
 
     /** The code the subject entered last. Session not found keeps it, and Reconnect reuses it (FR-8.3, FR-6.11). */
     var lastCode: String? = null
@@ -130,14 +138,28 @@ class SessionViewModel(
         val liveNow = connected?.role == Role.PHOTOGRAPHER
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {
-                camera.capabilities.filterNotNull().collect { session.send(SessionMessage.Capabilities(it)) }
+                coroutineScope {
+                    launch {
+                        camera.capabilities.filterNotNull().collect { session.send(SessionMessage.Capabilities(it)) }
+                    }
+                    remoteControl.start(this)
+                    launch { session.incoming.collect { remoteControl.handle(it) } }
+                    launch {
+                        remoteControl.actions.collect { action ->
+                            val name = peerName ?: return@collect
+                            when (action) {
+                                is RemoteAction.Zoom -> _notices.tryEmit(SessionNotice.RemoteZoom(name, action.ratio))
+                            }
+                        }
+                    }
+                    // TODO(#9): guideSyncer.startAsSender(this) while connected.
+                }
             }
-            // TODO(#9): guideSyncer.startAsSender(...) while connected.
-            // TODO(#10): session.incoming → remoteControl.handle while connected.
         }
-        if (!liveNow) {
+        if (!liveNow && connectedJob != null) {
             connectedJob?.cancel()
             connectedJob = null
+            remoteControl.stop()
         }
     }
 
@@ -158,7 +180,7 @@ class SessionViewModel(
     private fun onMessage(message: SessionMessage) {
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
-        _notices.tryEmit(PeerNotice(name, message.reason))
+        _notices.tryEmit(SessionNotice.PeerGone(name, message.reason))
     }
 
     private companion object {

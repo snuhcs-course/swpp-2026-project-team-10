@@ -38,6 +38,7 @@
     <string name="end_session">End session</string>
     <string name="peer_left">%1$s left</string>
     <string name="peer_disconnected">%1$s disconnected</string>
+    <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>

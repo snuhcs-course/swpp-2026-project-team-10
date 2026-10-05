@@ -32,6 +32,9 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
             // The same step as an uploaded photo: the person is separated on the phone (FR-4.6).
             referenceViewModel.onCandidatePicked(image)
             findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
+            // Reference confirm has the image now. The scene and the other candidates cannot be reached again, so
+            // they are let go; after navigating, so that this screen does not take the empty state for a restart.
+            viewModel.cancel()
         }
         binding.tryOtherButton.setOnClickListener {
             viewModel.retry()

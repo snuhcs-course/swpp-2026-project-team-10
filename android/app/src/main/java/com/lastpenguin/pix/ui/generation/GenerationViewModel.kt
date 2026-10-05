@@ -8,8 +8,10 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationConsent
+import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseTemplate
+import com.lastpenguin.pix.generation.RemotePoseGenerator
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The scene photo on Camera, Generating poses, Pick a pose, and Couldn't create poses (R&S 6.3). */
 data class GenerationUiState(
@@ -53,6 +56,7 @@ class GenerationViewModel(
     private val generator: PoseGenerator,
     private val camera: CameraController,
     private val consent: GenerationConsent,
+    private val limitMs: Long = RemotePoseGenerator.TIMEOUT_MS,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GenerationUiState())
@@ -133,7 +137,10 @@ class GenerationViewModel(
         _uiState.value.scene?.let(::start)
     }
 
-    /** *Cancel* and *Back to camera*: stops the requests and discards the scene and the candidates. */
+    /**
+     * *Cancel* and *Back to camera*: stops the requests and discards the scene and the candidates. Also called once
+     * *Use this pose* has handed the chosen image on, so the other images do not stay in memory.
+     */
     fun cancel() {
         shooting?.cancel()
         shooting = null
@@ -152,29 +159,42 @@ class GenerationViewModel(
     }
 
     /**
-     * Ends in PICKING when at least one candidate arrived and in FAILED otherwise (FR-4.7). The generator answers for
-     * every template within its 30 s limit, so collecting its flow to the end is also the 30 s deadline.
+     * Ends in PICKING when at least one candidate arrived and in FAILED otherwise (FR-4.7). One limit covers the whole
+     * run, fetching the templates included, so Generating poses never lasts longer than the 30 s it says (NFR-4).
      */
     private suspend fun generate(scene: Bitmap) {
         _uiState.value = GenerationUiState(scene = scene, phase = GenerationUiState.Phase.GENERATING)
         Timings.mark("pose.start")
-        try {
-            val templates = generator.templates()
-            _uiState.update { it.copy(templates = templates) }
-            generator.generate(scene, templates, Random.nextLong()).collect { event ->
-                if (event is CandidateEvent.Ready && _uiState.value.readyCount == 0) Timings.mark("pose.first")
-                _uiState.update { it.copy(candidates = it.candidates + (event.templateId to event)) }
+        val inTime = withTimeoutOrNull(limitMs) {
+            try {
+                val templates = generator.templates()
+                _uiState.update { it.copy(templates = templates) }
+                generator.generate(scene, templates, Random.nextLong()).collect { event ->
+                    if (event is CandidateEvent.Ready && _uiState.value.readyCount == 0) Timings.mark("pose.first")
+                    _uiState.update { it.copy(candidates = it.candidates + (event.templateId to event)) }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // The templates could not be fetched; whatever arrived before a later failure is still shown.
+                Log.w(TAG, "Generation stopped: $error")
             }
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            // The templates could not be fetched; whatever arrived before a later failure is still shown.
-            Log.w(TAG, "Generation stopped: $error")
         }
+        if (inTime == null) stopUnanswered()
         val state = _uiState.value
         Timings.mark("pose.done", "${state.readyCount} of ${state.templates.size} ready")
         val phase = if (state.readyCount > 0) GenerationUiState.Phase.PICKING else GenerationUiState.Phase.FAILED
         _uiState.update { it.copy(phase = phase) }
+    }
+
+    /** The limit ended the collector, and with it the requests still open: their poses count as timed out. */
+    private fun stopUnanswered() {
+        _uiState.update { state ->
+            val unanswered = state.templates.filter { it.id !in state.candidates }
+            for (template in unanswered) Log.w(TAG, "${template.id}: no answer within $limitMs ms")
+            val timedOut = unanswered.associate { it.id to CandidateEvent.Failed(it.id, GenerationError.TIMEOUT) }
+            state.copy(candidates = state.candidates + timedOut)
+        }
     }
 
     private companion object {

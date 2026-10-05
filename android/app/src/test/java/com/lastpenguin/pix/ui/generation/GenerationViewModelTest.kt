@@ -22,11 +22,13 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -55,7 +57,7 @@ class GenerationViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        model = GenerationViewModel(generator, camera, consent)
+        model = GenerationViewModel(generator, camera, consent, LIMIT_MS)
         store.put("generation", model)
     }
 
@@ -217,6 +219,41 @@ class GenerationViewModelTest {
     }
 
     @Test
+    fun oneLimitCoversTheTemplatesAndTheRequests() = runTest {
+        // The templates take two thirds of the limit; the requests get only what is left of it.
+        generator.templatesDelayMs = 20_000
+        generateFromAPhoto()
+        advanceTimeBy(20_000)
+        runCurrent()
+        val run = generator.runs.single()
+        run.send(ready("wave"))
+
+        advanceTimeBy(LIMIT_MS - 20_000 - 1)
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
+
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.PICKING, state.phase)
+        assertTrue(run.cancelled)
+        assertEquals(1, state.readyCount)
+        assertEquals(failed("walking", GenerationError.TIMEOUT), state.candidates["walking"])
+        assertEquals(FOUR_TEMPLATES.size, state.candidates.size)
+    }
+
+    @Test
+    fun aRunWithoutAnyAnswerFailsAtTheLimit() = runTest {
+        generateFromAPhoto()
+
+        advanceTimeBy(LIMIT_MS)
+        runCurrent()
+
+        assertEquals(GenerationUiState.Phase.FAILED, state.phase)
+        assertSame(camera.frame, state.scene)
+        assertTrue(generator.runs.single().cancelled)
+    }
+
+    @Test
     fun retryResendsTheSameSceneWithANewSeed() = runTest {
         generateFromAPhoto()
         generator.runs.single().run {
@@ -313,7 +350,7 @@ class GenerationViewModelTest {
     @Test
     fun consentGivenEarlierIsNotAskedAgain() = runTest {
         consent.given = true
-        val later = GenerationViewModel(generator, camera, consent)
+        val later = GenerationViewModel(generator, camera, consent, LIMIT_MS)
         store.put("later", later)
 
         runCurrent()
@@ -338,9 +375,11 @@ class GenerationViewModelTest {
     /** Each call to generate is a [Run] the test feeds with events. */
     private class FakeGenerator : PoseGenerator {
         var templatesError: Exception? = null
+        var templatesDelayMs = 0L
         val runs = mutableListOf<Run>()
 
         override suspend fun templates(): List<PoseTemplate> {
+            delay(templatesDelayMs)
             templatesError?.let { throw it }
             return FOUR_TEMPLATES
         }
@@ -396,6 +435,10 @@ class GenerationViewModelTest {
         }
 
         override fun setFrameSink(sink: FrameSink?) = Unit
+    }
+
+    private companion object {
+        const val LIMIT_MS = 30_000L
     }
 
     private class FakeConsent : GenerationConsent {

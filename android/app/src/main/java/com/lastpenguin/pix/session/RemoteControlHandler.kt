@@ -84,6 +84,9 @@ class RemoteControlHandler(
         }
         val queued = PendingZoom(ratio, clock(), request.final)
         pending = queued
+        // A final echo still due for the previous step would send a stale zoom after the subject's pinch ended.
+        // The newer request brings its own echoes: when applied, or from the timeout answer.
+        finalJob?.cancel()
         camera.setZoom(ratio)
         if (!request.final) return
         timeoutJob = scope?.launch { answerIfStalled(queued) }

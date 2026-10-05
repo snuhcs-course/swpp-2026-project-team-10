@@ -221,6 +221,39 @@ class RemoteControlHandlerTest {
     }
 
     @Test
+    fun `a newer request cancels the final echo still due for the previous step`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        session.sent.clear()
+
+        handler.handle(SessionMessage.ZoomSet(1.8f))
+        runCurrent()
+        assertEquals(SessionMessage.CameraStateUpdate(1.8f, Role.SUBJECT, final = false), echoes().last())
+
+        // Within the 100 ms final delay, the pinch ends on a value that needs another lens.
+        camera.applies = false
+        camera.setStatus(CameraStatus.STARTING)
+        handler.handle(SessionMessage.ZoomSet(0.6f, final = true))
+        advanceTimeBy(300)
+        runCurrent()
+        assertTrue(echoes().none { it.final })
+
+        camera.applyLocally(0.6f)
+        camera.setStatus(CameraStatus.READY)
+        advanceTimeBy(200)
+        runCurrent()
+        assertEquals(
+            listOf(SessionMessage.CameraStateUpdate(0.6f, Role.SUBJECT, final = true)),
+            echoes().filter {
+                it.final
+            },
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Zoom(0.6f)), actions)
+        handler.stop()
+    }
+
+    @Test
     fun `other messages are ignored`() = runTest {
         handler.start(this)
         advanceTimeBy(200)

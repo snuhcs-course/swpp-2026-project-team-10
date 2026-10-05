@@ -10,7 +10,6 @@ import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
-import com.lastpenguin.pix.guide.InterimGuideRepository
 import com.lastpenguin.pix.guide.MlKitReferenceGuideMaker
 import com.lastpenguin.pix.guide.OutlineExtractor
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
@@ -46,8 +45,7 @@ class AppContainer(context: Context) {
     // ---- Guide (#5, #6) -------------------------------------------------------
 
     /** The photographer's guide. */
-    // TODO(#6): back to InMemoryGuideRepository() once #6 fills it in; InterimGuideRepository stands in until then.
-    val guideRepository: GuideRepository = InterimGuideRepository()
+    val guideRepository: GuideRepository = InMemoryGuideRepository()
 
     /** The subject's copy of the photographer's guide. A separate instance (GuideRepository.kt). */
     val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository()

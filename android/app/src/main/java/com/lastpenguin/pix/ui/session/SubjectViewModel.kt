@@ -16,7 +16,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -29,12 +28,13 @@ data class SubjectUiState(
     /** The photographer's zoom range, from `camera.capabilities`; equal until it arrives. */
     val minZoom: Float = 1f,
     val maxZoom: Float = 1f,
-    /** The zoom to show: the pinch in progress, until the photographer echoes the applied zoom in `camera.state`. */
+    /** The zoom to show: the slider value during editing, until the photographer echoes applied zoom in `camera.state`. */
     val zoom: Float = 1f,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
 ) {
-    val canZoom: Boolean get() = connected && maxZoom > minZoom
+    val canZoom: Boolean
+        get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
 }
 
 /**
@@ -50,7 +50,7 @@ class SubjectViewModel(
     private val _uiState = MutableStateFlow(SubjectUiState())
     val uiState: StateFlow<SubjectUiState> = _uiState.asStateFlow()
 
-    private var pinching = false
+    private var adjustingZoom = false
     private var queued: Float? = null
     private var sendJob: Job? = null
 
@@ -60,7 +60,7 @@ class SubjectViewModel(
         viewModelScope.launch {
             session.state.collect { state ->
                 val connected = state as? SessionState.Connected
-                if (connected == null) endPinch()
+                if (connected == null) endZoomInteraction()
                 _uiState.update {
                     it.copy(
                         connected = connected != null,
@@ -71,16 +71,17 @@ class SubjectViewModel(
         }
         viewModelScope.launch {
             // Kept by the session, so it is there even if the message came before this screen existed.
-            session.peerCapabilities.filterNotNull().collect { caps ->
-                _uiState.update { it.copy(minZoom = caps.minZoom, maxZoom = caps.maxZoom) }
+            session.peerCapabilities.collect { caps ->
+                _uiState.update { it.copy(minZoom = caps?.minZoom ?: 1f, maxZoom = caps?.maxZoom ?: 1f) }
+                if (!_uiState.value.canZoom) endZoomInteraction()
             }
         }
         viewModelScope.launch {
             session.incoming.collect { message ->
                 when (message) {
                     is SessionMessage.CameraStateUpdate -> {
-                        // While a pinch is in progress its own steps rule the readout; the echo wins once it ends.
-                        if (!pinching) _uiState.update { it.copy(zoom = message.zoom) }
+                        // While the slider is moving its own steps rule the readout; the echo wins once it ends.
+                        if (!adjustingZoom) _uiState.update { it.copy(zoom = message.zoom) }
                         if (message.by == Role.SUBJECT && message.final) Timings.mark("zoom.echo", "${message.zoom}")
                     }
 
@@ -92,21 +93,22 @@ class SubjectViewModel(
     }
 
     /**
-     * One step of a pinch on the live view, or its last value when [final]. The readout follows at once; steps go
+     * One slider step, or its last value when [final]. The readout follows at once; steps go
      * to the photographer at most every [SEND_INTERVAL_MS] (the newest wins), the final value right away, and the
      * echoed `camera.state` decides what stays (Design 2.6.5).
      */
     fun onZoomGesture(ratio: Float, final: Boolean) {
+        // A disabled or interrupted slider must release echo suppression even if its final request is rejected.
+        if (final) endZoomInteraction()
         val ui = _uiState.value
         if (!ratio.isFinite() || !ui.canZoom) return
         val clamped = ratio.coerceIn(ui.minZoom, ui.maxZoom)
         _uiState.update { it.copy(zoom = clamped) }
         if (final) {
-            endPinch()
             send(clamped, final = true)
             return
         }
-        pinching = true
+        adjustingZoom = true
         if (sendJob?.isActive == true) {
             queued = clamped
             return
@@ -122,8 +124,8 @@ class SubjectViewModel(
         }
     }
 
-    private fun endPinch() {
-        pinching = false
+    private fun endZoomInteraction() {
+        adjustingZoom = false
         queued = null
         sendJob?.cancel()
         sendJob = null

@@ -6,6 +6,7 @@
 | 0.2 | 2026-09-30 | Iteration 1 design developed: a JSON example for every data channel message, signaling message, and REST endpoint (2.5); the Iteration 1 test setup, with both phones and the server (a laptop) on the same Wi-Fi (Figure 1); the remote zoom flow (Figure 3); guide sync and remote control as separate modules (2.9). Added the plan for Iterations 2–5 with the target architecture (1.4): friends and invitations, cellular connections, more remote controls, saved guides, an offline connection with a QR code, and guides that keep the background. The photographer takes every photo. |
 | 0.3 | 2026-10-04 | Pose generation as built: the image-editing API is OpenRouter's Image API with the model as a server setting, and the selection result is recorded (2.6.3); a prompt that lets the model re-place the person (2.6.3); the server validates the scene photo and does not resize it (1.1.2, 2.2); `400 INVALID_REQUEST` and a 1 MiB request limit (2.5.3); a 30 s upstream timeout, and the server cancels the image API call when the phone disconnects (2.6.3, 2.8); rate limiting per client address (2.8). |
 | 0.4 | 2026-10-05 | Remote zoom as built: the subject pinches the live view instead of tapping zoom chips (Figure 3, Figure 7, 2.6.5), and `CameraCapabilities.zoomStops` stays in the contract for later subject controls (2.3, 2.5.1, 2.6.2); `camera.zoom.set` carries `final`, with pinch steps on the realtime channel at most every 50 ms and the last value on the reliable channel (2.5.1); every applied zoom is echoed as `camera.state`, only a final request shows the remote-action notice, and the subject ignores echoes while its pinch is in progress (2.6.5); `SessionManager` keeps the last `camera.capabilities` and the last echoed zoom for a Subject view that opens late (2.1); *Remote control* owns pinch zoom on Subject view (2.9). |
+| 0.5 | 2026-10-06 | Camera and Subject view use single-value zoom sliders with hardware endpoint labels and keyboard/accessibility support. Preview and live-video pinches no longer zoom the camera; guide drag/pinch remains. Dragging keeps the thumb under the user's control despite asynchronous observations, supports lens switching, and finishes on release, cancellation, or pause; the existing remote step/final protocol is unchanged (Figure 3, 2.5.1, 2.6.2, 2.6.5). |
 
 Audience: the development team. This page describes the Iteration 1 design in detail; each later iteration adds the design for the features it builds (1.4). **TBD** marks an open decision. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page. Testing plans are in the Testing Documentation.
 
@@ -111,12 +112,12 @@ sequenceDiagram
   participant S as Subject app
   participant P as Photographer app
   participant C as CameraX
-  Note over S: pinches the live view, the readout follows at once
+  Note over S: drags the zoom slider, the readout follows at once
   S->>P: camera.zoom.set (ratio 1.6), a step at most every 50 ms
   Note over P: clamps to [minZoom, maxZoom]
   P->>C: setZoomRatio(1.6)
   P-->>S: camera.state (zoom 1.6, by SUBJECT)
-  Note over S: the pinch ends
+  Note over S: the slider drag ends
   S->>P: camera.zoom.set (ratio 2.0, final)
   P->>C: setZoomRatio(2.0)
   P-->>S: camera.state (zoom 2.0, by SUBJECT, final)
@@ -419,7 +420,7 @@ classDiagram
   SubjectViewModel --> GuideRepository
 ```
 
-*Figure 7. Session, synchronization, and remote-control classes*
+*Figure 7. Session, synchronization, and remote-control classes. Subject view's zoom slider calls the existing `onZoomGesture(ratio, final)` API.*
 
 ```mermaid
 classDiagram
@@ -547,7 +548,7 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
 | `guide.image.end` | reliable | P→S | Ends the image; the subject checks it |
 | `guide.state` | realtime / reliable | P→S | Where and how the guide is drawn |
 | `guide.clear` | reliable | P→S | The guide was removed |
-| `camera.zoom.set` | realtime; `final` reliable | S→P | A step of the subject's pinch, or its last value (`final`) |
+| `camera.zoom.set` | realtime; `final` reliable | S→P | A step of the subject's zoom slider drag, or its final value |
 | `camera.state` | realtime / reliable | P→S | The zoom actually applied, and who changed it |
 | `session.leave` | reliable | both | Leaving on purpose |
 | `ping / pong` | realtime | both | Round-trip time for measurement |
@@ -584,7 +585,7 @@ Sent by both phones as soon as the channels open. A different `protocol` ends th
 }
 ```
 
-Sent after `hello`. The subject limits its pinch to `minZoom`–`maxZoom`. `zoomStops` is not shown on Subject view and stays in the contract for later subject controls.
+Sent after `hello`. The subject's zoom slider uses `minZoom`–`maxZoom` as its range and displays those actual hardware limits as endpoint labels. `zoomStops` is not shown on Subject view and stays in the contract for later controls.
 
 </details>
 
@@ -670,7 +671,7 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 { "v": 1, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
-Sent on `realtime` at most every 50 ms during a pinch, then once with `"final": true` on `reliable` when the pinch ends. The photographer clamps each value to the supported range, applies it, and echoes `camera.state` (Figure 3).
+Sent on `realtime` at most every 50 ms during a zoom slider drag, then once with `"final": true` on `reliable` when the drag ends, is cancelled, or the screen pauses. A discrete keyboard/accessibility adjustment sends a final request directly. The photographer clamps each value to the supported range, applies it, and echoes `camera.state` (Figure 3).
 
 </details>
 
@@ -867,11 +868,13 @@ view  → frame:  cx = (x − ox) / (W · s)      cy = (y − oy) / (H · s)
 guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 ```
 
-**Photographer composition aids (FR-1.9–1.10).** `CameraCompositionView` uses this same fit-centered image rectangle to draw lines at one-third and two-thirds in each direction. A short horizon bar is centered in the middle cell, with fixed horizontal end markers and a middle segment that counter-rotates with device roll. `CameraLevelMonitor` reads the gravity sensor, falling back to the accelerometer, while the view is resumed. It smooths gravity vectors before computing the screen-relative angle; level enters within ±2° and exits beyond ±3°. When level, the bar aligns horizontally and turns dark yellow (`#D4AC24`). Invalid sensor readings or an almost face-up/down phone hide the bar. These are non-interactive local View overlays and do not enter photos, analysis frames, or the WebRTC stream. Photographer zoom uses continuous preview pinch and an applied-ratio readout; Subject view pinches the live view the same way, and `CameraCapabilities.zoomStops` stays in the contract for later subject controls.
+**Photographer composition aids (FR-1.9–1.10).** `CameraCompositionView` uses this same fit-centered image rectangle to draw lines at one-third and two-thirds in each direction. A short horizon bar is centered in the middle cell, with fixed horizontal end markers and a middle segment that counter-rotates with device roll. `CameraLevelMonitor` reads the gravity sensor, falling back to the accelerometer, while the view is resumed. It smooths gravity vectors before computing the screen-relative angle; level enters within ±2° and exits beyond ±3°. When level, the bar aligns horizontally and turns dark yellow (`#D4AC24`). Invalid sensor readings or an almost face-up/down phone hide the bar. These are non-interactive local View overlays and do not enter photos, analysis frames, or the WebRTC stream.
+
+**Camera zoom controls.** Camera and Subject view each use a single-value Material slider with the actual minimum and maximum ratios shown at its ends. The Camera readout always shows the observed, applied ratio; the subject's readout follows its requested ratio optimistically during a drag, then settles on the photographer's applied echo (2.6.5). During a drag, neither screen moves the thumb in response to asynchronous observed values. The native slider provides keyboard and accessibility adjustment, and the ratio readout retains its Zoom in / Zoom out accessibility actions. Preview and live-video pinches do not change camera zoom. `CameraCapabilities.zoomStops` stays in the contract for later controls.
 
 **Gestures.** The photographer's pan and zoom deltas are converted with *view → frame* and applied to `GuideState`. `height` is limited to 0.21–2.1, and `cx`, `cy` are limited so that at least 20% of the guide's width and height stay inside the frame (FR-3.2, FR-3.3). Because only frame coordinates are sent, the subject's phone places the guide on the same part of the image regardless of its screen size (FR-3.7, NFR-8).
 
-An editable overlay owns a touch sequence only when its first finger lands inside the guide's visible bounding rectangle within the image. Transparent parts of this rectangle are included so the outline is easy to grab. A sequence starting elsewhere belongs to camera zoom; the preview container disables split touch dispatch so additional fingers cannot start a second gesture on the other View. One finger pans; two fingers pan by their midpoint and resize about the guide center by their distance ratio, without rotation. Touch slop filters accidental movement. Pointer IDs are tracked and positions are rebased when fingers join or leave, avoiding jumps. Every step updates the latest repository state, so rapid input does not depend on rendering catching up. Release or cancellation emits one final identity update after a manipulation, even when the last state is unchanged. A tap makes no guide update. Hiding, disabling, resizing, or detaching the overlay ends editing; replacing/removing the image discards the old gesture so it cannot affect the new guide. The remainder of an interrupted sequence stays consumed. Read-only overlays pass touches through to the underlying video.
+An editable overlay owns a touch sequence only when its first finger lands inside the guide's visible bounding rectangle within the image. Transparent parts of this rectangle are included so the outline is easy to grab. A sequence starting elsewhere does not edit the guide or zoom the camera; camera zoom belongs to the separate slider. The preview container disables split touch dispatch to keep additional fingers in the same guide touch sequence. One finger pans; two fingers pan by their midpoint and resize about the guide center by their distance ratio, without rotation. Touch slop filters accidental movement. Pointer IDs are tracked and positions are rebased when fingers join or leave, avoiding jumps. Every step updates the latest repository state, so rapid input does not depend on rendering catching up. Release or cancellation emits one final identity update after a manipulation, even when the last state is unchanged. A tap makes no guide update. Hiding, disabling, resizing, or detaching the overlay ends editing; replacing/removing the image discards the old gesture so it cannot affect the new guide. The remainder of an interrupted sequence stays consumed. Read-only overlays pass touches through to the underlying video.
 
 The guide's normalized width is `height × aspect × 4/3`. For either normalized dimension `d`, the center is limited to `[v − d/2, 1 − v + d/2]`, where `v = min(0.2 × d, 1)`. Centers may therefore lie outside 0–1. If an unusually wide guide exceeds five frame widths, showing 20% is impossible at that scale; keep the whole frame width covered instead, preserving the 30–300% scale range. Geometry also clamps opacity to 0.1–0.9. Non-finite state values reset to their defaults. Coordinate conversion requires finite points and positive, finite frame and view sizes, so callers wait for layout before converting touches.
 
@@ -918,8 +921,8 @@ Ten other model configurations were screened with one image each and left out, a
 
 #### 2.6.5 Remote control
 
-- **Zoom.** The subject pinches the live view like the photographer pinches the preview. Each step updates the subject's readout immediately (optimistic) and is sent as a non-final `camera.zoom.set` on the realtime channel at most every 50 ms, the newest value winning; the last value goes on the reliable channel with `final: true`. The photographer clamps every request to the advertised range and applies it through the shared camera controller; every applied zoom is echoed as `camera.state`, and only a final request produces the "set zoom to 2×" notice. Echoes are ignored on the subject while its pinch is in progress and win once it ends, so both phones settle on the applied value. Capabilities, requests, and echoed zoom all use the primary rear camera's 1× as their reference.
-- **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing it. The minimum follows hardware capabilities, such as 0.5×, 0.6×, or 1×; no unsupported 0.5× capability is inferred. Lens switches may briefly pause preview while the same 3:4 use-case group rebinds. An ongoing pinch retains the latest target during that transition, lens changes wait for in-flight photo capture, and an ultrawide bind failure falls back to the primary camera with updated capabilities.
+- **Zoom.** The subject adjusts a single-value zoom slider with the photographer's supported minimum and maximum shown at its ends. The existing `SubjectViewModel.onZoomGesture(ratio, final)` API receives slider input. Each drag step updates the subject's readout immediately (optimistic) and is sent as a non-final `camera.zoom.set` on the realtime channel at most every 50 ms, the newest value winning; release, cancellation, or screen pause sends the last value on the reliable channel with `final: true`. Discrete keyboard/accessibility changes, including the readout's Zoom in / Zoom out actions, send final requests directly. The photographer clamps every request to the advertised range and applies it through the shared camera controller; every applied zoom is echoed as `camera.state`, and only a final request produces the "set zoom to 2×" notice. Echoes do not change the subject's thumb or optimistic readout while its drag is in progress and win after it ends, so both phones settle on the applied value. Capabilities, requests, and echoed zoom all use the primary rear camera's 1× as their reference.
+- **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing it. The minimum follows hardware capabilities, such as 0.5×, 0.6×, or 1×; no unsupported 0.5× capability is inferred. Lens switches may briefly pause preview while the same 3:4 use-case group rebinds. An ongoing slider drag continues to update its target through the camera's `STARTING` state, lens changes wait for in-flight photo capture, and an ultrawide bind failure falls back to the primary camera with updated capabilities and slider endpoints.
 - **Photos.** Only the photographer takes photos, with the camera screen's own shutter. The subject adjusts the zoom, and the photographer decides when to take the photo.
 - **Notices.** The photographer's UI shows a toast for each applied remote action, using the `by` field (FR-7.4).
 
@@ -957,7 +960,7 @@ Iteration 1 has no database. The server keeps room codes and sessions in memory,
 | **Server and signaling** | Server/AI/Sync | WebSocket hub, room codes, running on the laptop on the test Wi-Fi | Session |
 | **Real-time session** | Real-time | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | Guide sync, remote control |
 | **Guide sync** | Server/AI/Sync | `GuideSyncer`, the guide on Subject view | UI |
-| **Remote control** | Real-time | `RemoteControlHandler` (zoom), pinch zoom on Subject view | UI |
+| **Remote control** | Real-time | `RemoteControlHandler` (zoom), zoom slider on Subject view | UI |
 
 **Shared contracts in code.** `android/` holds the Gradle project, which builds an empty app, and the contract files marked \* in 2.1.
 

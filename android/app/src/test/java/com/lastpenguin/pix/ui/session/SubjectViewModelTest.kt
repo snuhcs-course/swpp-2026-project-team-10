@@ -66,7 +66,7 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun `a pinch step shows at once and asks the photographer`() = runTest(dispatcher) {
+    fun `a slider step shows at once and asks the photographer`() = runTest(dispatcher) {
         connect()
         runCurrent()
 
@@ -77,7 +77,7 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun `pinch steps are sent at most every 50 ms, newest first, and the final value at once`() = runTest(dispatcher) {
+    fun `slider steps are sent at most every 50 ms, newest first, and the final value at once`() = runTest(dispatcher) {
         connect()
         runCurrent()
 
@@ -111,7 +111,7 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun `echoes wait until the pinch ends, then win`() = runTest(dispatcher) {
+    fun `echoes wait until the slider interaction ends, then win`() = runTest(dispatcher) {
         connect()
         runCurrent()
 
@@ -127,7 +127,7 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun `pinching does nothing before the session is connected`() = runTest(dispatcher) {
+    fun `slider changes do nothing before the session is connected`() = runTest(dispatcher) {
         runCurrent()
 
         viewModel.onZoomGesture(2f, final = false)
@@ -158,5 +158,71 @@ class SubjectViewModelTest {
 
         assertEquals("Dongje", viewModel.uiState.value.photographerName)
         assertFalse(viewModel.uiState.value.connected)
+    }
+
+    @Test
+    fun `collapsed or invalid capabilities stop queued changes and let echoes resume`() = runTest(dispatcher) {
+        val ranges = listOf(
+            1f to 1f,
+            2f to 1f,
+            0f to 2f,
+            -1f to 2f,
+            Float.NaN to 2f,
+            1f to Float.POSITIVE_INFINITY,
+            Float.NEGATIVE_INFINITY to 2f,
+        )
+        for ((minimum, maximum) in ranges) {
+            connect()
+            runCurrent()
+            viewModel.onZoomGesture(2f, final = false)
+            viewModel.onZoomGesture(3f, final = false)
+            val count = requests().size
+
+            session.deliver(SessionMessage.Capabilities(CameraCapabilities(minimum, maximum, emptyList())))
+            runCurrent()
+            assertFalse(viewModel.uiState.value.canZoom)
+            viewModel.onZoomGesture(3f, final = true)
+            session.deliver(SessionMessage.CameraStateUpdate(1.25f, Role.PHOTOGRAPHER, final = true))
+            runCurrent()
+            advanceTimeBy(200)
+            runCurrent()
+
+            assertEquals(1.25f, viewModel.uiState.value.zoom, 0f)
+            assertEquals(count, requests().size)
+        }
+    }
+
+    @Test
+    fun `disconnect cancels a queued nonfinal slider change`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+        viewModel.onZoomGesture(2f, final = false)
+        viewModel.onZoomGesture(3f, final = false)
+
+        session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+        runCurrent()
+        viewModel.onZoomGesture(3f, final = true)
+        advanceTimeBy(200)
+        runCurrent()
+
+        assertFalse(viewModel.uiState.value.canZoom)
+        assertEquals(listOf(SessionMessage.ZoomSet(2f, final = false)), requests())
+    }
+
+    @Test
+    fun `a rejected final value still ends adjustment and cancels pending work`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+        viewModel.onZoomGesture(2f, final = false)
+        viewModel.onZoomGesture(3f, final = false)
+
+        viewModel.onZoomGesture(Float.NaN, final = true)
+        session.deliver(SessionMessage.CameraStateUpdate(1.5f, Role.PHOTOGRAPHER, final = true))
+        runCurrent()
+        advanceTimeBy(200)
+        runCurrent()
+
+        assertEquals(1.5f, viewModel.uiState.value.zoom, 0f)
+        assertEquals(listOf(SessionMessage.ZoomSet(2f, final = false)), requests())
     }
 }

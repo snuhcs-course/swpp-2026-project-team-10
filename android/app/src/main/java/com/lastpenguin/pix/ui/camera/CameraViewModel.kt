@@ -127,7 +127,12 @@ class CameraViewModel(
 
     /** From GuideOverlayView.onGesture. */
     fun onGuideGesture(dx: Float, dy: Float, scale: Float, final: Boolean) {
-        // TODO(#6): guides.update(final) { it.copy(cx = ..., cy = ..., height = ...) }.
+        if (!dx.isFinite() || !dy.isFinite() || !scale.isFinite() || scale <= 0f) return
+        // Read inside update: several touch steps may arrive before uiState renders the previous one.
+        // An unchanged final step still publishes the reliable gesture-end event.
+        guides.update(final) { state ->
+            state.copy(cx = state.cx + dx, cy = state.cy + dy, height = state.height * scale)
+        }
     }
 
     fun onOpacityChange(opacity: Float, final: Boolean) {

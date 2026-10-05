@@ -105,7 +105,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.styleToggleButton.setOnClickListener { viewModel.onStyleToggle() }
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
-        // TODO(#6): wire opacitySlider and render guide controls when overlay editing is implemented.
+        // TODO(#6): wire opacitySlider and render the opacity/style/remove controls.
         controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
 
         val resolver = requireContext().contentResolver
@@ -295,8 +295,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.compositionOverlay.isVisible = ready
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = ready
-        // Keep the hint's space so applying a guide does not resize the live image.
-        controls.hintText.visibility = if (state.guide == null) View.VISIBLE else View.INVISIBLE
+        controls.hintText.setText(if (state.guide == null) R.string.hint_add_guide else R.string.hint_edit_guide)
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)

@@ -36,6 +36,7 @@
     <string name="gallery_unavailable">No app is available to open this photo.</string>
     <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
     <string name="hint_add_guide">Tap Guide to add a pose</string>
+    <string name="hint_edit_guide">Drag or pinch the guide</string>
     <string name="guide">Guide</string>
     <string name="shutter">Shutter</string>
     <string name="gallery">Gallery</string>

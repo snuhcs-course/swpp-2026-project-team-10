@@ -6,7 +6,11 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
@@ -23,15 +27,22 @@ class GuideOverlayView @JvmOverloads constructor(
     private var guide: ReferenceGuide? = null
     private var state = GuideState()
     private var bitmap: Bitmap? = null
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+    private var ownsTouch = false
+    private var gesture: TouchGesture? = null
 
     init {
-        // Static rendering and the subject's read-only overlay let camera zoom gestures reach the video below.
+        // Only a touch starting on an editable guide is consumed; the video below owns other gestures.
         isClickable = false
         isFocusable = false
     }
 
     /** Drag and pinch are handled only when true: on the photographer's camera. */
     var editable: Boolean = true
+        set(value) {
+            field = value
+            if (!value) finishGesture()
+        }
 
     /**
      * Called for each drag or pinch step. [dx] and [dy] are in frame coordinates, [scale] is the pinch factor,
@@ -42,17 +53,153 @@ class GuideOverlayView @JvmOverloads constructor(
     /** Shows [guide] at [state]; null hides it. */
     fun render(guide: ReferenceGuide?, state: GuideState) {
         if (this.guide === guide && this.state == state) return
+        if (this.guide !== guide || state.guideId != this.state.guideId || !state.visible) {
+            // A replacement is already committed in the repository. Never send an old gesture to the new image.
+            finishGesture(sendFinal = this.guide === guide && this.state.guideId == state.guideId)
+        }
         this.guide = guide
         this.state = state
         updateDrawing()
+        if (!canEdit()) finishGesture()
         postInvalidateOnAnimation()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        finishGesture()
         updateDrawing()
         postInvalidateOnAnimation()
     }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (visibility != VISIBLE) finishGesture()
+    }
+
+    override fun onDetachedFromWindow() {
+        finishGesture()
+        releaseTouch()
+        super.onDetachedFromWindow()
+    }
+
+    override fun setEnabled(enabled: Boolean) {
+        super.setEnabled(enabled)
+        if (!enabled) finishGesture()
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            finishGesture()
+            releaseTouch()
+            if (!canEdit() || !frameBounds.contains(event.x, event.y) || !guideBounds.contains(event.x, event.y)) {
+                return false
+            }
+            ownsTouch = true
+            gesture = TouchGesture(event.getPointerId(0), position = TouchPosition(event.x, event.y, 0f))
+            parent?.requestDisallowInterceptTouchEvent(true)
+            return true
+        }
+        if (!ownsTouch) return false
+        if (!canEdit()) finishGesture()
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> moveGesture(event)
+
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
+                // Pointer changes can carry a last movement too; all old IDs are still in this event.
+                moveGesture(event)
+                rebasePointers(event)
+            }
+
+            MotionEvent.ACTION_UP -> {
+                val wasTap = gesture?.moved == false
+                moveGesture(event)
+                val moved = gesture?.moved == true
+                finishGesture()
+                releaseTouch()
+                if (wasTap && !moved) performClick()
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                finishGesture()
+                releaseTouch()
+            }
+        }
+        // Even if editing stops mid-stream, do not hand the remaining pointers to camera zoom.
+        return true
+    }
+
+    override fun performClick(): Boolean = super.performClick()
+
+    private fun canEdit(): Boolean =
+        editable && isEnabled && visibility == VISIBLE && bitmap?.isRecycled == false && onGesture != null
+
+    private fun moveGesture(event: MotionEvent) {
+        val gesture = gesture ?: return
+        val position = touchPosition(event, gesture) ?: return
+        val previous = gesture.position
+        val dx = position.x - previous.x
+        val dy = position.y - previous.y
+        val scale = if (previous.span > 0f && position.span > 0f) position.span / previous.span else 1f
+        if (!dx.isFinite() || !dy.isFinite() || !scale.isFinite() || scale <= 0f) return
+        if (!gesture.moved && hypot(dx, dy) <= touchSlop && abs(position.span - previous.span) <= touchSlop) return
+        gesture.position = position
+        if (dx == 0f && dy == 0f && scale == 1f) return
+        gesture.moved = true
+        // Offsets cancel when converting a delta: divide by the fitted image, never the letterboxed View.
+        onGesture?.invoke(dx / frameBounds.width(), dy / frameBounds.height(), scale, false)
+    }
+
+    private fun rebasePointers(event: MotionEvent) {
+        val gesture = gesture ?: return
+        val lifted = if (event.actionMasked == MotionEvent.ACTION_POINTER_UP) event.actionIndex else -1
+        var first = -1
+        var second = -1
+        for (index in 0 until event.pointerCount) {
+            if (index == lifted) continue
+            if (first == -1) {
+                first = index
+            } else if (second == -1) {
+                second = index
+            }
+        }
+        if (first == -1) return
+        gesture.primaryId = event.getPointerId(first)
+        gesture.secondaryId = if (second == -1) -1 else event.getPointerId(second)
+        touchPosition(event, gesture)?.let { gesture.position = it }
+    }
+
+    private fun touchPosition(event: MotionEvent, gesture: TouchGesture): TouchPosition? {
+        val first = event.findPointerIndex(gesture.primaryId)
+        if (first == -1) return null
+        val x = event.getX(first)
+        val y = event.getY(first)
+        if (gesture.secondaryId == -1) return TouchPosition(x, y, 0f)
+        val second = event.findPointerIndex(gesture.secondaryId)
+        if (second == -1) return null
+        val otherX = event.getX(second)
+        val otherY = event.getY(second)
+        return TouchPosition((x + otherX) / 2f, (y + otherY) / 2f, hypot(otherX - x, otherY - y))
+    }
+
+    private fun finishGesture(sendFinal: Boolean = true) {
+        val finished = gesture
+        gesture = null
+        if (sendFinal && finished?.moved == true) onGesture?.invoke(0f, 0f, 1f, true)
+    }
+
+    private fun releaseTouch() {
+        ownsTouch = false
+        parent?.requestDisallowInterceptTouchEvent(false)
+    }
+
+    private data class TouchPosition(val x: Float, val y: Float, val span: Float)
+
+    private data class TouchGesture(
+        var primaryId: Int,
+        var secondaryId: Int = -1,
+        var position: TouchPosition,
+        var moved: Boolean = false,
+    )
 
     private fun updateDrawing() {
         bitmap = null

@@ -29,12 +29,15 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.text.DecimalFormat
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -53,7 +56,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private val zoomLimitFormat = DecimalFormat("0.#")
-    private var zoomSlider: ZoomSliderController? = null
+    private var zoomSlider: TrackedSliderController? = null
+    private var opacitySlider: TrackedSliderController? = null
     private var previewLogged = false
     private var noticeJob: Job? = null
 
@@ -77,9 +81,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 Timings.mark("camera.preview")
             }
         }
-        zoomSlider = ZoomSliderController(controls.zoomControls.zoomSlider) { ratio, _ ->
+        zoomSlider = TrackedSliderController.zoom(controls.zoomControls.zoomSlider) { ratio, _ ->
             viewModel.onZoomChanged(ratio)
         }
+        opacitySlider = TrackedSliderController(
+            controls.opacitySlider,
+            { getString(R.string.guide_opacity_percent, (it * 100f).roundToInt()) },
+            viewModel::onOpacityChange,
+        )
         setupZoomAccessibility(controls.zoomControls.zoomRatio)
         setupCompositionLevel(controls.compositionOverlay)
         controls.cameraActionButton.setOnClickListener {
@@ -106,7 +115,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.styleToggleButton.setOnClickListener { viewModel.onStyleToggle() }
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
-        // TODO(#6): wire opacitySlider and render the opacity/style/remove controls.
         controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
 
         val resolver = requireContext().contentResolver
@@ -190,12 +198,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     override fun onPause() {
         zoomSlider?.finishInteraction()
+        opacitySlider?.finishInteraction()
         super.onPause()
     }
 
     override fun onDestroyView() {
         zoomSlider?.finishInteraction()
         zoomSlider = null
+        opacitySlider?.finishInteraction()
+        opacitySlider = null
         binding = null
         previewLogged = false
         super.onDestroyView()
@@ -258,6 +269,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.compositionOverlay.isVisible = ready
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = ready
+        // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
+        // and hiding the bar then would shift the zoom slider under an active drag.
+        val guideEditable = granted && !unavailable
+        controls.guideControls.isVisible = state.guide != null
+        controls.styleToggleButton.isEnabled = guideEditable
+        controls.styleToggleButton.setText(
+            if (state.guideState.style == GuideStyle.CUTOUT) R.string.show_outline else R.string.show_cutout,
+        )
+        opacitySlider?.render(
+            GuideState.MIN_OPACITY,
+            GuideState.MAX_OPACITY,
+            state.guideState.opacity,
+            enabled = guideEditable && state.guide != null,
+        )
+        controls.removeGuideButton.isEnabled = guideEditable
         controls.hintText.setText(if (state.guide == null) R.string.hint_add_guide else R.string.hint_edit_guide)
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)

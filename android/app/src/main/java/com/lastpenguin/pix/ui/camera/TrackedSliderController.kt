@@ -6,25 +6,27 @@ import com.google.android.material.slider.Slider
 import com.lastpenguin.pix.R
 import java.text.DecimalFormat
 
-/** View-scoped zoom input shared by the camera and remote controls. Values are camera ratios, not percentages. */
-internal class ZoomSliderController(
+/**
+ * View-scoped slider input: the thumb stays under the user's control during a drag, and the last value is committed
+ * once with `final = true`. Shared by camera zoom, remote zoom, and guide opacity.
+ */
+internal class TrackedSliderController(
     private val slider: Slider,
-    private val onZoomChange: (Float, Boolean) -> Unit,
+    formatLabel: (Float) -> String,
+    private val onChange: (Float, Boolean) -> Unit,
 ) {
     var isTracking: Boolean = false
         private set
     private var changed = false
     private var handlingTouch = false
-    private val format = DecimalFormat("0.0#")
-
     init {
         slider.stepSize = 0f
-        slider.setLabelFormatter { slider.context.getString(R.string.zoom_ratio, format.format(it)) }
+        slider.setLabelFormatter(formatLabel)
         slider.addOnChangeListener { _, value, fromUser ->
             if (fromUser && slider.isEnabled && (!handlingTouch || isTracking)) {
                 changed = isTracking
                 // Keyboard and accessibility changes have no touch-stop callback: commit them immediately.
-                onZoomChange(value, !isTracking)
+                onChange(value, !isTracking)
             }
         }
         handleTouch()
@@ -55,19 +57,20 @@ internal class ZoomSliderController(
         }
     }
 
-    fun render(minZoom: Float, maxZoom: Float, zoom: Float, enabled: Boolean) {
-        val validRange = minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
+    /** Zoom ratios must be positive; an invalid range (before capabilities arrive) renders disabled at 1–2. */
+    fun render(min: Float, max: Float, value: Float, enabled: Boolean) {
+        val validRange = min.isFinite() && max.isFinite() && min > 0f && max > min
         // Material requires a strictly increasing range even while disabled and before capabilities arrive.
-        val minimum = if (validRange) minZoom else 1f
-        val maximum = if (validRange) maxZoom else 2f
-        val canZoom = enabled && validRange
+        val minimum = if (validRange) min else 1f
+        val maximum = if (validRange) max else 2f
+        val canChange = enabled && validRange
         val rangeChanged = slider.valueFrom != minimum || slider.valueTo != maximum
-        if (isTracking && (!canZoom || rangeChanged)) finishInteraction()
-        slider.isEnabled = canZoom
+        if (isTracking && (!canChange || rangeChanged)) finishInteraction()
+        slider.isEnabled = canChange
         slider.valueFrom = minimum
         slider.valueTo = maximum
         if (!isTracking) {
-            slider.value = (zoom.takeIf { it.isFinite() } ?: minimum).coerceIn(minimum, maximum)
+            slider.value = (value.takeIf { it.isFinite() } ?: minimum).coerceIn(minimum, maximum)
         }
     }
 
@@ -76,6 +79,17 @@ internal class ZoomSliderController(
         val publish = isTracking && changed
         isTracking = false
         changed = false
-        if (publish) onZoomChange(slider.value, true)
+        if (publish) onChange(slider.value, true)
+    }
+
+    companion object {
+        private val zoomFormat = DecimalFormat("0.0#")
+
+        /** Values are camera ratios, not percentages. */
+        fun zoom(slider: Slider, onZoomChange: (Float, Boolean) -> Unit) = TrackedSliderController(
+            slider,
+            { slider.context.getString(R.string.zoom_ratio, zoomFormat.format(it)) },
+            onZoomChange,
+        )
     }
 }

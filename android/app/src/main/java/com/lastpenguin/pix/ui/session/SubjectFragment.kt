@@ -20,7 +20,7 @@ import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
-import com.lastpenguin.pix.ui.camera.ZoomSliderController
+import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import java.text.DecimalFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -40,7 +40,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val zoomFormat = DecimalFormat("0.0")
     private val zoomLimitFormat = DecimalFormat("0.#")
-    private var zoomSlider: ZoomSliderController? = null
+    private var zoomSlider: TrackedSliderController? = null
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
 
@@ -57,7 +57,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
-        zoomSlider = ZoomSliderController(binding.zoomControls.zoomSlider, viewModel::onZoomGesture)
+        zoomSlider = TrackedSliderController.zoom(binding.zoomControls.zoomSlider, viewModel::onZoomGesture)
         setupZoomAccessibility(binding.zoomControls.zoomRatio)
 
         binding.leaveButton.setOnClickListener { leaveNow() }

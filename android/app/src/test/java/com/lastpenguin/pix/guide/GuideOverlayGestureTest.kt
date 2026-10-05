@@ -15,9 +15,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 
-/** Real MotionEvent dispatch, including ownership of multi-touch streams over the camera preview. */
+/** MotionEvent dispatch through real Views, including ownership of multi-touch streams over the camera preview. */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideOverlayGestureTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val bitmaps = mutableListOf<Bitmap>()

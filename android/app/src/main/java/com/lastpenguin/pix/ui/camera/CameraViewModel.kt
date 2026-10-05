@@ -11,6 +11,7 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -135,12 +136,17 @@ class CameraViewModel(
         }
     }
 
+    /** From the opacity slider; the repository keeps it within 10–90% (FR-3.4). */
     fun onOpacityChange(opacity: Float, final: Boolean) {
-        // TODO(#6): guides.update(final) { it.copy(opacity = ...) }, within 0.1–0.9.
+        if (!opacity.isFinite()) return
+        guides.update(final) { it.copy(opacity = opacity) }
     }
 
+    /** Switches cutout ↔ outline; position and size are untouched (FR-3.5). */
     fun onStyleToggle() {
-        // TODO(#6): switch between CUTOUT and OUTLINE.
+        guides.update(final = true) { state ->
+            state.copy(style = if (state.style == GuideStyle.CUTOUT) GuideStyle.OUTLINE else GuideStyle.CUTOUT)
+        }
     }
 
     fun onRemoveGuide() {

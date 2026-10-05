@@ -40,7 +40,11 @@
     <string name="guide">Guide</string>
     <string name="shutter">Shutter</string>
     <string name="gallery">Gallery</string>
-    <string name="style_toggle">Cutout / Outline</string>
+    <!-- The style toggle names the style it switches to (FR-3.5). -->
+    <string name="show_cutout">Cutout</string>
+    <string name="show_outline">Outline</string>
+    <string name="guide_opacity">Guide opacity</string>
+    <string name="guide_opacity_percent">%1$d%%</string>
     <string name="remove_guide">Remove</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>

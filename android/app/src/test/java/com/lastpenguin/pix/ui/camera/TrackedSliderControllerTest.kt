@@ -18,10 +18,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 
 /** Exercises Material's actual callback ordering, including touch and virtual accessibility actions. */
 @RunWith(AndroidJUnit4::class)
-class ZoomSliderControllerTest {
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class TrackedSliderControllerTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private var eventTime = 1_000L
 
@@ -195,7 +197,7 @@ class ZoomSliderControllerTest {
 
     private data class Fixture(
         val slider: Slider,
-        val controller: ZoomSliderController,
+        val controller: TrackedSliderController,
         val requests: MutableList<Request>,
     )
 
@@ -212,7 +214,7 @@ class ZoomSliderControllerTest {
         }
         assertEquals(host, slider.parent)
         val requests = mutableListOf<Request>()
-        val controller = ZoomSliderController(slider) { ratio, final -> requests += Request(ratio, final) }
+        val controller = TrackedSliderController.zoom(slider) { ratio, final -> requests += Request(ratio, final) }
         return Fixture(slider, controller, requests)
     }
 

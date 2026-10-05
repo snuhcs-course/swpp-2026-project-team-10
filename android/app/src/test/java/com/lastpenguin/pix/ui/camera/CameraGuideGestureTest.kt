@@ -171,6 +171,73 @@ class CameraGuideGestureTest {
         assertTrue(camera.zoomRequests.isEmpty())
     }
 
+    @Test
+    fun opacityIsKeptBetweenTenAndNinetyPercentAndPublishesTheFinalStep() = runTest {
+        guides.setGuide(guide())
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { guides.changes.collect { changes += it } }
+        runCurrent()
+
+        model.onOpacityChange(0.3f, final = false)
+        model.onOpacityChange(0.02f, final = false)
+        model.onOpacityChange(0.95f, final = true)
+        runCurrent()
+
+        assertEquals(listOf(0.3f, 0.1f, 0.9f), changes.map { it.state.opacity })
+        assertEquals(listOf(false, false, true), changes.map { it.final })
+        assertEquals(GuideState(guideId = "guide", opacity = 0.9f), guides.state.value)
+    }
+
+    @Test
+    fun nonFiniteOpacityIsIgnored() = runTest {
+        guides.setGuide(guide())
+        model.onOpacityChange(0.3f, final = true)
+        val before = guides.state.value
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { guides.changes.collect { changes += it } }
+        runCurrent()
+
+        for (invalid in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            model.onOpacityChange(invalid, final = true)
+        }
+        runCurrent()
+
+        assertEquals(before, guides.state.value)
+        assertTrue(changes.isEmpty())
+    }
+
+    @Test
+    fun styleToggleSwitchesBothWaysAndKeepsPositionSizeAndOpacity() = runTest {
+        guides.setGuide(guide())
+        guides.update(final = true) { it.copy(cx = 0.3f, cy = 0.6f, height = 1.2f, opacity = 0.8f) }
+        val placed = guides.state.value
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { guides.changes.collect { changes += it } }
+        runCurrent()
+
+        model.onStyleToggle()
+        assertEquals(placed.copy(style = GuideStyle.CUTOUT), guides.state.value)
+        model.onStyleToggle()
+        runCurrent()
+
+        assertEquals(placed, guides.state.value)
+        assertEquals(listOf(true, true), changes.map { it.final })
+    }
+
+    @Test
+    fun opacityAndStyleWithoutAGuideDoNothing() = runTest {
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { guides.changes.collect { changes += it } }
+        runCurrent()
+
+        model.onOpacityChange(0.3f, final = true)
+        model.onStyleToggle()
+        runCurrent()
+
+        assertEquals(GuideState(), guides.state.value)
+        assertTrue(changes.isEmpty())
+    }
+
     private fun guide(): ReferenceGuide {
         // JVM Android stubs cannot create bitmaps; this test only stores their references.
         val unsafeClass = Class.forName("sun.misc.Unsafe")

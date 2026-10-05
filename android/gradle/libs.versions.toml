@@ -22,8 +22,9 @@ datastore = "1.1.7"
 # WebRTC prebuilt (Design 1.2): a maintained libwebrtc build that keeps the org.webrtc package.
 webrtc = "137.7151.01"
 junit = "4.13.2"
-androidxTestRunner = "1.7.0"
 androidxTestJunit = "1.3.0"
+# Runs View, Canvas, and touch tests on the JVM (Android SDK 36 support needs 4.16+).
+robolectric = "4.17"
 # Formatting and style checks: Spotless runs ktlint (see build.gradle.kts and .editorconfig).
 spotless = "8.10.3"
 ktlint = "1.8.0"
@@ -54,8 +55,8 @@ retrofit-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "con
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

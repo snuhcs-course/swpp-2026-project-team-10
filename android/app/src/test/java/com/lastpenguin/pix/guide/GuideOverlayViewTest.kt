@@ -14,9 +14,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 
-/** Exercises real Android Canvas composition, including the frame's letterbox clipping. */
+/** Exercises Android Canvas composition (Robolectric native graphics), including the frame's letterbox clipping. */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideOverlayViewTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val bitmaps = mutableListOf<Bitmap>()

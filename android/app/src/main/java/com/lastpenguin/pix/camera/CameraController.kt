@@ -8,12 +8,12 @@ import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 
-/** What the photographer's camera can do. Sent to the subject in `camera.capabilities`. */
+/** Supported zoom in primary-rear-camera units (1x). Sent to the subject in `camera.capabilities`. */
 @Serializable
 data class CameraCapabilities(
     val minZoom: Float,
     val maxZoom: Float,
-    /** Zoom chips shown on both phones, e.g. [0.6, 1, 2, 3] within [minZoom, maxZoom]. */
+    /** Subject-side zoom stops, e.g. [0.5, 0.6, 1, 2, 3], filtered to [minZoom, maxZoom]. */
     val zoomStops: List<Float>,
 )
 
@@ -39,13 +39,13 @@ interface CameraController {
 
     val capabilities: StateFlow<CameraCapabilities?>
 
-    /** Zoom ratio actually applied. */
+    /** Zoom ratio actually applied, relative to the primary rear camera across any lens switch. */
     val zoom: StateFlow<Float>
 
     /** Binds Preview, ImageCapture, and ImageAnalysis with one 3:4 viewport (AD-10). */
     fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider)
 
-    /** Clamped to [CameraCapabilities.minZoom, CameraCapabilities.maxZoom]. */
+    /** Primary-relative ratio, clamped to [CameraCapabilities.minZoom, CameraCapabilities.maxZoom]. */
     fun setZoom(ratio: Float)
 
     /** Full resolution to Pictures/Pix, never with the guide (FR-1.5). */

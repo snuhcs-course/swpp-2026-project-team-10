@@ -8,7 +8,8 @@ class CameraZoomTest {
     @Test
     fun doesNotAdvertiseUltrawideWhenCameraMinimumIsAboveTheChipRatio() {
         assertEquals(listOf(1f, 2f, 3f), cameraZoomStops(0.8f, 10f))
-        assertEquals(listOf(0.6f, 1f, 2f, 3f), cameraZoomStops(0.5f, 10f))
+        assertEquals(listOf(0.5f, 0.6f, 1f, 2f, 3f), cameraZoomStops(0.5f, 10f))
+        assertEquals(listOf(0.6f, 1f, 2f, 3f), cameraZoomStops(0.6f, 10f))
     }
 
     @Test

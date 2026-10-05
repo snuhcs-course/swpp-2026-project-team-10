@@ -129,12 +129,14 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 |---|---|---|---|
 | FR-1.1 | Pix opens directly to the rear-camera preview. No sign-in, menu, or splash screen comes before it. | Must | It 1 |
 | FR-1.2 | On first launch Pix asks for camera permission. If it is denied, Pix explains why the camera is needed and shows a button that opens the system settings. | Must | It 1 |
-| FR-1.3 | The camera screen has a shutter button and zoom chips for the zoom levels the phone supports (for example 0.6×, 1×, 2×, 3×). Pinching the preview also zooms. | Must | It 1 |
+| FR-1.3 | The camera screen has a shutter button and continuous two-finger pinch zoom within the phone's supported range, including 0.5× when the phone exposes that capability. The actual hardware minimum applies otherwise (for example 0.6× or 1×). Zoom is relative to the primary rear camera across lens switches. The currently applied zoom is displayed, and accessibility actions allow zooming in and out. | Must | It 1 |
 | FR-1.4 | Tapping the preview focuses and sets exposure at that point. | Should | It 2 |
 | FR-1.5 | Photos are saved at the camera's full resolution to a "Pix" album in the gallery. No guide or on-screen control is included. | Must | It 1 |
 | FR-1.6 | After saving, "Saved without the guide" appears and the thumbnail updates. Tapping the thumbnail opens the photo in the gallery. | Must | It 1 |
 | FR-1.7 | If saving fails (for example, storage is full), Pix shows why, and the camera and guide stay as they were. | Must | It 1 |
 | FR-1.8 | The camera screen has entry points for *Guide* (add a pose guide) and *Shoot together*. | Must | It 1 |
+| FR-1.9 | The photographer's preview shows a 3×3 composition grid. The actual 3:4 image is divided into three equal columns and three equal rows, excluding letterbox bars. | Must | It 1 |
+| FR-1.10 | A horizon bar at the center of the middle grid cell follows device tilt and turns dark yellow when level. If the horizon cannot be determined, the bar is hidden. The grid and bar do not block gestures or appear in saved photos or streamed video. | Must | It 1 |
 
 #### F2 · Guide from a reference photo
 *Turn any photo of a person into a guide.*
@@ -261,7 +263,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | Camera permission is granted | I open Pix | The rear-camera preview appears within 2 s, with the shutter, zoom chips, *Guide*, and *Shoot together*. |
+| **Normal** | Camera permission is granted | I open Pix | The rear-camera preview appears within 2 s, with the shutter, applied zoom readout, composition grid, horizon bar when available, *Guide*, and *Shoot together*. |
 | **Normal** | The preview is showing | I tap the shutter | The photo is saved to the "Pix" album within 2 s, a confirmation appears, and the thumbnail updates. |
 | **Failure** | I denied camera permission | Pix opens | Pix explains why it needs the camera and shows *Open settings* instead of a blank preview. |
 | **Failure** | The phone's storage is full | I tap the shutter | "Couldn't save the photo. Free up storage and try again." appears, and the camera stays ready. |
@@ -482,7 +484,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Camera** | Live preview; *Shoot together* (top); zoom chips; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Zoom chip or pinch → zoom. | Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. |
+| **Camera** | Live preview with a 3×3 grid and centered horizon bar; *Shoot together* (top); applied zoom readout; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Two-finger pinch → continuous zoom · Align phone → dark yellow horizon bar. | Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. Unknown horizon or no sensor → hide the bar, retain the grid. |
 | **Add a pose guide** | Bottom sheet with *Upload a reference*, *Generate poses here*, and *Cancel*. | *Upload a reference* → system photo picker → Reference confirm · *Generate poses here* → Generating poses (Flow 2) · *Cancel* or swipe down → Camera. | Picker closed without a choice → Camera with the old guide kept. |
 | **Reference confirm** | The separated person; Cutout/Outline switch; "Person found". | *Use this guide* → Camera + guide · *Choose another photo* → picker · Switch → preview the other style. | No person → No person found. |
 | **Camera + guide** | Guide over the preview; hint "Drag · pinch to resize"; style toggle; opacity slider; shutter. | Drag → move · Pinch → resize · Slider → opacity · Toggle → cutout or outline · Shutter → Photo saved. | Size limited to 30–300%. At least 20% of the guide stays on screen. |

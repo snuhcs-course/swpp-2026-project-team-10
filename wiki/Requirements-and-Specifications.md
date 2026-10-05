@@ -4,6 +4,7 @@
 |---|---|---|
 | 0.1 | 2026-09-30 | Initial draft: abstract, customers, competitive landscape, feature list, functional requirements, 14 user stories with acceptance criteria, non-functional requirements, wireframes with per-screen specifications, assumptions and scope, and glossary. |
 | 0.2 | 2026-09-30 | Feature updates: saved guides (Iteration 2); room codes stay after Iteration 2, so Pix works without signing in; an offline connection with a QR code and a local hotspot that accepts one phone and starts only after both people confirm (F9, Iteration 3–4); guides that keep the reference's background (Iteration 3–4). Remote control: the subject changes the zoom in Iteration 1, and moves or resizes the guide and sets the brightness and flash in Iteration 2; the photographer takes every photo. Iteration 1 test setup: both phones and the server (a laptop) on the same Wi-Fi. Minimum Android version: Android 10. The scope table now lists Iterations 2, 3–4, and 5. |
+| 0.3 | 2026-10-04 | The image-editing API is chosen: OpenRouter's Image API, with the model as a server setting (FR-4.3, section 7). NFR-13 now says that the server passes the scene photo on to that service. |
 
 Items marked **TBD** need a team decision.
 
@@ -128,12 +129,14 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 |---|---|---|---|
 | FR-1.1 | Pix opens directly to the rear-camera preview. No sign-in, menu, or splash screen comes before it. | Must | It 1 |
 | FR-1.2 | On first launch Pix asks for camera permission. If it is denied, Pix explains why the camera is needed and shows a button that opens the system settings. | Must | It 1 |
-| FR-1.3 | The camera screen has a shutter button and zoom chips for the zoom levels the phone supports (for example 0.6×, 1×, 2×, 3×). Pinching the preview also zooms. | Must | It 1 |
+| FR-1.3 | The camera screen has a shutter button and continuous two-finger pinch zoom within the phone's supported range, including 0.5× when the phone exposes that capability. The actual hardware minimum applies otherwise (for example 0.6× or 1×). Zoom is relative to the primary rear camera across lens switches. The currently applied zoom is displayed, and accessibility actions allow zooming in and out. | Must | It 1 |
 | FR-1.4 | Tapping the preview focuses and sets exposure at that point. | Should | It 2 |
 | FR-1.5 | Photos are saved at the camera's full resolution to a "Pix" album in the gallery. No guide or on-screen control is included. | Must | It 1 |
 | FR-1.6 | After saving, "Saved without the guide" appears and the thumbnail updates. Tapping the thumbnail opens the photo in the gallery. | Must | It 1 |
 | FR-1.7 | If saving fails (for example, storage is full), Pix shows why, and the camera and guide stay as they were. | Must | It 1 |
 | FR-1.8 | The camera screen has entry points for *Guide* (add a pose guide) and *Shoot together*. | Must | It 1 |
+| FR-1.9 | The photographer's preview shows a 3×3 composition grid. The actual 3:4 image is divided into three equal columns and three equal rows, excluding letterbox bars. | Must | It 1 |
+| FR-1.10 | A horizon bar at the center of the middle grid cell follows device tilt and turns dark yellow when level. If the horizon cannot be determined, the bar is hidden. The grid and bar do not block gestures or appear in saved photos or streamed video. | Must | It 1 |
 
 #### F2 · Guide from a reference photo
 *Turn any photo of a person into a guide.*
@@ -170,7 +173,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 |---|---|---|---|
 | FR-4.1 | *Generate poses here* uses the current camera frame, with the subject in it, as the scene photo. | Must | It 1 |
 | FR-4.2 | Before the first request, Pix says that the scene photo will be sent to an external AI service and asks for consent. Without consent, nothing is sent. | Should | It 1 |
-| FR-4.3 | Pix requests four candidates that keep the same person and background, through the Pix server. The image-editing API is chosen during Iteration 1 (**TBD**). | Must | It 1 |
+| FR-4.3 | Pix requests four candidates that keep the same person and background, through the Pix server. The server generates them with an image-editing model on OpenRouter; the model is a server setting (Design Documentation 2.6.3). | Must | It 1 |
 | FR-4.4 | In Iteration 1 the four poses come from predefined templates: hands on hips, wave, walking, and arms crossed. | Must | It 1 |
 | FR-4.5 | *Generating poses* shows the scene photo, each candidate as soon as it is ready, progress ("2 of 4 ready · up to 30 s"), and *Cancel*. | Must | It 1 |
 | FR-4.6 | *Pick a pose* shows the candidates with labels. *Use this pose* sends the selected image to *Reference confirm* (F2). *Try other poses* requests a new set. | Must | It 1 |
@@ -260,7 +263,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | Camera permission is granted | I open Pix | The rear-camera preview appears within 2 s, with the shutter, zoom chips, *Guide*, and *Shoot together*. |
+| **Normal** | Camera permission is granted | I open Pix | The rear-camera preview appears within 2 s, with the shutter, applied zoom readout, composition grid, horizon bar when available, *Guide*, and *Shoot together*. |
 | **Normal** | The preview is showing | I tap the shutter | The photo is saved to the "Pix" album within 2 s, a confirmation appears, and the thumbnail updates. |
 | **Failure** | I denied camera permission | Pix opens | Pix explains why it needs the camera and shows *Open settings* instead of a blank preview. |
 | **Failure** | The phone's storage is full | I tap the shutter | "Couldn't save the photo. Free up storage and try again." appears, and the camera stays ready. |
@@ -451,7 +454,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. "(It 2)" means the
 | NFR-10 | Reliability | At least 90% of sessions connect in each network combination: same Wi-Fi, different Wi-Fi, Wi-Fi with cellular, and cellular with cellular. (It 2) | 10 trials per combination. |
 | NFR-11 | Reliability | A drop shorter than 10 s recovers without a new invitation. Switching from Wi-Fi to cellular during a session does not crash the app. (It 2) | Turn on airplane mode for 5 s during a session; switch Wi-Fi off. |
 | NFR-12 | Resource use | A 10-minute session uses at most 10% of the photographer's battery. The live view uses at most 2.5 Mbps, about 190 MB per 10 minutes. | Battery statistics; bitrate from connection statistics. |
-| NFR-13 | Privacy | Reference photos never leave the phone. A scene photo is sent only when the user asks for poses, only to the Pix server, and it is deleted there once the response is returned. Nothing from the live view is recorded or stored on any server. | Code review; server log review. |
+| NFR-13 | Privacy | Reference photos never leave the phone. A scene photo is sent only when the user asks for poses, only to the Pix server, which passes it to the image-editing service to generate the poses (FR-4.2) and keeps no copy once the response is returned. Nothing from the live view is recorded or stored on any server. | Code review; server log review. |
 | NFR-14 | Security | API keys exist only on the server. All server traffic uses HTTPS or WSS. The live view and control messages are encrypted end to end between the phones, and a relay server cannot read them. | Inspect the APK for keys; configuration review. |
 | NFR-15 | Access control | Only accepted friends can invite each other. Pix IDs are found only by exact match. Remote control works only while the photographer allows it. (It 2) A QR connection accepts only one phone and starts only after both people tap *Resume*. (It 3–4) | API tests with non-friend and blocked cases; a third phone tries to join a QR session. |
 | NFR-16 | Usability | Controls on *Subject view* are at least 48 dp and reachable with one thumb. Every failure screen says what happened and offers both a retry and a way back. A first-time user can add a guide and take a photo without help. | Hallway test with 5 people: at least 4 finish "add a guide and shoot" within 1 minute. |
@@ -481,7 +484,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Camera** | Live preview; *Shoot together* (top); zoom chips; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Zoom chip or pinch → zoom. | Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. |
+| **Camera** | Live preview with a 3×3 grid and centered horizon bar; *Shoot together* (top); applied zoom readout; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Two-finger pinch → continuous zoom · Align phone → dark yellow horizon bar. | Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. Unknown horizon or no sensor → hide the bar, retain the grid. |
 | **Add a pose guide** | Bottom sheet with *Upload a reference*, *Generate poses here*, and *Cancel*. | *Upload a reference* → system photo picker → Reference confirm · *Generate poses here* → Generating poses (Flow 2) · *Cancel* or swipe down → Camera. | Picker closed without a choice → Camera with the old guide kept. |
 | **Reference confirm** | The separated person; Cutout/Outline switch; "Person found". | *Use this guide* → Camera + guide · *Choose another photo* → picker · Switch → preview the other style. | No person → No person found. |
 | **Camera + guide** | Guide over the preview; hint "Drag · pinch to resize"; style toggle; opacity slider; shutter. | Drag → move · Pinch → resize · Slider → opacity · Toggle → cutout or outline · Shutter → Photo saved. | Size limited to 30–300%. At least 20% of the guide stays on screen. |
@@ -585,7 +588,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 - Pose generation, friends, and invitations need an internet connection. The camera and gallery guides work offline, and from Iteration 3–4 two phones can connect offline with a QR code (F9).
 
 **Constraints**
-- The image-editing API has usage costs and rate limits. The API is chosen in Iteration 1 (**TBD**).
+- The image-editing API has usage costs and rate limits. Pix uses OpenRouter's Image API, which bills each generated image, so the server limits how many poses one phone can request per hour.
 - In Iteration 1, both phones and the Pix server, which runs on a laptop, are on the same Wi-Fi network, and the phones connect with a room code. Cellular connections need a relay server, planned for Iteration 2.
 - Development follows the course schedule: about 10 hours of work per member per iteration.
 

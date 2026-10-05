@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Camera, Camera + guide, Photo saved, and the photographer's side of a session (R&S 6.2, 6.5). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -36,6 +35,16 @@
             android:id="@+id/guideOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <com.lastpenguin.pix.ui.camera.CameraCompositionView
+            android:id="@+id/compositionOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="yes"
+            android:visibility="invisible"
+            tools:visibility="visible" />
 
         <ProgressBar
             android:id="@+id/cameraProgress"
@@ -102,27 +111,32 @@
             tools:visibility="visible" />
     </FrameLayout>
 
-    <HorizontalScrollView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fillViewport="true"
-        android:scrollbars="none">
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/zoomRatio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:focusable="true"
             android:gravity="center"
-            android:orientation="horizontal">
+            android:importantForAccessibility="yes"
+            android:minWidth="64dp"
+            android:minHeight="48dp"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            tools:text="1.0×" />
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/zoomChips"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="8dp"
-                app:singleLine="true"
-                app:singleSelection="true" />
-        </LinearLayout>
-    </HorizontalScrollView>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/pinch_to_zoom"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/captureStatus"

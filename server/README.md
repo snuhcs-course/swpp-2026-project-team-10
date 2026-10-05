@@ -92,7 +92,7 @@ Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose tem
 | --- | --- |
 | `400 INVALID_IMAGE` | Not a readable JPEG, a long side over 1024 px, or EXIF metadata. |
 | `400 UNKNOWN_TEMPLATE` | No template has that `templateId`. |
-| `400 INVALID_REQUEST` | A part is missing or `seed` is not an integer. This code is not in Design §2.5.3; it replaces FastAPI's default 422, which this API uses for `REJECTED`. |
+| `400 INVALID_REQUEST` | A part is missing or `seed` is not an integer. It replaces FastAPI's default 422, which this API uses for `REJECTED`. |
 | `413` | The request is larger than 1 MiB. It is refused before the upload is read, so it carries Starlette's own body (`Content Too Large`) and not the error shape above. |
 | `422 REJECTED` | The image service declined the photo or pose (a content filter or a model refusal). |
 | `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600). Requests refused before that point are not counted. |

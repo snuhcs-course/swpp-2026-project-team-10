@@ -358,6 +358,23 @@ class GenerationViewModelTest {
         assertFalse(later.needsConsent)
     }
 
+    @Test
+    fun consentGivenWhileTheStoredAnswerLoadsIsKept() = runTest {
+        consent.hold = CompletableDeferred()
+        val slow = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        store.put("slow", slow)
+        runCurrent()
+
+        slow.onConsentGiven()
+        runCurrent()
+        // The answer that was read before the user agreed arrives only now.
+        consent.hold?.complete(Unit)
+        runCurrent()
+
+        assertFalse(slow.needsConsent)
+        assertTrue(consent.given)
+    }
+
     /** *Generate poses here*, the shutter, and *Use this photo*. */
     private fun TestScope.generateFromAPhoto() {
         model.beginScene()
@@ -444,7 +461,14 @@ class GenerationViewModelTest {
     private class FakeConsent : GenerationConsent {
         var given = false
 
-        override suspend fun isGiven(): Boolean = given
+        /** When set, the stored answer is read at once but handed over only after this completes. */
+        var hold: CompletableDeferred<Unit>? = null
+
+        override suspend fun isGiven(): Boolean {
+            val stored = given
+            hold?.await()
+            return stored
+        }
 
         override suspend fun give() {
             given = true

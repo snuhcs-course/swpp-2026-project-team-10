@@ -68,7 +68,8 @@ class GenerationViewModel(
     private var consentGiven = false
 
     init {
-        viewModelScope.launch { consentGiven = consent.isGiven() }
+        // Only ever sets it: an answer read before the user agreed must not take that agreement back.
+        viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
     }
 
     /**

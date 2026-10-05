@@ -871,6 +871,8 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 
 **Gestures.** The photographer's pan and zoom deltas are converted with *view → frame* and applied to `GuideState`. `height` is limited to 0.21–2.1, and `cx`, `cy` are limited so that at least 20% of the guide's width and height stay inside the frame (FR-3.2, FR-3.3). Because only frame coordinates are sent, the subject's phone places the guide on the same part of the image regardless of its screen size (FR-3.7, NFR-8).
 
+The guide's normalized width is `height × aspect × 4/3`. For either normalized dimension `d`, the center is limited to `[v − d/2, 1 − v + d/2]`, where `v = min(0.2 × d, 1)`. Centers may therefore lie outside 0–1. If an unusually wide guide exceeds five frame widths, showing 20% is impossible at that scale; keep the whole frame width covered instead, preserving the 30–300% scale range. Geometry also clamps opacity to 0.1–0.9. Non-finite state values reset to their defaults. Coordinate conversion requires finite points and positive, finite frame and view sizes, so callers wait for layout before converting touches.
+
 #### 2.6.3 Pose generation
 
 1.  **Scene photo, prepared on the phone.** The app takes the latest analysis frame (or a still from ImageCapture), rotates it to portrait, resizes it so the long side is at most 1024 px, and encodes it as JPEG (quality 85), which leaves out location and other metadata. This preparation is the app's job: the server checks the photo but does not resize or repair it, and rejects one that is not prepared this way (2.5.3). Doing it on the phone keeps the four uploads small and keeps location data on the phone.

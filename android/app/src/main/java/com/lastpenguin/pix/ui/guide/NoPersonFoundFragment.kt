@@ -14,16 +14,21 @@ class NoPersonFoundFragment : Fragment(R.layout.fragment_failure) {
 
     private val viewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
 
+    /** Another photo goes back to Reference confirm; closing the picker stays here. */
+    private val pickPhoto = registerPhotoPicker { uri ->
+        if (uri != null) {
+            viewModel.onPhotoPicked(uri)
+            findNavController().navigate(R.id.action_noPersonFound_to_referenceConfirm)
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentFailureBinding.bind(view)
         binding.failureTitle.setText(R.string.no_person_title)
         binding.failureMessage.setText(R.string.no_person_message)
 
         binding.primaryButton.setText(R.string.choose_another_photo)
-        binding.primaryButton.setOnClickListener {
-            // TODO(#5): open the system photo picker, then viewModel.onPhotoPicked(uri).
-            findNavController().navigate(R.id.action_noPersonFound_to_referenceConfirm)
-        }
+        binding.primaryButton.setOnClickListener { pickPhoto() }
         binding.secondaryButton.setText(R.string.back_to_camera)
         binding.secondaryButton.setOnClickListener {
             findNavController().popBackStack(R.id.cameraFragment, false)

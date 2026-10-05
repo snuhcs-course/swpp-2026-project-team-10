@@ -18,16 +18,23 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     private val referenceViewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
     private val generationViewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
 
+    /** A picked photo opens Reference confirm; closing the picker returns to the camera, guide unchanged (FR-2.7). */
+    private val pickPhoto = registerPhotoPicker { uri ->
+        if (uri == null) {
+            dismiss()
+        } else {
+            referenceViewModel.onPhotoPicked(uri)
+            findNavController().navigate(R.id.action_addGuide_to_referenceConfirm)
+        }
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         SheetAddGuideBinding.inflate(inflater, container, false).root
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = SheetAddGuideBinding.bind(view)
 
-        binding.uploadButton.setOnClickListener {
-            // TODO(#5): open the system photo picker, then referenceViewModel.onPhotoPicked(uri).
-            findNavController().navigate(R.id.action_addGuide_to_referenceConfirm)
-        }
+        binding.uploadButton.setOnClickListener { pickPhoto() }
         binding.generateButton.setOnClickListener {
             generationViewModel.startFromCamera()
             findNavController().navigate(R.id.action_addGuide_to_generating)

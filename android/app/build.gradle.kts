@@ -89,6 +89,9 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.lifecycle.process)
 
+    // Reference guide (#5): on-device person segmentation, model from Google Play services.
+    implementation(libs.mlkit.subject.segmentation)
+
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.
 

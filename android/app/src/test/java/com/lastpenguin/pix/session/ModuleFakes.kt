@@ -34,6 +34,9 @@ class FakeSessionManager : SessionManager {
     private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
     override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
 
+    private val _peerZoom = MutableStateFlow<Float?>(null)
+    override val peerZoom: StateFlow<Float?> = _peerZoom.asStateFlow()
+
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
 
@@ -53,6 +56,7 @@ class FakeSessionManager : SessionManager {
 
     fun deliver(message: SessionMessage) {
         if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
+        if (message is SessionMessage.CameraStateUpdate) _peerZoom.value = message.zoom
         check(_incoming.tryEmit(message))
     }
 }

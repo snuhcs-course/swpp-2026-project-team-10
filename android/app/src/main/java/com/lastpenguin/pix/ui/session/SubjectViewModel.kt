@@ -55,6 +55,8 @@ class SubjectViewModel(
     private var sendJob: Job? = null
 
     init {
+        // The photographer may have echoed a zoom before this screen existed; later echoes come through incoming.
+        session.peerZoom.value?.let { zoom -> _uiState.update { it.copy(zoom = zoom) } }
         viewModelScope.launch {
             session.state.collect { state ->
                 val connected = state as? SessionState.Connected

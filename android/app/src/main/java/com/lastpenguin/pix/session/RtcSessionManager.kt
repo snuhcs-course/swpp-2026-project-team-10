@@ -73,6 +73,9 @@ class RtcSessionManager(
     private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
     override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
 
+    private val _peerZoom = MutableStateFlow<Float?>(null)
+    override val peerZoom: StateFlow<Float?> = _peerZoom.asStateFlow()
+
     override val eglContext: EglBase.Context
         get() = peers.eglContext
 
@@ -123,6 +126,7 @@ class RtcSessionManager(
         sessionId = null
         iceServers = emptyList()
         _peerCapabilities.value = null
+        _peerZoom.value = null
         // The photographer stays Idle until the code arrives; the subject is connecting from the first moment.
         _state.value = if (role == Role.SUBJECT) SessionState.Connecting(null) else SessionState.Idle
         Timings.mark("session.start", role.name)
@@ -418,6 +422,11 @@ class RtcSessionManager(
 
             is SessionMessage.Capabilities -> {
                 _peerCapabilities.value = message.capabilities
+                _incoming.tryEmit(message)
+            }
+
+            is SessionMessage.CameraStateUpdate -> {
+                _peerZoom.value = message.zoom
                 _incoming.tryEmit(message)
             }
 

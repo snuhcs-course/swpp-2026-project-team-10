@@ -19,6 +19,9 @@ interface SessionManager {
     /** Subject: the photographer's `camera.capabilities`, kept so a screen that opens late still gets it. */
     val peerCapabilities: StateFlow<CameraCapabilities?>
 
+    /** Subject: the zoom from the last `camera.state`, for the same reason; null until one arrives. */
+    val peerZoom: StateFlow<Float?>
+
     suspend fun start(entry: SessionEntry, role: Role)
 
     /** Sent on the realtime or reliable data channel as listed in Design 2.5.1. */

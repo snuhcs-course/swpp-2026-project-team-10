@@ -138,6 +138,18 @@ class SubjectViewModelTest {
     }
 
     @Test
+    fun `a zoom echoed before the screen existed is the starting zoom`() = runTest(dispatcher) {
+        connect()
+        session.deliver(SessionMessage.CameraStateUpdate(2.5f, Role.PHOTOGRAPHER, final = true))
+        runCurrent()
+
+        val late = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        runCurrent()
+
+        assertEquals(2.5f, late.uiState.value.zoom, 0f)
+    }
+
+    @Test
     fun `the name stays after the session ends`() = runTest(dispatcher) {
         connect()
         runCurrent()

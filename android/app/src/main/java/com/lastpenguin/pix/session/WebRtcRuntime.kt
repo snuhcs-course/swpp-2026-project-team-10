@@ -24,7 +24,15 @@ class WebRtcRuntime(context: Context, private val frameSource: CameraFrameSource
     }
 
     private val factory: PeerConnectionFactory by lazy {
+        val options = PeerConnectionFactory.Options().apply {
+            // Android's network monitor only reports networks known to ConnectivityManager, which leaves out the
+            // phone's own hotspot interface. A phone that hosts the test hotspot then offers only cellular
+            // candidates and never connects. Enumerating interfaces directly includes the hotspot (and Wi-Fi)
+            // addresses; the cost is no reaction to network switches, which the session's own grace timer covers.
+            disableNetworkMonitor = true
+        }
         PeerConnectionFactory.builder()
+            .setOptions(options)
             // Hardware H.264 (high profile allowed) and VP8 first, software codecs as the fallback (Design 2.6.4).
             .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true))
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))

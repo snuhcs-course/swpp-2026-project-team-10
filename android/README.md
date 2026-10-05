@@ -113,7 +113,8 @@ Run these from `android/` before you push. On every pull request, the `android-l
 | `./gradlew spotlessCheck` | Fails if a file is not formatted or breaks a ktlint rule. |
 | `./gradlew :app:lintDebug` | Android Lint. Errors fail; warnings are only listed in `app/build/reports/lint-results-debug.html`. |
 | `./gradlew :app:testDebugUnitTest` | Unit tests in `app/src/test/`. They run on the JVM, without a phone or an emulator. |
+| `./gradlew :app:connectedDebugAndroidTest` | Instrumentation tests in `app/src/androidTest/`. Requires a running emulator or connected phone. Guide overlay tests draw onto a real Android Canvas and check placement, clipping, styles, and alpha. |
 
 - **Rules.** ktlint rules are in `.editorconfig`, which Android Studio's formatter also reads. After you change that file, run `./gradlew clean` once, or Spotless keeps using the old rules.
 - **Suppressing.** For one place, use `@Suppress("ktlint:standard:<rule>")` or `@SuppressLint("<LintId>")` with a comment that says why. To turn off an Android Lint check for the whole app, add it to `lint { disable += ... }` in `app/build.gradle.kts`.
-- **Tests.** Put a test next to its class, in the same package under `app/src/test/java/`. Add tests in the pull request that writes the code. Unit tests cannot call the Android framework, so keep logic you want to test in plain Kotlin.
+- **Tests.** Put a test next to its class, in the same package under `app/src/test/java/`, or `app/src/androidTest/java/` when real Android Views/Canvas are required. Add tests in the pull request that writes the code. JVM unit tests cannot call the Android framework, so keep coordinate and state logic in plain Kotlin. Instrumentation tests use synthetic guide bitmaps and do not require camera permission, segmentation, or a server.

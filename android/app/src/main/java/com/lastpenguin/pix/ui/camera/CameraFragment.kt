@@ -293,6 +293,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val ready = granted && state.cameraStatus == CameraStatus.READY
         val unavailable = state.cameraStatus == CameraStatus.UNAVAILABLE
         controls.compositionOverlay.isVisible = ready
+        controls.guideOverlay.render(state.guide, state.guideState)
+        controls.guideOverlay.isVisible = ready
+        // Keep the hint's space so applying a guide does not resize the live image.
+        controls.hintText.visibility = if (state.guide == null) View.VISIBLE else View.INVISIBLE
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)

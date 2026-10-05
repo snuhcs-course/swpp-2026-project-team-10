@@ -31,6 +31,9 @@ class FakeSessionManager : SessionManager {
     private val _incoming = MutableSharedFlow<SessionMessage>(extraBufferCapacity = 64)
     override val incoming: Flow<SessionMessage> = _incoming.asSharedFlow()
 
+    private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
+    override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
+
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
 
@@ -48,7 +51,10 @@ class FakeSessionManager : SessionManager {
         _state.value = state
     }
 
-    fun deliver(message: SessionMessage) = check(_incoming.tryEmit(message))
+    fun deliver(message: SessionMessage) {
+        if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
+        check(_incoming.tryEmit(message))
+    }
 }
 
 /** A camera whose zoom applies at once (or not at all when [applies] is false). */
@@ -78,9 +84,13 @@ class FakeCameraController(
         if (applies) _zoom.value = ratio
     }
 
-    /** The photographer changed the zoom on their own phone. */
+    /** The photographer changed the zoom on their own phone, or a request the camera held was applied. */
     fun applyLocally(ratio: Float) {
         _zoom.value = ratio
+    }
+
+    fun setStatus(status: CameraStatus) {
+        _status.value = status
     }
 
     override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())

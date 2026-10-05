@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -67,12 +68,14 @@ class SubjectViewModel(
             }
         }
         viewModelScope.launch {
+            // Kept by the session, so it is there even if the message came before this screen existed.
+            session.peerCapabilities.filterNotNull().collect { caps ->
+                _uiState.update { it.copy(minZoom = caps.minZoom, maxZoom = caps.maxZoom) }
+            }
+        }
+        viewModelScope.launch {
             session.incoming.collect { message ->
                 when (message) {
-                    is SessionMessage.Capabilities -> _uiState.update {
-                        it.copy(minZoom = message.capabilities.minZoom, maxZoom = message.capabilities.maxZoom)
-                    }
-
                     is SessionMessage.CameraStateUpdate -> {
                         // While a pinch is in progress its own steps rule the readout; the echo wins once it ends.
                         if (!pinching) _uiState.update { it.copy(zoom = message.zoom) }

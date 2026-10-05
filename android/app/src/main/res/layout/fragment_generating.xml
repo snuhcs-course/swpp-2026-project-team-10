@@ -67,6 +67,15 @@
         android:gravity="center"
         tools:text="2 of 4 ready" />
 
+    <!-- A waiting state says how long it may take (R&S 6.9). -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:text="@string/generating_wait"
+        android:textAppearance="?attr/textAppearanceBodySmall" />
+
     <Button
         android:id="@+id/cancelButton"
         style="@style/Widget.Material3.Button.TextButton"

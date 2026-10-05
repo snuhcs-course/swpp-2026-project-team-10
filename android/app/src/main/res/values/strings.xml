@@ -83,6 +83,7 @@
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
     <string name="ready_count">%1$d of %2$d ready</string>
+    <string name="generating_wait">Generation may take up to 30 seconds.</string>
     <string name="pick_pose_title">Pick a pose</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>

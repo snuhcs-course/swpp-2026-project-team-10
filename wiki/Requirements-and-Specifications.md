@@ -5,7 +5,7 @@
 | 0.1 | 2026-09-30 | Initial draft: abstract, customers, competitive landscape, feature list, functional requirements, 14 user stories with acceptance criteria, non-functional requirements, wireframes with per-screen specifications, assumptions and scope, and glossary. |
 | 0.2 | 2026-09-30 | Feature updates: saved guides (Iteration 2); room codes stay after Iteration 2, so Pix works without signing in; an offline connection with a QR code and a local hotspot that accepts one phone and starts only after both people confirm (F9, Iteration 3–4); guides that keep the reference's background (Iteration 3–4). Remote control: the subject changes the zoom in Iteration 1, and moves or resizes the guide and sets the brightness and flash in Iteration 2; the photographer takes every photo. Iteration 1 test setup: both phones and the server (a laptop) on the same Wi-Fi. Minimum Android version: Android 10. The scope table now lists Iterations 2, 3–4, and 5. |
 | 0.3 | 2026-10-04 | The image-editing API is chosen: OpenRouter's Image API, with the model as a server setting (FR-4.3, section 7). NFR-13 now says that the server passes the scene photo on to that service. |
-| 0.4 | 2026-10-05 | The user takes the scene photo and confirms it before it is sent: after *Generate poses here*, the Camera screen's shutter takes the scene photo, and *Use this photo* or *Shoot again* comes before Generating poses (FR-4.1, US-4, 6.2, 6.3). The candidates are shown as images only, without the pose names (FR-4.6, 6.3), and the progress line is "n of 4 ready" without "up to 30 s" (FR-4.5, 6.3). |
+| 0.4 | 2026-10-05 | The user takes the scene photo and confirms it before it is sent: after *Generate poses here*, the Camera screen's shutter takes the scene photo, and *Use this photo* or *Shoot again* comes before Generating poses (FR-4.1, US-4, 6.2, 6.3, 6.8). The candidates are shown as images only, without the pose names (FR-4.6, 6.3), and Generating poses says "Generation may take up to 30 seconds" under the progress line (FR-4.5, 6.3). |
 
 Items marked **TBD** need a team decision.
 
@@ -176,7 +176,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-4.2 | Before the first request, Pix says that the scene photo will be sent to an external AI service and asks for consent. Without consent, nothing is sent. | Should | It 1 |
 | FR-4.3 | Pix requests four candidates that keep the same person and background, through the Pix server. The server generates them with an image-editing model on OpenRouter; the model is a server setting (Design Documentation 2.6.3). | Must | It 1 |
 | FR-4.4 | In Iteration 1 the four poses come from predefined templates: hands on hips, wave, walking, and arms crossed. | Must | It 1 |
-| FR-4.5 | *Generating poses* shows the scene photo, each candidate as soon as it is ready, progress ("2 of 4 ready"), and *Cancel*. | Must | It 1 |
+| FR-4.5 | *Generating poses* shows the scene photo, each candidate as soon as it is ready, progress ("2 of 4 ready"), how long it may take ("Generation may take up to 30 seconds"), and *Cancel*. | Must | It 1 |
 | FR-4.6 | *Pick a pose* shows the candidate images, without pose names. *Use this pose* sends the selected image to *Reference confirm* (F2). *Try other poses* requests a new set. | Must | It 1 |
 | FR-4.7 | If no candidate arrives within 30 s or every request fails, Pix shows *Couldn't create poses* with *Try again* and *Back to camera*, and keeps the scene photo. If only some candidates fail, the others are still shown. | Must | It 1 |
 | FR-4.8 | The user can describe the desired pose in Korean or English (up to 100 characters), and the candidates follow the description. | Should | It 2 |
@@ -497,12 +497,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 2: pose generation](images/flow2_pose_generation.jpg)
 
-*Figure 2. Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. The scene photo is taken on the Camera screen before Generating poses; that step is not drawn in this figure. The pose names drawn under the candidates and "up to 30 s" are not shown in the app.*
+*Figure 2. Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure.
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Camera, taking the scene photo** | The Camera screen with "Take the scene photo" and *Cancel* in place of *Shoot together*; the preview, grid, zoom readout, and shutter as usual; *Guide*, the thumbnail, and any earlier guide are hidden. After the shutter, the photo that was taken, in place of the preview, with "Use this photo?". | Two-finger pinch → zoom · Shutter → the photo is shown, and nothing is saved · *Use this photo* → Generating poses · *Shoot again* → the live camera again · *Cancel* → Camera. | The shutter is disabled until the camera is ready. No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again* while the photo is shown and *Cancel* before it. |
-| **Generating poses** | The scene photo ("same person and place"); four slots that fill in as candidates arrive; "n of 4 ready". | *Cancel* → Camera · All ready, or 30 s with at least one ready → Pick a pose. | Candidates cannot be selected until generation ends. No candidate, or an error → Couldn't create poses. |
+| **Generating poses** | The scene photo ("same person and place"); four slots that fill in as candidates arrive; "n of 4 ready"; "Generation may take up to 30 seconds". | *Cancel* → Camera · All ready, or 30 s with at least one ready → Pick a pose. | Candidates cannot be selected until generation ends. No candidate, or an error → Couldn't create poses. |
 | **Pick a pose** | 2×2 grid of candidate images, without pose names; the selected one is highlighted. | Tap a candidate → select · *Use this pose* → Reference confirm (Flow 1) · *Try other poses* → Generating poses with a new set. | *Use this pose* is disabled until a candidate is selected. |
 | **Couldn't create poses** | "The request failed or took over 30 s. Your photo is kept." and the scene photo. | *Try again* → Generating poses with the same photo · *Back to camera* → Camera. | — |
 
@@ -563,6 +563,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 |---|---|---|
 | Camera permission denied | Explain why the camera is needed; *Open settings*. | FR-1.2 |
 | Pose generation consent | One-time notice that the scene photo is sent to an AI service; *Agree* / *Not now*. | FR-4.2 |
+| Camera, taking the scene photo | The Camera screen after *Generate poses here*: "Take the scene photo" with *Cancel* and the shutter, then the photo with *Use this photo* / *Shoot again* (specified in 6.3). | FR-4.1 |
 | Pix ID setup | Sign in, then choose a Pix ID with live rule checking. | FR-5.2, FR-5.3 |
 | Friend requests | List of received requests with *Accept* / *Decline*. | FR-5.7 |
 | Invitation no longer available | Shown when an expired or cancelled invitation is opened. | FR-6.4 |

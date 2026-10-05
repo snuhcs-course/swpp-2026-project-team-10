@@ -1,5 +1,6 @@
 package com.lastpenguin.pix.session
 
+import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -165,6 +166,57 @@ class RemoteControlHandlerTest {
         advanceTimeBy(600)
         runCurrent()
         assertEquals(listOf(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true)), echoes())
+        handler.stop()
+    }
+
+    @Test
+    fun `a final request the camera applies late is still the subject's`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        session.sent.clear()
+        camera.applies = false
+
+        handler.handle(SessionMessage.ZoomSet(2f, final = true))
+        advanceTimeBy(600)
+        runCurrent()
+        assertEquals(listOf(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true)), echoes())
+        assertTrue(actions.isEmpty())
+
+        // The camera finishes saving a photo and applies the request it held.
+        camera.applyLocally(2f)
+        advanceTimeBy(200)
+        runCurrent()
+        assertEquals(listOf<RemoteAction>(RemoteAction.Zoom(2f)), actions)
+        assertEquals(SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = true), lastFinal())
+        handler.stop()
+    }
+
+    @Test
+    fun `no stale answer while the camera opens another lens`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        session.sent.clear()
+        camera.applies = false
+        camera.setStatus(CameraStatus.STARTING)
+
+        handler.handle(SessionMessage.ZoomSet(0.6f, final = true))
+        advanceTimeBy(900)
+        runCurrent()
+        assertTrue(echoes().isEmpty())
+
+        camera.applyLocally(0.6f)
+        camera.setStatus(CameraStatus.READY)
+        advanceTimeBy(200)
+        runCurrent()
+        assertEquals(listOf<RemoteAction>(RemoteAction.Zoom(0.6f)), actions)
+        assertEquals(
+            listOf(SessionMessage.CameraStateUpdate(0.6f, Role.SUBJECT, final = true)),
+            echoes().filter {
+                it.final
+            },
+        )
         handler.stop()
     }
 

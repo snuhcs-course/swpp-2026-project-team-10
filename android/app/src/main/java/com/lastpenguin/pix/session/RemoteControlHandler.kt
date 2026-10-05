@@ -1,6 +1,7 @@
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlin.math.abs
@@ -10,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** A remote action the photographer's phone applied, for "Junhyeong set zoom to 2×" (FR-7.4). */
@@ -24,7 +26,9 @@ sealed interface RemoteAction {
  * zoom changes and both phones always end on the same value (FR-7.6). A pinch arrives as a stream of non-final
  * requests followed by one final value: every step is applied, but only the final one is reported as an action
  * (one notice per pinch) and, when the camera does not apply it within [ECHO_TIMEOUT_MS], answered with the
- * current zoom so the subject's readout snaps back.
+ * current zoom so the subject's readout snaps back. The camera may hold a request while it opens another lens or
+ * finishes saving a photo, so an answered request keeps its attribution for [PENDING_MS]: when the held request
+ * is applied later, it is still the subject's and still gets its one notice.
  * Owner: Real-time (#10).
  */
 class RemoteControlHandler(
@@ -78,17 +82,24 @@ class RemoteControlHandler(
             send(ratio, Role.SUBJECT, final = true)
             return
         }
-        pending = PendingZoom(ratio, clock(), request.final)
+        val queued = PendingZoom(ratio, clock(), request.final)
+        pending = queued
         camera.setZoom(ratio)
         if (!request.final) return
-        timeoutJob = scope?.launch {
-            delay(ECHO_TIMEOUT_MS)
-            if (pending != null) {
-                // The camera did not apply it (not ready, or already at that zoom): tell the subject where we are.
-                pending = null
-                send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
-            }
-        }
+        timeoutJob = scope?.launch { answerIfStalled(queued) }
+    }
+
+    /**
+     * After [ECHO_TIMEOUT_MS] with nothing applied, tells the subject where the zoom is. The request is not
+     * forgotten: the camera may still be holding it (see the class comment), and [onApplied] attributes it then.
+     */
+    private suspend fun answerIfStalled(request: PendingZoom) {
+        delay(ECHO_TIMEOUT_MS)
+        // While the camera opens another lens the request is certainly held: wait rather than answer with a stale zoom.
+        camera.status.first { it != CameraStatus.STARTING }
+        if (pending !== request || request.answered) return
+        request.answered = true
+        send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
     }
 
     private fun onApplied(zoom: Float) {
@@ -117,11 +128,15 @@ class RemoteControlHandler(
         session.send(SessionMessage.CameraStateUpdate(zoom = zoom, by = by, final = final))
     }
 
-    private class PendingZoom(val ratio: Float, val at: Long, val final: Boolean)
+    private class PendingZoom(val ratio: Float, val at: Long, val final: Boolean) {
+        var answered = false
+    }
 
     private companion object {
         const val ZOOM_MATCH = 0.01f
-        const val PENDING_MS = 1_000L
+
+        /** How long a request stays the subject's: long enough for a lens switch or a photo save to finish. */
+        const val PENDING_MS = 5_000L
         const val ECHO_TIMEOUT_MS = 500L
         const val FINAL_DELAY_MS = 100L
     }

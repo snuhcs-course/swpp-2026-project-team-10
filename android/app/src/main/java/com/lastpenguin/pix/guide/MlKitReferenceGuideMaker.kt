@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
+import android.util.Log
 import androidx.core.graphics.scale
 import com.lastpenguin.pix.core.Timings
 import java.util.UUID
@@ -36,6 +37,8 @@ class MlKitReferenceGuideMaker(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                // No person is an expected answer; anything else is worth the stack trace in logcat.
+                if (e !is NoPersonFoundException) Log.w(TAG, "Could not make a guide from the reference", e)
                 Result.failure(e)
             }
             Timings.mark(
@@ -85,5 +88,9 @@ class MlKitReferenceGuideMaker(
         } else {
             software.scale(size.width, size.height)
         }
+    }
+
+    private companion object {
+        const val TAG = "PixGuideMaker"
     }
 }

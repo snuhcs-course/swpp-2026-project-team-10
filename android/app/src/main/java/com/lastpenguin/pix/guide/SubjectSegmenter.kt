@@ -3,22 +3,26 @@ package com.lastpenguin.pix.guide
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.util.Log
 import androidx.core.graphics.createBitmap
-import com.google.android.gms.common.moduleinstall.InstallStatusListener
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
-import com.google.android.gms.common.moduleinstall.ModuleInstallStatusUpdate
-import com.google.android.gms.common.moduleinstall.ModuleInstallStatusUpdate.InstallState
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenter as MlKitSegmenter
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
+import com.lastpenguin.pix.core.Timings
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+
+/** The segmentation model from Google Play services did not arrive in time, for example without a network. */
+class SegmentationModelUnavailableException : Exception("The segmentation model is not downloaded yet")
 
 /** What the segmenter found in one photo (Design 2.6.1). */
 class Segmentation(
@@ -72,36 +76,28 @@ class SubjectSegmenter(private val context: Context) {
         Result.failure(e)
     }
 
-    /** The model comes from Google Play services; the first use waits for its download (Design 2.6.1, step 2). */
+    /**
+     * The model comes from Google Play services; the first use waits for its download (Design 2.6.1, step 2).
+     * On the Galaxy S22 the install status reported an end while Play services was still downloading, so this asks
+     * for the install and then checks until the model is really there, or gives up after [MODEL_WAIT_MS].
+     */
     private suspend fun ensureModule() {
         val installer = ModuleInstall.getClient(context)
-        if (installer.areModulesAvailable(client).await().areModulesAvailable()) return
-        suspendCancellableCoroutine { continuation ->
-            lateinit var listener: InstallStatusListener
-
-            // The status listener and the request's own result can both report the end; the first one wins.
-            // Both arrive on the main thread, so checking isActive is enough.
-            fun finish(error: Throwable?) {
-                installer.unregisterListener(listener)
-                if (!continuation.isActive) return
-                if (error == null) continuation.resume(Unit) else continuation.resumeWithException(error)
-            }
-            listener = InstallStatusListener { update: ModuleInstallStatusUpdate ->
-                when (update.installState) {
-                    InstallState.STATE_COMPLETED -> finish(null)
-
-                    InstallState.STATE_FAILED, InstallState.STATE_CANCELED ->
-                        finish(IllegalStateException("The segmentation model was not installed"))
-
-                    else -> Unit
-                }
-            }
-            val request = ModuleInstallRequest.newBuilder().addApi(client).setListener(listener).build()
-            installer.installModules(request)
-                .addOnSuccessListener { response -> if (response.areModulesAlreadyInstalled()) finish(null) }
-                .addOnFailureListener { error -> finish(error) }
-            continuation.invokeOnCancellation { installer.unregisterListener(listener) }
+        suspend fun available() = installer.areModulesAvailable(client).await().areModulesAvailable()
+        if (available()) return
+        Timings.mark("seg.model", "downloading")
+        try {
+            installer.installModules(ModuleInstallRequest.newBuilder().addApi(client).build()).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Play services may already be downloading it for the segmenter itself; keep checking.
+            Log.w(TAG, "Install request for the segmentation model failed", e)
         }
+        withTimeoutOrNull(MODEL_WAIT_MS) {
+            while (!available()) delay(MODEL_CHECK_MS)
+        } ?: throw SegmentationModelUnavailableException()
+        Timings.mark("seg.model", "ready")
     }
 
     private fun alphaMask(confidence: FloatArray, width: Int, height: Int): Bitmap {
@@ -117,6 +113,9 @@ class SubjectSegmenter(private val context: Context) {
     }
 
     private companion object {
+        const val TAG = "PixSegmenter"
         const val MIN_PERSON_FRACTION = 0.02f
+        const val MODEL_WAIT_MS = 60_000L
+        const val MODEL_CHECK_MS = 500L
     }
 }

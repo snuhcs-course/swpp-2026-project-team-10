@@ -5,6 +5,7 @@
 | 0.1 | 2026-09-30 | Initial draft: system architecture, external libraries, architectural decisions, Android app structure and module interfaces, class diagrams, data models, state machines, protocols and APIs, algorithms, database schema, implementation decisions, module ownership, and the Iteration 1 build order. The shared contracts (interfaces, models, messages, API) are also in `android/`. |
 | 0.2 | 2026-09-30 | Iteration 1 design developed: a JSON example for every data channel message, signaling message, and REST endpoint (2.5); the Iteration 1 test setup, with both phones and the server (a laptop) on the same Wi-Fi (Figure 1); the remote zoom flow (Figure 3); guide sync and remote control as separate modules (2.9). Added the plan for Iterations 2–5 with the target architecture (1.4): friends and invitations, cellular connections, more remote controls, saved guides, an offline connection with a QR code, and guides that keep the background. The photographer takes every photo. |
 | 0.3 | 2026-10-04 | Pose generation as built: the image-editing API is OpenRouter's Image API with the model as a server setting, and the selection result is recorded (2.6.3); a prompt that lets the model re-place the person (2.6.3); the server validates the scene photo and does not resize it (1.1.2, 2.2); `400 INVALID_REQUEST` and a 1 MiB request limit (2.5.3); a 30 s upstream timeout, and the server cancels the image API call when the phone disconnects (2.6.3, 2.8); rate limiting per client address (2.8). |
+| 0.4 | 2026-10-05 | Remote zoom as built: the subject pinches the live view instead of tapping zoom chips (Figure 3, Figure 7, 2.6.5), and `CameraCapabilities.zoomStops` stays in the contract for later subject controls (2.3, 2.5.1, 2.6.2); `camera.zoom.set` carries `final`, with pinch steps on the realtime channel at most every 50 ms and the last value on the reliable channel (2.5.1); every applied zoom is echoed as `camera.state`, only a final request shows the remote-action notice, and the subject ignores echoes while its pinch is in progress (2.6.5); `SessionManager` keeps the last `camera.capabilities` and the last echoed zoom for a Subject view that opens late (2.1); *Remote control* owns pinch zoom on Subject view (2.9). |
 
 Audience: the development team. This page describes the Iteration 1 design in detail; each later iteration adds the design for the features it builds (1.4). **TBD** marks an open decision. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page. Testing plans are in the Testing Documentation.
 
@@ -110,16 +111,20 @@ sequenceDiagram
   participant S as Subject app
   participant P as Photographer app
   participant C as CameraX
-  Note over S: shows the new chip at once
-  S->>P: camera.zoom.set (ratio 2.0)
+  Note over S: pinches the live view, the readout follows at once
+  S->>P: camera.zoom.set (ratio 1.6), a step at most every 50 ms
   Note over P: clamps to [minZoom, maxZoom]
+  P->>C: setZoomRatio(1.6)
+  P-->>S: camera.state (zoom 1.6, by SUBJECT)
+  Note over S: the pinch ends
+  S->>P: camera.zoom.set (ratio 2.0, final)
   P->>C: setZoomRatio(2.0)
   P-->>S: camera.state (zoom 2.0, by SUBJECT, final)
   Note over P: shows "Junhyeong set zoom to 2×"
   Note over S: snaps to the applied zoom
 ```
 
-*Figure 3. The photographer's phone applies the request and echoes the value it applied, so both phones end on the same zoom. Only the photographer takes photos.*
+*Figure 3. The photographer's phone applies each request and echoes the value it applied, so both phones end on the same zoom. Only the photographer takes photos.*
 
 #### 1.1.5 Architectural patterns
 
@@ -271,7 +276,9 @@ interface PoseGenerator {
 
 interface SessionManager {
     val state: StateFlow<SessionState>
-    val incoming: Flow<SessionMessage>
+    val incoming: Flow<SessionMessage>                  // not replayed: a late subscriber misses earlier messages
+    val peerCapabilities: StateFlow<CameraCapabilities?> // subject: the last camera.capabilities, for a screen that opens late
+    val peerZoom: StateFlow<Float?>                     // subject: the zoom from the last camera.state, null until one arrives
     suspend fun start(entry: SessionEntry, role: Role)
     fun send(message: SessionMessage)                   // ChannelRouter picks realtime or reliable
     fun videoSink(): FrameSink                          // photographer: pass to CameraController
@@ -354,6 +361,8 @@ classDiagram
     <<interface>>
     +state StateFlow~SessionState~
     +incoming Flow~SessionMessage~
+    +peerCapabilities StateFlow~CameraCapabilities~
+    +peerZoom StateFlow~Float~
     +start(entry, role)
     +send(message)
     +videoSink() FrameSink
@@ -393,7 +402,7 @@ classDiagram
   }
   class SubjectViewModel {
     +uiState StateFlow~SubjectUiState~
-    +onZoomChip(ratio)
+    +onZoomGesture(ratio, final)
   }
   RtcSessionManager ..|> SessionManager
   RtcSessionManager --> SignalingClient
@@ -475,7 +484,7 @@ data class GuideState(            // everything needed to place the guide, in fr
 // ---- Camera ---------------------------------------------------------------
 data class CameraCapabilities(
     val minZoom: Float, val maxZoom: Float, // relative to the primary rear camera's 1x
-    val zoomStops: List<Float>,   // subject chips: [0.5, 0.6, 1, 2, 3] filtered to [min, max]
+    val zoomStops: List<Float>,   // subject-side stops: [0.5, 0.6, 1, 2, 3] filtered to [min, max]; kept for later controls
 )
 
 // ---- Session --------------------------------------------------------------
@@ -532,7 +541,7 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
 | Type | Channel | Dir. | Purpose |
 |----|----|----|----|
 | `hello` | reliable | both | First message; checks the protocol version |
-| `camera.capabilities` | reliable | P→S | Zoom range and the zoom chips |
+| `camera.capabilities` | reliable | P→S | Zoom range and the zoom stops |
 | `guide.image.begin` | reliable | P→S | Starts sending the guide image |
 | `guide.image.chunk` | reliable | P→S | One piece of the image |
 | `guide.image.end` | reliable | P→S | Ends the image; the subject checks it |
@@ -575,7 +584,7 @@ Sent by both phones as soon as the channels open. A different `protocol` ends th
 }
 ```
 
-Sent after `hello`. The subject shows one chip per value in `zoomStops`.
+Sent after `hello`. The subject limits its pinch to `minZoom`–`maxZoom`. `zoomStops` is not shown on Subject view and stays in the contract for later subject controls.
 
 </details>
 
@@ -655,13 +664,13 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 </details>
 
 <details>
-<summary><code>camera.zoom.set</code> · realtime · S→P</summary>
+<summary><code>camera.zoom.set</code> · realtime / reliable · S→P</summary>
 
 ```json
 { "v": 1, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
-The photographer clamps the value to the supported range, applies it, and echoes `camera.state` (Figure 3).
+Sent on `realtime` at most every 50 ms during a pinch, then once with `"final": true` on `reliable` when the pinch ends. The photographer clamps each value to the supported range, applies it, and echoes `camera.state` (Figure 3).
 
 </details>
 

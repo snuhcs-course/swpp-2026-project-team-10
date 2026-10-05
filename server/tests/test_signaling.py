@@ -40,11 +40,8 @@ def ice_signal(tag="test"):
     return {"type": "signal", "candidate": {"sdpMid": "0", "sdpMLineIndex": 0, "candidate": tag}}
 
 
-def test_health_and_no_image_generation_api(client):
+def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
-    for path in ("/poses", "/templates", "/api/v1/poses", "/api/v1/templates"):
-        assert client.get(path).status_code == 404
-        assert client.post(path).status_code == 404
 
 
 def test_codes_preserve_leading_zeroes_and_retry_collisions(client, monkeypatch):

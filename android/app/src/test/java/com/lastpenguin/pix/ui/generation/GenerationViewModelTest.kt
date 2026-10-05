@@ -117,7 +117,7 @@ class GenerationViewModelTest {
 
     @Test
     fun theShutterAndTheConfirmationWorkOnlyInTheirStep() = runTest {
-        // Not on the Scene photo screen yet.
+        // No scene photo was asked for yet.
         model.takeScene()
         model.useScene()
         model.retakeScene()

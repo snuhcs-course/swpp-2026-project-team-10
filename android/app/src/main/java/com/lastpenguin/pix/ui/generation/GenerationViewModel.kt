@@ -2,12 +2,9 @@ package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
 import android.util.Log
-import androidx.camera.core.Preview
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
-import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationConsent
@@ -22,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Scene photo, Generating poses, Pick a pose, and Couldn't create poses (R&S 6.3). */
+/** The scene photo on Camera, Generating poses, Pick a pose, and Couldn't create poses (R&S 6.3). */
 data class GenerationUiState(
     /** The photo the user took and confirmed; kept for *Try again* and *Try other poses*. */
     val scene: Bitmap? = null,
@@ -31,12 +28,12 @@ data class GenerationUiState(
     val candidates: Map<String, CandidateEvent> = emptyMap(),
     val selectedTemplateId: String? = null,
     val phase: Phase = Phase.IDLE,
-    /** The shutter gave no photo; told on Scene photo until the next attempt. */
+    /** The shutter gave no photo; told on Camera until the next attempt. */
     val shotFailed: Boolean = false,
 ) {
     /**
-     * FRAMING and REVIEWING are the Scene photo screen: the camera with a shutter, then the photo with
-     * *Use this photo* and *Shoot again*. Nothing is sent before GENERATING.
+     * FRAMING and REVIEWING are the scene photo step on the Camera screen: the live camera, whose shutter takes the
+     * photo, then the photo with *Use this photo* and *Shoot again*. Nothing is sent before GENERATING.
      */
     enum class Phase { IDLE, FRAMING, REVIEWING, GENERATING, PICKING, FAILED }
 
@@ -48,7 +45,8 @@ data class GenerationUiState(
 }
 
 /**
- * Pose generation screens (Design 2.2, Figure 8). Shared by the three screens (activity scope).
+ * Pose generation (Design 2.2, Figure 8). Shared by the Camera screen, for the scene photo, and the three
+ * generation screens (activity scope).
  * Owner: Server/AI/Sync (#7).
  */
 class GenerationViewModel(
@@ -81,21 +79,13 @@ class GenerationViewModel(
         viewModelScope.launch { consent.give() }
     }
 
-    /** For the Scene photo screen: its shutter works only while the camera is ready. */
-    val cameraStatus: StateFlow<CameraStatus> get() = camera.status
-
-    /** The Scene photo screen shows the live camera while it is in front. */
-    fun bindCamera(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
-        camera.bind(owner, surfaceProvider)
-    }
-
-    /** *Generate poses here*: opens the camera for the scene photo (FR-4.1). Nothing is sent yet. */
+    /** *Generate poses here*: the Camera screen now takes the scene photo (FR-4.1). Nothing is sent yet. */
     fun beginScene() {
         cancel()
         _uiState.value = GenerationUiState(phase = GenerationUiState.Phase.FRAMING)
     }
 
-    /** The shutter on Scene photo: the camera's current frame becomes the photo to confirm. */
+    /** The shutter during FRAMING: the camera's current frame becomes the photo to confirm. */
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         shooting = viewModelScope.launch {
@@ -118,7 +108,7 @@ class GenerationViewModel(
         }
     }
 
-    /** *Shoot again*: the photo is dropped and the camera is shown again. */
+    /** *Shoot again*: the photo is dropped and the live camera is shown again. */
     fun retakeScene() {
         _uiState.update {
             val reviewing = it.phase == GenerationUiState.Phase.REVIEWING

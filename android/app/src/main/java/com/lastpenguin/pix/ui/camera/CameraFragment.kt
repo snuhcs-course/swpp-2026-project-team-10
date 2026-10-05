@@ -12,11 +12,14 @@ import android.util.Size
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -35,6 +38,8 @@ import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.generation.GenerationUiState
+import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.text.DecimalFormat
@@ -47,12 +52,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Camera screen. Guide gestures belong to #6; live session UI belongs to #8. */
+/** Camera screen. Guide gestures belong to #6; the scene photo for poses belongs to #7; live session UI belongs to #8. */
 class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     private val viewModel: CameraViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val generationViewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
     private var binding: FragmentCameraBinding? = null
+    private var sceneBack: OnBackPressedCallback? = null
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private var previewLogged = false
@@ -100,7 +107,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             sessionViewModel.startRoom()
             findNavController().navigate(R.id.action_camera_to_roomCode)
         }
-        controls.shutterButton.setOnClickListener { viewModel.onShutter() }
+        controls.shutterButton.setOnClickListener {
+            // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
+            if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
+                generationViewModel.takeScene()
+            } else {
+                viewModel.onShutter()
+            }
+        }
+        setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { openLastPhoto() }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.styleToggleButton.setOnClickListener { viewModel.onStyleToggle() }
@@ -112,6 +127,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
+                launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
                 // The photographer's side of a session: the live badge, End session, and "left" notices (FR-6.8, FR-6.10).
                 launch {
                     sessionViewModel.state.collect { state ->
@@ -189,6 +205,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     override fun onDestroyView() {
         binding = null
+        sceneBack = null
         previewLogged = false
         super.onDestroyView()
     }
@@ -287,6 +304,29 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         })
     }
 
+    /** *Cancel*, *Shoot again*, and *Use this photo* of the scene photo step (R&S 6.3, FR-4.1). */
+    private fun setupScenePhoto(controls: FragmentCameraBinding) {
+        controls.sceneCancelButton.setOnClickListener { generationViewModel.cancel() }
+        controls.shootAgainButton.setOnClickListener { generationViewModel.retakeScene() }
+        controls.usePhotoButton.setOnClickListener {
+            val navController = findNavController()
+            val reviewing = generationViewModel.uiState.value.phase == GenerationUiState.Phase.REVIEWING
+            if (reviewing && navController.currentDestination?.id == R.id.cameraFragment) {
+                generationViewModel.useScene()
+                navController.navigate(R.id.action_camera_to_generating)
+            }
+        }
+        // System back does the same as the secondary action (R&S 6.9): Shoot again on the photo, Cancel on the camera.
+        // It is enabled only during this step, so back leaves the app from the plain camera as before.
+        sceneBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
+            if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.REVIEWING) {
+                generationViewModel.retakeScene()
+            } else {
+                generationViewModel.cancel()
+            }
+        }
+    }
+
     private fun render(state: CameraUiState) {
         val controls = binding ?: return
         val granted = hasCameraPermission()
@@ -304,6 +344,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
+        controls.hintText.setText(R.string.hint_add_guide)
 
         val ratio = zoomFormat.format(state.zoom)
         controls.zoomRatio.text = getString(R.string.zoom_ratio, ratio)
@@ -321,6 +362,40 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 },
             )
         }
+        renderScenePhoto(controls, generationViewModel.uiState.value)
+    }
+
+    /**
+     * The scene photo for poses is taken and confirmed on this screen (R&S 6.3, FR-4.1): the live camera with the
+     * shutter, then the photo with *Use this photo* and *Shoot again*. Applied last, over the camera's own controls,
+     * so that the step shows only what it needs.
+     */
+    private fun renderScenePhoto(controls: FragmentCameraBinding, scene: GenerationUiState) {
+        val reviewing = scene.phase == GenerationUiState.Phase.REVIEWING
+        val active = reviewing || scene.phase == GenerationUiState.Phase.FRAMING
+        sceneBack?.isEnabled = active
+        controls.sceneTitle.isVisible = active
+        controls.sceneCancelButton.isVisible = active
+        controls.shootTogetherButton.isVisible = !active
+        // Guide and the thumbnail keep their place, so the shutter stays where it is.
+        controls.guideButton.isInvisible = active
+        controls.galleryButton.isInvisible = active
+        // An earlier guide is not part of the scene photo and would be in the way of framing it.
+        controls.guideOverlay.isVisible = !active
+        controls.sceneStill.isVisible = reviewing
+        controls.sceneStill.setImageBitmap(if (reviewing) scene.scene else null)
+        // The photo is taken: no zoom until it is used or shot again. A disabled view gets no touch listener calls.
+        controls.previewView.isEnabled = !reviewing
+        controls.zoomControls.isInvisible = reviewing
+        controls.captureControls.isVisible = !reviewing
+        controls.sceneReviewControls.isVisible = reviewing
+        if (!active) return
+
+        controls.sceneTitle.setText(if (reviewing) R.string.scene_review_title else R.string.scene_title)
+        controls.hintText.setText(if (reviewing) R.string.scene_review_body else R.string.scene_body)
+        controls.guideControls.isVisible = false
+        controls.captureStatus.isVisible = scene.shotFailed
+        controls.captureStatus.setText(R.string.scene_shot_failed)
     }
 
     private fun showNotice(controls: FragmentCameraBinding, text: String) {

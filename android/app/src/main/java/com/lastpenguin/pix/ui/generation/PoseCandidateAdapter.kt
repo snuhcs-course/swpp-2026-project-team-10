@@ -37,13 +37,14 @@ class PoseCandidateAdapter(
         val binding = holder.binding
         val image = (slot.event as? CandidateEvent.Ready)?.image
 
-        binding.poseLabel.text = slot.template.label
         binding.poseImage.setImageBitmap(image)
         binding.poseProgress.isVisible = slot.event == null
         binding.poseStatus.isVisible = image == null
         binding.poseStatus.setText(if (slot.event == null) R.string.creating_pose else R.string.pose_failed)
 
         val card = binding.root
+        // The pose name is not shown; a screen reader still says which pose the image is.
+        card.contentDescription = slot.template.label
         card.isChecked = slot.selected
         card.strokeWidth = card.resources.getDimensionPixelSize(
             if (slot.selected) R.dimen.pose_card_stroke_selected else R.dimen.pose_card_stroke,

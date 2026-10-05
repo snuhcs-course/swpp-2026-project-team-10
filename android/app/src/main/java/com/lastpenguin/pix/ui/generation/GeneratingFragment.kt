@@ -44,8 +44,9 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
     private fun render(binding: FragmentGeneratingBinding, candidates: PoseCandidateAdapter, state: GenerationUiState) {
         binding.sceneImage.setImageBitmap(state.scene)
         candidates.submitList(state.slots())
+        // Until the templates are there, the number of poses is not known.
         binding.readyCount.text = if (state.templates.isEmpty()) {
-            getString(R.string.generating_wait)
+            getString(R.string.creating_pose)
         } else {
             getString(R.string.ready_count, state.readyCount, state.templates.size)
         }

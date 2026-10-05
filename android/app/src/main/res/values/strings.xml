@@ -71,7 +71,7 @@
     <string name="consent_agree">Agree and continue</string>
     <string name="not_now">Not now</string>
     <string name="scene_title">Take the scene photo</string>
-    <string name="scene_body">Frame the person and the place, then press the shutter. The poses are made from this photo.</string>
+    <string name="scene_body">Frame the person and the place, then press the shutter.</string>
     <string name="scene_review_title">Use this photo?</string>
     <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="use_this_photo">Use this photo</string>
@@ -82,8 +82,7 @@
     <string name="scene_photo_description">The photo of the scene the poses are made from</string>
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
-    <string name="ready_count">%1$d of %2$d ready · up to 30 s</string>
-    <string name="generating_wait">This can take up to 30 seconds.</string>
+    <string name="ready_count">%1$d of %2$d ready</string>
     <string name="pick_pose_title">Pick a pose</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>

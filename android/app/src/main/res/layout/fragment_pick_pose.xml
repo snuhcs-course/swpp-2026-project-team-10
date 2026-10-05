@@ -14,7 +14,7 @@
         android:text="@string/pick_pose_title"
         android:textAppearance="?attr/textAppearanceTitleLarge" />
 
-    <!-- The candidates with their labels; the selected one is highlighted. -->
+    <!-- The candidate images; the selected one is highlighted. -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/candidateGrid"
         android:layout_width="match_parent"

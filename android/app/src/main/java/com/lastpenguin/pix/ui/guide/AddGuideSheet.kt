@@ -55,9 +55,9 @@ class AddGuideSheet : BottomSheetDialogFragment() {
             .show()
     }
 
-    /** The poses start from a photo the user takes and confirms on the next screen (FR-4.1). */
+    /** The poses start from a photo the user takes and confirms on the camera behind this sheet (FR-4.1). */
     private fun takeScenePhoto() {
         generationViewModel.beginScene()
-        findNavController().navigate(R.id.action_addGuide_to_scenePhoto)
+        dismiss()
     }
 }

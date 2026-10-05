@@ -65,7 +65,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        tools:text="2 of 4 ready · up to 30 s" />
+        tools:text="2 of 4 ready" />
 
     <Button
         android:id="@+id/cancelButton"

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Border of a pose candidate, and of the selected one (R&S 6.3). -->
+    <dimen name="pose_card_stroke">1dp</dimen>
+    <dimen name="pose_card_stroke_selected">3dp</dimen>
+</resources>

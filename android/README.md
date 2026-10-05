@@ -14,7 +14,7 @@ The camera screen requests camera permission, shows a rear-camera preview, suppo
 
 `Preview`, full-resolution `ImageCapture`, and YUV `ImageAnalysis` share a portrait 3:4 viewport. The preview uses fit-center scaling. `CameraController.status` is an added local contract: `IDLE`, `STARTING`, `READY`, or `UNAVAILABLE`; screens enable capture only when ready and offer a retry on initialization/opening failure. Include this addition in the affected owners' contract review and the Design Documentation update when preparing the PR.
 
-`grabFrame()` snapshots the latest analysis frame before its first suspension and returns an upright, cropped bitmap owned by the caller. Invoke it before navigating away from Camera (for example, at the beginning of `GenerationViewModel.startFromCamera`), then retain the returned scene for generation retries. `setFrameSink()` supplies YUV frames on a serial analysis thread. The receiver must respect crop/rotation metadata, copy what it needs, and close the proxy before returning; it must not block on network work.
+`grabFrame()` snapshots the latest analysis frame before its first suspension and returns an upright, cropped bitmap owned by the caller. Invoke it while a screen has the camera bound (the Scene photo screen's shutter does, in `GenerationViewModel.takeScene`), then retain the returned scene for generation retries. `setFrameSink()` supplies YUV frames on a serial analysis thread. The receiver must respect crop/rotation metadata, copy what it needs, and close the proxy before returning; it must not block on network work.
 
 Camera UI state observes the camera's applied zoom, rather than assuming requested zoom succeeded, so remote zoom can use the same controller. All ratios are relative to the primary rear camera's 1× field of view. Native logical-camera zoom below 1× is preferred; otherwise the controller can switch to a separately exposed rear ultrawide whose zoom range overlaps the primary camera. The minimum is hardware-dependent (for example 0.5×, 0.6×, or 1×), and unsupported ratios are never advertised. A lens switch may briefly pause the preview, but an ongoing pinch continues to update its target; lens changes requested during a photo save wait until capture finishes. If an ultrawide cannot bind, the controller returns to the primary camera and updates the supported range.
 
@@ -57,7 +57,7 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Camera, Camera + guide, Photo saved, live badge | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel` | #3, #6, #8 |
 | Add a pose guide (bottom sheet) | `guide/AddGuideSheet` | `ReferenceViewModel` | #5 |
 | Reference confirm, No person found | `guide/ReferenceConfirmFragment`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` | #5 |
-| Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` | #7 |
+| Scene photo, Generating poses, Pick a pose, Couldn't create poses | `generation/ScenePhotoFragment`, `GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` | #7 |
 | Room code (bottom sheet) | `session/RoomCodeSheet` | `SessionViewModel` | #8 |
 | Join with code, Session not found | `session/JoinCodeFragment`, `SessionNotFoundFragment` | `SessionViewModel` | #8 |
 | Subject view, Connection lost | `session/SubjectFragment`, `ConnectionLostFragment` | `SubjectViewModel`, `SessionViewModel` | #8, #9, #10 |
@@ -71,7 +71,7 @@ The failure screens share `fragment_failure.xml`.
 | `camera/` | `CameraXController`, `PhotoSaver` | #3 |
 | `guide/` | `InMemoryGuideRepository`, `GuideGeometry`, `GuideOverlayView` | #6 |
 | `guide/` | `MlKitReferenceGuideMaker`, `SubjectSegmenter`, `OutlineExtractor` | #5 |
-| `generation/` | `RemotePoseGenerator` | #7 |
+| `generation/` | `RemotePoseGenerator`, `PoseImageCodec` + `AndroidPoseImageCodec`, `GenerationConsent` + `DataStoreGenerationConsent` | #7 |
 | `session/` | `RtcSessionManager`, `SignalingClient` + `OkHttpSignalingClient`, `PeerConnectionClient` + `WebRtcPeerConnectionClient`, `WebRtcRuntime`, `CameraFrameSource` + `YuvToNv21`, `RemoteVideo`, `SessionIdentity`, `protocol/MessageCodec`, `protocol/ChannelRouter`, `signaling/SignalCodec` | #8 |
 | `session/` | `GuideSyncer` | #9 |
 | `session/` | `RemoteControlHandler` | #10 |
@@ -82,7 +82,6 @@ The failure screens share `fragment_failure.xml`.
 - **Find your part.** Search for your issue number next to `TODO`, for example `TODO("#3` and `TODO(#3`.
   - Unimplemented module functions throw `TODO(...)`. Camera functions are implemented; the other owners still need to connect their modules.
   - ViewModel functions are empty with a `// TODO` comment, so the app runs while you work.
-- **Temporary buttons.** Buttons labeled `(temp)` stand in for events that are not built yet: no person found, poses ready or failed, friend joined, code not found, connection lost. When your ViewModel moves to that screen by itself, remove the button.
 - **Fakes.** To work before another owner's module is ready, write a fake of the interface and use it in `core/AppContainer.kt`.
 - **Contracts.** Change a contract only through a pull request that the affected owners review, and update the Design Documentation in the same change.
 - **Libraries.** Versions are in `gradle/libs.versions.toml`. Add the ones your module needs to `app/build.gradle.kts`.
@@ -102,6 +101,19 @@ Two phones connect with a room code over the Pix server and then stream phone to
 - **Hooks for #9.** Send with `SessionManager.send` and read `SessionManager.incoming`; both data channels are open while the state is `Connected`, `hello` has been exchanged, and `camera.capabilities` is sent by `SessionViewModel`. The reliable channel queues messages while its buffer is above 256 KiB, so image chunks can be sent without checking. Stale realtime values are already dropped by `seq`. The subject's renderer attaches through `RemoteVideo`.
 - **Camera frames.** `SessionViewModel` sets `CameraFrameSource` as the frame sink from the moment a subject starts connecting, and `CameraFrameSource` honors `cropRect` and `rotationDegrees`. The `frames` line in the `PixTimings` log counts frames handed to WebRTC.
 - **Tests.** `app/src/test/.../session/` covers the envelope codec, the channel table, the signaling JSON against the server's examples, the NV21 packing for every plane layout, and the session state machine with fake signaling and peer clients (`SessionFakes.kt`). A manager test that ends while connected must call `leave`, or the virtual-time ping loop keeps `runTest` from finishing.
+
+## Pose generation
+
+*Guide › Generate poses here* lets the user take a scene photo, sends it through the Pix server, and shows up to four pose candidates; the chosen one goes to Reference confirm like an uploaded photo (R&S F4, Design 2.5.3, 2.6.3).
+
+- **Run it.** Start the server with an OpenRouter key (`server/README.md`) and set `pix.serverUrl` as above; on the emulator the default address already reaches the laptop. Every set is billed as up to four images.
+- **Scene photo.** `ScenePhotoFragment` binds the camera to its own view and shows it with a shutter. The shutter takes the frame with `grabFrame()`, and the photo is then shown with *Use this photo* and *Shoot again*; nothing is sent before *Use this photo* (FR-4.1). The camera restarts when this screen opens, and it keeps the zoom set on the Camera screen. `AndroidPoseImageCodec` prepares the confirmed photo on the phone: long side at most 1024 px, JPEG quality 85, no EXIF. The server checks the photo and rejects any other; it does not resize it (Design 2.6.3, step 1).
+- **Requests.** `RemotePoseGenerator` sends one `POST /poses` per template in parallel, each with its own seed, and emits a `CandidateEvent` as each one ends. A request without an answer after 30 s becomes `TIMEOUT`; the HTTP client in `AppContainer` waits 35 s so that this limit decides (OkHttp's default of 10 s would end every generation). Cancelling the collector closes the connections, and the server then stops its own calls to the image service.
+- **Consent.** The notice appears once, before the Scene photo screen opens for the first time (FR-4.2), and the answer is kept in DataStore (`pose_generation`). *Not now* sends nothing and stays on the sheet. Clear the app's data to see the notice again.
+- **Screens.** On Scene photo, system back is *Shoot again* while the photo is shown and *Cancel* on the camera. Generating poses moves to Pick a pose when at least one candidate arrived and to Couldn't create poses otherwise; a pose that failed is left out of Pick a pose. System back does what *Cancel* and *Back to camera* do: it stops the requests and discards the scene photo and the candidates.
+- **Watch it.** `adb logcat -s PixTimings PixPoses` shows `pose.start`, `pose.first`, and `pose.done 3 of 4 ready` (NFR-4), and one `PixPoses` line for each failed request with the server's error code and message.
+- **Tests.** `generation/RemotePoseGeneratorTest` covers the parallel requests, the seeds, the error mapping, the timeout, and cancellation with a fake `PixApi`; `ui/generation/GenerationViewModelTest` covers taking and confirming the photo, the phases, partial failure, retry, cancel, selection, and consent.
+- **Not here yet.** *Use this guide* stores the guide, but the camera does not draw it until #6.
 
 ## Lint, format, and test
 

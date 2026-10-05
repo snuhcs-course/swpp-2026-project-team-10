@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.ui.PixViewModels
@@ -36,9 +37,27 @@ class AddGuideSheet : BottomSheetDialogFragment() {
 
         binding.uploadButton.setOnClickListener { pickPhoto() }
         binding.generateButton.setOnClickListener {
-            generationViewModel.startFromCamera()
-            findNavController().navigate(R.id.action_addGuide_to_generating)
+            if (generationViewModel.needsConsent) showConsentNotice() else takeScenePhoto()
         }
         binding.cancelButton.setOnClickListener { dismiss() }
+    }
+
+    /** Asked before the first request only (FR-4.2). *Not now* sends nothing and leaves this sheet open. */
+    private fun showConsentNotice() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.consent_title)
+            .setMessage(R.string.consent_message)
+            .setPositiveButton(R.string.consent_agree) { _, _ ->
+                generationViewModel.onConsentGiven()
+                takeScenePhoto()
+            }
+            .setNegativeButton(R.string.not_now, null)
+            .show()
+    }
+
+    /** The poses start from a photo the user takes and confirms on the next screen (FR-4.1). */
+    private fun takeScenePhoto() {
+        generationViewModel.beginScene()
+        findNavController().navigate(R.id.action_addGuide_to_scenePhoto)
     }
 }

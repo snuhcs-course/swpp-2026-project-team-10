@@ -22,7 +22,9 @@ object PixViewModels {
     val Factory: ViewModelProvider.Factory = viewModelFactory {
         initializer { CameraViewModel(container.cameraController, container.guideRepository) }
         initializer { ReferenceViewModel(container.referenceGuideMaker, container.guideRepository) }
-        initializer { GenerationViewModel(container.poseGenerator, container.cameraController) }
+        initializer {
+            GenerationViewModel(container.poseGenerator, container.cameraController, container.generationConsent)
+        }
         initializer {
             SessionViewModel(
                 container.sessionManager,

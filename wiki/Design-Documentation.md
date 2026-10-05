@@ -6,6 +6,7 @@
 | 0.2 | 2026-09-30 | Iteration 1 design developed: a JSON example for every data channel message, signaling message, and REST endpoint (2.5); the Iteration 1 test setup, with both phones and the server (a laptop) on the same Wi-Fi (Figure 1); the remote zoom flow (Figure 3); guide sync and remote control as separate modules (2.9). Added the plan for Iterations 2–5 with the target architecture (1.4): friends and invitations, cellular connections, more remote controls, saved guides, an offline connection with a QR code, and guides that keep the background. The photographer takes every photo. |
 | 0.3 | 2026-10-04 | Pose generation as built: the image-editing API is OpenRouter's Image API with the model as a server setting, and the selection result is recorded (2.6.3); a prompt that lets the model re-place the person (2.6.3); the server validates the scene photo and does not resize it (1.1.2, 2.2); `400 INVALID_REQUEST` and a 1 MiB request limit (2.5.3); a 30 s upstream timeout, and the server cancels the image API call when the phone disconnects (2.6.3, 2.8); rate limiting per client address (2.8). |
 | 0.4 | 2026-10-05 | Remote zoom as built: the subject pinches the live view instead of tapping zoom chips (Figure 3, Figure 7, 2.6.5), and `CameraCapabilities.zoomStops` stays in the contract for later subject controls (2.3, 2.5.1, 2.6.2); `camera.zoom.set` carries `final`, with pinch steps on the realtime channel at most every 50 ms and the last value on the reliable channel (2.5.1); every applied zoom is echoed as `camera.state`, only a final request shows the remote-action notice, and the subject ignores echoes while its pinch is in progress (2.6.5); `SessionManager` keeps the last `camera.capabilities` and the last echoed zoom for a Subject view that opens late (2.1); *Remote control* owns pinch zoom on Subject view (2.9). |
+| 0.5 | 2026-10-05 | Pose generation: the user takes the scene photo on a Scene photo screen and confirms it before anything is sent (1.1.3, 2.2, 2.6.3). |
 
 Audience: the development team. This page describes the Iteration 1 design in detail; each later iteration adds the design for the features it builds (1.4). **TBD** marks an open decision. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page. Testing plans are in the Testing Documentation.
 
@@ -70,7 +71,7 @@ Pix is one Android app that runs in two roles, **photographer** and **subject**,
 | Flow | Path | Transport | Latency budget |
 |----|----|----|----|
 | **Reference photo → guide** | Photo picker → downscale → ML Kit segmentation → cutout and outline → guide store | On device only | ≤ 2 s (NFR-3) |
-| **Pose generation** | Camera frame → JPEG (resized on the phone, EXIF removed) → 4 parallel requests → pose proxy → image API → candidates → reference flow | HTTPS | First ≤ 20 s, all ≤ 30 s (NFR-4) |
+| **Pose generation** | Scene photo the user takes and confirms → JPEG (resized on the phone, EXIF removed) → 4 parallel requests → pose proxy → image API → candidates → reference flow | HTTPS | First ≤ 20 s, all ≤ 30 s (NFR-4) |
 | **Session setup** | Room code → signaling → SDP and ICE exchange → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
 | **Live view** | CameraX frames → I420 → WebRTC encoder → peer → subject renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi (NFR-5) |
 | **Guide sync** | Guide store (photographer) → `guide.state` → subject's guide store → overlay | Data channel | ≤ 0.3 s (NFR-7) |
@@ -426,6 +427,10 @@ classDiagram
   direction LR
   class GenerationViewModel {
     +uiState StateFlow~GenerationUiState~
+    +beginScene()
+    +takeScene()
+    +retakeScene()
+    +useScene()
     +start(scene)
     +retry()
     +cancel()
@@ -873,7 +878,7 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 
 #### 2.6.3 Pose generation
 
-1.  **Scene photo, prepared on the phone.** The app takes the latest analysis frame (or a still from ImageCapture), rotates it to portrait, resizes it so the long side is at most 1024 px, and encodes it as JPEG (quality 85), which leaves out location and other metadata. This preparation is the app's job: the server checks the photo but does not resize or repair it, and rejects one that is not prepared this way (2.5.3). Doing it on the phone keeps the four uploads small and keeps location data on the phone.
+1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, the Scene photo screen shows the camera. Its shutter copies the latest analysis frame, already upright, and the user confirms it with *Use this photo* or takes another with *Shoot again*; nothing is sent before that. The app then resizes the photo so the long side is at most 1024 px and encodes it as JPEG (quality 85), which leaves out location and other metadata. This preparation is the app's job: the server checks the photo but does not resize or repair it, and rejects one that is not prepared this way (2.5.3). Doing it on the phone keeps the four uploads small and keeps location data on the phone.
 2.  **Requests.** Send one `POST /poses` per template (4 in parallel), each with a new random `seed`. *Try other poses* repeats the same templates with new seeds. A model without seed support ignores the seed, and its results still differ from one request to the next.
 3.  **Server prompt.** Each template holds a pose description. The server wraps it in a fixed prompt, which lets the model move the person to a better spot while the camera framing stays fixed: *"Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting exactly as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer would: judge whether the person is too far, too close, or poorly placed, and if so move them to a better spot and distance in this scene. Change the person's pose to: {pose}. Show the full body, standing on the ground at a natural scale. Photorealistic."*
 4.  **Progressive results.** The app maps each response to a `CandidateEvent`. The screen fills its slots as events arrive and moves to *Pick a pose* when all are done, or at 30 s if at least one is ready. Zero candidates means *Couldn't create poses* (FR-4.7).

@@ -92,6 +92,10 @@ dependencies {
     // Reference guide (#5): on-device person segmentation, model from Google Play services.
     implementation(libs.mlkit.subject.segmentation)
 
+    // Pose generation (#7): the remembered consent (FR-4.2), and candidate cells that keep the frame's 3:4 ratio.
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.constraintlayout)
+
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.
 

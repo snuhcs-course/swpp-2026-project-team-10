@@ -21,8 +21,10 @@ sealed interface RemoteAction {
  * Photographer: applies the subject's remote zoom and echoes the applied zoom (Design 2.6.5, Figure 3).
  *
  * The echo follows the camera's *applied* zoom, not the request, so the subject also sees the photographer's own
- * zoom changes and both phones always end on the same value (FR-7.6). A request that the camera does not apply
- * within [ECHO_TIMEOUT_MS] is answered with the current zoom, so the subject's chip snaps back.
+ * zoom changes and both phones always end on the same value (FR-7.6). A pinch arrives as a stream of non-final
+ * requests followed by one final value: every step is applied, but only the final one is reported as an action
+ * (one notice per pinch) and, when the camera does not apply it within [ECHO_TIMEOUT_MS], answered with the
+ * current zoom so the subject's readout snaps back.
  * Owner: Real-time (#10).
  */
 class RemoteControlHandler(
@@ -65,10 +67,20 @@ class RemoteControlHandler(
         val caps = camera.capabilities.value
         val ratio = if (caps == null) request.ratio else request.ratio.coerceIn(caps.minZoom, caps.maxZoom)
         if (!ratio.isFinite()) return
-        Timings.mark("zoom.received", "$ratio")
-        pending = PendingZoom(ratio, clock())
-        camera.setZoom(ratio)
+        Timings.mark("zoom.received", "$ratio${if (request.final) " final" else ""}")
         timeoutJob?.cancel()
+        timeoutJob = null
+        if (request.final && abs(camera.zoom.value - ratio) < ZOOM_MATCH) {
+            // The pinch's last step already landed, so the camera will not emit again: confirm it now.
+            pending = null
+            finalJob?.cancel()
+            confirm(ratio)
+            send(ratio, Role.SUBJECT, final = true)
+            return
+        }
+        pending = PendingZoom(ratio, clock(), request.final)
+        camera.setZoom(ratio)
+        if (!request.final) return
         timeoutJob = scope?.launch {
             delay(ECHO_TIMEOUT_MS)
             if (pending != null) {
@@ -85,8 +97,7 @@ class RemoteControlHandler(
         if (bySubject) {
             pending = null
             timeoutJob?.cancel()
-            _actions.tryEmit(RemoteAction.Zoom(zoom))
-            Timings.mark("zoom.applied", "$zoom")
+            if (request.final) confirm(zoom)
         }
         val by = if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER
         send(zoom, by, final = false)
@@ -97,11 +108,16 @@ class RemoteControlHandler(
         }
     }
 
+    private fun confirm(zoom: Float) {
+        _actions.tryEmit(RemoteAction.Zoom(zoom))
+        Timings.mark("zoom.applied", "$zoom")
+    }
+
     private fun send(zoom: Float, by: Role, final: Boolean) {
         session.send(SessionMessage.CameraStateUpdate(zoom = zoom, by = by, final = final))
     }
 
-    private class PendingZoom(val ratio: Float, val at: Long)
+    private class PendingZoom(val ratio: Float, val at: Long, val final: Boolean)
 
     private companion object {
         const val ZOOM_MATCH = 0.01f

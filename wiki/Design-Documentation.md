@@ -538,7 +538,7 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
 | `guide.image.end` | reliable | P→S | Ends the image; the subject checks it |
 | `guide.state` | realtime / reliable | P→S | Where and how the guide is drawn |
 | `guide.clear` | reliable | P→S | The guide was removed |
-| `camera.zoom.set` | realtime | S→P | The subject asks for a zoom level |
+| `camera.zoom.set` | realtime; `final` reliable | S→P | A step of the subject's pinch, or its last value (`final`) |
 | `camera.state` | realtime / reliable | P→S | The zoom actually applied, and who changed it |
 | `session.leave` | reliable | both | Leaving on purpose |
 | `ping / pong` | realtime | both | Round-trip time for measurement |
@@ -658,7 +658,7 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 <summary><code>camera.zoom.set</code> · realtime · S→P</summary>
 
 ```json
-{ "v": 1, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0 } }
+{ "v": 1, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
 The photographer clamps the value to the supported range, applies it, and echoes `camera.state` (Figure 3).
@@ -858,7 +858,7 @@ view  → frame:  cx = (x − ox) / (W · s)      cy = (y − oy) / (H · s)
 guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 ```
 
-**Photographer composition aids (FR-1.9–1.10).** `CameraCompositionView` uses this same fit-centered image rectangle to draw lines at one-third and two-thirds in each direction. A short horizon bar is centered in the middle cell, with fixed horizontal end markers and a middle segment that counter-rotates with device roll. `CameraLevelMonitor` reads the gravity sensor, falling back to the accelerometer, while the view is resumed. It smooths gravity vectors before computing the screen-relative angle; level enters within ±2° and exits beyond ±3°. When level, the bar aligns horizontally and turns dark yellow (`#D4AC24`). Invalid sensor readings or an almost face-up/down phone hide the bar. These are non-interactive local View overlays and do not enter photos, analysis frames, or the WebRTC stream. Photographer zoom uses continuous preview pinch and an applied-ratio readout; the subject's remote zoom chips continue to use `CameraCapabilities.zoomStops`.
+**Photographer composition aids (FR-1.9–1.10).** `CameraCompositionView` uses this same fit-centered image rectangle to draw lines at one-third and two-thirds in each direction. A short horizon bar is centered in the middle cell, with fixed horizontal end markers and a middle segment that counter-rotates with device roll. `CameraLevelMonitor` reads the gravity sensor, falling back to the accelerometer, while the view is resumed. It smooths gravity vectors before computing the screen-relative angle; level enters within ±2° and exits beyond ±3°. When level, the bar aligns horizontally and turns dark yellow (`#D4AC24`). Invalid sensor readings or an almost face-up/down phone hide the bar. These are non-interactive local View overlays and do not enter photos, analysis frames, or the WebRTC stream. Photographer zoom uses continuous preview pinch and an applied-ratio readout; Subject view pinches the live view the same way, and `CameraCapabilities.zoomStops` stays in the contract for later subject controls.
 
 **Gestures.** The photographer's pan and zoom deltas are converted with *view → frame* and applied to `GuideState`. `height` is limited to 0.21–2.1, and `cx`, `cy` are limited so that at least 20% of the guide's width and height stay inside the frame (FR-3.2, FR-3.3). Because only frame coordinates are sent, the subject's phone places the guide on the same part of the image regardless of its screen size (FR-3.7, NFR-8).
 
@@ -903,7 +903,7 @@ Ten other model configurations were screened with one image each and left out, a
 
 #### 2.6.5 Remote control
 
-- **Zoom.** The subject's chip selection is shown immediately (optimistic) and sent as `camera.zoom.set`. The photographer clamps the request to the advertised range, applies it through the shared camera controller, and echoes the observed `camera.state`; the subject then snaps to the echoed value. Capabilities, requests, and echoed zoom all use the primary rear camera's 1× as their reference. The subject's stops are `[0.5, 0.6, 1, 2, 3]` filtered to that range; the photographer uses continuous pinch with an applied-ratio readout.
+- **Zoom.** The subject pinches the live view like the photographer pinches the preview. Each step updates the subject's readout immediately (optimistic) and is sent as a non-final `camera.zoom.set` on the realtime channel at most every 50 ms, the newest value winning; the last value goes on the reliable channel with `final: true`. The photographer clamps every request to the advertised range and applies it through the shared camera controller; every applied zoom is echoed as `camera.state`, and only a final request produces the "set zoom to 2×" notice. Echoes are ignored on the subject while its pinch is in progress and win once it ends, so both phones settle on the applied value. Capabilities, requests, and echoed zoom all use the primary rear camera's 1× as their reference.
 - **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing it. The minimum follows hardware capabilities, such as 0.5×, 0.6×, or 1×; no unsupported 0.5× capability is inferred. Lens switches may briefly pause preview while the same 3:4 use-case group rebinds. An ongoing pinch retains the latest target during that transition, lens changes wait for in-flight photo capture, and an ultrawide bind failure falls back to the primary camera with updated capabilities.
 - **Photos.** Only the photographer takes photos, with the camera screen's own shutter. The subject adjusts the zoom, and the photographer decides when to take the photo.
 - **Notices.** The photographer's UI shows a toast for each applied remote action, using the `by` field (FR-7.4).
@@ -941,7 +941,7 @@ Iteration 1 has no database. The server keeps room codes and sessions in memory,
 | **Server and signaling** | Server/AI/Sync | WebSocket hub, room codes, running on the laptop on the test Wi-Fi | Session |
 | **Real-time session** | Real-time | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | Guide sync, remote control |
 | **Guide sync** | Server/AI/Sync | `GuideSyncer`, the guide on Subject view | UI |
-| **Remote control** | Real-time | `RemoteControlHandler` (zoom), zoom chips on Subject view | UI |
+| **Remote control** | Real-time | `RemoteControlHandler` (zoom), pinch zoom on Subject view | UI |
 
 **Shared contracts in code.** `android/` holds the Gradle project, which builds an empty app, and the contract files marked \* in 2.1.
 

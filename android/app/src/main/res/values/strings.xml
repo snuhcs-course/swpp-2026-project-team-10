@@ -98,7 +98,7 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
-    <string name="subject_caption">Only the photographer takes the photo.</string>
+    <string name="subject_caption">Pinch to change the photographer\'s zoom. Only the photographer takes the photo.</string>
     <string name="peer_ended_session">%1$s ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
     <string name="session_ended">The session has ended.</string>

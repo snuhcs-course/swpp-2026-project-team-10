@@ -43,7 +43,7 @@ class RemoteControlHandlerTest {
         advanceTimeBy(200)
         session.sent.clear()
 
-        handler.handle(SessionMessage.ZoomSet(2f))
+        handler.handle(SessionMessage.ZoomSet(2f, final = true))
         runCurrent()
         assertEquals(listOf(2f), camera.requests)
         assertEquals(SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = false), echoes().first())
@@ -91,7 +91,7 @@ class RemoteControlHandlerTest {
         session.sent.clear()
         camera.applies = false
 
-        handler.handle(SessionMessage.ZoomSet(2f))
+        handler.handle(SessionMessage.ZoomSet(2f, final = true))
         advanceTimeBy(400)
         runCurrent()
         assertTrue(echoes().isEmpty())
@@ -116,6 +116,55 @@ class RemoteControlHandlerTest {
 
         assertEquals(3f, camera.zoom.value, 0f)
         assertEquals(SessionMessage.CameraStateUpdate(3f, Role.PHOTOGRAPHER, final = true), lastFinal())
+        handler.stop()
+    }
+
+    @Test
+    fun `pinch steps are applied and echoed, and only the final value makes a notice`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        session.sent.clear()
+
+        handler.handle(SessionMessage.ZoomSet(1.5f))
+        runCurrent()
+        handler.handle(SessionMessage.ZoomSet(1.8f))
+        runCurrent()
+        assertEquals(listOf(1.5f, 1.8f), camera.requests)
+        assertEquals(SessionMessage.CameraStateUpdate(1.8f, Role.SUBJECT, final = false), echoes().last())
+        assertTrue(actions.isEmpty())
+
+        advanceTimeBy(600)
+        runCurrent()
+        assertTrue(actions.isEmpty())
+        assertEquals(SessionMessage.CameraStateUpdate(1.8f, Role.SUBJECT, final = true), lastFinal())
+
+        // The pinch ends on the value the camera already shows: no new request, one notice, one final echo.
+        session.sent.clear()
+        handler.handle(SessionMessage.ZoomSet(1.8f, final = true))
+        runCurrent()
+        assertEquals(listOf(1.5f, 1.8f), camera.requests)
+        assertEquals(listOf<RemoteAction>(RemoteAction.Zoom(1.8f)), actions)
+        assertEquals(listOf(SessionMessage.CameraStateUpdate(1.8f, Role.SUBJECT, final = true)), echoes())
+        handler.stop()
+    }
+
+    @Test
+    fun `a step the camera does not apply is not answered but the final value is`() = runTest {
+        handler.start(this)
+        advanceTimeBy(200)
+        session.sent.clear()
+        camera.applies = false
+
+        handler.handle(SessionMessage.ZoomSet(2f))
+        advanceTimeBy(700)
+        runCurrent()
+        assertTrue(echoes().isEmpty())
+
+        handler.handle(SessionMessage.ZoomSet(2.5f, final = true))
+        advanceTimeBy(600)
+        runCurrent()
+        assertEquals(listOf(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true)), echoes())
         handler.stop()
     }
 

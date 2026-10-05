@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1). No shutter: only the photographer takes photos. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -34,7 +34,8 @@
         android:layout_weight="1"
         android:background="#000000">
 
-        <!-- The photographer's live video, aspect-fit so the whole 3:4 frame is visible (Design 2.6.4, AD-10). -->
+        <!-- The photographer's live video, aspect-fit so the whole 3:4 frame is visible (Design 2.6.4, AD-10).
+             Pinching it zooms the photographer's camera (FR-7.1). -->
         <org.webrtc.SurfaceViewRenderer
             android:id="@+id/liveView"
             android:layout_width="match_parent"
@@ -56,28 +57,33 @@
             android:layout_height="match_parent" />
     </FrameLayout>
 
-    <!-- One chip per zoom stop of the photographer's camera; enabled while connected (FR-7.1). -->
-    <HorizontalScrollView
+    <!-- The photographer's zoom, with the same readout as the Camera screen; enabled while connected (FR-7.1). -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fillViewport="true"
-        android:scrollbars="none">
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/zoomRatio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:focusable="true"
             android:gravity="center"
-            android:orientation="horizontal">
+            android:importantForAccessibility="yes"
+            android:minWidth="64dp"
+            android:minHeight="48dp"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            tools:text="1.0×" />
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/zoomChips"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="8dp"
-                app:singleLine="true"
-                app:singleSelection="true" />
-        </LinearLayout>
-    </HorizontalScrollView>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/pinch_to_zoom"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="match_parent"

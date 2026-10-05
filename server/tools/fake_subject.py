@@ -137,7 +137,7 @@ async def main(args):
             await asyncio.sleep(2)
             if args.zoom is not None:
                 state["zoom_sent_at"] = time.monotonic()
-                channels["realtime"].send(codec.encode("camera.zoom.set", {"ratio": args.zoom}))
+                channels["reliable"].send(codec.encode("camera.zoom.set", {"ratio": args.zoom, "final": True}))
                 log(f"sent camera.zoom.set ratio={args.zoom}")
             try:
                 await asyncio.wait_for(state["done"].wait(), args.seconds)

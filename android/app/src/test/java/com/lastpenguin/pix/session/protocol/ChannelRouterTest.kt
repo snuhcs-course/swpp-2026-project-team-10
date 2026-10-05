@@ -21,6 +21,7 @@ class ChannelRouterTest {
             router.channelFor(SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = false)),
         )
         assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.ZoomSet(2f)))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ZoomSet(2f, final = true)))
         assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.Ping(0)))
         assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.Pong(0)))
     }

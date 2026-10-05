@@ -1,6 +1,7 @@
 package com.lastpenguin.pix.session
 
 import android.util.Log
+import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -69,6 +70,12 @@ class RtcSessionManager(
     private val _incoming = MutableSharedFlow<SessionMessage>(extraBufferCapacity = 64)
     override val incoming: Flow<SessionMessage> = _incoming.asSharedFlow()
 
+    private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
+    override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
+
+    private val _peerZoom = MutableStateFlow<Float?>(null)
+    override val peerZoom: StateFlow<Float?> = _peerZoom.asStateFlow()
+
     override val eglContext: EglBase.Context
         get() = peers.eglContext
 
@@ -118,6 +125,8 @@ class RtcSessionManager(
         code = (entry as? SessionEntry.RoomCode)?.code
         sessionId = null
         iceServers = emptyList()
+        _peerCapabilities.value = null
+        _peerZoom.value = null
         // The photographer stays Idle until the code arrives; the subject is connecting from the first moment.
         _state.value = if (role == Role.SUBJECT) SessionState.Connecting(null) else SessionState.Idle
         Timings.mark("session.start", role.name)
@@ -409,6 +418,16 @@ class RtcSessionManager(
             is SessionMessage.Leave -> {
                 _incoming.tryEmit(message)
                 onPeerGone(message.reason)
+            }
+
+            is SessionMessage.Capabilities -> {
+                _peerCapabilities.value = message.capabilities
+                _incoming.tryEmit(message)
+            }
+
+            is SessionMessage.CameraStateUpdate -> {
+                _peerZoom.value = message.zoom
+                _incoming.tryEmit(message)
             }
 
             else -> _incoming.tryEmit(message)

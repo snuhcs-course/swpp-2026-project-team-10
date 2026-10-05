@@ -1,9 +1,13 @@
 package com.lastpenguin.pix.ui.session
 
+import android.annotation.SuppressLint
 import android.os.Bundle
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -18,6 +22,7 @@ import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import java.text.DecimalFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
@@ -27,12 +32,14 @@ import org.webrtc.VideoSink
 
 /**
  * Subject view (R&S 6.6): the photographer's live video, fitted to the 3:4 frame, with their name and *Leave*.
- * System back asks first (R&S 6.9). Owner: Real-time (#8, #10), with the guide from #9.
+ * Pinching the video zooms the photographer's camera, with the Camera screen's readout (FR-7.1). System back asks
+ * first (R&S 6.9). Owner: Real-time (#8, #10), with the guide from #9.
  */
 class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     private val viewModel: SubjectViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val zoomFormat = DecimalFormat("0.0")
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
 
@@ -49,6 +56,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
+        setupPinchZoom(live)
+        setupZoomAccessibility(binding.zoomRatio)
 
         binding.leaveButton.setOnClickListener { leaveNow() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
@@ -61,7 +70,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
                         // TODO(#9): binding.guideOverlay.render(ui.guide, ui.guideState).
-                        // TODO(#10): zoom chips from ui.zoomStops and ui.zoom → viewModel.onZoomChip.
+                        val ratio = zoomFormat.format(ui.zoom)
+                        binding.zoomRatio.text = getString(R.string.zoom_ratio, ratio)
+                        binding.zoomRatio.contentDescription = getString(R.string.camera_zoom_description, ratio)
+                        binding.zoomRatio.isEnabled = ui.canZoom
                     }
                 }
                 launch {
@@ -87,6 +99,66 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         renderer?.release()
         renderer = null
         super.onDestroyView()
+    }
+
+    // The same gesture as CameraFragment's, aimed at the photographer's camera. The guide overlay above the video
+    // does not take touches on the subject's phone in Iteration 1 (editable = false).
+    @SuppressLint("ClickableViewAccessibility") // The zoom readout exposes accessible zoom actions.
+    private fun setupPinchZoom(video: View) {
+        var requestedZoom = 1f
+        val detector =
+            ScaleGestureDetector(
+                requireContext(),
+                object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                        val ui = viewModel.uiState.value
+                        requestedZoom = ui.zoom
+                        return ui.canZoom
+                    }
+
+                    override fun onScale(detector: ScaleGestureDetector): Boolean {
+                        val ui = viewModel.uiState.value
+                        val factor = detector.scaleFactor
+                        if (!ui.canZoom || !factor.isFinite() || factor <= 0f) return false
+                        // Accumulate the gesture locally; the echo, not the step, decides what the readout keeps.
+                        requestedZoom = (requestedZoom * factor).coerceIn(ui.minZoom, ui.maxZoom)
+                        viewModel.onZoomGesture(requestedZoom, final = false)
+                        return true
+                    }
+
+                    override fun onScaleEnd(detector: ScaleGestureDetector) {
+                        viewModel.onZoomGesture(requestedZoom, final = true)
+                    }
+                },
+            ).apply {
+                isQuickScaleEnabled = false
+                isStylusScaleEnabled = false
+            }
+        video.setOnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            true
+        }
+    }
+
+    private fun setupZoomAccessibility(readout: View) {
+        fun adjust(factor: Float): Boolean {
+            val ui = viewModel.uiState.value
+            if (!ui.canZoom) return false
+            val ratio = (ui.zoom * factor).coerceIn(ui.minZoom, ui.maxZoom)
+            if (ratio == ui.zoom) return false
+            viewModel.onZoomGesture(ratio, final = true)
+            return true
+        }
+        ViewCompat.replaceAccessibilityAction(
+            readout,
+            AccessibilityActionCompat.ACTION_SCROLL_FORWARD,
+            getString(R.string.zoom_in),
+        ) { _, _ -> adjust(1.1f) }
+        ViewCompat.replaceAccessibilityAction(
+            readout,
+            AccessibilityActionCompat.ACTION_SCROLL_BACKWARD,
+            getString(R.string.zoom_out),
+        ) { _, _ -> adjust(1f / 1.1f) }
     }
 
     private fun onTransition(state: SessionState) {

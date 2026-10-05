@@ -45,6 +45,7 @@
     <string name="end_session">End session</string>
     <string name="peer_left">%1$s left</string>
     <string name="peer_disconnected">%1$s disconnected</string>
+    <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>
@@ -96,10 +97,9 @@
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s\'s camera</string>
     <string name="subject_title_placeholder">Photographer\'s camera</string>
-    <string name="subject_zoom_placeholder">Zoom chips (#10)</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
-    <string name="subject_caption">Only the photographer takes the photo.</string>
+    <string name="subject_caption">Pinch to change the photographer\'s zoom. Only the photographer takes the photo.</string>
     <string name="peer_ended_session">%1$s ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
     <string name="session_ended">The session has ended.</string>

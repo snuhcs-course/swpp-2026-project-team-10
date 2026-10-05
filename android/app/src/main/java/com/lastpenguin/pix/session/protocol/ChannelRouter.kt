@@ -17,7 +17,8 @@ class ChannelRouter {
     fun channelFor(message: SessionMessage): Channel = when (message) {
         is SessionMessage.GuideStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.CameraStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
-        is SessionMessage.ZoomSet, is SessionMessage.Ping, is SessionMessage.Pong -> Channel.REALTIME
+        is SessionMessage.ZoomSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+        is SessionMessage.Ping, is SessionMessage.Pong -> Channel.REALTIME
         else -> Channel.RELIABLE
     }
 

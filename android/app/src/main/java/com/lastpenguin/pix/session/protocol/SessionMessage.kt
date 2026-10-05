@@ -66,7 +66,11 @@ sealed interface SessionMessage {
 
     @Serializable
     @SerialName("camera.zoom.set")
-    data class ZoomSet(val ratio: Float) : SessionMessage
+    data class ZoomSet(
+        val ratio: Float,
+        /** True for the last value of a pinch (or a single tap). Only it travels reliably and gets a notice. */
+        val final: Boolean = false,
+    ) : SessionMessage
 
     /** The zoom actually applied, and who changed it. */
     @Serializable

@@ -35,6 +35,7 @@ import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.text.DecimalFormat
 import kotlinx.coroutines.Dispatchers
@@ -123,11 +124,26 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 }
                 launch {
                     sessionViewModel.notices.collect { notice ->
-                        val text = when (notice.reason) {
-                            EndReason.CONNECTION_LOST -> R.string.peer_disconnected
-                            else -> R.string.peer_left
+                        val text = when (notice) {
+                            is SessionNotice.PeerGone -> getString(
+                                if (notice.reason ==
+                                    EndReason.CONNECTION_LOST
+                                ) {
+                                    R.string.peer_disconnected
+                                } else {
+                                    R.string.peer_left
+                                },
+                                notice.name,
+                            )
+
+                            is SessionNotice.RemoteZoom ->
+                                getString(
+                                    R.string.remote_zoom_notice,
+                                    notice.name,
+                                    DecimalFormat("0.#").format(notice.ratio),
+                                )
                         }
-                        showNotice(controls, getString(text, notice.name))
+                        showNotice(controls, text)
                     }
                 }
                 launch {

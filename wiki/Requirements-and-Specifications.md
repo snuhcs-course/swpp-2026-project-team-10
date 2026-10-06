@@ -7,6 +7,7 @@
 | 0.3 | 2026-10-04 | The image-editing API is chosen: OpenRouter's Image API, with the model as a server setting (FR-4.3, section 7). NFR-13 now says that the server passes the scene photo on to that service. |
 | 0.4 | 2026-10-06 | Camera and Subject view use continuous zoom sliders with the actual supported minimum/maximum labels and keyboard/accessibility adjustment (FR-1.3, FR-7.1, US-1, US-12, Flows 1 and 5). Guide drag/pinch remains; pinching the preview or live video no longer changes camera zoom. |
 | 0.5 | 2026-10-06 | The user takes the scene photo and confirms it before it is sent: after *Generate poses here*, the Camera screen's shutter takes the scene photo, and *Use this photo* or *Shoot again* comes before Generating poses (FR-4.1, US-4, 6.2, 6.3, 6.8). The candidates are shown as images only, without the pose names (FR-4.6, 6.3), and Generating poses says "Generation may take up to 30 seconds" under the progress line (FR-4.5, 6.3). |
+| 0.6 | 2026-10-06 | The Flow 2 wireframe is redrawn to match 0.5: the Consent notice, Scene photo, and Scene photo · Review come before Generating poses, and 6.3 has one row for each of them (Figure 2, 6.2, 6.3, 6.8). |
 
 Items marked **TBD** need a team decision.
 
@@ -494,7 +495,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Camera** | Live preview with a 3×3 grid and centered horizon bar; *Shoot together* (top); single-value zoom slider with actual minimum/maximum labels and applied zoom readout; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Zoom slider → continuous zoom, including keyboard/accessibility adjustment · Align phone → dark yellow horizon bar. | Preview pinch does not zoom the camera. Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. Unknown horizon or no sensor → hide the bar, retain the grid. |
-| **Add a pose guide** | Bottom sheet with *Upload a reference*, *Generate poses here*, and *Cancel*. | *Upload a reference* → system photo picker → Reference confirm · *Generate poses here* → Camera, taking the scene photo (Flow 2) · *Cancel* or swipe down → Camera. | Picker closed without a choice → Camera with the old guide kept. |
+| **Add a pose guide** | Bottom sheet with *Upload a reference*, *Generate poses here*, and *Cancel*. | *Upload a reference* → system photo picker → Reference confirm · *Generate poses here* → Scene photo, after the Consent notice the first time (Flow 2) · *Cancel* or swipe down → Camera. | Picker closed without a choice → Camera with the old guide kept. |
 | **Reference confirm** | The separated person; Cutout/Outline switch; "Person found". | *Use this guide* → Camera + guide · *Choose another photo* → picker · Switch → preview the other style. | No person → No person found. |
 | **Camera + guide** | Guide over the preview; hint "Drag · pinch to resize"; style toggle; guide opacity slider; camera zoom slider; shutter. | Drag on guide → move · Pinch on guide → resize · Opacity slider → fade guide · Zoom slider → camera zoom · Toggle → cutout or outline · Shutter → Photo saved. | Size limited to 30–300%. At least 20% of the guide stays on screen. Starting outside the guide does not move or resize it, and preview pinches do not zoom the camera. |
 | **Photo saved** | "Saved without the guide"; thumbnail updated; camera still live. | Thumbnail → gallery · Shutter → another photo. | Save failed → reason shown; guide and camera unchanged. |
@@ -504,11 +505,13 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 2: pose generation](images/flow2_pose_generation.jpg)
 
-*Figure 2. Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure.
+*Figure 2. Consent notice (the first time) → Scene photo → Scene photo · Review → Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. The Scene photo frame draws zoom as in Figure 1, before the zoom slider; the table below defines the current controls.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Camera, taking the scene photo** | The Camera screen with "Take the scene photo" and *Cancel* in place of *Shoot together*; the preview, grid, zoom slider, and shutter as usual; *Guide*, the thumbnail, and any earlier guide are hidden. After the shutter, the photo that was taken, in place of the preview, with "Use this photo?". | Zoom slider → zoom · Shutter → the photo is shown, and nothing is saved · *Use this photo* → Generating poses · *Shoot again* → the live camera again · *Cancel* → Camera. | The shutter is disabled until the camera is ready. No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again* while the photo is shown and *Cancel* before it. |
+| **Consent notice** | A dialog over Add a pose guide, the first time only: "Send this photo to an AI service?"; that Pix sends the scene photo taken next through the Pix server to an external AI image service, and that the server does not keep it; *Not now* and *Agree and continue*. | *Agree and continue* → Scene photo, and the notice is not shown again · *Not now* → Add a pose guide. | Nothing is sent without consent (FR-4.2). |
+| **Scene photo** | The Camera screen with "Take the scene photo" and *Cancel* in place of *Shoot together*; the preview, grid, zoom slider, and shutter as usual; "Frame the person and the place, then press the shutter."; *Guide*, the thumbnail, and any earlier guide are hidden. | Zoom slider → zoom · Shutter → Scene photo · Review, and nothing is saved · *Cancel* → Camera. | The shutter is disabled until the camera is ready. Nothing is sent. System back is *Cancel*. |
+| **Scene photo · Review** | The same screen with "Use this photo?" and *Cancel*; the photo that was taken, in place of the preview; "Pix sends this photo to create the poses."; *Shoot again* and *Use this photo*. | *Use this photo* → Generating poses · *Shoot again* → Scene photo · *Cancel* → Camera. | No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again*. |
 | **Generating poses** | The scene photo ("same person and place"); four slots that fill in as candidates arrive; "n of 4 ready"; "Generation may take up to 30 seconds". | *Cancel* → Camera · All ready, or 30 s with at least one ready → Pick a pose. | Candidates cannot be selected until generation ends. No candidate, or an error → Couldn't create poses. |
 | **Pick a pose** | 2×2 grid of candidate images, without pose names; the selected one is highlighted. | Tap a candidate → select · *Use this pose* → Reference confirm (Flow 1) · *Try other poses* → Generating poses with a new set. | *Use this pose* is disabled until a candidate is selected. |
 | **Couldn't create poses** | "The request failed or took over 30 s. Your photo is kept." and the scene photo. | *Try again* → Generating poses with the same photo · *Back to camera* → Camera. | — |
@@ -569,12 +572,10 @@ These screens follow from the requirements above but are not yet in the wirefram
 | Screen | Purpose | Requirement |
 |---|---|---|
 | Camera permission denied | Explain why the camera is needed; *Open settings*. | FR-1.2 |
-| Pose generation consent | One-time notice that the scene photo is sent to an AI service; *Agree* / *Not now*. | FR-4.2 |
-| Camera, taking the scene photo | The Camera screen after *Generate poses here*: "Take the scene photo" with *Cancel* and the shutter, then the photo with *Use this photo* / *Shoot again* (specified in 6.3). | FR-4.1 |
 | Pix ID setup | Sign in, then choose a Pix ID with live rule checking. | FR-5.2, FR-5.3 |
 | Friend requests | List of received requests with *Accept* / *Decline*. | FR-5.7 |
 | Invitation no longer available | Shown when an expired or cancelled invitation is opened. | FR-6.4 |
-| Camera and Subject view (update) | Draw the zoom slider and actual hardware endpoint labels in Flows 1, 5, and 6; remove *Take photo* from Subject view; add the brightness slider and flash button (It 2). | FR-1.3, FR-7.1–7.3 |
+| Camera and Subject view (update) | Draw the zoom slider and actual hardware endpoint labels in Flows 1, 2, 5, and 6; remove *Take photo* from Subject view; add the brightness slider and flash button (It 2). | FR-1.3, FR-7.1–7.3 |
 | Subject view, control blocked | Disabled remote controls with the reason. | FR-7.5 |
 | Pose description input | Text field (100 characters) on Add a pose guide. | FR-4.8 |
 | Saved guides | *Save guide* on Camera + guide; the saved list on Add a pose guide. | FR-3.8 |

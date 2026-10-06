@@ -24,7 +24,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#000000">
+        android:background="#000000"
+        android:splitMotionEvents="false">
 
         <androidx.camera.view.PreviewView
             android:id="@+id/previewView"
@@ -111,32 +112,9 @@
             tools:visibility="visible" />
     </FrameLayout>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:id="@+id/zoomRatio"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:gravity="center"
-            android:importantForAccessibility="yes"
-            android:minWidth="64dp"
-            android:minHeight="48dp"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            tools:text="1.0×" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/pinch_to_zoom"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
-    </LinearLayout>
+    <include
+        android:id="@+id/zoomControls"
+        layout="@layout/include_zoom_control" />
 
     <TextView
         android:id="@+id/captureStatus"
@@ -163,13 +141,18 @@
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/style_toggle" />
+            android:text="@string/show_cutout" />
 
-        <SeekBar
+        <com.google.android.material.slider.Slider
             android:id="@+id/opacitySlider"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:contentDescription="@string/guide_opacity"
+            android:enabled="false"
+            android:value="0.5"
+            android:valueFrom="0.1"
+            android:valueTo="0.9" />
 
         <Button
             android:id="@+id/removeGuideButton"

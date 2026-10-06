@@ -21,7 +21,7 @@
     <string name="allow_camera">Allow camera</string>
     <string name="zoom_ratio">%1$s×</string>
     <string name="camera_zoom_description">Camera zoom, %1$s times</string>
-    <string name="pinch_to_zoom">Pinch to zoom</string>
+    <string name="camera_zoom">Camera zoom</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
     <string name="camera_grid_description">Camera composition grid</string>
@@ -36,10 +36,15 @@
     <string name="gallery_unavailable">No app is available to open this photo.</string>
     <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
     <string name="hint_add_guide">Tap Guide to add a pose</string>
+    <string name="hint_edit_guide">Drag or pinch the guide</string>
     <string name="guide">Guide</string>
     <string name="shutter">Shutter</string>
     <string name="gallery">Gallery</string>
-    <string name="style_toggle">Cutout / Outline</string>
+    <!-- The style toggle names the style it switches to (FR-3.5). -->
+    <string name="show_cutout">Cutout</string>
+    <string name="show_outline">Outline</string>
+    <string name="guide_opacity">Guide opacity</string>
+    <string name="guide_opacity_percent">%1$d%%</string>
     <string name="remove_guide">Remove</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
@@ -99,7 +104,7 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
-    <string name="subject_caption">Pinch to change the photographer\'s zoom. Only the photographer takes the photo.</string>
+    <string name="subject_caption">Use the slider to change the photographer\'s zoom. Only the photographer takes the photo.</string>
     <string name="peer_ended_session">%1$s ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
     <string name="session_ended">The session has ended.</string>

@@ -25,7 +25,7 @@ data class ReferenceGuide(
 data class GuideState(
     /** null = no guide. */
     val guideId: String? = null,
-    /** Guide center, 0..1 of the 3:4 portrait frame. */
+    /** Guide center relative to the 3:4 frame; may extend outside 0..1 while part of the guide remains visible. */
     val cx: Float = 0.5f,
     val cy: Float = 0.5f,
     /** Guide height / frame height. */

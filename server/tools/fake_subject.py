@@ -2,16 +2,20 @@
 
 It joins a room code through the signaling server, answers the WebRTC offer, exchanges `hello` on the data
 channels, counts the video frames it receives, optionally sends `camera.zoom.set`, and reports the echoed
-`camera.state` with its delay. It is a development tool, not part of the server.
+`camera.state` with its delay. It also receives the photographer's guide: the image chunks are reassembled and
+checked against the CRC, and every `guide.state` is printed. It is a development tool, not part of the server.
 
     pip install websockets aiortc
-    python tools/fake_subject.py <code> [--seconds 20] [--zoom 2.0] [--server ws://127.0.0.1:8000/ws]
+    python tools/fake_subject.py <code> [--seconds 20] [--zoom 2.0] [--have-guide <id>] [--save-guide guide.webp]
+                                 [--server ws://127.0.0.1:8000/ws]
 """
 
 import argparse
 import asyncio
+import base64
 import json
 import time
+import zlib
 
 import websockets
 from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
@@ -37,7 +41,7 @@ async def main(args):
     codec = Codec()
     pc = RTCPeerConnection(RTCConfiguration(iceServers=[]))
     channels = {}
-    state = {"hello": False, "frames": 0, "zoom_sent_at": None, "done": asyncio.Event()}
+    state = {"hello": False, "frames": 0, "zoom_sent_at": None, "done": asyncio.Event(), "guide": None}
 
     async def count_frames(track):
         while True:
@@ -72,7 +76,7 @@ async def main(args):
                 "appVersion": "fake",
                 "role": "SUBJECT",
                 "name": "fake-subject",
-                "haveGuideId": None,
+                "haveGuideId": args.have_guide,
             }
             channels["reliable"].send(codec.encode("hello", hello))
             state["hello"] = True
@@ -84,6 +88,44 @@ async def main(args):
             sent_at = state["zoom_sent_at"]
             since = f" {1000 * (time.monotonic() - sent_at):.0f} ms after zoom.set" if sent_at else ""
             log(f"camera.state zoom={body['zoom']} by={body['by']} final={body['final']}{since}")
+        elif kind == "guide.image.begin":
+            log(
+                f"guide.image.begin {body['guideId']} {body['format']} {body['width']}x{body['height']} "
+                f"{body['bytes']} B in {body['chunks']} chunks"
+            )
+            state["guide"] = {"begin": body, "parts": [], "at": time.monotonic()}
+        elif kind == "guide.image.chunk":
+            transfer = state["guide"]
+            if transfer and body["guideId"] == transfer["begin"]["guideId"] and body["index"] == len(transfer["parts"]):
+                transfer["parts"].append(base64.b64decode(body["data"]))
+            else:
+                log(f"guide.image.chunk {body['index']} out of order, dropped")
+        elif kind == "guide.image.end":
+            transfer = state["guide"]
+            state["guide"] = None
+            if not transfer or body["guideId"] != transfer["begin"]["guideId"]:
+                log("guide.image.end without a matching begin")
+            else:
+                data = b"".join(transfer["parts"])
+                ok = len(data) == transfer["begin"]["bytes"] and zlib.crc32(data) == body["crc32"]
+                took = 1000 * (time.monotonic() - transfer["at"])
+                log(
+                    f"guide image {transfer['begin']['guideId']}: {len(data)} B, crc {'ok' if ok else 'MISMATCH'}, "
+                    f"{took:.0f} ms from begin to end"
+                )
+                if ok and args.save_guide:
+                    with open(args.save_guide, "wb") as f:
+                        f.write(data)
+                    log("saved to", args.save_guide)
+        elif kind == "guide.state":
+            st = body["state"]
+            log(
+                f"guide.state {st.get('guideId')} cx={st.get('cx'):.3f} cy={st.get('cy'):.3f} "
+                f"height={st.get('height'):.3f} opacity={st.get('opacity'):.2f} style={st.get('style')} "
+                f"visible={st.get('visible')} final={body['final']}"
+            )
+        elif kind == "guide.clear":
+            log("guide.clear")
         elif kind == "session.leave":
             log("photographer left:", body["reason"])
             state["done"].set()
@@ -158,5 +200,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("code")
 parser.add_argument("--seconds", type=float, default=20)
 parser.add_argument("--zoom", type=float, default=None)
+parser.add_argument("--have-guide", default=None, help="guide id to report in hello, to test that the image is skipped")
+parser.add_argument("--save-guide", default=None, help="write the received guide image (WebP) to this file")
 parser.add_argument("--server", default="ws://127.0.0.1:8000/ws")
 asyncio.run(main(parser.parse_args()))

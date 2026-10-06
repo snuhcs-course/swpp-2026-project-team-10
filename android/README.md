@@ -56,8 +56,8 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 
 | Screen (R&S 6) | Class in `ui/` | ViewModel | Issue |
 |---|---|---|---|
-| Camera, Camera + guide, Photo saved, live badge, taking the scene photo | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel` | #3, #6, #7, #8 |
-| Add a pose guide (bottom sheet) | `guide/AddGuideSheet` | `ReferenceViewModel` | #5 |
+| Camera, Camera + guide, Photo saved, live badge, Scene photo, Scene photo · Review | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel` | #3, #6, #7, #8 |
+| Add a pose guide (bottom sheet), Consent notice | `guide/AddGuideSheet` | `ReferenceViewModel`, `GenerationViewModel` | #5, #7 |
 | Reference confirm, No person found | `guide/ReferenceConfirmFragment`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` | #5 |
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` | #7 |
 | Room code (bottom sheet) | `session/RoomCodeSheet` | `SessionViewModel` | #8 |

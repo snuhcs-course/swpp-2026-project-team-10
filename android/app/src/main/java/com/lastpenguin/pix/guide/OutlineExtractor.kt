@@ -19,7 +19,7 @@ class OutlineExtractor {
         val pixels = IntArray(width * height)
         mask.getPixels(pixels, 0, width, 0, 0, width, height)
         for (i in pixels.indices) pixels[i] = pixels[i] ushr 24
-        // The edge is one pixel wide, so a radius r stroke is 2r + 1 px: 2–3 px gives radius 1.
+        // The edge is one pixel wide, so a radius r stroke is 2r + 1 px: 5.7 px gives radius 2, 10 px radius 5.
         val radius = ((strokePx - 1f) / 2f).roundToInt().coerceAtLeast(0)
         val stroke = dilate(maskEdges(pixels, width, height), width, height, radius)
         for (i in pixels.indices) pixels[i] = if (stroke[i]) STROKE_COLOR else Color.TRANSPARENT

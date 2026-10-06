@@ -13,7 +13,7 @@ data class ReferenceGuide(
     val id: String,
     /** ARGB_8888, person only, transparent background, cropped to the person. */
     val cutout: Bitmap,
-    /** Same size as [cutout]; 2–3 px light stroke. */
+    /** Same size as [cutout]; light stroke, about 8 px (3 dp) on screen. */
     val outline: Bitmap,
     /** cutout width / height. */
     val aspect: Float,

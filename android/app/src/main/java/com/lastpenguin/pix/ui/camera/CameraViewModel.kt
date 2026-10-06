@@ -11,6 +11,7 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -127,15 +128,25 @@ class CameraViewModel(
 
     /** From GuideOverlayView.onGesture. */
     fun onGuideGesture(dx: Float, dy: Float, scale: Float, final: Boolean) {
-        // TODO(#6): guides.update(final) { it.copy(cx = ..., cy = ..., height = ...) }.
+        if (!dx.isFinite() || !dy.isFinite() || !scale.isFinite() || scale <= 0f) return
+        // Read inside update: several touch steps may arrive before uiState renders the previous one.
+        // An unchanged final step still publishes the reliable gesture-end event.
+        guides.update(final) { state ->
+            state.copy(cx = state.cx + dx, cy = state.cy + dy, height = state.height * scale)
+        }
     }
 
+    /** From the opacity slider; the repository keeps it within 10–90% (FR-3.4). */
     fun onOpacityChange(opacity: Float, final: Boolean) {
-        // TODO(#6): guides.update(final) { it.copy(opacity = ...) }, within 0.1–0.9.
+        if (!opacity.isFinite()) return
+        guides.update(final) { it.copy(opacity = opacity) }
     }
 
+    /** Switches cutout ↔ outline; position and size are untouched (FR-3.5). */
     fun onStyleToggle() {
-        // TODO(#6): switch between CUTOUT and OUTLINE.
+        guides.update(final = true) { state ->
+            state.copy(style = if (state.style == GuideStyle.CUTOUT) GuideStyle.OUTLINE else GuideStyle.CUTOUT)
+        }
     }
 
     fun onRemoveGuide() {

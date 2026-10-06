@@ -51,9 +51,13 @@ android {
     testOptions {
         // Android framework stubs (Log, SystemClock) return defaults in JVM tests instead of throwing.
         unitTests.isReturnDefaultValues = true
+        // Robolectric tests (View, Canvas, touch, Material Slider) need the app's themes and resources.
+        unitTests.isIncludeAndroidResources = true
         unitTests.all {
             // Print why a test failed, so a CI failure can be read from its log.
             it.testLogging.exceptionFormat = TestExceptionFormat.FULL
+            // Robolectric reads FileDescriptor internals, which Java 17+ modules hide by default.
+            it.jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
         }
     }
     lint {
@@ -101,4 +105,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
 }

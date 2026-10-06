@@ -5,7 +5,8 @@
 | 0.1 | 2026-09-30 | Initial draft: abstract, customers, competitive landscape, feature list, functional requirements, 14 user stories with acceptance criteria, non-functional requirements, wireframes with per-screen specifications, assumptions and scope, and glossary. |
 | 0.2 | 2026-09-30 | Feature updates: saved guides (Iteration 2); room codes stay after Iteration 2, so Pix works without signing in; an offline connection with a QR code and a local hotspot that accepts one phone and starts only after both people confirm (F9, Iteration 3–4); guides that keep the reference's background (Iteration 3–4). Remote control: the subject changes the zoom in Iteration 1, and moves or resizes the guide and sets the brightness and flash in Iteration 2; the photographer takes every photo. Iteration 1 test setup: both phones and the server (a laptop) on the same Wi-Fi. Minimum Android version: Android 10. The scope table now lists Iterations 2, 3–4, and 5. |
 | 0.3 | 2026-10-04 | The image-editing API is chosen: OpenRouter's Image API, with the model as a server setting (FR-4.3, section 7). NFR-13 now says that the server passes the scene photo on to that service. |
-| 0.4 | 2026-10-05 | The user takes the scene photo and confirms it before it is sent: after *Generate poses here*, the Camera screen's shutter takes the scene photo, and *Use this photo* or *Shoot again* comes before Generating poses (FR-4.1, US-4, 6.2, 6.3, 6.8). The candidates are shown as images only, without the pose names (FR-4.6, 6.3), and Generating poses says "Generation may take up to 30 seconds" under the progress line (FR-4.5, 6.3). |
+| 0.4 | 2026-10-06 | Camera and Subject view use continuous zoom sliders with the actual supported minimum/maximum labels and keyboard/accessibility adjustment (FR-1.3, FR-7.1, US-1, US-12, Flows 1 and 5). Guide drag/pinch remains; pinching the preview or live video no longer changes camera zoom. |
+| 0.5 | 2026-10-06 | The user takes the scene photo and confirms it before it is sent: after *Generate poses here*, the Camera screen's shutter takes the scene photo, and *Use this photo* or *Shoot again* comes before Generating poses (FR-4.1, US-4, 6.2, 6.3, 6.8). The candidates are shown as images only, without the pose names (FR-4.6, 6.3), and Generating poses says "Generation may take up to 30 seconds" under the progress line (FR-4.5, 6.3). |
 
 Items marked **TBD** need a team decision.
 
@@ -53,7 +54,7 @@ Every "shoot together" session has two people with two phones. Roles are decided
 
 ### 2.4 Example scenario
 
-> Dongje and Junhyeong are at the Han River. Junhyeong wants a photo like one they saved on Instagram. Dongje opens Pix, which starts on the camera, taps *Guide*, and picks that photo. The person in it appears as an outline on the camera. Dongje drags it to the left third of the frame and taps *Invite* next to Junhyeong in the friend list. Junhyeong's phone shows a notification, and after *Accept*, Junhyeong sees Dongje's camera and the same outline. Junhyeong steps into the outline and taps 2× to zoom in, and Dongje's camera zooms in right away. When Junhyeong is in position, Dongje presses the shutter, and the saved photo does not include the outline.
+> Dongje and Junhyeong are at the Han River. Junhyeong wants a photo like one they saved on Instagram. Dongje opens Pix, which starts on the camera, taps *Guide*, and picks that photo. The person in it appears as an outline on the camera. Dongje drags it to the left third of the frame and taps *Invite* next to Junhyeong in the friend list. Junhyeong's phone shows a notification, and after *Accept*, Junhyeong sees Dongje's camera and the same outline. Junhyeong steps into the outline and moves the zoom slider to 2×, and Dongje's camera zooms in right away. When Junhyeong is in position, Dongje presses the shutter, and the saved photo does not include the outline.
 
 ---
 
@@ -130,7 +131,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 |---|---|---|---|
 | FR-1.1 | Pix opens directly to the rear-camera preview. No sign-in, menu, or splash screen comes before it. | Must | It 1 |
 | FR-1.2 | On first launch Pix asks for camera permission. If it is denied, Pix explains why the camera is needed and shows a button that opens the system settings. | Must | It 1 |
-| FR-1.3 | The camera screen has a shutter button and continuous two-finger pinch zoom within the phone's supported range, including 0.5× when the phone exposes that capability. The actual hardware minimum applies otherwise (for example 0.6× or 1×). Zoom is relative to the primary rear camera across lens switches. The currently applied zoom is displayed, and accessibility actions allow zooming in and out. | Must | It 1 |
+| FR-1.3 | The camera screen has a shutter button and a continuous, single-value zoom slider whose endpoint labels show the phone's actual supported minimum and maximum, including 0.5× only when exposed by the hardware (otherwise, for example, 0.6× or 1×). Zoom is relative to the primary rear camera across lens switches. The readout shows the currently applied zoom, while the slider thumb stays under the user's control during a drag. The slider supports keyboard and accessibility input, and the readout retains Zoom in / Zoom out accessibility actions. Pinching the preview does not change camera zoom; guide pinch resizing remains separate (FR-3.3). | Must | It 1 |
 | FR-1.4 | Tapping the preview focuses and sets exposure at that point. | Should | It 2 |
 | FR-1.5 | Photos are saved at the camera's full resolution to a "Pix" album in the gallery. No guide or on-screen control is included. | Must | It 1 |
 | FR-1.6 | After saving, "Saved without the guide" appears and the thumbnail updates. Tapping the thumbnail opens the photo in the gallery. | Must | It 1 |
@@ -223,7 +224,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-7.1 | *Subject view* shows zoom chips that match the zoom levels of the photographer's camera. Tapping one changes the photographer's zoom, and the subject sees the result in the live view. | Must | It 1 |
+| FR-7.1 | *Subject view* has a continuous, single-value zoom slider with the photographer's actual supported minimum and maximum as endpoint labels. Moving it changes the photographer's zoom and the live view. During a drag, the thumb and readout follow the requested ratio immediately; afterward they settle on the applied ratio echoed by the photographer. Keyboard/accessibility adjustment is available through the slider and the readout's Zoom in / Zoom out actions. Pinching the live video does not change camera zoom. | Must | It 1 |
 | FR-7.2 | On *Subject view*, the subject can drag the guide to move it and pinch it to resize it, within the same limits as the photographer (FR-3.2, FR-3.3). Both phones show the change. Opacity and style stay with the photographer. | Must | It 2 |
 | FR-7.3 | *Subject view* has a brightness slider (exposure compensation, within the range the photographer's camera supports) and a flash button (off, auto, on). The flash button is hidden if the photographer's phone has no flash. | Should | It 2 |
 | FR-7.4 | The photographer sees a short notice for each remote action, such as "Junhyeong set zoom to 2×" or "Junhyeong moved the guide". | Should | It 1 |
@@ -264,7 +265,10 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | Camera permission is granted | I open Pix | The rear-camera preview appears within 2 s, with the shutter, applied zoom readout, composition grid, horizon bar when available, *Guide*, and *Shoot together*. |
+| **Normal** | Camera permission is granted | I open Pix | The rear-camera preview appears within 2 s, with the shutter, zoom slider and hardware endpoint labels, applied zoom readout, composition grid, horizon bar when available, *Guide*, and *Shoot together*. |
+| **Normal** | The preview is showing | I drag the zoom slider or adjust it with keyboard/accessibility input | The camera zoom changes within its supported range and the readout shows the applied ratio. During a drag, delayed camera updates do not pull the thumb away from my finger. |
+| **Normal** | A guide is on the preview | I pinch inside the guide, then pinch outside it | The first gesture resizes the guide; the second does not. Neither changes camera zoom. |
+| **Edge** | A slider drag crosses a lens boundary | The preview briefly restarts while I keep dragging | The drag keeps its latest target, and that ratio applies when the lens is ready. |
 | **Normal** | The preview is showing | I tap the shutter | The photo is saved to the "Pix" album within 2 s, a confirmation appears, and the thumbnail updates. |
 | **Failure** | I denied camera permission | Pix opens | Pix explains why it needs the camera and shows *Open settings* instead of a blank preview. |
 | **Failure** | The phone's storage is full | I tap the shutter | "Couldn't save the photo. Free up storage and try again." appears, and the camera stays ready. |
@@ -406,11 +410,14 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | We are connected and remote control is allowed | I tap 2× | Dongje's camera zooms to 2×, I see it within 0.5 s, and Dongje sees "Junhyeong set zoom to 2×". |
+| **Normal** | We are connected and remote control is allowed | I drag the zoom slider to 2× and release | My thumb and readout follow immediately, Dongje's camera zooms to 2× within 0.5 s, both readouts settle on the applied ratio, and Dongje sees "Junhyeong set zoom to 2×". |
+| **Normal** | We are connected and remote control is allowed | I adjust the zoom slider with keyboard/accessibility input or use the readout's Zoom in / Zoom out action | The photographer receives the final requested ratio, and both phones show the applied result. |
+| **Edge** | I am dragging the zoom slider | An applied zoom update arrives from Dongje's phone | My thumb and readout keep following the drag; after it ends, applied updates determine the displayed result. |
+| **Edge** | I am dragging the zoom slider while connected | The gesture is cancelled or I leave the screen | The last requested value is finalized and the drag ends. |
 | **Normal** | We are connected and remote control is allowed (It 2) | I drag the guide to the right and pinch it larger | The guide moves and grows on both phones, and Dongje sees "Junhyeong moved the guide". |
 | **Normal** | We are connected and remote control is allowed (It 2) | I raise the brightness slider | Dongje's preview and my live view get brighter within 0.5 s. |
 | **Failure** | Dongje turned off remote control (It 2) | I look at my controls | My remote controls are disabled with "Dongje turned off remote control". The live view continues. |
-| **Edge** | Dongje's phone has no ultra-wide lens | *Subject view* opens | The 0.6× chip is not shown. |
+| **Edge** | Dongje's phone has no usable ultra-wide range | *Subject view* opens | The slider starts at the actual supported minimum, typically 1×, and cannot request unsupported values. A device with a 0.6× minimum labels its endpoint 0.6×. |
 | **Edge** | Dongje's phone has no flash (It 2) | *Subject view* opens | The flash button is not shown. |
 | **Edge** | Dongje and I change the zoom at almost the same moment | Both changes arrive | The later change wins, and both phones show the same zoom level. |
 
@@ -482,14 +489,14 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 1: pose guide](images/flow1_pose_guide.jpg)
 
-*Figure 1. Camera → Add a pose guide → Reference confirm → Camera + guide → Photo saved, with the "No person found" failure*
+*Figure 1. Camera → Add a pose guide → Reference confirm → Camera + guide → Photo saved, with the "No person found" failure. The original wireframe predates the zoom slider; the table below defines the current controls.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Camera** | Live preview with a 3×3 grid and centered horizon bar; *Shoot together* (top); applied zoom readout; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Two-finger pinch → continuous zoom · Align phone → dark yellow horizon bar. | Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. Unknown horizon or no sensor → hide the bar, retain the grid. |
+| **Camera** | Live preview with a 3×3 grid and centered horizon bar; *Shoot together* (top); single-value zoom slider with actual minimum/maximum labels and applied zoom readout; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Zoom slider → continuous zoom, including keyboard/accessibility adjustment · Align phone → dark yellow horizon bar. | Preview pinch does not zoom the camera. Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. Unknown horizon or no sensor → hide the bar, retain the grid. |
 | **Add a pose guide** | Bottom sheet with *Upload a reference*, *Generate poses here*, and *Cancel*. | *Upload a reference* → system photo picker → Reference confirm · *Generate poses here* → Camera, taking the scene photo (Flow 2) · *Cancel* or swipe down → Camera. | Picker closed without a choice → Camera with the old guide kept. |
 | **Reference confirm** | The separated person; Cutout/Outline switch; "Person found". | *Use this guide* → Camera + guide · *Choose another photo* → picker · Switch → preview the other style. | No person → No person found. |
-| **Camera + guide** | Guide over the preview; hint "Drag · pinch to resize"; style toggle; opacity slider; shutter. | Drag → move · Pinch → resize · Slider → opacity · Toggle → cutout or outline · Shutter → Photo saved. | Size limited to 30–300%. At least 20% of the guide stays on screen. |
+| **Camera + guide** | Guide over the preview; hint "Drag · pinch to resize"; style toggle; guide opacity slider; camera zoom slider; shutter. | Drag on guide → move · Pinch on guide → resize · Opacity slider → fade guide · Zoom slider → camera zoom · Toggle → cutout or outline · Shutter → Photo saved. | Size limited to 30–300%. At least 20% of the guide stays on screen. Starting outside the guide does not move or resize it, and preview pinches do not zoom the camera. |
 | **Photo saved** | "Saved without the guide"; thumbnail updated; camera still live. | Thumbnail → gallery · Shutter → another photo. | Save failed → reason shown; guide and camera unchanged. |
 | **No person found** | Failure message: "Pick a photo where one person is clearly visible." | *Choose another photo* → picker · *Back to camera* → Camera without a guide. | — |
 
@@ -501,7 +508,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Camera, taking the scene photo** | The Camera screen with "Take the scene photo" and *Cancel* in place of *Shoot together*; the preview, grid, zoom readout, and shutter as usual; *Guide*, the thumbnail, and any earlier guide are hidden. After the shutter, the photo that was taken, in place of the preview, with "Use this photo?". | Two-finger pinch → zoom · Shutter → the photo is shown, and nothing is saved · *Use this photo* → Generating poses · *Shoot again* → the live camera again · *Cancel* → Camera. | The shutter is disabled until the camera is ready. No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again* while the photo is shown and *Cancel* before it. |
+| **Camera, taking the scene photo** | The Camera screen with "Take the scene photo" and *Cancel* in place of *Shoot together*; the preview, grid, zoom slider, and shutter as usual; *Guide*, the thumbnail, and any earlier guide are hidden. After the shutter, the photo that was taken, in place of the preview, with "Use this photo?". | Zoom slider → zoom · Shutter → the photo is shown, and nothing is saved · *Use this photo* → Generating poses · *Shoot again* → the live camera again · *Cancel* → Camera. | The shutter is disabled until the camera is ready. No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again* while the photo is shown and *Cancel* before it. |
 | **Generating poses** | The scene photo ("same person and place"); four slots that fill in as candidates arrive; "n of 4 ready"; "Generation may take up to 30 seconds". | *Cancel* → Camera · All ready, or 30 s with at least one ready → Pick a pose. | Candidates cannot be selected until generation ends. No candidate, or an error → Couldn't create poses. |
 | **Pick a pose** | 2×2 grid of candidate images, without pose names; the selected one is highlighted. | Tap a candidate → select · *Use this pose* → Reference confirm (Flow 1) · *Try other poses* → Generating poses with a new set. | *Use this pose* is disabled until a candidate is selected. |
 | **Couldn't create poses** | "The request failed or took over 30 s. Your photo is kept." and the scene photo. | *Try again* → Generating poses with the same photo · *Back to camera* → Camera. | — |
@@ -535,19 +542,19 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 5: subject](images/flow5_friend.jpg)
 
-*Figure 5. Invitation → Subject view, with the "Connection lost" failure*
+*Figure 5. Invitation → Subject view, with the "Connection lost" failure. The original wireframe predates the zoom slider; the table below defines the current controls.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Invitation** | Opened from the notification "Dongje invites you to shoot together"; "You'll see the framing and pose guide live." | *Accept* → Subject view · *Decline* → closes, and the photographer sees Invite not accepted. | Expired or cancelled → "This invitation is no longer available" (screen to be drawn). |
-| **Subject view** | Photographer's live camera with the synced guide; "Dongje's camera"; *Leave*; zoom chips (only levels the photographer's phone supports); from Iteration 2, a brightness slider and a flash button. No shutter. | Zoom chip → photographer's zoom changes · (It 2) drag or pinch the guide → it moves or resizes on both phones · (It 2) brightness slider or flash button → applied to the photographer's camera · *Leave* (or system back, then confirm) → own Camera. | The guide's opacity and style cannot be changed here, and in Iteration 1 it cannot be moved or resized either. Remote control blocked → controls disabled with a message. Connection lost → Connection lost. |
+| **Subject view** | Photographer's live camera with the synced guide; "Dongje's camera"; *Leave*; single-value zoom slider with the photographer's actual minimum/maximum labels and ratio readout; from Iteration 2, a brightness slider and a flash button. No shutter. | Zoom slider, keyboard, or accessibility action → photographer's zoom changes; during a drag the local readout follows the request, then settles on the applied echo · (It 2) drag or pinch the guide → it moves or resizes on both phones · (It 2) brightness slider or flash button → applied to the photographer's camera · *Leave* (or system back, then confirm) → own Camera. | Live-video pinch does not change camera zoom. The guide's opacity and style cannot be changed here, and in Iteration 1 it cannot be moved or resized either. Remote control blocked → controls disabled with a message. Connection lost → Connection lost. |
 | **Connection lost** | "Video stopped · Check your connection and reconnect". | *Reconnect* → Subject view if the session is still open, otherwise "Session ended" → Camera · *Leave* → Camera. | — |
 
 ### 6.7 Flow 6 · Room code
 
 ![Wireflow 6: room code prototype](images/flow6_room_code_prototype.jpg)
 
-*Figure 6. Room code → Join with code → Subject view, with the "Session not found" failure. From Iteration 2 it stays next to the friend list for people without an account.*
+*Figure 6. Room code → Join with code → Subject view, with the "Session not found" failure. From Iteration 2 it stays next to the friend list for people without an account. Subject view uses the zoom slider specified in Flow 5; the original wireframe predates that control.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -567,7 +574,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 | Pix ID setup | Sign in, then choose a Pix ID with live rule checking. | FR-5.2, FR-5.3 |
 | Friend requests | List of received requests with *Accept* / *Decline*. | FR-5.7 |
 | Invitation no longer available | Shown when an expired or cancelled invitation is opened. | FR-6.4 |
-| Subject view (update) | Remove *Take photo* from Flows 5 and 6; add the brightness slider and flash button (It 2). | FR-7.2, FR-7.3 |
+| Camera and Subject view (update) | Draw the zoom slider and actual hardware endpoint labels in Flows 1, 5, and 6; remove *Take photo* from Subject view; add the brightness slider and flash button (It 2). | FR-1.3, FR-7.1–7.3 |
 | Subject view, control blocked | Disabled remote controls with the reason. | FR-7.5 |
 | Pose description input | Text field (100 characters) on Add a pose guide. | FR-4.8 |
 | Saved guides | *Save guide* on Camera + guide; the saved list on Add a pose guide. | FR-3.8 |

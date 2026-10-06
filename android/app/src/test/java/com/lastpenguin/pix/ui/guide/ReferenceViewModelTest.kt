@@ -8,6 +8,7 @@ import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.GuideStyle
+import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
@@ -17,7 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -112,6 +116,48 @@ class ReferenceViewModelTest {
         assertEquals(GuideStyle.CUTOUT, guides.state.value.style)
         assertEquals(listOf(true), guides.finals)
         assertEquals(ReferenceUiState.Idle, model.uiState.value)
+    }
+
+    @Test
+    fun usingANewGuideResetsTheRealRepositoryAndPublishesTheConfirmedStyle() = runTest {
+        val repository = InMemoryGuideRepository()
+        val reference = ReferenceViewModel(maker, repository)
+        store.put("integration-reference", reference)
+        val previous = guide()
+        repository.setGuide(previous)
+        repository.update(final = true) {
+            it.copy(cx = 0.7f, cy = 0.6f, height = 1.1f, opacity = 0.8f, visible = false)
+        }
+        val previousState = repository.state.value
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.changes.toList(changes)
+        }
+
+        val replacement = guide()
+        reference.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(replacement))
+        runCurrent()
+        reference.onStylePreview(GuideStyle.CUTOUT)
+
+        assertEquals(ReferenceUiState.Ready(replacement, GuideStyle.CUTOUT), reference.uiState.value)
+        assertSame(previous, repository.guide.value)
+        assertEquals(previousState, repository.state.value)
+        assertEquals(emptyList<GuideChange>(), changes)
+
+        reference.onUseGuide()
+        runCurrent()
+
+        val initialState = GuideState(guideId = replacement.id)
+        val confirmedState = initialState.copy(style = GuideStyle.CUTOUT)
+        assertSame(replacement, repository.guide.value)
+        assertEquals(confirmedState, repository.state.value)
+        assertEquals(
+            listOf(GuideChange(initialState, final = true), GuideChange(confirmedState, final = true)),
+            changes,
+        )
+        assertEquals(ReferenceUiState.Idle, reference.uiState.value)
     }
 
     @Test

@@ -481,7 +481,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.noticeText.isVisible = true
         noticeJob?.cancel()
         noticeJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(NOTICE_MS)
+            delay(CameraViewModel.NOTICE_MS)
             controls.noticeText.isVisible = false
         }
     }
@@ -504,6 +504,5 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     companion object {
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
-        private const val NOTICE_MS = 3_000L
     }
 }

@@ -14,6 +14,8 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +44,7 @@ data class CameraUiState(
     val maxZoom: Float = 1f,
     val zoom: Float = 1f,
     val isSaving: Boolean = false,
+    /** "Saved without the guide" for [CameraViewModel.NOTICE_MS], or why the last photo failed until the next one. */
     val captureNotice: CaptureNotice? = null,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
@@ -62,6 +65,7 @@ class CameraViewModel(
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
+    private var savedNoticeJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -94,6 +98,7 @@ class CameraViewModel(
 
     fun onShutter() {
         if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return
+        savedNoticeJob?.cancel()
         // Set before launching so two taps in the same frame cannot enqueue two captures.
         _uiState.update { it.copy(isSaving = true, captureNotice = null) }
         viewModelScope.launch {
@@ -101,6 +106,11 @@ class CameraViewModel(
                 camera.takePhoto().fold(
                     onSuccess = { uri ->
                         _uiState.update { it.copy(lastPhoto = uri, captureNotice = CaptureNotice.SAVED) }
+                        // Only a confirmation (FR-1.6): it goes by itself, while a failure stays until the next photo.
+                        savedNoticeJob = viewModelScope.launch {
+                            delay(NOTICE_MS)
+                            _uiState.update { it.copy(captureNotice = null) }
+                        }
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
@@ -152,5 +162,10 @@ class CameraViewModel(
     /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */
     fun onRemoveGuide() {
         guides.setGuide(null)
+    }
+
+    companion object {
+        /** How long a short notice stays on the Camera screen: "Saved without the guide" and remote action notices. */
+        const val NOTICE_MS = 3_000L
     }
 }

@@ -7,6 +7,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStore
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraStatus
@@ -23,6 +24,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -34,8 +36,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
 
+// Robolectric only for a real Uri, which a saved photo needs.
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(AndroidJUnit4::class)
 class CameraViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val store = ViewModelStore()
@@ -88,6 +93,45 @@ class CameraViewModelTest {
         assertNull(model.uiState.value.captureNotice)
         camera.capture.complete(Result.failure(IOException("Storage still full")))
         runCurrent()
+    }
+
+    @Test
+    fun savedNoticeGoesAfterThreeSecondsAndANewPhotoRestartsIt() = runTest {
+        val photo = Uri.parse("content://media/external/images/media/1")
+        model.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo))
+        runCurrent()
+        assertEquals(photo, model.uiState.value.lastPhoto)
+        assertEquals(CaptureNotice.SAVED, model.uiState.value.captureNotice)
+
+        // A second photo before the notice goes shows its own notice for the full time.
+        advanceTimeBy(2_000)
+        camera.capture = CompletableDeferred()
+        model.onShutter()
+        runCurrent()
+        assertNull(model.uiState.value.captureNotice)
+        camera.capture.complete(Result.success(photo))
+        runCurrent()
+        advanceTimeBy(CameraViewModel.NOTICE_MS - 1)
+        runCurrent()
+        assertEquals(CaptureNotice.SAVED, model.uiState.value.captureNotice)
+
+        advanceTimeBy(1)
+        runCurrent()
+        assertNull(model.uiState.value.captureNotice)
+        assertEquals(photo, model.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun saveFailureStaysUntilTheNextPhoto() = runTest {
+        model.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.failure(IOException("Storage full")))
+        runCurrent()
+        advanceTimeBy(CameraViewModel.NOTICE_MS * 2)
+        runCurrent()
+        assertEquals(CaptureNotice.SAVE_FAILED, model.uiState.value.captureNotice)
     }
 
     @Test

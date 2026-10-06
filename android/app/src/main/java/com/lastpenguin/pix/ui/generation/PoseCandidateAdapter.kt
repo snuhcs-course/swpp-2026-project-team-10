@@ -46,6 +46,7 @@ class PoseCandidateAdapter(
         // The pose name is not shown; a screen reader still says which pose the image is.
         card.contentDescription = slot.template.label
         card.isChecked = slot.selected
+        binding.poseCheck.isVisible = slot.selected
         card.strokeWidth = card.resources.getDimensionPixelSize(
             if (slot.selected) R.dimen.pose_card_stroke_selected else R.dimen.pose_card_stroke,
         )

@@ -1,4 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Pix" parent="Theme.Material3.DayNight.NoActionBar" />
+    <!-- Dark only: Pix is a camera, and the preview is the page. Tokens in colors.xml, styles in styles.xml. -->
+    <style name="Theme.Pix" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/pix_accent</item>
+        <item name="colorOnPrimary">@color/pix_on_accent</item>
+        <item name="colorPrimaryContainer">@color/pix_accent</item>
+        <item name="colorOnPrimaryContainer">@color/pix_on_accent</item>
+        <item name="colorSecondary">@color/pix_guide</item>
+        <item name="colorOnSecondary">@color/pix_on_accent</item>
+        <item name="colorTertiary">@color/pix_live</item>
+        <item name="colorOnTertiary">@color/pix_on_accent</item>
+        <item name="colorError">@color/pix_danger</item>
+        <item name="colorOnError">@color/pix_on_accent</item>
+        <item name="colorErrorContainer">@color/pix_danger_surface</item>
+        <item name="colorOnErrorContainer">@color/pix_danger_text</item>
+
+        <item name="android:colorBackground">@color/pix_ground</item>
+        <item name="colorOnBackground">@color/pix_text</item>
+        <item name="colorSurface">@color/pix_ground</item>
+        <item name="colorOnSurface">@color/pix_text</item>
+        <item name="colorSurfaceVariant">@color/pix_surface_2</item>
+        <item name="colorOnSurfaceVariant">@color/pix_text_muted</item>
+        <item name="colorSurfaceContainerLowest">@color/pix_ground</item>
+        <item name="colorSurfaceContainerLow">@color/pix_surface</item>
+        <item name="colorSurfaceContainer">@color/pix_surface</item>
+        <item name="colorSurfaceContainerHigh">@color/pix_surface_2</item>
+        <item name="colorSurfaceContainerHighest">@color/pix_surface_3</item>
+        <item name="colorSurfaceInverse">@color/pix_text</item>
+        <item name="colorOnSurfaceInverse">@color/pix_ground</item>
+        <item name="colorOutline">@color/pix_outline</item>
+        <item name="colorOutlineVariant">@color/pix_hairline</item>
+        <item name="android:textColorPrimary">@color/pix_text</item>
+        <item name="android:textColorSecondary">@color/pix_text_muted</item>
+
+        <item name="android:windowBackground">@color/pix_ground</item>
+        <item name="android:statusBarColor">@color/pix_ground</item>
+        <item name="android:navigationBarColor">@color/pix_ground</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Fonts come from the text appearances. A theme-wide android:fontFamily would override them. -->
+        <item name="android:textViewStyle">@style/Widget.Pix.TextView</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Pix.Title</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Pix.SheetTitle</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Pix.Header</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Pix.Action.Small</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Pix.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Pix.Body</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Pix.Body.Small</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.Pix.Action.Small</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.Pix.Label</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Pix.Caption</item>
+
+        <item name="materialButtonStyle">@style/Widget.Pix.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.Pix.Button.Secondary</item>
+        <item name="borderlessButtonStyle">@style/Widget.Pix.Button.Text</item>
+        <item name="sliderStyle">@style/Widget.Pix.Slider</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.Pix.BottomSheetDialog</item>
+        <item name="bottomSheetDragHandleStyle">@style/Widget.Pix.BottomSheet.DragHandle</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Pix.MaterialAlertDialog</item>
+    </style>
+
+    <style name="ThemeOverlay.Pix.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.Pix.BottomSheet</item>
+        <item name="android:backgroundDimAmount">0.66</item>
+        <item name="android:navigationBarColor">@color/pix_surface</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="ThemeOverlay.Pix.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.Pix.Dialog</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.Pix.Title.Text</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/MaterialAlertDialog.Pix.Body.Text</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.Pix.Button.Dialog.Positive</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.Pix.Button.Dialog</item>
+    </style>
 </resources>

@@ -5,7 +5,7 @@ Kotlin, XML Views with ViewBinding. minSdk 29, targetSdk 36. Open this `android/
 ## What is here
 
 - **Shared contracts**: the code-level version of the agreements in the Design Documentation.
-- **App shell** (#2): one activity, the navigation graph, every Iteration 1 screen with a basic layout, and every class from Design 2.1–2.2 with its functions declared.
+- **App shell** (#2): one activity, the navigation graph, every Iteration 1 screen, and every class from Design 2.1–2.2 with its functions declared.
 - Owners fill in the bodies in their own issues.
 
 ### Camera
@@ -65,6 +65,8 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Subject view, Connection lost | `session/SubjectFragment`, `ConnectionLostFragment` | `SubjectViewModel`, `SessionViewModel` | #8, #9, #10 |
 
 The failure screens share `fragment_failure.xml`.
+
+**Look.** Every screen uses the dark-only `Theme.Pix` (`res/values/themes.xml`). The design tokens are in `colors.xml`: the ground and surfaces, glass for controls over the preview, one accent (`#F2C14E`), the live color (`#36D399`), the guide color (`#5EEAD4`), and the danger color. Type and component styles are in `styles.xml`: `TextAppearance.Pix.*`, and `Widget.Pix.*` for primary, secondary, text, glass, icon, and segment buttons, chips, sliders, cards, sheets, and dialogs. Fonts are Manrope and DM Mono in `res/font` (SIL OFL 1.1; licenses in `assets/licenses`). Icons are vector drawables in `res/drawable` (`ic_*`, with 16–20 dp `_small` versions for use beside text), and the app icon is the adaptive icon in `res/mipmap-anydpi`. The team's UI mockups are the visual reference; where they differ from built behavior, the behavior wins, for example the zoom slider instead of zoom chips and the system number keyboard instead of an on-screen keypad.
 
 ### Module classes
 

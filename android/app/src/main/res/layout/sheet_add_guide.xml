@@ -1,40 +1,154 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Add a pose guide (R&S 6.2). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingHorizontal="20dp"
+    android:paddingBottom="24dp">
+
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:accessibilityHeading="true"
         android:text="@string/add_guide_title"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
+        android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
 
     <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="16dp"
-        android:text="@string/add_guide_body" />
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="6dp"
+        android:lineSpacingMultiplier="1.2"
+        android:text="@string/add_guide_body"
+        android:textAppearance="@style/TextAppearance.Pix.Body" />
 
-    <Button
+    <LinearLayout
         android:id="@+id/uploadButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/upload_reference" />
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_option_card"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="88dp"
+        android:padding="16dp">
 
-    <Button
+        <FrameLayout
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_icon_tile">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_image"
+                app:tint="@color/pix_text" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/upload_reference"
+                android:textAppearance="@style/TextAppearance.Pix.Action"
+                android:textColor="@color/pix_text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="@string/upload_reference_body"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="8dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/pix_text_faint" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/generateButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/generate_poses" />
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_option_card"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="88dp"
+        android:padding="16dp">
+
+        <FrameLayout
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_icon_tile_accent">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_sparkle"
+                app:tint="@color/pix_on_accent" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/generate_poses"
+                android:textAppearance="@style/TextAppearance.Pix.Action"
+                android:textColor="@color/pix_text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="@string/generate_poses_body"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="8dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/pix_text_faint" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/cancelButton"
-        style="@style/Widget.Material3.Button.TextButton"
+        style="@style/Widget.Pix.Button.Text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="@string/cancel" />
 </LinearLayout>

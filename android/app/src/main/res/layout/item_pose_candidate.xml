@@ -3,26 +3,25 @@
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    style="@style/Widget.Material3.CardView.Outlined"
+    style="@style/Widget.Pix.PoseCard"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
+    android:layout_margin="6dp"
     android:checkable="true"
-    app:checkedIcon="@null"
-    app:strokeColor="@color/pose_card_stroke">
+    app:checkedIcon="@null">
 
     <!-- The cell keeps the camera frame's 3:4 shape before its image arrives. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <ImageView
+        <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/poseImage"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:background="#33333333"
             android:importantForAccessibility="no"
             android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.PoseImage"
             app:layout_constraintDimensionRatio="3:4"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -40,16 +39,34 @@
 
             <ProgressBar
                 android:id="@+id/poseProgress"
-                android:layout_width="32dp"
-                android:layout_height="32dp" />
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:indeterminateTint="@color/pix_text_faint" />
 
             <TextView
                 android:id="@+id/poseStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:layout_marginTop="10dp"
+                android:textAppearance="@style/TextAppearance.Pix.Caption"
+                android:textColor="@color/pix_text_faint"
                 tools:text="Creating…" />
         </LinearLayout>
+
+        <!-- The chosen pose (Pick a pose). -->
+        <ImageView
+            android:id="@+id/poseCheck"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_margin="10dp"
+            android:background="@drawable/bg_check_badge"
+            android:importantForAccessibility="no"
+            android:padding="5dp"
+            android:src="@drawable/ic_check"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/pix_on_accent"
+            tools:visibility="visible" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

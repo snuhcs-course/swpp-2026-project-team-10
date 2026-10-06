@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The shutter: a white ring around a white disc that shrinks while pressed and fades while disabled. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false">
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <stroke android:width="4dp" android:color="#59F4F4F2" />
+                </shape>
+            </item>
+            <item android:bottom="8dp" android:left="8dp" android:right="8dp" android:top="8dp">
+                <shape android:shape="oval">
+                    <solid android:color="#59F4F4F2" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <stroke android:width="4dp" android:color="@color/pix_text" />
+                </shape>
+            </item>
+            <item android:bottom="11dp" android:left="11dp" android:right="11dp" android:top="11dp">
+                <shape android:shape="oval">
+                    <solid android:color="#D6D6D3" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <stroke android:width="4dp" android:color="@color/pix_text" />
+                </shape>
+            </item>
+            <item android:bottom="8dp" android:left="8dp" android:right="8dp" android:top="8dp">
+                <shape android:shape="oval">
+                    <solid android:color="@color/pix_text" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

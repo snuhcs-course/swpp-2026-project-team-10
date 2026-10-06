@@ -1,4 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Design tokens: a dark camera UI where the preview is the page and controls float on glass.
+     One accent, one live color, one guide color. -->
 <resources>
+    <color name="pix_ground">#0B0B0D</color>
+    <color name="pix_surface">#16171A</color>
+    <color name="pix_surface_2">#1F2024</color>
+    <color name="pix_surface_3">#2A2C31</color>
+    <!-- 12,12,14 at 58% and 78%, over the preview. -->
+    <color name="pix_glass">#940C0C0E</color>
+    <color name="pix_glass_strong">#C70C0C0E</color>
+    <color name="pix_glass_stroke">#29FFFFFF</color>
+    <color name="pix_outline">#24FFFFFF</color>
+    <color name="pix_hairline">#14FFFFFF</color>
+
+    <color name="pix_text">#F4F4F2</color>
+    <color name="pix_text_soft">#E6E7E9</color>
+    <color name="pix_text_muted">#B8BBC0</color>
+    <color name="pix_text_faint">#8A8E94</color>
+
+    <color name="pix_accent">#F2C14E</color>
+    <color name="pix_on_accent">#141413</color>
+    <color name="pix_live">#36D399</color>
+    <color name="pix_live_stroke">#7336D399</color>
+    <color name="pix_guide">#5EEAD4</color>
+    <color name="pix_guide_stroke">#805EEAD4</color>
+    <color name="pix_danger">#FF6B57</color>
+    <color name="pix_danger_stroke">#66FF6B57</color>
+    <color name="pix_danger_text">#FFB4A8</color>
+    <color name="pix_danger_surface">#1C1416</color>
+
+    <!-- The horizon bar when level (FR-1.10, Design 2.6.2). -->
     <color name="camera_level_aligned">#D4AC24</color>
+
+    <color name="ic_launcher_background">#16171A</color>
 </resources>

@@ -39,6 +39,16 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
+        <!-- The same 3×3 grid as the photographer's preview, over the same fitted image; no level bar here. -->
+        <com.lastpenguin.pix.ui.camera.CameraCompositionView
+            android:id="@+id/compositionOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
         <!-- Shown until the peer connection is up. -->
         <TextView
             android:id="@+id/connectingText"

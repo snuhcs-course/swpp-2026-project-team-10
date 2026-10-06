@@ -71,6 +71,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
                         binding.guideOverlay.render(ui.guide, ui.guideState)
+                        binding.compositionOverlay.isVisible = ui.connected
                         val ratio = zoomFormat.format(ui.zoom)
                         val zoomControls = binding.zoomControls
                         zoomControls.zoomRatio.text = getString(R.string.zoom_ratio, ratio)

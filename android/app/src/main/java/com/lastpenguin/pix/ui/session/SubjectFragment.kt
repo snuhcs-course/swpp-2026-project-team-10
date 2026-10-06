@@ -70,7 +70,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.photographerName.text = ui.photographerName
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
-                        // TODO(#9): binding.guideOverlay.render(ui.guide, ui.guideState).
+                        binding.guideOverlay.render(ui.guide, ui.guideState)
                         val ratio = zoomFormat.format(ui.zoom)
                         val zoomControls = binding.zoomControls
                         zoomControls.zoomRatio.text = getString(R.string.zoom_ratio, ratio)

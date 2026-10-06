@@ -69,6 +69,7 @@ class SessionViewModel(
     private var peerName: String? = null
     private var streaming = false
     private var connectedJob: Job? = null
+    private var receiverJob: Job? = null
     private var backgroundJob: Job? = null
 
     /** The whole app in the background: the camera is released by its lifecycle, so the video pauses. */
@@ -135,6 +136,17 @@ class SessionViewModel(
         if (!streamingNow && streaming) camera.setFrameSink(null)
         streaming = streamingNow
 
+        // The subject listens for the guide from the moment it joins: the photographer sends the image as soon as
+        // its own side is connected, which can be before this phone's Connected, and incoming does not replay.
+        val receivingNow = role == Role.SUBJECT && (state is SessionState.Connecting || connected != null)
+        if (receivingNow && receiverJob == null) {
+            receiverJob = viewModelScope.launch { coroutineScope { guideSyncer.startAsReceiver(this) } }
+        }
+        if (!receivingNow && receiverJob != null) {
+            receiverJob?.cancel()
+            receiverJob = null
+        }
+
         val liveNow = connected?.role == Role.PHOTOGRAPHER
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {
@@ -152,7 +164,7 @@ class SessionViewModel(
                             }
                         }
                     }
-                    // TODO(#9): guideSyncer.startAsSender(this) while connected.
+                    guideSyncer.startAsSender(this)
                 }
             }
         }

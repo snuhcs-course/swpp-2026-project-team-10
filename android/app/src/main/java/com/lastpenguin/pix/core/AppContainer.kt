@@ -87,6 +87,7 @@ class AppContainer(context: Context) {
         router = ChannelRouter(),
         serverUrl = BuildConfig.SERVER_URL,
         identity = SessionIdentity.of(appContext, BuildConfig.VERSION_NAME),
+        haveGuideId = { mirrorGuideRepository.guide.value?.id },
     )
 
     val sessionManager: SessionManager = rtcSessionManager

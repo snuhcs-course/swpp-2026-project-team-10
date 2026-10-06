@@ -15,7 +15,11 @@ sealed interface SessionEntry {
 }
 
 @Serializable
-data class PeerInfo(val displayName: String)
+data class PeerInfo(
+    val displayName: String,
+    /** Subject only: the guide image it already has, from its `hello`; the photographer skips sending that one. */
+    val haveGuideId: String? = null,
+)
 
 @Serializable
 enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, ERROR }

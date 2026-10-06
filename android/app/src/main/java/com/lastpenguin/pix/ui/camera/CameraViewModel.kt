@@ -149,7 +149,8 @@ class CameraViewModel(
         }
     }
 
+    /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */
     fun onRemoveGuide() {
-        // TODO(#6): guides.setGuide(null).
+        guides.setGuide(null)
     }
 }

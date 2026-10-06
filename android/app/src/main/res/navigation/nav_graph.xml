@@ -19,6 +19,10 @@
         <action
             android:id="@+id/action_camera_to_roomCode"
             app:destination="@id/roomCodeSheet" />
+        <!-- The scene photo is taken and confirmed on Camera (R&S 6.3); *Use this photo* starts Flow 2. -->
+        <action
+            android:id="@+id/action_camera_to_generating"
+            app:destination="@id/generatingFragment" />
     </fragment>
 
     <!-- Flow 1: Add a pose guide -->
@@ -29,11 +33,6 @@
         <action
             android:id="@+id/action_addGuide_to_referenceConfirm"
             app:destination="@id/referenceConfirmFragment"
-            app:popUpTo="@id/addGuideSheet"
-            app:popUpToInclusive="true" />
-        <action
-            android:id="@+id/action_addGuide_to_generating"
-            app:destination="@id/generatingFragment"
             app:popUpTo="@id/addGuideSheet"
             app:popUpToInclusive="true" />
     </dialog>

@@ -9,8 +9,28 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="end"
+        android:gravity="end|center_vertical"
         android:padding="12dp">
+
+        <!-- The title and Cancel replace Shoot together while the scene photo for poses is taken (R&S 6.3). -->
+        <TextView
+            android:id="@+id/sceneTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/scene_title"
+            android:textAppearance="?attr/textAppearanceTitleLarge"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/sceneCancelButton"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/cancel"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/shootTogetherButton"
@@ -88,6 +108,16 @@
                 android:text="@string/allow_camera"
                 android:visibility="gone" />
         </LinearLayout>
+
+        <!-- The scene photo that was taken, over the camera, until it is used or shot again (R&S 6.3). -->
+        <ImageView
+            android:id="@+id/sceneStill"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#000000"
+            android:contentDescription="@string/scene_photo_description"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
 
         <!-- Shown while a subject is connected (FR-6.8). -->
         <TextView
@@ -171,6 +201,7 @@
         android:text="@string/hint_add_guide" />
 
     <LinearLayout
+        android:id="@+id/captureControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
@@ -199,6 +230,34 @@
             android:padding="4dp"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_photo" />
+    </LinearLayout>
+
+    <!-- Replaces the row above while the scene photo is confirmed. The middle, where the shutter was, stays empty. -->
+    <LinearLayout
+        android:id="@+id/sceneReviewControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/shootAgainButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/shoot_again" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/usePhotoButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/use_this_photo" />
     </LinearLayout>
 
     <!-- Shown while a subject is connected (FR-6.10). -->

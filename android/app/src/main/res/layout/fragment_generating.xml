@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Generating poses (R&S 6.3). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -13,22 +14,51 @@
         android:text="@string/generating_title"
         android:textAppearance="?attr/textAppearanceTitleLarge" />
 
-    <TextView
+    <!-- The scene photo the poses are made from. -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/generating_body" />
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <!-- TODO(#7): the scene photo and four slots that fill in as candidates arrive. -->
-    <TextView
-        android:id="@+id/candidateSlots"
+        <ImageView
+            android:id="@+id/sceneImage"
+            android:layout_width="54dp"
+            android:layout_height="72dp"
+            android:background="#33333333"
+            android:contentDescription="@string/scene_photo_description"
+            android:scaleType="centerCrop" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/your_photo"
+                android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/same_person_and_place" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- One slot per pose template; each fills in when its candidate arrives. -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/candidateGrid"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginVertical="16dp"
+        android:layout_marginVertical="12dp"
         android:layout_weight="1"
-        android:background="#33333333"
-        android:gravity="center"
-        android:text="@string/candidates_placeholder" />
+        app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
+        app:spanCount="2"
+        tools:listitem="@layout/item_pose_candidate" />
 
     <TextView
         android:id="@+id/readyCount"
@@ -37,11 +67,14 @@
         android:gravity="center"
         tools:text="2 of 4 ready" />
 
+    <!-- A waiting state says how long it may take (R&S 6.9). -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:gravity="center"
-        android:text="@string/generating_wait" />
+        android:text="@string/generating_wait"
+        android:textAppearance="?attr/textAppearanceBodySmall" />
 
     <Button
         android:id="@+id/cancelButton"
@@ -49,19 +82,4 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/cancel" />
-
-    <!-- TODO(#7): remove when GenerationViewModel moves to Pick a pose or Couldn't create poses. -->
-    <Button
-        android:id="@+id/tempReadyButton"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/temp_poses_ready" />
-
-    <Button
-        android:id="@+id/tempFailedButton"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/temp_generation_failed" />
 </LinearLayout>

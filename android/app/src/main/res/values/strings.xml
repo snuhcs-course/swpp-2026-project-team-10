@@ -71,17 +71,29 @@
 
     <!-- Flow 2: Pose generation -->
     <string name="generating_title">Generating poses</string>
-    <string name="generating_body">Pix keeps the same person and place and changes only the pose.</string>
-    <string name="candidates_placeholder">Four candidate slots (#7)</string>
-    <string name="ready_count">%1$d of 4 ready</string>
-    <string name="generating_wait">This can take up to 30 seconds.</string>
+    <string name="consent_title">Send this photo to an AI service?</string>
+    <string name="consent_message">To create poses, Pix sends the scene photo you take next through the Pix server to an external AI image service. The Pix server does not keep the photo.</string>
+    <string name="consent_agree">Agree and continue</string>
+    <string name="not_now">Not now</string>
+    <string name="scene_title">Take the scene photo</string>
+    <string name="scene_body">Frame the person and the place, then press the shutter.</string>
+    <string name="scene_review_title">Use this photo?</string>
+    <string name="scene_review_body">Pix sends this photo to create the poses.</string>
+    <string name="use_this_photo">Use this photo</string>
+    <string name="shoot_again">Shoot again</string>
+    <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>
+    <string name="your_photo">Your photo</string>
+    <string name="same_person_and_place">Same person and place</string>
+    <string name="scene_photo_description">The photo of the scene the poses are made from</string>
+    <string name="creating_pose">Creating…</string>
+    <string name="pose_failed">Couldn\'t create</string>
+    <string name="ready_count">%1$d of %2$d ready</string>
+    <string name="generating_wait">Generation may take up to 30 seconds.</string>
     <string name="pick_pose_title">Pick a pose</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>
     <string name="generation_failed_message">The request failed or took longer than 30 seconds. Your photo is kept, so you can try again.</string>
-    <string name="temp_poses_ready">(temp) Poses ready</string>
-    <string name="temp_generation_failed">(temp) Generation failed</string>
 
     <!-- Flow 6: Room code -->
     <string name="room_code_body">Ask your friend to open Pix, tap Shoot together, and enter this code.</string>

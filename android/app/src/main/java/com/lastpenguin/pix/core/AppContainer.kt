@@ -6,6 +6,8 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraXController
 import com.lastpenguin.pix.camera.PhotoSaver
 import com.lastpenguin.pix.core.network.PixApi
+import com.lastpenguin.pix.generation.DataStoreGenerationConsent
+import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.guide.GuideRepository
@@ -25,8 +27,10 @@ import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.WebRtcRuntime
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
@@ -56,11 +60,20 @@ class AppContainer(context: Context) {
     // ---- Pose generation (#7) ---------------------------------------------------
     private val pixApi: PixApi = Retrofit.Builder()
         .baseUrl(BuildConfig.SERVER_URL)
+        // A pose arrives in one piece after 10–25 s. OkHttp's default gives up after 10 s without data, so wait
+        // past the generator's own 30 s limit and let that limit decide.
+        .client(
+            OkHttpClient.Builder()
+                .readTimeout(RemotePoseGenerator.TIMEOUT_MS + 5_000, TimeUnit.MILLISECONDS)
+                .build(),
+        )
         .addConverterFactory(Json { ignoreUnknownKeys = true }.asConverterFactory("application/json".toMediaType()))
         .build()
         .create(PixApi::class.java)
 
     val poseGenerator: PoseGenerator = RemotePoseGenerator(pixApi)
+
+    val generationConsent: GenerationConsent = DataStoreGenerationConsent(appContext)
 
     // ---- Session, guide sync, remote zoom (#8, #9, #10) -------------------------
     private val frameSource = CameraFrameSource()

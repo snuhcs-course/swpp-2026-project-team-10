@@ -25,6 +25,7 @@ import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.WebRtcRuntime
+import com.lastpenguin.pix.session.WebpGuideImageCodec
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import java.util.concurrent.TimeUnit
@@ -95,7 +96,7 @@ class AppContainer(context: Context) {
     /** The photographer's live video for the Subject view. */
     val remoteVideo: RemoteVideo = rtcSessionManager
 
-    val guideSyncer = GuideSyncer(sessionManager, guideRepository, mirrorGuideRepository)
+    val guideSyncer = GuideSyncer(sessionManager, guideRepository, mirrorGuideRepository, WebpGuideImageCodec())
 
     val remoteControlHandler = RemoteControlHandler(sessionManager, cameraController)
 }

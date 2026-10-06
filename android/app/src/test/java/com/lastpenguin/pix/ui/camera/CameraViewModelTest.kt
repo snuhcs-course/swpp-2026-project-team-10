@@ -231,11 +231,26 @@ class CameraViewModelTest {
         override fun setFrameSink(sink: FrameSink?) = Unit
     }
 
+    @Test
+    fun `removing the guide clears the repository`() = runTest(dispatcher) {
+        runCurrent()
+
+        model.onRemoveGuide()
+        runCurrent()
+
+        assertEquals(listOf<ReferenceGuide?>(null), guides.set)
+        assertNull(model.uiState.value.guide)
+    }
+
     private class FakeGuides : GuideRepository {
         override val guide = MutableStateFlow<ReferenceGuide?>(null)
         override val state = MutableStateFlow(GuideState(cx = 0.3f, height = 0.8f))
         override val changes = MutableSharedFlow<GuideChange>()
-        override fun setGuide(guide: ReferenceGuide?) = Unit
+        val set = mutableListOf<ReferenceGuide?>()
+        override fun setGuide(guide: ReferenceGuide?) {
+            set += guide
+            this.guide.value = guide
+        }
         override fun update(final: Boolean, change: (GuideState) -> GuideState) = Unit
     }
 }

@@ -5,8 +5,11 @@ import kotlin.math.roundToInt
 /** The reference is segmented at this long side at most (Design 2.6.1, step 1). */
 internal const val MAX_REFERENCE_LONG_SIDE = 1280
 
-/** The outline's stroke where the guide first appears: 2–3 px on screen (Design 2.6.1, step 5). */
-private const val STROKE_ON_SCREEN_PX = 2.5f
+/**
+ * The outline's stroke where the guide first appears: about 8 px on screen, 3 dp on a typical phone (Design 2.6.1,
+ * step 5). Much lower values round to a 1 px stroke on the 720 px cutout the subject receives.
+ */
+private const val STROKE_ON_SCREEN_PX = 8f
 
 /** A new guide is [GuideState.DEFAULT_HEIGHT] of the frame; a 1080 px wide phone's 3:4 frame is 1440 px tall. */
 private const val GUIDE_ON_SCREEN_PX = GuideState.DEFAULT_HEIGHT * 1440f

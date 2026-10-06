@@ -33,7 +33,7 @@ class RtcSessionManagerTest {
 
     private val incoming = mutableListOf<SessionMessage>()
 
-    private fun TestScope.manager(): RtcSessionManager {
+    private fun TestScope.manager(haveGuideId: () -> String? = { null }): RtcSessionManager {
         val manager = RtcSessionManager(
             signaling = signaling,
             peers = peers,
@@ -44,6 +44,7 @@ class RtcSessionManagerTest {
             identity = SessionIdentity("Dongje", "0.1.0"),
             dispatcher = StandardTestDispatcher(testScheduler),
             clock = { 0L },
+            haveGuideId = haveGuideId,
         )
         backgroundScope.launch { manager.incoming.collect { incoming += it } }
         runCurrent()
@@ -55,8 +56,10 @@ class RtcSessionManagerTest {
     private fun FakePeerConnectionClient.sentMessages(): List<SessionMessage> =
         sent.mapNotNull { reader.decode(it.second)?.message }
 
-    private fun hello(role: Role, name: String) =
-        otherPhone.encode(SessionMessage.Hello(appVersion = "0.1.0", role = role, name = name))
+    private fun hello(role: Role, name: String, haveGuideId: String? = null) =
+        otherPhone.encode(
+            SessionMessage.Hello(appVersion = "0.1.0", role = role, name = name, haveGuideId = haveGuideId),
+        )
 
     /**
      * Photographer: start, get a code, and have a subject join and connect. A test that ends while connected must
@@ -203,6 +206,48 @@ class RtcSessionManagerTest {
         assertTrue(peer.closed)
         assertEquals(1, signaling.closeCount)
         assertEquals(SessionMessage.Leave(EndReason.LEFT), incoming.last())
+    }
+
+    @Test
+    fun `the subject says which guide image it already has, and the photographer learns it`() = runTest {
+        val subject = manager(haveGuideId = { "g1" })
+        subject.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT))
+        runCurrent()
+        val peer = peers.created.single()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("offer", "v=0 offer")))
+        runCurrent()
+        peer.open()
+        runCurrent()
+        val sent = peer.sentMessages().first() as SessionMessage.Hello
+        assertEquals("g1", sent.haveGuideId)
+        subject.leave(EndReason.LEFT)
+        runCurrent()
+
+        // The photographer reads it from the subject's hello.
+        peers.created.clear()
+        signaling.sent.clear()
+        val photographer = manager(haveGuideId = { "ignored on the photographer" })
+        photographer.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_2"))
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        val photographerPeer = peers.created.last()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
+        photographerPeer.open()
+        runCurrent()
+        assertEquals(null, (photographerPeer.sentMessages().first() as SessionMessage.Hello).haveGuideId)
+        photographerPeer.deliver(hello(Role.SUBJECT, "Junhyeong", haveGuideId = "g1"))
+        runCurrent()
+        assertEquals(
+            SessionState.Connected("s_2", PeerInfo("Junhyeong", haveGuideId = "g1"), Role.PHOTOGRAPHER),
+            photographer.state.value,
+        )
+        photographer.leave(EndReason.LEFT)
     }
 
     @Test

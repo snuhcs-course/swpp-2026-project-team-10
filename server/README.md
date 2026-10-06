@@ -69,12 +69,14 @@ Errors leave the socket usable. Text messages larger than 64 KiB close the socke
 
 ## Testing the photographer's phone without a second phone
 
-`tools/fake_subject.py` is a subject phone made of Python. It joins a room code, answers the WebRTC offer with [aiortc](https://github.com/aiortc/aiortc), exchanges `hello` on the data channels, counts the video frames it receives, optionally sends `camera.zoom.set`, and prints the echoed `camera.state` with its delay. It is a development tool and not part of the server; its two dependencies are not in `pyproject.toml`.
+`tools/fake_subject.py` is a subject phone made of Python. It joins a room code, answers the WebRTC offer with [aiortc](https://github.com/aiortc/aiortc), exchanges `hello` on the data channels, counts the video frames it receives, receives the photographer's guide image (reassembled from its chunks and checked against the CRC; `--save-guide guide.webp` keeps it, `--have-guide <id>` reports an image it already has), prints every `guide.state`, optionally sends `camera.zoom.set`, and prints the echoed `camera.state` with its delay. It is a development tool and not part of the server; its two dependencies are not in `pyproject.toml`.
 
 ```sh
 pip install websockets aiortc
 python tools/fake_subject.py 482915 --seconds 20 --zoom 2.0
 ```
+
+`tools/fake_photographer.py` is the other side: it creates a room and prints the code; once a phone joins it sends a test-pattern video, the two data channels, `hello`, `camera.capabilities`, the guide image from `--guide` (a WebP cutout with alpha, at most 720 px tall) with its `guide.state`, then moves and resizes the guide for `--seconds` as a drag would, `--clear` removes it at the end, and every `camera.zoom.set` is echoed as `camera.state`. Use it to test Subject view with one phone or an emulator: `python tools/fake_photographer.py --guide cutout.webp`, then *Shoot together › Join with a code instead* on the phone (it needs `pillow` as well).
 
 Start the server, open Pix on one phone or emulator (an emulator reaches the laptop at `http://10.0.2.2:8000/`), tap *Shoot together*, and pass the code. The phone shows "Live · fake-subject connected", and the script reports the first video frame, a frame count, and the `camera.state` that answers the zoom request.
 

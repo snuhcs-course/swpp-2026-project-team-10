@@ -535,7 +535,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Invite sent** | "Waiting for Junhyeong"; "Junhyeong gets a notification. The live view starts when they accept."; toggle "Let Junhyeong adjust the camera and guide" (on by default). | Toggle → allow or block remote control · *Cancel invite* → Friends · Friend accepts → Friend connected. | Declined or no answer in 30 s → Invite not accepted. |
-| **Friend connected** | Camera + guide with the badge "Live · Junhyeong connected"; notices for remote actions ("Junhyeong set zoom to 2×"); *End session*. | All camera and guide inputs from Flow 1 · *End session* → Camera alone, and the subject is told · Remote zoom (and, from Iteration 2, guide, brightness, and flash) from the subject → applied here. | Subject leaves or disconnects → banner "Junhyeong left" or "Junhyeong disconnected"; the camera keeps working. |
+| **Friend connected** | Camera + guide with the badge "Live · Junhyeong connected"; notices for remote actions ("Junhyeong set zoom to 2×"); *End session* in place of *Shoot together* (top). | All camera and guide inputs from Flow 1 · *End session* → Camera alone, and the subject is told · Remote zoom (and, from Iteration 2, guide, brightness, and flash) from the subject → applied here. | Subject leaves or disconnects → banner "Junhyeong left" or "Junhyeong disconnected"; the camera keeps working. |
 | **Invite not accepted** | "Junhyeong declined or didn't answer within 30 seconds." | *Invite again* → Invite sent · *Back to camera* → Camera. | — |
 
 ### 6.6 Flow 5 · Shoot together, subject's phone

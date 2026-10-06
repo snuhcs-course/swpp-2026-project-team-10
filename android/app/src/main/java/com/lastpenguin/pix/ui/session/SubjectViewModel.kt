@@ -89,7 +89,13 @@ class SubjectViewModel(
                 }
             }
         }
-        // TODO(#9): mirror.guide and mirror.state → uiState.guide and guideState.
+        // The mirror is written by GuideSyncer while the session runs; the overlay only draws it (FR-6.7).
+        viewModelScope.launch {
+            mirror.guide.collect { guide -> _uiState.update { it.copy(guide = guide) } }
+        }
+        viewModelScope.launch {
+            mirror.state.collect { state -> _uiState.update { it.copy(guideState = state) } }
+        }
     }
 
     /**

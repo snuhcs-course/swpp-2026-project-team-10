@@ -8,6 +8,7 @@ import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,6 +21,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -29,12 +31,13 @@ class SubjectViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private val session = FakeSessionManager()
+    private val mirror = FakeGuideRepository()
     private lateinit var viewModel: SubjectViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        viewModel = SubjectViewModel(session, mirror, FakeRemoteVideo())
     }
 
     @After
@@ -147,6 +150,24 @@ class SubjectViewModelTest {
         runCurrent()
 
         assertEquals(2.5f, late.uiState.value.zoom, 0f)
+    }
+
+    @Test
+    fun `the mirrored guide and its state reach the screen`() = runTest(dispatcher) {
+        runCurrent()
+        assertNull(viewModel.uiState.value.guide)
+
+        mirror.setGuide(fakeGuide("g1"))
+        mirror.update(final = true) { it.copy(guideId = "g1", cx = 0.3f, height = 0.5f) }
+        runCurrent()
+
+        assertEquals("g1", viewModel.uiState.value.guide?.id)
+        assertEquals(0.3f, viewModel.uiState.value.guideState.cx, 0f)
+        assertEquals(0.5f, viewModel.uiState.value.guideState.height, 0f)
+
+        mirror.setGuide(null)
+        runCurrent()
+        assertNull(viewModel.uiState.value.guide)
     }
 
     @Test

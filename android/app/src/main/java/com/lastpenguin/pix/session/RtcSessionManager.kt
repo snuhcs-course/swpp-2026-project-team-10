@@ -59,6 +59,8 @@ class RtcSessionManager(
     private val identity: SessionIdentity,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Subject: the id of the guide image this phone already holds, sent in `hello` (Design 2.5.1). */
+    private val haveGuideId: () -> String? = { null },
 ) : SessionManager, RemoteVideo {
 
     private val serial = dispatcher.limitedParallelism(1)
@@ -363,6 +365,7 @@ class RtcSessionManager(
             appVersion = identity.appVersion,
             role = checkNotNull(role),
             name = identity.name,
+            haveGuideId = if (role == Role.SUBJECT) haveGuideId() else null,
         )
         peer?.send(Channel.RELIABLE, codec.encode(hello))
     }
@@ -373,7 +376,11 @@ class RtcSessionManager(
         if (_state.value !is SessionState.Connecting || openChannels.size != 2) return
         connectTimeout?.cancel()
         connectTimeout = null
-        _state.value = SessionState.Connected(checkNotNull(sessionId), PeerInfo(hello.name), checkNotNull(role))
+        _state.value = SessionState.Connected(
+            checkNotNull(sessionId),
+            PeerInfo(hello.name, hello.haveGuideId),
+            checkNotNull(role),
+        )
         Timings.mark("session.connected")
         pingJob?.cancel()
         pingJob = scope.launch {

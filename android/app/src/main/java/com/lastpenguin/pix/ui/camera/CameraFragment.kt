@@ -143,6 +143,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         val connected = state as? SessionState.Connected
                         controls.liveBadge.isVisible = connected != null
                         controls.endSessionButton.isVisible = connected != null
+                        controls.shootTogetherButton.isVisible = connected == null && !isScenePhotoActive()
                         connected?.let { controls.liveBadge.text = getString(R.string.live_badge, it.peer.displayName) }
                         view.keepScreenOn = connected != null
                     }
@@ -361,6 +362,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         renderScenePhoto(controls, generationViewModel.uiState.value)
     }
 
+    /** Whether the scene photo for poses is being framed or reviewed; the top bar is its title then. */
+    private fun isScenePhotoActive(scene: GenerationUiState = generationViewModel.uiState.value): Boolean =
+        scene.phase == GenerationUiState.Phase.REVIEWING || scene.phase == GenerationUiState.Phase.FRAMING
+
     /**
      * The scene photo for poses is taken and confirmed on this screen (R&S 6.3, FR-4.1): the live camera with the
      * shutter, then the photo with *Use this photo* and *Shoot again*. Applied last, over the camera's own controls,
@@ -368,11 +373,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
      */
     private fun renderScenePhoto(controls: FragmentCameraBinding, scene: GenerationUiState) {
         val reviewing = scene.phase == GenerationUiState.Phase.REVIEWING
-        val active = reviewing || scene.phase == GenerationUiState.Phase.FRAMING
+        val active = isScenePhotoActive(scene)
         sceneBack?.isEnabled = active
         controls.sceneTitle.isVisible = active
         controls.sceneCancelButton.isVisible = active
-        controls.shootTogetherButton.isVisible = !active
+        controls.shootTogetherButton.isVisible = !active && sessionViewModel.state.value !is SessionState.Connected
         // Guide and the thumbnail keep their place, so the shutter stays where it is.
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active

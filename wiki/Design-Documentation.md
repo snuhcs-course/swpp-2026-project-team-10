@@ -471,7 +471,7 @@ classDiagram
 data class ReferenceGuide(
     val id: String,               // UUID; the subject uses it to tell whether it already has the image
     val cutout: Bitmap,           // ARGB_8888, person only, transparent background, cropped to the person
-    val outline: Bitmap,          // same size as cutout; 2–3 px light stroke
+    val outline: Bitmap,          // same size as cutout; light stroke, about 8 px (3 dp) on screen
     val aspect: Float,            // cutout width / height
     val source: GuideSource,      // GALLERY or GENERATED
 )
@@ -855,7 +855,7 @@ The server checks the photo and does not repair it: one that is not a readable J
 2.  **Segment.** Run the ML Kit subject segmenter with the foreground bitmap and the foreground confidence mask enabled. The segmenter's model is delivered by Google Play services, so the first use checks that the module is installed and waits for its download.
 3.  **Check for a person.** If fewer than 2% of the pixels have confidence ≥ 0.5, the step fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
 4.  **Cutout.** Use the foreground bitmap and crop it to the bounding box of the mask (confidence ≥ 0.5) plus a 2% margin. Store the result's aspect ratio.
-5.  **Outline.** Threshold the mask at 0.5. A foreground pixel with at least one background pixel among its 8 neighbors becomes an edge. Dilate the edges to a 2–3 px stroke (scaled to the output size) and draw them in a light color on a transparent bitmap of the cutout size.
+5.  **Outline.** Threshold the mask at 0.5. A foreground pixel with at least one background pixel among its 8 neighbors becomes an edge. Dilate the edges to a stroke of about 8 px on screen, 3 dp on a typical phone (scaled to the cutout size, so the 720 px cutout the subject receives gets a 5 px stroke and a 1280 px one 11 px) and draw them in a light color on a transparent bitmap of the cutout size.
 6.  **Hand over.** Put the `ReferenceGuide` into `GuideRepository`. The subject receives only the cutout (WebP with alpha, height ≤ 720 px) and runs step 5 on its alpha channel, which halves the data sent.
 
 All steps run on `Dispatchers.Default`. Target: ≤ 2 s from selection to *Reference confirm* (NFR-3).

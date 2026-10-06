@@ -10,6 +10,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -141,5 +142,41 @@ class FakeRemoteVideo : RemoteVideo {
 
     override fun detach(sink: VideoSink) {
         sinks -= sink
+    }
+}
+
+/** A Bitmap for tests that never touch pixels: Android's JVM stubs cannot create one, so allocate it raw. */
+fun fakeBitmap(): Bitmap {
+    val unsafeClass = Class.forName("sun.misc.Unsafe")
+    val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+    return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, Bitmap::class.java) as Bitmap
+}
+
+fun fakeGuide(id: String, aspect: Float = 0.5f): ReferenceGuide =
+    ReferenceGuide(id, fakeBitmap(), fakeBitmap(), aspect, GuideSource.GALLERY)
+
+/** Encodes a guide as its id's bytes and decodes any bytes into a guide, with no graphics. */
+class FakeGuideImageCodec : GuideImageCodec {
+    val encoded = mutableListOf<String>()
+    val decoded = mutableListOf<String>()
+    var decodes = true
+
+    override fun encode(guide: ReferenceGuide): EncodedGuideImage {
+        encoded += guide.id
+        return EncodedGuideImage(
+            guide.id,
+            "fake",
+            10,
+            20,
+            "image:${guide.id}".toByteArray().let {
+                it +
+                    ByteArray(20_000)
+            },
+        )
+    }
+
+    override fun decode(guideId: String, format: String, bytes: ByteArray): ReferenceGuide? {
+        decoded += guideId
+        return if (decodes && format == "fake") fakeGuide(guideId) else null
     }
 }

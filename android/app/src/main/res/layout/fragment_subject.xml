@@ -1,37 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1). No shutter: only the photographer takes photos. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/topBar"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:padding="12dp">
+        android:minHeight="64dp"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
         <!-- "<name>'s camera" with the name from hello (FR-6.6). -->
         <TextView
             android:id="@+id/photographerName"
-            android:layout_width="0dp"
+            style="@style/Widget.Pix.Chip.Live"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/subject_title_placeholder" />
+            android:layout_marginEnd="12dp"
+            android:text="@string/subject_title_placeholder"
+            app:layout_constrainedWidth="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/leaveButton"
+            app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <Button
             android:id="@+id/leaveButton"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/Widget.Pix.Button.Glass"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/leave" />
-    </LinearLayout>
+            android:text="@string/leave"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <FrameLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="#000000">
+        android:background="@color/pix_ground"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar">
 
         <!-- The photographer's live video, aspect-fit so the whole 3:4 frame is visible (Design 2.6.4, AD-10). -->
         <org.webrtc.SurfaceViewRenderer
@@ -49,14 +68,13 @@
             android:importantForAccessibility="no"
             android:visibility="gone" />
 
-        <!-- Shown until the peer connection is up. -->
+        <!-- "Connecting…" until the peer connection is up, or "camera paused" when frames stop. -->
         <TextView
             android:id="@+id/connectingText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            style="@style/Widget.Pix.Chip"
             android:layout_gravity="center"
-            android:text="@string/connecting"
-            android:textColor="#FFFFFF" />
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/connecting" />
 
         <!-- The synced guide (#9). The subject cannot move or resize it in Iteration 1. -->
         <com.lastpenguin.pix.guide.GuideOverlayView
@@ -65,15 +83,36 @@
             android:layout_height="match_parent" />
     </FrameLayout>
 
-    <!-- The same zoom slider as the Camera screen; enabled while connected (FR-7.1). -->
-    <include
-        android:id="@+id/zoomControls"
-        layout="@layout/include_zoom_control" />
-
-    <TextView
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:id="@+id/bottomPanel"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:padding="8dp"
-        android:text="@string/subject_caption" />
-</LinearLayout>
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="20dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            app:drawableStartCompat="@drawable/ic_zoom_small"
+            android:drawablePadding="8dp"
+            app:drawableTint="@color/pix_text_muted"
+            android:gravity="center"
+            android:text="@string/subject_caption"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            android:textColor="@color/pix_text_soft" />
+
+        <!-- The same zoom slider as the Camera screen; enabled while connected (FR-7.1). -->
+        <include
+            android:id="@+id/zoomControls"
+            layout="@layout/include_zoom_control"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="14dp" />
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

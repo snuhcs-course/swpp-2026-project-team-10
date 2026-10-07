@@ -6,6 +6,8 @@ import android.util.Log
 /**
  * Named timestamps in logcat under one tag, so the NFR latencies can be read without extra tools (Design 2.8).
  * Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, `rtt`.
+ * Times are this phone's `elapsedRealtime`, so never subtract them across phones directly: align two phones' logs
+ * with the `ping.received` and `rtt` lines first (RtcSessionManager).
  */
 object Timings {
     const val TAG = "PixTimings"

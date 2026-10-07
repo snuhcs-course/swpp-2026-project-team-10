@@ -4,20 +4,26 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Size
 import android.view.View
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.ColorRes
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -128,7 +134,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { openLastPhoto() }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
-        controls.styleToggleButton.setOnClickListener { viewModel.onStyleToggle() }
+        controls.cutoutSegment.setOnClickListener { chooseStyle(GuideStyle.CUTOUT) }
+        controls.outlineSegment.setOnClickListener { chooseStyle(GuideStyle.OUTLINE) }
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
 
@@ -186,7 +193,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             }
                         }
                         if (thumbnail == null) {
-                            controls.galleryButton.setImageResource(R.drawable.ic_photo)
+                            controls.galleryButton.setImageResource(R.drawable.gallery_placeholder)
                         } else {
                             controls.galleryButton.setImageBitmap(thumbnail)
                         }
@@ -314,18 +321,29 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // and hiding the bar then would shift the zoom slider under an active drag.
         val guideEditable = granted && !unavailable
         controls.guideControls.isVisible = state.guide != null
-        controls.styleToggleButton.isEnabled = guideEditable
-        controls.styleToggleButton.setText(
-            if (state.guideState.style == GuideStyle.CUTOUT) R.string.show_outline else R.string.show_cutout,
-        )
+        val cutout = state.guideState.style == GuideStyle.CUTOUT
+        controls.cutoutSegment.isSelected = cutout
+        controls.outlineSegment.isSelected = !cutout
+        controls.cutoutSegment.isEnabled = guideEditable
+        controls.outlineSegment.isEnabled = guideEditable
         opacitySlider?.render(
             GuideState.MIN_OPACITY,
             GuideState.MAX_OPACITY,
             state.guideState.opacity,
             enabled = guideEditable && state.guide != null,
         )
+        controls.opacityValue.text =
+            getString(R.string.guide_opacity_percent, (state.guideState.opacity * 100f).roundToInt())
         controls.removeGuideButton.isEnabled = guideEditable
-        controls.hintText.setText(if (state.guide == null) R.string.hint_add_guide else R.string.hint_edit_guide)
+        // Guide-colored once a guide is on the camera; it then changes the guide instead of adding one.
+        controls.guideButton.isActivated = state.guide != null
+        controls.guideButton.contentDescription =
+            getString(if (state.guide == null) R.string.guide_add_description else R.string.guide_change_description)
+        if (state.guide == null) {
+            showHint(controls.hintText, R.string.hint_add_guide, R.drawable.ic_target_small, R.color.pix_accent)
+        } else {
+            showHint(controls.hintText, R.string.hint_edit_guide, R.drawable.ic_move_small, R.color.pix_guide)
+        }
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)
@@ -333,7 +351,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             !granted && shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
         controls.cameraProgress.isVisible = granted && !ready && !unavailable
         controls.shutterButton.isEnabled = ready && !state.isSaving
-        controls.shutterButton.setText(if (state.isSaving) R.string.saving_photo else R.string.shutter)
+        controls.shutterButton.contentDescription =
+            getString(if (state.isSaving) R.string.saving_photo else R.string.shutter)
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
@@ -347,16 +366,23 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // Lens switching briefly enters STARTING: preserve an already active slider drag across that transition.
         val canContinueZoom = granted && state.cameraStatus == CameraStatus.STARTING && zoomSlider?.isTracking == true
         zoomSlider?.render(state.minZoom, state.maxZoom, state.zoom, enabled = ready || canContinueZoom)
-        controls.captureStatus.isVisible = state.captureNotice != null
-        state.captureNotice?.let {
-            controls.captureStatus.setText(
-                when (it) {
+        // The round shutter has no label, so saving is shown where the result appears next.
+        val notice = state.captureNotice
+        when {
+            state.isSaving -> showStatus(controls.captureStatus, R.string.saving_photo, StatusLook.PROGRESS)
+
+            notice == null -> controls.captureStatus.isVisible = false
+
+            else -> showStatus(
+                controls.captureStatus,
+                when (notice) {
                     CaptureNotice.SAVED -> R.string.photo_saved
                     CaptureNotice.STORAGE_FAILED -> R.string.photo_storage_failed
                     CaptureNotice.CAMERA_UNAVAILABLE -> R.string.photo_camera_closed
                     CaptureNotice.PERMISSION_REQUIRED -> R.string.camera_permission_message
                     CaptureNotice.SAVE_FAILED -> R.string.photo_save_failed
                 },
+                if (notice == CaptureNotice.SAVED) StatusLook.SUCCESS else StatusLook.ERROR,
             )
         }
         renderScenePhoto(controls, generationViewModel.uiState.value)
@@ -390,12 +416,64 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         if (!active) return
 
         controls.sceneTitle.setText(if (reviewing) R.string.scene_review_title else R.string.scene_title)
-        controls.hintText.setText(if (reviewing) R.string.scene_review_body else R.string.scene_body)
+        showHint(controls.hintText, if (reviewing) R.string.scene_review_body else R.string.scene_body)
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false
-        controls.captureStatus.isVisible = scene.shotFailed
-        controls.captureStatus.setText(R.string.scene_shot_failed)
+        if (scene.shotFailed) {
+            showStatus(controls.captureStatus, R.string.scene_shot_failed, StatusLook.ERROR)
+        } else {
+            controls.captureStatus.isVisible = false
+        }
+    }
+
+    /** Cutout / Outline: a tap on the style already shown changes nothing. */
+    private fun chooseStyle(style: GuideStyle) {
+        if (viewModel.uiState.value.guideState.style != style) viewModel.onStyleToggle()
+    }
+
+    /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */
+    private fun showHint(
+        chip: TextView,
+        @StringRes text: Int,
+        @DrawableRes icon: Int = 0,
+        @ColorRes tint: Int = R.color.pix_text,
+    ) {
+        chip.setText(text)
+        chip.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
+        TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(requireContext().getColor(tint)))
+    }
+
+    private enum class StatusLook { PROGRESS, SUCCESS, ERROR }
+
+    /** The status chip: saving, "Saved without the guide" in green, or why a photo failed in the danger color. */
+    private fun showStatus(chip: TextView, @StringRes text: Int, look: StatusLook) {
+        val context = requireContext()
+        chip.isVisible = true
+        chip.setText(text)
+        chip.setBackgroundResource(
+            when (look) {
+                StatusLook.PROGRESS -> R.drawable.bg_chip_glass
+                StatusLook.SUCCESS -> R.drawable.bg_chip_success
+                StatusLook.ERROR -> R.drawable.bg_chip_danger
+            },
+        )
+        chip.setTextColor(context.getColor(if (look == StatusLook.ERROR) R.color.pix_danger_text else R.color.pix_text))
+        chip.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            when (look) {
+                StatusLook.PROGRESS -> 0
+                StatusLook.SUCCESS -> R.drawable.ic_check_circle_small
+                StatusLook.ERROR -> R.drawable.ic_alert_small
+            },
+            0,
+            0,
+            0,
+        )
+        // The check keeps its own two colors; the alert takes the text color.
+        TextViewCompat.setCompoundDrawableTintList(
+            chip,
+            if (look == StatusLook.ERROR) ColorStateList.valueOf(context.getColor(R.color.pix_danger_text)) else null,
+        )
     }
 
     private fun showNotice(controls: FragmentCameraBinding, text: String) {
@@ -403,7 +481,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.noticeText.isVisible = true
         noticeJob?.cancel()
         noticeJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(NOTICE_MS)
+            delay(CameraViewModel.NOTICE_MS)
             controls.noticeText.isVisible = false
         }
     }
@@ -426,6 +504,5 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     companion object {
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
-        private const val NOTICE_MS = 3_000L
     }
 }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The gallery button before a photo is saved: a 24 dp icon centered in the 56 dp thumbnail. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="56dp" android:height="56dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/pix_surface_2" />
+        </shape>
+    </item>
+    <item android:width="24dp" android:height="24dp" android:drawable="@drawable/ic_photo" android:gravity="center" />
+</layer-list>

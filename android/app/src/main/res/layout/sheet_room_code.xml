@@ -1,65 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Room code, photographer (R&S 6.7, FR-8.1, FR-8.4, FR-8.5). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingHorizontal="20dp"
+    android:paddingBottom="24dp">
+
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/shoot_together"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/room_code_body" />
+        android:accessibilityHeading="true"
+        android:text="@string/room_code_title"
+        android:textAppearance="@style/TextAppearance.Pix.Overline" />
 
     <!-- The code from SessionState.Waiting; a placeholder until it arrives. -->
     <TextView
         android:id="@+id/codeText"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginVertical="16dp"
-        android:fontFamily="monospace"
+        android:layout_marginTop="4dp"
         android:gravity="center"
+        android:maxLines="1"
         android:text="@string/room_code_placeholder"
-        android:textSize="34sp" />
+        android:textAppearance="@style/TextAppearance.Pix.Code" />
 
     <!-- Getting a code, waiting, connecting, expired, or the same-Wi-Fi message (FR-8.5). -->
     <TextView
         android:id="@+id/statusText"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/getting_code" />
+        android:layout_marginTop="12dp"
+        android:accessibilityLiveRegion="polite"
+        android:background="@drawable/bg_chip_surface"
+        app:drawableStartCompat="@drawable/ic_waiting_dot"
+        android:drawablePadding="10dp"
+        android:gravity="center_vertical"
+        android:minHeight="36dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="16dp"
+        android:text="@string/getting_code"
+        android:textAppearance="@style/TextAppearance.Pix.Label"
+        android:textColor="@color/pix_text" />
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/code_expiry" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/same_wifi" />
-
-    <Button
-        android:id="@+id/joinInsteadButton"
-        style="@style/Widget.Material3.Button.TextButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.2"
+        android:text="@string/room_code_body"
+        android:textAppearance="@style/TextAppearance.Pix.Body" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:drawableStartCompat="@drawable/ic_wifi_small"
+            android:drawablePadding="6dp"
+            app:drawableTint="@color/pix_text_faint"
+            android:gravity="center_vertical"
+            android:text="@string/same_wifi"
+            android:textAppearance="@style/TextAppearance.Pix.Caption" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            app:drawableStartCompat="@drawable/ic_clock_small"
+            android:drawablePadding="6dp"
+            app:drawableTint="@color/pix_text_faint"
+            android:gravity="center_vertical"
+            android:text="@string/code_expiry"
+            android:textAppearance="@style/TextAppearance.Pix.Caption" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/joinInsteadButton"
+        style="@style/Widget.Pix.Button.Secondary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
         android:text="@string/join_instead" />
 
     <Button
         android:id="@+id/cancelButton"
-        style="@style/Widget.Material3.Button.TextButton"
+        style="@style/Widget.Pix.Button.Text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="@string/cancel" />
 </LinearLayout>

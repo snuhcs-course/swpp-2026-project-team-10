@@ -1,49 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Join with code, subject (R&S 6.7, FR-8.2, FR-8.3, FR-8.5). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingHorizontal="20dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="20dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/join_title"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
+        android:gravity="center_vertical"
+        android:minHeight="56dp">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            style="@style/Widget.Pix.Header.Back"
+            android:contentDescription="@string/back_to_camera" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:accessibilityHeading="true"
+            android:text="@string/join_title"
+            android:textAppearance="@style/TextAppearance.Pix.Header" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/join_body" />
+        android:layout_marginTop="12dp"
+        android:lineSpacingMultiplier="1.2"
+        android:text="@string/join_body"
+        android:textAppearance="@style/TextAppearance.Pix.BodyLarge"
+        android:textColor="@color/pix_text_muted" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="28dp"
         android:labelFor="@id/codeInput"
-        android:text="@string/room_code_label" />
+        android:text="@string/room_code_label"
+        android:textAppearance="@style/TextAppearance.Pix.Overline" />
 
-    <!-- Digits only; Join stays disabled until 6 digits are entered (FR-8.2). -->
-    <EditText
-        android:id="@+id/codeInput"
+    <!-- Six digit boxes drawn from codeInput, which lies over them and takes the digits (FR-8.2). -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:autofillHints="none"
-        android:digits="0123456789"
-        android:fontFamily="monospace"
-        android:imeOptions="actionDone"
-        android:inputType="number"
-        android:maxLength="6"
-        android:textSize="26sp" />
+        android:layout_height="64dp"
+        android:layout_marginTop="10dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center_vertical"
+            android:importantForAccessibility="noHideDescendants">
+
+            <TextView
+                android:id="@+id/digit1"
+                style="@style/Widget.Pix.CodeDigit" />
+
+            <TextView
+                android:id="@+id/digit2"
+                style="@style/Widget.Pix.CodeDigit"
+                android:layout_marginStart="8dp" />
+
+            <TextView
+                android:id="@+id/digit3"
+                style="@style/Widget.Pix.CodeDigit"
+                android:layout_marginStart="8dp" />
+
+            <View
+                android:layout_width="8dp"
+                android:layout_height="2dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@color/pix_outline" />
+
+            <TextView
+                android:id="@+id/digit4"
+                style="@style/Widget.Pix.CodeDigit" />
+
+            <TextView
+                android:id="@+id/digit5"
+                style="@style/Widget.Pix.CodeDigit"
+                android:layout_marginStart="8dp" />
+
+            <TextView
+                android:id="@+id/digit6"
+                style="@style/Widget.Pix.CodeDigit"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <!-- Digits only; Join stays disabled until 6 digits are entered (FR-8.2). -->
+        <EditText
+            android:id="@+id/codeInput"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autofillHints="none"
+            android:background="@null"
+            android:cursorVisible="false"
+            android:digits="0123456789"
+            android:imeOptions="actionDone"
+            android:importantForAutofill="no"
+            android:inputType="number"
+            android:maxLength="6"
+            android:textColor="@android:color/transparent" />
+    </FrameLayout>
 
     <TextView
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/same_wifi" />
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="18dp"
+        app:drawableStartCompat="@drawable/ic_wifi_small"
+        android:drawablePadding="8dp"
+        app:drawableTint="@color/pix_text_muted"
+        android:gravity="center_vertical"
+        android:text="@string/same_wifi"
+        android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
 
     <!-- "Connecting…" while joining, or why the join failed (FR-8.5). -->
     <TextView
@@ -51,6 +129,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
+        android:accessibilityLiveRegion="polite"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Pix.Body"
+        android:textColor="@color/pix_text_soft"
         android:visibility="gone"
         tools:text="Connecting…"
         tools:visibility="visible" />
@@ -66,11 +148,4 @@
         android:layout_height="wrap_content"
         android:enabled="false"
         android:text="@string/join" />
-
-    <Button
-        android:id="@+id/backButton"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/back" />
 </LinearLayout>

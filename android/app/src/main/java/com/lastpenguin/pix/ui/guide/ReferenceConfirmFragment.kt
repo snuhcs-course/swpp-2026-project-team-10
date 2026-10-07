@@ -27,10 +27,9 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
 
-        binding.styleToggle.addOnButtonCheckedListener { _, buttonId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            viewModel.onStylePreview(if (buttonId == R.id.cutoutButton) GuideStyle.CUTOUT else GuideStyle.OUTLINE)
-        }
+        binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
+        binding.cutoutButton.setOnClickListener { viewModel.onStylePreview(GuideStyle.CUTOUT) }
+        binding.outlineButton.setOnClickListener { viewModel.onStylePreview(GuideStyle.OUTLINE) }
         binding.useGuideButton.setOnClickListener {
             viewModel.onUseGuide()
             findNavController().popBackStack(R.id.cameraFragment, false)
@@ -51,13 +50,20 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         binding.referenceImage.isVisible = ready != null
         binding.referenceStatus.isVisible = working || ready != null
         binding.referenceStatus.setText(if (ready != null) R.string.person_found else R.string.finding_person)
+        binding.referenceStatus.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            if (ready != null) R.drawable.ic_person_check_small else 0,
+            0,
+            0,
+            0,
+        )
         binding.cutoutButton.isEnabled = ready != null
         binding.outlineButton.isEnabled = ready != null
         binding.useGuideButton.isEnabled = ready != null
         if (ready != null) {
             val cutout = ready.style == GuideStyle.CUTOUT
             binding.referenceImage.setImageBitmap(if (cutout) ready.guide.cutout else ready.guide.outline)
-            binding.styleToggle.check(if (cutout) R.id.cutoutButton else R.id.outlineButton)
+            binding.cutoutButton.isSelected = cutout
+            binding.outlineButton.isSelected = !cutout
         }
 
         when (state) {

@@ -7,8 +7,7 @@
     <string name="back">Back</string>
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
-    <string name="failure_label">FAILURE</string>
-    <string name="same_wifi">Both phones need to be on the same Wi-Fi.</string>
+    <string name="same_wifi">Both phones on the same Wi-Fi</string>
     <string name="connecting">Connecting…</string>
     <string name="couldnt_connect_wifi">Couldn\'t connect. Make sure both phones are on the same Wi-Fi.</string>
 
@@ -36,16 +35,14 @@
     <string name="gallery_unavailable">No app is available to open this photo.</string>
     <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
     <string name="hint_add_guide">Tap Guide to add a pose</string>
-    <string name="hint_edit_guide">Drag or pinch the guide</string>
+    <string name="hint_edit_guide">Drag · pinch to resize</string>
     <string name="guide">Guide</string>
-    <string name="shutter">Shutter</string>
-    <string name="gallery">Gallery</string>
-    <!-- The style toggle names the style it switches to (FR-3.5). -->
-    <string name="show_cutout">Cutout</string>
-    <string name="show_outline">Outline</string>
+    <string name="guide_add_description">Add a pose guide</string>
+    <string name="guide_change_description">Change the pose guide</string>
+    <string name="shutter">Take photo</string>
     <string name="guide_opacity">Guide opacity</string>
     <string name="guide_opacity_percent">%1$d%%</string>
-    <string name="remove_guide">Remove</string>
+    <string name="remove_guide">Remove guide</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
     <string name="peer_left">%1$s left</string>
@@ -54,10 +51,12 @@
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>
-    <string name="add_guide_body">Choose how to get a reference for this shot.</string>
+    <string name="add_guide_body">Pix cuts the person out of a photo and shows them on your camera, so you can frame the same pose.</string>
     <string name="upload_reference">Upload a reference</string>
+    <string name="upload_reference_body">A photo from your gallery with one person in it</string>
     <string name="generate_poses">Generate poses here</string>
-    <string name="reference_title">Reference</string>
+    <string name="generate_poses_body">Four pose ideas for this scene, made by AI</string>
+    <string name="reference_title">Your reference</string>
     <string name="reference_preview_description">The person from the reference photo</string>
     <string name="cutout">Cutout</string>
     <string name="outline">Outline</string>
@@ -83,26 +82,27 @@
     <string name="shoot_again">Shoot again</string>
     <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>
     <string name="your_photo">Your photo</string>
-    <string name="same_person_and_place">Same person and place</string>
     <string name="scene_photo_description">The photo of the scene the poses are made from</string>
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
     <string name="ready_count">%1$d of %2$d ready</string>
-    <string name="generating_wait">Generation may take up to 30 seconds.</string>
+    <string name="generating_scene_caption">Same person and place · up to 30 s</string>
     <string name="pick_pose_title">Pick a pose</string>
+    <string name="pick_pose_body">Tap one to use it as the guide</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>
     <string name="generation_failed_message">The request failed or took longer than 30 seconds. Your photo is kept, so you can try again.</string>
 
     <!-- Flow 6: Room code -->
+    <string name="room_code_title">Your room code</string>
     <string name="room_code_body">Ask your friend to open Pix, tap Shoot together, and enter this code.</string>
     <string name="room_code_placeholder">––– –––</string>
     <string name="getting_code">Getting a code…</string>
     <string name="waiting_for_friend">Waiting for your friend…</string>
     <string name="friend_joined_connecting">Your friend joined · connecting…</string>
     <string name="code_expired">The code expired. Tap Shoot together again for a new one.</string>
-    <string name="code_expiry">The code expires in 10 minutes if nobody joins.</string>
+    <string name="code_expiry">Expires in 10 min</string>
     <string name="join_instead">Join with a code instead</string>
     <string name="join_title">Join with a code</string>
     <string name="join_body">Enter the 6-digit code shown on your friend\'s camera.</string>
@@ -116,7 +116,7 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
-    <string name="subject_caption">Use the slider to change the photographer\'s zoom. Only the photographer takes the photo.</string>
+    <string name="subject_caption">Zoom changes the photographer\'s camera</string>
     <string name="peer_ended_session">%1$s ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
     <string name="session_ended">The session has ended.</string>

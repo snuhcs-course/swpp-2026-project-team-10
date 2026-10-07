@@ -1,72 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Shared by the failure screens: what happened, a retry, and a way back (R&S 6.9). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingHorizontal="20dp"
+    android:paddingTop="20dp"
+    android:paddingBottom="20dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/failure_label"
-        android:textAppearance="?attr/textAppearanceLabelLarge" />
-
-    <TextView
-        android:id="@+id/failureTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textAppearance="?attr/textAppearanceTitleLarge"
-        tools:text="No person found" />
-
-    <TextView
-        android:id="@+id/failureMessage"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        tools:text="Pick a photo where one person is clearly visible." />
-
-    <!-- The photo the failed request was about, for a screen that has one (R&S 6.3). -->
-    <LinearLayout
-        android:id="@+id/failurePhoto"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:visibility="gone">
-
-        <ImageView
-            android:id="@+id/failurePhotoImage"
-            android:layout_width="54dp"
-            android:layout_height="72dp"
-            android:importantForAccessibility="no"
-            android:scaleType="centerCrop" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="@string/your_photo" />
-    </LinearLayout>
-
-    <Space
+    <com.google.android.material.card.MaterialCardView
+        style="@style/Widget.Pix.Card"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- The photo the failed request was about, for a screen that has one (R&S 6.3). -->
+            <FrameLayout
+                android:id="@+id/failurePhoto"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/failurePhotoImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:alpha="0.3"
+                    android:importantForAccessibility="no"
+                    android:scaleType="centerCrop" />
+
+                <TextView
+                    style="@style/Widget.Pix.Chip"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="14dp"
+                    android:text="@string/your_photo" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:padding="28dp">
+
+                <ImageView
+                    android:id="@+id/failureIcon"
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
+                    android:background="@drawable/bg_failure_icon"
+                    android:importantForAccessibility="no"
+                    android:padding="26dp"
+                    android:src="@drawable/ic_alert"
+                    app:tint="@color/pix_danger_text" />
+
+                <TextView
+                    android:id="@+id/failureTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:accessibilityHeading="true"
+                    android:gravity="center"
+                    android:textAppearance="@style/TextAppearance.Pix.Title"
+                    tools:text="No person found" />
+
+                <TextView
+                    android:id="@+id/failureMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:accessibilityLiveRegion="polite"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.25"
+                    android:textAppearance="@style/TextAppearance.Pix.BodyLarge"
+                    tools:text="Pick a photo where one person is clearly visible." />
+            </LinearLayout>
+        </FrameLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <Button
         android:id="@+id/primaryButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         tools:text="Choose another photo" />
 
     <Button
         android:id="@+id/secondaryButton"
-        style="@style/Widget.Material3.Button.TextButton"
+        style="@style/Widget.Pix.Button.Secondary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
         tools:text="Back to camera" />
 </LinearLayout>

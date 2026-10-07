@@ -418,9 +418,15 @@ class RtcSessionManager(
                 maybeConnected()
             }
 
-            is SessionMessage.Ping -> sendNow(SessionMessage.Pong(message.ts))
+            // Each phone's Timings clock starts at its own boot. These two lines, matched by `ts` across the two
+            // logs, give the receiver's clock minus the sender's: t(ping.received) − t(rtt) + rtt/2, within ±rtt/2.
+            // Cross-phone latencies such as guide.sent → guide.applied (NFR-7) need that offset.
+            is SessionMessage.Ping -> {
+                Timings.mark("ping.received", "ts=${message.ts}")
+                sendNow(SessionMessage.Pong(message.ts))
+            }
 
-            is SessionMessage.Pong -> Timings.mark("rtt", "${clock() - message.ts} ms")
+            is SessionMessage.Pong -> Timings.mark("rtt", "${clock() - message.ts} ms ts=${message.ts}")
 
             is SessionMessage.Leave -> {
                 _incoming.tryEmit(message)

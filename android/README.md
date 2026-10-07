@@ -5,7 +5,7 @@ Kotlin, XML Views with ViewBinding. minSdk 29, targetSdk 36. Open this `android/
 ## What is here
 
 - **Shared contracts**: the code-level version of the agreements in the Design Documentation.
-- **App shell** (#2): one activity, the navigation graph, every Iteration 1 screen with a basic layout, and every class from Design 2.1–2.2 with its functions declared.
+- **App shell** (#2): one activity, the navigation graph, every Iteration 1 screen, and every class from Design 2.1–2.2 with its functions declared.
 - Owners fill in the bodies in their own issues.
 
 ### Camera
@@ -28,7 +28,7 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 
 1. Fresh launch: grant camera permission; verify the entire 3:4 preview appears. Deny permission on another launch and use Open settings to grant it, then return.
 2. Drag the zoom slider across its labeled hardware range; verify continuous zoom and an applied ratio such as 1.7×. Reach either limit and reverse without lifting: the thumb should follow immediately without jumping back as camera observations arrive. Pinching the preview, including outside a visible guide, must not zoom the camera; pinching a guide must still resize it. Check native slider keyboard/TalkBack adjustment and the readout's Zoom in / Zoom out actions.
-3. Tap the shutter repeatedly while saving: one capture should be in flight, followed by a Pix album image, a new thumbnail, and “Saved without the guide.” Open the thumbnail.
+3. Tap the shutter repeatedly while saving: one capture should be in flight, followed by a Pix album image, a new thumbnail, and “Saved without the guide,” which goes away after 3 s. Open the thumbnail.
 4. Open/close the guide and room-code sheets, open the gallery, background/foreground the app, and return from a full-screen destination; the camera should resume.
 5. On the S22 and S23 Ultra, compare preview, saved image, and `grabFrame()` framing/rotation. Verify file-write/camera failures keep the shutter usable for retry.
 6. Check that the grid divides only the camera image into equal thirds, including after a save message changes the preview area. Tilt the phone left/right: the center bar should rotate, then align in dark yellow near level. Point it straight down/up: the ambiguous level bar should disappear. Confirm guide drag/pinch still works through the grid, photos omit the aids, and the bar resumes after returning from the gallery.
@@ -66,6 +66,8 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 
 The failure screens share `fragment_failure.xml`.
 
+**Look.** Every screen uses the dark-only `Theme.Pix` (`res/values/themes.xml`). The design tokens are in `colors.xml`: the ground and surfaces, glass for controls over the preview, one accent (`#F2C14E`), the live color (`#36D399`), the guide color (`#5EEAD4`), and the danger color. Type and component styles are in `styles.xml`: `TextAppearance.Pix.*`, and `Widget.Pix.*` for primary, secondary, text, glass, icon, and segment buttons, chips, sliders, cards, sheets, and dialogs. Fonts are Manrope and DM Mono in `res/font` (SIL OFL 1.1; licenses in `assets/licenses`). Icons are vector drawables in `res/drawable` (`ic_*`, with 16–20 dp `_small` versions for use beside text), and the app icon is the adaptive icon in `res/mipmap-anydpi`. The team's UI mockups are the visual reference; where they differ from built behavior, the behavior wins, for example the zoom slider instead of zoom chips and the system number keyboard instead of an on-screen keypad.
+
 ### Module classes
 
 | Package | Classes | Issue |
@@ -95,7 +97,7 @@ Two phones connect with a room code over the Pix server and then stream phone to
 
 - **Run it.** Start the server on the laptop (`server/README.md`), set `pix.serverUrl` as above, install the debug build on both phones, and put the laptop and both phones on one Wi-Fi that allows device-to-device traffic (campus networks usually do not; a phone hotspot does, and the phone that hosts the hotspot can take part too: the peer connection enumerates network interfaces itself instead of asking Android's network monitor, which does not report the hotspot interface). *Shoot together* on one phone shows the code; *Shoot together › Join with a code instead* on the other joins it.
 - **One phone is enough to test either side.** `server/tools/fake_photographer.py` plays the photographer for Subject view: it sends a test-pattern video, a guide image, guide moves and style changes, and echoes zoom requests. `server/tools/fake_subject.py` plays the subject: it connects over WebRTC, receives the video and the guide image (checked against its CRC, `--save-guide` keeps it), prints every `guide.state`, and sends a zoom request (see `server/README.md`).
-- **Watch it.** `adb logcat -s PixTimings PixSession PixSignaling PixPeer` shows the session steps (`room.created`, `peer.joined`, `offer.sent`, `ice.connected`, `session.connected`), the ping round-trip time (`rtt`), a `stats` line every 2 s with the codec, frame size, fps, bitrate, and ICE round-trip time from WebRTC's statistics (NFR-5, 6, 12), and why a session ended.
+- **Watch it.** `adb logcat -s PixTimings PixSession PixSignaling PixPeer` shows the session steps (`room.created`, `peer.joined`, `offer.sent`, `ice.connected`, `session.connected`), the ping round-trip time (`rtt`) and each ping received from the other phone (`ping.received`), both with the ping's `ts` so the two phones' logs can be aligned (Design 2.5.1), a `stats` line every 2 s with the codec, frame size, fps, bitrate, and ICE round-trip time from WebRTC's statistics (NFR-5, 6, 12), and why a session ended.
 - **States.** `SessionManager.state` follows Design 2.4 with one addition: when the subject leaves or drops, the photographer closes the peer connection and goes back to `Waiting(code)` with the same code, so the subject's *Reconnect* can join again. The subject sees `Ended(CONNECTION_LOST)` and the Connection lost screen.
 - **Screens.** Screens draw from `SessionViewModel.state` and navigate on `SessionViewModel.transitions`, a one-shot stream of state changes, so returning to a screen never replays an old navigation. "Junhyeong left" notices come from `SessionViewModel.notices`.
 - **Background.** The camera is bound to the Camera screen's view, so it is released whenever another screen or app is in front, and the subject's view shows "The photographer's camera is paused" after 2 s without frames. If the whole app stays in the background for 60 s during a live session, the photographer's phone ends the session (Design 2.8, Lifecycle).

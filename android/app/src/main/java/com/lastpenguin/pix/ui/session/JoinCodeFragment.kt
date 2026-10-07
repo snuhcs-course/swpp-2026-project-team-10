@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
@@ -33,8 +35,21 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
         val binding = FragmentJoinCodeBinding.bind(view)
 
         if (binding.codeInput.text.isNullOrEmpty()) sessionViewModel.lastCode?.let(binding.codeInput::setText)
-        binding.codeInput.doAfterTextChanged { updateJoinButton(binding) }
+        binding.codeInput.doAfterTextChanged {
+            updateJoinButton(binding)
+            renderDigits(binding)
+        }
+        binding.codeInput.setOnFocusChangeListener { _, _ -> renderDigits(binding) }
         updateJoinButton(binding)
+        renderDigits(binding)
+        // The code is all there is to fill in here, so the number keyboard comes up with the screen.
+        if (savedInstanceState == null) {
+            binding.codeInput.post {
+                binding.codeInput.requestFocus()
+                WindowCompat.getInsetsController(requireActivity().window, binding.codeInput)
+                    .show(WindowInsetsCompat.Type.ime())
+            }
+        }
 
         binding.joinButton.setOnClickListener { join(binding) }
         binding.codeInput.setOnEditorActionListener { _, actionId, event ->
@@ -86,6 +101,18 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
         binding.statusText.isVisible = true
         updateJoinButton(binding)
         sessionViewModel.joinRoom(code)
+    }
+
+    /** The six boxes show the digits typed so far; the one the next digit goes into is outlined. */
+    private fun renderDigits(binding: FragmentJoinCodeBinding) {
+        val code = binding.codeInput.text?.toString().orEmpty()
+        val boxes =
+            listOf(binding.digit1, binding.digit2, binding.digit3, binding.digit4, binding.digit5, binding.digit6)
+        val next = minOf(code.length, CODE_LENGTH - 1)
+        boxes.forEachIndexed { index, box ->
+            box.text = code.getOrNull(index)?.toString().orEmpty()
+            box.isActivated = binding.codeInput.hasFocus() && index == next
+        }
     }
 
     private fun updateJoinButton(binding: FragmentJoinCodeBinding) {

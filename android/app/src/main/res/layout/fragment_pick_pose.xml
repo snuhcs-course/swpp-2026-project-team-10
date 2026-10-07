@@ -6,20 +6,50 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingHorizontal="20dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="20dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/pick_pose_title"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
+        android:gravity="center_vertical"
+        android:minHeight="56dp">
 
-    <!-- The candidate images; the selected one is highlighted. -->
+        <ImageButton
+            android:id="@+id/backButton"
+            style="@style/Widget.Pix.Header.Back"
+            android:contentDescription="@string/back" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/pick_pose_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/pick_pose_body"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- The candidate images; the selected one is outlined in the accent and checked. -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/candidateGrid"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginVertical="12dp"
+        android:layout_marginHorizontal="-6dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
         app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
         app:spanCount="2"
@@ -29,13 +59,17 @@
         android:id="@+id/usePoseButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         android:enabled="false"
         android:text="@string/use_this_pose" />
 
     <Button
         android:id="@+id/tryOtherButton"
-        style="@style/Widget.Material3.Button.TextButton"
+        style="@style/Widget.Pix.Button.Secondary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/try_other_poses" />
+        android:layout_marginTop="10dp"
+        android:text="@string/try_other_poses"
+        app:icon="@drawable/ic_refresh"
+        app:iconSize="18dp" />
 </LinearLayout>

@@ -8,6 +8,7 @@
 | 0.4 | 2026-10-05 | Remote zoom as built: the subject pinches the live view instead of tapping zoom chips (Figure 3, Figure 7, 2.6.5), and `CameraCapabilities.zoomStops` stays in the contract for later subject controls (2.3, 2.5.1, 2.6.2); `camera.zoom.set` carries `final`, with pinch steps on the realtime channel at most every 50 ms and the last value on the reliable channel (2.5.1); every applied zoom is echoed as `camera.state`, only a final request shows the remote-action notice, and the subject ignores echoes while its pinch is in progress (2.6.5); `SessionManager` keeps the last `camera.capabilities` and the last echoed zoom for a Subject view that opens late (2.1); *Remote control* owns pinch zoom on Subject view (2.9). |
 | 0.5 | 2026-10-06 | Camera and Subject view use single-value zoom sliders with hardware endpoint labels and keyboard/accessibility support. Preview and live-video pinches no longer zoom the camera; guide drag/pinch remains. Dragging keeps the thumb under the user's control despite asynchronous observations, supports lens switching, and finishes on release, cancellation, or pause; the existing remote step/final protocol is unchanged (Figure 3, 2.5.1, 2.6.2, 2.6.5). |
 | 0.6 | 2026-10-06 | Pose generation: the user takes the scene photo with the Camera screen's shutter and confirms it before anything is sent (1.1.3, 2.2, 2.6.3). One 30 s limit covers a whole generation run, and the app discards the scene photo and the other candidates after *Use this pose* (2.6.3, 2.8). |
+| 0.7 | 2026-10-07 | Measurement as built: both phones ping every 2 s, the phone that receives a `ping` logs `ping.received` with its `ts`, and the sender's `rtt` line carries the same `ts`. Matching the two lines gives the difference between the phones' `Timings` clocks, `t(ping.received) − t(rtt) + rtt/2`, so cross-phone latencies such as guide sync can be read from the two logs (2.5.1, 2.8). |
 
 Audience: the development team. This page describes the Iteration 1 design in detail; each later iteration adds the design for the features it builds (1.4). **TBD** marks an open decision. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page. Testing plans are in the Testing Documentation.
 
@@ -710,7 +711,7 @@ Sent before closing, so the other phone shows "left" instead of "connection lost
 { "v": 1, "t": "pong", "seq": 30, "ts": 1759212360041, "b": { "ts": 1759212360000 } }
 ```
 
-Every 2 s. `pong` echoes the `ts` of the `ping`, and the round-trip time goes to the `Timings` log.
+Every 2 s, from both phones. `pong` echoes the `ts` of the `ping`. The phone that receives a `ping` logs `ping.received ts=<ts>`, and the phone that sent it logs `rtt <ms> ms ts=<ts>` when the `pong` arrives. `Timings` times start at each phone's boot, so for one `ts` the receiver's clock minus the sender's is `t(ping.received) − t(rtt) + rtt/2`, within ±rtt/2. This offset aligns the two phones' logs for cross-phone latencies such as `guide.sent` → `guide.applied` (NFR-7).
 
 </details>
 
@@ -950,7 +951,7 @@ Iteration 1 has no database. The server keeps room codes and sessions in memory,
 | **Timeouts** | Pose generation: 30 s on the client for a whole run, and 30 s from server to API for each request. Because the phone's limit starts first, it usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. Room code: 10 min. |
 | **Configuration and secrets** | The server URL is set per build type in `BuildConfig`. In Iteration 1 it is the laptop's address on the test Wi-Fi, and only debug builds allow the plain HTTP and WebSocket traffic to it. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. `.env.example` lists the names. |
 | **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, counting only requests sent to the image API, to control cost. |
-| **Measurement hooks** | `Timings` logs named timestamps with a shared tag, so NFR latencies can be read from logcat without extra tools. Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping. |
+| **Measurement hooks** | `Timings` logs named timestamps with a shared tag, so NFR latencies can be read from logcat without extra tools. Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping. Times are each phone's own clock; the `ping.received` and `rtt` lines align two phones' logs (2.5.1). |
 | **SDK vs in-house** | **Use SDKs** for segmentation (ML Kit) and real-time media (WebRTC). These are hard problems with mature solutions. **Build in-house** the parts that make Pix different: guide geometry and sync, the message protocol, remote control, and the pose prompt pipeline. |
 
 ### 2.9 Module ownership and build order

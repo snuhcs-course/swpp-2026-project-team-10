@@ -27,6 +27,7 @@ class ConnectionLostFragment : Fragment(R.layout.fragment_failure) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentFailureBinding.bind(view)
+        binding.failureIcon.setImageResource(R.drawable.ic_wifi_off)
         binding.failureTitle.setText(R.string.connection_lost_title)
         binding.failureMessage.setText(R.string.connection_lost_message)
 

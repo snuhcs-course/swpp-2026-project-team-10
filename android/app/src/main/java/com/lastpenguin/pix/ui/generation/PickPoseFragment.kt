@@ -36,6 +36,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
             // they are let go; after navigating, so that this screen does not take the empty state for a restart.
             viewModel.cancel()
         }
+        binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         binding.tryOtherButton.setOnClickListener {
             viewModel.retry()
             findNavController().navigate(R.id.action_pickPose_to_generating)

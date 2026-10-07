@@ -4,9 +4,25 @@ Pix is an Android camera app that helps two people get the portrait one of them 
 
 This branch is the **Iteration 1 prototype**: two phones and a laptop running the Pix server on one Wi-Fi network, connected with a room code.
 
-## Demo video
+## Demo videos
 
-The demo video will be linked here.
+Recorded on real phones with the Iteration 1 build (#34).
+
+**Camera**: zoom slider, composition grid, and level bar
+
+https://github.com/user-attachments/assets/359779b9-ea86-4ce6-8425-9a0eb07146dd
+
+**Guide overlay**: drag, pinch, and opacity
+
+https://github.com/user-attachments/assets/54f37994-fe68-483a-82b1-97c35ff123a1
+
+**AI pose generation**
+
+https://github.com/user-attachments/assets/c45d7a0f-5084-4287-9bcc-bf081cc381d1
+
+**Shoot together**: the subject's phone (left) and the photographer's phone (right)
+
+https://github.com/user-attachments/assets/fced811f-32ba-423f-a3ff-5e789ff96e9a
 
 ## What Iteration 1 does
 

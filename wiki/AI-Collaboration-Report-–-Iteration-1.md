@@ -1,12 +1,18 @@
-# AI Collaboration Report – Iteration 1: Dongje's part (detailed)
+**Iteration:** 1 (2026-09-27 ~ 2026-10-09) · **Written by:** 박동제 · **Tools used:** Claude Code
 
-**Iteration:** 1 (2026-09-27 ~ 2026-10-09) · **Written by:** 박동제 (PM) · **Tool:** Claude Code
+<!-- Each member adds a row to the table below and their own ### heading under every section. -->
 
-**Tasks covered:** P1–P6 (kickoff, issues, requirements, design, shared contracts, app shell), P9 reference guide (#5), and the code reviews on #23 and #34. Hours below come from the team schedule.
+| Member | Tasks covered |
+|---|---|
+| 박동제 (PM) | P1–P6 (kickoff, issues, requirements, design, shared contracts, app shell), P9 reference guide (#5), and the code reviews on #23 and #34 |
+
+Hours come from the team schedule.
 
 ---
 
 ## 1. 🤖 Where AI Was Used
+
+### 박동제 (PM · reference guide)
 
 **Documents and project management**
 - **Kickoff minutes (P1):** Claude Code transcribed the 9/28 Zoom recording locally with an open-source speech-to-text model, then wrote the minutes and a PDF; they later became the [[Team Meetings|Team-Meetings]] page (wiki `8c7bd0e`).
@@ -16,7 +22,10 @@
 
 **Code**
 - **Shared contracts and app shell (P6):** [#13] shared contracts (29 files), [#15] PR template, [#16] app shell with navigation and every screen (54 files).
-- **Reference guide (P9, [#5]):** [#28] (`414bb79`): `guide/SubjectSegmenter.kt`, `guide/MaskMath.kt`, `guide/OutlineExtractor.kt`, `guide/GuideSizes.kt`, `guide/MlKitReferenceGuideMaker.kt`, `ui/guide/ReferenceViewModel.kt`, `ui/guide/PhotoPicker.kt`, the *Reference confirm* and *No person found* screens, and the tests `MaskMathTest`, `GuideSizesTest`, `ReferenceViewModelTest`.
+- **Reference guide (P9, [#5]):** [#28] (`414bb79`)
+  - Code: `guide/SubjectSegmenter.kt`, `guide/MaskMath.kt`, `guide/OutlineExtractor.kt`, `guide/GuideSizes.kt`, `guide/MlKitReferenceGuideMaker.kt`, `ui/guide/ReferenceViewModel.kt`, `ui/guide/PhotoPicker.kt`
+  - Screens: *Reference confirm*, *No person found*
+  - Tests: `MaskMathTest`, `GuideSizesTest`, `ReferenceViewModelTest`
 - **Arm and leg lines inside the outline:** a prototype on the local branch `feat/5-limb-lines` (`5581861`), parked for Iteration 2.
 
 **Code reviews**
@@ -33,32 +42,61 @@
 
 ## 2. 💬 Prompt History
 
-- [[Documents|AI-Collaboration-Iteration-1-Prompts-Documents]]
-- [[Reference guide (#5)|AI-Collaboration-Iteration-1-Prompts-Reference-Guide]]
-- [[Code reviews|AI-Collaboration-Iteration-1-Prompts-Code-Reviews]]
+### 박동제 (PM · reference guide)
+
+- [[Documents|Iteration-1-–-Prompt-Log-–-Documents]]
+- [[Reference guide (#5)|Iteration-1-–-Prompt-Log-–-Reference-Guide]]
+- [[Code reviews|Iteration-1-–-Prompt-Log-–-Code-Reviews]]
 
 ---
 
 ## 3. ✅ What AI Did Well
 
-- **Reference guide in seven small commits ([#28]).** Each commit built and passed its unit tests before the next one. A photo becomes a guide in about 0.6 s on the Galaxy S22, against the 2 s target (NFR-3). Schedule P9: planned 4 h; actual 1 h of my time and 3 h of agent time.
-- **Issues that teammates could start from (P2).** All 12 issues share one structure (goal, tasks, *Done when*, references, dependencies, branch and PR names), so each owner could open a branch without asking. Schedule P2: planned 1 h; actual 0.5 h of my time and 0.5 h of agent time.
-- **App shell (P6, [#16]).** Navigation and every Iteration 1 screen in one PR of 54 files, built against the shared contracts. Schedule P6: planned 1.5 h; actual 1 h of my time and 2 h of agent time.
+### 박동제 (PM · reference guide)
+
+- **Reference guide in seven small commits ([#28]).** Each commit built and passed its unit tests before the next one. A photo becomes a guide in about 0.6 s on the Galaxy S22, against the 2 s target (NFR-3).
+- **Issues that teammates could start from (P2).** All 12 issues share one structure (goal, tasks, *Done when*, references, dependencies, branch and PR names), so each owner could open a branch without asking.
+- **App shell (P6, [#16]).** Navigation and every Iteration 1 screen in one PR of 54 files, built against the shared contracts.
 - **Reviews that found real problems.** On [#23], Claude found a race in which a camera frame could reach an already disposed WebRTC video source (a possible native crash), and four session-state problems such as the photographer being stuck in a dead *Waiting* state. On [#34], the author added the missing revision rows to both documents before merging.
+
+| Task | Planned | Human | Agent |
+|---|---|---|---|
+| P2 Issues | 1 h | 0.5 h | 0.5 h |
+| P6 App shell | 1.5 h | 1 h | 2 h |
+| P9 Reference guide | 4 h | 1 h | 3 h |
 
 ---
 
 ## 4. ⚠️ Hallucinations / Errors
 
-- **The model download was treated as finished (#5).** Claude's first `SubjectSegmenter` ran segmentation before Google Play services had finished downloading the ML Kit model. On the S22, the first two photos failed with `IllegalStateException` (logcat, 10/4 20:28) while the download was still running. The unit tests and the emulator could not show this. I caught it in the first test on the phone. Fix: `SubjectSegmenter.ensureModule()` now polls `areModulesAvailable` every 500 ms for up to 60 s (in [#28]). Cost: one extra commit and a re-test the next day.
-- **It built more than I asked for (P6).** Asked for the shared contracts, Claude produced a full runnable skeleton of 103 files with screens, implementations, fakes, and a server, which took over my teammates' tasks. I caught it in review and cut it back to the contracts ([#13], 29 files). Cost: the extra work was discarded; it is kept only as a local reference.
-- **Wrong kickoff date in the wiki.** The [[Team Meetings|Team-Meetings]] page gives the kickoff as 9/27, the planned date in the schedule, but the recording shows 9/28. Claude found it while matching task dates to PRs (10/6). Still to fix.
-- **Dead ends on the arm and leg lines.** Tracing edges near the pose skeleton drew noisy lines on printed photos and missed crossed arms, because the pose landmarks sat beside the arm. Skin-color regions worked better but still missed covered or black-and-white limbs. Cost: about a day of prototyping, now parked on `feat/5-limb-lines`.
-- **Smaller tool errors.** Diagrams in the design-document PDF did not render until each got its own render id and its `<<...>>` labels were escaped. `connectedAndroidTest` uninstalled the app from the phone and deleted the test output, so the probe had to be run again a different way.
+### 박동제 (PM · reference guide)
+
+- **The model download was treated as finished (#5)**
+  - What: Claude's first `SubjectSegmenter` ran segmentation before Google Play services had finished downloading the ML Kit model.
+  - How caught: on the S22, the first two photos failed with `IllegalStateException` (logcat, 10/4 20:28) while the download was still running. The unit tests and the emulator could not show this; I caught it in the first test on the phone.
+  - Fix: `SubjectSegmenter.ensureModule()` now polls `areModulesAvailable` every 500 ms for up to 60 s (in [#28]).
+  - Cost: one extra commit and a re-test the next day.
+- **It built more than I asked for (P6)**
+  - What: asked for the shared contracts, Claude produced a full runnable skeleton of 103 files with screens, implementations, fakes, and a server, which took over my teammates' tasks.
+  - How caught: in review.
+  - Fix: cut it back to the contracts ([#13], 29 files).
+  - Cost: the extra work was discarded; it is kept only as a local reference.
+- **Wrong kickoff date in the wiki**
+  - What: the [[Team Meetings|Team-Meetings]] page gives the kickoff as 9/27, the planned date in the schedule, but the recording shows 9/28.
+  - How caught: Claude found it while matching task dates to PRs (10/6).
+  - Fix: still to fix.
+- **Dead ends on the arm and leg lines**
+  - What: tracing edges near the pose skeleton drew noisy lines on printed photos and missed crossed arms, because the pose landmarks sat beside the arm. Skin-color regions worked better but still missed covered or black-and-white limbs.
+  - Cost: about a day of prototyping, now parked on `feat/5-limb-lines`.
+- **Smaller tool errors**
+  - Diagrams in the design-document PDF did not render until each got its own render id and its `<<...>>` labels were escaped.
+  - `connectedAndroidTest` uninstalled the app from the phone and deleted the test output, so the probe had to be run again a different way.
 
 ---
 
 ## 5. 🔁 Prompt Revisions
+
+### 박동제 (PM · reference guide)
 
 - **Arm lines**
   - Before: "It only traces the outer silhouette now. Can it also trace the inner outline of the arms?"
@@ -72,6 +110,8 @@
 ---
 
 ## 6. ✋ Manual Fixes and Why
+
+### 박동제 (PM · reference guide)
 
 I did not edit code or documents by hand. I reviewed every output, then sent it back with specific corrections. These are the corrections that mattered.
 
@@ -93,6 +133,8 @@ The document tasks took more of my time than planned (P3: 2 h against 1 h; P5: 2
 ---
 
 ## 7. 📌 Takeaway for Iteration 2
+
+### 박동제 (PM · reference guide)
 
 - Run the first build on a real phone within the first hour, not after the feature is done.
 - Tell Claude the boundary of my task (which modules are mine) before it starts.

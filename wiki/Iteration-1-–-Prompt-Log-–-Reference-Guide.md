@@ -1,4 +1,7 @@
-**Reference guide (#5)**
+Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
+
+## Reference guide (#5)
+
 - [Dongje, 10-04] "Explain exactly what issue #5 asks me to build. Then create a branch and implement it with me one commit at a time, checking that each step works before moving on."
 - [Dongje, 10-04] "Until #6 is merged, connect *Use this guide* to a temporary fake repository."
 - [Dongje, 10-04] "It only traces the outer silhouette now. Can it also trace the inner outline of the arms?"

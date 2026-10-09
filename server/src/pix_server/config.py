@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
 """Environment configuration for the Pix server."""
 
 from pydantic import Field, PositiveFloat, PositiveInt, SecretStr

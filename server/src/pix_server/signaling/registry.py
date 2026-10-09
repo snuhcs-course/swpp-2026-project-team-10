@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
 """In-memory room state, owned by one asyncio event loop.
 
 All transitions and outbound enqueues are synchronous: a join cannot interleave

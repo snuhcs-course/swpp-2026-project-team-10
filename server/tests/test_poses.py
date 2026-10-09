@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 import asyncio
 import base64
 import io

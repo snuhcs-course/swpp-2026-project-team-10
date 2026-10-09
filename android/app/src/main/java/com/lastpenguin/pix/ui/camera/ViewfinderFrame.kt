@@ -1,3 +1,4 @@
+// AI-generated with ChatGPT Codex, 2026-10-05, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 /** The same portrait 3:4, fit-centered image area used by CameraX and PreviewView. */

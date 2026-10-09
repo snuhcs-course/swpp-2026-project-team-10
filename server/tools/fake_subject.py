@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-05, reviewed by Sungmin Jo
 """A subject phone made of Python, for testing the photographer's side with one phone or emulator.
 
 It joins a room code through the signaling server, answers the WebRTC offer, exchanges `hello` on the data

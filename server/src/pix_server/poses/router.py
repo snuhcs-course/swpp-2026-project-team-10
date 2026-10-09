@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio

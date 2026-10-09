@@ -1,7 +1,5 @@
 Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
 
-`[…]` marks text pasted into the prompt. It is quoted under the prompt.
-
 ## Signaling server (#4), with review and network questions
 
 - [Jaewan, 10-01] "Read AGENTS.md for the project's context and instructions. For convenience, I have downloaded the design documentation and requirements and specifications to the ./wiki directory. You can refer to them for detailed information on the project specifications and design considerations. I need you to create a server app at ./server that meets the requirements outlined in the documentation. Only implement requirements for iteration 1; but don't create the APIs for image generation yet and only implement the signaling hub part. Use uv for package management with pyproject.toml and uv.lock files. Also use ruff for linting and formatting. I have a preferred ruff.toml configuration file at the repo root. Put this configuration file in the ./server directory as well.

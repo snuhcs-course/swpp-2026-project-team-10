@@ -4,9 +4,9 @@
 
 ## 1. Where AI Was Used
 
-- **Documents:** requirements and design drafts, issues #1–#12, meeting minutes, and the updates after each feature ([#25], [#33]): Claude Code.
+- **Documents:** the task breakdown, requirements and design drafts (from the course guidelines, other teams' wikis, and our meeting minutes), issues #1–#12, meeting minutes, and the updates after each feature ([#25], [#33]): Claude Code.
 - **Server:** signaling ([#17]), pose generation API and model comparison script ([#22]), wiki workflow ([#24]): Claude Code.
-- **Android:** camera, zoom, and guide gestures ([#21], [#26], [#31]): ChatGPT Codex. Reference guide ([#28]), streaming ([#23]), remote zoom ([#27]), pose generation ([#30]), guide sync ([#32]), integration and UI ([#34]): Claude Code.
+- **Android:** camera, zoom, and guide gestures ([#21], [#26], [#31]): ChatGPT Codex. Shared contracts and app shell ([#13], [#16]), reference guide ([#28]), streaming ([#23]), remote zoom ([#27]), pose generation ([#30]), guide sync ([#32]), integration and UI ([#34]): Claude Code.
 - **Code review:** the Codex reviewer checked 10 PRs ([#13], [#17], [#21], [#22], [#27], [#28], [#30], [#31], [#32], [#34]) and Copilot 2 ([#13], [#16]), with 15 inline findings. Claude helped us judge each finding before we fixed or declined it, and drafted the human reviews on [#23] and [#34].
 - **CLAUDE.md:** `/CLAUDE.md`, `/android/CLAUDE.md`, and `/server/CLAUDE.md` give Claude Code our architecture, commands, conventions, pitfalls, and rules ("commit or push only when a human asks"). Feature PRs update them with the code ([[history|Iteration-1-–-CLAUDE-md-History]]).
 - **AI-generated code markers:** the first line of every source file names the tool, the date, and the reviewer: [all markers](https://github.com/search?q=repo%3Asnuhcs-course%2Fswpp-2026-project-team-10+%22AI-generated+with%22&type=code) · [the PR that added them](https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/41/files)

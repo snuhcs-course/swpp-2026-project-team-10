@@ -1,7 +1,5 @@
 Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
 
-Prompts were given in Korean; they are translated here. Claude Code dates are KST; the Codex sessions did not record dates. Git and branch questions are left out.
-
 ## Camera (P7, [#3]): ChatGPT Codex (GPT-6 Astra)
 
 - [Joonhyung] (Attached the Design Documentation, R&S, and wireframe PDFs and the project schedule) "Based on the `dev` branch on GitHub, explain in detail what is implemented so far and what I need to implement, following the Project Schedule."

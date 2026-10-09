@@ -1,7 +1,5 @@
 Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
 
-Prompts were given in Korean; they are translated here. Routine messages (commit, push, start the server, build the APK) are left out.
-
 ## WebRTC streaming with room codes (#8)
 
 - [Sungmin, 10-03] "My part of Iteration 1 is streaming one phone's camera to the other phone over the same Wi-Fi with a room code. Read the documents and think through how to build it. Don't implement yet; explain the approach in detail."

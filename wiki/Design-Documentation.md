@@ -9,18 +9,18 @@
 | 0.5 | 2026-10-06 | Camera and Subject view use single-value zoom sliders with hardware endpoint labels and keyboard/accessibility support. Preview and live-video pinches no longer zoom the camera; guide drag/pinch remains. Dragging keeps the thumb under the user's control despite asynchronous observations, supports lens switching, and finishes on release, cancellation, or pause; the existing remote step/final protocol is unchanged (Figure 3, 2.5.1, 2.6.2, 2.6.5). |
 | 0.6 | 2026-10-06 | Pose generation: the user takes the scene photo with the Camera screen's shutter and confirms it before anything is sent (1.1.3, 2.2, 2.6.3). One 30 s limit covers a whole generation run, and the app discards the scene photo and the other candidates after *Use this pose* (2.6.3, 2.8). |
 | 0.7 | 2026-10-07 | Measurement as built: both phones ping every 2 s, the phone that receives a `ping` logs `ping.received` with its `ts`, and the sender's `rtt` line carries the same `ts`. Matching the two lines gives the difference between the phones' `Timings` clocks, `t(ping.received) − t(rtt) + rtt/2`, so cross-phone latencies such as guide sync can be read from the two logs (2.5.1, 2.8). |
+| 0.8 | 2026-10-09 | Final version for Iteration 1, synced with the current build and the team's decisions. The WebRTC build is decided: `io.github.webrtc-sdk:android` 137.7151.01 (header, 1.2). DataStore keeps only the generation consent (1.2). `CameraController.status` (2.1) and `PeerInfo.haveGuideId` (2.3) are added. When the subject leaves or drops, the photographer's phone goes back to `Waiting` with the same code (2.4). The remote zoom notice shows for 3 s on the Camera screen instead of as a toast (2.6.5), and the use of `camera.state`'s `by` field is corrected (2.5.1). The owners of the app shell and guide sync are corrected (2.9), and the repository tree shows `wiki/` (2.10). This entry also records the composition grid and horizon bar (2.6.2) and ultrawide zoom routing (2.6.5), added on 2026-10-05. |
 
-Audience: the development team. This page describes the Iteration 1 design in detail; each later iteration adds the design for the features it builds (1.4). **TBD** marks an open decision. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page. Testing plans are in the Testing Documentation.
+Audience: the development team. This page describes the Iteration 1 design in detail; each later iteration adds the design for the features it builds (1.4). **TBD** marks an open decision. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page. Testing plans will be in the Testing Documentation.
 
 **Decided (2026-09-30):** XML Views with ViewBinding and the Navigation component · FastAPI (Python) server · package `com.lastpenguin.pix` · minSdk 29 (Android 10), target and compile SDK 36 · Iteration 1 test setup: both phones and the server, which runs on a laptop, on the same Wi-Fi network.
 
-**Decided (2026-10-04):** the image-editing API is OpenRouter's Image API, with the model as a server setting; the default is GPT Image 2.5 Flare at low quality (2.6.3).
+**Decided (2026-10-04):** the image-editing API is OpenRouter's Image API, with the model as a server setting; the default is GPT Image 2.5 Flare at low quality (2.6.3) · the WebRTC build for Android is `io.github.webrtc-sdk:android` 137.7151.01, a maintained prebuilt of libwebrtc that keeps the `org.webrtc` package, because Google no longer publishes an official Android artifact (1.2).
 
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
-| WebRTC build for Android | A maintained prebuilt of libwebrtc (Google no longer publishes an official Android artifact) | Real-time | 10/2 |
 | Detailed design of later features (1.4) | Designed at the start of the iteration that builds each feature | Team | Start of each iteration |
 
 **Contents**
@@ -143,10 +143,10 @@ sequenceDiagram
 | AppCompat, Material Components, Fragment, Navigation component, ViewBinding, Lifecycle ViewModel | XML screens, the navigation graph, state that survives rotation | App |
 | CameraX 1.6 (`core`, `camera2`, `lifecycle`, `view` for PreviewView) | Preview, ImageCapture, ImageAnalysis (frames for streaming), zoom | App |
 | ML Kit Subject Segmentation (Google Play services) | On-device foreground bitmap and confidence mask for the cutout and outline | App |
-| WebRTC for Android (prebuilt, **TBD**) | Peer connection, H.264/VP8 video, two data channels, ICE | App |
+| WebRTC for Android (`io.github.webrtc-sdk:android` 137.7151.01, a maintained prebuilt) | Peer connection, H.264/VP8 video, two data channels, ICE | App |
 | OkHttp (+ Retrofit for REST) | WebSocket signaling and HTTPS requests | App |
 | kotlinx.serialization (JSON) | Data channel, signaling, and REST payloads | App |
-| Jetpack DataStore | Small preferences: consent given, last zoom | App |
+| Jetpack DataStore | Small preferences: consent given | App |
 | FastAPI, Uvicorn, pydantic-settings, python-multipart, httpx2, Pillow (Python) | One process that serves WebSocket signaling and the REST API; settings from environment variables; multipart uploads; calls to the image API; checking the scene photo and converting candidates to JPEG | Server |
 | OpenRouter Image API | Pose candidate generation with an image-editing model chosen by a server setting (2.6.3) | Server |
 
@@ -248,7 +248,9 @@ android/app/src/main/java/com/lastpenguin/pix/
 These interfaces are the contracts between owners. Each owner starts with a fake implementation (for example, a `FakeSessionManager` that echoes messages), so that UI and sync work can begin before the real module is ready.
 
 ```kotlin
+enum class CameraStatus { IDLE, STARTING, READY, UNAVAILABLE }   // READY: camera open and its first frame received
 interface CameraController {
+    val status: StateFlow<CameraStatus>                // IDLE until bound; a failed bind is UNAVAILABLE, and bind again retries
     val capabilities: StateFlow<CameraCapabilities?>
     val zoom: StateFlow<Float>                        // applied ratio relative to primary rear camera
     fun bind(owner: LifecycleOwner, surface: Preview.SurfaceProvider)
@@ -507,7 +509,10 @@ sealed interface SessionState {
     data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role) : SessionState
     data class Ended(val reason: EndReason) : SessionState
 }
-data class PeerInfo(val displayName: String)
+data class PeerInfo(
+    val displayName: String,
+    val haveGuideId: String? = null, // subject only: the guide image it already has, from its hello
+)
 enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, ERROR }
 
 // ---- Generation -----------------------------------------------------------
@@ -536,6 +541,8 @@ stateDiagram-v2
 ```
 
 *Figure 9. `SessionState` on each phone*
+
+On the photographer's phone, the room stays open when the subject leaves, the connection drops, or connecting times out: the state goes back to `Waiting` with the same code instead of `Ended`, so the subject can join again with *Reconnect* (FR-6.10, FR-6.11). The subject's phone goes to `Ended`.
 
 ### 2.5 Protocols and APIs
 
@@ -688,7 +695,7 @@ Sent on `realtime` at most every 50 ms during a zoom slider drag, then once with
 { "v": 1, "t": "camera.state", "seq": 58, "ts": 1759212352342, "b": { "zoom": 2.0, "by": "SUBJECT", "final": true } }
 ```
 
-Same realtime-then-final pattern as `guide.state`. `by` is PHOTOGRAPHER or SUBJECT and drives the notice on the photographer's phone (FR-7.4).
+Same realtime-then-final pattern as `guide.state`. `by` is PHOTOGRAPHER or SUBJECT; the subject logs `zoom.echo` when the final echo of its own request arrives (NFR-7).
 
 </details>
 
@@ -930,7 +937,7 @@ Ten other model configurations were screened with one image each and left out, a
 - **Zoom.** The subject adjusts a single-value zoom slider with the photographer's supported minimum and maximum shown at its ends. The existing `SubjectViewModel.onZoomGesture(ratio, final)` API receives slider input. Each drag step updates the subject's readout immediately (optimistic) and is sent as a non-final `camera.zoom.set` on the realtime channel at most every 50 ms, the newest value winning; release, cancellation, or screen pause sends the last value on the reliable channel with `final: true`. Discrete keyboard/accessibility changes, including the readout's Zoom in / Zoom out actions, send final requests directly. The photographer clamps every request to the advertised range and applies it through the shared camera controller; every applied zoom is echoed as `camera.state`, and only a final request produces the "set zoom to 2×" notice. Echoes do not change the subject's thumb or optimistic readout while its drag is in progress and win after it ends, so both phones settle on the applied value. Capabilities, requests, and echoed zoom all use the primary rear camera's 1× as their reference.
 - **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing it. The minimum follows hardware capabilities, such as 0.5×, 0.6×, or 1×; no unsupported 0.5× capability is inferred. Lens switches may briefly pause preview while the same 3:4 use-case group rebinds. An ongoing slider drag continues to update its target through the camera's `STARTING` state, lens changes wait for in-flight photo capture, and an ultrawide bind failure falls back to the primary camera with updated capabilities and slider endpoints.
 - **Photos.** Only the photographer takes photos, with the camera screen's own shutter. The subject adjusts the zoom, and the photographer decides when to take the photo.
-- **Notices.** The photographer's UI shows a toast for each applied remote action, using the `by` field (FR-7.4).
+- **Notices.** For each final remote zoom it applies, `RemoteControlHandler` reports the action, and the photographer's Camera screen shows a notice such as "Junhyeong set zoom to 2×" for 3 s (FR-7.4).
 
 ### 2.7 Database
 
@@ -958,17 +965,17 @@ Iteration 1 has no database. The server keeps room codes and sessions in memory,
 
 | Module | Owner (role) | Builds in Iteration 1 | Provides to |
 |----|----|----|----|
-| **App shell and navigation** | Camera/Overlay | Activity, navigation graph, permission flow, `AppContainer` | All screens |
+| **App shell and navigation** | PM | Activity, navigation graph, permission flow, `AppContainer` | All screens |
 | **Camera** | Camera/Overlay | Preview, capture to MediaStore, zoom, 3:4 viewport, `setFrameSink` | Session, remote control |
 | **Guide overlay** | Camera/Overlay | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity, style | Guide sync, Subject view |
 | **Reference guide** | PM | Picker, segmentation, cutout, outline, *No person found* | Guide overlay |
 | **Pose generation** | Server/AI/Sync | API choice, `POST /poses`, templates, `PoseGenerator` | Reference guide |
 | **Server and signaling** | Server/AI/Sync | WebSocket hub, room codes, running on the laptop on the test Wi-Fi | Session |
 | **Real-time session** | Real-time | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | Guide sync, remote control |
-| **Guide sync** | Server/AI/Sync | `GuideSyncer`, the guide on Subject view | UI |
+| **Guide sync** | Real-time | `GuideSyncer`, the guide on Subject view | UI |
 | **Remote control** | Real-time | `RemoteControlHandler` (zoom), zoom slider on Subject view | UI |
 
-**Shared contracts in code.** `android/` holds the Gradle project, which builds an empty app, and the contract files marked \* in 2.1.
+**Shared contracts in code.** The contract files marked \* in 2.1 were written first in `android/` (#13), so each owner could build against them.
 
 - The contracts are the module interfaces (2.1), data models (2.3), data channel and signaling messages (2.5.1, 2.5.2), and the REST API (2.5.3).
 - Everything else is built by the owners in their tasks: screens, implementations, fakes, and the server.
@@ -990,8 +997,8 @@ Iteration 1 has no database. The server keeps room codes and sessions in memory,
 swpp-2026-project-team-10/
 ├─ android/        Android app (Gradle project with the shared contracts; open this folder in Android Studio)
 ├─ server/         FastAPI app (created in the backend server task); .env.example for secrets
-├─ docs/images/    images used by the wiki if needed
-└─ .github/        issue and pull-request templates, CI workflow
+├─ wiki/           source of the GitHub wiki, with its images in wiki/images/; the wiki-sync workflow mirrors it on every push to dev
+└─ .github/        pull-request template, CI and wiki-sync workflows
 ```
 
 - **main**: stable; updated from **dev** with a merge commit at the end of each iteration. `iteration-N-demo` is created from main for the demo.

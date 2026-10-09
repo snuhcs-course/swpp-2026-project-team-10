@@ -9,6 +9,7 @@
 | 0.5 | 2026-10-06 | The user takes the scene photo and confirms it before it is sent: after *Generate poses here*, the Camera screen's shutter takes the scene photo, and *Use this photo* or *Shoot again* comes before Generating poses (FR-4.1, US-4, 6.2, 6.3, 6.8). The candidates are shown as images only, without the pose names (FR-4.6, 6.3), and Generating poses says "Generation may take up to 30 seconds" under the progress line (FR-4.5, 6.3). |
 | 0.6 | 2026-10-06 | The Flow 2 wireframe is redrawn to match 0.5: the Consent notice, Scene photo, and Scene photo · Review come before Generating poses, and 6.3 has one row for each of them (Figure 2, 6.2, 6.3, 6.8). |
 | 0.7 | 2026-10-07 | Text as built in the final screen design: Generating poses labels the scene photo "Your photo" and "Same person and place · up to 30 s", which replaces "Generation may take up to 30 seconds" (FR-4.5, 6.3). "Saved without the guide" shows for 3 s, and the reason for a failed save stays until the next photo (6.2). |
+| 0.8 | 2026-10-09 | Final version for Iteration 1, synced with the current build and the team's decisions. HTTPS and WSS apply from Iteration 2; Iteration 1 uses HTTP and WS to the laptop on the test Wi-Fi (NFR-14). The storage failure text matches the app (US-1). The photographer sees "left" or "disconnected" as a 3 s notice (6.5). System back asks "Leave the session?" only on *Subject view*, and the guide is a semi-transparent cutout or a white outline (6.9, glossary). *Camera permission denied* is built in Iteration 1, and its wireframe is still to be drawn (6.8). This entry also records the composition grid and horizon bar (FR-1.9, FR-1.10), added on 2026-10-05. |
 
 Items marked **TBD** need a team decision.
 
@@ -273,7 +274,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Edge** | A slider drag crosses a lens boundary | The preview briefly restarts while I keep dragging | The drag keeps its latest target, and that ratio applies when the lens is ready. |
 | **Normal** | The preview is showing | I tap the shutter | The photo is saved to the "Pix" album within 2 s, a confirmation appears, and the thumbnail updates. |
 | **Failure** | I denied camera permission | Pix opens | Pix explains why it needs the camera and shows *Open settings* instead of a blank preview. |
-| **Failure** | The phone's storage is full | I tap the shutter | "Couldn't save the photo. Free up storage and try again." appears, and the camera stays ready. |
+| **Failure** | The phone's storage is full | I tap the shutter | "Couldn't write the photo. Check available storage and try again." appears, and the camera stays ready. |
 
 #### US-2 · Turn a gallery photo into a pose guide
 <sub>F2 · FR-2.1–2.7 · Iteration 1 · UAT candidate</sub>
@@ -466,7 +467,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. "(It 2)" means the
 | NFR-11 | Reliability | A drop shorter than 10 s recovers without a new invitation. Switching from Wi-Fi to cellular during a session does not crash the app. (It 2) | Turn on airplane mode for 5 s during a session; switch Wi-Fi off. |
 | NFR-12 | Resource use | A 10-minute session uses at most 10% of the photographer's battery. The live view uses at most 2.5 Mbps, about 190 MB per 10 minutes. | Battery statistics; bitrate from connection statistics. |
 | NFR-13 | Privacy | Reference photos never leave the phone. A scene photo is sent only when the user asks for poses, only to the Pix server, which passes it to the image-editing service to generate the poses (FR-4.2) and keeps no copy once the response is returned. Nothing from the live view is recorded or stored on any server. | Code review; server log review. |
-| NFR-14 | Security | API keys exist only on the server. All server traffic uses HTTPS or WSS. The live view and control messages are encrypted end to end between the phones, and a relay server cannot read them. | Inspect the APK for keys; configuration review. |
+| NFR-14 | Security | API keys exist only on the server. All server traffic uses HTTPS or WSS (It 2; Iteration 1 uses HTTP and WS to the laptop on the test Wi-Fi). The live view and control messages are encrypted end to end between the phones, and a relay server cannot read them. | Inspect the APK for keys; configuration review. |
 | NFR-15 | Access control | Only accepted friends can invite each other. Pix IDs are found only by exact match. Remote control works only while the photographer allows it. (It 2) A QR connection accepts only one phone and starts only after both people tap *Resume*. (It 3–4) | API tests with non-friend and blocked cases; a third phone tries to join a QR session. |
 | NFR-16 | Usability | Controls on *Subject view* are at least 48 dp and reachable with one thumb. Every failure screen says what happened and offers both a retry and a way back. A first-time user can add a guide and take a photo without help. | Hallway test with 5 people: at least 4 finish "add a guide and shoot" within 1 minute. |
 | NFR-17 | Compatibility | Pix runs on Android phones in portrait orientation. It is tested on a Galaxy S22 and a Galaxy S23 Ultra. The minimum version is Android 10 (API 29). | Full test pass on both devices each iteration. |
@@ -539,7 +540,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Invite sent** | "Waiting for Junhyeong"; "Junhyeong gets a notification. The live view starts when they accept."; toggle "Let Junhyeong adjust the camera and guide" (on by default). | Toggle → allow or block remote control · *Cancel invite* → Friends · Friend accepts → Friend connected. | Declined or no answer in 30 s → Invite not accepted. |
-| **Friend connected** | Camera + guide with the badge "Live · Junhyeong connected"; notices for remote actions ("Junhyeong set zoom to 2×"); *End session* in place of *Shoot together* (top). | All camera and guide inputs from Flow 1 · *End session* → Camera alone, and the subject is told · Remote zoom (and, from Iteration 2, guide, brightness, and flash) from the subject → applied here. | Subject leaves or disconnects → banner "Junhyeong left" or "Junhyeong disconnected"; the camera keeps working. |
+| **Friend connected** | Camera + guide with the badge "Live · Junhyeong connected"; notices for remote actions ("Junhyeong set zoom to 2×"); *End session* in place of *Shoot together* (top). | All camera and guide inputs from Flow 1 · *End session* → Camera alone, and the subject is told · Remote zoom (and, from Iteration 2, guide, brightness, and flash) from the subject → applied here. | Subject leaves or disconnects → notice "Junhyeong left" or "Junhyeong disconnected" for 3 s; the camera keeps working. |
 | **Invite not accepted** | "Junhyeong declined or didn't answer within 30 seconds." | *Invite again* → Invite sent · *Back to camera* → Camera. | — |
 
 ### 6.6 Flow 5 · Shoot together, subject's phone
@@ -572,7 +573,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 
 | Screen | Purpose | Requirement |
 |---|---|---|
-| Camera permission denied | Explain why the camera is needed; *Open settings*. | FR-1.2 |
+| Camera permission denied | Explain why the camera is needed; *Open settings*. Built in Iteration 1; the wireframe is still to be drawn. | FR-1.2 |
 | Pix ID setup | Sign in, then choose a Pix ID with live rule checking. | FR-5.2, FR-5.3 |
 | Friend requests | List of received requests with *Accept* / *Decline*. | FR-5.7 |
 | Invitation no longer available | Shown when an expired or cancelled invitation is opened. | FR-6.4 |
@@ -586,10 +587,10 @@ These screens follow from the requirements above but are not yet in the wirefram
 ### 6.9 Rules for every screen
 
 - **Portrait only.** Every screen is designed for one-handed portrait use.
-- **System back** does the same as the screen's secondary action (*Back* or *Cancel*). On *Subject view* and *Friend connected*, it first asks "Leave the session?".
+- **System back** does the same as the screen's secondary action (*Back* or *Cancel*). On *Subject view*, it first asks "Leave the session?".
 - **Waiting states** always say what the app is waiting for and how long it may take, and offer *Cancel*.
 - **Failure screens** always state what happened in plain words, offer a primary retry, and offer a way back. No screen is a dead end.
-- **The guide** is always drawn in a color and dash pattern that is not used by any other UI element, so it is never mistaken for a control.
+- **The guide** is drawn only inside the camera image, as a semi-transparent cutout or a white outline of the person, so it is not mistaken for a control.
 
 ---
 
@@ -623,7 +624,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 | **Photographer** | The person holding the phone that takes the photo. |
 | **Subject** | The friend in the photo, who joins the session from their own phone. |
 | **Reference** | The photo that shows the desired pose: a gallery photo or a selected pose candidate. |
-| **Guide** | The person from the reference drawn over the camera preview, as a **cutout** (semi-transparent image) or an **outline** (dashed contour). |
+| **Guide** | The person from the reference drawn over the camera preview, as a **cutout** (semi-transparent image) or an **outline** (white contour). |
 | **Pose candidate** | One of four images generated from the scene photo, showing the same person and place in a different pose. |
 | **Session** | A live connection between one photographer's phone and one subject's phone. |
 | **Live view** | The photographer's camera image as shown on the subject's phone. |

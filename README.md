@@ -34,7 +34,14 @@ https://github.com/user-attachments/assets/fced811f-32ba-423f-a3ff-5e789ff96e9a
 | **Guide overlay** | Drag the guide, pinch it to 30–300% of its size, fade it to 10–90%, switch between cutout and outline, or remove it. |
 | **Shoot together** | The photographer gets a 6-digit room code, and the friend joins with it. The friend's phone shows the live camera over WebRTC with the same guide, and the friend's zoom slider changes the photographer's zoom. Only the photographer takes photos. |
 
-Iteration 2 adds Pix IDs, friends and invitations, connections over cellular data, more remote controls (guide, brightness, flash), poses described in words, and saved guides. The plan for every iteration is in [Requirements and Specifications §4.1](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications#41-scope-by-iteration).
+### Next: Iteration 2
+
+- Pix IDs, friends, and invitations that the friend can accept or decline
+- Connections over Wi-Fi or cellular data, with automatic reconnection
+- More remote controls from the friend's phone: moving and resizing the guide, brightness, and flash, with a switch to allow or block them
+- Poses described in words, and saved guides to reuse
+
+The plan for every iteration is in [Requirements and Specifications §4.1](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications#41-scope-by-iteration).
 
 ## How it works
 
@@ -46,18 +53,35 @@ Iteration 2 adds Pix IDs, friends and invitations, connections over cellular dat
 
 The full design is in the [Design Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation).
 
+## Technology stack
+
+| Part | Stack |
+|---|---|
+| Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel and coroutines · CameraX 1.6 · ML Kit Subject Segmentation · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore |
+| Server | Python 3.11 · FastAPI and Uvicorn (WebSocket signaling and REST API) · pydantic-settings · httpx2 · Pillow |
+| AI | OpenRouter Image API with GPT Image 2.5 Flare at low quality (a server setting) |
+| Tests and CI | JUnit 4 and Robolectric 4.17 · Spotless with ktlint · Ruff and pytest · GitHub Actions |
+
 ## Development environment
 
 | Part | Requirements |
 |---|---|
 | Android app | Android Studio with its bundled JDK (21 or later is needed for the unit tests), Kotlin 2.2, Gradle 9.5 through the wrapper. minSdk 29 (Android 10), target and compile SDK 36. |
 | Server | Python 3.11 or later and [uv](https://docs.astral.sh/uv/getting-started/installation/). An [OpenRouter](https://openrouter.ai/) API key with credits for pose generation. |
-| Test phones | Galaxy S22 and Galaxy S23 Ultra. A Galaxy Note 9 (Android 10) covers the minimum version. |
+| Tested on | Galaxy S22, S23 Ultra, S25 Ultra, S21 Ultra, and Note 9 (Android 10, the minimum version) |
 | Network | One Wi-Fi network for the laptop and both phones that allows traffic between devices. A phone hotspot works; campus Wi-Fi usually blocks it. |
 
 ## Run the demo
 
-### 1. Start the server on the laptop
+### 1. Get the code
+
+```sh
+git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git
+cd swpp-2026-project-team-10
+git checkout iteration-1-demo
+```
+
+### 2. Start the server on the laptop
 
 From the repository root:
 
@@ -75,7 +99,7 @@ uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-m
 
 Find the laptop's Wi-Fi address (on macOS, `ipconfig getifaddr en0`) and check `http://<laptop-IP>:8000/health` from a phone's browser; it answers `{"status":"ok"}`.
 
-### 2. Install the app on both phones
+### 3. Install the app on both phones
 
 Create `android/local.properties` with the laptop's address:
 
@@ -91,7 +115,7 @@ Connect a phone with USB debugging on, then from `android/`:
 
 Repeat for the second phone. On an emulator, skip `local.properties`: the default address `http://10.0.2.2:8000/` already reaches the laptop.
 
-### 3. Try the flows
+### 4. Try the flows
 
 1. **Guide from a photo.** On the Camera screen, tap *Guide* › *Upload a reference*, pick a photo of a person, and tap *Use this guide*. Drag, pinch, and fade the guide, then take a photo: "Saved without the guide" appears and the thumbnail changes. The first time, the segmentation model is downloaded through Google Play services, which can take a minute.
 2. **AI poses.** Tap *Guide* › *Generate poses here*, accept the notice, take a photo of the scene, and tap *Use this photo*. After 10–30 seconds, tap a pose, *Use this pose*, and *Use this guide*.
@@ -119,7 +143,7 @@ More detail is in the [Android README](android/README.md) and the [server README
 | `wiki/` | The source of the GitHub wiki, published on every push to `dev` |
 | `.github/` | CI workflows and the pull request template |
 
-Branches: `main` holds the stable version and `dev` is the integration branch. Each task is a branch from `dev` that returns through a reviewed, squash-merged pull request. At the end of an iteration, `dev` is merged into `main`, and `iteration-N-demo` is created from `main`.
+Branches: `main` holds the stable version and `dev` is the integration branch. Each task is a branch from `dev` that returns through a reviewed, squash-merged pull request. `iteration-N-demo` holds the code shown in that iteration's demo, and at the end of an iteration `dev` is merged into `main`.
 
 ## Documents
 

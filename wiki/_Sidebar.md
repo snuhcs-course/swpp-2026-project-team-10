@@ -8,3 +8,7 @@
   - [[Prompt Log – Documents|Iteration-1-–-Prompt-Log-–-Documents]]
   - [[Prompt Log – Reference Guide|Iteration-1-–-Prompt-Log-–-Reference-Guide]]
   - [[Prompt Log – Code Reviews|Iteration-1-–-Prompt-Log-–-Code-Reviews]]
+  - [[Prompt Log – Server and Pose Generation|Iteration-1-–-Prompt-Log-–-Server-and-Pose-Generation]]
+  - [[Prompt Log – Real-time|Iteration-1-–-Prompt-Log-–-Real-time]]
+  - [[Prompt Log – Camera and Guide Overlay|Iteration-1-–-Prompt-Log-–-Camera-and-Guide-Overlay]]
+  - [[CLAUDE.md History|Iteration-1-–-CLAUDE-md-History]]

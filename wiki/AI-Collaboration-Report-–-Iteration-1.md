@@ -1,159 +1,78 @@
-**Iteration:** 1 (2026-09-27 ~ 2026-10-09) · **Written by:** 박동제 · **Tools used:** Claude Code
+**Iteration:** 1 (2026-09-27 ~ 2026-10-09) · **Written by:** 박동제 · **Contributors:** 박동제, 박재완, 조성민, 한준형
 
-<!-- Each member adds a row to the table below and their own ### heading under every section. -->
+**Tools used:** Claude Code (Claude Opus 5.5), ChatGPT Codex (GPT-6 Astra), GitHub Copilot code review
 
-| Member | Tasks covered |
-|---|---|
-| 박동제 (PM) | P1–P6 (kickoff, issues, requirements, design, shared contracts, app shell), P9 reference guide (#5), and the code reviews on #23 and #34 |
+## 1. Where AI Was Used
 
-Hours come from the team schedule.
+- **Documents:** the task breakdown, requirements and design drafts (from the course guidelines, other teams' wikis, and our meeting minutes), issues #1–#12, meeting minutes, and the updates after each feature ([#25], [#33]): Claude Code.
+- **Server:** signaling ([#17]), pose generation API and model comparison script ([#22]), wiki workflow ([#24]): Claude Code.
+- **Android:** camera, zoom, and guide gestures ([#21], [#26], [#31]): ChatGPT Codex. Shared contracts and app shell ([#13], [#16]), reference guide ([#28]), streaming ([#23]), remote zoom ([#27]), pose generation ([#30]), guide sync ([#32]), integration and UI ([#34]): Claude Code.
+- **Code review:** the Codex reviewer checked 10 PRs ([#13], [#17], [#21], [#22], [#27], [#28], [#30], [#31], [#32], [#34]) and Copilot 2 ([#13], [#16]), with 15 inline findings. Claude helped us judge each finding before we fixed or declined it, and drafted the human reviews on [#23] and [#34].
+- **CLAUDE.md:** `/CLAUDE.md`, `/android/CLAUDE.md`, and `/server/CLAUDE.md` give Claude Code our architecture, commands, conventions, pitfalls, and rules ("commit or push only when a human asks"). Feature PRs update them with the code ([[history|Iteration-1-–-CLAUDE-md-History]]).
+- **AI-generated code markers:** the first line of every source file names the tool, the date, and the reviewer: [all markers](https://github.com/search?q=repo%3Asnuhcs-course%2Fswpp-2026-project-team-10+%22AI-generated+with%22&type=code) · [the PR that added them](https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/41/files)
+- **Not used:** tests on real phones, document review, product decisions, and the design of the specific workflows and requirements in our documents; AI only wrote the text.
 
----
+## 2. Prompt History
 
-## 1. 🤖 Where AI Was Used
+Full prompt logs, one page per task: [[Documents|Iteration-1-–-Prompt-Log-–-Documents]] · [[Reference guide|Iteration-1-–-Prompt-Log-–-Reference-Guide]] · [[Code reviews|Iteration-1-–-Prompt-Log-–-Code-Reviews]] · [[Server and pose generation|Iteration-1-–-Prompt-Log-–-Server-and-Pose-Generation]] · [[Real-time|Iteration-1-–-Prompt-Log-–-Real-time]] · [[Camera and guide overlay|Iteration-1-–-Prompt-Log-–-Camera-and-Guide-Overlay]]
 
-### 박동제 (PM · reference guide)
+## 3. What AI Did Well
 
-**Documents and project management**
-- **Kickoff minutes (P1):** Claude Code transcribed the 9/28 Zoom recording locally with an open-source speech-to-text model, then wrote the minutes and a PDF; they later became the [[Team Meetings|Team-Meetings]] page (wiki `8c7bd0e`).
-- **Issues (P2):** drafted issues [#1]–[#12] from the schedule rows, each with the goal, tasks, *Done when*, references, dependencies, and the branch and PR names, under the "Iteration 1" milestone.
-- **Requirements and design (P3, P5):** drafted [[Requirements and Specifications|Requirements-and-Specifications]] v0.1–v0.2 and [[Design Documentation|Design-Documentation]] v0.1–v0.2, including the architecture figure (wiki `8318fa4`, `1fc59c9`, `c8bfcde`, `b9cde5b`, `8dd9a1d`).
-- **Daily standup log:** translated the teammates' Korean notes into English ([#29]).
+- **Time:** programming tasks P7–P16 and A1–A2 were planned at 39 h and took 18.5 h of human time plus 24.5 h of agent time (team schedule).
+- **Small, tested steps:** the reference guide came in seven commits, each passing its tests ([#28]); it takes 0.6 s per photo on the S22 (target 2 s).
+- **Streaming in one evening ([#23]):** signaling, data channels, five screens, and 34 tests; the first two-phone test worked unchanged.
+- **Model choice from data ([#22]):** four models compared on 128 generated images by latency and cost. Claude also caught our error: we wrote "speed" as the reason, but the table showed our model as the slowest and cheapest; we meant cost.
+- **Review triage ([#27]):** of five Codex findings, Claude confirmed two bugs, hardened two cases, and declined one with a written reason.
+- **Tests without a device ([#31]):** the overlay tests moved to Robolectric, so all 240 tests run without a phone.
+- **Measurement ([#34]):** aligned logs showed remote zoom at 10–30 ms (target 0.5 s).
 
-**Code**
-- **Shared contracts and app shell (P6):** [#13] shared contracts (29 files), [#15] PR template, [#16] app shell with navigation and every screen (54 files).
-- **Reference guide (P9, [#5]):** [#28] (`414bb79`)
-  - Code: `guide/SubjectSegmenter.kt`, `guide/MaskMath.kt`, `guide/OutlineExtractor.kt`, `guide/GuideSizes.kt`, `guide/MlKitReferenceGuideMaker.kt`, `ui/guide/ReferenceViewModel.kt`, `ui/guide/PhotoPicker.kt`
-  - Screens: *Reference confirm*, *No person found*
-  - Tests: `MaskMathTest`, `GuideSizesTest`, `ReferenceViewModelTest`
-- **Arm and leg lines inside the outline:** a prototype on the local branch `feat/5-limb-lines` (`5581861`), parked for Iteration 2.
+## 4. Hallucinations / Errors
 
-**Code reviews**
-- Drafted and posted the reviews on [#23] (WebRTC streaming: a summary and 15 inline comments) and [#34] (integration: a summary and four inline comments).
+- **Model assumed ready ([#28]):** the first photos failed on the S22 while the ML Kit model was still downloading; tests and the emulator could not show it. One extra commit.
+- **Hotspot assumed reachable ([#27]):** Android hid the hotspot host's interface from WebRTC. Caught in a two-phone test; cost about 15 minutes.
+- **Bugs found by the Codex review, not Claude's tests ([#22], [#30]):** an upload checked after parsing, error text in logs, a doubled 30 s limit. Five fixes with tests.
+- **One pinch for two features ([#26] → [#31]):** resizing the guide kept zooming the camera, so zoom became a slider.
+- **Smaller:** a full skeleton when only contracts were asked for ([#13]) and a theme font that hid bold weights ([#34]).
 
-**AI-generated code markers:** to be added (`TODO`: mark the files above in a follow-up PR and list the markers here).
+## 5. Prompt Revisions
 
-**Not used**
-- Testing on a real phone (Galaxy S22): every build was checked on the phone by me.
-- Team meetings and the decisions made there.
-- Document review: I read every draft before it went to the wiki and sent it back with corrections (section 6).
+- **Scene photo step**
+  - Before: "Now implement the client-side pose generation flow (issue #7)." The photo was sent on the tap.
+  - After: "After we click generate poses here, there should be some step where we show the camera screen to the user and make them press the shutter to shoot the scene image."
+  - Why: it described the flow as the user sees it.
+- **Subject's zoom**
+  - Before: "That seems wrong, doesn't it?" Claude defended the zoom chips.
+  - After: "Make it work the same way as the main camera's zoom instead of buttons."
+  - Why: it named an implementation to copy.
 
----
+## 6. Manual Fixes and Why
 
-## 2. 💬 Prompt History
+- **Inline dependencies removed from the comparison script (10/4):** Claude had declared the script's packages inside the script. After Pillow became a server dependency in [#22], we manually removed that block, so the dependencies are in one place.
+- **README section removed (10/4):** in the wiki workflow branch, Claude added a "Documentation" section to the root `README.md`. We removed it before the commit, because [#24] only needed the `wiki/` folder and the workflow.
+- **Our decisions:** a cheaper image model than the one recommended, the scene photo inside *Camera*, a zoom slider, contracts instead of a full skeleton, and cross-network sessions deferred to Iteration 2.
+- **Ownership:** we kept Claude off another member's `TODO` until its owner agreed ([#32]).
+- **Real devices:** the model download, hotspot, gesture, and notice bugs appeared only on phones.
 
-### 박동제 (PM · reference guide)
+## 7. Takeaway for Iteration 2
 
-- [[Documents|Iteration-1-–-Prompt-Log-–-Documents]]
-- [[Reference guide (#5)|Iteration-1-–-Prompt-Log-–-Reference-Guide]]
-- [[Code reviews|Iteration-1-–-Prompt-Log-–-Code-Reviews]]
+- Run the first build on real phones, and once on a hotspot, within the first hour.
+- Start prompts with the issue text, the screen flow, and the files we own.
+- Tell Claude to ask before departing from the design document or R&S.
+- Add AI-generated markers in the same PR as the code.
 
----
-
-## 3. ✅ What AI Did Well
-
-### 박동제 (PM · reference guide)
-
-- **Reference guide in seven small commits ([#28]).** Each commit built and passed its unit tests before the next one. A photo becomes a guide in about 0.6 s on the Galaxy S22, against the 2 s target (NFR-3).
-- **Issues that teammates could start from (P2).** All 12 issues share one structure (goal, tasks, *Done when*, references, dependencies, branch and PR names), so each owner could open a branch without asking.
-- **App shell (P6, [#16]).** Navigation and every Iteration 1 screen in one PR of 54 files, built against the shared contracts.
-- **Reviews that found real problems.** On [#23], Claude found a race in which a camera frame could reach an already disposed WebRTC video source (a possible native crash), and four session-state problems such as the photographer being stuck in a dead *Waiting* state. On [#34], the author added the missing revision rows to both documents before merging.
-
-| Task | Planned | Human | Agent |
-|---|---|---|---|
-| P2 Issues | 1 h | 0.5 h | 0.5 h |
-| P6 App shell | 1.5 h | 1 h | 2 h |
-| P9 Reference guide | 4 h | 1 h | 3 h |
-
----
-
-## 4. ⚠️ Hallucinations / Errors
-
-### 박동제 (PM · reference guide)
-
-- **The model download was treated as finished (#5)**
-  - What: Claude's first `SubjectSegmenter` ran segmentation before Google Play services had finished downloading the ML Kit model.
-  - How caught: on the S22, the first two photos failed with `IllegalStateException` (logcat, 10/4 20:28) while the download was still running. The unit tests and the emulator could not show this; I caught it in the first test on the phone.
-  - Fix: `SubjectSegmenter.ensureModule()` now polls `areModulesAvailable` every 500 ms for up to 60 s (in [#28]).
-  - Cost: one extra commit and a re-test the next day.
-- **It built more than I asked for (P6)**
-  - What: asked for the shared contracts, Claude produced a full runnable skeleton of 103 files with screens, implementations, fakes, and a server, which took over my teammates' tasks.
-  - How caught: in review.
-  - Fix: cut it back to the contracts ([#13], 29 files).
-  - Cost: the extra work was discarded; it is kept only as a local reference.
-- **Wrong kickoff date in the wiki**
-  - What: the [[Team Meetings|Team-Meetings]] page gives the kickoff as 9/27, the planned date in the schedule, but the recording shows 9/28.
-  - How caught: Claude found it while matching task dates to PRs (10/6).
-  - Fix: still to fix.
-- **Dead ends on the arm and leg lines**
-  - What: tracing edges near the pose skeleton drew noisy lines on printed photos and missed crossed arms, because the pose landmarks sat beside the arm. Skin-color regions worked better but still missed covered or black-and-white limbs.
-  - Cost: about a day of prototyping, now parked on `feat/5-limb-lines`.
-- **Smaller tool errors**
-  - Diagrams in the design-document PDF did not render until each got its own render id and its `<<...>>` labels were escaped.
-  - `connectedAndroidTest` uninstalled the app from the phone and deleted the test output, so the probe had to be run again a different way.
-
----
-
-## 5. 🔁 Prompt Revisions
-
-### 박동제 (PM · reference guide)
-
-- **Arm lines**
-  - Before: "It only traces the outer silhouette now. Can it also trace the inner outline of the arms?"
-  - After: "Only arms and legs. If a limb isn't visible, leave it out."
-  - Why it worked: it limited the target to limbs and gave a rule for hidden ones, so Claude stopped trying to trace every inner edge and looked for each limb separately.
-- **Review on #34**
-  - Before: "Review PR #34 and leave comments." Claude started running the app on an emulator to check the new UI.
-  - After: "Don't focus so much on the UI; review the code."
-  - Why it worked: it set the scope, and the review came back as four code-level comments.
-
----
-
-## 6. ✋ Manual Fixes and Why
-
-### 박동제 (PM · reference guide)
-
-I did not edit code or documents by hand. I reviewed every output, then sent it back with specific corrections. These are the corrections that mattered.
-
-**Documents**
-- **Contracts only, not a skeleton (9/30):** each owner should build their own module, so I had Claude keep only the Gradle project and the shared contracts ([#13]).
-- **Contracts limited to Iteration 1 (9/30):** after the team meeting, the contracts kept only the 12 data channel messages Iteration 1 needs.
-- **Later iterations at the plan level:** the design document describes what each later iteration adds (components, flows, key decisions), but messages, APIs, and database columns are added only when that iteration starts. The revision table lists additions and never drops content.
-- **Only team decisions in the requirements:** items still waiting for a team decision were tagged NEW in the draft and left out of v0.1 until the 9/30 meeting decided them (v0.2).
-- **Wireframes matched to the decisions (10/1):** removed the remote shutter and the control toggle, because only the photographer takes photos; added names in the badges, the code expiry, and *Reconnect* / *Leave*.
-- **Room code in the Waiting state (10/1, wiki `8dd9a1d`).**
-
-**Code**
-- **Temporary fake until #6:** `InterimGuideRepository` let *Use this guide* work before #6 was merged. I had the PR stress that it must be reverted, and [#31] removed it.
-- **Arm and leg lines parked (10/5):** after checking the results on the phone, I stopped prompting and had Claude go back to the finished version. The outline already met #5, and the lines were not accurate enough.
-- **Real-device testing:** the model-download bug (section 4) only showed up on the phone.
-
-The document tasks took more of my time than planned (P3: 2 h against 1 h; P5: 2 h against 1.5 h) because of these review rounds.
-
----
-
-## 7. 📌 Takeaway for Iteration 2
-
-### 박동제 (PM · reference guide)
-
-- Run the first build on a real phone within the first hour, not after the feature is done.
-- Tell Claude the boundary of my task (which modules are mine) before it starts.
-- Say the scope of a review (code, UI, or documents) in the first request.
-
----
-
-## Summary for the team report
-
-> **Dongje (PM, reference guide).** Claude Code drafted the kickoff minutes, issues #1–#12, the requirements and design documents (v0.1–v0.2), the shared contracts (#13), the app shell (#16), and the reference guide (#5, #28), and posted the reviews on #23 and #34. It saved the most time on #5 (planned 4 h; 1 h of mine and 3 h of agent time) and #16. Its main errors: it ran segmentation before the ML Kit model had downloaded, which only a real phone showed, and it built a full skeleton when only the contracts were asked for. I fixed things by reviewing every output and sending it back with specific corrections, not by editing by hand. Next iteration: test on a phone first, and state my task's boundary and the review scope up front.
-
-[#1]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/1
-[#5]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/5
-[#12]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/12
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13
-[#15]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/15
 [#16]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/16
+[#17]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/17
+[#21]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/21
+[#22]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/22
 [#23]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/23
+[#24]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/24
+[#25]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/25
+[#26]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/26
+[#27]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/27
 [#28]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/28
-[#29]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/29
+[#30]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/30
 [#31]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/31
+[#32]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/32
+[#33]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/33
 [#34]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/34

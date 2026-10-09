@@ -1,3 +1,4 @@
+// AI-generated with Claude Code, 2026-10-07, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import androidx.test.ext.junit.runners.AndroidJUnit4

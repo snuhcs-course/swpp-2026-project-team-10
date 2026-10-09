@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio

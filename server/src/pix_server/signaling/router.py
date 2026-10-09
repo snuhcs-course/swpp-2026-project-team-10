@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
 """WebSocket transport with one ordered writer and a bounded queue per phone."""
 
 import asyncio

@@ -1,3 +1,4 @@
+// AI-generated with Claude Code, 2026-10-06, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap

@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 """Compare image-editing models on OpenRouter for pose generation (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY set:

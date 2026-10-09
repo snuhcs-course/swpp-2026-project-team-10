@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-06, reviewed by Sungmin Jo
 """A photographer phone made of Python, for testing the subject's side with one phone or emulator.
 
 It creates a room and prints the code. When the subject joins, it offers a test-pattern video and the two data

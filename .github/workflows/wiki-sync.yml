@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 name: wiki-sync
 
 # Publishes the wiki/ folder to the repository's GitHub wiki. wiki/ is the source: an edit made on

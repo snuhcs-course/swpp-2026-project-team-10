@@ -19,12 +19,12 @@
 ## 2. 💬 Prompt History
 
 Full prompt logs, one page per task:
-- [[Documents (Dongje)|Iteration-1-–-Prompt-Log-–-Documents]]
-- [[Reference guide (Dongje)|Iteration-1-–-Prompt-Log-–-Reference-Guide]]
-- [[Code reviews (Dongje)|Iteration-1-–-Prompt-Log-–-Code-Reviews]]
-- [[Server and pose generation (Jaewan)|Iteration-1-–-Prompt-Log-–-Server-and-Pose-Generation]]
-- [[Real-time (Sungmin)|Iteration-1-–-Prompt-Log-–-Real-time]]
-- [[Camera and guide overlay (Joonhyung)|Iteration-1-–-Prompt-Log-–-Camera-and-Guide-Overlay]]
+- [[Documents|Iteration-1-–-Prompt-Log-–-Documents]]
+- [[Reference guide|Iteration-1-–-Prompt-Log-–-Reference-Guide]]
+- [[Code reviews|Iteration-1-–-Prompt-Log-–-Code-Reviews]]
+- [[Server and pose generation|Iteration-1-–-Prompt-Log-–-Server-and-Pose-Generation]]
+- [[Real-time|Iteration-1-–-Prompt-Log-–-Real-time]]
+- [[Camera and guide overlay|Iteration-1-–-Prompt-Log-–-Camera-and-Guide-Overlay]]
 
 ---
 

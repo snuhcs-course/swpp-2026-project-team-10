@@ -1,3 +1,4 @@
+// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import kotlin.math.roundToInt

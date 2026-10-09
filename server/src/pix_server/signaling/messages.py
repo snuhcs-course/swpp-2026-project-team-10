@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
 """Client messages from Design Documentation 2.5.2 and Android's SignalMessage.kt."""
 
 import json

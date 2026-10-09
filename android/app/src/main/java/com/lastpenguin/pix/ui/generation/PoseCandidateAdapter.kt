@@ -1,3 +1,4 @@
+// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater

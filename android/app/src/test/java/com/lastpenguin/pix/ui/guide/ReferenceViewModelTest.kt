@@ -1,3 +1,4 @@
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-05, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap

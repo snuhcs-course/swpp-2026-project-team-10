@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 """Per-client request cap that bounds what one phone can spend on the image API (Design Documentation 2.8)."""
 
 from collections import deque

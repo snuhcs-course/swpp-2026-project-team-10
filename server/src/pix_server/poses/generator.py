@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 """One pose candidate per call through OpenRouter's Image API."""
 
 import asyncio

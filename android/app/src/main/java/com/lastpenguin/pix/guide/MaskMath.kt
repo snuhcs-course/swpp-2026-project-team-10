@@ -1,3 +1,4 @@
+// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 /** A pixel counts as the person from this confidence on (Design 2.6.1, steps 3–5). */

@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 """The single error shape of the REST API (Design Documentation 2.5.3)."""
 
 from fastapi import Request

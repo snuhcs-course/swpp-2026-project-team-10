@@ -1,3 +1,4 @@
+# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
 """Pose templates and the prompt that wraps them (Design Documentation 2.6.3)."""
 
 from dataclasses import dataclass

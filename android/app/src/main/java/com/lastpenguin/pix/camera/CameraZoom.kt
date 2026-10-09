@@ -1,3 +1,4 @@
+// AI-generated with ChatGPT Codex, 2026-10-04, reviewed by Joonhyung Han
 package com.lastpenguin.pix.camera
 
 /** Advertise only ratios this camera can actually apply; never imply an unavailable physical lens. */

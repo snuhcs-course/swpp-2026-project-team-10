@@ -1,3 +1,4 @@
+// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.DialogInterface

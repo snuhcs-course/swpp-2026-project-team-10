@@ -1,3 +1,4 @@
+// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
 // Top-level build file. Module settings live in app/build.gradle.kts.
 plugins {
     alias(libs.plugins.android.application) apply false

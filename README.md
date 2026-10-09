@@ -4,6 +4,19 @@ Pix is an Android camera app that helps two people get the portrait one of them 
 
 This branch is the **Iteration 1 prototype**: two phones and a laptop running the Pix server on one Wi-Fi network, connected with a room code.
 
+## Contents
+
+- [Demo videos](#demo-videos)
+- [What Iteration 1 does](#what-iteration-1-does)
+- [How it works](#how-it-works)
+- [Technology stack](#technology-stack)
+- [Development environment](#development-environment)
+- [Run the demo](#run-the-demo): [1. Get the code](#1-get-the-code) · [2. Start the server](#2-start-the-server-on-the-laptop) · [3. Install the app](#3-install-the-app-on-both-phones) · [4. Try the flows](#4-try-the-flows)
+- [Tests and checks](#tests-and-checks)
+- [Repository](#repository)
+- [Documents](#documents)
+- [Team](#team)
+
 ## Demo videos
 
 Recorded on real phones with the Iteration 1 build (#34).

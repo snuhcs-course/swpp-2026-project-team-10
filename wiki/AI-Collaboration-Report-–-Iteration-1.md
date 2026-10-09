@@ -47,7 +47,8 @@ Full prompt logs, one page per task: [[Documents|Iteration-1-–-Prompt-Log-–-
 
 ## 6. Manual Fixes and Why
 
-- **Few hand edits:** we reviewed every diff and sent corrections back as prompts; by hand we only removed an inline dependency block ([#22]) and an unneeded README section ([#24]).
+- **Inline dependencies removed from the comparison script (10/4):** Claude had declared the script's packages inside the script. After Pillow became a server dependency in [#22], we manually removed that block, so the dependencies are in one place.
+- **README section removed (10/4):** in the wiki workflow branch, Claude added a "Documentation" section to the root `README.md`. We removed it before the commit, because [#24] only needed the `wiki/` folder and the workflow.
 - **Our decisions:** a cheaper image model than the one recommended, the scene photo inside *Camera*, a zoom slider, contracts instead of a full skeleton, and cross-network sessions deferred to Iteration 2.
 - **Ownership:** we kept Claude off another member's `TODO` until its owner agreed ([#32]).
 - **Real devices:** the model download, hotspot, gesture, and notice bugs appeared only on phones.

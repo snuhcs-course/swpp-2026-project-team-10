@@ -1,9 +1,13 @@
 Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
 
-`[…]` marks text I pasted into the prompt. It is quoted under the prompt.
+`[…]` marks text pasted into the prompt. It is quoted under the prompt.
 
 ## Signaling server (#4), with review and network questions
 
+- [Jaewan, 10-01] "Read AGENTS.md for the project's context and instructions. For convenience, I have downloaded the design documentation and requirements and specifications to the ./wiki directory. You can refer to them for detailed information on the project specifications and design considerations. I need you to create a server app at ./server that meets the requirements outlined in the documentation. Only implement requirements for iteration 1; but don't create the APIs for image generation yet and only implement the signaling hub part. Use uv for package management with pyproject.toml and uv.lock files. Also use ruff for linting and formatting. I have a preferred ruff.toml configuration file at the repo root. Put this configuration file in the ./server directory as well.
+Use FastAPI for the server framework. We would have to use sqlalchemy and alembic for database management in the next iterations, but since we don't need database management for iteration 1, you can skip that for now."
+- [Jaewan, 10-01] "i find some places that mark this app as 'Pix signaling hub' or 'Pix signaling server' as if the server is only for signaling, but this server will also serve its role for other APIs like friend invitations, pose generation, etc. so can you fix these and just write neutrally like 'Pix server' or so"
+- [Jaewan, 10-01] "I don't think we need load_signaling.py as a separate script and mention it in README.md. It's just a temporary test script for now. I think I can just mention it in the PR explanation for people who want to test on their own."
 - [Jaewan, 10-02] "I'm developing the server-side signaling part for iteration 1. Someone gave me a review: […] What does this mean?"
   > On the documented Android test-phone path, this ws:// endpoint is blocked by Android's cleartext policy: the app targets SDK 36, while android/app/src/main/AndroidManifest.xml has neither usesCleartextTraffic nor a network-security configuration, and a repo-wide search finds no debug-specific exception. Thus the claimed exception does not exist and an OkHttp signaling client cannot connect to this server as instructed; add a debug-only cleartext configuration (or serve wss://) before relying on this workflow.
 - [Jaewan, 10-02] "Oh, the android part isn't implemented yet, so we'll wait for this. Not my problem yet right?"

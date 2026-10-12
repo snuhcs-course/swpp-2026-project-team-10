@@ -90,3 +90,39 @@
 | 한준형 | Connected guide opacity and the cutout/outline switch; checked that photos still save without the guide while the overlay is on | Connect the guide state synced with pose generation results to the camera screen | – |
 
 </details>
+
+<details>
+<summary><b>2026-10-06 (Tue)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Reviewed guide sync (#32); merged the Flow 2 wireframe redraw (#33) | Review the integration PR (#34); prepare the lab meeting | – |
+| 박재완 | Merged the Android pose generation flow (#30): the scene photo on the Camera screen, the consent notice, and a 30 s limit per run; approved the guide overlay (#31) and guide sync (#32); redrew the Flow 2 wireframe (#33) | Organize the documents for the lab meeting | – |
+| 조성민 | Merged guide sync (#32): the guide image sent over the data channel and shown on Subject view, the composition grid on Subject view, and *End session* while connected; approved the pose generation flow (#30) | Review the integration PR (#34) | – |
+| 한준형 | Merged the guide overlay (#31): drag, pinch, opacity, and the zoom slider; started the Iteration 1 integration (#11) | Finish the integration and the UI update (#34); record the demo videos | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-07 (Wed)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Lab meeting: prepared the presentation, organized the documents, and discussed how to run the demo; created the `iteration-1-demo` branch with its README and demo videos (#35, #37) | Write the AI collaboration report | – |
+| 박재완 | Lab meeting: organized the documents and discussed how to run the demo | Review the AI collaboration report | – |
+| 조성민 | Lab meeting: organized the documents and discussed how to run the demo; approved the integration PR (#34) | Review the AI collaboration report | – |
+| 한준형 | Lab meeting: organized the documents and discussed how to run the demo; merged the Iteration 1 integration and UI update (#34) with the demo videos | Review the AI collaboration report | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-08 (Thu)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Wrote the AI collaboration report with the team's input (#39, #40) | Submit the final documents | – |
+| 박재완 | Reviewed the AI collaboration report | – | – |
+| 조성민 | Reviewed the AI collaboration report | – | – |
+| 한준형 | Reviewed the AI collaboration report | – | – |
+
+</details>

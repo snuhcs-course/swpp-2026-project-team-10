@@ -6,6 +6,7 @@
 - These documents may be updated over time, so check them regularly for the latest information. If any text referencing these documents is outdated, update it to reflect the current state of the documentation.
 - The `wiki/` folder is the source of the GitHub wiki. Edit the pages there, through a pull request like any other change; the `wiki-sync` workflow mirrors the folder to the wiki on every push to `dev`, deletions included, and overwrites anything edited on GitHub directly. Every file in `wiki/` becomes a wiki page or asset, so keep notes and READMEs out of it.
 - Do not make git commits or pushes to the repository on your own. Only make commits and pushes when instructed to do so by a human.
+- Every source file that AI wrote or substantially changed (Kotlin, Gradle scripts, Python, workflow YAML) starts with the marker `AI-generated with <tool>, <YYYY-MM-DD>, reviewed by <name>` as its first line, in the file's line-comment syntax (`//` or `#`), before any docstring or import. Name every tool used (for example `Claude Code`, `ChatGPT Codex`, or `ChatGPT Codex and Claude Code`), the date of the last AI change, and the team member who reviewed the result. One marker line per file, not per function or class, and only in source files, never in documentation, resources, or configuration data. Add or update the marker in the same PR as the code. The reviewer is a human; never fill in a name you were not given.
 
 ## Maintaining this file
 

@@ -10,6 +10,7 @@
 | 0.6 | 2026-10-06 | The Flow 2 wireframe is redrawn to match 0.5: the Consent notice, Scene photo, and Scene photo · Review come before Generating poses, and 6.3 has one row for each of them (Figure 2, 6.2, 6.3, 6.8). |
 | 0.7 | 2026-10-07 | Text as built in the final screen design: Generating poses labels the scene photo "Your photo" and "Same person and place · up to 30 s", which replaces "Generation may take up to 30 seconds" (FR-4.5, 6.3). "Saved without the guide" shows for 3 s, and the reason for a failed save stays until the next photo (6.2). |
 | 0.8 | 2026-10-09 | Final version for Iteration 1, synced with the current build and the team's decisions. HTTPS and WSS apply from Iteration 2; Iteration 1 uses HTTP and WS to the laptop on the test Wi-Fi (NFR-14). The storage failure text matches the app (US-1). The photographer sees "left" or "disconnected" as a 3 s notice (6.5). System back asks "Leave the session?" only on *Subject view*, and the guide is a semi-transparent cutout or a white outline (6.9, glossary). *Camera permission denied* is built in Iteration 1, and its wireframe is still to be drawn (6.8). This entry also records the composition grid and horizon bar (FR-1.9, FR-1.10), added on 2026-10-05. |
+| 0.9 | 2026-10-12 | Iteration 2 requirements from the kickoff on 2026-10-09 and the schedule of 2026-10-11. Dates: Iteration 2 runs 10/11–10/25 with the midterm on 10/21 (4.1). Camera: brightness, flash, aspect ratios 4:3, 16:9, and 1:1, and no shutter sound (FR-1.11–1.14); pinch zoom returns as a Could item with a guide-edit switch (FR-1.3, FR-7.1); the composition grid follows the chosen aspect ratio (FR-1.9). Guide: it never shows the reference's pixels or background and is an outline only, with the exact style decided in P23 (FR-2.2, FR-2.3, FR-3.5, 6.9, glossary); smooth edges with limbs that keep their shape (FR-2.9); it starts where the person stands in the reference (FR-3.1); a reference thumbnail in a corner of the Camera screen (FR-3.9); a guide color that contrasts with the background as a Could item (FR-3.10); saved guides live in the app's private storage (FR-3.8); the guide that keeps the reference's background is dropped (FR-2.8). Both people can move and resize the guide (FR-6.7, FR-7.2). Pose description with idea chips, *Generate 4 poses*, and *Skip, use the preset poses* (FR-4.4, FR-4.8, US-5, 6.3). Sign-in is with Google (FR-5.2). Invitations arrive as push notifications with an invite link as the fallback (FR-6.1, FR-6.2, US-9, 6.5); sessions across networks go through the public Pix server and a TURN relay (FR-6.5, section 7). The remote-control switch (FR-7.5) and remote focus (FR-7.7) are Could items for Iteration 2. New NFRs for smooth zoom and shutter (NFR-19) and account data (NFR-13, NFR-14); the Galaxy S21 joins the test devices (NFR-17). Iterations 3–4 gain selfie mode, a settings screen, and a Korean language setting; choosing the image model in the app is out of scope. |
 
 Items marked **TBD** need a team decision.
 
@@ -27,7 +28,7 @@ Items marked **TBD** need a team decision.
 
 ## 1. Project Abstract
 
-Pix is an Android camera app that helps two people get the portrait one of them has in mind. When friends photograph each other, the person in the photo usually knows the pose and framing they want, but only the photographer sees the screen, which leads to repeated instructions and retakes. Pix gives both people the same view. The photographer adds a pose guide to the camera, either from a gallery photo or from one of four poses that Pix generates for the current scene with an image-editing AI. Pix separates the person from the background and shows them as a semi-transparent cutout or outline that can be moved, resized, and faded. The photographer then invites a friend added by Pix ID. Once the friend accepts, their phone shows the photographer's live camera view with the same guide, over Wi-Fi or cellular data. With the photographer's permission, the friend can also adjust the shot from their own phone: the zoom, and later the guide's position and size, the brightness, and the flash. The photographer takes the photo, and it is saved at full quality without the guide. Without an account, two phones on the same Wi-Fi can also connect with a 6-digit room code, which is how Iteration 1 connects them. Later, a QR code will connect two phones even without internet.
+Pix is an Android camera app that helps two people get the portrait one of them has in mind. When friends photograph each other, the person in the photo usually knows the pose and framing they want, but only the photographer sees the screen, which leads to repeated instructions and retakes. Pix gives both people the same view. The photographer adds a pose guide to the camera, either from a gallery photo or from one of four poses that Pix generates for the current scene with an image-editing AI. Pix separates the person from the background and shows them as an outline that can be moved, resized, and faded; the reference's own pixels and background are never drawn on the camera. The photographer then invites a friend added by Pix ID. Once the friend accepts, their phone shows the photographer's live camera view with the same guide, over Wi-Fi or cellular data. With the photographer's permission, the friend can also adjust the shot from their own phone: the zoom, the guide's position and size, the brightness, and the flash. The photographer takes the photo, and it is saved at full quality without the guide. Without an account, two phones on the same Wi-Fi can also connect with a 6-digit room code. Later, a QR code will connect two phones even without internet.
 
 ---
 
@@ -103,9 +104,11 @@ Every "shoot together" session has two people with two phones. Roles are decided
 | Iteration | What users can do by the end of it |
 |---|---|
 | **Iteration 1**<br>9/27 – 10/9 · prototype | Open the camera and take photos; add a guide from a gallery photo or from four generated poses (predefined pose templates); adjust the guide; connect a second phone **with a room code on the same Wi-Fi**; see the live view and guide on the second phone; change the zoom from the second phone. |
-| **Iteration 2**<br>from 10/11 · tentative · midterm 10/21 | Create a Pix ID; add friends; invite a friend **over Wi-Fi or cellular data**; accept or decline invitations; move and resize the guide, adjust the brightness, and switch the flash from the subject's phone; allow or block remote control; automatic reconnection; describe the desired pose in words; save guides and reuse them. Room codes stay for use without signing in. |
-| **Iterations 3–4**<br>tentative · heuristic evaluation 11/2, UAT 11/6 | Connect two phones without internet by scanning a QR code; guides that keep the reference's background; set the focus remotely; send photos to the subject; fixes from the heuristic evaluation. Key stories for the user acceptance test (UAT) are fixed by the end of Iteration 3. |
+| **Iteration 2**<br>10/11 – 10/25 · midterm 10/21 | Sign in with Google and create a Pix ID; add friends; invite a friend **over Wi-Fi or cellular data** by push notification, or by an invite link if the push does not arrive; accept or decline invitations; automatic reconnection. Camera: tap to focus, brightness, flash, aspect ratios 4:3, 16:9, and 1:1, no shutter sound, and zooming without stutter. Guide: smooth outlines with limbs that keep their shape, a guide that starts where the person stands in the reference, a reference thumbnail, hide and replace, and saved guides. From the subject's phone: move and resize the guide, adjust the brightness, and switch the flash. Pose generation from idea chips or a typed description. Room codes stay for use without signing in. If time allows (Could): pinch zoom, the remote-control switch, remote focus, and a guide color that contrasts with the background. |
+| **Iterations 3–4**<br>tentative · heuristic evaluation 11/2, UAT 11/6 | Connect two phones without internet by scanning a QR code; selfie mode; a settings screen with the guide color and a frame-delay indicator for remote sessions; a Korean language setting; send photos to the subject; Could items left over from Iteration 2; fixes from the heuristic evaluation. Key stories for the user acceptance test (UAT) are fixed by the end of Iteration 3. |
 | **Iteration 5**<br>tentative | Polish, stability, and performance against the non-functional requirements, based on UAT feedback. |
+
+Iteration 2 overlaps with the midterm exams, so one or two Iteration 2 items may move to Iteration 3. The Must items of Iteration 2 are the smooth outlines (FR-2.9) and the zoom without stutter (NFR-19); they are fixed first.
 
 ### 4.2 Feature list
 
@@ -113,13 +116,13 @@ Priority: **Must** = required for the product to make sense · **Should** = impo
 
 | ID | Feature | What it covers | Priority | Target |
 |---|---|---|---|---|
-| F1 | **Camera** | Opens straight to the live preview; shutter, zoom, tap to focus; saves full-quality photos to the gallery. | Must | It 1 |
-| F2 | **Guide from a reference photo** | Pick a gallery photo; separate the person from the background on the device; preview as a cutout or outline. Later, the guide can keep the background too. | Must / Should | It 1 / It 3–4 |
-| F3 | **Guide overlay** | Show the guide over the preview; move, resize, fade, switch style, hide, remove; never saved in photos. Save guides to reuse them. | Must / Should | It 1 / It 2 |
-| F4 | **AI pose generation** | Four pose candidates of the same person in the same place, generated through the Pix server; pick one as the guide. Predefined poses first, then a pose described in words. | Must / Should | It 1 / It 2 |
-| F5 | **Pix account and friends** | Optional sign-in, needed only for friends; Pix ID, search by exact Pix ID, friend requests, friend list with online status. | Must | It 2 |
-| F6 | **Shoot-together session** | Invitation, live view on the subject's phone, guide sync, leaving and reconnecting, over Wi-Fi or cellular data. | Must | It 1 / It 2 |
-| F7 | **Remote control** | From their own phone, the subject changes the zoom, then the guide's position and size, the brightness, and the flash. The photographer sees each action, can block it, and always takes the photo. Remote focus comes later. | Must / Should / Could | It 1 – 3 |
+| F1 | **Camera** | Opens straight to the live preview; shutter, zoom, tap to focus, brightness, flash, aspect ratio, no shutter sound; saves full-quality photos to the gallery. Pinch zoom if time allows. | Must / Should / Could | It 1 / It 2 |
+| F2 | **Guide from a reference photo** | Pick a gallery photo; separate the person from the background on the device; preview as an outline that never shows the reference's pixels. Smooth edges with arms and legs that keep their shape. | Must | It 1 / It 2 |
+| F3 | **Guide overlay** | Show the guide over the preview, starting where the person stands in the reference; move, resize, fade, hide, replace, remove; a reference thumbnail; never saved in photos. Save guides to reuse them. A guide color that contrasts with the background if time allows. | Must / Should / Could | It 1 / It 2 |
+| F4 | **AI pose generation** | Four pose candidates of the same person in the same place, generated through the Pix server; pick one as the guide. Predefined poses, or a pose chosen from idea chips or described in words. | Must / Should | It 1 / It 2 |
+| F5 | **Pix account and friends** | Optional Google sign-in, needed only for friends; Pix ID, search by exact Pix ID, friend requests, friend list with online status. | Must | It 2 |
+| F6 | **Shoot-together session** | Invitation by push notification with an invite link as the fallback, live view on the subject's phone, guide sync, leaving and reconnecting, over Wi-Fi or cellular data through the public Pix server and a relay. | Must | It 1 / It 2 |
+| F7 | **Remote control** | From their own phone, the subject changes the zoom, the guide's position and size, the brightness, and the flash. The photographer sees each action and always takes the photo. The switch that blocks remote control and remote focus are Could items. | Must / Should / Could | It 1 – 2 |
 | F8 | **Room-code session** | 6-digit code on the same Wi-Fi, with no sign-in. The way to connect in Iteration 1, and kept afterward for people without an account. | Must | It 1 |
 | F9 | **Offline connection (QR)** | The photographer's phone creates a local hotspot and shows a QR code; the subject scans it and connects without internet. One phone only, and both people confirm before the session starts. | Should | It 3–4 |
 
@@ -134,14 +137,18 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 |---|---|---|---|
 | FR-1.1 | Pix opens directly to the rear-camera preview. No sign-in, menu, or splash screen comes before it. | Must | It 1 |
 | FR-1.2 | On first launch Pix asks for camera permission. If it is denied, Pix explains why the camera is needed and shows a button that opens the system settings. | Must | It 1 |
-| FR-1.3 | The camera screen has a shutter button and a continuous, single-value zoom slider whose endpoint labels show the phone's actual supported minimum and maximum, including 0.5× only when exposed by the hardware (otherwise, for example, 0.6× or 1×). Zoom is relative to the primary rear camera across lens switches. The readout shows the currently applied zoom, while the slider thumb stays under the user's control during a drag. The slider supports keyboard and accessibility input, and the readout retains Zoom in / Zoom out accessibility actions. Pinching the preview does not change camera zoom; guide pinch resizing remains separate (FR-3.3). | Must | It 1 |
+| FR-1.3 | The camera screen has a shutter button and a continuous, single-value zoom slider whose endpoint labels show the phone's actual supported minimum and maximum, including 0.5× only when exposed by the hardware (otherwise, for example, 0.6× or 1×). Zoom is relative to the primary rear camera across lens switches. The readout shows the currently applied zoom, while the slider thumb stays under the user's control during a drag. The slider supports keyboard and accessibility input, and the readout retains Zoom in / Zoom out accessibility actions. In Iteration 1 pinching the preview does not change camera zoom; guide pinch resizing remains separate (FR-3.3). **Could (It 2):** pinching the preview zooms the camera again. A guide-edit switch hands the pinch to the guide while it is on, so zooming and resizing the guide never clash; whether the slider stays next to pinch zoom is decided in P23. | Must / Could | It 1 / It 2 |
 | FR-1.4 | Tapping the preview focuses and sets exposure at that point. | Should | It 2 |
 | FR-1.5 | Photos are saved at the camera's full resolution to a "Pix" album in the gallery. No guide or on-screen control is included. | Must | It 1 |
 | FR-1.6 | After saving, "Saved without the guide" appears and the thumbnail updates. Tapping the thumbnail opens the photo in the gallery. | Must | It 1 |
 | FR-1.7 | If saving fails (for example, storage is full), Pix shows why, and the camera and guide stay as they were. | Must | It 1 |
 | FR-1.8 | The camera screen has entry points for *Guide* (add a pose guide) and *Shoot together*. | Must | It 1 |
-| FR-1.9 | The photographer's preview shows a 3×3 composition grid. The actual 3:4 image is divided into three equal columns and three equal rows, excluding letterbox bars. | Must | It 1 |
+| FR-1.9 | The photographer's preview shows a 3×3 composition grid. The actual image in the chosen aspect ratio (FR-1.13) is divided into three equal columns and three equal rows, excluding letterbox bars. | Must | It 1 |
 | FR-1.10 | A horizon bar at the center of the middle grid cell follows device tilt and turns dark yellow when level. If the horizon cannot be determined, the bar is hidden. The grid and bar do not block gestures or appear in saved photos or streamed video. | Must | It 1 |
+| FR-1.11 | The camera screen has a brightness slider that sets exposure compensation within the range the phone's camera supports. The applied value shows on the slider. | Should | It 2 |
+| FR-1.12 | The camera screen has a flash button with off, auto, and on. On a phone without a flash the button is hidden. | Should | It 2 |
+| FR-1.13 | The user chooses the aspect ratio 4:3, 16:9, or 1:1. The preview, the composition grid, the guide frame, the saved photo, and the live view all use the same frame, so 16:9 photos fit Instagram stories without cropping. This replaces the fixed 3:4 frame of Iteration 1; how each ratio is cropped from the sensor is decided in P23. | Should | It 2 |
+| FR-1.14 | Taking a photo plays no shutter sound, except where the phone requires one (`mustPlayShutterSound`, Android 13 and later). | Should | It 2 |
 
 #### F2 · Guide from a reference photo
 *Turn any photo of a person into a guide.*
@@ -149,27 +156,30 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
 | FR-2.1 | *Upload a reference* opens the system photo picker, and the user picks one photo. Pix does not need access to the whole gallery. | Must | It 1 |
-| FR-2.2 | Pix separates the person from the background on the phone and makes two guide styles: a semi-transparent cutout and an outline. | Must | It 1 |
-| FR-2.3 | *Reference confirm* shows the result with a Cutout/Outline switch and two actions: *Use this guide* and *Choose another photo*. | Must | It 1 |
+| FR-2.2 | Pix separates the person from the background on the phone and makes an outline guide. From Iteration 2 the guide never shows the reference's pixels or background; the person is drawn only as an outline. The exact outline style (line weight, color, and any fill) is decided in P23 and recorded in the Design Documentation. Iteration 1 also offered a semi-transparent cutout, which is removed. | Must | It 1 / It 2 |
+| FR-2.3 | *Reference confirm* shows the outline over a neutral background and two actions: *Use this guide* and *Choose another photo*. The Cutout/Outline switch of Iteration 1 is removed. | Must | It 1 / It 2 |
 | FR-2.4 | If no person can be separated, Pix shows *No person found* with *Choose another photo* and *Back to camera*. | Must | It 1 |
 | FR-2.5 | If the photo shows several people, such as a couple, all of them are kept in the guide. | Should | It 1 |
 | FR-2.6 | The reference photo is processed only on the phone and is never uploaded. | Must | It 1 |
 | FR-2.7 | Closing the picker without choosing returns to the camera, and any existing guide stays unchanged. | Must | It 1 |
-| FR-2.8 | The user can choose a guide that keeps the reference's background, drawn faintly around the person, so that the framing of the place can be matched as well as the pose. | Should | It 3–4 |
+| FR-2.8 | Dropped on 2026-10-09: a guide that keeps the reference's background. Framing the person matters more than the background, and the guide no longer shows the reference's pixels (FR-2.2). | — | Dropped |
+| FR-2.9 | The outline has smooth edges, and the arms and legs keep their real shape and length instead of coming out jagged, too thick, or too long. The same outline is built on the subject's phone from the received guide. | Must | It 2 |
 
 #### F3 · Guide overlay
 *Place the guide exactly where the person should stand.*
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-3.1 | A confirmed guide appears over the live preview. It starts centered, at a size where the person fills about 70% of the preview height. | Must | It 1 |
+| FR-3.1 | A confirmed guide appears over the live preview. From Iteration 2 it starts at the position and size the person has in the reference photo, mapped to the camera frame, and the user adjusts it from there. In Iteration 1 it started centered, at a size where the person filled about 70% of the preview height. | Must | It 1 / It 2 |
 | FR-3.2 | Dragging with one finger moves the guide. At least 20% of it always stays on screen. | Must | It 1 |
 | FR-3.3 | Pinching resizes the guide between 30% and 300% of its starting size. | Must | It 1 |
 | FR-3.4 | A slider changes the guide's opacity between 10% and 90%. | Must | It 1 |
-| FR-3.5 | A toggle switches between cutout and outline and keeps the same position and size. | Must | It 1 |
+| FR-3.5 | Removed in Iteration 2: the Cutout/Outline toggle. The guide is an outline only (FR-2.2). | — | It 1 only |
 | FR-3.6 | The user can hide the guide for a moment, remove it, or replace it with another one. | Should | It 2 |
 | FR-3.7 | The guide's position and size are kept relative to the camera image rather than the screen, so the guide lands on the same part of the scene on a phone with a different screen size. | Must | It 1 |
-| FR-3.8 | *Save guide* stores the current guide on the phone. *Add a pose guide* lists saved guides so the user can reuse or delete them. Saved guides never leave the phone. | Should | It 2 |
+| FR-3.8 | *Save guide* stores the current guide on the phone. *Add a pose guide* lists saved guides so the user can reuse or delete them. Saved guides live in the app's private storage, not in the gallery and not on the server, and survive an app restart. | Should | It 2 |
+| FR-3.9 | While a guide is set, a small thumbnail of the reference photo sits in a corner of the Camera screen, so the photographer still sees the original pose. Tapping it enlarges it; tapping again, or a close action, hides it. The thumbnail is not streamed to the subject and does not appear in photos. | Should | It 2 |
+| FR-3.10 | The guide color contrasts with the background: black or white by default, and the user can switch it. | Could | It 2 |
 
 #### F4 · AI pose generation
 *Pose ideas made for this person in this place.*
@@ -179,11 +189,11 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-4.1 | *Generate poses here* returns to the Camera screen to take the scene photo. The user frames the subject, with zoom as usual, and presses the shutter, then confirms the photo with *Use this photo* or takes another with *Shoot again*. Nothing is sent before the photo is confirmed, and the scene photo is not saved to the gallery. | Must | It 1 |
 | FR-4.2 | Before the first request, Pix says that the scene photo will be sent to an external AI service and asks for consent. Without consent, nothing is sent. | Should | It 1 |
 | FR-4.3 | Pix requests four candidates that keep the same person and background, through the Pix server. The server generates them with an image-editing model on OpenRouter; the model is a server setting (Design Documentation 2.6.3). | Must | It 1 |
-| FR-4.4 | In Iteration 1 the four poses come from predefined templates: hands on hips, wave, walking, and arms crossed. | Must | It 1 |
+| FR-4.4 | Without a description, the four poses come from predefined templates: hands on hips, wave, walking, and arms crossed. In Iteration 2 *Skip, use the preset poses* requests them. | Must | It 1 |
 | FR-4.5 | *Generating poses* shows the scene photo, each candidate as soon as it is ready, progress ("2 of 4 ready"), how long it may take ("up to 30 s"), and *Cancel*. | Must | It 1 |
 | FR-4.6 | *Pick a pose* shows the candidate images, without pose names. *Use this pose* sends the selected image to *Reference confirm* (F2). *Try other poses* requests a new set. | Must | It 1 |
 | FR-4.7 | If no candidate arrives within 30 s or every request fails, Pix shows *Couldn't create poses* with *Try again* and *Back to camera*, and keeps the scene photo. If only some candidates fail, the others are still shown. | Must | It 1 |
-| FR-4.8 | The user can describe the desired pose in Korean or English (up to 100 characters), and the candidates follow the description. | Should | It 2 |
+| FR-4.8 | After the scene photo is confirmed, *Generate poses* shows a thumbnail of the scene, idea chips, and a text field for a pose description in Korean or English (up to 100 characters, with a counter). Idea chips are the default: tapping a chip fills the field, and the user can edit or type their own text. *Generate 4 poses* requests candidates that follow the description; *Skip, use the preset poses* requests the predefined poses (FR-4.4). The server's default prompt keeps good framing of the person and the place whatever the description says. | Should | It 2 |
 | FR-4.9 | The Pix server does not keep the scene photo or the generated images after returning them. | Must | It 1 |
 
 #### F5 · Pix account and friends
@@ -192,7 +202,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
 | FR-5.1 | Pix works without an account: single-phone features (F1–F4), room codes (F8), and QR connections (F9) need no sign-in. Only friends and invitations need one. | Must | It 2 |
-| FR-5.2 | The first time the user opens the friend list in *Shoot together*, Pix asks them to sign in (method **TBD**, for example a Google account) and choose a Pix ID. A Pix ID is 4–20 characters of lowercase letters, digits, "." and "_". | Must | It 2 |
+| FR-5.2 | The first time the user opens the friend list in *Shoot together*, Pix asks them to sign in with their Google account and choose a Pix ID. The server verifies the Google sign-in and issues Pix's own session token, which the phone keeps. A Pix ID is 4–20 characters of lowercase letters, digits, "." and "_". | Must | It 2 |
 | FR-5.3 | A Pix ID that is taken or breaks the rules is rejected with the reason, and nothing is saved. | Must | It 2 |
 | FR-5.4 | The Friends screen shows the user's own Pix ID. Tapping it copies the ID. | Should | It 2 |
 | FR-5.5 | *Add a friend* finds users only by their exact Pix ID. There is no public list or partial-match search. | Must | It 2 |
@@ -207,13 +217,13 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-6.1 | *Invite* sends an invitation that reaches the friend as a notification, even when Pix is closed on the friend's phone. | Must | It 2 |
-| FR-6.2 | *Invite sent* shows "Waiting for &lt;name&gt;", the remote-control toggle (FR-7.5), and *Cancel invite*. | Must | It 2 |
+| FR-6.1 | *Invite* sends an invitation that reaches the friend as a push notification, even when Pix is closed on the friend's phone. If the push does not arrive, the photographer can share an invite link through the Android share sheet (for example KakaoTalk) or copy it; opening the link shows the same *Invitation* screen. | Must | It 2 |
+| FR-6.2 | *Invite sent* shows "Waiting for &lt;name&gt;", *Share invite link*, *Copy link*, and *Cancel invite*. The remote-control toggle (FR-7.5) is added here if it is built. | Must | It 2 |
 | FR-6.3 | An invitation expires after 30 s. If it is declined or expires, the photographer sees *Invite not accepted* with *Invite again* and *Back to camera*. | Must | It 2 |
 | FR-6.4 | The friend's *Invitation* screen shows who is inviting, with *Accept* and *Decline*. Opening an expired or cancelled invitation shows "This invitation is no longer available". | Must | It 2 |
-| FR-6.5 | After *Accept*, the phones connect whether they are on the same Wi-Fi, on different Wi-Fi networks, or on cellular data. Pix relays through a server when a direct connection is not possible. | Must | It 2 |
+| FR-6.5 | After *Accept*, the phones connect whether they are on the same Wi-Fi, on different Wi-Fi networks, or on cellular data. Signaling goes through the public Pix server, and a TURN relay on the same host forwards the live view when a direct connection is not possible. Room-code sessions use the same server and relay. | Must | It 2 |
 | FR-6.6 | The subject's *Subject view* shows the photographer's live camera in portrait, the photographer's name ("Dongje's camera"), and *Leave*. | Must | It 1 |
-| FR-6.7 | The guide appears on the subject's phone at the same relative position, size, opacity, and style as on the photographer's phone. It updates whenever the photographer changes, replaces, or removes it. | Must | It 1 |
+| FR-6.7 | The guide appears on the subject's phone at the same relative position, size, and opacity as on the photographer's phone, including its starting position (FR-3.1). It updates whenever either person moves or resizes it (FR-7.2), and whenever the photographer fades, hides, replaces, or removes it. | Must | It 1 / It 2 |
 | FR-6.8 | While connected, the photographer's camera shows "Live · &lt;name&gt; connected". | Must | It 1 |
 | FR-6.9 | A session has exactly one photographer and one subject. Inviting a friend who is already in a session shows "&lt;name&gt; is in another session". | Should | It 2 |
 | FR-6.10 | Either person can end the session (*End session* or *Leave*). The other person is told, and the photographer's camera keeps working on its own. | Must | It 1 |
@@ -227,13 +237,13 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-7.1 | *Subject view* has a continuous, single-value zoom slider with the photographer's actual supported minimum and maximum as endpoint labels. Moving it changes the photographer's zoom and the live view. During a drag, the thumb and readout follow the requested ratio immediately; afterward they settle on the applied ratio echoed by the photographer. Keyboard/accessibility adjustment is available through the slider and the readout's Zoom in / Zoom out actions. Pinching the live video does not change camera zoom. | Must | It 1 |
-| FR-7.2 | On *Subject view*, the subject can drag the guide to move it and pinch it to resize it, within the same limits as the photographer (FR-3.2, FR-3.3). Both phones show the change. Opacity and style stay with the photographer. | Must | It 2 |
-| FR-7.3 | *Subject view* has a brightness slider (exposure compensation, within the range the photographer's camera supports) and a flash button (off, auto, on). The flash button is hidden if the photographer's phone has no flash. | Should | It 2 |
+| FR-7.1 | *Subject view* has a continuous, single-value zoom slider with the photographer's actual supported minimum and maximum as endpoint labels. Moving it changes the photographer's zoom and the live view. During a drag, the thumb and readout follow the requested ratio immediately; afterward they settle on the applied ratio echoed by the photographer. Keyboard/accessibility adjustment is available through the slider and the readout's Zoom in / Zoom out actions. In Iteration 1 pinching the live video does not change camera zoom. **Could (It 2):** pinching the live video zooms the photographer's camera under the same guide-edit rule as FR-1.3. | Must / Could | It 1 / It 2 |
+| FR-7.2 | On *Subject view*, the subject can drag the guide to move it and pinch it to resize it, within the same limits as the photographer (FR-3.2, FR-3.3), so the subject can fix a guide that the photographer placed badly. Both phones show the change. Opacity, hiding, and replacing stay with the photographer. | Must | It 2 |
+| FR-7.3 | *Subject view* has a brightness slider and a flash button with the same range and states as the photographer's own controls (FR-1.11, FR-1.12). The flash button is hidden if the photographer's phone has no flash. | Should | It 2 |
 | FR-7.4 | The photographer sees a short notice for each remote action, such as "Junhyeong set zoom to 2×" or "Junhyeong moved the guide". | Should | It 1 |
-| FR-7.5 | The photographer can allow or block remote control on *Invite sent* and change it during the session. While it is blocked, the subject's remote controls are disabled with the message "Dongje turned off remote control". | Must | It 2 |
+| FR-7.5 | The photographer can allow or block remote control on *Invite sent* and change it during the session. While it is blocked, the subject's remote controls are disabled with the message "Dongje turned off remote control". Until this is built, remote control is always allowed. | Could | It 2 |
 | FR-7.6 | The photographer's own controls always keep working, and only the photographer takes photos. If both people change the zoom, the guide, or the brightness at the same moment, the later change wins and both phones show the same final value. | Must | It 1 |
-| FR-7.7 | The subject can also set the focus point remotely. | Could | It 3 |
+| FR-7.7 | The subject can also set the focus point remotely, as the photographer does with FR-1.4. | Could | It 2 |
 
 #### F8 · Room-code session
 *Connect on the same Wi-Fi without an account.*
@@ -262,7 +272,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 Each story lists its scenarios in Given-When-Then form. **Normal** is the expected path, **Failure** is an error or a rejected input, and **Edge** is an unusual but valid situation. Stories marked "UAT candidate" are proposals; the final UAT set is fixed by the end of Iteration 3.
 
 #### US-1 · Take a photo right after opening Pix
-<sub>F1 · FR-1.1–1.8 · Iteration 1</sub>
+<sub>F1 · FR-1.1–1.14 · Iteration 1 → Iteration 2 (focus, brightness, flash, aspect ratio, shutter sound, pinch zoom)</sub>
 
 > As a photographer, I want Pix to open straight to the camera, so that I do not miss the moment.
 
@@ -270,37 +280,51 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 |---|---|---|---|
 | **Normal** | Camera permission is granted | I open Pix | The rear-camera preview appears within 2 s, with the shutter, zoom slider and hardware endpoint labels, applied zoom readout, composition grid, horizon bar when available, *Guide*, and *Shoot together*. |
 | **Normal** | The preview is showing | I drag the zoom slider or adjust it with keyboard/accessibility input | The camera zoom changes within its supported range and the readout shows the applied ratio. During a drag, delayed camera updates do not pull the thumb away from my finger. |
-| **Normal** | A guide is on the preview | I pinch inside the guide, then pinch outside it | The first gesture resizes the guide; the second does not. Neither changes camera zoom. |
+| **Normal** | A guide is on the preview | I pinch inside the guide, then pinch outside it | The first gesture resizes the guide; the second does not. In Iteration 1 neither changes camera zoom. |
+| **Normal** (It 2, Could) | Pinch zoom is built and the guide-edit switch is off | I pinch the preview | The camera zooms, and the guide keeps its size. With the switch on, the same pinch resizes the guide instead. |
 | **Edge** | A slider drag crosses a lens boundary | The preview briefly restarts while I keep dragging | The drag keeps its latest target, and that ratio applies when the lens is ready. |
+| **Normal** (It 2) | The preview is showing | I change the zoom, including below 1× | The preview stays continuous, with no stutter and no loading pause (NFR-19). |
+| **Normal** (It 2) | The preview is showing | I tap a point in the preview | The camera focuses and meters there. |
+| **Normal** (It 2) | The preview is showing | I move the brightness slider or tap the flash button | The preview gets brighter or darker within the camera's range, and the flash cycles off, auto, on. |
+| **Normal** (It 2) | The preview is showing | I choose 16:9 | The preview, grid, and guide frame change to 16:9, and the next photo is saved in 16:9. |
+| **Normal** (It 2) | The preview is showing | I tap the shutter | No shutter sound plays, unless the phone requires one. |
+| **Edge** (It 2) | My phone has no flash | I look at the controls | There is no flash button. |
 | **Normal** | The preview is showing | I tap the shutter | The photo is saved to the "Pix" album within 2 s, a confirmation appears, and the thumbnail updates. |
 | **Failure** | I denied camera permission | Pix opens | Pix explains why it needs the camera and shows *Open settings* instead of a blank preview. |
 | **Failure** | The phone's storage is full | I tap the shutter | "Couldn't write the photo. Check available storage and try again." appears, and the camera stays ready. |
 
 #### US-2 · Turn a gallery photo into a pose guide
-<sub>F2 · FR-2.1–2.7 · Iteration 1 · UAT candidate</sub>
+<sub>F2 · FR-2.1–2.7, FR-2.9 · Iteration 1 → Iteration 2 (outline only, smooth edges) · UAT candidate</sub>
 
 > As a photographer, I want to pick a reference photo from my gallery and see the person in it on my camera screen, so that I can frame the shot the way my friend wants.
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | I tapped *Guide › Upload a reference* | I choose a photo with a clearly visible person | *Reference confirm* shows the person as a cutout within 2 s, with a Cutout/Outline switch. |
+| **Normal** | I tapped *Guide › Upload a reference* | I choose a photo with a clearly visible person | *Reference confirm* shows the person as an outline within 2 s. None of the photo's pixels or background are shown. |
+| **Normal** (It 2) | The person in the photo has an arm stretched out and legs apart | Processing finishes | The outline is smooth, and the arm and legs have their real shape and length. |
 | **Normal** | *Reference confirm* is showing | I tap *Use this guide* | The camera shows the guide over the live preview. |
 | **Failure** | I chose a photo with no person, such as a landscape | Processing finishes | *No person found* appears. *Choose another photo* reopens the picker, and *Back to camera* returns without a guide. |
 | **Edge** | The photo shows two people | Processing finishes | Both people are included in the guide. |
 | **Edge** | The photo picker is open and a guide was already set | I close the picker without choosing | I return to the camera, and the existing guide is unchanged. |
 
 #### US-3 · Adjust the guide to my composition
-<sub>F3 · FR-3.1–3.7, FR-1.5 · Iteration 1</sub>
+<sub>F3 · FR-3.1–3.10, FR-1.5 · Iteration 1 → Iteration 2 (starting position, hide, replace, thumbnail, saved guides)</sub>
 
-> As a photographer, I want to move, resize, fade, and restyle the guide, so that it matches the composition without hiding the scene.
+> As a photographer, I want to move, resize, fade, hide, and replace the guide, and keep the ones I like, so that it matches the composition without hiding the scene.
 
 | Case | Given | When | Then |
 |---|---|---|---|
 | **Normal** | A guide is on the preview | I drag it with one finger | It follows my finger, and the preview stays smooth. |
 | **Normal** | A guide is on the preview | I pinch it | It grows or shrinks, and stops at 30% and 300% of its starting size. |
-| **Normal** | A guide is on the preview | I move the opacity slider or tap the style toggle | The opacity changes between 10% and 90%, or the style switches between cutout and outline at the same position and size. |
+| **Normal** | A guide is on the preview | I move the opacity slider | The opacity changes between 10% and 90%. |
 | **Normal** | A guide is visible | I take a photo | The saved photo does not contain the guide. |
 | **Edge** | I am dragging the guide toward the edge | I keep dragging past the edge | It stops when only 20% of it is still on screen, so it cannot be lost. |
+| **Normal** (It 2) | I confirmed a reference where the person stands at the left edge | The guide appears | It appears at the left, at the person's size in the photo, not centered. |
+| **Normal** (It 2) | A guide is on the preview | I tap *Hide*, then *Show* | The guide disappears and comes back at the same position and size. |
+| **Normal** (It 2) | A guide is on the preview | I tap *Replace* and confirm another reference | The new guide takes the old one's place. |
+| **Normal** (It 2) | A guide is on the preview | I tap the reference thumbnail in the corner | The reference photo is shown large; tapping again hides it. It is not in my photos. |
+| **Normal** (It 2) | A guide is on the preview | I tap *Save guide*, close Pix, open it, and open *Add a pose guide* | The saved guide is listed and can be used or deleted. It is not in my gallery. |
+| **Normal** (It 2, Could) | The guide color is built and the scene is dark | I switch the guide color | The outline changes between black and white. |
 
 #### US-4 · Get pose ideas that fit this place
 <sub>F4 · FR-4.1–4.7, FR-4.9 · Iteration 1 · UAT candidate</sub>
@@ -325,8 +349,9 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | I typed "벽에 기대서 한 손은 주머니에" (leaning on the wall, one hand in a pocket) | I request poses | The candidates show that pose with the same person and place. |
-| **Edge** | The description field is empty | I request poses | Pix uses the predefined poses. |
+| **Normal** | *Generate poses* shows the scene thumbnail and idea chips | I tap a chip | Its text fills the description field, and I can edit it. |
+| **Normal** | I typed "벽에 기대서 한 손은 주머니에" (leaning on the wall, one hand in a pocket) | I tap *Generate 4 poses* | The candidates show that pose with the same person and place, still well framed. |
+| **Edge** | The description field is empty | I tap *Generate 4 poses* or *Skip, use the preset poses* | Pix uses the predefined poses. |
 | **Failure** | I am typing a description | I go past 100 characters | Further input is blocked, and the counter shows 100/100. |
 | **Failure** | The AI service rejects the description | The response arrives | Pix shows "Try a different description" and keeps my text. |
 
@@ -337,7 +362,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | I have no account | I tap *Shoot together*, sign in, and save the Pix ID "dongje.p" | *Friends* opens and shows "My Pix ID: dongje.p". |
+| **Normal** | I have no account | I tap *Shoot together*, sign in with Google, and save the Pix ID "dongje.p" | *Friends* opens and shows "My Pix ID: dongje.p". The next time, Pix does not ask me to sign in again. |
 | **Failure** | "dongje.p" is already used | I tap *Save* | "This Pix ID is taken" appears, and I stay on the screen with my input kept. |
 | **Failure** | I typed "Dong Je!" | I look at the *Save* button | *Save* is disabled, and the rule (4–20 characters: a–z, 0–9, ".", "_") is shown. |
 | **Edge** | I have no account | I use the camera, guides, or pose generation | Pix never asks me to sign in. |
@@ -379,6 +404,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Edge** | The invitation is waiting | I tap *Cancel invite* | I return to *Friends*. If Junhyeong opens the invitation now, it says it is no longer available. |
 | **Edge** | Junhyeong is already in another session | I tap *Invite* | "Junhyeong is in another session" appears, and no invitation is sent. |
 | **Edge** | Junhyeong is shown as offline because Pix is closed | I tap *Invite* | Junhyeong still receives the invitation as a notification. |
+| **Edge** | The invitation is waiting and Junhyeong says no notification arrived | I tap *Share invite link* and send it in KakaoTalk | Junhyeong opens the link, sees the same *Invitation* screen, and *Accept* connects us. |
 
 #### US-10 · See the photographer's framing live
 <sub>F6 · FR-6.4, 6.6, 6.10–6.12 · Iteration 1 (room code) → Iteration 2 (invitation) · UAT candidate</sub>
@@ -394,17 +420,18 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Edge** | The invitation expired or was cancelled | I tap the old notification | "This invitation is no longer available" appears. |
 
 #### US-11 · See the same guide on both phones
-<sub>F3, F6 · FR-3.7, FR-6.7 · Iteration 1 · UAT candidate</sub>
+<sub>F3, F6 · FR-3.7, FR-6.7 · Iteration 1 → Iteration 2 (moves from either phone) · UAT candidate</sub>
 
 > As a subject, I want the guide on my phone to match the photographer's, so that we both aim at the same target.
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | Dongje set a guide before I joined | I join the session | The same guide appears on my phone at the same relative position, size, opacity, and style. |
-| **Normal** | Both phones show the guide | Dongje drags, pinches, fades, or restyles it | My phone shows the same change within 0.3 s. |
-| **Normal** | Both phones show the guide | Dongje removes or replaces it | My phone removes or replaces it too. |
+| **Normal** | Dongje set a guide before I joined | I join the session | The same guide appears on my phone at the same relative position, size, and opacity. |
+| **Normal** | Both phones show the guide | Dongje drags, pinches, or fades it | My phone shows the same change within 0.3 s. |
+| **Normal** | Both phones show the guide | Dongje hides, removes, or replaces it | My phone hides, removes, or replaces it too. |
+| **Edge** (It 2) | Dongje and I drag the guide at almost the same moment | Both changes arrive | The later change wins, and both phones show the guide in the same place. |
 | **Edge** | My screen has a different aspect ratio from Dongje's | The guide is shown | It covers the same part of the camera image; the offset is at most 3% of the frame width. |
-| **Failure** | I am on *Subject view* | I look for the guide's opacity or style controls | There are none; only Dongje changes the opacity and style. In Iteration 1, I cannot move or resize the guide either (FR-7.2 adds this in Iteration 2). |
+| **Failure** | I am on *Subject view* | I look for the guide's opacity, hide, or replace controls | There are none; only Dongje changes those. From Iteration 2 I can move and resize the guide (FR-7.2). |
 
 #### US-12 · Adjust the shot from my phone
 <sub>F7 · FR-7.1–7.6 · Iteration 1 (zoom) → Iteration 2 (guide, brightness, flash, permission) · UAT candidate</sub>
@@ -419,7 +446,9 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Edge** | I am dragging the zoom slider while connected | The gesture is cancelled or I leave the screen | The last requested value is finalized and the drag ends. |
 | **Normal** | We are connected and remote control is allowed (It 2) | I drag the guide to the right and pinch it larger | The guide moves and grows on both phones, and Dongje sees "Junhyeong moved the guide". |
 | **Normal** | We are connected and remote control is allowed (It 2) | I raise the brightness slider | Dongje's preview and my live view get brighter within 0.5 s. |
-| **Failure** | Dongje turned off remote control (It 2) | I look at my controls | My remote controls are disabled with "Dongje turned off remote control". The live view continues. |
+| **Normal** (It 2) | We are connected and remote control is allowed | I tap the flash button | Dongje's flash cycles to the next state, and both phones show it. |
+| **Failure** (It 2, Could) | The remote-control switch is built and Dongje turned it off | I look at my controls | My remote controls are disabled with "Dongje turned off remote control". The live view continues. |
+| **Normal** (It 2, Could) | Remote focus is built | I tap a point in the live view | Dongje's camera focuses there. |
 | **Edge** | Dongje's phone has no usable ultra-wide range | *Subject view* opens | The slider starts at the actual supported minimum, typically 1×, and cannot request unsupported values. A device with a 0.6× minimum labels its endpoint 0.6×. |
 | **Edge** | Dongje's phone has no flash (It 2) | *Subject view* opens | The flash button is not shown. |
 | **Edge** | Dongje and I change the zoom at almost the same moment | Both changes arrive | The later change wins, and both phones show the same zoom level. |
@@ -456,7 +485,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. "(It 2)" means the
 |---|---|---|---|
 | NFR-1 | Performance | The camera preview appears within 2 s of tapping the app icon (cold start). | Screen recording; median of 10 launches. |
 | NFR-2 | Performance | The preview stays at 30 fps or more while a guide is shown and being dragged or pinched. | Frame-rate profiling during 30 s of dragging. |
-| NFR-3 | Response latency | A reference photo (up to 12 MP) is ready on *Reference confirm* within 2 s. | Timing logs; 90th percentile over 10 photos. |
+| NFR-3 | Response latency | A reference photo (up to 12 MP) is ready on *Reference confirm* within 2 s, including the outline smoothing of FR-2.9. | Timing logs; 90th percentile over 10 photos. |
 | NFR-4 | Response latency | The first pose candidate appears within 20 s and all four within 30 s. Requests stop at 30 s. | Timing logs over 10 requests on Wi-Fi. |
 | NFR-5 | Response latency | The live view on the subject's phone lags the real scene by at most 0.5 s on the same Wi-Fi and at most 0.8 s over cellular data or a relay (It 2). | Point the camera at a running stopwatch and photograph both screens together; 10 samples per network. |
 | NFR-6 | Quality | The live view runs at 720p and 24 fps or more on Wi-Fi. On a weak network it lowers quality, but not below 480p and 15 fps, instead of freezing. | Connection statistics logged during sessions. |
@@ -466,12 +495,13 @@ Targets are measured on a Galaxy S22 unless stated otherwise. "(It 2)" means the
 | NFR-10 | Reliability | At least 90% of sessions connect in each network combination: same Wi-Fi, different Wi-Fi, Wi-Fi with cellular, and cellular with cellular. (It 2) | 10 trials per combination. |
 | NFR-11 | Reliability | A drop shorter than 10 s recovers without a new invitation. Switching from Wi-Fi to cellular during a session does not crash the app. (It 2) | Turn on airplane mode for 5 s during a session; switch Wi-Fi off. |
 | NFR-12 | Resource use | A 10-minute session uses at most 10% of the photographer's battery. The live view uses at most 2.5 Mbps, about 190 MB per 10 minutes. | Battery statistics; bitrate from connection statistics. |
-| NFR-13 | Privacy | Reference photos never leave the phone. A scene photo is sent only when the user asks for poses, only to the Pix server, which passes it to the image-editing service to generate the poses (FR-4.2) and keeps no copy once the response is returned. Nothing from the live view is recorded or stored on any server. | Code review; server log review. |
-| NFR-14 | Security | API keys exist only on the server. All server traffic uses HTTPS or WSS (It 2; Iteration 1 uses HTTP and WS to the laptop on the test Wi-Fi). The live view and control messages are encrypted end to end between the phones, and a relay server cannot read them. | Inspect the APK for keys; configuration review. |
+| NFR-13 | Privacy | Reference photos and saved guides never leave the phone. A scene photo is sent only when the user asks for poses, only to the Pix server, which passes it to the image-editing service to generate the poses (FR-4.2) and keeps no copy once the response is returned. Nothing from the live view is recorded or stored on any server. The server stores only what friends and invitations need: the Google account identifier, the Pix ID, friendships and requests, and the push-notification device token (It 2). Tokens and personal data are never written to logs. | Code review; server log review. |
+| NFR-14 | Security | API keys exist only on the server. All server traffic uses HTTPS or WSS (It 2, on the public Pix server; Iteration 1 used HTTP and WS to the laptop on the test Wi-Fi). The server verifies Google sign-ins and issues its own session tokens; the Google token itself is never stored (It 2). The live view and control messages are encrypted end to end between the phones, and the relay server cannot read them. | Inspect the APK for keys; configuration review. |
 | NFR-15 | Access control | Only accepted friends can invite each other. Pix IDs are found only by exact match. Remote control works only while the photographer allows it. (It 2) A QR connection accepts only one phone and starts only after both people tap *Resume*. (It 3–4) | API tests with non-friend and blocked cases; a third phone tries to join a QR session. |
 | NFR-16 | Usability | Controls on *Subject view* are at least 48 dp and reachable with one thumb. Every failure screen says what happened and offers both a retry and a way back. A first-time user can add a guide and take a photo without help. | Hallway test with 5 people: at least 4 finish "add a guide and shoot" within 1 minute. |
-| NFR-17 | Compatibility | Pix runs on Android phones in portrait orientation. It is tested on a Galaxy S22 and a Galaxy S23 Ultra. The minimum version is Android 10 (API 29). | Full test pass on both devices each iteration. |
+| NFR-17 | Compatibility | Pix runs on Android phones in portrait orientation. It is tested on a Galaxy S22, a Galaxy S23 Ultra, and, from Iteration 2, a Galaxy S21. The minimum version is Android 10 (API 29). | Full test pass on every test device each iteration. |
 | NFR-18 | Scalability | The server handles at least 50 sessions at the same time (100 users). This is sized for demos and the UAT, not for a public launch. | Load test script. |
+| NFR-19 | Performance | Zooming does not stutter: the preview on the photographer's phone and the live view on the subject's phone stay continuous through every zoom change, and crossing below 1× shows no loading pause or blank preview (the last frame stays on screen if a lens must switch). (It 2) Could: the short freeze when the shutter is pressed is gone as well. | `Timings` marks on the Galaxy S21 and S22, with before and after numbers in the PR; 20 zoom changes per phone. |
 
 ---
 
@@ -492,14 +522,14 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 1: pose guide](images/flow1_pose_guide.jpg)
 
-*Figure 1. Camera → Add a pose guide → Reference confirm → Camera + guide → Photo saved, with the "No person found" failure. The original wireframe predates the zoom slider; the table below defines the current controls.*
+*Figure 1. Camera → Add a pose guide → Reference confirm → Camera + guide → Photo saved, with the "No person found" failure. The original wireframe predates the zoom slider, the Iteration 2 camera controls, and the outline-only guide; the table below defines the current controls.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Camera** | Live preview with a 3×3 grid and centered horizon bar; *Shoot together* (top); single-value zoom slider with actual minimum/maximum labels and applied zoom readout; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Zoom slider → continuous zoom, including keyboard/accessibility adjustment · Align phone → dark yellow horizon bar. | Preview pinch does not zoom the camera. Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. Unknown horizon or no sensor → hide the bar, retain the grid. |
-| **Add a pose guide** | Bottom sheet with *Upload a reference*, *Generate poses here*, and *Cancel*. | *Upload a reference* → system photo picker → Reference confirm · *Generate poses here* → Scene photo, after the Consent notice the first time (Flow 2) · *Cancel* or swipe down → Camera. | Picker closed without a choice → Camera with the old guide kept. |
-| **Reference confirm** | The separated person; Cutout/Outline switch; "Person found". | *Use this guide* → Camera + guide · *Choose another photo* → picker · Switch → preview the other style. | No person → No person found. |
-| **Camera + guide** | Guide over the preview; hint "Drag · pinch to resize"; style toggle; guide opacity slider; camera zoom slider; shutter. | Drag on guide → move · Pinch on guide → resize · Opacity slider → fade guide · Zoom slider → camera zoom · Toggle → cutout or outline · Shutter → Photo saved. | Size limited to 30–300%. At least 20% of the guide stays on screen. Starting outside the guide does not move or resize it, and preview pinches do not zoom the camera. |
+| **Camera** | Live preview with a 3×3 grid and centered horizon bar in the chosen aspect ratio; *Shoot together* (top); single-value zoom slider with actual minimum/maximum labels and applied zoom readout; (It 2) aspect ratio 4:3 / 16:9 / 1:1, brightness slider, and flash button; *Guide*, shutter, gallery thumbnail (bottom); hint "Tap Guide to add a pose". | *Guide* → Add a pose guide · Shutter → Photo saved, silently · *Shoot together* → Friends (It 2) or room code (It 1) · Thumbnail → system gallery · Zoom slider → continuous zoom, including keyboard/accessibility adjustment · (It 2) Tap the preview → focus and meter there · (It 2) Aspect ratio, brightness, flash → applied to the preview and the next photo · (It 2, Could) Pinch the preview → camera zoom while the guide-edit switch is off · Align phone → dark yellow horizon bar. | In Iteration 1 the preview pinch does not zoom the camera. Permission denied → explanation and *Open settings*. Camera busy in another app → "Camera unavailable" with *Retry*. Unknown horizon or no sensor → hide the bar, retain the grid. No flash hardware → no flash button. |
+| **Add a pose guide** | Bottom sheet with *Upload a reference*, *Generate poses here*, (It 2) the saved guides with *Use* and *Delete*, and *Cancel*. | *Upload a reference* → system photo picker → Reference confirm · *Generate poses here* → Scene photo, after the Consent notice the first time (Flow 2) · (It 2) *Use* on a saved guide → Camera + guide · *Cancel* or swipe down → Camera. | Picker closed without a choice → Camera with the old guide kept. |
+| **Reference confirm** | The person as an outline over a neutral background; "Person found". The exact outline style is decided in P23. | *Use this guide* → Camera + guide · *Choose another photo* → picker. | No person → No person found. In Iteration 1 this screen had a Cutout/Outline switch, which is removed. |
+| **Camera + guide** | Outline guide over the preview, starting where the person stands in the reference (It 2); hint "Drag · pinch to resize"; guide opacity slider; (It 2) *Hide* / *Show*, *Replace*, *Remove*, *Save guide*, the reference thumbnail in a corner, and, if built, the guide-edit switch and the guide color switch; camera zoom slider; shutter. | Drag on guide → move · Pinch on guide → resize · Opacity slider → fade guide · Zoom slider → camera zoom · (It 2) *Hide* → the guide disappears until *Show* · *Replace* → Add a pose guide, and the new guide takes the old one's place · *Save guide* → stored on the phone · Thumbnail → enlarge, tap again to hide · Shutter → Photo saved. | Size limited to 30–300%. At least 20% of the guide stays on screen. Starting outside the guide does not move or resize it. In Iteration 1 preview pinches do not zoom the camera; from Iteration 2, with pinch zoom built, the guide-edit switch decides which one the pinch does. The thumbnail is never in photos or the live view. |
 | **Photo saved** | "Saved without the guide" for 3 s; thumbnail updated; camera still live. | Thumbnail → gallery · Shutter → another photo. | Save failed → reason shown until the next photo; guide and camera unchanged. |
 | **No person found** | Failure message: "Pick a photo where one person is clearly visible." | *Choose another photo* → picker · *Back to camera* → Camera without a guide. | — |
 
@@ -507,16 +537,17 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 2: pose generation](images/flow2_pose_generation.jpg)
 
-*Figure 2. Consent notice (the first time) → Scene photo → Scene photo · Review → Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. The Scene photo frame draws zoom as in Figure 1, before the zoom slider; the table below defines the current controls.*
+*Figure 2. Consent notice (the first time) → Scene photo → Scene photo · Review → Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. The Scene photo frame draws zoom as in Figure 1, before the zoom slider, and the Iteration 2 Generate poses screen, accepted on 2026-10-09, is not in the wireflow yet (6.8); the table below defines the current controls.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Consent notice** | A dialog over Add a pose guide, the first time only: "Send this photo to an AI service?"; that Pix sends the scene photo taken next through the Pix server to an external AI image service, and that the server does not keep it; *Not now* and *Agree and continue*. | *Agree and continue* → Scene photo, and the notice is not shown again · *Not now* → Add a pose guide. | Nothing is sent without consent (FR-4.2). |
 | **Scene photo** | The Camera screen with "Take the scene photo" and *Cancel* in place of *Shoot together*; the preview, grid, zoom slider, and shutter as usual; "Frame the person and the place, then press the shutter."; *Guide*, the thumbnail, and any earlier guide are hidden. | Zoom slider → zoom · Shutter → Scene photo · Review, and nothing is saved · *Cancel* → Camera. | The shutter is disabled until the camera is ready. Nothing is sent. System back is *Cancel*. |
-| **Scene photo · Review** | The same screen with "Use this photo?" and *Cancel*; the photo that was taken, in place of the preview; "Pix sends this photo to create the poses."; *Shoot again* and *Use this photo*. | *Use this photo* → Generating poses · *Shoot again* → Scene photo · *Cancel* → Camera. | No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again*. |
+| **Scene photo · Review** | The same screen with "Use this photo?" and *Cancel*; the photo that was taken, in place of the preview; "Pix sends this photo to create the poses."; *Shoot again* and *Use this photo*. | *Use this photo* → Generate poses (It 2; Generating poses in It 1) · *Shoot again* → Scene photo · *Cancel* → Camera. | No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again*. |
+| **Generate poses** (It 2) | A thumbnail of the scene photo; idea chips; a description field for Korean or English with a "0/100" counter; *Generate 4 poses*; *Skip, use the preset poses*; *Cancel*. | Tap a chip → its text fills the field · Type → the counter updates · *Generate 4 poses* → Generating poses with the description · *Skip, use the preset poses* → Generating poses with the predefined poses · *Cancel* → Camera. | Input stops at 100 characters. An empty field with *Generate 4 poses* uses the predefined poses. System back is *Cancel*. |
 | **Generating poses** | The scene photo, labeled "Your photo" and "Same person and place · up to 30 s"; four slots that fill in as candidates arrive; "n of 4 ready". | *Cancel* → Camera · All ready, or 30 s with at least one ready → Pick a pose. | Candidates cannot be selected until generation ends. No candidate, or an error → Couldn't create poses. |
 | **Pick a pose** | 2×2 grid of candidate images, without pose names; the selected one is highlighted. | Tap a candidate → select · *Use this pose* → Reference confirm (Flow 1) · *Try other poses* → Generating poses with a new set. | *Use this pose* is disabled until a candidate is selected. |
-| **Couldn't create poses** | "The request failed or took over 30 s. Your photo is kept." and the scene photo. | *Try again* → Generating poses with the same photo · *Back to camera* → Camera. | — |
+| **Couldn't create poses** | "The request failed or took over 30 s. Your photo is kept." and the scene photo. (It 2) If the service rejected the description: "Try a different description", with the text kept. | *Try again* → Generating poses with the same photo · (It 2) *Edit description* → Generate poses with the text kept · *Back to camera* → Camera. | — |
 
 ### 6.4 Flow 3 · Add a friend by Pix ID
 
@@ -526,7 +557,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Friends (empty)** | "Shoot together · Invite a friend to see your camera live"; "No friends yet"; "My Pix ID: dongje.p". | *Add a friend* → Add a friend · Tap own Pix ID → copied · System back → Camera. | No account yet → Pix ID setup first (screen to be drawn, see 6.8). |
+| **Friends (empty)** | "Shoot together · Invite a friend to see your camera live"; "No friends yet"; "My Pix ID: dongje.p". | *Add a friend* → Add a friend · Tap own Pix ID → copied · System back → Camera. | No account yet → Google sign-in, then Pix ID setup first (screen to be drawn, see 6.8). |
 | **Add a friend** | Search field for a Pix ID; result card with name, @ID, and *Add*; note "Junhyeong gets a friend request and accepts it in Pix." | Type an ID and search → result or No user found · *Add* → "Requested" · *Back* → Friends. | Characters other than a–z, 0–9, ".", "_" are not accepted. Search is disabled while the field is empty. Own ID, an existing friend, or a pending request → labeled instead of *Add*. |
 | **Friends (list)** | Friend rows with name, Online/Offline, and *Invite*; *Add a friend*; "Works on Wi-Fi or cellular data". | *Invite* → Invite sent (Flow 4) · *Add a friend* → Add a friend · Long-press a friend → *Remove friend*. | Friend already in a session → "&lt;name&gt; is in another session". |
 | **No user found** | The searched ID highlighted; "Check the Pix ID with your friend and try again." | *Search again* → Add a friend with the text kept · *Back* → Friends. | — |
@@ -539,8 +570,8 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Invite sent** | "Waiting for Junhyeong"; "Junhyeong gets a notification. The live view starts when they accept."; toggle "Let Junhyeong adjust the camera and guide" (on by default). | Toggle → allow or block remote control · *Cancel invite* → Friends · Friend accepts → Friend connected. | Declined or no answer in 30 s → Invite not accepted. |
-| **Friend connected** | Camera + guide with the badge "Live · Junhyeong connected"; notices for remote actions ("Junhyeong set zoom to 2×"); *End session* in place of *Shoot together* (top). | All camera and guide inputs from Flow 1 · *End session* → Camera alone, and the subject is told · Remote zoom (and, from Iteration 2, guide, brightness, and flash) from the subject → applied here. | Subject leaves or disconnects → notice "Junhyeong left" or "Junhyeong disconnected" for 3 s; the camera keeps working. |
+| **Invite sent** | "Waiting for Junhyeong"; "Junhyeong gets a notification. The live view starts when they accept."; *Share invite link* and *Copy link* under "No notification? Send a link instead."; if built (Could), the toggle "Let Junhyeong adjust the camera and guide" (on by default). | *Share invite link* → Android share sheet with the link · *Copy link* → copied · Toggle → allow or block remote control · *Cancel invite* → Friends · Friend accepts, from the notification or the link → Friend connected. | Declined or no answer in 30 s → Invite not accepted. |
+| **Friend connected** | Camera + guide with the badge "Live · Junhyeong connected"; notices for remote actions ("Junhyeong set zoom to 2×", "Junhyeong moved the guide"); *End session* in place of *Shoot together* (top). | All camera and guide inputs from Flow 1 · *End session* → Camera alone, and the subject is told · Remote zoom (and, from Iteration 2, guide moves, brightness, and flash) from the subject → applied here and echoed back. | Subject leaves or disconnects → notice "Junhyeong left" or "Junhyeong disconnected" for 3 s; the camera keeps working. |
 | **Invite not accepted** | "Junhyeong declined or didn't answer within 30 seconds." | *Invite again* → Invite sent · *Back to camera* → Camera. | — |
 
 ### 6.6 Flow 5 · Shoot together, subject's phone
@@ -551,8 +582,8 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Invitation** | Opened from the notification "Dongje invites you to shoot together"; "You'll see the framing and pose guide live." | *Accept* → Subject view · *Decline* → closes, and the photographer sees Invite not accepted. | Expired or cancelled → "This invitation is no longer available" (screen to be drawn). |
-| **Subject view** | Photographer's live camera with the synced guide; "Dongje's camera"; *Leave*; single-value zoom slider with the photographer's actual minimum/maximum labels and ratio readout; from Iteration 2, a brightness slider and a flash button. No shutter. | Zoom slider, keyboard, or accessibility action → photographer's zoom changes; during a drag the local readout follows the request, then settles on the applied echo · (It 2) drag or pinch the guide → it moves or resizes on both phones · (It 2) brightness slider or flash button → applied to the photographer's camera · *Leave* (or system back, then confirm) → own Camera. | Live-video pinch does not change camera zoom. The guide's opacity and style cannot be changed here, and in Iteration 1 it cannot be moved or resized either. Remote control blocked → controls disabled with a message. Connection lost → Connection lost. |
+| **Invitation** | Opened from the notification "Dongje invites you to shoot together" or from an invite link; "You'll see the framing and pose guide live." | *Accept* → Subject view · *Decline* → closes, and the photographer sees Invite not accepted. | Expired or cancelled → "This invitation is no longer available" (screen to be drawn). |
+| **Subject view** | Photographer's live camera in the photographer's aspect ratio, with the synced guide; "Dongje's camera"; *Leave*; single-value zoom slider with the photographer's actual minimum/maximum labels and ratio readout; from Iteration 2, a brightness slider and a flash button. No shutter. | Zoom slider, keyboard, or accessibility action → photographer's zoom changes; during a drag the local readout follows the request, then settles on the applied echo · (It 2) drag or pinch the guide → it moves or resizes on both phones · (It 2) brightness slider or flash button → applied to the photographer's camera · (It 2, Could) pinch the live video → photographer's zoom under the guide-edit rule · (It 2, Could) tap the live video → photographer's focus · *Leave* (or system back, then confirm) → own Camera. | In Iteration 1 a live-video pinch does not change camera zoom, and the guide cannot be moved or resized. The guide's opacity, hiding, and replacing cannot be changed here. Remote control blocked (if the switch is built) → controls disabled with a message. Connection lost → Connection lost. |
 | **Connection lost** | "Video stopped · Check your connection and reconnect". | *Reconnect* → Subject view if the session is still open, otherwise "Session ended" → Camera · *Leave* → Camera. | — |
 
 ### 6.7 Flow 6 · Room code
@@ -577,11 +608,13 @@ These screens follow from the requirements above but are not yet in the wirefram
 | Pix ID setup | Sign in, then choose a Pix ID with live rule checking. | FR-5.2, FR-5.3 |
 | Friend requests | List of received requests with *Accept* / *Decline*. | FR-5.7 |
 | Invitation no longer available | Shown when an expired or cancelled invitation is opened. | FR-6.4 |
-| Camera and Subject view (update) | Draw the zoom slider and actual hardware endpoint labels in Flows 1, 2, 5, and 6; remove *Take photo* from Subject view; add the brightness slider and flash button (It 2). | FR-1.3, FR-7.1–7.3 |
-| Subject view, control blocked | Disabled remote controls with the reason. | FR-7.5 |
-| Pose description input | Text field (100 characters) on Add a pose guide. | FR-4.8 |
+| Camera and Subject view (update) | Draw the zoom slider and actual hardware endpoint labels in Flows 1, 2, 5, and 6; remove *Take photo* from Subject view; add the aspect-ratio control, brightness slider, and flash button; draw the outline-only guide, the reference thumbnail, *Hide*, *Replace*, and *Save guide*; the guide-edit switch if pinch zoom is built (It 2). | FR-1.3, FR-1.11–1.13, FR-3.6, FR-3.8, FR-3.9, FR-7.1–7.3 |
+| Reference confirm (update) | Remove the Cutout/Outline switch; show the outline style chosen in P23. | FR-2.2, FR-2.3 |
+| Generate poses | The screen accepted on 2026-10-09: scene thumbnail, idea chips, 100-character field with a counter, *Generate 4 poses*, *Skip, use the preset poses*. Add the image to Flow 2. | FR-4.8 |
+| Invite sent (update) | *Share invite link* and *Copy link*; the remote-control toggle only if it is built. | FR-6.1, FR-6.2, FR-7.5 |
+| Subject view, control blocked | Disabled remote controls with the reason. Could item. | FR-7.5 |
 | Saved guides | *Save guide* on Camera + guide; the saved list on Add a pose guide. | FR-3.8 |
-| Background option | A switch on Reference confirm that keeps the background in the guide. | FR-2.8 |
+| Selfie mode and Settings | Front camera; a settings screen with the guide color, a frame-delay indicator for remote sessions, and the language (It 3–4). | Iteration 3–4 scope (4.1) |
 | Show QR, Scan QR, Connected | The QR code and hotspot status; the scanner; both phones confirm with *Resume*. | FR-9.1–9.4 |
 
 ### 6.9 Rules for every screen
@@ -590,7 +623,8 @@ These screens follow from the requirements above but are not yet in the wirefram
 - **System back** does the same as the screen's secondary action (*Back* or *Cancel*). On *Subject view*, it first asks "Leave the session?".
 - **Waiting states** always say what the app is waiting for and how long it may take, and offer *Cancel*.
 - **Failure screens** always state what happened in plain words, offer a primary retry, and offer a way back. No screen is a dead end.
-- **The guide** is drawn only inside the camera image, as a semi-transparent cutout or a white outline of the person, so it is not mistaken for a control.
+- **The guide** is drawn only inside the camera image, as an outline of the person that never shows the reference's pixels or background, so it is not mistaken for a control or for the scene. The exact outline style is decided in P23 and recorded in the Design Documentation.
+- **Language.** The UI is in English. A Korean translation comes with a language setting at the end, if there is time (Iteration 3–4).
 
 ---
 
@@ -599,11 +633,11 @@ These screens follow from the requirements above but are not yet in the wirefram
 **Assumptions**
 - Both people have an Android phone with Pix installed.
 - The photographer's phone has a rear camera. Multiple lenses are optional.
-- Pose generation, friends, and invitations need an internet connection. The camera and gallery guides work offline, and from Iteration 3–4 two phones can connect offline with a QR code (F9).
+- Pose generation, friends, and invitations need an internet connection. Friends and invitations also need a Google account. The camera and gallery guides work offline, and from Iteration 3–4 two phones can connect offline with a QR code (F9).
 
 **Constraints**
 - The image-editing API has usage costs and rate limits. Pix uses OpenRouter's Image API, which bills each generated image, so the server limits how many poses one phone can request per hour.
-- In Iteration 1, both phones and the Pix server, which runs on a laptop, are on the same Wi-Fi network, and the phones connect with a room code. Cellular connections need a relay server, planned for Iteration 2.
+- From Iteration 2 the Pix server runs on a public host: the course-provided server if it is available, otherwise AWS, with Docker and nginx, and a TURN relay on the same host for sessions across networks. GitHub hosting serves only static pages and cannot run it. In Iteration 1 the server ran on a laptop on the test Wi-Fi, and the phones connected with a room code.
 - Development follows the course schedule: about 10 hours of work per member per iteration.
 
 **Out of scope**
@@ -614,6 +648,9 @@ These screens follow from the requirements above but are not yet in the wirefram
 - Beauty filters and photo editing.
 - Public profiles or a social feed.
 - Running the generative model on the phone.
+- Choosing the image model in the app, because it would show our costs; the model stays a server setting.
+- A guide that keeps the reference's background (dropped on 2026-10-09).
+- Video, until the remote session is stable; it is not planned before Iteration 5.
 
 ---
 
@@ -624,13 +661,16 @@ These screens follow from the requirements above but are not yet in the wirefram
 | **Photographer** | The person holding the phone that takes the photo. |
 | **Subject** | The friend in the photo, who joins the session from their own phone. |
 | **Reference** | The photo that shows the desired pose: a gallery photo or a selected pose candidate. |
-| **Guide** | The person from the reference drawn over the camera preview, as a **cutout** (semi-transparent image) or an **outline** (white contour). |
+| **Guide** | The person from the reference drawn over the camera preview as an **outline**, without the reference's pixels or background. The exact style is decided in P23. Iteration 1 also had a semi-transparent **cutout**, which is removed. |
+| **Reference thumbnail** | A small copy of the reference photo in a corner of the Camera screen, so the photographer still sees the original pose (Iteration 2). |
+| **Idea chip** | A short preset pose description on *Generate poses* that fills the description field when tapped (Iteration 2). |
+| **Invite link** | A link to an invitation that the photographer shares when the push notification does not arrive; it opens the same *Invitation* screen (Iteration 2). |
 | **Pose candidate** | One of four images generated from the scene photo, showing the same person and place in a different pose. |
 | **Session** | A live connection between one photographer's phone and one subject's phone. |
 | **Live view** | The photographer's camera image as shown on the subject's phone. |
-| **Remote control** | The subject adjusting the shot from their own phone: the zoom in Iteration 1, and the guide's position and size, the brightness, and the flash from Iteration 2. The photographer always takes the photo. |
+| **Remote control** | The subject adjusting the shot from their own phone: the zoom in Iteration 1, and the guide's position and size, the brightness, and the flash from Iteration 2. Either person can move and resize the guide. The photographer always takes the photo. |
 | **Pix ID** | A unique user name, such as "junhyeong.h", that friends use to find each other. |
 | **Room code** | A 6-digit code that connects two phones on the same Wi-Fi without an account. |
-| **Relay** | A server that forwards the encrypted live view when the two phones cannot connect directly, for example on cellular data. |
+| **Relay** | A TURN server next to the Pix server that forwards the encrypted live view when the two phones cannot connect directly, for example on cellular data (Iteration 2). |
 | **QR connection** | Connecting two phones without internet: the photographer's phone creates a local hotspot and shows its details as a QR code, which the subject scans (Iteration 3–4). |
 | **Saved guide** | A guide stored on the phone to reuse later (Iteration 2). |

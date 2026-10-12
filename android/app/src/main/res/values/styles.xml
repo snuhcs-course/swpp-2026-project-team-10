@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall;
+     radius 999 for chips and pills, 16 for buttons and cards, 28 for sheets. -->
+<resources>
+
+    <!-- Type: Manrope for the UI, DM Mono for the room code. -->
+    <style name="TextAppearance.Pix.Title" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/manrope_extrabold</item>
+        <item name="fontFamily">@font/manrope_extrabold</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
+    <style name="TextAppearance.Pix.SheetTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">@font/manrope_extrabold</item>
+        <item name="fontFamily">@font/manrope_extrabold</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Header" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">@font/manrope_bold</item>
+        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Action" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">@font/manrope_bold</item>
+        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Action.Small">
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="TextAppearance.Pix.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:fontFamily">@font/manrope_medium</item>
+        <item name="fontFamily">@font/manrope_medium</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text_soft</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">@font/manrope_medium</item>
+        <item name="fontFamily">@font/manrope_medium</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text_muted</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Body.Small">
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Label" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:fontFamily">@font/manrope_semibold</item>
+        <item name="fontFamily">@font/manrope_semibold</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text_soft</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Label.Bold">
+        <item name="android:fontFamily">@font/manrope_bold</item>
+        <item name="fontFamily">@font/manrope_bold</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Caption" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:fontFamily">@font/manrope_bold</item>
+        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text_muted</item>
+    </style>
+
+    <!-- A small heading over a value, such as YOUR ROOM CODE. -->
+    <style name="TextAppearance.Pix.Overline" parent="TextAppearance.Pix.Caption">
+        <item name="android:textSize">13sp</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Code" parent="TextAppearance.Material3.DisplayMedium">
+        <item name="android:fontFamily">@font/dm_mono_medium</item>
+        <item name="fontFamily">@font/dm_mono_medium</item>
+        <item name="android:textSize">56sp</item>
+        <item name="android:letterSpacing">0.1</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
+    <style name="TextAppearance.Pix.Code.Digit">
+        <item name="android:textSize">28sp</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+
+    <!-- A TextView without its own text appearance. -->
+    <style name="Widget.Pix.TextView" parent="Widget.MaterialComponents.TextView">
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Body</item>
+    </style>
+
+    <!-- Buttons. Primary is the one accent action of a screen; Secondary its way back. -->
+    <style name="Widget.Pix.Button" parent="Widget.Material3.Button">
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">20dp</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="backgroundTint">@color/button_primary_background</item>
+        <item name="android:textColor">@color/button_primary_text</item>
+        <item name="iconTint">@color/button_primary_text</item>
+        <item name="rippleColor">#1F141413</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
+    </style>
+
+    <style name="Widget.Pix.Button.Secondary" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">20dp</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="strokeColor">@color/button_secondary_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/button_secondary_text</item>
+        <item name="iconTint">@color/button_secondary_text</item>
+        <item name="iconPadding">8dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
+    </style>
+
+    <style name="Widget.Pix.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="cornerRadius">14dp</item>
+        <item name="android:textColor">@color/button_text_text</item>
+        <item name="rippleColor">#14FFFFFF</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <!-- A pill over the preview: 44 dp of glass inside a 48 dp touch target. -->
+    <style name="Widget.Pix.Button.Glass" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">2dp</item>
+        <item name="android:insetBottom">2dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="cornerRadius">22dp</item>
+        <item name="backgroundTint">@color/pix_glass</item>
+        <item name="strokeColor">@color/pix_glass_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/button_secondary_text</item>
+        <item name="iconTint">@color/button_secondary_text</item>
+        <item name="iconSize">20dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <style name="Widget.Pix.Button.Glass.Danger">
+        <item name="strokeColor">@color/pix_danger_stroke</item>
+        <item name="android:textColor">@color/button_danger_text</item>
+        <item name="iconTint">@color/button_danger_text</item>
+    </style>
+
+    <!-- An icon-only round button, such as Remove guide. -->
+    <style name="Widget.Pix.Button.Icon" parent="Widget.Material3.Button.IconButton">
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="iconSize">20dp</item>
+        <item name="iconTint">@color/button_secondary_text</item>
+        <item name="rippleColor">#1FFFFFFF</item>
+    </style>
+
+    <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->
+    <style name="Widget.Pix.Button.Segment" parent="Widget.Material3.Button.TextButton">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="backgroundTint">@color/segment_background</item>
+        <item name="android:textColor">@color/segment_text</item>
+        <item name="rippleColor">#14FFFFFF</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label.Bold</item>
+    </style>
+
+    <!-- Sliders: a thin track and a round thumb, like the zoom and opacity controls of a camera. -->
+    <style name="Widget.Pix.Slider" parent="Widget.Material3.Slider">
+        <item name="trackHeight">4dp</item>
+        <item name="thumbWidth">20dp</item>
+        <item name="thumbHeight">20dp</item>
+        <item name="thumbTrackGapSize">0dp</item>
+        <item name="trackStopIndicatorSize">0dp</item>
+        <item name="trackInsideCornerSize">2dp</item>
+        <item name="thumbColor">@color/pix_text</item>
+        <item name="trackColorActive">@color/pix_accent</item>
+        <item name="trackColorInactive">#33FFFFFF</item>
+        <item name="haloColor">#33F2C14E</item>
+        <item name="haloRadius">18dp</item>
+        <item name="tickVisible">false</item>
+        <item name="labelStyle">@style/Widget.Pix.Slider.Label</item>
+    </style>
+
+    <!-- The guide's own controls use the guide color. -->
+    <style name="Widget.Pix.Slider.Guide">
+        <item name="trackColorActive">@color/pix_guide</item>
+        <item name="haloColor">#335EEAD4</item>
+    </style>
+
+    <style name="Widget.Pix.Slider.Label" parent="Widget.Material3.Slider.Label">
+        <item name="backgroundTint">@color/pix_surface_3</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
+    <!-- Status chips over the preview. -->
+    <style name="Widget.Pix.Chip" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">32dp</item>
+        <item name="android:background">@drawable/bg_chip_glass</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:drawablePadding">8dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
+    </style>
+
+    <!-- "Live · <name> connected" (FR-6.8) and "<name>'s camera". -->
+    <style name="Widget.Pix.Chip.Live">
+        <item name="android:minHeight">44dp</item>
+        <item name="android:background">@drawable/bg_chip_live</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="drawableStartCompat">@drawable/ic_live_dot</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
+    <style name="Widget.Pix.Header.Back" parent="">
+        <item name="android:layout_width">48dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_marginStart">-12dp</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:src">@drawable/ic_arrow_back</item>
+        <item name="android:contentDescription">@string/back</item>
+        <item name="tint">@color/pix_text</item>
+    </style>
+
+    <!-- One box of the 6-digit room code (R&S 6.7). Six of them fit a 360 dp wide phone. -->
+    <style name="Widget.Pix.CodeDigit" parent="">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">58dp</item>
+        <item name="android:background">@drawable/bg_code_digit</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Code.Digit</item>
+    </style>
+
+    <!-- A Generating poses / Pick a pose candidate. -->
+    <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardBackgroundColor">@color/pix_surface</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/pose_card_stroke</item>
+        <item name="rippleColor">#14FFFFFF</item>
+    </style>
+
+    <style name="Widget.Pix.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/pix_surface</item>
+        <item name="cardCornerRadius">24dp</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+
+    <!-- Sheets and dialogs. -->
+    <style name="ShapeAppearance.Pix.Sheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Pix.Dialog" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">28dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Pix.Thumbnail" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <!-- Matches Widget.Pix.PoseCard, so the image follows the card's corners. -->
+    <style name="ShapeAppearance.Pix.PoseImage" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">18dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Pix.SmallThumbnail" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+
+    <style name="Widget.Pix.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@color/pix_surface</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Pix.Sheet</item>
+    </style>
+
+    <style name="Widget.Pix.BottomSheet.DragHandle" parent="Widget.Material3.BottomSheet.DragHandle">
+        <item name="tint">#47FFFFFF</item>
+    </style>
+
+    <style name="MaterialAlertDialog.Pix.Title.Text" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textAppearance">@style/TextAppearance.Pix.SheetTitle</item>
+    </style>
+
+    <style name="MaterialAlertDialog.Pix.Body.Text" parent="MaterialAlertDialog.Material3.Body.Text">
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Body</item>
+        <item name="android:lineSpacingMultiplier">1.2</item>
+    </style>
+
+    <style name="Widget.Pix.Button.Dialog" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/button_text_text</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <style name="Widget.Pix.Button.Dialog.Positive">
+        <item name="android:textColor">@color/pix_accent</item>
+    </style>
+</resources>

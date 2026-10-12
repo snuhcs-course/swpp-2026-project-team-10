@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generating poses (R&S 6.3). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="48dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/generating_title"
+            android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
+
+        <!-- "n of 4 ready" while the slots fill in. -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_chip_surface"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp">
+
+            <ProgressBar
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:importantForAccessibility="no"
+                android:indeterminateTint="@color/pix_accent" />
+
+            <TextView
+                android:id="@+id/readyCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:accessibilityLiveRegion="polite"
+                android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                android:textColor="@color/pix_accent"
+                tools:text="2 of 4 ready" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- The scene photo the poses are made from; a waiting state says how long it may take (R&S 6.9). -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_info_card"
+        android:gravity="center_vertical"
+        android:padding="10dp">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/sceneImage"
+            android:layout_width="56dp"
+            android:layout_height="72dp"
+            android:background="@color/pix_surface_2"
+            android:contentDescription="@string/scene_photo_description"
+            android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/your_photo"
+                android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+                android:textColor="@color/pix_text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="@string/generating_scene_caption"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- One slot per pose template; each fills in when its candidate arrives. -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/candidateGrid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="-6dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1"
+        app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
+        app:spanCount="2"
+        tools:listitem="@layout/item_pose_candidate" />
+
+    <Button
+        android:id="@+id/cancelButton"
+        style="@style/Widget.Pix.Button.Secondary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/cancel" />
+</LinearLayout>

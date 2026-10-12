@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug builds only: the Iteration 1 server runs on a laptop on the test Wi-Fi and speaks plain http:// and
+    ws://, which Android blocks by default (Design 2.8, Configuration and secrets).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:usesCleartextTraffic="true" />
+</manifest>

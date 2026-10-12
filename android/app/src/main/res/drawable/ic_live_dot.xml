@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The live dot with its halo (FR-6.8). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="16dp" android:height="16dp">
+        <shape android:shape="oval">
+            <solid android:color="#3836D399" />
+        </shape>
+    </item>
+    <item android:width="8dp" android:height="8dp" android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="@color/pix_live" />
+        </shape>
+    </item>
+</layer-list>

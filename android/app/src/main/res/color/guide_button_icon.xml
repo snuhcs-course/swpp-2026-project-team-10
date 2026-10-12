@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Guide button: guide-colored once a guide is on the camera (activated). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_text_faint" android:state_enabled="false" />
+    <item android:color="@color/pix_guide" android:state_activated="true" />
+    <item android:color="@color/pix_text" />
+</selector>

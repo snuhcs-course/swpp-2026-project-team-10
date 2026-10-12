@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.idea/
+*.iml
+.externalNativeBuild/
+.cxx/
+
+# Python server
+.venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+*.egg-info/
+.coverage
+htmlcov/
+server/scripts/out/
+
+# IDEs
+.idea/
+.vscode/

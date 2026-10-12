@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The border of a pose candidate: the accent around the selected one (R&S 6.3). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_accent" android:state_checked="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

@@ -40,10 +40,18 @@ Before finishing a task, consider whether it introduced durable knowledge that b
 **Revised version (10/4)**
 
 ```diff
-@@ -5,2 +5,3 @@
+## Project instructions
 
 -- Always refer to the [design documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and [requirements and specifications](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications) for detailed information on the project specifications and design considerations.
 +- Always refer to the [design documentation](wiki/Design-Documentation.md) and [requirements and specifications](wiki/Requirements-and-Specifications.md) for detailed information on the project specifications and design considerations.
-...
+
 +- The `wiki/` folder is the source of the GitHub wiki. Edit the pages there, through a pull request like any other change; the `wiki-sync` workflow mirrors the folder to the wiki on every push to `dev`, deletions included, and overwrites anything edited on GitHub directly. Every file in `wiki/` becomes a wiki page or asset, so keep notes and READMEs out of it.
+```
+
+**Revised version (10/12)**
+
+```diff
+## Project instructions
+
++- Every source file that AI wrote or substantially changed (Kotlin, Gradle scripts, Python, workflow YAML) starts with the marker `AI-generated with <tool>, <YYYY-MM-DD>, reviewed by <name>` as its first line, in the file's line-comment syntax (`//` or `#`), before any docstring or import. Name every tool used (for example `Claude Code`, `ChatGPT Codex`, or `ChatGPT Codex and Claude Code`), the date of the last AI change, and the team member who reviewed the result. One marker line per file, not per function or class, and only in source files, never in documentation, resources, or configuration data. Add or update the marker in the same PR as the code. The reviewer is a human; never fill in a name you were not given.
 ```

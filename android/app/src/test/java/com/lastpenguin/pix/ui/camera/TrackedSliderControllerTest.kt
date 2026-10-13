@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -29,7 +29,7 @@ class TrackedSliderControllerTest {
     private var eventTime = 1_000L
 
     @Test
-    fun renderingUsesTheHardwareRangeAndNeverSendsZoomRequests() = onMain {
+    fun renderingUsesTheGivenRangeAndNeverSendsRequests() = onMain {
         val fixture = fixture()
 
         fixture.controller.render(0.6f, 8f, 2f, enabled = true)
@@ -215,7 +215,8 @@ class TrackedSliderControllerTest {
         }
         assertEquals(host, slider.parent)
         val requests = mutableListOf<Request>()
-        val controller = TrackedSliderController.zoom(slider) { ratio, final -> requests += Request(ratio, final) }
+        val controller =
+            TrackedSliderController(slider, { "$it" }) { ratio, final -> requests += Request(ratio, final) }
         return Fixture(slider, controller, requests)
     }
 

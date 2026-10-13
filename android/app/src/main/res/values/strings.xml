@@ -20,7 +20,6 @@
     <string name="allow_camera">Allow camera</string>
     <string name="zoom_ratio">%1$s×</string>
     <string name="camera_zoom_description">Camera zoom, %1$s times</string>
-    <string name="camera_zoom">Camera zoom</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
     <string name="camera_grid_description">Camera composition grid</string>

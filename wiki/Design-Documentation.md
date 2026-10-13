@@ -149,7 +149,7 @@ sequenceDiagram
   Note over P: clamps to [minZoom, maxZoom]
   P->>C: setZoomRatio(1.6)
   P-->>S: camera.state (zoom 1.6, by SUBJECT)
-  Note over S: the slider drag ends
+  Note over S: the pinch ends
   S->>P: camera.zoom.set (ratio 2.0, final)
   P->>C: setZoomRatio(2.0)
   P-->>S: camera.state (zoom 2.0, by SUBJECT, final)
@@ -1580,7 +1580,7 @@ erDiagram
 | **Accounts and friends** | 박재완 | — | Database, Google sign-in, Pix IDs, friend requests, friend list, presence (Iter2-P8, #50); Sign-in, Pix ID, and Friends screens (Iter2-P13, #54) | Invitations |
 | **Pose generation** | 박재완 | API choice, `POST /poses`, templates, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, prompt (Iter2-P12, #53) | Reference guide |
 | **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | TURN, `wss://`, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter2-P16, #56); invitations with push and link (Iter2-P15, #55) | Guide sync, remote control |
-| **Remote control** | 조성민 | `RemoteControlHandler` (zoom), zoom slider on Subject view | Brightness, flash, guide moves, notices; remote focus and the permission switch if time allows (Iter2-P17, #57); pinch zoom and the guide-edit mode toggle on Subject view, replacing its slider (Iter2-P6, #48); zoom stutter (Iter2-P5, #47) | UI |
+| **Remote control** | 조성민 | `RemoteControlHandler` (zoom), pinch zoom on Subject view | Brightness, flash, guide moves, notices; remote focus and the permission switch if time allows (Iter2-P17, #57); pinch zoom and the guide-edit mode toggle on Subject view, replacing its slider (Iter2-P6, #48); zoom stutter (Iter2-P5, #47) | UI |
 | **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible`, `anchor`, and mask-only transfer in the syncer (with Iter2-P7 and Iter2-P11) | UI |
 
 The friends feature needs both the accounts server (박재완) and the session entry point (조성민); Iter2-P8 lands before Iter2-P15 and Iter2-P16, and the two owners agree the order of the invitation work (Team Meetings 2026-10-09).

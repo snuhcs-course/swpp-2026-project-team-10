@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The guide-edit mode toggle: guide-colored while the mode is on (selected). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_text_faint" android:state_enabled="false" />
+    <item android:color="@color/pix_guide" android:state_selected="true" />
+    <item android:color="@color/pix_text" />
+</selector>

@@ -43,6 +43,8 @@
     <string name="guide_opacity">Guide opacity</string>
     <string name="guide_opacity_percent">%1$d%%</string>
     <string name="remove_guide">Remove guide</string>
+    <string name="edit_guide">Edit guide</string>
+    <string name="hint_pinch_zoom">Pinch to zoom</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
     <string name="peer_left">%1$s left</string>

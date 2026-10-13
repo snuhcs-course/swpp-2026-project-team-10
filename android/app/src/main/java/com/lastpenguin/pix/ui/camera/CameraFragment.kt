@@ -350,6 +350,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             getString(R.string.guide_opacity_percent, (state.guideState.opacity * 100f).roundToInt())
         controls.removeGuideButton.isEnabled = guideEditable
         // Guide-edit mode (AD-17): the overlay owns the preview's touches while on; the pinch zooms while off.
+        // Its toggle sits beside the zoom readout, so it stays when the guide's panel changes (Iter2-P11).
+        controls.editGuideButton.isVisible = state.guide != null
         controls.editGuideButton.isSelected = state.guideEditing
         controls.editGuideButton.isEnabled = guideEditable
         controls.guideOverlay.editable = state.guideEditing
@@ -430,7 +432,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The photo is taken: no zoom until it is used or shot again. While it is framed, the guide is hidden,
         // so a pinch zooms whatever the guide-edit mode says.
         controls.zoomReadout.isInvisible = reviewing
-        if (active) pinchZoom?.enabled = !reviewing
+        if (active) {
+            pinchZoom?.enabled = !reviewing
+            controls.editGuideButton.isVisible = false
+        }
         controls.captureControls.isVisible = !reviewing
         controls.sceneReviewControls.isVisible = reviewing
         if (!active) return

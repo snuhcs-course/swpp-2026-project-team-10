@@ -200,17 +200,6 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <!-- Guide-edit mode (AD-17): selected while drags and pinches edit the guide instead of zooming. -->
-                <Button
-                    android:id="@+id/editGuideButton"
-                    style="@style/Widget.Pix.Button.Icon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/edit_guide"
-                    app:backgroundTint="@color/edit_guide_background"
-                    app:icon="@drawable/ic_move"
-                    app:iconTint="@color/edit_guide_icon" />
-
                 <!-- Cutout / Outline (FR-3.5); the chosen one is selected. -->
                 <Button
                     android:id="@+id/cutoutSegment"
@@ -326,22 +315,42 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- The applied zoom (FR-1.3). A pinch on the preview changes it; the readout keeps Zoom in / Zoom out. -->
-        <TextView
-            android:id="@+id/zoomReadout"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_gravity="center_horizontal"
-            android:background="@drawable/bg_zoom_readout"
-            android:focusable="true"
-            android:gravity="center"
-            android:importantForAccessibility="yes"
-            android:minWidth="56dp"
-            android:paddingHorizontal="12dp"
-            android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
-            android:textColor="@color/zoom_readout_text"
-            android:textSize="14sp"
-            tools:text="1.0×" />
+        <!-- The applied zoom (FR-1.3), which a pinch on the preview changes, and the guide-edit mode toggle; the
+             same row as Subject view. The readout keeps the Zoom in / Zoom out accessibility actions. -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp">
+
+            <TextView
+                android:id="@+id/zoomReadout"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_zoom_readout"
+                android:focusable="true"
+                android:gravity="center"
+                android:importantForAccessibility="yes"
+                android:minWidth="56dp"
+                android:paddingHorizontal="12dp"
+                android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                android:textColor="@color/zoom_readout_text"
+                android:textSize="14sp"
+                tools:text="1.0×" />
+
+            <!-- Shown while a guide is on the camera (AD-17); selected while drags and pinches edit the guide. -->
+            <Button
+                android:id="@+id/editGuideButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:contentDescription="@string/edit_guide"
+                android:visibility="gone"
+                app:backgroundTint="@color/edit_guide_background"
+                app:icon="@drawable/ic_move"
+                app:iconTint="@color/edit_guide_icon"
+                tools:visibility="visible" />
+        </FrameLayout>
 
         <!-- Guide, shutter, and the last photo, in thirds and on one center line; the Guide label hangs below (R&S 6.2). -->
         <LinearLayout

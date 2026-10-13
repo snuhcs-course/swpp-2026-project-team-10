@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -16,7 +16,9 @@ import kotlin.math.roundToInt
 
 /**
  * Draws the guide over the camera preview or the subject's live view (Design 2.6.2, 2.6.4).
- * Owner: Camera/Overlay (#6). The subject's phone uses it with [editable] = false (#9).
+ * Owner: Camera/Overlay (#6). [editable] is the screen's guide-edit mode (AD-17, #48): while it is on, every touch
+ * that starts inside the camera image edits the guide, so the camera never zooms by mistake; while it is off, every
+ * touch passes through to the preview or live video below.
  */
 class GuideOverlayView @JvmOverloads constructor(
     context: Context,
@@ -33,12 +35,12 @@ class GuideOverlayView @JvmOverloads constructor(
     private var gesture: TouchGesture? = null
 
     init {
-        // Only a touch starting on an editable guide is consumed; the video below owns other gestures.
+        // Only a touch starting inside the camera image while editable is consumed; the video below owns the rest.
         isClickable = false
         isFocusable = false
     }
 
-    /** Drag and pinch are handled only when true: on the photographer's camera. */
+    /** Guide-edit mode: drag and pinch are handled only while true, and then anywhere inside the camera image. */
     var editable: Boolean = true
         set(value) {
             field = value
@@ -92,9 +94,8 @@ class GuideOverlayView @JvmOverloads constructor(
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             finishGesture()
             releaseTouch()
-            if (!canEdit() || !frameBounds.contains(event.x, event.y) || !guideBounds.contains(event.x, event.y)) {
-                return false
-            }
+            // In edit mode the whole image belongs to the guide, so it is easy to grab even by its transparent parts.
+            if (!canEdit() || !frameBounds.contains(event.x, event.y)) return false
             ownsTouch = true
             gesture = TouchGesture(event.getPointerId(0), position = TouchPosition(event.x, event.y, 0f))
             parent?.requestDisallowInterceptTouchEvent(true)

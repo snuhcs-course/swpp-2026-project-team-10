@@ -114,15 +114,71 @@ Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose tem
 
 The rate limit is counted per client IP address in memory, so it resets when the server restarts; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
 
-## Before moving to a public host
+## Deploy
 
-In Iteration 1 the phones reach the laptop directly. Behind a reverse proxy, a tunnel, or a hosting platform, the pose API depends on the following, so check each one:
+The server runs on the two course servers (Design §2.8, Hosting and Deployment). Each is reachable only through the course's HTTP proxy on port 80, so there is no HTTPS or WSS, and the two cannot reach each other.
 
-- **Cancelled requests must reach the server.** The server learns that a phone cancelled only when its own incoming connection closes, so the proxy has to close its connection to the server when the phone closes its side. nginx does this by default (`proxy_ignore_client_abort off`). A proxy that lets the request run on hides the cancel, and the image is generated and billed. To check, cancel a request through the public address, for example `curl --max-time 3 -F "image=@scene.jpg" -F templateId=wave -F seed=1 https://<host>/api/v1/poses`, and watch the server's access log: no line for that request means the cancel arrived, and a `POST /api/v1/poses` line with `200` about ten seconds later means it did not.
-- **The rate limit needs each phone's address.** It uses the client address that Uvicorn reports. Uvicorn takes that address from `X-Forwarded-For` only when the request comes from an address listed in `--forwarded-allow-ips`, which defaults to `127.0.0.1`. A proxy on the same machine therefore only has to set `X-Forwarded-For`; for a proxy on another machine, also pass its address in `--forwarded-allow-ips`. Otherwise every phone appears as the proxy and shares one limit. Phones behind one carrier or Wi-Fi gateway share an address too, so limit per user once accounts exist.
-- **Uploads stay small and in memory.** The server refuses a request over 1 MiB, which is also nginx's default limit (`client_max_body_size`); nginx answers a larger one with its own 413. A proxy may write an upload to a temporary file on its disk (nginx does for a body larger than `client_body_buffer_size`); raise that buffer or turn off request buffering to keep scene photos in memory (FR-4.9, NFR-13).
-- **Slow answers must be allowed.** A pose can take up to the 30-second upstream timeout. Set the proxy's or platform's response timeout above that.
-- **One process.** The rate limit, like the sessions, lives in the memory of one process, so keep one worker and one instance. Serve HTTPS and WSS (NFR-14).
+| Server | Address | Branch | Use |
+| --- | --- | --- | --- |
+| A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds of the app use it. |
+| B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging; set `pix.serverUrl` to it in a debug build. |
+
+[`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs nginx on port 80 and two copies of the app, `app-blue` and `app-green`, built from the [`Dockerfile`](Dockerfile). One copy serves and the other is stopped. nginx forwards `/api/v1/`, `/ws`, and `/health` to the serving copy, answers `/version` with the commit that is live, and answers `404` for everything else, so FastAPI's `/docs` and the app's `/internal` routes are not public. A new public route must be added to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf).
+
+### How a deploy happens
+
+GitHub cannot push to the servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights and is advised against on a public repository. So each server pulls. A systemd timer runs [`deploy/deploy.sh auto`](deploy/deploy.sh) every minute as root:
+
+1. It fetches the server's branch. If the commit is already recorded, it stops.
+2. If the commit does not change `server/`, it records the commit and restarts nothing.
+3. It builds the image. pytest runs as a build stage, so a commit whose tests fail stops here.
+4. It starts the image as the idle copy and waits for the container's health check.
+5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. The two copies cannot share a room until the Redis session store is built (Design AD-18). After 10 minutes it goes on anyway: sessions that are already live continue, because the video goes phone to phone, and rooms still waiting for a subject end.
+6. It points nginx at the new copy and reloads it, checks `/health` through nginx, and stops the old copy with 40 s for requests in flight.
+7. It records the commit, which `/version` then shows, and deletes images other than the two copies'.
+
+A failure at any step leaves the serving copy as it was, and the timer does not try that `server/` tree again; fix the branch, or run `deploy.sh deploy` to retry. On GitHub, the [server-image](../.github/workflows/server-image.yml) workflow builds the image and checks the routes through nginx on every pull request, and the [server-deploy](../.github/workflows/server-deploy.yml) workflow waits after a merge until `/version` shows the commit, so a deploy that failed is a red mark on the commit.
+
+### Set up a server once
+
+The server needs Docker with the Compose and Buildx plugins (`sudo apt install -y docker.io docker-compose-v2 docker-buildx`). Then, on the server:
+
+```sh
+sudo git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git /opt/pix/repo
+sudo /opt/pix/repo/server/deploy/setup.sh dev        # "main" on Server A
+sudoedit /opt/pix/.env                               # put the OpenRouter key in
+sudo /opt/pix/repo/server/deploy/deploy.sh deploy    # the first deploy, by hand
+sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
+```
+
+[`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It writes the branch to `/opt/pix/deploy.conf`, creates `/opt/pix/.env` from `.env.example` (readable by root only), and installs the systemd units. Secrets exist only in `/opt/pix/.env`; `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before it is merged, pass it to the first deploy: `deploy.sh deploy feat/2-deploy`.
+
+### Operate it
+
+Run these on the server with `sudo`:
+
+| Command | What it does |
+| --- | --- |
+| `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, the open rooms, and the containers. |
+| `… deploy.sh deploy [ref]` | Deploys a branch or a commit now; the default is the server's branch. It also retries a commit the timer gave up on. |
+| `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without waiting for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
+| `… deploy.sh restart` | Starts the other copy from the same image, for example after editing `/opt/pix/.env`. |
+| `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
+| `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy and `pix-nginx-1` for the access log. Logs rotate at 10 MB, five files each. |
+
+Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command to switch without waiting for rooms.
+
+### What the course's proxy does
+
+Measured on Server B on 2026-10-13; nginx and the app are configured for it:
+
+- **WebSockets pass and stay open.** One with pings stayed open for 300 s and an idle one for 200 s, although the course cuts a plain HTTP response after 120 s. Uvicorn's ping every 20 s keeps nginx's 75 s read timeout from closing a quiet socket.
+- **The phone's address is the last `X-Forwarded-For` value.** The proxy adds it and passes on whatever the client sent before it. nginx takes the last value only and replaces the header on the way to the app, which Uvicorn trusts (`--forwarded-allow-ips "*"`) because nothing but nginx can reach its port. The rate limit therefore counts per phone address; phones behind one carrier or Wi-Fi gateway still share an address, so limit per user once accounts exist.
+- **A cancelled request does not reach the server.** The proxy keeps its connection open after the phone closes its side, so a pose request the user cancelled is still generated and billed. The rate limit bounds the cost.
+- **Uploads stay small and in memory.** nginx refuses a request over 1 MiB with its own 413 and buffers a smaller one in memory, and it never writes a pose answer to a temporary file (FR-4.9, NFR-13). What the course's proxy does with an upload is outside our control.
+- **Nothing is encrypted in transit.** A scene photo and the session token travel as plain HTTP between the phone and the server (NFR-14).
+
+Docker Hub limits anonymous pulls per address, and the course servers share theirs. If a build fails with `toomanyrequests`, wait and run `deploy.sh deploy`; the base images are cached after the first pull.
 
 ## Lint, format, and test
 

@@ -1,0 +1,16 @@
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# Installed to /etc/systemd/system by setup.sh and started by pix-deploy.timer.
+[Unit]
+Description=Deploy the Pix server when its branch has a new commit
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pix/repo/server/deploy/deploy.sh auto
+# A deploy builds the image and may wait up to 10 minutes for open rooms.
+TimeoutStartSec=30min
+# Keep the journal to what deploy.sh prints and to failures: without these two lines systemd also logs
+# "Starting" and "Finished" every minute.
+SyslogLevel=notice
+LogLevelMax=notice

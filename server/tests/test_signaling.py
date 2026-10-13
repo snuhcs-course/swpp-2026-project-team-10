@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
 import json
 import re
 from contextlib import ExitStack
@@ -43,6 +43,15 @@ def ice_signal(tag="test"):
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
+
+
+def test_internal_stats_count_open_rooms_and_sockets(client):
+    assert client.get("/internal/stats").json() == {"sessions": 0, "connections": 0}
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        assert client.get("/internal/stats").json()["sessions"] == 1
+        join_room(photographer, subject, room)
+        assert client.get("/internal/stats").json() == {"sessions": 1, "connections": 2}
 
 
 def test_codes_preserve_leading_zeroes_and_retry_collisions(client, monkeypatch):

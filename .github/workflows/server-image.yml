@@ -1,0 +1,64 @@
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+name: server-image
+
+on:
+  # Reported for every PR, like the other server checks, so it can become a required check.
+  pull_request:
+  push:
+    branches: [dev, main]
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: server-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The same two builds as server/deploy/deploy.sh.
+      - name: Run the tests in the image build
+        run: docker build --target test server
+
+      - name: Build the runtime image
+        run: docker build --target runtime -t pix-server:ci server
+
+      - name: Start nginx and one copy of the app
+        run: |
+          mkdir -p "$RUNNER_TEMP/pix/state"
+          printf 'set $pix_app "app-blue:8000";\nset $pix_copy "blue";\n' > "$RUNNER_TEMP/pix/state/active.conf"
+          echo "$GITHUB_SHA" > "$RUNNER_TEMP/pix/state/version"
+          touch "$RUNNER_TEMP/pix/.env"
+          export PIX_BLUE_TAG=ci PIX_HTTP_PORT=8080
+          export PIX_ENV_FILE="$RUNNER_TEMP/pix/.env" PIX_STATE_DIR="$RUNNER_TEMP/pix/state"
+          docker compose -f server/deploy/docker-compose.yml up -d --wait app-blue nginx
+
+      - name: Check the routes through nginx
+        run: |
+          status() { curl -s -o /dev/null -m 5 -w '%{http_code}' "$@" || true; }
+          set -x
+          test "$(curl -fsS http://127.0.0.1:8080/health)" = '{"status":"ok"}'
+          test "$(curl -fsS http://127.0.0.1:8080/version)" = "$GITHUB_SHA"
+          curl -fsS http://127.0.0.1:8080/api/v1/pose-templates > /dev/null
+          # A WebSocket upgrade reaches the app; curl then waits for frames until its time limit.
+          test "$(status -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' http://127.0.0.1:8080/ws)" = 101
+          # FastAPI's documentation and the app's internal routes are not public.
+          test "$(status http://127.0.0.1:8080/docs)" = 404
+          test "$(status http://127.0.0.1:8080/openapi.json)" = 404
+          test "$(status http://127.0.0.1:8080/internal/stats)" = 404
+
+      - name: Show the container logs
+        if: failure()
+        run: PIX_BLUE_TAG=ci docker compose -f server/deploy/docker-compose.yml logs --tail 100

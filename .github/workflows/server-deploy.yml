@@ -1,0 +1,41 @@
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+name: server-deploy
+
+# GitHub cannot push to the course servers, so each server pulls its branch and deploys it by itself.
+# This workflow only watches: it waits until the server reports the pushed commit at /version,
+# so a deploy that failed or never ran shows on the commit.
+on:
+  push:
+    branches: [dev, main]
+
+permissions: {}
+
+concurrency:
+  # A newer push replaces the commit the server is deploying, so the older wait would never end.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wait:
+    name: server-deploy
+    runs-on: ubuntu-latest
+    # A deploy builds the image and may wait up to 10 minutes for open rooms before it switches.
+    timeout-minutes: 30
+    env:
+      # Server A runs main, Server B runs dev (Design 2.8, Hosting).
+      SERVER_URL: ${{ github.ref_name == 'main' && 'http://swpp26t10.147-46-242-169.sslip.io' || 'http://swpp26t10.147-46-242-174.sslip.io' }}
+    steps:
+      - name: Wait until the server reports this commit
+        run: |
+          deadline=$((SECONDS + 1500))
+          live=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            live=$(curl -fsS -m 10 "$SERVER_URL/version" 2> /dev/null || true)
+            if [ "$live" = "$GITHUB_SHA" ]; then
+              echo "$SERVER_URL is on $GITHUB_SHA"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::$SERVER_URL reports '${live:-nothing}' and not $GITHUB_SHA. On the server: sudo /opt/pix/repo/server/deploy/deploy.sh status; journalctl -u pix-deploy"
+          exit 1

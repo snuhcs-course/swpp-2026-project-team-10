@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
 """In-memory room state, owned by one asyncio event loop.
 
 All transitions and outbound enqueues are synchronous: a join cannot interleave
@@ -48,6 +48,10 @@ class SessionRegistry:
     @property
     def session_count(self) -> int:
         return len(self._sessions)
+
+    @property
+    def connection_count(self) -> int:
+        return len(self._peers)
 
     def connect(self) -> Peer:
         peer = Peer(outbox=asyncio.Queue(maxsize=self.settings.outbound_queue_size))

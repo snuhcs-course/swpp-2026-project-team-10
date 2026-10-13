@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug builds only: the server may run on a laptop on the test Wi-Fi or on the emulator's host, which speak
+    plain http:// and ws:// from any address (Design 2.8, Configuration and secrets). This file replaces the one
+    in src/main/res/xml/, which allows the two course servers only.
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration" />
+</network-security-config>

@@ -1,0 +1,40 @@
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# The Pix server on the course server. deploy.sh drives this file and supplies the variables
+# On the server, use deploy.sh instead of calling docker compose by hand.
+name: pix
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+# Two copies of the app. One serves; the other is stopped, or is starting during a deploy.
+x-app: &app
+  env_file: ${PIX_ENV_FILE:-/opt/pix/.env}
+  restart: unless-stopped
+  # Longer than Uvicorn's 35 s graceful shutdown, so a pose request in flight finishes.
+  stop_grace_period: 40s
+  logging: *logging
+
+services:
+  app-blue:
+    <<: *app
+    image: pix-server:${PIX_BLUE_TAG:-none}
+
+  app-green:
+    <<: *app
+    image: pix-server:${PIX_GREEN_TAG:-none}
+
+  nginx:
+    image: nginx:1.30-alpine
+    command: ["nginx", "-c", "/etc/nginx/conf/nginx.conf", "-g", "daemon off;"]
+    ports:
+      # The course's proxy reaches only port 80, and only on 0.0.0.0.
+      - "${PIX_HTTP_PORT:-80}:80"
+    volumes:
+      # Directories, not single files: a bind-mounted file keeps its old content after git or deploy.sh replaces it.
+      - ./nginx:/etc/nginx/conf:ro
+      - ${PIX_STATE_DIR:-/opt/pix/state}:/etc/nginx/pix:ro
+    restart: unless-stopped
+    logging: *logging

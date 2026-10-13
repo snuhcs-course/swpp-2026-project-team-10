@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The course servers have no TLS (Design AD-11), so plain http:// and ws:// are allowed to these two hosts,
+    Server A and Server B, and to nothing else. Debug builds replace this file with src/debug/res/xml/.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">swpp26t10.147-46-242-169.sslip.io</domain>
+        <domain includeSubdomains="false">swpp26t10.147-46-242-174.sslip.io</domain>
+    </domain-config>
+</network-security-config>

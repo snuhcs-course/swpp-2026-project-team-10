@@ -89,7 +89,7 @@ The failure screens share `fragment_failure.xml`.
 - **Fakes.** To work before another owner's module is ready, write a fake of the interface and use it in `core/AppContainer.kt`.
 - **Contracts.** Change a contract only through a pull request that the affected owners review, and update the Design Documentation in the same change.
 - **Libraries.** Versions are in `gradle/libs.versions.toml`. Add the ones your module needs to `app/build.gradle.kts`.
-- **Server address.** `BuildConfig.SERVER_URL` defaults to `http://10.0.2.2:8000/`, the host machine as seen from the emulator. For a real phone, put the laptop's address on the test Wi-Fi in `local.properties` as `pix.serverUrl=http://192.168.0.10:8000/` (the file is not committed), or pass `-Ppix.serverUrl=...` to Gradle. Debug builds allow this plain `http://` and `ws://` traffic (`src/debug/AndroidManifest.xml`); release builds do not.
+- **Server address.** In a release build `BuildConfig.SERVER_URL` is Server A, `http://swpp26t10.147-46-242-169.sslip.io/`, which runs `main`. In a debug build it defaults to `http://10.0.2.2:8000/`, the host machine as seen from the emulator; to use another server, put its address in `local.properties` as `pix.serverUrl=...` (the file is not committed) or pass `-Ppix.serverUrl=...` to Gradle: `http://swpp26t10.147-46-242-174.sslip.io/` for Server B, which runs `dev`, or the laptop's address on the test Wi-Fi, such as `http://192.168.0.10:8000/`. The course servers have no HTTPS, so the app allows plain `http://` and `ws://` traffic: release builds to the two course servers only (`src/main/res/xml/network_security_config.xml`), debug builds to any host (`src/debug/res/xml/network_security_config.xml`).
 
 ## Real-time session (#8)
 

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -21,7 +21,7 @@ import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
-import com.lastpenguin.pix.ui.camera.TrackedSliderController
+import com.lastpenguin.pix.ui.camera.PinchZoomController
 import java.text.DecimalFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -32,22 +32,22 @@ import org.webrtc.VideoSink
 
 /**
  * Subject view (R&S 6.6): the photographer's live video, fitted to the 3:4 frame, with their name and *Leave*.
- * The zoom slider controls the photographer's camera, with the Camera screen's readout (FR-7.1). System back asks
- * first (R&S 6.9). Owner: Real-time (#8, #10), with the guide from #9.
+ * A pinch on the video zooms the photographer's camera while guide-edit mode is off, with the Camera screen's
+ * readout (FR-7.1, AD-17). System back asks first (R&S 6.9). Owner: Real-time (#8, #10), with the guide from #9.
  */
 class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     private val viewModel: SubjectViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val zoomFormat = DecimalFormat("0.0")
-    private val zoomLimitFormat = DecimalFormat("0.#")
-    private var zoomSlider: TrackedSliderController? = null
+    private var pinchZoom: PinchZoomController? = null
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
         binding.guideOverlay.editable = false
+        binding.guideOverlay.onGesture = viewModel::onGuideGesture
         view.keepScreenOn = true
 
         val live = binding.liveView
@@ -58,8 +58,16 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
-        zoomSlider = TrackedSliderController.zoom(binding.zoomControls.zoomSlider, viewModel::onZoomGesture)
-        setupZoomAccessibility(binding.zoomControls.zoomRatio)
+        pinchZoom = PinchZoomController(
+            live,
+            range = { viewModel.uiState.value.let { if (it.canZoom) it.minZoom..it.maxZoom else null } },
+            current = { viewModel.uiState.value.zoom },
+            onZoom = viewModel::onZoomGesture,
+        )
+        setupZoomAccessibility(binding.zoomReadout)
+        binding.editGuideButton.setOnClickListener {
+            viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
+        }
 
         binding.leaveButton.setOnClickListener { leaveNow() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
@@ -73,14 +81,16 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             ?: getString(R.string.subject_title_placeholder)
                         binding.guideOverlay.render(ui.guide, ui.guideState)
                         binding.compositionOverlay.isVisible = ui.connected
+                        // Guide-edit mode (AD-17): the overlay owns the video's touches while on; the pinch zooms while off.
+                        binding.guideOverlay.editable = ui.guideEditing
+                        pinchZoom?.enabled = !ui.guideEditing
+                        binding.editGuideButton.isVisible = ui.guide != null
+                        binding.editGuideButton.isSelected = ui.guideEditing
                         val ratio = zoomFormat.format(ui.zoom)
-                        val zoomControls = binding.zoomControls
-                        zoomControls.zoomRatio.text = getString(R.string.zoom_ratio, ratio)
-                        zoomControls.zoomRatio.contentDescription = getString(R.string.camera_zoom_description, ratio)
-                        zoomControls.zoomRatio.isEnabled = ui.canZoom
-                        zoomControls.minZoom.text = getString(R.string.zoom_ratio, zoomLimitFormat.format(ui.minZoom))
-                        zoomControls.maxZoom.text = getString(R.string.zoom_ratio, zoomLimitFormat.format(ui.maxZoom))
-                        zoomSlider?.render(ui.minZoom, ui.maxZoom, ui.zoom, ui.canZoom)
+                        binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
+                        binding.zoomReadout.contentDescription = getString(R.string.camera_zoom_description, ratio)
+                        binding.zoomReadout.isEnabled = ui.canZoom
+                        if (!ui.canZoom) pinchZoom?.finishInteraction()
                     }
                 }
                 launch {
@@ -101,12 +111,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onPause() {
-        zoomSlider?.finishInteraction()
+        pinchZoom?.finishInteraction()
         super.onPause()
     }
 
     override fun onDestroyView() {
-        zoomSlider = null
+        pinchZoom?.finishInteraction()
+        pinchZoom = null
         watchdog?.let(viewModel.video::detach)
         watchdog = null
         renderer?.release()
@@ -168,7 +179,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     private fun leaveNow() {
-        zoomSlider?.finishInteraction()
+        pinchZoom?.finishInteraction()
         sessionViewModel.leave()
         backToCamera()
     }

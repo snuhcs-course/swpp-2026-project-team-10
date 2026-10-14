@@ -57,3 +57,9 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-14] "can you explain what was wrong and what you fixed?"
 - [Jaewan, 10-14] "update the testing document now"
 - [Jaewan, 10-14] "commit and push"
+
+## Server shortcuts
+
+- [Jaewan, 10-14] i think i should register some aliases to the server, any recommendations?
+- [Jaewan, 10-14] add a help option there
+- [Jaewan, 10-14] save the shortcut as a script in the repo

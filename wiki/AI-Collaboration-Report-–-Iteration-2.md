@@ -16,7 +16,7 @@ This page is written as we go: each pull request's *AI usage* section (tools use
 
 ## 2. Prompt History
 
-Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · Server and deployment (TBD) · Android camera and guide (TBD) · Accounts, friends, and invitations (TBD) · Real-time and remote control (TBD) · Code reviews (TBD)
+Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server and deployment|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · Android camera and guide (TBD) · Accounts, friends, and invitations (TBD) · Real-time and remote control (TBD) · Code reviews (TBD)
 
 ## 3. What AI Did Well
 

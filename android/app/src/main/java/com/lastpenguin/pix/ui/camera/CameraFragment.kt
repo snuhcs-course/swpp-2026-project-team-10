@@ -356,7 +356,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.editGuideButton.isChecked = state.guideEditing
         controls.editGuideButton.isEnabled = guideEditable && state.guideState.visible
         controls.guideOverlay.editable = state.guideEditing
-        pinchZoom?.enabled = !state.guideEditing
+        // Computed once per render: while the scene photo is framed the guide is hidden, so the pinch zooms whatever
+        // the mode says, and while the photo is shown there is no zoom. Flipping it off and on again in one render
+        // would end a pinch in progress, which the detector cannot restart in the same touch stream.
+        val scene = generationViewModel.uiState.value
+        pinchZoom?.enabled = if (isScenePhotoActive(scene)) {
+            scene.phase != GenerationUiState.Phase.REVIEWING
+        } else {
+            !state.guideEditing
+        }
         // Guide-colored once a guide is on the camera; it then changes the guide instead of adding one.
         controls.guideButton.isActivated = state.guide != null
         controls.guideButton.contentDescription =
@@ -430,13 +438,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.galleryButton.isInvisible = active
         controls.sceneStill.isVisible = reviewing
         controls.sceneStill.setImageBitmap(if (reviewing) scene.scene else null)
-        // The photo is taken: no zoom until it is used or shot again. While it is framed, the guide is hidden,
-        // so a pinch zooms whatever the guide-edit mode says.
+        // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
         controls.zoomReadout.isInvisible = reviewing
-        if (active) {
-            pinchZoom?.enabled = !reviewing
-            controls.editGuideButton.isVisible = false
-        }
+        if (active) controls.editGuideButton.isVisible = false
         controls.captureControls.isVisible = !reviewing
         controls.sceneReviewControls.isVisible = reviewing
         if (!active) return

@@ -42,3 +42,18 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-14] "now that the branch is pushed to gh, what should i do at server b now?"
 - [Jaewan, 10-14] "what do you mean about the invite link? we need to fix the design if we can't use HTTPS?"
 - [Jaewan, 10-14] "how would the 'custom scheme' look like?"
+
+## Redis setup (#73)
+
+- [Jaewan, 10-14] "okay now add the redis container settings and implement the relevant code changes in this branch"
+- [Jaewan, 10-14] "so what is the current behavior when switching servers? and what is to be changed on #56?"
+- [Jaewan, 10-14] "commit and push this fix"
+- [Jaewan, 10-14] "just remove the rejoin part from the issue"
+- [Jaewan, 10-14] "the image build workflow failed"
+- [Jaewan, 10-14] "commit and push"
+- [Jaewan, 10-14] "there are updates in dev that change the design document. merge and solve conflicts, then commit and push"
+- [Jaewan, 10-14] "before updating the testing document, first i have a review comment. can you read and fix what's wrong?"
+- [Jaewan, 10-14] "commit and push this"
+- [Jaewan, 10-14] "can you explain what was wrong and what you fixed?"
+- [Jaewan, 10-14] "update the testing document now"
+- [Jaewan, 10-14] "commit and push"

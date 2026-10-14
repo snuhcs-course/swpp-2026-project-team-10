@@ -151,9 +151,9 @@ class CameraViewModel(
         }
     }
 
-    /** The guide-edit mode toggle; there is no mode without a guide. */
+    /** The guide-edit mode toggle; there is no mode without a visible guide. */
     fun setGuideEditing(on: Boolean) {
-        _uiState.update { it.copy(guideEditing = on && it.guide != null) }
+        _uiState.update { it.copy(guideEditing = on && it.guide != null && it.guideState.visible) }
     }
 
     /** From GuideOverlayView.onGesture. */

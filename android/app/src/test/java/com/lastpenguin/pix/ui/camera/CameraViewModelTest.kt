@@ -315,9 +315,13 @@ class CameraViewModelTest {
         guides.state.value = guides.state.value.copy(visible = false)
         runCurrent()
         assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertFalse(model.uiState.value.guideEditing)
         guides.state.value = guides.state.value.copy(visible = true)
         runCurrent()
         assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertTrue(model.uiState.value.guideEditing)
 
         model.setGuideEditing(true)
         guides.setGuide(null)

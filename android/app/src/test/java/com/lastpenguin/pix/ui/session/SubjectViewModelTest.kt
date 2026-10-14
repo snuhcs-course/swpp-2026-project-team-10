@@ -172,7 +172,7 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun `guide-edit mode starts off, needs a guide, and ends when the guide goes`() = runTest(dispatcher) {
+    fun `guide-edit mode starts off, needs a visible guide, and ends when the guide goes`() = runTest(dispatcher) {
         connect()
         runCurrent()
         assertFalse(viewModel.uiState.value.guideEditing)
@@ -188,6 +188,16 @@ class SubjectViewModelTest {
         viewModel.onGuideGesture(0.1f, 0.1f, 1.5f, final = true)
         assertTrue(session.sent.none { it is SessionMessage.ZoomSet })
         viewModel.setGuideEditing(false)
+        assertFalse(viewModel.uiState.value.guideEditing)
+
+        viewModel.setGuideEditing(true)
+        mirror.update(final = true) { it.copy(visible = false) }
+        runCurrent()
+        assertFalse(viewModel.uiState.value.guideEditing)
+        viewModel.setGuideEditing(true)
+        assertFalse(viewModel.uiState.value.guideEditing)
+        mirror.update(final = true) { it.copy(visible = true) }
+        runCurrent()
         assertFalse(viewModel.uiState.value.guideEditing)
 
         viewModel.setGuideEditing(true)

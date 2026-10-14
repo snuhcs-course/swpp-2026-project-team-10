@@ -102,13 +102,16 @@ class SubjectViewModel(
             }
         }
         viewModelScope.launch {
-            mirror.state.collect { state -> _uiState.update { it.copy(guideState = state) } }
+            // A guide the photographer hid cannot be edited, so the mode ends and the pinch zooms again.
+            mirror.state.collect { state ->
+                _uiState.update { it.copy(guideState = state, guideEditing = it.guideEditing && state.visible) }
+            }
         }
     }
 
-    /** The guide-edit mode toggle; there is no mode without a guide. */
+    /** The guide-edit mode toggle; there is no mode without a visible guide. */
     fun setGuideEditing(on: Boolean) {
-        _uiState.update { it.copy(guideEditing = on && it.guide != null) }
+        _uiState.update { it.copy(guideEditing = on && it.guide != null && it.guideState.visible) }
     }
 
     /**

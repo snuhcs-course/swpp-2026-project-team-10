@@ -1,11 +1,10 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-14, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Log
-import androidx.core.graphics.createBitmap
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
 import com.google.android.gms.tasks.Task
@@ -14,7 +13,6 @@ import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenter as MlKitSegmenter
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import com.lastpenguin.pix.core.Timings
-import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
@@ -27,10 +25,10 @@ class SegmentationModelUnavailableException : Exception("The segmentation model 
 
 /** What the segmenter found in one photo (Design 2.6.1). */
 class Segmentation(
-    /** The person with a transparent background, same size as the input. */
-    val foreground: Bitmap,
-    /** Foreground confidence as alpha (ALPHA_8), same size as the input. */
-    val mask: Bitmap,
+    /** Foreground confidence 0..1 per pixel, row-major, the same size as the input. */
+    val confidence: FloatArray,
+    val width: Int,
+    val height: Int,
     /** Bounding box of the pixels with confidence ≥ 0.5. */
     val bounds: Rect,
 )
@@ -43,9 +41,9 @@ class SubjectSegmenter(private val context: Context) {
 
     private val client: MlKitSegmenter by lazy {
         SubjectSegmentation.getClient(
+            // Only the confidence: the guide is built from the smoothed mask, not from ML Kit's foreground bitmap.
             SubjectSegmenterOptions.Builder()
                 .enableForegroundConfidenceMask()
-                .enableForegroundBitmap()
                 .build(),
         )
     }
@@ -61,15 +59,10 @@ class SubjectSegmenter(private val context: Context) {
             rewind()
             get(confidence)
         }
-        val foreground = checkNotNull(result.foregroundBitmap) { "No foreground bitmap" }
         val area = foregroundBounds(confidence, width, height)
         if (area == null || area.count < MIN_PERSON_FRACTION * width * height) throw NoPersonFoundException()
         Result.success(
-            Segmentation(
-                foreground = foreground,
-                mask = alphaMask(confidence, width, height),
-                bounds = Rect(area.left, area.top, area.right, area.bottom),
-            ),
+            Segmentation(confidence, width, height, Rect(area.left, area.top, area.right, area.bottom)),
         )
     } catch (e: CancellationException) {
         throw e
@@ -99,12 +92,6 @@ class SubjectSegmenter(private val context: Context) {
             while (!available()) delay(MODEL_CHECK_MS)
         } ?: throw SegmentationModelUnavailableException()
         Timings.mark("seg.model", "ready")
-    }
-
-    private fun alphaMask(confidence: FloatArray, width: Int, height: Int): Bitmap {
-        val mask = createBitmap(width, height, Bitmap.Config.ALPHA_8)
-        mask.copyPixelsFromBuffer(ByteBuffer.wrap(confidenceToAlpha(confidence, width, height, mask.rowBytes)))
-        return mask
     }
 
     private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { continuation ->

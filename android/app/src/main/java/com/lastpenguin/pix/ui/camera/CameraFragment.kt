@@ -352,8 +352,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // Guide-edit mode (AD-17): the overlay owns the preview's touches while on; the pinch zooms while off.
         // Its toggle sits beside the zoom readout, so it stays when the guide's panel changes (Iter2-P11).
         controls.editGuideButton.isVisible = state.guide != null
-        controls.editGuideButton.isSelected = state.guideEditing
-        controls.editGuideButton.isEnabled = guideEditable
+        // Checkable, so TalkBack reads the mode as on or off; the ViewModel decides the state after a tap.
+        controls.editGuideButton.isChecked = state.guideEditing
+        controls.editGuideButton.isEnabled = guideEditable && state.guideState.visible
         controls.guideOverlay.editable = state.guideEditing
         pinchZoom?.enabled = !state.guideEditing
         // Guide-colored once a guide is on the camera; it then changes the guide instead of adding one.

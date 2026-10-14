@@ -84,8 +84,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         // Guide-edit mode (AD-17): the overlay owns the video's touches while on; the pinch zooms while off.
                         binding.guideOverlay.editable = ui.guideEditing
                         pinchZoom?.enabled = !ui.guideEditing
-                        binding.editGuideButton.isVisible = ui.guide != null
-                        binding.editGuideButton.isSelected = ui.guideEditing
+                        // TODO(#57): show the toggle with guide moves; until then it would only block the zoom.
+                        binding.editGuideButton.isVisible = false
+                        binding.editGuideButton.isChecked = ui.guideEditing
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
                         binding.zoomReadout.contentDescription = getString(R.string.camera_zoom_description, ratio)

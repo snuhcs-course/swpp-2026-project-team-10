@@ -337,12 +337,13 @@
                 android:textSize="14sp"
                 tools:text="1.0×" />
 
-            <!-- Shown while a guide is on the camera (AD-17); selected while drags and pinches edit the guide. -->
-            <Button
+            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/editGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:checkable="true"
                 android:layout_gravity="end|center_vertical"
                 android:contentDescription="@string/edit_guide"
                 android:visibility="gone"

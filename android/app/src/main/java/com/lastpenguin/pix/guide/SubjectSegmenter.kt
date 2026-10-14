@@ -3,7 +3,6 @@ package com.lastpenguin.pix.guide
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Rect
 import android.util.Log
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
@@ -29,8 +28,6 @@ class Segmentation(
     val confidence: FloatArray,
     val width: Int,
     val height: Int,
-    /** Bounding box of the pixels with confidence ≥ 0.5. */
-    val bounds: Rect,
 )
 
 /**
@@ -62,7 +59,7 @@ class SubjectSegmenter(private val context: Context) {
         val area = foregroundBounds(confidence, width, height)
         if (area == null || area.count < MIN_PERSON_FRACTION * width * height) throw NoPersonFoundException()
         Result.success(
-            Segmentation(confidence, width, height, Rect(area.left, area.top, area.right, area.bottom)),
+            Segmentation(confidence, width, height),
         )
     } catch (e: CancellationException) {
         throw e

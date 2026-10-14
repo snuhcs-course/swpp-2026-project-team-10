@@ -71,7 +71,7 @@ class MlKitReferenceGuideMaker(
         val width = segmentation.width
         val height = segmentation.height
         Timings.mark("smooth.start")
-        val radius = smoothRadius(segmentation.bounds.height())
+        val radius = smoothRadius(subjectHeight(segmentation.confidence, width, height))
         val field = smoothMask(segmentation.confidence, width, height, radius)
         // Smoothing drops specks, so a photo with nothing but specks has no person after all.
         val area = foregroundBounds(field, width, height) ?: throw NoPersonFoundException()

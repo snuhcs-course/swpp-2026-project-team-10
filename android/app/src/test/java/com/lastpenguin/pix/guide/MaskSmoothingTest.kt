@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-13, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-14, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import org.junit.Assert.assertEquals
@@ -12,6 +12,16 @@ class MaskSmoothingTest {
     fun theBlurRadiusFollowsThePersonsHeight() {
         assertEquals(9, smoothRadius(1100))
         assertEquals(1, smoothRadius(20))
+    }
+
+    @Test
+    fun theBlurIsSizedForThePersonNotForAStrayBlobFarAway() {
+        // A person 40 px tall at the bottom and a 3 px blob at the top: the box of both would be 97 px tall.
+        val confidence = square(50, 100, 20, 60, 30, 100)
+        fill(confidence, 50, 5, 0, 8, 3)
+
+        assertEquals(40, subjectHeight(confidence, 50, 100))
+        assertEquals(0, subjectHeight(FloatArray(50 * 100), 50, 100))
     }
 
     @Test

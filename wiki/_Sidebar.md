@@ -7,6 +7,7 @@
 - [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
   <ul>
   <li type="none"><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-1-–-CLAUDE-md-History">CLAUDE.md History</a></li>
+  <li type="none"><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-CLAUDE-md-History">CLAUDE.md History – Iteration 2</a></li>
   <li type="none"><details><summary>Prompt History</summary><ul>
   <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-1-–-Prompt-Log-–-Documents">Documents</a></li>
   <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-1-–-Prompt-Log-–-Reference-Guide">Reference Guide</a></li>

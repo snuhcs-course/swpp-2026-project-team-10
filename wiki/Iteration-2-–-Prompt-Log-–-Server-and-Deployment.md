@@ -60,6 +60,10 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 
 ## Server shortcuts
 
-- [Jaewan, 10-14] i think i should register some aliases to the server, any recommendations?
-- [Jaewan, 10-14] add a help option there
-- [Jaewan, 10-14] save the shortcut as a script in the repo
+- [Jaewan, 10-14] "i think i should register some aliases to the server, any recommendations?"
+- [Jaewan, 10-14] "add a help option there"
+- [Jaewan, 10-14] "save the shortcut as a script in the repo"
+- [Jaewan, 10-14] "what does MAX_WAIT_SECONDS=0 do and what is the default? do we need it?"
+- [Jaewan, 10-14] "what happens to the timer we set initially? this uses 600? if we change to 0 then will that be updated automatically?"
+- [Jaewan, 10-14] "fix both of those in this branch"
+- [Jaewan, 10-14] "commit and push"

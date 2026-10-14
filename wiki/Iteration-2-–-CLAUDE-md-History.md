@@ -1,4 +1,4 @@
-Back to [[Iteration 1 – CLAUDE.md History|Iteration-1-–-CLAUDE-md-History]] · [[Home]]
+Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]] · [[Iteration 1 history|Iteration-1-–-CLAUDE-md-History]]
 
 This page continues the [[Iteration 1 history|Iteration-1-–-CLAUDE-md-History]]: every change to the three `CLAUDE.md` files (`/CLAUDE.md`, `/android/CLAUDE.md`, `/server/CLAUDE.md`) since the revised version of 10/12, as a diff against the previous version, with the pull request that made it and why. Iteration 1 recorded only the root file; from Iteration 2 the Android and server files are included, because feature PRs update them with the code (CLAUDE.md, *Maintaining this file*).
 

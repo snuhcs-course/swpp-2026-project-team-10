@@ -1,67 +1,168 @@
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
-"""In-memory room state, owned by one asyncio event loop.
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+"""The sockets of one server process, and the room protocol on top of the session store.
 
-All transitions and outbound enqueues are synchronous: a join cannot interleave
-with another join, and notifications are queued before subsequent signals.
-Socket I/O is handled separately so a slow phone cannot block other sessions.
+Room state lives in Redis (Design Documentation 2.7), so a room created through one worker can be joined
+through another. A transition is one script in the store, so two joins cannot interleave. This class keeps
+only what belongs to the process: each socket's bounded queue, so a slow phone cannot block other sessions.
+A message for a socket of this process goes straight into its queue; one for another worker's socket is
+published to that worker.
 """
 
 import asyncio
 import json
+import logging
 import secrets
-import time
-from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from uuid import uuid4
 
+from redis.exceptions import RedisError
+
 from pix_server.config import Settings
 from pix_server.signaling.messages import ClientMessage, Leave, ProtocolError, RoomCreate, RoomJoin, Signal
+from pix_server.store import Delivery, SessionStore
+
+logger = logging.getLogger(__name__)
+
+EXPIRED = ProtocolError("EXPIRED", "This room code has expired")
+JOIN_ERRORS = {
+    "INVALID_STATE": "Leave the current session before creating or joining another",
+    "EXPIRED": EXPIRED.message,
+    "NOT_FOUND": "No active room with this code",
+    "FULL": "This room already has a subject",
+}
 
 
 @dataclass(eq=False)
 class Peer:
+    id: str
     outbox: asyncio.Queue[str]
     closing: asyncio.Event = field(default_factory=asyncio.Event)
     close_code: int = 1000
-    session_id: str | None = None
 
 
-@dataclass
-class Session:
-    id: str
-    code: str
-    photographer: Peer | None
-    expires_at: float | None
-    subject: Peer | None = None
-    empty_since: float | None = None
+def encode(message: dict) -> str:
+    return json.dumps(message, separators=(",", ":"))
+
+
+def render(delivery: Delivery) -> str:
+    """The JSON text of a message a store script decided on."""
+    if delivery.kind == "peer.joined":
+        return encode({"type": "peer.joined"})
+    if delivery.kind == "peer.left":
+        return encode({"type": "peer.left", "reason": delivery.detail})
+    if delivery.kind == "error" and delivery.detail == EXPIRED.code:
+        return encode({"type": "error", "code": EXPIRED.code, "message": EXPIRED.message})
+    raise ValueError(f"Unknown delivery: {delivery.kind} {delivery.detail}")
 
 
 class SessionRegistry:
-    def __init__(self, settings: Settings, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, settings: Settings, store: SessionStore) -> None:
         self.settings = settings
-        self.clock = clock
-        self._peers: set[Peer] = set()
-        self._sessions: dict[str, Session] = {}
-        self._codes: dict[str, str] = {}
-        self._expired_codes: dict[str, float] = {}
+        self.store = store
+        self._peers: dict[str, Peer] = {}
+        # Connections whose disconnect did not reach Redis; the housekeeping loop tries again.
+        self._unreleased: set[str] = set()
+        self._tasks: list[asyncio.Task] = []
+        self._releases: set[asyncio.Task] = set()
+        self._stopping = False
+        self._store_reachable = True
 
-    @property
-    def session_count(self) -> int:
-        return len(self._sessions)
+    # --- lifecycle -------------------------------------------------------------------------------------------------
 
-    @property
-    def connection_count(self) -> int:
-        return len(self._peers)
+    async def start(self) -> None:
+        await self.store.start()
+        self._tasks = [asyncio.create_task(self._listen()), asyncio.create_task(self._keep_house())]
 
-    def connect(self) -> Peer:
-        peer = Peer(outbox=asyncio.Queue(maxsize=self.settings.outbound_queue_size))
-        self._peers.add(peer)
+    async def stop(self) -> None:
+        # The flag ends the loops even if a cancellation that lands inside a Redis call surfaces as a Redis error.
+        self._stopping = True
+        for task in self._tasks:
+            task.cancel()
+        await asyncio.gather(*self._tasks, *self._releases, return_exceptions=True)
+        self._tasks = []
+        for peer in self._peers.values():
+            peer.close_code = 1001
+            peer.closing.set()
+        self._peers.clear()
+        # Without this the other workers would learn about these sockets only when the heartbeat runs out.
+        with suppress(RedisError):
+            await self._deliver(await self.store.release())
+        with suppress(RedisError):
+            await self.store.close()
+
+    async def _listen(self) -> None:
+        """Passes on what other workers publish for this worker's sockets."""
+        while not self._stopping:
+            try:
+                received = await self.store.receive()
+            except RedisError:
+                if not self._stopping:
+                    await asyncio.sleep(self.settings.cleanup_interval_seconds)
+                continue
+            if received is not None:
+                peer = self._peers.get(received[0])
+                if peer is not None:
+                    self.send(peer, received[1])
+
+    async def _keep_house(self) -> None:
+        while not self._stopping:
+            await asyncio.sleep(self.settings.cleanup_interval_seconds)
+            try:
+                await self._deliver(await self.store.beat())
+                for connection in list(self._unreleased):
+                    await self._deliver(await self.store.disconnect(connection))
+                    self._unreleased.discard(connection)
+            except RedisError as exc:
+                if self._store_reachable:
+                    logger.error("The session store is unreachable: %s", type(exc).__name__)
+                self._store_reachable = False
+            else:
+                if not self._store_reachable:
+                    logger.info("The session store is reachable again")
+                self._store_reachable = True
+
+    async def sweep(self) -> None:
+        """One pass of the sweeper, whoever holds the lock. The housekeeping loop does this every interval."""
+        await self._deliver(await self.store.sweep())
+
+    async def stats(self) -> tuple[int, int]:
+        """Open sessions and open connections, over all workers."""
+        return await self.store.stats()
+
+    # --- sockets ---------------------------------------------------------------------------------------------------
+
+    async def connect(self) -> Peer:
+        peer = Peer(id=f"c_{uuid4().hex}", outbox=asyncio.Queue(maxsize=self.settings.outbound_queue_size))
+        self._peers[peer.id] = peer
+        try:
+            await self._deliver(await self.store.connect(peer.id))
+        except RedisError:
+            del self._peers[peer.id]
+            raise
         return peer
+
+    async def disconnect(self, peer: Peer) -> None:
+        peer.closing.set()
+        if self._peers.pop(peer.id, None) is None:
+            return
+        # A socket handler that is being cancelled must still free its place in the store, so the store call runs
+        # as a task of its own and the handler only waits for it.
+        release = asyncio.create_task(self._release(peer.id))
+        self._releases.add(release)
+        release.add_done_callback(self._releases.discard)
+        await asyncio.shield(release)
+
+    async def _release(self, connection: str) -> None:
+        try:
+            await self._deliver(await self.store.disconnect(connection))
+        except RedisError:
+            self._unreleased.add(connection)
 
     def send(self, peer: Peer, message: dict | str) -> None:
         if peer.closing.is_set():
             return
-        text = message if isinstance(message, str) else json.dumps(message, separators=(",", ":"))
+        text = message if isinstance(message, str) else encode(message)
         try:
             peer.outbox.put_nowait(text)
         except asyncio.QueueFull:
@@ -72,135 +173,62 @@ class SessionRegistry:
     def error(self, peer: Peer, error: ProtocolError) -> None:
         self.send(peer, {"type": "error", "code": error.code, "message": error.message})
 
-    def handle(self, peer: Peer, message: ClientMessage, raw_text: str) -> None:
-        self.expire()
+    async def _send_to(self, connection: str, worker: str, text: str) -> None:
+        if worker != self.store.worker:
+            await self.store.publish(worker, connection, text)
+            return
+        peer = self._peers.get(connection)
+        if peer is not None:
+            self.send(peer, text)
+
+    async def _deliver(self, deliveries: list[Delivery]) -> None:
+        for delivery in deliveries:
+            await self._send_to(delivery.connection, delivery.worker, render(delivery))
+
+    # --- protocol --------------------------------------------------------------------------------------------------
+
+    async def handle(self, peer: Peer, message: ClientMessage, raw_text: str) -> None:
         if peer.closing.is_set():
             return
         if isinstance(message, RoomCreate):
-            self._create(peer)
+            await self._create(peer)
         elif isinstance(message, RoomJoin):
-            self._join(peer, message.code)
+            await self._join(peer, message.code)
         elif isinstance(message, Signal):
-            self._relay(peer, message, raw_text)
+            await self._relay(peer, message, raw_text)
         elif isinstance(message, Leave):
-            self._leave(peer)
+            await self._deliver(await self.store.leave(peer.id))
 
-    def _require_idle(self, peer: Peer) -> None:
-        if peer.session_id is not None:
-            raise ProtocolError("INVALID_STATE", "Leave the current session before creating or joining another")
-
-    def _create(self, peer: Peer) -> None:
-        self._require_idle(peer)
+    async def _create(self, peer: Peer) -> None:
+        session_id = f"s_{uuid4().hex}"
         for _ in range(100):
             code = f"{secrets.randbelow(1_000_000):06d}"
-            if code not in self._codes and code not in self._expired_codes:
-                break
-        else:
-            raise ProtocolError("FULL", "No room code available; try again")
-        session = Session(
-            id=f"s_{uuid4().hex}",
-            code=code,
-            photographer=peer,
-            expires_at=self.clock() + self.settings.room_ttl_seconds,
-        )
-        self._sessions[session.id] = session
-        self._codes[code] = session.id
-        peer.session_id = session.id
-        self.send(peer, {"type": "room.created", "code": code, "sessionId": session.id, "iceServers": []})
+            status, deliveries = await self.store.create(peer.id, session_id, code)
+            await self._deliver(deliveries)
+            if status == "OK":
+                self.send(peer, {"type": "room.created", "code": code, "sessionId": session_id, "iceServers": []})
+                return
+            if status == "INVALID_STATE":
+                raise ProtocolError(status, JOIN_ERRORS[status])
+        raise ProtocolError("FULL", "No room code available; try again")
 
-    def _join(self, peer: Peer, code: str) -> None:
-        self._require_idle(peer)
-        if code in self._expired_codes:
-            raise ProtocolError("EXPIRED", "This room code has expired")
-        session = self._sessions.get(self._codes.get(code, ""))
-        if session is None or session.photographer is None or session.photographer.closing.is_set():
-            raise ProtocolError("NOT_FOUND", "No active room with this code")
-        if session.subject is not None:
-            raise ProtocolError("FULL", "This room already has a subject")
-        session.subject = peer
-        session.expires_at = None
-        peer.session_id = session.id
-        self.send(peer, {"type": "session.joined", "sessionId": session.id, "role": "SUBJECT", "iceServers": []})
-        self.send(session.photographer, {"type": "peer.joined"})
+    async def _join(self, peer: Peer, code: str) -> None:
+        status, session_id, deliveries = await self.store.join(peer.id, code)
+        if status == "OK":
+            self.send(peer, {"type": "session.joined", "sessionId": session_id, "role": "SUBJECT", "iceServers": []})
+        # The photographer's peer.joined is among these, and it must be on its way before this socket's next signal.
+        await self._deliver(deliveries)
+        if status != "OK":
+            raise ProtocolError(status, JOIN_ERRORS[status])
 
-    def _relay(self, peer: Peer, message: Signal, raw_text: str) -> None:
-        session = self._sessions.get(peer.session_id or "")
-        if session is None:
-            raise ProtocolError("INVALID_STATE", "Create or join a room before signaling")
-        is_photographer = session.photographer is peer
-        if message.sdp is not None:
-            expected = "offer" if is_photographer else "answer"
-            if message.sdp.type != expected:
-                raise ProtocolError("INVALID_STATE", f"This peer may only send an SDP {expected}")
-        other = session.subject if is_photographer else session.photographer
-        if other is None or other.closing.is_set():
-            raise ProtocolError("PEER_UNAVAILABLE", "The other phone is not connected")
-        self.send(other, raw_text)
-
-    def _leave(self, peer: Peer) -> None:
-        session = self._sessions.get(peer.session_id or "")
-        if session is None:
-            return
-        if session.photographer is peer:
-            other = session.subject
-            self._remove(session)
-        else:
-            other = session.photographer
-            session.subject = None
-            peer.session_id = None
-            if other is None:
-                session.empty_since = self.clock()
-        if other is not None:
-            self.send(other, {"type": "peer.left", "reason": "PEER_LEFT"})
-
-    def disconnect(self, peer: Peer) -> None:
-        self._peers.discard(peer)
-        peer.closing.set()
-        session = self._sessions.get(peer.session_id or "")
-        peer.session_id = None
-        if session is None:
-            return
-        if session.photographer is peer:
-            session.photographer = None
-            other = session.subject
-        else:
-            session.subject = None
-            other = session.photographer
-        if other is not None:
-            self.send(other, {"type": "peer.left", "reason": "CONNECTION_LOST"})
-        else:
-            session.empty_since = self.clock()
-
-    def _remove(self, session: Session) -> None:
-        self._sessions.pop(session.id)
-        self._codes.pop(session.code)
-        for peer in (session.photographer, session.subject):
-            if peer is not None:
-                peer.session_id = None
-
-    def expire(self) -> None:
-        now = self.clock()
-        for code, forget_at in list(self._expired_codes.items()):
-            if now >= forget_at:
-                del self._expired_codes[code]
-        for session in list(self._sessions.values()):
-            if session.expires_at is not None and now >= session.expires_at:
-                self._remove(session)
-                # Remember recent expirations without retaining sockets/sessions.
-                self._expired_codes[session.code] = now + self.settings.room_ttl_seconds
-                if session.photographer is not None:
-                    self.error(session.photographer, ProtocolError("EXPIRED", "This room code has expired"))
-            elif (
-                session.empty_since is not None and now >= session.empty_since + self.settings.empty_session_ttl_seconds
-            ):
-                self._remove(session)
-
-    def shutdown(self) -> None:
-        for peer in self._peers:
-            peer.session_id = None
-            peer.close_code = 1001
-            peer.closing.set()
-        self._peers.clear()
-        self._sessions.clear()
-        self._codes.clear()
-        self._expired_codes.clear()
+    async def _relay(self, peer: Peer, message: Signal, raw_text: str) -> None:
+        sdp_type = message.sdp.type if message.sdp is not None else ""
+        status, expected, target, worker, deliveries = await self.store.route(peer.id, sdp_type)
+        await self._deliver(deliveries)
+        if status == "INVALID_STATE":
+            raise ProtocolError(status, "Create or join a room before signaling")
+        if status == "WRONG_SDP":
+            raise ProtocolError("INVALID_STATE", f"This peer may only send an SDP {expected}")
+        if status == "PEER_UNAVAILABLE":
+            raise ProtocolError(status, "The other phone is not connected")
+        await self._send_to(target, worker, raw_text)

@@ -2,7 +2,7 @@
 
 FastAPI backend for Pix. The server's responsibilities include session signaling, pose generation, and planned APIs for friend invitations and other features as the project develops.
 
-The current implementation provides iteration 1 signaling (anonymous room-code sessions and WebRTC SDP/ICE relay between one photographer and one subject) and the pose generation REST API, which turns a scene photo into pose candidates through an image-editing model on [OpenRouter](https://openrouter.ai/). Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. Database support and account and friend APIs are not implemented yet.
+The current implementation provides iteration 1 signaling (anonymous room-code sessions and WebRTC SDP/ICE relay between one photographer and one subject) and the pose generation REST API, which turns a scene photo into pose candidates through an image-editing model on [OpenRouter](https://openrouter.ai/). Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. Rooms, room codes, and the pose rate limit are kept in a Redis session store, so the server can run several worker processes ([Session store](#session-store)). Database support and account and friend APIs are not implemented yet.
 
 The wire contract comes from [Design Documentation §2.5.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt). Room behavior follows [FR-8 and FR-6](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications). The REST contract comes from Design Documentation §2.5.3 and Android's [PixApi.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/PixApi.kt) and [ApiModels.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/ApiModels.kt); pose generation follows §2.6.3 and FR-4.
 
@@ -27,13 +27,13 @@ From `server/`, start the server:
 uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 65536
 ```
 
-Use **one worker and one server instance**: room membership is process-local and is lost when the server restarts. For development, `--reload` can replace `--workers 1`; a reload ends existing sessions.
+Started this way, without `PIX_REDIS_URL`, the server keeps its rooms inside the process, so use **one worker**; a restart loses the rooms. For development, `--reload` can replace `--workers 1`; a reload ends existing sessions. To run several workers, or to keep rooms across a restart, give it a Redis ([Session store](#session-store)).
 
 Put the laptop and both phones on the same Wi-Fi. Connect Android to `ws://<laptop-Wi-Fi-IP>:8000/ws` for signaling and `http://<laptop-Wi-Fi-IP>:8000/api/v1` for the REST API (a phone's `localhost` refers to that phone). The network must allow device-to-device traffic and inbound TCP port 8000 on the laptop. Iteration 1 uses the debug-build HTTP/WS exception in Design §2.8. `iceServers` is always `[]`; STUN/TURN and cellular connectivity belong to later iterations.
 
 Uvicorn's WebSocket ping/pong detects dead connections; no application heartbeat message is required.
 
-`GET /health` returns `{"status":"ok"}`.
+`GET /health` returns `{"status":"ok"}`, or `503` with `{"status":"unavailable"}` while the session store does not answer.
 
 ## WebSocket protocol
 
@@ -65,7 +65,7 @@ Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active ro
 | `INVALID_STATE` | Already in a room, signaling before joining, or SDP from the wrong role. |
 | `PEER_UNAVAILABLE` | No connected counterpart to receive a signal. |
 
-Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. Request bodies, room codes, and signaling payloads are not logged by the app.
+Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. The server also closes a socket with 1013 when it cannot reach the session store; the phone can connect again later. Request bodies, room codes, and signaling payloads are not logged by the app.
 
 ## Testing the photographer's phone without a second phone
 
@@ -109,10 +109,26 @@ Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose tem
 | `413` | The request is larger than 1 MiB. It is refused before the upload is read, so it carries Starlette's own body (`Content Too Large`) and not the error shape above. |
 | `422 REJECTED` | The image service declined the photo or pose (a content filter or a model refusal). |
 | `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600). Requests refused before that point are not counted. |
+| `503 UNAVAILABLE` | The session store, which counts the rate limit, does not answer. Nothing is sent to the image service. |
 | `502 UPSTREAM_ERROR` | The image service failed, could not be reached, or gave an unreadable answer, or `OPENROUTER_API_KEY` is not set. The server log gives OpenRouter's status code, for example 402 when the credits run out, and never the text of its answer. |
 | `504 UPSTREAM_TIMEOUT` | The image service did not answer in time. |
 
-The rate limit is counted per client IP address in memory, so it resets when the server restarts; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
+The rate limit is counted per client IP address in the session store, so every worker counts against the same window; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
+
+## Session store
+
+Room state is in Redis and not in the server process (Design §2.7, AD-18): sessions, room codes, recently expired codes, each socket's connection record, and the pose rate limit. The code is in [`src/pix_server/store/`](src/pix_server/store/).
+
+- **Workers.** Each server process is one worker. A room created through one worker can be joined through another, and a signal for a socket on another worker travels over Redis pub/sub. The image runs two workers.
+- **Transitions.** Create, join, leave, disconnect, and expiry each run as one Lua script inside Redis ([`store/scripts.py`](src/pix_server/store/scripts.py)), so two workers cannot seat two subjects in one room. The caller passes the time in, which is why the tests can move a clock.
+- **Housekeeping.** Every `PIX_CLEANUP_INTERVAL_SECONDS` each worker renews a heartbeat that lasts `PIX_WORKER_TTL_SECONDS` (15), and the one worker that gets a lock for that interval expires rooms and removes empty sessions. A worker whose heartbeat ran out, for example after a crash, loses its sockets in the store, and the other phones get `peer.left` with `CONNECTION_LOST`.
+- **A worker that stops** gives up its sockets at once. Its sessions stay in the store for the usual 60 s, which is what a phone that reconnects will come back to once the app can rejoin (Design §2.6.7, #56).
+- **Redis down.** `/health` answers `503`, sockets are closed with 1013, and pose requests answer `503 UNAVAILABLE`. If Redis itself restarts, the open rooms are gone; the workers carry on with new ones.
+
+| `PIX_REDIS_URL` | Where the rooms are |
+| --- | --- |
+| Not set | Inside the server process, in [fakeredis](https://github.com/cunla/fakeredis-py), which runs the same scripts. This is for one worker on a laptop: nothing to install. fakeredis is a development dependency, so the deployed image does not have it and refuses to start without `PIX_REDIS_URL`. |
+| `redis://<host>:6379/0` | In that Redis. On the course servers [`deploy/docker-compose.yml`](deploy/docker-compose.yml) sets it to its own `redis` service. Locally, `docker run --rm -p 6379:6379 redis:8-alpine` gives one for trying several workers. |
 
 ## Deploy
 
@@ -123,7 +139,7 @@ The server runs on the two course servers (Design §2.8, Hosting and Deployment)
 | A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds of the app use it. |
 | B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging; set `pix.serverUrl` to it in a debug build. |
 
-[`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs nginx on port 80 and two copies of the app, `app-blue` and `app-green`, built from the [`Dockerfile`](Dockerfile). One copy serves and the other is stopped. nginx forwards `/api/v1/`, `/ws`, and `/health` to the serving copy, answers `/version` with the commit that is live, and answers `404` for everything else, so FastAPI's `/docs` and the app's `/internal` routes are not public. A new public route must be added to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf).
+[`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs nginx on port 80, Redis, and two copies of the app, `app-blue` and `app-green`, built from the [`Dockerfile`](Dockerfile). One copy serves and the other is stopped; each copy runs two workers, and both copies use the same Redis, whose port is not published and which writes nothing to disk. nginx forwards `/api/v1/`, `/ws`, and `/health` to the serving copy, answers `/version` with the commit that is live, and answers `404` for everything else, so FastAPI's `/docs` and the app's `/internal` routes are not public. A new public route must be added to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf).
 
 ### How a deploy happens
 
@@ -132,8 +148,8 @@ GitHub cannot push to the servers: SSH goes through a campus-only relay with per
 1. It fetches the server's branch. If the commit is already recorded, it stops.
 2. If the commit does not change `server/`, it records the commit and restarts nothing.
 3. It builds the image. pytest runs as a build stage, so a commit whose tests fail stops here.
-4. It starts the image as the idle copy and waits for the container's health check.
-5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. The two copies cannot share a room until the Redis session store is built (Design AD-18). After 10 minutes it goes on anyway: sessions that are already live continue, because the video goes phone to phone, and rooms still waiting for a subject end.
+4. It starts the image as the idle copy and waits for the container's health check, which also needs Redis. Redis is started with the first copy and is left running by later deploys.
+5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. The two copies share their rooms through Redis, but stopping a copy closes its sockets, and the app cannot come back to its room until it can rejoin (Design §2.6.7, #56); until then the wait stays. After 10 minutes it goes on anyway: sessions that are already live continue, because the video goes phone to phone, and rooms still waiting for a subject end.
 6. It points nginx at the new copy and reloads it, checks `/health` through nginx, and stops the old copy with 40 s for requests in flight.
 7. It records the commit, which `/version` then shows, and deletes images other than the two copies'.
 
@@ -164,7 +180,7 @@ Run these on the server with `sudo`:
 | `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without waiting for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
 | `… deploy.sh restart` | Starts the other copy from the same image, for example after editing `/opt/pix/.env`. |
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
-| `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy and `pix-nginx-1` for the access log. Logs rotate at 10 MB, five files each. |
+| `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, and `pix-redis-1` for the session store. Logs rotate at 10 MB, five files each. |
 
 Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command to switch without waiting for rooms.
 
@@ -189,11 +205,12 @@ Run these from `server/` before you push. On every pull request, the [server-lin
 | `uv run ruff format .` | Formats Python files with Ruff. |
 | `uv run ruff format --check .` | Fails if a file is not formatted. |
 | `uv run ruff check .` | Ruff lint. Add `--fix` to apply the fixes Ruff can make, such as import order. |
-| `uv run pytest` | Tests in `tests/`. They run in one process, without a running server or a phone. |
+| `uv run pytest` | Tests in `tests/`. They run in one process, without a running server, a Redis, or a phone. |
+| `PIX_TEST_REDIS_URL=redis://localhost:6379/0 uv run pytest` | The same tests on a real Redis, whose database they empty first. CI runs both. |
 
 - **Rules.** Ruff rules are in `ruff.toml`: a 120-character line limit and the lint rule sets `E4`, `E7`, `E9`, `F`, and `I`.
 - **Suppressing.** For one line, use `# noqa: <rule>` with a comment that says why. To turn off a rule for some files or for the whole server, add it to `per-file-ignores` or `ignore` in `ruff.toml`.
-- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `client` also replaces OpenRouter with the fake `image_api`, which records requests and returns what the test sets, so tests never call the real service or need a key; `make_image` builds test photos. `async def` tests need no marker, and a test fails after 15 seconds.
+- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `client` also replaces OpenRouter with the fake `image_api`, which records requests and returns what the test sets, so tests never call the real service or need a key; `make_image` builds test photos. The session store in tests is an in-process Redis (fakeredis) that runs the real Lua scripts; `make_registry` starts registries that share it, each standing for one worker, and `outage` switches the store off and on. `async def` tests need no marker, and a test fails after 15 seconds.
 
 ## Compare image-editing models
 

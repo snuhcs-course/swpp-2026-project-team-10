@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 name: server-image
 
 on:
@@ -35,6 +35,7 @@ jobs:
       - name: Build the runtime image
         run: docker build --target runtime -t pix-server:ci server
 
+      # Starting the app also starts Redis, which the app depends on.
       - name: Start nginx and one copy of the app
         run: |
           mkdir -p "$RUNNER_TEMP/pix/state"
@@ -58,6 +59,32 @@ jobs:
           test "$(status http://127.0.0.1:8080/docs)" = 404
           test "$(status http://127.0.0.1:8080/openapi.json)" = 404
           test "$(status http://127.0.0.1:8080/internal/stats)" = 404
+
+      # Eight rooms through nginx, so both workers of the app take part and rooms cross between them.
+      - name: Create and join rooms through nginx
+        run: |
+          docker compose -f server/deploy/docker-compose.yml exec -T app-blue python - <<'EOF'
+          import asyncio
+          import json
+
+          import websockets
+
+
+          async def room():
+              async with websockets.connect("ws://nginx/ws") as photographer, websockets.connect("ws://nginx/ws") as subject:
+                  await photographer.send(json.dumps({"type": "room.create"}))
+                  created = json.loads(await photographer.recv())
+                  await subject.send(json.dumps({"type": "room.join", "code": created["code"]}))
+                  assert json.loads(await subject.recv())["sessionId"] == created["sessionId"]
+                  assert json.loads(await photographer.recv()) == {"type": "peer.joined"}
+
+
+          async def main():
+              await asyncio.wait_for(asyncio.gather(*(room() for _ in range(8))), timeout=30)
+
+
+          asyncio.run(main())
+          EOF
 
       - name: Show the container logs
         if: failure()

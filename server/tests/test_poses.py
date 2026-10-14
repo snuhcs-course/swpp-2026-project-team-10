@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 import asyncio
 import base64
 import io
@@ -197,22 +197,39 @@ def test_rate_limit_counts_only_requests_sent_to_the_image_api(client, image_api
     assert create_pose(client, make_image()).status_code == 200
 
 
-def test_rate_limiter_slides_and_separates_clients(clock):
-    limiter = RateLimiter(limit=2, window_seconds=60, clock=clock)
-    assert limiter.allow("a")
+async def test_rate_limiter_slides_and_separates_clients(clock, make_registry):
+    limiter = RateLimiter((await make_registry()).store, limit=2, window_seconds=60)
+    assert await limiter.allow("a")
     clock.advance(30)
-    assert limiter.allow("a")
-    assert not limiter.allow("a")
-    assert limiter.allow("b")
+    assert await limiter.allow("a")
+    assert not await limiter.allow("a")
+    assert await limiter.allow("b")
     clock.advance(30)
-    assert limiter.allow("a")
-    assert not limiter.allow("a")
+    assert await limiter.allow("a")
+    assert not await limiter.allow("a")
 
 
-async def test_dropped_request_cancels_the_image_api_call(settings, image_api, make_image, unused_tcp_port):
+async def test_rate_limit_is_shared_by_all_workers(make_registry):
+    first = RateLimiter((await make_registry()).store, limit=2, window_seconds=60)
+    second = RateLimiter((await make_registry()).store, limit=2, window_seconds=60)
+    assert await first.allow("a")
+    assert await second.allow("a")
+    assert not await first.allow("a")
+    assert not await second.allow("a")
+
+
+def test_pose_request_is_refused_while_the_session_store_is_down(client, image_api, make_image, outage):
+    outage(True)
+    assert_error(create_pose(client, make_image()), 503, "UNAVAILABLE")
+    assert image_api.requests == []  # A request that cannot be counted is not sent to the image API.
+    outage(False)
+    assert create_pose(client, make_image()).status_code == 200
+
+
+async def test_dropped_request_cancels_the_image_api_call(settings, image_api, make_image, unused_tcp_port, open_store):
     # A real server and socket, because the test client cannot close a connection in the middle of a request.
     image_api.delay = 30
-    app = create_app(settings, image_api=httpx2.MockTransport(image_api))
+    app = create_app(settings, image_api=httpx2.MockTransport(image_api), redis=open_store)
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=unused_tcp_port, log_level="warning"))
     serving = asyncio.create_task(server.serve())
     try:

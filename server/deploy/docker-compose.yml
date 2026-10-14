@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 # The Pix server on the course server. deploy.sh drives this file and supplies the variables
 # On the server, use deploy.sh instead of calling docker compose by hand.
 name: pix
@@ -12,6 +12,12 @@ x-logging: &logging
 # Two copies of the app. One serves; the other is stopped, or is starting during a deploy.
 x-app: &app
   env_file: ${PIX_ENV_FILE:-/opt/pix/.env}
+  environment:
+    # Set here and not in .env, because this file is what names the service.
+    PIX_REDIS_URL: redis://redis:6379/0
+  depends_on:
+    redis:
+      condition: service_healthy
   restart: unless-stopped
   # Longer than Uvicorn's 35 s graceful shutdown, so a pose request in flight finishes.
   stop_grace_period: 40s
@@ -25,6 +31,22 @@ services:
   app-green:
     <<: *app
     image: pix-server:${PIX_GREEN_TAG:-none}
+
+  # The session store (Design 2.7): rooms, codes, and the rate limit, shared by both copies and all their
+  # workers. Its port is not published, so only the app containers reach it. Nothing in it has to survive a
+  # restart, so it writes nothing to disk. A deploy starts it once and leaves it running.
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+      start_interval: 1s
+    restart: unless-stopped
+    logging: *logging
 
   nginx:
     image: nginx:1.30-alpine

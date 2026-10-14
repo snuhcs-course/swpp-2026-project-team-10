@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -51,7 +51,7 @@ async def create_pose(
 
     # Only requests that reach the image API count, because the limit exists to control its cost.
     limiter: RateLimiter = request.app.state.pose_limiter
-    if not limiter.allow(request.client.host if request.client else ""):
+    if not await limiter.allow(request.client.host if request.client else ""):
         raise ApiError(429, "RATE_LIMITED", "Too many pose requests from this device; try again later")
 
     generator: PoseGenerator = request.app.state.pose_generator

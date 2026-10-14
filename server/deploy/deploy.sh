@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 # Deploys the Pix server on a course server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
 #
 #   deploy.sh auto           deploy the configured branch if it has a new commit; the systemd timer runs this
@@ -8,9 +8,10 @@
 #   deploy.sh rollback       switch back to the image that served before the last deploy
 #   deploy.sh status         show what is running
 #
-# Two copies of the app, blue and green, sit behind nginx. A deploy builds the image, starts it as the idle copy,
-# waits until it is healthy, points nginx at it, and stops the other copy. Until the Redis session store exists
-# (Design AD-18) the two copies cannot share a room, so the switch first waits until no room is open.
+# Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis (Design 2.7). A
+# deploy builds the image, starts it as the idle copy, waits until it is healthy, points nginx at it, and stops
+# the other copy. Stopping a copy closes its sockets, and a phone cannot come back to its room until the app can
+# rejoin (Design 2.6.7, #56), so the switch still waits until no room is open.
 #
 # Everything is inside functions and the last line calls main, so bash has read the whole file before a deploy
 # checks out another version of it.

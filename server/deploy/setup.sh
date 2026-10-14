@@ -6,7 +6,8 @@
 #   sudo git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git /opt/pix/repo
 #   sudo /opt/pix/repo/server/deploy/setup.sh dev     # Server B; use "main" on Server A
 #
-# Running it again is safe: it keeps an existing .env and only rewrites the branch and the systemd units.
+# Running it again is safe: it keeps an existing .env and the other settings in deploy.conf, and only changes the
+# branch and the systemd units.
 set -euo pipefail
 
 PIX_HOME=/opt/pix
@@ -26,7 +27,13 @@ docker compose version > /dev/null 2>&1 || die "Docker Compose is missing: sudo 
 docker buildx version > /dev/null 2>&1 || die "Docker Buildx is missing: sudo apt install -y docker-buildx"
 
 mkdir -p "$PIX_HOME/state"
-printf 'BRANCH=%s\n' "$BRANCH" > "$PIX_HOME/deploy.conf"
+# Only the BRANCH line changes; settings such as MAX_WAIT_SECONDS that someone added stay.
+CONF=$PIX_HOME/deploy.conf
+{
+    printf 'BRANCH=%s\n' "$BRANCH"
+    if [ -f "$CONF" ]; then grep -v '^BRANCH=' "$CONF" || true; fi
+} > "$CONF.tmp"
+mv "$CONF.tmp" "$CONF"
 
 if [ ! -f "$PIX_HOME/.env" ]; then
     install -m 600 "$REPO/server/.env.example" "$PIX_HOME/.env"

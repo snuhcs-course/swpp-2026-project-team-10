@@ -167,7 +167,7 @@ sudo /opt/pix/repo/server/deploy/deploy.sh deploy    # the first deploy, by hand
 sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 ```
 
-[`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It writes the branch to `/opt/pix/deploy.conf`, creates `/opt/pix/.env` from `.env.example` (readable by root only), and installs the systemd units. Secrets exist only in `/opt/pix/.env`; `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before it is merged, pass it to the first deploy: `deploy.sh deploy feat/2-deploy`.
+[`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It sets the branch in `/opt/pix/deploy.conf`, keeping any other setting there, creates `/opt/pix/.env` from `.env.example` (readable by root only), and installs the systemd units. Secrets exist only in `/opt/pix/.env`; `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before it is merged, pass it to the first deploy: `deploy.sh deploy feat/2-deploy`.
 
 ### Operate it
 
@@ -190,7 +190,7 @@ Without the shortcuts, run these on the server with `sudo`:
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
 | `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, and `pix-redis-1` for the session store. Logs rotate at 10 MB, five files each. |
 
-Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`), or in front of `pix deploy`, to switch without waiting for rooms.
+A deploy waits at most `MAX_WAIT_SECONDS` (600) for open rooms. Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`), or in front of `pix deploy`, to switch without waiting for that one run. To change it for every deploy on a server, the timer's included, put `MAX_WAIT_SECONDS=<seconds>` in `/opt/pix/deploy.conf`; the timer's next run uses it, and a value given in front of a command still wins for that run.
 
 ### What the course's proxy does
 

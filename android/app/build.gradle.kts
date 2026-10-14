@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Jaewan Park
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -7,16 +7,18 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Iteration 1: the Pix server runs on a laptop on the test Wi-Fi (Design 2.8). Set its address as
-// `pix.serverUrl=http://192.168.0.10:8000/` in local.properties (never committed) or pass -Ppix.serverUrl=...
-// The default, 10.0.2.2, is the host machine as seen from the emulator.
+// The Pix server (Design 2.8, Hosting and Configuration). Release builds use Server A, which runs main.
+// Debug builds use `pix.serverUrl` from local.properties (never committed) or -Ppix.serverUrl=...: Server B, which
+// runs dev (`http://swpp26t10.147-46-242-174.sslip.io/`), or a laptop on the test Wi-Fi
+// (`http://192.168.0.10:8000/`). Their default, 10.0.2.2, is the host machine as seen from the emulator.
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
-val serverUrl: String = providers.gradleProperty("pix.serverUrl").orNull
+val debugServerUrl: String = providers.gradleProperty("pix.serverUrl").orNull
     ?: localProperties.getProperty("pix.serverUrl")
     ?: "http://10.0.2.2:8000/"
+val releaseServerUrl = "http://swpp26t10.147-46-242-169.sslip.io/"
 
 android {
     namespace = "com.lastpenguin.pix"
@@ -30,12 +32,14 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-
-        buildConfigField("String", "SERVER_URL", "\"$serverUrl\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "SERVER_URL", "\"$debugServerUrl\"")
+        }
         release {
+            buildConfigField("String", "SERVER_URL", "\"$releaseServerUrl\"")
             optimization {
                 enable = false
             }

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -66,6 +66,12 @@ def create_app(
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/internal/stats", include_in_schema=False)
+    async def stats() -> dict[str, int]:
+        """Open rooms and sockets, read by deploy.sh inside the container; nginx does not forward /internal."""
+        registry: SessionRegistry = app.state.signaling
+        return {"sessions": registry.session_count, "connections": registry.connection_count}
 
     return app
 

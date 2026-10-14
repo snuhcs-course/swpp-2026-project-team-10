@@ -171,7 +171,15 @@ sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 
 ### Operate it
 
-Run these on the server with `sudo`:
+[`deploy/pix.sh`](deploy/pix.sh) gives each account on a server a `pix` command for the operations below. Load it once from your `~/.bashrc`, from the checkout that deploys update, so everyone gets the same version:
+
+```sh
+echo '[ -f /opt/pix/repo/server/deploy/pix.sh ] && . /opt/pix/repo/server/deploy/pix.sh' >> ~/.bashrc
+```
+
+`pix help` lists the commands: `pix status`, `pix deploy [ref]`, `pix rollback`, `pix restart`, `pix logs` for the serving copy, `pix nginx`, `pix journal`, `pix build`, `pix timer`, `pix env`, `pix health`, and `pix redis`. They need an account that can use `sudo`. One deployment serves everyone on a server, so tell the team before a rollback, and never edit files in `/opt/pix/repo`, where each deploy checks out its commit.
+
+Without the shortcuts, run these on the server with `sudo`:
 
 | Command | What it does |
 | --- | --- |
@@ -182,7 +190,7 @@ Run these on the server with `sudo`:
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
 | `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, and `pix-redis-1` for the session store. Logs rotate at 10 MB, five files each. |
 
-Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command to switch without waiting for rooms.
+Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`), or in front of `pix deploy`, to switch without waiting for rooms.
 
 ### What the course's proxy does
 

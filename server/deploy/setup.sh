@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 # One-time setup of a course server for the Pix server (server/README.md, Deploy). It installs no packages and
 # creates no users. Run it as root from the checkout, with the branch this server follows:
 #
@@ -46,3 +46,6 @@ else
 fi
 echo "  2. Deploy once by hand:   sudo $REPO/server/deploy/deploy.sh deploy"
 echo "  3. Turn on automatic deploys:   sudo systemctl enable --now pix-deploy.timer"
+echo
+echo "For the pix shortcuts in your own account (each account adds them once, without sudo):"
+echo "  echo '[ -f $REPO/server/deploy/pix.sh ] && . $REPO/server/deploy/pix.sh' >> ~/.bashrc"

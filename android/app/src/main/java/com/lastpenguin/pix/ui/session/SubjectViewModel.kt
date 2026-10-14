@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-05, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModel
@@ -29,10 +29,15 @@ data class SubjectUiState(
     /** The photographer's zoom range, from `camera.capabilities`; equal until it arrives. */
     val minZoom: Float = 1f,
     val maxZoom: Float = 1f,
-    /** The zoom to show: the slider value during editing, until the photographer echoes applied zoom in `camera.state`. */
+    /** The zoom to show: the pinch's value during the gesture, until the photographer echoes applied zoom in `camera.state`. */
     val zoom: Float = 1f,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
+    /**
+     * Guide-edit mode (AD-17): while on, drags and pinches on the live video go to the guide; while off, a pinch
+     * zooms the photographer's camera. Off until the subject turns it on, and off again when the guide goes.
+     */
+    val guideEditing: Boolean = false,
 ) {
     val canZoom: Boolean
         get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
@@ -90,22 +95,41 @@ class SubjectViewModel(
                 }
             }
         }
-        // The mirror is written by GuideSyncer while the session runs; the overlay only draws it (FR-6.7).
+        // The mirror is written by GuideSyncer while the session runs; the overlay draws it (FR-6.7).
         viewModelScope.launch {
-            mirror.guide.collect { guide -> _uiState.update { it.copy(guide = guide) } }
+            mirror.guide.collect { guide ->
+                _uiState.update { it.copy(guide = guide, guideEditing = it.guideEditing && guide != null) }
+            }
         }
         viewModelScope.launch {
-            mirror.state.collect { state -> _uiState.update { it.copy(guideState = state) } }
+            // A guide the photographer hid cannot be edited, so the mode ends and the pinch zooms again.
+            mirror.state.collect { state ->
+                _uiState.update { it.copy(guideState = state, guideEditing = it.guideEditing && state.visible) }
+            }
         }
     }
 
+    /** The guide-edit mode toggle; there is no mode without a visible guide. */
+    fun setGuideEditing(on: Boolean) {
+        _uiState.update { it.copy(guideEditing = on && it.guide != null && it.guideState.visible) }
+    }
+
     /**
-     * One slider step, or its last value when [final]. The readout follows at once; steps go
+     * From GuideOverlayView.onGesture while guide-edit mode is on. Owning the gesture here is what keeps it away
+     * from camera zoom; moving the photographer's guide with it is Iteration 2's `guide.move` (FR-7.2).
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun onGuideGesture(dx: Float, dy: Float, scale: Float, final: Boolean) {
+        // TODO(#57): send guide.move steps at most every 50 ms and the final value reliably; follow optimistically.
+    }
+
+    /**
+     * One pinch step, or its last value when [final]. The readout follows at once; steps go
      * to the photographer at most every [SEND_INTERVAL_MS] (the newest wins), the final value right away, and the
      * echoed `camera.state` decides what stays (Design 2.6.5).
      */
     fun onZoomGesture(ratio: Float, final: Boolean) {
-        // A disabled or interrupted slider must release echo suppression even if its final request is rejected.
+        // A disabled or interrupted pinch must release echo suppression even if its final request is rejected.
         if (final) endZoomInteraction()
         val ui = _uiState.value
         if (!ratio.isFinite() || !ui.canZoom) return

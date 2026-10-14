@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-04, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -69,8 +69,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var sceneBack: OnBackPressedCallback? = null
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
-    private val zoomLimitFormat = DecimalFormat("0.#")
-    private var zoomSlider: TrackedSliderController? = null
+    private var pinchZoom: PinchZoomController? = null
     private var opacitySlider: TrackedSliderController? = null
     private var previewLogged = false
     private var noticeJob: Job? = null
@@ -95,15 +94,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 Timings.mark("camera.preview")
             }
         }
-        zoomSlider = TrackedSliderController.zoom(controls.zoomControls.zoomSlider) { ratio, _ ->
-            viewModel.onZoomChanged(ratio)
-        }
+        // A pinch on the preview zooms while guide-edit mode is off (AD-17); each step is applied as it comes.
+        pinchZoom = PinchZoomController(
+            controls.previewView,
+            range = ::zoomRange,
+            current = { viewModel.uiState.value.zoom },
+        ) { ratio, _ -> viewModel.onZoomChanged(ratio) }
         opacitySlider = TrackedSliderController(
             controls.opacitySlider,
             { getString(R.string.guide_opacity_percent, (it * 100f).roundToInt()) },
             viewModel::onOpacityChange,
         )
-        setupZoomAccessibility(controls.zoomControls.zoomRatio)
+        setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
         controls.cameraActionButton.setOnClickListener {
             if (hasCameraPermission()) {
@@ -138,6 +140,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.cutoutSegment.setOnClickListener { chooseStyle(GuideStyle.CUTOUT) }
         controls.outlineSegment.setOnClickListener { chooseStyle(GuideStyle.OUTLINE) }
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
+        controls.editGuideButton.setOnClickListener {
+            viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
+        }
         controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
 
         val resolver = requireContext().contentResolver
@@ -222,14 +227,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     override fun onPause() {
-        zoomSlider?.finishInteraction()
+        pinchZoom?.finishInteraction()
         opacitySlider?.finishInteraction()
         super.onPause()
     }
 
     override fun onDestroyView() {
-        zoomSlider?.finishInteraction()
-        zoomSlider = null
+        pinchZoom?.finishInteraction()
+        pinchZoom = null
         opacitySlider?.finishInteraction()
         opacitySlider = null
         binding = null
@@ -245,6 +250,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private fun bindCamera() {
         val controls = binding ?: return
         viewModel.bindCamera(viewLifecycleOwner, controls.previewView.surfaceProvider)
+    }
+
+    /** A pinch starts while the camera is ready and continues through a lens switch's STARTING, as the slider did. */
+    private fun zoomRange(): ClosedFloatingPointRange<Float>? {
+        val state = viewModel.uiState.value
+        if (!hasCameraPermission() || state.maxZoom <= state.minZoom) return null
+        val continuing = state.cameraStatus == CameraStatus.STARTING && pinchZoom?.isTracking == true
+        return if (state.cameraStatus == CameraStatus.READY || continuing) state.minZoom..state.maxZoom else null
     }
 
     private fun setupZoomAccessibility(readout: View) {
@@ -319,7 +332,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = ready
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
-        // and hiding the bar then would shift the zoom slider under an active drag.
+        // and hiding the bar then would move the controls under an active touch.
         val guideEditable = granted && !unavailable
         controls.guideControls.isVisible = state.guide != null
         val cutout = state.guideState.style == GuideStyle.CUTOUT
@@ -336,14 +349,34 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.opacityValue.text =
             getString(R.string.guide_opacity_percent, (state.guideState.opacity * 100f).roundToInt())
         controls.removeGuideButton.isEnabled = guideEditable
+        // Guide-edit mode (AD-17): the overlay owns the preview's touches while on; the pinch zooms while off.
+        // Its toggle sits beside the zoom readout, so it stays when the guide's panel changes (Iter2-P11).
+        controls.editGuideButton.isVisible = state.guide != null
+        // Checkable, so TalkBack reads the mode as on or off; the ViewModel decides the state after a tap.
+        controls.editGuideButton.isChecked = state.guideEditing
+        controls.editGuideButton.isEnabled = guideEditable && state.guideState.visible
+        controls.guideOverlay.editable = state.guideEditing
+        // Computed once per render: while the scene photo is framed the guide is hidden, so the pinch zooms whatever
+        // the mode says, and while the photo is shown there is no zoom. Flipping it off and on again in one render
+        // would end a pinch in progress, which the detector cannot restart in the same touch stream.
+        val scene = generationViewModel.uiState.value
+        pinchZoom?.enabled = if (isScenePhotoActive(scene)) {
+            scene.phase != GenerationUiState.Phase.REVIEWING
+        } else {
+            !state.guideEditing
+        }
         // Guide-colored once a guide is on the camera; it then changes the guide instead of adding one.
         controls.guideButton.isActivated = state.guide != null
         controls.guideButton.contentDescription =
             getString(if (state.guide == null) R.string.guide_add_description else R.string.guide_change_description)
-        if (state.guide == null) {
-            showHint(controls.hintText, R.string.hint_add_guide, R.drawable.ic_target_small, R.color.pix_accent)
-        } else {
-            showHint(controls.hintText, R.string.hint_edit_guide, R.drawable.ic_move_small, R.color.pix_guide)
+        when {
+            state.guide == null ->
+                showHint(controls.hintText, R.string.hint_add_guide, R.drawable.ic_target_small, R.color.pix_accent)
+
+            state.guideEditing ->
+                showHint(controls.hintText, R.string.hint_edit_guide, R.drawable.ic_move_small, R.color.pix_guide)
+
+            else -> showHint(controls.hintText, R.string.hint_pinch_zoom, R.drawable.ic_zoom_small)
         }
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
@@ -359,14 +392,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.galleryButton.isEnabled = state.lastPhoto != null
 
         val ratio = zoomFormat.format(state.zoom)
-        controls.zoomControls.zoomRatio.text = getString(R.string.zoom_ratio, ratio)
-        controls.zoomControls.zoomRatio.contentDescription = getString(R.string.camera_zoom_description, ratio)
-        controls.zoomControls.zoomRatio.isEnabled = ready && state.maxZoom > state.minZoom
-        controls.zoomControls.minZoom.text = getString(R.string.zoom_ratio, zoomLimitFormat.format(state.minZoom))
-        controls.zoomControls.maxZoom.text = getString(R.string.zoom_ratio, zoomLimitFormat.format(state.maxZoom))
-        // Lens switching briefly enters STARTING: preserve an already active slider drag across that transition.
-        val canContinueZoom = granted && state.cameraStatus == CameraStatus.STARTING && zoomSlider?.isTracking == true
-        zoomSlider?.render(state.minZoom, state.maxZoom, state.zoom, enabled = ready || canContinueZoom)
+        controls.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
+        controls.zoomReadout.contentDescription = getString(R.string.camera_zoom_description, ratio)
+        controls.zoomReadout.isEnabled = ready && state.maxZoom > state.minZoom
         // The round shutter has no label, so saving is shown where the result appears next.
         val notice = state.captureNotice
         when {
@@ -410,8 +438,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.galleryButton.isInvisible = active
         controls.sceneStill.isVisible = reviewing
         controls.sceneStill.setImageBitmap(if (reviewing) scene.scene else null)
-        // The photo is taken: no zoom until it is used or shot again.
-        controls.zoomControls.root.isInvisible = reviewing
+        // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
+        controls.zoomReadout.isInvisible = reviewing
+        if (active) controls.editGuideButton.isVisible = false
         controls.captureControls.isVisible = !reviewing
         controls.sceneReviewControls.isVisible = reviewing
         if (!active) return

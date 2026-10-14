@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-05, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -169,6 +169,41 @@ class SubjectViewModelTest {
         mirror.setGuide(null)
         runCurrent()
         assertNull(viewModel.uiState.value.guide)
+    }
+
+    @Test
+    fun `guide-edit mode starts off, needs a visible guide, and ends when the guide goes`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+        assertFalse(viewModel.uiState.value.guideEditing)
+        viewModel.setGuideEditing(true)
+        assertFalse(viewModel.uiState.value.guideEditing)
+
+        mirror.setGuide(fakeGuide("g1"))
+        runCurrent()
+        assertFalse(viewModel.uiState.value.guideEditing)
+        viewModel.setGuideEditing(true)
+        assertTrue(viewModel.uiState.value.guideEditing)
+        // A guide gesture is owned here and, until #57, changes nothing on either phone.
+        viewModel.onGuideGesture(0.1f, 0.1f, 1.5f, final = true)
+        assertTrue(session.sent.none { it is SessionMessage.ZoomSet })
+        viewModel.setGuideEditing(false)
+        assertFalse(viewModel.uiState.value.guideEditing)
+
+        viewModel.setGuideEditing(true)
+        mirror.update(final = true) { it.copy(visible = false) }
+        runCurrent()
+        assertFalse(viewModel.uiState.value.guideEditing)
+        viewModel.setGuideEditing(true)
+        assertFalse(viewModel.uiState.value.guideEditing)
+        mirror.update(final = true) { it.copy(visible = true) }
+        runCurrent()
+        assertFalse(viewModel.uiState.value.guideEditing)
+
+        viewModel.setGuideEditing(true)
+        mirror.setGuide(null)
+        runCurrent()
+        assertFalse(viewModel.uiState.value.guideEditing)
     }
 
     @Test

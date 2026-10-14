@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -148,16 +148,21 @@ class GuideOverlayGestureTest {
     }
 
     @Test
-    fun onlyTheVisiblePartOfTheGuideAcceptsTheInitialTouch() = onMain {
+    fun inEditModeTheWholeCameraImageAcceptsTheInitialTouchButTheLetterboxDoesNot() = onMain {
         val fixture = fixture(500, 400)
         fixture.view.render(fixture.guide, fixture.state.copy(cx = 0f, height = 1f))
 
-        // The guide spans x = 0..200, but only x = 100..200 falls inside the camera image.
+        // The image spans x = 100..400; the guide only x = 0..200. A touch beside the guide still edits it.
         assertFalse(touch(fixture.view, MotionEvent.ACTION_DOWN, point(7, 50f, 200f)))
-        assertFalse(touch(fixture.view, MotionEvent.ACTION_DOWN, point(7, 250f, 200f)))
+        assertFalse(touch(fixture.view, MotionEvent.ACTION_DOWN, point(7, 450f, 200f)))
         assertTrue(touch(fixture.view, MotionEvent.ACTION_DOWN, point(7, 150f, 200f)))
         touch(fixture.view, MotionEvent.ACTION_CANCEL, point(7, 150f, 200f))
-        assertTrue(fixture.steps.isEmpty())
+        assertTrue(touch(fixture.view, MotionEvent.ACTION_DOWN, point(7, 350f, 200f)))
+        touch(fixture.view, MotionEvent.ACTION_MOVE, point(7, 380f, 240f))
+        touch(fixture.view, MotionEvent.ACTION_UP, point(7, 380f, 240f))
+        assertEquals(2, fixture.steps.size)
+        assertStep(fixture.steps[0], dx = 0.1f, dy = 0.1f)
+        assertStep(fixture.steps[1], final = true)
     }
 
     @Test
@@ -197,8 +202,9 @@ class GuideOverlayGestureTest {
     }
 
     @Test
-    fun aPreviewGestureKeepsOwnershipWhenTheSecondFingerLandsOnTheGuide() = onMain {
+    fun withEditModeOffEveryTouchReachesThePreviewEvenWhenAFingerLandsOnTheGuide() = onMain {
         val fixture = fixture()
+        fixture.view.editable = false
         val previewActions = mutableListOf<Int>()
         val host = host(fixture.view, previewActions)
 

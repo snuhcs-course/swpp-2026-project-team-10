@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-04, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -49,6 +49,11 @@ data class CameraUiState(
     val captureNotice: CaptureNotice? = null,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
+    /**
+     * Guide-edit mode (AD-17): while on, every drag and pinch on the preview edits the guide; while off, a pinch
+     * zooms the camera. On when a guide is added, off on the shutter or when the guide goes (Design 2.6.2).
+     */
+    val guideEditing: Boolean = false,
     /** The last saved photo, for the thumbnail and "Saved without the guide". */
     val lastPhoto: Uri? = null,
     /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
@@ -86,10 +91,18 @@ class CameraViewModel(
             camera.zoom.collect { zoom -> _uiState.update { it.copy(zoom = zoom) } }
         }
         viewModelScope.launch {
-            guides.guide.collect { guide -> _uiState.update { it.copy(guide = guide) } }
+            guides.guide.collect { guide ->
+                _uiState.update {
+                    // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
+                    val editing = guide != null && (guide !== it.guide || it.guideEditing)
+                    it.copy(guide = guide, guideEditing = editing)
+                }
+            }
         }
         viewModelScope.launch {
-            guides.state.collect { state -> _uiState.update { it.copy(guideState = state) } }
+            guides.state.collect { state ->
+                _uiState.update { it.copy(guideState = state, guideEditing = it.guideEditing && state.visible) }
+            }
         }
     }
 
@@ -100,8 +113,9 @@ class CameraViewModel(
     fun onShutter() {
         if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return
         savedNoticeJob?.cancel()
-        // Set before launching so two taps in the same frame cannot enqueue two captures.
-        _uiState.update { it.copy(isSaving = true, captureNotice = null) }
+        // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
+        // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
+        _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false) }
         viewModelScope.launch {
             try {
                 camera.takePhoto().fold(
@@ -135,6 +149,11 @@ class CameraViewModel(
         ) {
             camera.setZoom(ratio)
         }
+    }
+
+    /** The guide-edit mode toggle; there is no mode without a visible guide. */
+    fun setGuideEditing(on: Boolean) {
+        _uiState.update { it.copy(guideEditing = on && it.guide != null && it.guideState.visible) }
     }
 
     /** From GuideOverlayView.onGesture. */

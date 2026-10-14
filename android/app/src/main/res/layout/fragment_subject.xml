@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1). No shutter: only the photographer takes photos. -->
+<!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1). No shutter: only the photographer takes photos. A pinch on
+     the video zooms the photographer's camera while guide-edit mode is off (AD-17). -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -76,7 +77,7 @@
             android:accessibilityLiveRegion="polite"
             android:text="@string/connecting" />
 
-        <!-- The synced guide (#9). The subject cannot move or resize it in Iteration 1. -->
+        <!-- The synced guide (#9). Editable only while guide-edit mode is on; moving it is #57. -->
         <com.lastpenguin.pix.guide.GuideOverlayView
             android:id="@+id/guideOverlay"
             android:layout_width="match_parent"
@@ -107,12 +108,42 @@
             android:textAppearance="@style/TextAppearance.Pix.Body.Small"
             android:textColor="@color/pix_text_soft" />
 
-        <!-- The same zoom slider as the Camera screen; enabled while connected (FR-7.1). -->
-        <include
-            android:id="@+id/zoomControls"
-            layout="@layout/include_zoom_control"
+        <!-- The Camera screen's zoom readout, enabled while connected (FR-7.1), and the guide-edit mode toggle. -->
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="14dp" />
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp">
+
+            <TextView
+                android:id="@+id/zoomReadout"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_zoom_readout"
+                android:focusable="true"
+                android:gravity="center"
+                android:importantForAccessibility="yes"
+                android:minWidth="56dp"
+                android:paddingHorizontal="12dp"
+                android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                android:textColor="@color/zoom_readout_text"
+                android:textSize="14sp"
+                tools:text="1.0×" />
+
+            <!-- Shown while a guide is on the video (AD-17); checked while gestures edit the guide. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/editGuideButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checkable="true"
+                android:layout_gravity="end|center_vertical"
+                android:contentDescription="@string/edit_guide"
+                android:visibility="gone"
+                app:backgroundTint="@color/edit_guide_background"
+                app:icon="@drawable/ic_move"
+                app:iconTint="@color/edit_guide_icon"
+                tools:visibility="visible" />
+        </FrameLayout>
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

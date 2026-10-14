@@ -9,6 +9,9 @@ The scripts avoid `cjson` and `unpack`, which the in-process Redis used by the t
 Keys: `session:<id>` (hash), `code:<code>`, `conn:<id>` (hash), `conns:<worker>` (set), `worker:<worker>`
 (heartbeat with a real expiry), and the indexes `sessions`, `workers`, `deadlines` (sorted by the next time a
 session has to be looked at), and `expired` (recently expired codes, sorted by the time to forget them).
+
+Only REGISTER adds a worker to `workers`. Every other script refuses to run for a worker that is not in it,
+because that worker has lost its state: Redis restarted empty, or the sweeper took the worker for dead.
 """
 
 # ARGV[1..5] of every session script: now, room TTL, empty-session TTL, the calling worker, heartbeat TTL in ms.
@@ -122,9 +125,20 @@ local function touch(conn)
   end
 end
 
+-- A worker missing from `workers` has lost its state, and its sockets may have missed messages: it has to close
+-- them and register again.
+if redis.call('SISMEMBER', 'workers', me) == 0 then
+  return redis.error_reply('WORKER_LOST ' .. me .. ' is not registered in the session store')
+end
 -- A worker that runs a script is alive, so its own heartbeat is renewed before anything is swept.
 redis.call('SET', 'worker:' .. me, '1', 'PX', ARGV[5])
-redis.call('SADD', 'workers', me)
+"""
+
+# ARGV: the worker, heartbeat TTL in ms. A worker runs it when it starts, and again after it lost its state.
+REGISTER = """
+redis.call('SADD', 'workers', ARGV[1])
+redis.call('SET', 'worker:' .. ARGV[1], '1', 'PX', ARGV[2])
+return 1
 """
 
 # ARGV[6] is "sweep" for the worker that holds the sweeper lock; the others only renew their heartbeat.

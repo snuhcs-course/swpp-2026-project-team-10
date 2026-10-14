@@ -91,13 +91,26 @@ class SessionRegistry:
         with suppress(RedisError):
             await self.store.close()
 
+    def _lose_store(self, exc: RedisError) -> None:
+        """The store failed, or this worker lost its state there. Messages for its sockets may be gone without a trace,
+        so a waiting room could stall with a code that no longer works; every socket is closed with 1013 instead.
+        A live session goes on phone to phone, and a phone in a waiting room shows an error and can start again."""
+        if self._store_reachable:
+            logger.error("The session store failed (%s); closing this worker's sockets", exc)
+            for peer in self._peers.values():
+                peer.close_code = 1013
+                peer.closing.set()
+        self._store_reachable = False
+
     async def _listen(self) -> None:
         """Passes on what other workers publish for this worker's sockets."""
         while not self._stopping:
             try:
                 received = await self.store.receive()
-            except RedisError:
+            except RedisError as exc:
                 if not self._stopping:
+                    # The subscription broke, so messages published meanwhile are lost.
+                    self._lose_store(exc)
                     await asyncio.sleep(self.settings.cleanup_interval_seconds)
                 continue
             if received is not None:
@@ -109,14 +122,16 @@ class SessionRegistry:
         while not self._stopping:
             await asyncio.sleep(self.settings.cleanup_interval_seconds)
             try:
+                if not self._store_reachable:
+                    # Its sockets are closed, so the worker can start clean.
+                    await self.store.register()
                 await self._deliver(await self.store.beat())
                 for connection in list(self._unreleased):
                     await self._deliver(await self.store.disconnect(connection))
                     self._unreleased.discard(connection)
             except RedisError as exc:
-                if self._store_reachable:
-                    logger.error("The session store is unreachable: %s", type(exc).__name__)
-                self._store_reachable = False
+                if not self._stopping:
+                    self._lose_store(exc)
             else:
                 if not self._store_reachable:
                     logger.info("The session store is reachable again")

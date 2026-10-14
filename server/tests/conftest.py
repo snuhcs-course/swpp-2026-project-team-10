@@ -139,6 +139,20 @@ def outage(redis_server):
 
 
 @pytest.fixture
+def restart_store(redis_server):
+    """Empties the test's Redis, as a restart does, since the session store keeps nothing on disk."""
+
+    def restart() -> None:
+        if redis_server is None:
+            with redis.Redis.from_url(os.environ["PIX_TEST_REDIS_URL"]) as real:
+                real.flushdb()
+        else:
+            fakeredis.FakeRedis(server=redis_server).flushdb()
+
+    return restart
+
+
+@pytest.fixture
 async def make_registry(settings, clock, open_store):
     """Starts registries that share the test's Redis: each one stands for a worker process.
 

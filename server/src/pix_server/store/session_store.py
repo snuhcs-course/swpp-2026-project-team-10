@@ -68,15 +68,21 @@ class SessionStore:
             name: redis.register_script(getattr(scripts, name))
             for name in ("BEAT", "CONNECT", "CREATE", "JOIN", "ROUTE", "LEAVE", "DISCONNECT", "RELEASE", "STATS")
         }
+        self._register = redis.register_script(scripts.REGISTER)
         self._rate_limit = redis.register_script(scripts.RATE_LIMIT)
 
+    def _heartbeat_ms(self) -> str:
+        return str(max(1, round(self.settings.worker_ttl_seconds * 1000)))
+
     async def _run(self, name: str, *args: str) -> list:
+        """Runs a session script. It raises a `ResponseError` starting with WORKER_LOST if this worker has lost its
+        state in the store; the worker then has to close its sockets and call `register` again."""
         common = [
             f"{self.clock():.6f}",
             f"{self.settings.room_ttl_seconds:.6f}",
             f"{self.settings.empty_session_ttl_seconds:.6f}",
             self.worker,
-            str(max(1, round(self.settings.worker_ttl_seconds * 1000))),
+            self._heartbeat_ms(),
         ]
         return await self._scripts[name](args=[*common, *args])
 
@@ -91,7 +97,11 @@ class SessionStore:
                 message = await self._pubsub.get_message(timeout=RECEIVE_POLL_SECONDS)
                 if message is not None and message["type"] == "subscribe":
                     break
-        await self._run("BEAT", "")
+        await self.register()
+
+    async def register(self) -> None:
+        """Adds this worker to the store, with no connections, so the session scripts run for it."""
+        await self._register(args=[self.worker, self._heartbeat_ms()])
 
     async def beat(self) -> list[Delivery]:
         """Renews the heartbeat. The worker that gets the lock for this interval also sweeps."""

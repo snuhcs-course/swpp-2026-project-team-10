@@ -40,6 +40,21 @@ async def create_pair(first, second=None):
     return photographer, subject, room
 
 
+async def eventually(attempt, timeout=2):
+    """Repeats `attempt` until it succeeds, while the worker recovers from a store failure in the background."""
+    async with asyncio.timeout(timeout):
+        while True:
+            try:
+                return await attempt()
+            except RedisError:
+                await asyncio.sleep(0.01)
+
+
+async def closed_for_retry(peer):
+    await asyncio.wait_for(peer.closing.wait(), timeout=2)
+    assert peer.close_code == 1013
+
+
 async def kill(registry, open_store):
     """The worker's process dies: nothing is released, and later its heartbeat runs out."""
     for task in registry._tasks:
@@ -228,3 +243,55 @@ async def test_disconnect_during_a_store_outage_is_finished_afterwards(make_regi
     finally:
         restarted.cancel()
     assert await registry.stats() == (1, 1)
+
+
+async def test_a_store_outage_closes_every_socket_of_the_worker(make_registry, settings, outage):
+    settings.cleanup_interval_seconds = 0.01
+    registry = await make_registry()
+    photographer, subject, _ = await create_pair(registry)
+    waiting, _ = await create_room(registry)  # Sends nothing more, so no message of its own would fail.
+    outage(True)
+    for peer in (photographer, subject, waiting):
+        await closed_for_retry(peer)
+        await registry.disconnect(peer)  # What each socket handler does; the store is still down.
+    outage(False)
+    # Back again: the closed sockets are released from the store, and a new one gets a room.
+    newcomer = await eventually(registry.connect)
+    await handle(registry, newcomer, type="room.create")
+    assert (await receive(newcomer))["type"] == "room.created"
+    async with asyncio.timeout(2):
+        while (await registry.stats())[1] != 1:
+            await asyncio.sleep(0.01)
+
+
+async def test_a_redis_restart_closes_the_sockets_and_the_worker_registers_again(
+    make_registry, settings, restart_store
+):
+    settings.cleanup_interval_seconds = 0.01
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    restart_store()
+    # The restart threw no error, but the worker is no longer registered, which it notices on its next beat.
+    await closed_for_retry(photographer)
+    await registry.disconnect(photographer)
+    subject = await eventually(registry.connect)
+    with pytest.raises(ProtocolError) as exc:
+        await handle(registry, subject, type="room.join", code=room["code"])
+    assert exc.value.code == "NOT_FOUND"  # The room went with the restart.
+    await handle(registry, subject, type="room.create")
+    assert (await receive(subject))["type"] == "room.created"
+
+
+async def test_a_worker_taken_for_dead_closes_its_sockets_when_it_comes_back(make_registry, settings, open_store):
+    stalled, other = await make_registry(), await make_registry()
+    photographer, subject, _ = await create_pair(stalled, other)
+    await kill(stalled, open_store)  # Its process stalls for longer than the heartbeat lasts.
+    await other.sweep()
+    assert await receive(subject) == LEFT
+    # When the stalled worker runs again, its photographer's place is gone, so its socket must not stay open.
+    settings.cleanup_interval_seconds = 0.01
+    resumed = asyncio.create_task(stalled._keep_house())
+    try:
+        await closed_for_retry(photographer)
+    finally:
+        resumed.cancel()

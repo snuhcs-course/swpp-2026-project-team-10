@@ -65,7 +65,7 @@ Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active ro
 | `INVALID_STATE` | Already in a room, signaling before joining, or SDP from the wrong role. |
 | `PEER_UNAVAILABLE` | No connected counterpart to receive a signal. |
 
-Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. The server also closes a socket with 1013 when it cannot reach the session store; the phone can connect again later. Request bodies, room codes, and signaling payloads are not logged by the app.
+Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. The server also closes its sockets with 1013 when the session store fails or restarts ([Session store](#session-store)); the phone can connect again later. Request bodies, room codes, and signaling payloads are not logged by the app.
 
 ## Testing the photographer's phone without a second phone
 
@@ -123,7 +123,7 @@ Room state is in Redis and not in the server process (Design §2.7, AD-18): sess
 - **Transitions.** Create, join, leave, disconnect, and expiry each run as one Lua script inside Redis ([`store/scripts.py`](src/pix_server/store/scripts.py)), so two workers cannot seat two subjects in one room. The caller passes the time in, which is why the tests can move a clock.
 - **Housekeeping.** Every `PIX_CLEANUP_INTERVAL_SECONDS` each worker renews a heartbeat that lasts `PIX_WORKER_TTL_SECONDS` (15), and the one worker that gets a lock for that interval expires rooms and removes empty sessions. A worker whose heartbeat ran out, for example after a crash, loses its sockets in the store, and the other phones get `peer.left` with `CONNECTION_LOST`.
 - **A worker that stops** gives up its sockets at once. Its sessions stay in the store for the usual 60 s, which is what a phone that reconnects will come back to once the app can rejoin (Design §2.6.7, #56).
-- **Redis down.** `/health` answers `503`, sockets are closed with 1013, and pose requests answer `503 UNAVAILABLE`. If Redis itself restarts, the open rooms are gone; the workers carry on with new ones.
+- **Redis down or restarted.** When a worker's call to Redis fails, or it finds that it is no longer registered there (Redis came back empty, or the other workers took it for dead), messages for its sockets may have been lost. It closes all of them with 1013 and registers again: a live session goes on phone to phone, and a waiting room ends on the phone with an error instead of keeping a code that no longer works. Until Redis answers, `/health` answers `503`, new sockets are closed with 1013, and pose requests answer `503 UNAVAILABLE`. A restart loses the open rooms; the workers carry on with new ones.
 
 | `PIX_REDIS_URL` | Where the rooms are |
 | --- | --- |

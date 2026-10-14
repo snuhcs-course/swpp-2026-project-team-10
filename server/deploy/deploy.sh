@@ -8,6 +8,9 @@
 #   deploy.sh rollback       switch back to the image that served before the last deploy
 #   deploy.sh status         show what is running
 #
+# Settings come from /opt/pix/deploy.conf: BRANCH, and optionally HTTP_PORT, MAX_WAIT_SECONDS (600), and PROJECT.
+# MAX_WAIT_SECONDS given for one command, as in `sudo MAX_WAIT_SECONDS=0 deploy.sh deploy`, wins over the file.
+#
 # Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis (Design 2.7). A
 # deploy builds the image, starts it as the idle copy, waits until it is healthy, points nginx at it, and stops
 # the other copy. Stopping a copy closes its sockets, and a phone cannot come back to its room until the app can
@@ -346,12 +349,17 @@ main() {
 
     [ -d "$REPO/.git" ] || die "$REPO is not a git checkout; see server/README.md, Deploy"
     [ -f "$ENV_FILE" ] || die "$ENV_FILE is missing; see server/README.md, Deploy"
+    # Loading deploy.conf would overwrite a wait given for this one command, so that value is kept aside first.
+    local wait_for_this_run=${MAX_WAIT_SECONDS:-}
     # shellcheck disable=SC1091
     if [ -f "$PIX_HOME/deploy.conf" ]; then . "$PIX_HOME/deploy.conf"; fi
     BRANCH=${BRANCH:-dev}
     HTTP_PORT=${HTTP_PORT:-80}
-    MAX_WAIT_SECONDS=${MAX_WAIT_SECONDS:-600}
+    MAX_WAIT_SECONDS=${wait_for_this_run:-${MAX_WAIT_SECONDS:-600}}
     PROJECT=${PROJECT:-pix}
+    case "$MAX_WAIT_SECONDS" in
+        "" | *[!0-9]*) die "MAX_WAIT_SECONDS must be a whole number of seconds, not '$MAX_WAIT_SECONDS'" ;;
+    esac
     mkdir -p "$STATE_DIR"
     load_state
 

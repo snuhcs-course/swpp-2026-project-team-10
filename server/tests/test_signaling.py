@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 import json
 import re
 from contextlib import ExitStack
@@ -43,6 +43,59 @@ def ice_signal(tag="test"):
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
+
+
+def test_health_fails_while_the_session_store_is_down(client, outage):
+    outage(True)
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable"}
+    outage(False)
+    assert client.get("/health").status_code == 200
+
+
+def test_socket_is_asked_to_try_again_while_the_session_store_is_down(client, outage):
+    outage(True)
+    with client.websocket_connect("/ws") as socket:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            socket.receive_json()
+        assert exc.value.code == 1013
+    outage(False)
+    with client.websocket_connect("/ws") as socket:
+        create_room(socket)
+
+
+def test_store_outage_in_the_middle_of_a_session_closes_the_socket(client, outage):
+    with client.websocket_connect("/ws") as photographer:
+        create_room(photographer)
+        outage(True)
+        photographer.send_json(ice_signal())
+        with pytest.raises(WebSocketDisconnect) as exc:
+            photographer.receive_json()
+        assert exc.value.code == 1013
+    outage(False)
+    with client.websocket_connect("/ws") as socket:
+        create_room(socket)
+
+
+def test_waiting_room_is_closed_when_the_session_store_fails(client, outage):
+    # The photographer sends nothing while it waits, so only the server's own check can notice the outage.
+    with client.websocket_connect("/ws") as photographer:
+        create_room(photographer)
+        outage(True)
+        with pytest.raises(WebSocketDisconnect) as exc:
+            photographer.receive_json()
+        assert exc.value.code == 1013
+    outage(False)
+
+
+def test_waiting_room_is_closed_when_redis_restarts_empty(client, restart_store):
+    with client.websocket_connect("/ws") as photographer:
+        create_room(photographer)
+        restart_store()
+        with pytest.raises(WebSocketDisconnect) as exc:
+            photographer.receive_json()
+        assert exc.value.code == 1013
 
 
 def test_internal_stats_count_open_rooms_and_sockets(client):

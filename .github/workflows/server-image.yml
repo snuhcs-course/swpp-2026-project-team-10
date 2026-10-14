@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 name: server-image
 
 on:
@@ -35,15 +35,24 @@ jobs:
       - name: Build the runtime image
         run: docker build --target runtime -t pix-server:ci server
 
-      - name: Start nginx and one copy of the app
+      # The files deploy.sh writes on a server. The compose file reads the variables, and every later step that
+      # runs docker compose needs them, so they go to $GITHUB_ENV; an export would last only for this step.
+      - name: Prepare what deploy.sh would write
         run: |
           mkdir -p "$RUNNER_TEMP/pix/state"
           printf 'set $pix_app "app-blue:8000";\nset $pix_copy "blue";\n' > "$RUNNER_TEMP/pix/state/active.conf"
           echo "$GITHUB_SHA" > "$RUNNER_TEMP/pix/state/version"
           touch "$RUNNER_TEMP/pix/.env"
-          export PIX_BLUE_TAG=ci PIX_HTTP_PORT=8080
-          export PIX_ENV_FILE="$RUNNER_TEMP/pix/.env" PIX_STATE_DIR="$RUNNER_TEMP/pix/state"
-          docker compose -f server/deploy/docker-compose.yml up -d --wait app-blue nginx
+          {
+            echo "PIX_BLUE_TAG=ci"
+            echo "PIX_HTTP_PORT=8080"
+            echo "PIX_ENV_FILE=$RUNNER_TEMP/pix/.env"
+            echo "PIX_STATE_DIR=$RUNNER_TEMP/pix/state"
+          } >> "$GITHUB_ENV"
+
+      # Starting the app also starts Redis, which the app depends on.
+      - name: Start nginx and one copy of the app
+        run: docker compose -f server/deploy/docker-compose.yml up -d --wait app-blue nginx
 
       - name: Check the routes through nginx
         run: |
@@ -59,6 +68,32 @@ jobs:
           test "$(status http://127.0.0.1:8080/openapi.json)" = 404
           test "$(status http://127.0.0.1:8080/internal/stats)" = 404
 
+      # Eight rooms through nginx, so both workers of the app take part and rooms cross between them.
+      - name: Create and join rooms through nginx
+        run: |
+          docker compose -f server/deploy/docker-compose.yml exec -T app-blue python - <<'EOF'
+          import asyncio
+          import json
+
+          import websockets
+
+
+          async def room():
+              async with websockets.connect("ws://nginx/ws") as photographer, websockets.connect("ws://nginx/ws") as subject:
+                  await photographer.send(json.dumps({"type": "room.create"}))
+                  created = json.loads(await photographer.recv())
+                  await subject.send(json.dumps({"type": "room.join", "code": created["code"]}))
+                  assert json.loads(await subject.recv())["sessionId"] == created["sessionId"]
+                  assert json.loads(await photographer.recv()) == {"type": "peer.joined"}
+
+
+          async def main():
+              await asyncio.wait_for(asyncio.gather(*(room() for _ in range(8))), timeout=30)
+
+
+          asyncio.run(main())
+          EOF
+
       - name: Show the container logs
         if: failure()
-        run: PIX_BLUE_TAG=ci docker compose -f server/deploy/docker-compose.yml logs --tail 100
+        run: docker compose -f server/deploy/docker-compose.yml logs --tail 100

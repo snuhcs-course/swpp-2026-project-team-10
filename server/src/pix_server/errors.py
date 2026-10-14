@@ -1,9 +1,10 @@
-# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 """The single error shape of the REST API (Design Documentation 2.5.3)."""
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from redis.exceptions import RedisError
 
 
 class ApiError(Exception):
@@ -26,3 +27,8 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
     # FastAPI's default is 422, which this API reserves for REJECTED. The submitted value is left out of the message.
     error = exc.errors()[0]
     return error_response(400, "INVALID_REQUEST", f"{error['loc'][-1]}: {error['msg']}")
+
+
+async def handle_store_error(request: Request, exc: RedisError) -> JSONResponse:
+    # The session store also holds the rate limit, so a request that cannot be counted is refused.
+    return error_response(503, "UNAVAILABLE", "The server is temporarily unavailable; try again")

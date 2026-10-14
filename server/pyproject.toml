@@ -11,12 +11,14 @@ dependencies = [
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "python-multipart>=0.0.32",
+    "redis>=8.1.0",
     "uvicorn>=0.54.0",
     "websockets>=17.1",
 ]
 
 [dependency-groups]
 dev = [
+    "fakeredis[lua]>=2.39.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-timeout>=2.4.0",

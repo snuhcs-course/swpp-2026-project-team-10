@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
 """Environment configuration for the Pix server."""
 
 from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     max_message_bytes: PositiveInt = 65_536
     outbound_queue_size: PositiveInt = 128
     send_timeout_seconds: PositiveFloat = 5
+
+    # The session store (Design Documentation 2.7). Unset keeps the state inside the process, for one worker on a laptop.
+    redis_url: str | None = None
+    # A worker that has not renewed its heartbeat for this long has lost its sockets.
+    worker_ttl_seconds: PositiveFloat = 15
 
     # The vendor's own variable name, without the PIX_ prefix. Pose requests fail with UPSTREAM_ERROR while it is unset.
     openrouter_api_key: SecretStr | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")

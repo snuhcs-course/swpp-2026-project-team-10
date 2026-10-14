@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The guide-edit mode toggle: a faint guide-colored tile while the mode is on (checked). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="#335EEAD4" android:state_checked="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

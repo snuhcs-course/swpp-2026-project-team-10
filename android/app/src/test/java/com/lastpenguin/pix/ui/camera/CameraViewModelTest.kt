@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-04, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import java.io.IOException
@@ -285,6 +286,52 @@ class CameraViewModelTest {
 
         assertEquals(listOf<ReferenceGuide?>(null), guides.set)
         assertNull(model.uiState.value.guide)
+    }
+
+    @Test
+    fun `a new guide starts edit mode, and the shutter, hiding, or removing the guide ends it`() = runTest(dispatcher) {
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertFalse(model.uiState.value.guideEditing)
+
+        guides.setGuide(guide("g1"))
+        runCurrent()
+        assertTrue(model.uiState.value.guideEditing)
+        model.setGuideEditing(false)
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertTrue(model.uiState.value.guideEditing)
+
+        model.onShutter()
+        assertFalse(model.uiState.value.guideEditing)
+        camera.capture.complete(Result.success(Uri.parse("content://media/1")))
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+
+        guides.setGuide(guide("g2"))
+        runCurrent()
+        assertTrue(model.uiState.value.guideEditing)
+        guides.state.value = guides.state.value.copy(visible = false)
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertFalse(model.uiState.value.guideEditing)
+        guides.state.value = guides.state.value.copy(visible = true)
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertTrue(model.uiState.value.guideEditing)
+
+        model.setGuideEditing(true)
+        guides.setGuide(null)
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+    }
+
+    private fun guide(id: String): ReferenceGuide {
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        return ReferenceGuide(id, bitmap, bitmap, 0.5f, GuideSource.GALLERY)
     }
 
     private class FakeGuides : GuideRepository {

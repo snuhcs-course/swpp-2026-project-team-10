@@ -1,15 +1,13 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-13, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.annotation.SuppressLint
 import android.view.MotionEvent
 import com.google.android.material.slider.Slider
-import com.lastpenguin.pix.R
-import java.text.DecimalFormat
 
 /**
  * View-scoped slider input: the thumb stays under the user's control during a drag, and the last value is committed
- * once with `final = true`. Shared by camera zoom, remote zoom, and guide opacity.
+ * once with `final = true`. Used by the guide opacity slider; camera zoom is a pinch (PinchZoomController).
  */
 internal class TrackedSliderController(
     private val slider: Slider,
@@ -58,7 +56,7 @@ internal class TrackedSliderController(
         }
     }
 
-    /** Zoom ratios must be positive; an invalid range (before capabilities arrive) renders disabled at 1–2. */
+    /** Values must be positive; an invalid range renders disabled at 1–2. */
     fun render(min: Float, max: Float, value: Float, enabled: Boolean) {
         val validRange = min.isFinite() && max.isFinite() && min > 0f && max > min
         // Material requires a strictly increasing range even while disabled and before capabilities arrive.
@@ -81,16 +79,5 @@ internal class TrackedSliderController(
         isTracking = false
         changed = false
         if (publish) onChange(slider.value, true)
-    }
-
-    companion object {
-        private val zoomFormat = DecimalFormat("0.0#")
-
-        /** Values are camera ratios, not percentages. */
-        fun zoom(slider: Slider, onZoomChange: (Float, Boolean) -> Unit) = TrackedSliderController(
-            slider,
-            { slider.context.getString(R.string.zoom_ratio, zoomFormat.format(it)) },
-            onZoomChange,
-        )
     }
 }

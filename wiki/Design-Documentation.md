@@ -11,8 +11,9 @@
 | 0.7 | 2026-10-07 | Measurement as built: both phones ping every 2 s, the phone that receives a `ping` logs `ping.received` with its `ts`, and the sender's `rtt` line carries the same `ts`. Matching the two lines gives the difference between the phones' `Timings` clocks, `t(ping.received) − t(rtt) + rtt/2`, so cross-phone latencies such as guide sync can be read from the two logs (2.5.1, 2.8). |
 | 0.8 | 2026-10-09 | Final version for Iteration 1, synced with the current build and the team's decisions. The WebRTC build is decided: `io.github.webrtc-sdk:android` 137.7151.01 (header, 1.2). DataStore keeps only the generation consent (1.2). `CameraController.status` (2.1) and `PeerInfo.haveGuideId` (2.3) are added. When the subject leaves or drops, the photographer's phone goes back to `Waiting` with the same code (2.4). The remote zoom notice shows for 3 s on the Camera screen instead of as a toast (2.6.5), and the use of `camera.state`'s `by` field is corrected (2.5.1). The owners of the app shell and guide sync are corrected (2.9), and the repository tree shows `wiki/` (2.10). This entry also records the composition grid and horizon bar (2.6.2) and ultrawide zoom routing (2.6.5), added on 2026-10-05. |
 | 1.0 | 2026-10-13 | First version for Iteration 2; Iteration 2 versions start at 1.0 and count up by one minor step per change: 1.1, 1.2, …, 1.9, 1.10, 1.11, and so on. Iteration 2 design, from the kickoff on 2026-10-09 (Team Meetings) and the schedule of 2026-10-11, written before feature work (#45, Iter2-P3). Task IDs use the issue numbering `Iter2-Pn` (the schedule's P21–P44 minus 20). Architecture: the server on a public host with HTTPS and WSS, a database, Firebase Cloud Messaging for invitations, and a TURN relay on the same host (1.1, 1.2, AD-11–AD-14, 1.4). Camera: brightness, flash, aspect ratios 4:3, 16:9, and 1:1, and no app shutter sound; the zoom slider is replaced by pinch zoom with a guide-edit mode toggle (AD-10, AD-17, 2.1, 2.3, 2.6.2, 2.6.5). Guide: outline only, never the reference's pixels; the photographer smooths the mask once and sends only that mask; the guide starts where the person stands in the reference; a reference thumbnail; saved guides in private storage (AD-6, AD-15, AD-16, 2.1, 2.3, 2.5.1, 2.6.1, 2.6.2, 2.8). New module interfaces and models for accounts, friends, invitations, camera controls, and saved guides (2.1, 2.3); session states for invitations and reconnection (2.4); new data channel messages, signaling, and REST endpoints with a JSON example each (2.5); pose descriptions and idea chips (2.6.3); invitations and push, reconnection (2.6.6, 2.6.7); the database schema (2.7); Iteration 2 owners and build order (2.9). The details each owner settles while building are listed under *Still open* and as **TODO** in their sections, and come back in later versions. |
+| 1.1 | 2026-10-13 | Hosting decided (Iter2-P4, #46). The server runs on the two course-provided servers, which are reachable only through the course's HTTP proxy on port 80, so it speaks HTTP and WS instead of HTTPS and WSS (AD-11, 1.1, 2.5.2, 2.5.3, 2.8). The TURN relay is Cloudflare's managed service instead of coturn on the server host, which cannot open the ports (AD-14, 1.1.2, 1.2, 2.2, 2.5.2). Session state moves from the server process to a Redis session store, so the server can run several workers and a deploy loses no room (AD-18, 1.1.2, 2.2, 2.7). Deploys are blue-green behind nginx and pulled by each server (2.8, Hosting and Deployment). The invite link cannot be a verified App Link without HTTPS (2.6.6, Still open). Figure 4 is redrawn for these decisions. |
 
-Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.0). Testing plans will be in the Testing Documentation.
+Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.1). Testing plans will be in the Testing Documentation.
 
 **Decided (2026-09-30):** XML Views with ViewBinding and the Navigation component · FastAPI (Python) server · package `com.lastpenguin.pix` · minSdk 29 (Android 10), target and compile SDK 36 · Iteration 1 test setup: both phones and the server, which runs on a laptop, on the same Wi-Fi network.
 
@@ -22,11 +23,13 @@ Audience: the development team. This page describes the design of Iterations 1 a
 
 **Decided (2026-10-12):** pinch zoom replaces the zoom slider on Camera and Subject view, and a **guide-edit mode toggle** decides what a pinch or drag does: with the mode on, gestures edit the guide; with it off, a pinch zooms the camera; the toggle is on both phones (AD-17, 2.6.2) · the zoom slider leaves the main layouts; whether it returns inside a *detail settings* panel is still open · the photographer smooths the segmentation mask once and sends the subject **only that smoothed mask**; the subject draws the outline from it, so both phones show the same shape (2.5.1, 2.6.1) · the Could items of Iteration 2 are the remote-control switch (FR-7.5), remote focus (FR-7.7), the guide color (FR-3.10), and the shutter freeze fix (NFR-19).
 
+**Decided (2026-10-13, hosting, Iter2-P4):** the server runs on the two course-provided servers, Server A for `main` (production) and Server B for `dev` (staging); AWS is not used (AD-11) · the course servers are reachable only through the course's HTTP proxy on port 80, so the server speaks HTTP and WS, without HTTPS or WSS (AD-11, NFR-14) · the TURN relay is Cloudflare's managed TURN service, because the course servers cannot open the TURN ports (AD-14) · sessions, room codes, presence, and the rate limit move from the server process to a Redis session store, so the server can run several workers and a deploy loses no room (AD-18, 2.7) · deploys are blue-green behind nginx, pulled by a timer on each server, because GitHub cannot push to the servers (2.8).
+
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
-| Public host | The course-provided server if it is available; otherwise AWS. Needs a public IP, a domain for the TLS certificate (Let's Encrypt through nginx), and open ports for TURN (3478 TCP/UDP and a UDP relay range). If the course server cannot open the TURN ports, only coturn goes to AWS | 박재완 (Iter2-P4) | 10/14 |
+| Session store rollout | When the Redis-backed registry replaces the in-memory one. Proposal: right after the deploy (Iter2-P4) and before invitations and reconnection build on the registry (Iter2-P15, Iter2-P16), in an issue of its own. The Lua scripts, the delivery between workers, and the test setup (an in-process fake Redis or a Redis service in CI) are settled there (2.7) | 박재완 | 10/16 |
 | Database engine | PostgreSQL in a container with a volume (proposal); SQLite is the fallback if operations get in the way. The schema in 2.7 works with either | 박재완 (Iter2-P4, Iter2-P8) | 10/16 |
 | Outline style | Line weight (3 dp now), color (white now; black/white switch is FR-3.10, Could), and whether the inside gets a faint single-color fill that follows the opacity slider. Proposal: white stroke plus a faint fill | 박동제 (Iter2-P7, Iter2-P11) | 10/16 |
 | Outline smoothing | Blur radius and threshold, morphological open/close kernel, contour simplification tolerance; whether ML Kit Pose Detection landmarks help keep the arms and legs. Decided from the Iter2-P7 test set, within the 2 s budget (NFR-3) | 박동제 (Iter2-P7) | 10/16 |
@@ -38,7 +41,7 @@ Audience: the development team. This page describes the design of Iterations 1 a
 | Zoom slider in a detail panel | The slider is gone from the main Camera and Subject view layouts. Under consideration: a *detail settings* button that opens a panel with the slider (and the brightness slider) for fine zoom steps; the readout's Zoom in / Zoom out actions stay either way | 박동제 with 조성민 (Iter2-P10, Iter2-P6) | 10/17 |
 | Zoom stutter cause | Lens rebinding, the rate of `setZoomRatio` calls, or the stream during zoom; measured first on the Galaxy S21 (2.6.5) | 조성민 (Iter2-P5) | 10/15 |
 | Session token lifetime | Proposal: 30 days, refreshed on each sign-in; stored in DataStore (2.8) | 박재완 (Iter2-P8, Iter2-P13) | 10/16 |
-| Invite link format | Proposal: `https://<host>/i/<invitationId>` as an Android App Link, with a custom scheme as the fallback (2.6.6) | 박재완 with 조성민 (Iter2-P15) | 10/20 |
+| Invite link format | A verified Android App Link needs HTTPS, which the course servers do not have (AD-11). Proposal: `http://<host>/i/<invitationId>` opens a small page from nginx that hands over to Pix through a custom scheme (`pix://i/<invitationId>`) and otherwise says to install Pix (2.6.6) | 박재완 with 조성민 (Iter2-P15) | 10/20 |
 | Pose ideas | The chip texts and whether they come from `GET /pose-ideas` or ship in the app (2.6.3); the preset images still to collect | 박재완 (Iter2-P12) | 10/18 |
 **Contents**
 
@@ -68,12 +71,12 @@ Audience: the development team. This page describes the design of Iterations 1 a
 
 Pix is one Android app that runs in two roles, **photographer** and **subject**, plus a small **Pix server**. The system separates a **control plane** from a **media plane**:
 
-- **Control plane (client-server).** The server connects the two phones (signaling), keeps accounts, friends, and invitations, sends push notifications, and forwards pose-generation requests to the external API. In Iteration 1 it ran on a laptop on the same Wi-Fi as both phones; from Iteration 2 it runs on a public host with HTTPS and WSS (AD-11).
-- **Media plane (peer-to-peer).** The live video and all control messages go directly between the two phones over WebRTC. When no direct path exists, for example on cellular data, the packets go through a TURN relay on the server host, still encrypted end to end (AD-14).
+- **Control plane (client-server).** The server connects the two phones (signaling), keeps accounts, friends, and invitations, sends push notifications, and forwards pose-generation requests to the external API. In Iteration 1 it ran on a laptop on the same Wi-Fi as both phones; from Iteration 2 it runs on the course-provided servers, which every network can reach over HTTP and WS (AD-11).
+- **Media plane (peer-to-peer).** The live video and all control messages go directly between the two phones over WebRTC. When no direct path exists, for example on cellular data, the packets go through a managed TURN relay, still encrypted end to end (AD-14).
 
 ![Architecture in Iteration 1](images/design_architecture.png)
 
-*Figure 1. High-level architecture in Iteration 1. Both phones and the Pix server, which runs on a laptop, are on the same Wi-Fi network; only the image-editing API is outside it. Figure 4 in 1.4 shows the Iteration 2 architecture with the public host, database, push notifications, and relay.*
+*Figure 1. High-level architecture in Iteration 1. Both phones and the Pix server, which runs on a laptop, are on the same Wi-Fi network; only the image-editing API is outside it. Figure 4 in 1.4 shows the Iteration 2 architecture with the course server, database, session store, push notifications, and relay.*
 
 #### 1.1.2 Components and interfaces
 
@@ -85,8 +88,9 @@ Pix is one Android app that runs in two roles, **photographer** and **subject**,
 | **Pose proxy** | Pix server | Holds the API key, validates the scene photo, calls the image-editing API with a template prompt, enforces the 30 s upstream timeout and rate limits, and cancels the upstream call when the phone drops the request. | REST `POST /api/v1/poses` (2.5.3) |
 | **Account and friends API** (It 2) | Pix server | Verifies Google sign-ins and issues session tokens; Pix IDs; exact-match lookup; friend requests, friendships, online presence; device tokens for push. | REST `/auth`, `/me`, `/users`, `/friend-requests`, `/friends`, `/devices` (2.5.3); database (2.7) |
 | **Invitation service** (It 2) | Pix server | Creates, accepts, declines, cancels, and expires invitations (30 s); sends the push through FCM; mints the invite link; hands an accepted invitation a `sessionId` in the signaling hub (AD-8). | REST `/invitations` (2.5.3); FCM; signaling hub |
-| **TURN relay** (It 2) | Server host | Forwards encrypted media when the phones cannot connect directly. Credentials are short-lived and issued by the Pix server. | coturn, TURN REST credentials in `iceServers` (2.5.2) |
-| **Database** (It 2) | Server host | Users, devices, friend requests, friendships, invitations (2.7). Sessions, room codes, and presence stay in memory. | SQL through the server only |
+| **TURN relay** (It 2) | External (Cloudflare) | Forwards encrypted media when the phones cannot connect directly. Credentials are short-lived; the Pix server requests them from Cloudflare for each session. | Cloudflare Realtime TURN; its `iceServers` passed on in signaling (2.5.2) |
+| **Database** (It 2) | Server host | Users, devices, friend requests, friendships, invitations (2.7). | SQL through the server only |
+| **Session store** (It 2) | Server host | Sessions, room codes, presence, and the pose rate limit, shared by every server process, and the channel that carries signals between them (AD-18, 2.7). | Redis, through the server only |
 | **Firebase Cloud Messaging** | External | Delivers invitation and friend-request notifications to a phone even when Pix is closed. | FCM HTTP v1 API from the server; Firebase SDK in the app |
 | **Google sign-in** | External | Identifies the user once; the server verifies the ID token and never stores it. | Credential Manager in the app; token verification on the server |
 | **Image-editing API** | External | Generates the same person in the same scene with a different pose. | OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`); the model is a server setting, `openai/gpt-image-2.5-flare@low` by default (2.6.3) |
@@ -96,14 +100,14 @@ Pix is one Android app that runs in two roles, **photographer** and **subject**,
 | Flow | Path | Transport | Latency budget |
 |----|----|----|----|
 | **Reference photo → guide** | Photo picker → downscale → ML Kit segmentation → mask smoothing → person box and outline → guide store | On device only | ≤ 2 s (NFR-3) |
-| **Pose generation** | Scene photo the user takes and confirms → JPEG (resized on the phone, EXIF removed) → 4 parallel requests → pose proxy → image API → candidates → reference flow | HTTPS | First ≤ 20 s, all ≤ 30 s (NFR-4) |
+| **Pose generation** | Scene photo the user takes and confirms → JPEG (resized on the phone, EXIF removed) → 4 parallel requests → pose proxy → image API → candidates → reference flow | HTTP to the Pix server, HTTPS from it to the image API | First ≤ 20 s, all ≤ 30 s (NFR-4) |
 | **Session setup** | Room code → signaling → SDP and ICE exchange → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
 | **Live view** | CameraX frames → I420 → WebRTC encoder → peer → subject renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi (NFR-5) |
 | **Guide sync** | Guide store (photographer) → `guide.state` → subject's guide store → overlay | Data channel | ≤ 0.3 s (NFR-7) |
 | **Remote zoom** | Subject → `camera.zoom.set` → clamp → CameraX → echo of the applied zoom | Data channel | ≤ 0.5 s (NFR-7) |
 | **Remote brightness, flash, guide move** (It 2) | Subject → `camera.exposure.set` / `camera.flash.set` / `guide.move` → apply → echo in `camera.state` / `guide.state` | Data channel | ≤ 0.5 s (NFR-7) |
-| **Sign-in** (It 2) | Credential Manager → Google ID token → `POST /auth/google` → session token kept in DataStore | HTTPS | — |
-| **Invitation** (It 2) | *Invite* → `POST /invitations` → database → FCM push (or a shared link) → `POST /invitations/{id}/accept` → `sessionId` to both phones → session setup as with a room code | HTTPS, FCM, then WebSocket and WebRTC | Push ≤ 5 s, live view ≤ 10 s after Accept (NFR-9) |
+| **Sign-in** (It 2) | Credential Manager → Google ID token → `POST /auth/google` → session token kept in DataStore | HTTP | — |
+| **Invitation** (It 2) | *Invite* → `POST /invitations` → database → FCM push (or a shared link) → `POST /invitations/{id}/accept` → `sessionId` to both phones → session setup as with a room code | HTTP, FCM, then WebSocket and WebRTC | Push ≤ 5 s, live view ≤ 10 s after Accept (NFR-9) |
 | **Reconnection** (It 2) | ICE disconnected → ICE restart through signaling → connected, or *Connection lost* after 10 s | WebSocket, WebRTC | ≤ 10 s (NFR-11) |
 | **Saved guide** (It 2) | Guide store → app private storage → guide store | On device only | — |
 
@@ -218,7 +222,7 @@ sequenceDiagram
 | CameraX 1.6 (`core`, `camera2`, `lifecycle`, `view` for PreviewView) | Preview, ImageCapture, ImageAnalysis (frames for streaming), zoom | App |
 | ML Kit Subject Segmentation (Google Play services) | On-device confidence mask of the person, smoothed into the guide mask and outline | App |
 | WebRTC for Android (`io.github.webrtc-sdk:android` 137.7151.01, a maintained prebuilt) | Peer connection, H.264/VP8 video, two data channels, ICE | App |
-| OkHttp (+ Retrofit for REST) | WebSocket signaling and HTTPS requests | App |
+| OkHttp (+ Retrofit for REST) | WebSocket signaling and HTTP requests | App |
 | kotlinx.serialization (JSON) | Data channel, signaling, and REST payloads | App |
 | Jetpack DataStore | Small preferences: consent given; from Iteration 2 the session token, the user's Pix ID, the FCM token, and the last aspect ratio | App |
 | Credential Manager with Google Identity (It 2) | Google sign-in on the phone; the ID token goes to the server once | App |
@@ -227,8 +231,10 @@ sequenceDiagram
 | `google-auth` (Python) (It 2) | Verifies Google ID tokens on the server | Server |
 | SQLAlchemy, Alembic, and the database driver (It 2) | Schema, migrations, and queries for users, devices, friends, and invitations (2.7) | Server |
 | `firebase-admin` or FCM HTTP v1 through `httpx` (It 2) | Sends push notifications | Server |
-| coturn, Docker, nginx, Let's Encrypt (It 2) | TURN relay; running the server, the relay, and the database on the public host behind TLS | Host |
-| FastAPI, Uvicorn, pydantic-settings, python-multipart, httpx2, Pillow (Python) | One process that serves WebSocket signaling and the REST API; settings from environment variables; multipart uploads; calls to the image API; checking the scene photo and converting candidates to JPEG | Server |
+| Docker, Docker Compose, nginx (It 2) | Running the server, the session store, and the database on the course servers; nginx is the reverse proxy on port 80 and switches between the two copies of the app during a deploy (2.8) | Host |
+| Redis, with `redis-py` on the server (It 2) | Session store: sessions, room codes, presence, and rate-limit windows shared by every server process, and pub/sub for signals between them (AD-18, 2.7) | Host, Server |
+| Cloudflare Realtime TURN (It 2) | Managed TURN relay; the server requests short-lived credentials for each session through its API (AD-14) | External |
+| FastAPI, Uvicorn, pydantic-settings, python-multipart, httpx2, Pillow (Python) | The server app, which serves WebSocket signaling and the REST API from the same process, in one or more workers (AD-18); settings from environment variables; multipart uploads; calls to the image API; checking the scene photo and converting candidates to JPEG | Server |
 | OpenRouter Image API | Pose candidate generation with an image-editing model chosen by a server setting (2.6.3) | Server |
 
 ### 1.3 Architectural decisions
@@ -245,13 +251,14 @@ sequenceDiagram
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Iteration 1 tested the riskiest part (streaming and sync) without accounts. In Iteration 2 only the entry point is added: an accepted invitation yields a `sessionId`, just like a room code does, and the signaling, peer connection, and reconnection code is shared. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots. One codebase and one install, with the role chosen per session. | A separate viewer app for the subject |
 | AD-10 | **One frame in the chosen aspect ratio (4:3, 16:9, or 1:1), shown whole (fit) on both phones** | Revised 2026-10-09; Iteration 1 used a fixed 3:4. The user picks the ratio; 16:9 fits Instagram stories without cropping. Preview, capture, and stream share one CameraX `ViewPort`, so what you see is what is captured, and showing the whole frame on both phones keeps guide coordinates identical. The sensor's 4:3 is cropped for the other ratios (**TODO** Iter2-P10: the crop and the saved JPEG, 2.6.2). | Fixed 3:4; full-screen 9:16 with cropping |
-| AD-11 | **The server runs on a public host with Docker and nginx, the course-provided server first and AWS otherwise** | Sessions across networks need a server both phones can reach, and HTTPS/WSS (NFR-14) needs a domain and a certificate, which nginx terminates. Containers make the course server and AWS interchangeable. GitHub hosting serves only static pages. | GitHub-hosted server; a laptop with port forwarding |
+| AD-11 | **The server runs on the course-provided servers with Docker and nginx, over HTTP and WS** | Revised 2026-10-13. Sessions across networks need a server both phones can reach. The course servers are reachable only through the course's HTTP proxy on port 80: no other port is open and there is no TLS, so the server speaks HTTP and WS and NFR-14 is revised with it. Server A runs `main` as production and Server B runs `dev` as staging; the two cannot reach each other, so each has its own database and session store. Containers keep the setup portable to another host. GitHub hosting serves only static pages. | AWS (cost, and the course servers are enough once the relay is a managed service); a TLS front such as a Cloudflare Tunnel (needs a domain and the course's approval; to revisit if `ws://` proves unreliable on cellular networks); GitHub-hosted server; a laptop with port forwarding |
 | AD-12 | **Sign-in with Google; the server issues its own session token** | One tap on every Android phone, no password to store, and the team already decided on it (2026-10-09). The server verifies the ID token once and keeps only the Google subject ID; the app keeps a Pix session token, so a Google token is never stored or sent again. | Email and password; Kakao sign-in (not on every test phone) |
 | AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | A closed app cannot keep a WebSocket open, so a push is the only way to reach a friend who is not in Pix. Pushes are not guaranteed, so the photographer can share a link through any messenger instead; sending only through KakaoTalk would need it on every test phone. | WebSocket presence only; KakaoTalk-only invitations |
-| AD-14 | **A TURN relay (coturn) on the server host, with short-lived credentials from the server** | STUN alone often fails behind carrier NAT, so cellular sessions need a relay. Media stays SRTP-encrypted, so the relay cannot read it (NFR-14). Credentials are minted per session, so the relay cannot be used by others. | A media server (SFU); no relay (Wi-Fi only) |
+| AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | Revised 2026-10-13. STUN alone often fails behind carrier NAT, so cellular sessions need a relay. The course servers cannot host one: a relay needs UDP or TCP 3478 and a UDP port range that the phones reach directly, and only HTTP on port 80 gets in. Cloudflare's relay needs no host of ours, its free monthly allowance is far above our use, and it also listens on TCP 80 and TLS 443 for networks that block UDP. The Pix server requests credentials per session with a key that stays on the server, so the relay cannot be used by others. Media stays SRTP-encrypted, so the relay cannot read it (NFR-14). | coturn on the server host (no open ports); coturn on AWS (cost and upkeep); a media server (SFU); no relay (Wi-Fi only) |
 | AD-15 | **The guide is an outline only and never shows the reference photo's pixels** | Framing the person matters more than the reference's background, and reference pixels over the live scene are confusing. The reference stays visible as a small thumbnail instead. Dropped with it: the guide that keeps the background. | Semi-transparent cutout (Iteration 1); a faint background guide |
 | AD-16 | **Saved guides live in the app's private storage** | Reuse without rebuilding, with nothing in the gallery and nothing on the server (FR-3.8, NFR-13). | Gallery album; server-side guides |
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones; the zoom slider leaves the main layouts** | A pinch is the natural zoom gesture, and one toggle makes the rule simple: edit mode on, gestures edit the guide; off, a pinch zooms the camera. The same toggle on Subject view, because the subject both moves the guide (FR-7.2) and zooms. Decided 2026-10-12. Whether the slider survives inside a *detail settings* panel for fine steps is still open. | Keeping the slider in the main layout; deciding by where the finger lands |
+| AD-18 | **Session state lives in a Redis session store, not in the server process** | Decided 2026-10-13; revises Iteration 1's in-memory registry and its one-worker rule. With shared state the server can run several workers when one process is no longer enough, and a new copy of the app can take over from the old one during a deploy without losing a waiting room (2.8). The state is small and short-lived (rooms, codes, presence, rate-limit windows), which fits Redis's atomic scripts and expiry, and pub/sub carries signals between workers (2.7). Cost: one more service to run, and room transitions become Redis scripts instead of plain Python. NFR-18 (50 sessions) fits in one worker, so this is for growth beyond the course, not for the demo load. | One process with in-memory state (Iteration 1); routing each room to one process by its code; session state in the relational database |
 
 ### 1.4 Later iterations
 
@@ -259,11 +266,11 @@ Iteration 1 built the core on one Wi-Fi network. Iteration 2 adds accounts, invi
 
 ![Target architecture](images/design_target_architecture.png)
 
-*Figure 4. Target architecture from Iteration 2. The dashed parts are added in Iteration 2: a database, push notifications for invitations, and a relay for cellular connections. The server moves from the laptop to a public host.*
+*Figure 4. Target architecture from Iteration 2. The dashed parts are added in Iteration 2: a database, a session store, push notifications for invitations, and a managed relay for cellular connections. The server moves from the laptop to a course-provided server behind nginx. The phones reach it only over HTTP and WS on port 80, and the relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18).*
 
 #### 1.4.1 Iteration 2 · 10/11 – 10/25 (midterm presentation 10/21)
 
-The Iteration 2 design is in section 2: interfaces and models (2.1, 2.3), states (2.4), messages and APIs (2.5), algorithms (2.6), the database (2.7), and owners and build order (2.9). The architectural changes are AD-10 to AD-17. The Must items are the smooth outlines (FR-2.9, Iter2-P7) and the zoom without stutter (NFR-19, Iter2-P5).
+The Iteration 2 design is in section 2: interfaces and models (2.1, 2.3), states (2.4), messages and APIs (2.5), algorithms (2.6), the database (2.7), and owners and build order (2.9). The architectural changes are AD-10 to AD-18. The Must items are the smooth outlines (FR-2.9, Iter2-P7) and the zoom without stutter (NFR-19, Iter2-P5).
 
 **Could items**, built only if time allows, in this order of preference: the remote-control switch (FR-7.5, Iter2-P17), remote focus (FR-7.7, Iter2-P17), the guide color switch (FR-3.10, Iter2-P11), and the shutter freeze fix (NFR-19, Iter2-P5). Each has a design note in its section, so a Could item that slips to Iteration 3 needs no design change.
 
@@ -673,15 +680,16 @@ classDiagram
 
 *Figure 8b. Account, friends, and invitation classes (Iteration 2). An accepted invitation becomes a `SessionEntry.Invitation` for the existing session code.*
 
-**Server modules.** One process with these modules (independent of the framework choice):
+**Server modules.** The server app has these modules (independent of the framework choice); every worker runs all of them:
 
 | Module | Responsibility |
 |----|----|
-| `signaling` | WebSocket hub; `SessionRegistry` (in-memory map of sessionId → up to two peers, room codes, and TTLs); relays `signal` messages |
+| `signaling` | WebSocket hub; `SessionRegistry` (sessionId → up to two peers, room codes, and TTLs); relays `signal` messages. Iteration 1 keeps the registry as an in-memory map in one process; from Iteration 2 it is backed by the session store, and a signal for a socket on another worker travels through it (AD-18, 2.7) |
+| `store` (It 2) | The Redis connection, the scripts for room transitions, delivery of messages between workers, the sweeper for expiry and dead workers, and the rate-limit windows (2.7) |
 | `poses` | The REST endpoints (scene photo validation, rate limiting, cancelling when the phone disconnects); `PoseGenerator`, the one client of OpenRouter's Image API, with the model as a setting; the template catalog and prompt |
-| `accounts` (It 2) | Google token verification, session tokens, Pix IDs, exact lookup, friend requests, friendships, device tokens; presence from the signaling hub's open sockets |
+| `accounts` (It 2) | Google token verification, session tokens, Pix IDs, exact lookup, friend requests, friendships, device tokens; presence from the signaling hub's open sockets, kept in the session store |
 | `invitations` (It 2) | Create, accept, decline, cancel, 30 s expiry; FCM sends; invite links; hands the `sessionId` to `signaling` on accept |
-| `turn` (It 2) | Mints short-lived TURN credentials (HMAC of expiry and user, coturn `use-auth-secret`) for `iceServers` |
+| `turn` (It 2) | Requests short-lived credentials from Cloudflare's TURN API and returns its `iceServers` for a session (AD-14) |
 | `db` (It 2) | SQLAlchemy models and Alembic migrations for 2.7 |
 
 ### 2.3 Data models
@@ -1067,7 +1075,7 @@ Every 2 s, from both phones. `pong` echoes the `ts` of the `ping`. The phone tha
 
 #### 2.5.2 Signaling protocol (phone ↔ server, WebSocket)
 
-JSON text frames over `wss://<host>/ws` (Iteration 1: `ws://<laptop address>:8000/ws` on the test Wi-Fi), each with a `type` field. A signed-in phone sends its session token in the `Authorization: Bearer` header of the WebSocket upgrade; it is required for invitation sessions and optional for room codes, and it marks the user online for the friend list (presence, FR-5.9).
+JSON text frames over `ws://<host>/ws` (the course servers have no TLS, AD-11; Iteration 1: `ws://<laptop address>:8000/ws` on the test Wi-Fi), each with a `type` field. A signed-in phone sends its session token in the `Authorization: Bearer` header of the WebSocket upgrade; it is required for invitation sessions and optional for room codes, and it marks the user online for the friend list (presence, FR-5.9).
 
 | Client → server | Server → client | Purpose |
 |----|----|----|
@@ -1089,13 +1097,14 @@ JSON text frames over `wss://<host>/ws` (Iteration 1: `ws://<laptop address>:800
 // server → photographer
 { "type": "room.created", "code": "482915", "sessionId": "s_7f3a92c1",
   "iceServers": [
-    { "urls": ["stun:pix.example.org:3478"] },
-    { "urls": ["turn:pix.example.org:3478?transport=udp", "turn:pix.example.org:3478?transport=tcp"],
-      "username": "1760281200:s_7f3a92c1", "credential": "u8Zk...base64 HMAC..." }
+    { "urls": ["stun:stun.cloudflare.com:3478"] },
+    { "urls": ["turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:3478?transport=tcp",
+               "turns:turn.cloudflare.com:5349?transport=tcp"],
+      "username": "g03a7c...", "credential": "9c1f52..." }
   ] }
 ```
 
-Room codes are 6 random digits, unique among active rooms, and expire after 10 minutes without a subject (FR-8.4). From Iteration 2 `iceServers` carries the public STUN and TURN entries with credentials that expire with the session (AD-14); in Iteration 1 it was empty on the same Wi-Fi. The same `iceServers` go to the subject in `session.joined`.
+Room codes are 6 random digits, unique among active rooms, and expire after 10 minutes without a subject (FR-8.4). From Iteration 2 `iceServers` is the list Cloudflare's TURN API returns for this session, passed on unchanged: its STUN and TURN entries with a username and credential that expire with the session (AD-14); in Iteration 1 it was empty on the same Wi-Fi. The same `iceServers` go to the subject in `session.joined`.
 
 </details>
 
@@ -1184,7 +1193,7 @@ A session is removed when the photographer leaves, or 60 s after its last phone 
 
 #### 2.5.3 REST API (phone ↔ server)
 
-Base URL `https://<host>/api/v1` (Iteration 1: `http://<laptop address>:8000/api/v1`), JSON responses. Errors use one shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. The one exception is a request over 1 MiB, which is refused with a plain `413` before it is read. Endpoints marked *auth* need `Authorization: Bearer <session token>` from `POST /auth/google` and answer `401 UNAUTHENTICATED` without it; `/poses` and `/pose-templates` work without an account (FR-5.1).
+Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteration 1: `http://<laptop address>:8000/api/v1`), JSON responses. Errors use one shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. The one exception is a request over 1 MiB, which is refused with a plain `413` before it is read. Endpoints marked *auth* need `Authorization: Bearer <session token>` from `POST /auth/google` and answer `401 UNAUTHENTICATED` without it; `/poses` and `/pose-templates` work without an account (FR-5.1).
 
 | Endpoint | Purpose | Errors |
 |----|----|----|
@@ -1355,7 +1364,7 @@ The receiver gets an FCM push `friend.request` and sees it under received reques
 
 // response 201
 { "id": "inv_9c2e", "to": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" },
-  "status": "PENDING", "expiresAt": 1760281230000, "link": "https://pix.example.org/i/inv_9c2e" }
+  "status": "PENDING", "expiresAt": 1760281230000, "link": "http://pix.example.org/i/inv_9c2e" }
 
 // response 409
 { "error": { "code": "BUSY", "message": "Junhyeong is in another session" } }
@@ -1421,7 +1430,7 @@ The guide's normalized width is `height × aspect × (H / W)` of the current fra
 2.  **Requests.** Without a description, send one `POST /poses` per template (4 in parallel), each with a new random `seed`; with a description (It 2), send four requests with the same description and different seeds, `candidateId` `custom-1` … `custom-4`. *Try other poses* repeats the same request with new seeds. A model without seed support ignores the seed, and its results still differ from one request to the next.
 3.  **Server prompt.** Each template holds a pose description. The server wraps it in a fixed prompt, which lets the model move the person to a better spot while the camera framing stays fixed: *"Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting exactly as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer would: judge whether the person is too far, too close, or poorly placed, and if so move them to a better spot and distance in this scene. Change the person's pose to: {pose}. Show the full body, standing on the ground at a natural scale. Photorealistic."*
 4.  **Progressive results.** The app maps each response to a `CandidateEvent`. The screen fills its slots as events arrive and moves to *Pick a pose* when all are done, or at 30 s if at least one is ready. The 30 s are one limit for the whole run, counted from *Use this photo* and including the request for the templates; the requests still open at the limit are cancelled. Zero candidates means *Couldn't create poses* (FR-4.7). After *Use this pose*, the app discards the scene photo and the other candidates.
-5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices that the phone closed its connection and cancels its own call to the image API, which then does not bill that image. The server also stops waiting for the image API after 30 s.
+5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices that the phone closed its connection and cancels its own call to the image API, which then does not bill that image. The server also stops waiting for the image API after 30 s. On the course servers the course's proxy does not pass the phone's cancel on to the server (measured 2026-10-13; 2.8, Hosting), so there a cancelled request runs to the end and is billed; the rate limit bounds that cost.
 
 **Pose description and idea chips (It 2, FR-4.8).** After *Use this photo*, the *Generate poses* screen shows the scene thumbnail, the idea chips from `GET /pose-ideas`, a 100-character field with a counter, *Generate 4 poses*, and *Skip, use the preset poses*. A chip fills the field and can be edited. *Skip*, or *Generate* with an empty field, uses the four templates. The server wraps the description in the same fixed prompt as a template, which keeps the person, background, and framing, and adds *"Pose: <description>"*; a description in Korean is passed as written, because the selected model follows Korean prompts (2.6.3, selection). The server also keeps a short default instruction for framing (*"the whole person stays in the frame at about the same size"*) so a description like "closer" does not crop the person (decided 2026-10-09). **TODO** Iter2-P12: the exact prompt after trying descriptions with `compare_image_edit_apis.py`, the chip texts, and the preset images. A description the service refuses answers `422 REJECTED`, shown as "Try a different description" with the text kept.
 
@@ -1473,23 +1482,24 @@ Ten other model configurations were screened with one image each and left out, a
 1.  **Device token.** After sign-in, `PushTokenRegistrar` sends the FCM token with `POST /devices`, and again whenever Firebase rotates it.
 2.  **Create.** *Invite* calls `POST /invitations`. The server refuses with `BUSY` if the friend is in a session, otherwise stores the invitation with a 30 s expiry, sends an FCM **data message** (`type: invitation`, `invitationId`, `from`) to the friend's devices, and returns the invitation with its link. The photographer's `SessionState` becomes `Inviting`.
 3.  **Deliver.** The app's `FirebaseMessagingService` turns the data message into a notification "Dongje invites you to shoot together" that opens the *Invitation* screen with the `invitationId`; with Pix in the foreground it opens the screen directly. A data message, not a notification message, so the app controls the text and the tap action in every app state.
-4.  **Link fallback (AD-13).** *Share invite link* hands `invitation.link` to the Android share sheet; *Copy link* copies it. The link opens Pix through an App Link on the same screen (**TODO** Iter2-P15: the final format, Still open); on a phone without Pix it shows a plain page from nginx that says to install Pix.
+4.  **Link fallback (AD-13).** *Share invite link* hands `invitation.link` to the Android share sheet; *Copy link* copies it. The link opens a small page from nginx that hands over to Pix on the same screen through a custom scheme; on a phone without Pix the page says to install Pix. A verified App Link, which would open Pix without the page, needs HTTPS, and the course servers have none (AD-11) (**TODO** Iter2-P15: the final format, Still open).
 5.  **Answer.** *Accept* calls `POST /invitations/{id}/accept`; the server creates the session, answers with `sessionId` and `iceServers`, and sends `invitation.accepted` to the photographer's signaling socket. Both phones call `session.join` and continue as in Figure 2. *Decline* and *Cancel* delete the invitation; the other side sees *Invite not accepted* or "no longer available" (FR-6.3, FR-6.4). The server's expiry timer does the same at 30 s.
 6.  **Friend requests** use the same push path (`type: friend.request`) and open the *Friends* screen's requests list (FR-5.7).
 
 #### 2.6.7 Reconnection and sessions across networks (Iteration 2)
 
-- **ICE.** Every session's `iceServers` holds the public STUN and TURN entries with credentials that expire with the session (AD-14, 2.5.2). WebRTC tries a direct path first and falls back to the relay; nothing in the app changes between the two.
+- **ICE.** Every session's `iceServers` holds Cloudflare's STUN and TURN entries with credentials that expire with the session (AD-14, 2.5.2). WebRTC tries a direct path first and falls back to the relay; nothing in the app changes between the two.
 - **Drop detection.** `PeerConnection` state `DISCONNECTED` or `FAILED`, or a closed data channel, moves `SessionState` to `Reconnecting` on both phones and starts a 10 s budget (NFR-11). The subject's video view keeps the last frame with "Reconnecting…".
 - **Restart.** The signaling socket is reopened if it dropped, and the phone sends `session.join` with `rejoin: true`. The photographer, which always creates the offer, sends an offer with `iceRestart: true`; the answer and new candidates are relayed as before. When ICE connects and both channels are open again, both phones send `hello` again (the subject with its `haveGuideId`, so the mask is not resent), and the photographer resends `camera.capabilities`, `camera.state`, and the final `guide.state`.
 - **Give up.** After 10 s the subject shows *Connection lost* with *Reconnect*, which repeats the restart while the photographer still holds the session (60 s after its last socket), and the photographer returns to `Waiting` (room code) or `Idle` (invitation).
+- **Server deploys and restarts.** To a phone these look like a dropped signaling socket. A connected session continues, because the media goes phone to phone; the phone reopens the socket and rejoins when it next needs signaling, and the session is still there because it lives in the session store, not in the server process that was replaced (AD-18, 2.7; 2.8, Deployment).
 - **Cellular notice (FR-6.13).** The first time a session's selected candidate pair uses a cellular interface, the app shows "The live view uses mobile data" once; the flag lives in DataStore.
 - **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the candidate pair type (`host`, `srflx`, `relay`) give NFR-5 and NFR-10 per network pair.
 
 
 ### 2.7 Database
 
-Iteration 1 had no database. From Iteration 2 the server keeps accounts, friends, and invitations in a relational database (**TODO** Iter2-P4: PostgreSQL in a container, SQLite as the fallback; Still open); the schema below works with either through SQLAlchemy, with Alembic migrations. Sessions, room codes, and online presence stay in memory, so they need no table and vanish with the process, which is why the server still runs as one worker. The app keeps small preferences in DataStore and saved guides in its private files (2.8).
+Iteration 1 had no database. From Iteration 2 the server keeps accounts, friends, and invitations in a relational database (**TODO** Iter2-P4: PostgreSQL in a container, SQLite as the fallback; Still open); the schema below works with either through SQLAlchemy, with Alembic migrations. Sessions, room codes, and online presence need no table: they are short-lived and live in the Redis session store described at the end of this section (AD-18). The app keeps small preferences in DataStore and saved guides in its private files (2.8).
 
 ```mermaid
 erDiagram
@@ -1529,7 +1539,7 @@ erDiagram
     text from_user_id FK
     text to_user_id FK
     text status "PENDING ACCEPTED DECLINED CANCELLED EXPIRED"
-    text session_id "set on accept; the session itself is in memory"
+    text session_id "set on accept; the session itself is in the session store"
     timestamptz expires_at
     timestamptz created_at
   }
@@ -1542,6 +1552,25 @@ erDiagram
 - Expired and answered invitations are deleted by a job after 24 h; nothing in the schema stores photos, guides, or session content (NFR-13).
 - Session tokens are stored as a hash in a small `sessions` table (`token_hash`, `user_id`, `device_id`, `expires_at`), so a leaked database does not give valid tokens.
 - No table stores a Google ID token, a scene photo, a guide, or anything from the live view. Logs never contain tokens or Pix IDs with request bodies (2.8, Privacy).
+
+**Session store (Redis, AD-18).** Sessions, room codes, presence, and the pose rate limit are in Redis, so every worker, and both copies of the app during a deploy, see the same state. Nothing in it has to survive a Redis restart, so persistence is off; a deploy does not restart Redis.
+
+| Key | Holds | Removed |
+|----|----|----|
+| `session:<sessionId>` (hash) | The room code, the photographer's and the subject's connection IDs (empty while absent), the expiry time of an unjoined room, the time its last socket left, and the invitation ID if it has one | By the sweeper, 10 min after creation if nobody joined (FR-8.4) or 60 s after its last socket (2.6.7); at once when the photographer leaves |
+| `code:<code>` | The `sessionId` of an active room code | With its session |
+| `expired:<code>` | A recently expired code, so a late `room.join` answers `EXPIRED` and the code is not handed out again | After 10 min |
+| `conn:<connectionId>` (hash) | The worker that holds the socket, the session it is in, and its user if signed in | On disconnect |
+| `worker:<workerId>` and `conns:<workerId>` (set) | A heartbeat, renewed every 5 s with a 15 s expiry, and the IDs of that worker's connections | The heartbeat by its expiry; the set by the sweeper once the heartbeat is gone |
+| `presence:<userId>` (set) | The user's open connection IDs; the user is online while the set is not empty (FR-5.9) | With the connections |
+| `rate:pose:<address>` (sorted set) | The times of that address's pose requests inside the window (2.8, Privacy) | As the window moves |
+| Channel `worker:<workerId>` | Messages for sockets that worker holds | Not stored |
+
+- **Atomic transitions.** Create, join, rejoin, leave, disconnect, and expire each run as one Lua script inside Redis. A script checks and changes the session and returns the messages to deliver, each with its connection and that connection's worker. This keeps Iteration 1's guarantee that two joins cannot interleave, now across workers. The caller passes the current time in, so tests still move a fake clock.
+- **Delivery.** A worker puts a message for one of its own sockets straight into that socket's bounded queue, as in Iteration 1, and publishes the others on the target worker's channel; every worker subscribes to its own channel. Messages from one worker to another keep their order, so `peer.joined` still reaches the photographer before the subject's first `signal`. Pub/sub does not store messages: one lost while a worker reconnects to Redis shows up as a session that does not connect, which the 15 s connecting timeout and reconnection (2.6.7) already handle.
+- **Sweeper.** One worker at a time, chosen by a Redis lock, runs it every second. It expires unjoined rooms and tells the photographer `EXPIRED`, removes empty sessions, and treats every connection of a worker without a heartbeat as disconnected, so the other phone gets `peer.left` with `CONNECTION_LOST`.
+- **Failure.** `/health` checks Redis, so a copy of the app that cannot reach it never receives traffic (2.8, Deployment). If Redis itself restarts, open rooms are lost, as they were on a server restart in Iteration 1.
+- **Until this is built** (Still open), the server keeps Iteration 1's in-memory `SessionRegistry` with one worker, and a deploy waits until no room is open before it switches copies (2.8, Deployment).
 
 ### 2.8 Implementation decisions
 
@@ -1556,10 +1585,11 @@ erDiagram
 | **Lifecycle** | The camera binds to the lifecycle of the camera screen; ViewModels keep UI state across rotation. If the photographer's app goes to the background, the camera is released and the video pauses. The session stays open for 60 s, and the subject sees that the camera is paused. No foreground service is used. From Iteration 2 a drop moves both phones to `Reconnecting` for up to 10 s before the session ends (2.6.7). The aspect ratio, brightness, and flash are restored when the camera rebinds; the last ratio is kept in DataStore. |
 | **Error handling** | Module interfaces return `Result` with typed errors (`NoPersonFound`, `GenerationError`, `EndReason`). ViewModels map them to the failure screens in the wireframe, and each maps to exactly one screen. |
 | **Timeouts** | Pose generation: 30 s on the client for a whole run, and 30 s from server to API for each request. Because the phone's limit starts first, it usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. Room code: 10 min. Invitation: 30 s on the server (It 2). Reconnection: 10 s (It 2). TURN credentials: the session's lifetime plus 10 min (It 2). |
-| **Configuration and secrets** | The server URL is set per build type in `BuildConfig`: the public host for release, and for debug either the public host or a laptop on the test Wi-Fi; only debug builds allow plain HTTP and WebSocket traffic. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. Iteration 2 adds `PIX_DATABASE_URL`, `PIX_GOOGLE_CLIENT_ID`, `PIX_FCM_CREDENTIALS` (path to the Firebase service-account file), `PIX_TURN_HOST` and `PIX_TURN_SECRET` (shared with coturn's `static-auth-secret`), and `PIX_PUBLIC_URL` for invite links. `.env.example` lists the names; the Firebase file and the secrets live only on the host. |
-| **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, counting only requests sent to the image API, to control cost. |
+| **Configuration and secrets** | The server URL is set per build type in `BuildConfig`: Server A for release, and for debug Server B or a laptop on the test Wi-Fi (`pix.serverUrl`). The course servers have no TLS (AD-11), so release builds allow plain HTTP and WebSocket traffic to the two course hostnames only, through the network security config; debug builds allow it to any host. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. Iteration 2 adds `PIX_DATABASE_URL`, `PIX_REDIS_URL` (AD-18), `PIX_GOOGLE_CLIENT_ID`, `PIX_FCM_CREDENTIALS` (path to the Firebase service-account file), `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (Cloudflare's TURN key, AD-14), and `PIX_PUBLIC_URL` for invite links. `.env.example` lists the names; the Firebase file and the secrets live only in a `.env` file on each server. |
+| **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, counting only requests sent to the image API, to control cost; on the course servers the address is the last `X-Forwarded-For` value, which the course's proxy adds. Requests to the course servers travel over plain HTTP (AD-11), so a scene photo and the session token are not encrypted between the phone and the server; the live view is, because it goes phone to phone (NFR-14). |
 | **Measurement hooks** | `Timings` logs named timestamps with a shared tag, so NFR latencies can be read from logcat without extra tools. Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping. Times are each phone's own clock; the `ping.received` and `rtt` lines align two phones' logs (2.5.1). |
-| **Hosting (It 2, AD-11)** | `server/deploy/` holds a `docker-compose.yml` with `app` (Uvicorn, one worker), `nginx` (TLS termination, `/api` and `/ws` to the app, `/i/<id>` install page), `coturn` (`network_mode: host`, `use-auth-secret`, the relay port range), and the database with a volume, plus the nginx and coturn configuration. One `deploy.sh` pulls `dev`, builds, runs migrations, and restarts. **TODO** Iter2-P4: host, domain, and ports (Still open). |
+| **Hosting (It 2, AD-11)** | Two course-provided servers, each behind the course's HTTP proxy and reachable only on port 80: Server A, `http://swpp26t10.147-46-242-169.sslip.io`, runs `main` as production, and Server B, `http://swpp26t10.147-46-242-174.sslip.io`, runs `dev` as staging. They cannot reach each other, so each has its own database and session store. `server/deploy/` holds a `docker-compose.yml` with `nginx` on port 80 (`/api/v1`, `/ws`, `/health`, `/version`, and the `/i/<id>` page; anything else answers `404`, so FastAPI's `/docs` is not public), two copies of the app (`app-blue` and `app-green`; Uvicorn with one worker until the session store is built, then a count set explicitly, because the servers report 38 CPUs for the 8 cores we get), `redis`, and the database with a volume, plus the nginx configuration. The course's proxy, measured on 2026-10-13: WebSockets pass and stay open (300 s with pings, 200 s idle), although the course cuts a plain HTTP response after 120 s; the proxy adds the phone's address as the last `X-Forwarded-For` value and passes on any value the client sent, so nginx trusts only the proxy and takes the last value; and it does not pass a client's cancel on to the server (2.6.3). |
+| **Deployment (It 2)** | GitHub cannot push to the servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights the team does not have and is advised against on a public repository. So each server pulls. A systemd timer runs `server/deploy/deploy.sh` every minute, which compares its branch with the deployed commit. A merge that does not change `server/` only records the commit. Otherwise the script builds the image on the server, with the tests as a build stage, starts it as the idle copy (blue or green), and waits for its `/health`. It then switches nginx, so new connections go to the new copy while sockets already open stay on the old one, and stops the old copy once its sockets have closed, or after 10 min at most, with a grace period long enough for a pose request in flight. Last it checks `/health` through nginx and records the commit in `/version`. A failure at any step leaves the running copy serving, and that commit is not tried again; `deploy.sh rollback` switches back to the previous image. With the session store a room can span both copies during the switch, so a deploy loses no room (AD-18). Until the session store is built the two copies cannot share a room, so the script first waits until the old copy has no open room, for at most 10 min, and stops it right after the switch. A workflow on GitHub's own runners builds the image on every pull request and, after a merge, waits until `/version` shows the commit, so a failed deploy is visible on the commit. |
 | **Accounts (It 2, AD-12)** | The app keeps the session token in DataStore and sends it as a bearer header on REST calls and the signaling upgrade. The server verifies Google ID tokens with `google-auth` against our client ID and stores only the Google subject. Token lifetime **TODO** (proposal 30 days; Still open). Sign-out deletes the token on the phone and the `sessions` row. Everything but friends and invitations works without a token (FR-5.1). |
 | **Push (It 2, AD-13)** | FCM data messages only, so the app renders every notification itself. A message for an invitation that is no longer `PENDING` when the app handles it opens the "no longer available" screen. The server deletes a device row when FCM reports the token unregistered. |
 | **Aspect ratio and shutter (It 2)** | `setAspectRatio` rebinds the `UseCaseGroup` with a `ViewPort` of the new ratio; the default is 4:3, and the last choice is restored from DataStore. The app plays no shutter sound of its own: `MediaActionSound` is not used, and `ImageCapture` has no sound. Where the device requires a sound (`CameraManager`/`MediaActionSound.mustPlayShutterSound()`, Android 13+), the system plays it and the app does nothing. **TODO** Iter2-P10: confirm the source of the current sound on the test phones and the crop rules (Still open). |
@@ -1574,10 +1604,10 @@ erDiagram
 | **Camera** | 박동제 | Preview, capture to MediaStore, zoom, 3:4 viewport, `setFrameSink` | Tap to focus, brightness, flash, aspect ratios, no app shutter sound; `CameraController` and `CameraCapabilities` additions (Iter2-P10, #51) | Session, remote control |
 | **Reference guide** | 박동제 | Picker, segmentation, cutout, outline, *No person found* | Smooth outlines with clean arms and legs, mask-only transfer (Iter2-P7, #49) | Guide overlay |
 | **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, #52); saved guides (Iter2-P18, #58) | Guide sync, Subject view |
-| **Server deployment** | 박재완 | Running on the laptop on the test Wi-Fi | Public host with Docker, nginx, TLS, coturn, and the database (Iter2-P4, #46) | Everything |
+| **Server deployment** | 박재완 | Running on the laptop on the test Wi-Fi | The course servers with Docker, nginx, and blue-green deploys (Iter2-P4, #46); the Redis session store (AD-18; issue to be filed, Still open) | Everything |
 | **Accounts and friends** | 박재완 | — | Database, Google sign-in, Pix IDs, friend requests, friend list, presence (Iter2-P8, #50); Sign-in, Pix ID, and Friends screens (Iter2-P13, #54) | Invitations |
 | **Pose generation** | 박재완 | API choice, `POST /poses`, templates, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, prompt (Iter2-P12, #53) | Reference guide |
-| **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | TURN, `wss://`, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter2-P16, #56); invitations with push and link (Iter2-P15, #55) | Guide sync, remote control |
+| **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | TURN through Cloudflare, `ws://` to the course server, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter2-P16, #56); invitations with push and link (Iter2-P15, #55) | Guide sync, remote control |
 | **Remote control** | 조성민 | `RemoteControlHandler` (zoom), zoom slider on Subject view | Brightness, flash, guide moves, notices; remote focus and the permission switch if time allows (Iter2-P17, #57); pinch zoom and the guide-edit mode toggle on Subject view, replacing its slider (Iter2-P6, #48); zoom stutter (Iter2-P5, #47) | UI |
 | **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible`, `anchor`, and mask-only transfer in the syncer (with Iter2-P7 and Iter2-P11) | UI |
 
@@ -1602,7 +1632,7 @@ The friends feature needs both the accounts server (박재완) and the session e
 **Iteration 2 build order** (follows the schedule of 2026-10-11; dates are the issues' due dates):
 
 1.  **By 10/12.** This design (v1.0) and the shared contracts for the new interfaces, models, and messages, merged to `dev` with fakes (Iter2-P3).
-2.  **By 10/14–10/16.** In parallel: the public host with TLS, coturn, and the database (Iter2-P4); the zoom stutter (Iter2-P5, Must) and pinch zoom with guide-edit mode (Iter2-P6); smooth outlines and the mask-only transfer (Iter2-P7, Must); the accounts server (Iter2-P8).
+2.  **By 10/14–10/16.** In parallel: the course servers with Docker, nginx, and blue-green deploys (Iter2-P4); the zoom stutter (Iter2-P5, Must) and pinch zoom with guide-edit mode (Iter2-P6); smooth outlines and the mask-only transfer (Iter2-P7, Must); the accounts server (Iter2-P8).
 3.  **By 10/17–10/18.** Camera controls (Iter2-P10); guide controls, thumbnail, and starting position (Iter2-P11); pose descriptions (Iter2-P12); Sign-in, Pix ID, and Friends screens (Iter2-P13).
 4.  **By 10/20.** Invitations with push and link (Iter2-P15); sessions across networks and reconnection (Iter2-P16); remote brightness, flash, and guide moves (Iter2-P17); saved guides (Iter2-P18).
 5.  **By 10/22–10/23.** Integration tests (Iter2-P21), integration on the test phones (Iter2-P22), latency and connection-rate measurement per network pair, and the demo README (Iter2-P23). The midterm presentation is on 10/21 with what is merged by then.
@@ -1612,7 +1642,7 @@ The friends feature needs both the accounts server (박재완) and the session e
 ```text
 swpp-2026-project-team-10/
 ├─ android/        Android app (Gradle project with the shared contracts; open this folder in Android Studio)
-├─ server/         FastAPI app; .env.example for secrets; deploy/ with docker-compose, nginx, and coturn configuration (It 2)
+├─ server/         FastAPI app; .env.example for secrets; deploy/ with docker-compose, the nginx configuration, and the deploy script (It 2)
 ├─ wiki/           source of the GitHub wiki, with its images in wiki/images/; the wiki-sync workflow mirrors it on every push to dev
 └─ .github/        pull-request template, CI and wiki-sync workflows
 ```

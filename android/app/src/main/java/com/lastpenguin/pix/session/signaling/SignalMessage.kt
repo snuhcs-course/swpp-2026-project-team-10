@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.session.signaling
 
 import com.lastpenguin.pix.session.EndReason
@@ -73,7 +73,7 @@ sealed interface SignalMessage {
     @SerialName("peer.left")
     data class PeerLeft(val reason: EndReason = EndReason.PEER_LEFT) : SignalMessage
 
-    /** code: NOT_FOUND, FULL, EXPIRED, UNKNOWN_TYPE. */
+    /** code: NOT_FOUND, FULL, EXPIRED, RATE_LIMITED (too many wrong codes from this network), UNKNOWN_TYPE. */
     @Serializable
     @SerialName("error")
     data class ServerError(val code: String, val message: String = "") : SignalMessage

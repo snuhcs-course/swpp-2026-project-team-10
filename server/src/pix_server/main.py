@@ -34,7 +34,7 @@ from pix_server.errors import (
     handle_validation_error,
 )
 from pix_server.poses.generator import PoseGenerator
-from pix_server.poses.limiter import RateLimiter
+from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.router import router as poses_router
 from pix_server.signaling.registry import SessionRegistry
 from pix_server.signaling.router import router as signaling_router
@@ -94,7 +94,7 @@ def create_app(
         app.state.clock = clock
         app.state.store = store
         app.state.signaling = registry
-        app.state.pose_limiter = RateLimiter(store, config.pose_rate_limit, config.pose_rate_window_seconds)
+        app.state.pose_limiter = PoseLimiter(store, config)
         app.state.passwords = Passwords(password_hasher or PasswordHasher())
         app.state.tokens = Tokens(jwt_secret(config), config.access_token_minutes * 60, clock)
         try:

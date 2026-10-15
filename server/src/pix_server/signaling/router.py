@@ -51,7 +51,7 @@ async def signaling(websocket: WebSocket) -> None:
     user = socket_user(websocket)
     await websocket.accept()
     try:
-        peer = await registry.connect(user)
+        peer = await registry.connect(user, websocket.client.host if websocket.client else "")
     except RedisError:
         # Without the session store this server cannot hold a room; 1013 asks the phone to try again later.
         await websocket.close(code=1013)

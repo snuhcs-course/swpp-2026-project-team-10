@@ -60,6 +60,7 @@ Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active ro
 | `NOT_FOUND` | Unknown/cancelled room, or photographer disconnected. |
 | `FULL` | A subject already occupies the room, or no code could be allocated. |
 | `EXPIRED` | Room expired. Codes are remembered for another ten minutes, then report `NOT_FOUND`. |
+| `RATE_LIMITED` | The client's address sent `PIX_JOIN_FAILURE_LIMIT` (10) wrong codes, unknown or expired, within `PIX_JOIN_FAILURE_WINDOW_SECONDS` (600). Every join from it is refused, the right code included, until the oldest leaves the window, so codes cannot be guessed. The count is per address, in the session store. |
 | `UNKNOWN_TYPE` | Unrecognized message type. |
 | `INVALID_MESSAGE` | Malformed JSON, binary frame, invalid fields, or invalid signaling payload. |
 | `INVALID_STATE` | Already in a room, signaling before joining, or SDP from the wrong role. |
@@ -108,12 +109,12 @@ Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose tem
 | `400 INVALID_REQUEST` | A part is missing or `seed` is not an integer. It replaces FastAPI's default 422, which this API uses for `REJECTED`. |
 | `413` | The request is larger than 1 MiB. It is refused before the upload is read, so it carries Starlette's own body (`Content Too Large`) and not the error shape above. |
 | `422 REJECTED` | The image service declined the photo or pose (a content filter or a model refusal). |
-| `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600). Requests refused before that point are not counted. |
+| `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600), or all clients together more than `PIX_POSE_GLOBAL_LIMIT` (500) within `PIX_POSE_GLOBAL_WINDOW_SECONDS` (86400); the message says which. Requests refused before that point are not counted, and a request refused by one window is counted in neither. |
 | `503 UNAVAILABLE` | The session store, which counts the rate limit, does not answer. Nothing is sent to the image service. |
 | `502 UPSTREAM_ERROR` | The image service failed, could not be reached, or gave an unreadable answer, or `OPENROUTER_API_KEY` is not set. The server log gives OpenRouter's status code, for example 402 when the credits run out, and never the text of its answer. |
 | `504 UPSTREAM_TIMEOUT` | The image service did not answer in time. |
 
-The rate limit is counted per client IP address in the session store, so every worker counts against the same window; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
+The rate limits are counted in the session store, so every worker counts against the same windows; 20 requests are five sets of four poses, and the global 500 bound what the image service can cost in a day however many addresses send requests. Set a spending limit on the OpenRouter key as well, in OpenRouter's dashboard, as the last bound. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
 
 ## Accounts and friends
 

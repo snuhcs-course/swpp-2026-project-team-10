@@ -191,15 +191,22 @@ return {status, out}
 """
 )
 
-# ARGV[6..7]: connection, room code. Returns {status, session id, out}.
+# ARGV[6..11]: connection, room code, and the window of wrong codes from the client's address ("" for none), its
+# limit, its length in seconds, and a unique member. Returns {status, session id, out}. A wrong code, unknown or
+# expired, counts in the window; while it is full, every join from that address answers RATE_LIMITED without the
+# code being looked at, so codes cannot be guessed.
 JOIN = (
     _PRELUDE
     + """
 local conn, code = ARGV[6], ARGV[7]
+local fails, fail_limit, fail_window = ARGV[8], tonumber(ARGV[9]), tonumber(ARGV[10])
 sweep()
 touch(conn)
 local status, sid = 'OK', ''
-if redis.call('HGET', 'conn:' .. conn, 'session') ~= '' then
+if fails ~= '' then redis.call('ZREMRANGEBYSCORE', fails, '-inf', num(now - fail_window)) end
+if fails ~= '' and redis.call('ZCARD', fails) >= fail_limit then
+  status = 'RATE_LIMITED'
+elseif redis.call('HGET', 'conn:' .. conn, 'session') ~= '' then
   status = 'INVALID_STATE'
 elseif redis.call('ZSCORE', 'expired', code) then
   status = 'EXPIRED'
@@ -217,6 +224,10 @@ else
     schedule(sid)
     emit(s[1], 'peer.joined')
   end
+end
+if fails ~= '' and (status == 'NOT_FOUND' or status == 'EXPIRED') then
+  redis.call('ZADD', fails, num(now), ARGV[11])
+  redis.call('EXPIRE', fails, math.floor(fail_window) + 1)
 end
 return {status, sid, out}
 """
@@ -340,13 +351,18 @@ end
 return out
 """
 
-# KEYS[1]: the rate-limit window of one client. ARGV: now, window in seconds, limit, a unique member, key TTL
-# in seconds. Returns 1 if the request is allowed and counted.
+# KEYS: sliding windows that one request counts in. ARGV: now, a unique member, then the length in seconds and the
+# limit of each window in turn. If none is full, the request is counted in all of them and 0 is returned; otherwise
+# it is counted in none, and the 1-based index of the first full window is returned.
 RATE_LIMIT = """
 local now = tonumber(ARGV[1])
-redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', string.format('%.6f', now - tonumber(ARGV[2])))
-if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[3]) then return 0 end
-redis.call('ZADD', KEYS[1], string.format('%.6f', now), ARGV[4])
-redis.call('EXPIRE', KEYS[1], ARGV[5])
-return 1
+for i, key in ipairs(KEYS) do
+  redis.call('ZREMRANGEBYSCORE', key, '-inf', string.format('%.6f', now - tonumber(ARGV[1 + 2 * i])))
+  if redis.call('ZCARD', key) >= tonumber(ARGV[2 + 2 * i]) then return i end
+end
+for i, key in ipairs(KEYS) do
+  redis.call('ZADD', key, string.format('%.6f', now), ARGV[2])
+  redis.call('EXPIRE', key, math.floor(tonumber(ARGV[1 + 2 * i])) + 1)
+end
+return 0
 """

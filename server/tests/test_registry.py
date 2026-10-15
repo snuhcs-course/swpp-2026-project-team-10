@@ -320,3 +320,24 @@ async def test_user_on_a_worker_without_a_heartbeat_goes_offline_when_swept(make
     assert await alive.store.presence(["u_A"]) == {"u_A": (True, False)}
     await alive.sweep()
     assert await alive.store.presence(["u_A"]) == {"u_A": (False, False)}
+
+
+async def test_wrong_codes_count_per_address_on_every_worker(make_registry, settings):
+    settings.join_failure_limit = 2
+    first, second = await make_registry(), await make_registry()
+    _, room = await create_room(first)
+    wrong = f"{(int(room['code']) + 1) % 1_000_000:06d}"
+    guesser = await first.connect(address="203.0.113.7")
+    for _ in range(2):
+        with pytest.raises(ProtocolError) as exc:
+            await handle(first, guesser, type="room.join", code=wrong)
+        assert exc.value.code == "NOT_FOUND"
+    same_address = await second.connect(address="203.0.113.7")
+    with pytest.raises(ProtocolError) as exc:
+        await handle(second, same_address, type="room.join", code=room["code"])
+    assert exc.value.code == "RATE_LIMITED"
+    # Another address, and a socket whose address is unknown, are not limited.
+    for peer in (await second.connect(address="198.51.100.4"), await second.connect()):
+        with pytest.raises(ProtocolError) as exc:
+            await handle(second, peer, type="room.join", code=wrong)
+        assert exc.value.code == "NOT_FOUND"

@@ -40,3 +40,11 @@ class Settings(BaseSettings):
     pose_upstream_timeout_seconds: PositiveFloat = 30
     pose_rate_limit: PositiveInt = 20
     pose_rate_window_seconds: PositiveFloat = 3600
+    # Pose requests over all clients together; it bounds what the image API can cost within the window.
+    pose_global_limit: PositiveInt = 500
+    pose_global_window_seconds: PositiveFloat = 86400
+
+    # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
+    # leaves the window, so codes cannot be guessed.
+    join_failure_limit: PositiveInt = 10
+    join_failure_window_seconds: PositiveFloat = 600

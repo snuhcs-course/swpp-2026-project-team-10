@@ -145,6 +145,10 @@ def settings(database_url):
         pose_upstream_timeout_seconds=25,
         pose_rate_limit=20,
         pose_rate_window_seconds=3600,
+        pose_global_limit=500,
+        pose_global_window_seconds=86400,
+        join_failure_limit=10,
+        join_failure_window_seconds=600,
     )
 
 

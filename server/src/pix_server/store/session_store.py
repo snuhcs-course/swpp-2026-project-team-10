@@ -43,6 +43,15 @@ def open_redis(settings: Settings) -> Redis:
 
 
 @dataclass(frozen=True)
+class Window:
+    """A sliding window: at most `limit` events within `seconds`, counted under `key`."""
+
+    key: str
+    limit: int
+    seconds: float
+
+
+@dataclass(frozen=True)
 class Delivery:
     """A message a script decided on, for a connection held by `worker`."""
 
@@ -136,8 +145,11 @@ class SessionStore:
         status, out = await self._run("CREATE", connection, session_id, code)
         return status, _deliveries(out)
 
-    async def join(self, connection: str, code: str) -> tuple[str, str, list[Delivery]]:
-        status, session_id, out = await self._run("JOIN", connection, code)
+    async def join(self, connection: str, code: str, failures: Window | None = None) -> tuple[str, str, list[Delivery]]:
+        """Seats a subject. A wrong code counts in `failures`, and while that window is full every join answers
+        RATE_LIMITED."""
+        limits = [failures.key, str(failures.limit), f"{failures.seconds:.6f}"] if failures else ["", "0", "0"]
+        status, session_id, out = await self._run("JOIN", connection, code, *limits, uuid4().hex)
         return status, session_id, _deliveries(out)
 
     async def route(self, connection: str, sdp_type: str) -> tuple[str, str, str, str, list[Delivery]]:
@@ -179,16 +191,11 @@ class SessionStore:
 
     # --- rate limit ------------------------------------------------------------------------------------------------
 
-    async def allow(self, key: str, limit: int, window_seconds: float) -> bool:
-        """Sliding window per key, shared by every worker."""
-        allowed = await self._rate_limit(
-            keys=[key],
-            args=[
-                f"{self.clock():.6f}",
-                f"{window_seconds:.6f}",
-                str(limit),
-                uuid4().hex,
-                str(int(window_seconds) + 1),
-            ],
+    async def allow(self, *windows: Window) -> Window | None:
+        """Counts one request in every window, or in none if one of them is full, and returns that one. Shared by
+        every worker."""
+        sizes = [value for window in windows for value in (f"{window.seconds:.6f}", str(window.limit))]
+        full = await self._rate_limit(
+            keys=[window.key for window in windows], args=[f"{self.clock():.6f}", uuid4().hex, *sizes]
         )
-        return bool(allowed)
+        return windows[full - 1] if full else None

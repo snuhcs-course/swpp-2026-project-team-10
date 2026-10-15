@@ -10,7 +10,8 @@ Partitions:
   invalid token; Google unavailable
 - adding Google to an account: the not-registered flow; the same Google again; a Google account another Pix account
   uses; a second Google account
-- adding a password to a Google account: valid; before a Pix ID; breaking a rule; an account that has one
+- adding a password to a Google account: valid; before a Pix ID; breaking a rule; an account that has one; at the
+  moment another phone changes the Pix ID to it
 - PUT /me: Pix ID for a Google account; invalid or taken Pix ID; display name only; the changed Pix ID as login name;
   a password account's change without its password, with a wrong one, and to the password itself in any case
 - access token: missing, wrong scheme, not a JWT; signed with another secret, with "none", or changed after signing;
@@ -344,6 +345,27 @@ def test_account_with_a_password_cannot_set_another(client, sign_up):
     assert_error(response, 409, "PASSWORD_ALREADY_SET")
     assert log_in(client, "dongje.p").status_code == 200
     assert_error(log_in(client, "dongje.p", "another2026"), 401, "INVALID_CREDENTIALS")
+
+
+def test_pix_id_change_and_new_password_at_once_never_leave_the_two_equal(client):
+    """A Google account signed in on two phones: one changes the Pix ID to "sunset2026" while the other adds that as
+    the password. Whichever runs second sees the first and refuses, so they never end up the same."""
+    first, _ = google_sign_up(client)
+    client.put("/api/v1/me", headers=first, json={"pixId": "junhyeong.h"})
+    second = bearer(client.post("/api/v1/auth/google", json={"idToken": "google:sub-1"}).json()["accessToken"])
+
+    async def both():
+        transport = httpx2.ASGITransport(app=client.app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://pix") as http:
+            return await asyncio.gather(
+                http.put("/api/v1/me", headers=first, json={"pixId": "sunset2026"}),
+                http.put("/api/v1/me/password", headers=second, json={"password": "sunset2026"}),
+            )
+
+    pix_id_change, new_password = client.portal.call(both)
+    assert sorted([pix_id_change.status_code, new_password.status_code]) in ([200, 400], [200, 401])
+    account = client.get("/api/v1/me", headers=first).json()
+    assert not (account["pixId"] == "sunset2026" and account["hasPassword"])
 
 
 # --- PUT /me -------------------------------------------------------------------------------------------------------

@@ -14,7 +14,7 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
 
-from pix_server.accounts.auth import Database, SignedIn, Tokens, hash_token, new_refresh_token, now_of
+from pix_server.accounts.auth import Caller, Database, SignedIn, Tokens, hash_token, new_refresh_token, now_of
 from pix_server.accounts.google import GoogleAccount, GoogleUnavailable, GoogleVerifier, InvalidGoogleToken
 from pix_server.accounts.passwords import Passwords
 from pix_server.accounts.rules import DISPLAY_NAME_MAX, normalize_pix_id, password_problem, pix_id_problem
@@ -69,6 +69,15 @@ def pix_id_taken() -> ApiError:
 
 def google_in_use() -> ApiError:
     return ApiError(409, "GOOGLE_IN_USE", "This Google account is already used by another Pix account")
+
+
+async def locked_user(db: Database, caller: Caller) -> User:
+    """The caller's row, read again and held until the transaction ends. Changing the Pix ID and adding a password
+    each check one against the other, so on PostgreSQL the second of two at once must wait and see the first's
+    result; SQLite already runs transactions one at a time."""
+    return await db.scalar(
+        select(User).where(User.id == caller.user.id).with_for_update().execution_options(populate_existing=True)
+    )
 
 
 def check_pix_id(pix_id: str) -> None:
@@ -241,7 +250,7 @@ async def update_me(body: AccountUpdate, request: Request, caller: SignedIn, db:
     """Sets the Pix ID, the display name, or both. A password account signs in with its new Pix ID afterwards, so
     changing it takes the current password; with the password in hand, the new Pix ID is checked against it, as at
     sign-up, which a hash alone could not do (FR-5.11)."""
-    user = caller.user
+    user = await locked_user(db, caller)
     if body.pixId is not None and body.pixId != user.pix_id:
         check_pix_id(body.pixId)
         if user.password_hash is not None:
@@ -281,7 +290,7 @@ async def add_google(body: GoogleRequest, request: Request, caller: SignedIn, db
 async def add_password(body: PasswordRequest, request: Request, caller: SignedIn, db: Database) -> AccountOut:
     """Lets an account made with Google sign in with its Pix ID and this password too. The Pix ID is the login name,
     so it comes first. Changing a password the account already has is not offered."""
-    user = caller.user
+    user = await locked_user(db, caller)
     if user.password_hash is not None:
         raise ApiError(409, "PASSWORD_ALREADY_SET", "This Pix account already has a password")
     if user.pix_id is None:

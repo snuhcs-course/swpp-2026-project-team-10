@@ -9,9 +9,12 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
@@ -259,6 +262,7 @@ class CameraViewModelTest {
             CameraCapabilities(1f, 4f, listOf(1f, 2f, 3f)),
         )
         override val zoom = MutableStateFlow(1f)
+        override val state = MutableStateFlow(CameraState(zoom = 1f))
         var capture = CompletableDeferred<Result<Uri>>()
         var captureCount = 0
         var throwOnCapture = false
@@ -268,6 +272,10 @@ class CameraViewModelTest {
         override fun setZoom(ratio: Float) {
             zoomRequests.add(ratio)
         }
+        override fun setFocusPoint(x: Float, y: Float) = Unit
+        override fun setExposure(index: Int) = Unit
+        override fun setFlash(mode: FlashMode) = Unit
+        override fun setAspectRatio(ratio: AspectRatio) = Unit
         override suspend fun takePhoto(): Result<Uri> {
             captureCount++
             if (throwOnCapture) throw IllegalStateException("Camera closed")

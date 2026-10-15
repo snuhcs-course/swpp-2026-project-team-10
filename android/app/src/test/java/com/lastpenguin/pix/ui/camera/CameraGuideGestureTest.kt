@@ -6,9 +6,12 @@ import android.net.Uri
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideSource
@@ -256,12 +259,21 @@ class CameraGuideGestureTest {
             CameraCapabilities(1f, 4f, listOf(1f, 2f, 3f)),
         )
         override val zoom = MutableStateFlow(1f)
+        override val state = MutableStateFlow(CameraState(zoom = 1f))
         val zoomRequests = mutableListOf<Float>()
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
         override fun setZoom(ratio: Float) {
             zoomRequests += ratio
         }
+
+        override fun setFocusPoint(x: Float, y: Float) = Unit
+
+        override fun setExposure(index: Int) = Unit
+
+        override fun setFlash(mode: FlashMode) = Unit
+
+        override fun setAspectRatio(ratio: AspectRatio) = Unit
         override suspend fun takePhoto(): Result<Uri> = error("Guide gestures must not capture photos")
         override suspend fun grabFrame(): Result<Bitmap> = error("Guide gestures must not capture frames")
         override fun setFrameSink(sink: FrameSink?) = Unit

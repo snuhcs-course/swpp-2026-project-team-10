@@ -5,9 +5,12 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
@@ -79,6 +82,8 @@ class FakeCameraController(
     private val _zoom = MutableStateFlow(1f)
     override val zoom: StateFlow<Float> = _zoom.asStateFlow()
 
+    override val state: StateFlow<CameraState> = MutableStateFlow(CameraState(zoom = 1f))
+
     val requests = mutableListOf<Float>()
     var applies = true
     var sink: FrameSink? = null
@@ -98,6 +103,14 @@ class FakeCameraController(
     fun setStatus(status: CameraStatus) {
         _status.value = status
     }
+
+    override fun setFocusPoint(x: Float, y: Float) = Unit
+
+    override fun setExposure(index: Int) = Unit
+
+    override fun setFlash(mode: FlashMode) = Unit
+
+    override fun setAspectRatio(ratio: AspectRatio) = Unit
 
     override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())
 

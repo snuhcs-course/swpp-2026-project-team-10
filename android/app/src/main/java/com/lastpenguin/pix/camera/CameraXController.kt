@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-04, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -10,12 +10,14 @@ import android.util.Size
 import android.view.Surface
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.CameraState
+import androidx.camera.core.CameraState as CameraXState
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
 import androidx.camera.core.ZoomState
@@ -39,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
@@ -65,6 +68,17 @@ class CameraXController(
 
     private val _zoom = MutableStateFlow(1f)
     override val zoom: StateFlow<Float> = _zoom.asStateFlow()
+
+    private val _state = MutableStateFlow(CameraState(zoom = 1f))
+    override val state: StateFlow<CameraState> = _state.asStateFlow()
+
+    // The primary rear camera's exposure, flash, and focus support, read once like the zoom plan.
+    private var controls: Controls? = null
+
+    // Kept across rebinds and lens switches, like retainedZoom: CameraX starts every binding without them.
+    private var aspect = AspectRatio.R4_3
+    private var retainedExposure = 0
+    private var flash = FlashMode.OFF
 
     // CameraX resets ZoomState when its lifecycle stops. Preserve only a successfully applied
     // request separately, so that the reset is still published without replacing the user's framing.
@@ -103,6 +117,7 @@ class CameraXController(
                     current.restoreZoomOnOpen = true
                     current.restoringZoom = false
                     current.zoomRequestId++
+                    current.exposureRestored = false
                     pendingZoom = null
                     current.frames.clear()
                     refreshStatus(current)
@@ -130,6 +145,7 @@ class CameraXController(
                 try {
                     val cameraProvider = future.get()
                     provider = cameraProvider
+                    if (controls == null) discoverControls(cameraProvider)
                     if (zoomPlan == null) discoverZoomPlan(cameraProvider)
                     val plan = checkNotNull(zoomPlan)
                     current.lens = plan.lensFor(plan.clamp(pendingZoom ?: retainedZoom)!!)
@@ -178,8 +194,10 @@ class CameraXController(
         current: Binding,
         surfaceProvider: Preview.SurfaceProvider,
     ) {
-        // Pix is portrait-only. All outputs describe the same 3:4 field of view (AD-10).
+        // Pix is portrait-only. All outputs describe the same field of view, cut from the sensor's 4:3 (AD-10).
         val rotation = Surface.ROTATION_0
+        val ratio = this.aspect
+        current.aspect = ratio
         val aspect = AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
         val preview = Preview.Builder()
             .setTargetRotation(rotation)
@@ -188,6 +206,7 @@ class CameraXController(
         val capture = ImageCapture.Builder()
             .setTargetRotation(rotation)
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setFlashMode(flash.captureMode)
             .setResolutionSelector(
                 ResolutionSelector.Builder()
                     .setAspectRatioStrategy(aspect)
@@ -204,7 +223,10 @@ class CameraXController(
                 ResolutionSelector.Builder()
                     .setAspectRatioStrategy(aspect)
                     .setResolutionStrategy(
-                        ResolutionStrategy(Size(960, 720), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER),
+                        ResolutionStrategy(
+                            analysisSize(ratio),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
+                        ),
                     )
                     .build(),
             )
@@ -217,8 +239,12 @@ class CameraXController(
         analysis.setAnalyzer(executor) { image -> analyze(current, image) }
         preview.setSurfaceProvider(surfaceProvider)
         val group = UseCaseGroup.Builder()
-            // ViewPort.FIT ignores aspect ratio. Crop to 3:4 here, then display with PreviewView.FIT_CENTER.
-            .setViewPort(ViewPort.Builder(Rational(3, 4), rotation).setScaleType(ViewPort.FILL_CENTER).build())
+            // ViewPort.FIT ignores aspect ratio. Crop to the chosen ratio here, then display with PreviewView.FIT_CENTER.
+            .setViewPort(
+                ViewPort.Builder(Rational(ratio.portraitParts.first, ratio.portraitParts.second), rotation)
+                    .setScaleType(ViewPort.FILL_CENTER)
+                    .build(),
+            )
             .addUseCase(preview)
             .addUseCase(capture)
             .addUseCase(analysis)
@@ -226,13 +252,15 @@ class CameraXController(
         val selector = if (current.lens == ZoomLens.PRIMARY) primarySelector else checkNotNull(ultrawideSelector)
         val camera = cameraProvider.bindToLifecycle(current.owner, selector, group)
         current.camera = camera
+        // A separately exposed ultrawide may have no flash of its own.
+        if (!camera.cameraInfo.hasFlashUnit()) capture.flashMode = ImageCapture.FLASH_MODE_OFF
         current.zoomObserver = Observer { state ->
             if (binding === current) publishZoom(current, state)
         }
         camera.cameraInfo.zoomState.observe(current.owner, current.zoomObserver!!)
         current.stateObserver = Observer { state ->
             if (binding === current) {
-                val open = state.type == CameraState.Type.OPEN
+                val open = state.type == CameraXState.Type.OPEN
                 if (current.open && !open) {
                     // A transient camera disconnect can also reset zoom without stopping the screen.
                     current.restoreZoomOnOpen = true
@@ -242,13 +270,14 @@ class CameraXController(
                 current.open = open
                 // CameraX can wait for another camera client without attaching an error.
                 // Keep retry/settings guidance visible while waiting; a later OPEN recovers automatically.
-                current.failed = state.error != null || state.type == CameraState.Type.PENDING_OPEN
+                current.failed = state.error != null || state.type == CameraXState.Type.PENDING_OPEN
                 if (!current.open || current.failed) current.frames.clear()
                 state.error?.let {
                     Log.w(TAG, "Camera state error ${it.code}", it.cause)
                     if (recoverPrimary(current)) return@Observer
                 }
                 restoreZoomIfNeeded(current)
+                restoreExposureIfNeeded(current)
                 refreshStatus(current)
             }
         }
@@ -359,6 +388,7 @@ class CameraXController(
                 finished = true
                 current.capturesInFlight--
                 drainZoom(current)
+                applyAspectRatio(current)
             }
             try {
                 Timings.mark("camera.capture.start")
@@ -413,6 +443,131 @@ class CameraXController(
         frameSink = sink
     }
 
+    // --- focus, exposure, flash, and aspect ratio (Iter2-P10) ---------------------------------------------------
+
+    override fun setFocusPoint(x: Float, y: Float) {
+        mainExecutor.execute {
+            val current = binding ?: return@execute
+            val camera = current.camera ?: return@execute
+            if (_status.value != CameraStatus.READY) return@execute
+            // The preview's buffer, its viewport crop, and its turn to upright locate the frame on the sensor.
+            val info = current.preview?.resolutionInfo ?: return@execute
+            val crop = info.cropRect
+            val point = frameToBuffer(x, y, info.rotationDegrees, crop.left, crop.top, crop.width(), crop.height())
+                ?: return@execute
+            val factory = SurfaceOrientedMeteringPointFactory(
+                info.resolution.width.toFloat(),
+                info.resolution.height.toFloat(),
+            )
+            // Focus, exposure, and white balance at that point; the camera returns to continuous focus after 5 s.
+            val action = FocusMeteringAction.Builder(factory.createPoint(point.x, point.y)).build()
+            try {
+                // A newer tap cancels this one, so its result is not needed.
+                camera.cameraControl.startFocusAndMetering(action)
+                Timings.mark("camera.focus")
+            } catch (error: Exception) {
+                Log.w(TAG, "Focus request could not start", error)
+            }
+        }
+    }
+
+    override fun setExposure(index: Int) {
+        mainExecutor.execute {
+            val range = controls?.exposureRange ?: return@execute
+            retainedExposure = clampedExposure(index, range) ?: return@execute
+            val current = binding ?: return@execute
+            // A camera that is not open yet gets the index when it opens.
+            if (!current.open || current.failed) return@execute
+            current.exposureRestored = true
+            applyExposure(current, retainedExposure)
+        }
+    }
+
+    override fun setFlash(mode: FlashMode) {
+        mainExecutor.execute {
+            if (controls?.hasFlash != true) return@execute
+            flash = mode
+            val current = binding
+            if (current?.camera?.cameraInfo?.hasFlashUnit() == true) current.capture?.flashMode = mode.captureMode
+            _state.update { it.copy(flash = mode) }
+        }
+    }
+
+    override fun setAspectRatio(ratio: AspectRatio) {
+        mainExecutor.execute {
+            if (ratio == aspect) return@execute
+            aspect = ratio
+            _state.update { it.copy(aspect = ratio) }
+            binding?.let(::applyAspectRatio)
+        }
+    }
+
+    /** Rebinds when the viewport differs from the chosen ratio, once no photo is being saved. */
+    private fun applyAspectRatio(current: Binding) {
+        // A binding still waiting for the camera provider builds its viewport with the chosen ratio anyway.
+        if (binding !== current || current.camera == null || current.aspect == aspect) return
+        if (current.capturesInFlight > 0) return
+        Timings.mark("camera.aspect", aspect.name)
+        // As for a lens switch: the zoom and the latest pinch target carry over to the new binding.
+        releaseBinding(preserveZoomPlan = true)
+        startBinding(current.owner, current.surfaceProvider)
+    }
+
+    /** Applies the retained exposure index once each time the camera opens; CameraX starts it at 0. */
+    private fun restoreExposureIfNeeded(current: Binding) {
+        if (!current.open || current.failed) {
+            current.exposureRestored = false
+            return
+        }
+        if (current.exposureRestored) return
+        current.exposureRestored = true
+        if (current.camera?.cameraInfo?.exposureState?.exposureCompensationIndex != retainedExposure) {
+            applyExposure(current, retainedExposure)
+        }
+    }
+
+    private fun applyExposure(current: Binding, index: Int) {
+        val camera = current.camera ?: return
+        val exposure = camera.cameraInfo.exposureState
+        if (!exposure.isExposureCompensationSupported) return
+        // The bound lens may be an ultrawide with a narrower range than the primary camera's.
+        val bounded = index.coerceIn(exposure.exposureCompensationRange.lower, exposure.exposureCompensationRange.upper)
+        val future = try {
+            camera.cameraControl.setExposureCompensationIndex(bounded)
+        } catch (error: Exception) {
+            Log.w(TAG, "Exposure request could not start", error)
+            return
+        }
+        future.addListener({
+            if (binding !== current) return@addListener
+            try {
+                future.get()
+            } catch (error: Exception) {
+                // A newer index cancels this one; either way, publish what the camera holds now.
+                Log.d(TAG, "Exposure request ended without applying", error)
+            }
+            _state.update { it.copy(exposure = camera.cameraInfo.exposureState.exposureCompensationIndex) }
+        }, mainExecutor)
+    }
+
+    private fun discoverControls(cameraProvider: ProcessCameraProvider) {
+        val info =
+            CameraSelector.DEFAULT_BACK_CAMERA.filter(cameraProvider.availableCameraInfos).firstOrNull() ?: return
+        val exposure = info.exposureState
+        val supported = exposure.isExposureCompensationSupported
+        val center = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
+        controls = Controls(
+            exposureRange = if (supported) {
+                exposure.exposureCompensationRange.lower..exposure.exposureCompensationRange.upper
+            } else {
+                0..0
+            },
+            exposureStep = if (supported) exposure.exposureCompensationStep.toFloat() else 0f,
+            hasFlash = info.hasFlashUnit(),
+            supportsFocusPoint = info.isFocusMeteringSupported(FocusMeteringAction.Builder(center).build()),
+        )
+    }
+
     private fun analyze(current: Binding, image: ImageProxy) {
         val frame = CloseOnceImageProxy(image)
         try {
@@ -433,12 +588,23 @@ class CameraXController(
 
     private fun publishCapabilities() {
         val plan = zoomPlan ?: return
-        _capabilities.value =
-            CameraCapabilities(plan.minZoom, plan.maxZoom, cameraZoomStops(plan.minZoom, plan.maxZoom))
+        val controls = controls
+        _capabilities.value = CameraCapabilities(
+            minZoom = plan.minZoom,
+            maxZoom = plan.maxZoom,
+            zoomStops = cameraZoomStops(plan.minZoom, plan.maxZoom),
+            exposureRange = controls?.exposureRange ?: 0..0,
+            exposureStep = controls?.exposureStep ?: 0f,
+            hasFlash = controls?.hasFlash ?: false,
+            // A viewport crops any ratio out of the sensor's 4:3, so every phone can bind all three.
+            aspectRatios = AspectRatio.entries,
+            supportsFocusPoint = controls?.supportsFocusPoint ?: false,
+        )
     }
 
     private fun publishZoom(current: Binding, state: ZoomState) {
         _zoom.value = current.range?.appZoom(state.zoomRatio) ?: return
+        _state.update { it.copy(zoom = _zoom.value) }
     }
 
     private fun refreshStatus(current: Binding) {
@@ -512,13 +678,27 @@ class CameraXController(
         var capturesInFlight = 0
         var lifecycleObserver: LifecycleEventObserver? = null
         var zoomObserver: Observer<ZoomState>? = null
-        var stateObserver: Observer<CameraState>? = null
+        var stateObserver: Observer<CameraXState>? = null
         var open = false
         var failed = false
         var restoreZoomOnOpen = true
         var restoringZoom = false
         var zoomRequestId = 0L
+
+        // The ratio this binding's viewport was built with.
+        var aspect = AspectRatio.R4_3
+
+        // Whether the retained exposure index was applied since the camera last opened.
+        var exposureRestored = false
     }
+
+    /** The primary rear camera's controls besides zoom (Design 2.3). */
+    private class Controls(
+        val exposureRange: IntRange,
+        val exposureStep: Float,
+        val hasFlash: Boolean,
+        val supportsFocusPoint: Boolean,
+    )
 
     /** The sink owns its call's frame, but an omitted close or thrown exception cannot stall CameraX. */
     private class CloseOnceImageProxy(private val delegate: ImageProxy) : ImageProxy by delegate {
@@ -531,5 +711,19 @@ class CameraXController(
 
     private companion object {
         const val TAG = "PixCamera"
+
+        /**
+         * The analysis buffer, which the viewport then crops: 960×720 for 4:3 and 720×720 for 1:1, and 1280×960
+         * for 16:9 so its crop is 1280×720 (Design 2.6.4).
+         */
+        fun analysisSize(ratio: AspectRatio): Size =
+            if (ratio == AspectRatio.R16_9) Size(1280, 960) else Size(960, 720)
+
+        val FlashMode.captureMode: Int
+            get() = when (this) {
+                FlashMode.OFF -> ImageCapture.FLASH_MODE_OFF
+                FlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO
+                FlashMode.ON -> ImageCapture.FLASH_MODE_ON
+            }
     }
 }

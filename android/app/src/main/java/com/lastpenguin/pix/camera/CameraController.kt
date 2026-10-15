@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -8,6 +8,13 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+
+/** The frame's shape (FR-1.13, AD-10), named as on a phone camera; the portrait frame is 3:4, 9:16, or 1:1. */
+enum class AspectRatio { R4_3, R16_9, R1_1 }
+
+/** FR-1.12. */
+enum class FlashMode { OFF, AUTO, ON }
 
 /** Supported zoom in primary-rear-camera units (1x). Sent to the subject in `camera.capabilities`. */
 @Serializable
@@ -16,6 +23,24 @@ data class CameraCapabilities(
     val maxZoom: Float,
     /** Subject-side zoom stops, e.g. [0.5, 0.6, 1, 2, 3], filtered to [minZoom, maxZoom]. */
     val zoomStops: List<Float>,
+    // The controls below are not sent yet: their place in `camera.capabilities` comes with the remote controls
+    // (Design 2.5.1, #57), so the subject reads their defaults until then.
+    /** Exposure-compensation indexes; 0..0 when the camera has none (FR-1.11). */
+    @Transient val exposureRange: IntRange = 0..0,
+    /** EV per index step. */
+    @Transient val exposureStep: Float = 0f,
+    @Transient val hasFlash: Boolean = false,
+    /** The ratios this phone can bind; always contains [AspectRatio.R4_3]. */
+    @Transient val aspectRatios: List<AspectRatio> = listOf(AspectRatio.R4_3),
+    @Transient val supportsFocusPoint: Boolean = false,
+)
+
+/** The applied camera values in one place (Design 2.3), which the photographer echoes to the subject. */
+data class CameraState(
+    val zoom: Float,
+    val exposure: Int = 0,
+    val flash: FlashMode = FlashMode.OFF,
+    val aspect: AspectRatio = AspectRatio.R4_3,
 )
 
 /**
@@ -40,16 +65,31 @@ interface CameraController {
 
     val capabilities: StateFlow<CameraCapabilities?>
 
+    /** Applied zoom, exposure, flash, and aspect ratio in one value. */
+    val state: StateFlow<CameraState>
+
     /** Zoom ratio actually applied, relative to the primary rear camera across any lens switch. */
     val zoom: StateFlow<Float>
 
-    /** Binds Preview, ImageCapture, and ImageAnalysis with one 3:4 viewport (AD-10). */
+    /** Binds Preview, ImageCapture, and ImageAnalysis with one viewport of the chosen aspect ratio (AD-10). */
     fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider)
 
     /** Primary-relative ratio, clamped to [CameraCapabilities.minZoom, CameraCapabilities.maxZoom]. */
     fun setZoom(ratio: Float)
 
-    /** Full resolution to Pictures/Pix, never with the guide (FR-1.5). */
+    /** Focuses and meters at a point of the frame, 0..1 from its top-left corner (FR-1.4). */
+    fun setFocusPoint(x: Float, y: Float)
+
+    /** Exposure-compensation index, clamped to [CameraCapabilities.exposureRange] (FR-1.11). */
+    fun setExposure(index: Int)
+
+    /** Ignored when [CameraCapabilities.hasFlash] is false (FR-1.12). */
+    fun setFlash(mode: FlashMode)
+
+    /** Rebinds the use cases with a viewport of [ratio], after any photo being saved (FR-1.13). */
+    fun setAspectRatio(ratio: AspectRatio)
+
+    /** Full resolution in the chosen aspect ratio to Pictures/Pix, never with the guide (FR-1.5). */
     suspend fun takePhoto(): Result<Uri>
 
     /**

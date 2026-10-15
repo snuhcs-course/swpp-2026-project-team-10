@@ -6,9 +6,12 @@ import android.net.Uri
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.FOUR_TEMPLATES
@@ -438,10 +441,19 @@ class GenerationViewModelTest {
         override val status = MutableStateFlow(CameraStatus.READY)
         override val capabilities = MutableStateFlow<CameraCapabilities?>(null)
         override val zoom = MutableStateFlow(1f)
+        override val state = MutableStateFlow(CameraState(zoom = 1f))
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
 
         override fun setZoom(ratio: Float) = Unit
+
+        override fun setFocusPoint(x: Float, y: Float) = Unit
+
+        override fun setExposure(index: Int) = Unit
+
+        override fun setFlash(mode: FlashMode) = Unit
+
+        override fun setAspectRatio(ratio: AspectRatio) = Unit
 
         override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())
 

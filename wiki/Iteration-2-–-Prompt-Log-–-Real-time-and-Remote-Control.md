@@ -36,3 +36,14 @@ Questions asked while #74 was in review; no code was changed.
 - [Sungmin, 10-14] "(pasted a teammate's comment on #55 and #56: the invite link cannot open the app directly without HTTPS, so a static page with buttons; TURN cannot run on the course servers, so Cloudflare TURN) Is this right?"
 - [Sungmin, 10-14] "So does streaming across networks work or not?"
 - [Sungmin, 10-14] "So if the server is reachable only from inside the school, is it impossible?"
+
+## Join with code keeps the previous room's code (#81)
+
+**Issue and fix (10/15)**
+
+- [Sungmin, 10-15] "I want to open a new issue for a bug: the code you type to join another room does not seem to reset. Write it in the format of #47 (pasted), so I can paste it in; I'll post it myself."
+- [Sungmin, 10-15] "The title should be like \"[Iter2-A2] Move live preview room sessions to Redis\"."
+- [Sungmin, 10-15] "`dev` has new commits: pull it, make a new branch, and fix this issue."
+- [Sungmin, 10-15] "Push it."
+- [Sungmin, 10-15] "Write the PR body."
+- [Sungmin, 10-15] "Add the prompt log and the AI collaboration report entries too, and push."

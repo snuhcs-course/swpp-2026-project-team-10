@@ -80,6 +80,9 @@ class CameraXController(
     private var retainedExposure = 0
     private var flash = FlashMode.OFF
 
+    // Whether the bound lens has a flash; a separately exposed ultrawide may not.
+    private var lensHasFlash = true
+
     // CameraX resets ZoomState when its lifecycle stops. Preserve only a successfully applied
     // request separately, so that the reset is still published without replacing the user's framing.
     private var retainedZoom = 1f
@@ -118,6 +121,7 @@ class CameraXController(
                     current.restoringZoom = false
                     current.zoomRequestId++
                     current.exposureRestored = false
+                    current.restoringExposure = false
                     pendingZoom = null
                     current.frames.clear()
                     refreshStatus(current)
@@ -252,8 +256,12 @@ class CameraXController(
         val selector = if (current.lens == ZoomLens.PRIMARY) primarySelector else checkNotNull(ultrawideSelector)
         val camera = cameraProvider.bindToLifecycle(current.owner, selector, group)
         current.camera = camera
-        // A separately exposed ultrawide may have no flash of its own.
-        if (!camera.cameraInfo.hasFlashUnit()) capture.flashMode = ImageCapture.FLASH_MODE_OFF
+        // A separately exposed ultrawide may have no flash of its own: while it is bound the flash is unavailable,
+        // and the chosen mode comes back with the primary camera.
+        lensHasFlash = camera.cameraInfo.hasFlashUnit()
+        if (!lensHasFlash) capture.flashMode = ImageCapture.FLASH_MODE_OFF
+        publishCapabilities()
+        _state.update { it.copy(flash = appliedFlash()) }
         current.zoomObserver = Observer { state ->
             if (binding === current) publishZoom(current, state)
         }
@@ -485,13 +493,16 @@ class CameraXController(
 
     override fun setFlash(mode: FlashMode) {
         mainExecutor.execute {
-            if (controls?.hasFlash != true) return@execute
+            // The capabilities report no flash while a lens without one is bound.
+            if (controls?.hasFlash != true || !lensHasFlash) return@execute
             flash = mode
-            val current = binding
-            if (current?.camera?.cameraInfo?.hasFlashUnit() == true) current.capture?.flashMode = mode.captureMode
-            _state.update { it.copy(flash = mode) }
+            binding?.capture?.flashMode = mode.captureMode
+            _state.update { it.copy(flash = appliedFlash()) }
         }
     }
+
+    /** The flash mode photos are taken with: the chosen one, or off on a lens without a flash. */
+    private fun appliedFlash(): FlashMode = if (lensHasFlash) flash else FlashMode.OFF
 
     override fun setAspectRatio(ratio: AspectRatio) {
         mainExecutor.execute {
@@ -513,29 +524,37 @@ class CameraXController(
         startBinding(current.owner, current.surfaceProvider)
     }
 
-    /** Applies the retained exposure index once each time the camera opens; CameraX starts it at 0. */
+    /**
+     * Applies the retained exposure index once each time the camera opens, because CameraX opens every camera at
+     * 0 EV. The camera stays STARTING until it is applied, so no photo is taken at the reset value.
+     */
     private fun restoreExposureIfNeeded(current: Binding) {
         if (!current.open || current.failed) {
             current.exposureRestored = false
+            current.restoringExposure = false
             return
         }
         if (current.exposureRestored) return
         current.exposureRestored = true
-        if (current.camera?.cameraInfo?.exposureState?.exposureCompensationIndex != retainedExposure) {
-            applyExposure(current, retainedExposure)
-        }
+        if (retainedExposure == 0) return
+        current.restoringExposure = true
+        applyExposure(current, retainedExposure)
     }
 
     private fun applyExposure(current: Binding, index: Int) {
-        val camera = current.camera ?: return
-        val exposure = camera.cameraInfo.exposureState
-        if (!exposure.isExposureCompensationSupported) return
+        val camera = current.camera
+        val exposure = camera?.cameraInfo?.exposureState
+        if (camera == null || exposure == null || !exposure.isExposureCompensationSupported) {
+            finishExposureRestore(current)
+            return
+        }
         // The bound lens may be an ultrawide with a narrower range than the primary camera's.
         val bounded = index.coerceIn(exposure.exposureCompensationRange.lower, exposure.exposureCompensationRange.upper)
         val future = try {
             camera.cameraControl.setExposureCompensationIndex(bounded)
         } catch (error: Exception) {
             Log.w(TAG, "Exposure request could not start", error)
+            finishExposureRestore(current)
             return
         }
         future.addListener({
@@ -547,7 +566,14 @@ class CameraXController(
                 Log.d(TAG, "Exposure request ended without applying", error)
             }
             _state.update { it.copy(exposure = camera.cameraInfo.exposureState.exposureCompensationIndex) }
+            finishExposureRestore(current)
         }, mainExecutor)
+    }
+
+    private fun finishExposureRestore(current: Binding) {
+        if (!current.restoringExposure) return
+        current.restoringExposure = false
+        refreshStatus(current)
     }
 
     private fun discoverControls(cameraProvider: ProcessCameraProvider) {
@@ -595,7 +621,8 @@ class CameraXController(
             zoomStops = cameraZoomStops(plan.minZoom, plan.maxZoom),
             exposureRange = controls?.exposureRange ?: 0..0,
             exposureStep = controls?.exposureStep ?: 0f,
-            hasFlash = controls?.hasFlash ?: false,
+            // Not on a separately exposed ultrawide without a flash of its own.
+            hasFlash = controls?.hasFlash == true && lensHasFlash,
             // A viewport crops any ratio out of the sensor's 4:3, so every phone can bind all three.
             aspectRatios = AspectRatio.entries,
             supportsFocusPoint = controls?.supportsFocusPoint ?: false,
@@ -612,7 +639,7 @@ class CameraXController(
         _status.value = when {
             !current.owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) -> CameraStatus.IDLE
             current.failed -> CameraStatus.UNAVAILABLE
-            current.restoringZoom || current.restoreZoomOnOpen -> CameraStatus.STARTING
+            current.restoringZoom || current.restoreZoomOnOpen || current.restoringExposure -> CameraStatus.STARTING
             current.open && current.frames.hasFrame() -> CameraStatus.READY
             else -> CameraStatus.STARTING
         }
@@ -688,8 +715,9 @@ class CameraXController(
         // The ratio this binding's viewport was built with.
         var aspect = AspectRatio.R4_3
 
-        // Whether the retained exposure index was applied since the camera last opened.
+        // Whether the retained exposure index was applied since the camera last opened, and whether that is pending.
         var exposureRestored = false
+        var restoringExposure = false
     }
 
     /** The primary rear camera's controls besides zoom (Design 2.3). */

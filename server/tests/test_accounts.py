@@ -574,6 +574,20 @@ def test_spent_tokens_are_forgotten_once_they_would_have_expired(client, clock):
     assert refresh(client, fourth["refreshToken"]).status_code == 200
 
 
+def test_a_token_spent_long_ago_is_forgotten_even_before_a_refresh_prunes_it(client, clock):
+    day = 86400
+    first = sign_up_with_tokens(client)
+    clock.advance(20 * day)
+    second = refresh(client, first["refreshToken"]).json()
+    clock.advance(20 * day)
+    third = refresh(client, second["refreshToken"]).json()
+    clock.advance(20 * day)
+    # No refresh since day 40, so the first token, spent on day 20, is still stored; it is 40 days old, so it no
+    # longer ends the session, which lasts until day 70.
+    assert_error(refresh(client, first["refreshToken"]), 401, "INVALID_REFRESH_TOKEN")
+    assert refresh(client, third["refreshToken"]).status_code == 200
+
+
 def test_sign_out_ends_the_refresh_token_of_this_phone_only(client):
     phone = sign_up_with_tokens(client)
     other_phone = log_in(client, "dongje.p").json()

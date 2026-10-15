@@ -215,8 +215,11 @@ async def refresh(body: RefreshRequest, request: Request, db: Database) -> Token
         )
     ).first()
     if rotated is None:
-        # A spent token ends its session, and so does an expired current one; an unknown token changes nothing.
-        spent = select(SpentRefreshToken.session_id).where(SpentRefreshToken.token_hash == presented)
+        # A spent token ends its session, and so does an expired current one; an unknown token changes nothing. A
+        # token spent longer ago than a session lasts is forgotten, whether or not a refresh has pruned it yet.
+        spent = select(SpentRefreshToken.session_id).where(
+            SpentRefreshToken.token_hash == presented, SpentRefreshToken.spent_at >= now - ttl
+        )
         await db.execute(
             delete(AuthSession).where(or_(AuthSession.id.in_(spent), AuthSession.refresh_hash == presented))
         )

@@ -130,7 +130,7 @@ The endpoints, request and response bodies, and error codes are in Design §2.5.
 | `PUT /me/google` | `{"idToken"}` → the account, which now signs in with Google too (`409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`). |
 | `PUT /me/password` | `{"password"}` → the account of a Google sign-up, which now signs in with its Pix ID and this password too (`403 PIX_ID_REQUIRED` before it has a Pix ID, `409 PASSWORD_ALREADY_SET`). Changing a password is not offered, and there is no email or password reset. |
 | `DELETE /auth/session` | Ends this phone's sign-in: its refresh token stops working and its device token is deleted. Its access token works until it expires, at most 15 minutes later. |
-| `GET /me`, `PUT /me` | The account, with `hasPassword` and `hasGoogle`; `PUT` sets `pixId`, `displayName`, or both. |
+| `GET /me`, `PUT /me` | The account, with `hasPassword` and `hasGoogle`; `PUT` sets `pixId`, `displayName`, or both. A password account changes its Pix ID only with its current `password`, which the new Pix ID must not equal (`401 INVALID_CREDENTIALS`, `400 PIX_ID_INVALID`). |
 | `POST /devices` | `{"fcmToken","platform":"android"}` → `204`. |
 | `POST /users/lookup` | `{"pixId"}` → `{"user","relation","requestId"}` for an exact Pix ID, or `404 NOT_FOUND`. |
 | `GET /friend-requests`, `POST /friend-requests`, `POST /friend-requests/{id}/accept`, `…/decline`, `DELETE /friend-requests/{id}` | Received and sent requests; send (`201`, or `200` with the new friend when the other user had already asked); accept; decline; withdraw. |

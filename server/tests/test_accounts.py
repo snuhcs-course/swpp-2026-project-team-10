@@ -11,7 +11,8 @@ Partitions:
 - adding Google to an account: the not-registered flow; the same Google again; a Google account another Pix account
   uses; a second Google account
 - adding a password to a Google account: valid; before a Pix ID; breaking a rule; an account that has one
-- PUT /me: Pix ID for a Google account; invalid or taken Pix ID; display name only; the changed Pix ID as login name
+- PUT /me: Pix ID for a Google account; invalid or taken Pix ID; display name only; the changed Pix ID as login name;
+  a password account's change without its password, with a wrong one, and to the password itself in any case
 - access token: missing, wrong scheme, not a JWT; signed with another secret, with "none", or changed after signing;
   another issuer; a claim missing; an unknown user; just before and at its 15 minutes; the secret unset
 - refresh token: valid (rotated); unknown; empty; exchanged before, or several rotations before (ends the session);
@@ -359,7 +360,8 @@ def test_google_account_chooses_its_pix_id(client):
 def test_rejected_pix_id_keeps_the_old_one(client, sign_up, pix_id, status, code):
     sign_up("taken.id")
     headers, _ = sign_up("dongje.p")
-    assert_error(client.put("/api/v1/me", headers=headers, json={"pixId": pix_id}), status, code)
+    response = client.put("/api/v1/me", headers=headers, json={"pixId": pix_id, "password": PASSWORD})
+    assert_error(response, status, code)
     assert client.get("/api/v1/me", headers=headers).json()["pixId"] == "dongje.p"
 
 
@@ -373,9 +375,26 @@ def test_put_me_changes_only_the_display_name_when_the_pix_id_is_left_out_or_the
 
 def test_changed_pix_id_is_the_new_log_in_name(client, sign_up):
     headers, _ = sign_up("dongje.p")
-    client.put("/api/v1/me", headers=headers, json={"pixId": "dongje.park"})
+    response = client.put("/api/v1/me", headers=headers, json={"pixId": "dongje.park", "password": PASSWORD})
+    assert response.json()["pixId"] == "dongje.park"
     assert_error(log_in(client, "dongje.p"), 401, "INVALID_CREDENTIALS")
     assert log_in(client, "dongje.park").status_code == 200
+
+
+@pytest.mark.parametrize("password", [None, "sunset2027"])
+def test_password_account_changes_its_pix_id_only_with_its_password(client, sign_up, password):
+    headers, _ = sign_up("dongje.p")
+    body = {"pixId": "dongje.park"} | ({"password": password} if password else {})
+    assert_error(client.put("/api/v1/me", headers=headers, json=body), 401, "INVALID_CREDENTIALS")
+    assert client.get("/api/v1/me", headers=headers).json()["pixId"] == "dongje.p"
+
+
+@pytest.mark.parametrize("password", ["sunset2026", "Sunset2026"])
+def test_pix_id_cannot_become_the_password(client, sign_up, password):
+    headers, _ = sign_up("dongje.p", password=password)
+    response = client.put("/api/v1/me", headers=headers, json={"pixId": "sunset2026", "password": password})
+    assert "same as the password" in assert_error(response, 400, "PIX_ID_INVALID")
+    assert client.get("/api/v1/me", headers=headers).json()["pixId"] == "dongje.p"
 
 
 # --- session tokens ------------------------------------------------------------------------------------------------

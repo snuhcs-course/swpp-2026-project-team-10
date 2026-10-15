@@ -53,6 +53,8 @@ class PasswordRequest(BaseModel):
 class AccountUpdate(BaseModel):
     pixId: str | None = None
     displayName: DisplayName | None = None
+    # The current password, which a password account sends to change its Pix ID.
+    password: str | None = None
 
 
 class DeviceRequest(BaseModel):
@@ -234,11 +236,19 @@ async def me(caller: SignedIn) -> AccountOut:
 
 
 @router.put("/me")
-async def update_me(body: AccountUpdate, caller: SignedIn, db: Database) -> AccountOut:
-    """Sets the Pix ID, the display name, or both. A password account signs in with its new Pix ID afterwards."""
+async def update_me(body: AccountUpdate, request: Request, caller: SignedIn, db: Database) -> AccountOut:
+    """Sets the Pix ID, the display name, or both. A password account signs in with its new Pix ID afterwards, so
+    changing it takes the current password; with the password in hand, the new Pix ID is checked against it, as at
+    sign-up, which a hash alone could not do (FR-5.11)."""
     user = caller.user
     if body.pixId is not None and body.pixId != user.pix_id:
         check_pix_id(body.pixId)
+        if user.password_hash is not None:
+            passwords: Passwords = request.app.state.passwords
+            if body.password is None or not await passwords.verify(user.password_hash, body.password):
+                raise ApiError(401, "INVALID_CREDENTIALS", "Enter the current password to change the Pix ID")
+            if body.password.lower() == body.pixId.lower():
+                raise ApiError(400, "PIX_ID_INVALID", "A Pix ID must not be the same as the password")
         user.pix_id = body.pixId
     if body.displayName is not None:
         user.display_name = body.displayName

@@ -401,7 +401,7 @@ interface AuthRepository {                               // It 2 (FR-5.1–5.3, 
     suspend fun signUpWithGoogle(idToken: String): Result<AccountSession>   // a new account; the Pix ID comes next
     suspend fun addGoogle(idToken: String): Result<AccountSession>   // fails with GOOGLE_IN_USE or GOOGLE_ALREADY_ADDED
     suspend fun addPassword(password: String): Result<AccountSession>   // a Google account with a Pix ID; PasswordError
-    suspend fun setPixId(pixId: String): Result<AccountSession>   // fails with PixIdError.TAKEN or INVALID
+    suspend fun setPixId(pixId: String, password: String? = null): Result<AccountSession>   // TAKEN or INVALID; a password account changing it sends its password
     suspend fun signOut()
 }
 
@@ -1244,7 +1244,7 @@ Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteratio
 | `POST /auth/google` (It 2) | Verify a Google ID token and sign in the account that uses it; return an access and a refresh token | `401 INVALID_TOKEN`, `404 NOT_REGISTERED`, `503 UNAVAILABLE` |
 | `POST /auth/google/signup` (It 2) | Create an account for a Google account that no account uses, without a Pix ID yet (FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `503 UNAVAILABLE` |
 | `DELETE /auth/session` (It 2, auth) | Sign this phone out: its refresh token stops working and its device token is deleted; the access token works until it expires, at most 15 minutes later, and the app deletes both | — |
-| `GET /me`, `PUT /me` (It 2, auth) | The user's own account, with the ways it signs in; `PUT` sets the Pix ID, the display name, or both | `409 PIX_ID_TAKEN`, `400 PIX_ID_INVALID` |
+| `GET /me`, `PUT /me` (It 2, auth) | The user's own account, with the ways it signs in; `PUT` sets the Pix ID, the display name, or both | `409 PIX_ID_TAKEN`, `400 PIX_ID_INVALID`, `401 INVALID_CREDENTIALS` |
 | `PUT /me/google` (It 2, auth) | Add a Google account, so the account signs in with either (FR-5.12, FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`, `503 UNAVAILABLE` |
 | `PUT /me/password` (It 2, auth) | Add a password to an account made with Google, so it signs in with its Pix ID too (FR-5.14) | `400 PASSWORD_INVALID`, `403 PIX_ID_REQUIRED`, `409 PASSWORD_ALREADY_SET` |
 | `POST /devices` (It 2, auth) | Register or refresh the FCM device token | — |
@@ -1371,8 +1371,8 @@ The server checks the ID token's signature against Google's published keys, whic
 <summary><code>PUT /me</code> · It 2 · auth</summary>
 
 ```jsonc
-// request; either field may be left out
-{ "pixId": "dongje.p", "displayName": "Dongje" }
+// request; either field may be left out, and "password" is needed only to change a password account's Pix ID
+{ "pixId": "dongje.p", "displayName": "Dongje", "password": "sunset2026" }
 
 // response 200; GET /me answers the same
 { "id": "u_01HZ", "pixId": "dongje.p", "displayName": "Dongje", "hasPassword": true, "hasGoogle": false }
@@ -1381,7 +1381,7 @@ The server checks the ID token's signature against Google's published keys, whic
 { "error": { "code": "PIX_ID_TAKEN", "message": "This Pix ID is taken" } }
 ```
 
-The rule is 4–20 characters of `a–z`, `0–9`, `.`, `_` (FR-5.2); `PIX_ID_INVALID` names the broken rule (FR-5.3), and a rejected Pix ID leaves the old one. A password account signs in with its new Pix ID afterwards.
+The rule is 4–20 characters of `a–z`, `0–9`, `.`, `_` (FR-5.2); `PIX_ID_INVALID` names the broken rule (FR-5.3), and a rejected Pix ID leaves the old one. A password account signs in with its Pix ID, so changing it takes the current `password`: without it, or with a wrong one, the answer is `401 INVALID_CREDENTIALS`, and a new Pix ID that is the password, in any case, is `400 PIX_ID_INVALID` (FR-5.11; added in review of #78). Setting the first Pix ID of a Google account, sending the same Pix ID again, and changing only the display name need no password.
 
 </details>
 

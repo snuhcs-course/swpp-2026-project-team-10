@@ -91,6 +91,19 @@ async def pending(db: AsyncSession, sender: str, receiver: str) -> FriendRequest
     )
 
 
+async def take_request(db: AsyncSession, *conditions) -> FriendRequest | None:
+    """Deletes the request that matches and returns what it was, in one statement. Accepting, declining, and
+    withdrawing all take the request this way, so of two at the same moment only one finds it."""
+    row = (
+        await db.execute(
+            delete(FriendRequest)
+            .where(*conditions)
+            .returning(FriendRequest.id, FriendRequest.from_user_id, FriendRequest.to_user_id)
+        )
+    ).first()
+    return FriendRequest(id=row.id, from_user_id=row.from_user_id, to_user_id=row.to_user_id) if row else None
+
+
 async def befriend(request: Request, db: AsyncSession, me: str, other: User) -> NewFriend:
     """Makes the two friends and removes the requests between them. The friendship is inserted unless it exists, in
     one statement, so two requests that accept at the same moment both succeed."""
@@ -180,10 +193,11 @@ async def send_friend_request(
         raise ApiError(409, "ALREADY_FRIENDS", "You are already friends")
     if await pending(db, me, other.id) is not None:
         raise ApiError(409, "ALREADY_REQUESTED", "You have already sent a request to this user")
-    if await pending(db, other.id, me) is not None:
+    other_id = other.id
+    # Taking their request, rather than reading it, keeps a withdrawal at the same moment from being overridden.
+    if await take_request(db, FriendRequest.from_user_id == other_id, FriendRequest.to_user_id == me) is not None:
         response.status_code = 200
         return await befriend(request, db, me, other)
-    other_id = other.id
     user_a, user_b = ordered(me, other_id)
     sent = FriendRequest(
         id=new_id("fr"),
@@ -201,41 +215,39 @@ async def send_friend_request(
         # asked at once: theirs is accepted, as if it had been there first.
         await db.rollback()
         other = await db.get(User, other_id)
-        if await pending(db, other_id, me) is not None:
+        if await take_request(db, FriendRequest.from_user_id == other_id, FriendRequest.to_user_id == me) is not None:
             response.status_code = 200
             return await befriend(request, db, me, other)
         raise ApiError(409, "ALREADY_REQUESTED", "You have already sent a request to this user") from exc
     return OutgoingRequest(id=sent.id, to=UserOut.of(other), createdAt=millis(sent.created_at))
 
 
-async def received_request(db: AsyncSession, request_id: str, me: str) -> FriendRequest:
-    found = await db.get(FriendRequest, request_id)
-    if found is None or found.to_user_id != me:
-        raise ApiError(404, "NOT_FOUND", "No pending friend request with this id")
-    return found
+def no_such_request() -> ApiError:
+    return ApiError(404, "NOT_FOUND", "No pending friend request with this id")
 
 
 @router.post("/friend-requests/{request_id}/accept")
 async def accept_friend_request(request_id: str, request: Request, caller: Member, db: Database) -> NewFriend:
-    found = await received_request(db, request_id, caller.user.id)
-    sender = await db.get(User, found.from_user_id)
-    return await befriend(request, db, caller.user.id, sender)
+    me = caller.user.id
+    taken = await take_request(db, FriendRequest.id == request_id, FriendRequest.to_user_id == me)
+    if taken is None:
+        raise no_such_request()
+    return await befriend(request, db, me, await db.get(User, taken.from_user_id))
 
 
 @router.post("/friend-requests/{request_id}/decline", status_code=204)
 async def decline_friend_request(request_id: str, caller: Member, db: Database) -> None:
     """The request is deleted, so the sender can ask again later (US-8)."""
-    await db.delete(await received_request(db, request_id, caller.user.id))
+    if await take_request(db, FriendRequest.id == request_id, FriendRequest.to_user_id == caller.user.id) is None:
+        raise no_such_request()
     await db.commit()
 
 
 @router.delete("/friend-requests/{request_id}", status_code=204)
 async def cancel_friend_request(request_id: str, caller: Member, db: Database) -> None:
     """The sender withdraws a request that has not been answered."""
-    found = await db.get(FriendRequest, request_id)
-    if found is None or found.from_user_id != caller.user.id:
-        raise ApiError(404, "NOT_FOUND", "No pending friend request with this id")
-    await db.delete(found)
+    if await take_request(db, FriendRequest.id == request_id, FriendRequest.from_user_id == caller.user.id) is None:
+        raise no_such_request()
     await db.commit()
 
 

@@ -9,16 +9,19 @@ Partitions:
   asked (accepted instead)
 - answer: accept or decline by the receiver; by the sender; an unknown or answered request; withdraw by the sender or
   by the receiver; ask again after a decline; accept a request for a pair who are already friends; requests saved at
-  once, to each other (accepted) or the same one twice (saved once)
+  once, to each other (accepted) or the same one twice (saved once); accepting at the moment the request is withdrawn
+  or declined (one of the two happens)
 - friend list: empty, one, several (ordered by name), both directions
 - remove: a friend, both directions, twice, with a pending request, and adding again
 - presence: no socket; a signed-in socket; in a room; an anonymous, invalid-token, or expired-token socket; two
   sockets, one closed
 """
 
+import asyncio
 import time
 from datetime import UTC, datetime
 
+import httpx2
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -360,18 +363,19 @@ def test_one_request_at_most_between_two_users(client, two, first):
 
 
 def checks_before_the_other_save(monkeypatch):
-    """Makes a request's two checks for a pending request see none, as if they ran just before another request
-    between the same two users was saved; later checks see the database as it is."""
-    original = friends_module.pending
-    stale = [True, True]
+    """Makes a request's first look for a request it sent and first try to take one sent to it find nothing, as if
+    they ran just before another request between the same two users was saved; later calls see the database."""
+    for name in ("pending", "take_request"):
+        original = getattr(friends_module, name)
+        stale = [True]
 
-    async def pending(db, sender, receiver):
-        if stale:
-            stale.pop()
-            return None
-        return await original(db, sender, receiver)
+        async def first_misses(*args, original=original, stale=stale):
+            if stale:
+                stale.pop()
+                return None
+            return await original(*args)
 
-    monkeypatch.setattr(friends_module, "pending", pending)
+        monkeypatch.setattr(friends_module, name, first_misses)
 
 
 def test_requests_sent_to_each_other_at_once_make_the_two_friends(client, two, monkeypatch):
@@ -394,3 +398,33 @@ def test_the_same_request_sent_twice_at_once_is_saved_once(client, two, monkeypa
     checks_before_the_other_save(monkeypatch)
     assert_error(request_friend(client, dongje, junhyeong_user), 409, "ALREADY_REQUESTED")
     assert [item["id"] for item in requests_of(client, junhyeong)["incoming"]] == ["fr_FIRST"]
+
+
+def at_once(client, *calls):
+    """Sends requests to the app at the same moment and returns the answers in order. Each call is
+    `(method, path, headers)`."""
+
+    async def send():
+        transport = httpx2.ASGITransport(app=client.app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://pix") as http:
+            return await asyncio.gather(
+                *(http.request(method, path, headers=headers) for method, path, headers in calls)
+            )
+
+    return client.portal.call(send)
+
+
+@pytest.mark.parametrize("other", ["withdraw", "decline"])
+def test_accepting_at_the_moment_the_request_is_withdrawn_or_declined_does_one_of_the_two(client, two, other):
+    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
+    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    second = (
+        ("DELETE", f"/api/v1/friend-requests/{request_id}", dongje)
+        if other == "withdraw"
+        else ("POST", f"/api/v1/friend-requests/{request_id}/decline", junhyeong)
+    )
+    accepted, ended = at_once(client, ("POST", f"/api/v1/friend-requests/{request_id}/accept", junhyeong), second)
+    assert sorted([accepted.status_code, ended.status_code]) in ([200, 404], [204, 404])
+    expected = [offline(junhyeong_user)] if accepted.status_code == 200 else []
+    assert friends_of(client, dongje) == expected
+    assert requests_of(client, junhyeong)["incoming"] == []

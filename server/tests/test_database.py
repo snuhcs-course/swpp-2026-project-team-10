@@ -5,7 +5,7 @@ PIX_TEST_DATABASE_URL names.
 Partitions:
 - migrate: an empty database; one already at the newest revision (data kept); two workers starting at once
 - schema: matches the models; a user with no way to sign in; a second user with the same Pix ID or Google account;
-  several users without a Pix ID
+  several users without a Pix ID; a second device for one session
 - times: read back with their zone
 """
 
@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from pix_server.db import migrate, open_database
-from pix_server.db.models import Base, User, new_id
+from pix_server.db.models import AuthSession, Base, Device, User, new_id
 
 NOW = datetime(2026, 10, 15, 4, 30, tzinfo=UTC)
 
@@ -100,3 +100,26 @@ async def test_times_are_read_back_in_utc(engine):
         created = (await connection.execute(select(User.created_at))).scalar_one()
     assert created == NOW
     assert created.tzinfo is not None
+
+
+async def test_a_session_has_one_device_at_most(engine):
+    await migrate(engine)
+    await save(engine, user(id="u_1"))
+    async with engine.begin() as connection:
+        await connection.execute(
+            AuthSession.__table__.insert().values(
+                id="ses_1", user_id="u_1", refresh_hash="hash", created_at=NOW, expires_at=NOW
+            )
+        )
+        await connection.execute(
+            Device.__table__.insert().values(
+                id="d_1", user_id="u_1", session_id="ses_1", fcm_token="fcm-1", platform="android", updated_at=NOW
+            )
+        )
+    with pytest.raises(IntegrityError):
+        async with engine.begin() as connection:
+            await connection.execute(
+                Device.__table__.insert().values(
+                    id="d_2", user_id="u_1", session_id="ses_1", fcm_token="fcm-2", platform="android", updated_at=NOW
+                )
+            )

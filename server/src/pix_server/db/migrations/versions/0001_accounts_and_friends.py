@@ -76,9 +76,9 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_devices")),
         sa.UniqueConstraint("fcm_token", name=op.f("uq_devices_fcm_token")),
+        sa.UniqueConstraint("session_id", name=op.f("uq_devices_session_id")),
     )
     op.create_index(op.f("ix_devices_user_id"), "devices", ["user_id"])
-    op.create_index(op.f("ix_devices_session_id"), "devices", ["session_id"])
     op.create_table(
         "friend_requests",
         sa.Column("id", sa.String(), nullable=False),

@@ -1441,7 +1441,7 @@ Exact match only; no partial search or listing (FR-5.5, NFR-15). Capitals and sp
 // DELETE /friend-requests/fr_77       → 204   (the sender withdraws it)
 ```
 
-The receiver gets an FCM push `friend.request` and sees it under received requests (FR-5.7); **TODO** Iter2-P15: the push is sent once the server has its FCM sender. A declined or withdrawn request is deleted and can be sent again later (US-8). Only the receiver can accept or decline, and only the sender can withdraw; anyone else, and a request already answered, get `404 NOT_FOUND`. Sending a request to oneself is `400 INVALID_REQUEST`. `createdAt` is in milliseconds since the epoch.
+The receiver gets an FCM push `friend.request` and sees it under received requests (FR-5.7); **TODO** Iter2-P15: the push is sent once the server has its FCM sender. A declined or withdrawn request is deleted and can be sent again later (US-8). Only the receiver can accept or decline, and only the sender can withdraw; anyone else, and a request already answered, get `404 NOT_FOUND`. Each of these, and a request that accepts the other user's, takes the request with one `DELETE … RETURNING`, so of two at the same moment only one succeeds: an accept and a withdrawal at once never leave the two as friends after the request was withdrawn. Sending a request to oneself is `400 INVALID_REQUEST`. `createdAt` is in milliseconds since the epoch.
 
 </details>
 
@@ -1627,7 +1627,7 @@ erDiagram
   devices {
     text id PK "d_<ulid>"
     text user_id FK
-    text session_id FK "the sign-in that registered it; deleted with it"
+    text session_id FK,UK "the sign-in that registered it; one device per session"
     text fcm_token UK
     text platform "android"
     timestamptz updated_at
@@ -1673,7 +1673,7 @@ erDiagram
 - `friendships` holds one row per pair with `user_a < user_b` and a unique constraint on the pair; a friend request is deleted when it is accepted (the friendship is created), declined, or either user removes the other.
 - `friend_requests` holds at most one request between two users, in either direction: (`user_a`, `user_b`), the pair with the smaller id first, is unique. A request in the opposite direction is accepted instead of duplicated, also when both are sent at the same moment: the second to be saved finds the pair taken and accepts the first.
 - Expired and answered invitations are deleted by a job after 24 h; nothing in the schema stores photos, guides, or session content (NFR-13).
-- Each sign-in on a phone is a row in `sessions`, which keeps only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. Every refresh token the session has exchanged goes to `spent_refresh_tokens`, so any of them that comes back ends the session; one spent longer ago than a session lasts is dropped, because it would have expired anyway. A sign-in removes the user's expired sessions, and a refresh moves `expires_at` forward. A device row belongs to the session that registered it, so a session has one device, a rotated FCM token replaces the old row, and ending the session deletes it (`ON DELETE CASCADE`).
+- Each sign-in on a phone is a row in `sessions`, which keeps only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. Every refresh token the session has exchanged goes to `spent_refresh_tokens`, so any of them that comes back ends the session; one spent longer ago than a session lasts is dropped, because it would have expired anyway. A sign-in removes the user's expired sessions, and a refresh moves `expires_at` forward. A device row belongs to the session that registered it, and `session_id` is unique, so a session has one device: `POST /devices` is one upsert on `session_id`, so a rotated FCM token replaces the old one in place, even when two registrations arrive at once. Ending the session deletes it (`ON DELETE CASCADE`).
 - **Storage.** On the course servers PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's own disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
 - **Failure.** An account request that cannot reach PostgreSQL, or loses its connection, answers `503 UNAVAILABLE`; signaling and pose generation do not use the database and keep working.
 - Every user can sign in somehow: a check constraint requires a Google subject, a password hash, or both. `pix_id` and `google_sub` are unique, and many users may have neither yet.

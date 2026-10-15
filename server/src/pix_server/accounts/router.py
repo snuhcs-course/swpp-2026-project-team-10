@@ -11,6 +11,7 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, or_, select, update
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
 
 from pix_server.accounts.auth import Database, SignedIn, Tokens, hash_token, new_refresh_token, now_of
@@ -297,18 +298,24 @@ async def add_password(body: PasswordRequest, request: Request, caller: SignedIn
 @router.post("/devices", status_code=204)
 async def register_device(body: DeviceRequest, request: Request, caller: SignedIn, db: Database) -> None:
     """Registers this phone's Firebase token under the caller and this session, or moves it there if the phone was
-    signed in to another account. A session keeps one device: a rotated token replaces the old one."""
-    if await db.get(AuthSession, caller.session_id) is None:
+    signed in to another account. A session has one device, `session_id` being unique: a rotated token replaces the
+    old one in place, in one upsert, so two registrations at once cannot leave two rows."""
+    session_id = caller.session_id
+    if await db.get(AuthSession, session_id) is None:
         # Signed out, with an access token that has not expired yet.
         raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
-    device = await db.scalar(select(Device).where(Device.fcm_token == body.fcmToken))
-    if device is None:
-        device = Device(id=new_id("d"), fcm_token=body.fcmToken)
-        db.add(device)
-    device.user_id = caller.user.id
-    device.session_id = caller.session_id
-    device.platform = body.platform
-    device.updated_at = now_of(request.app)
-    await db.flush()
-    await db.execute(delete(Device).where(Device.session_id == caller.session_id, Device.id != device.id))
+    # The token leaves the session it was registered under, if another.
+    await db.execute(delete(Device).where(Device.fcm_token == body.fcmToken, Device.session_id != session_id))
+    dialect = postgresql if db.get_bind().dialect.name == "postgresql" else sqlite
+    values = {
+        "user_id": caller.user.id,
+        "fcm_token": body.fcmToken,
+        "platform": body.platform,
+        "updated_at": now_of(request.app),
+    }
+    await db.execute(
+        dialect.insert(Device)
+        .values(id=new_id("d"), session_id=session_id, **values)
+        .on_conflict_do_update(index_elements=[Device.session_id], set_=values)
+    )
     await db.commit()

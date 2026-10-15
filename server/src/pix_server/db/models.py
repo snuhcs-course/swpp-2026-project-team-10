@@ -87,14 +87,14 @@ class SpentRefreshToken(Base):
 
 
 class Device(Base):
-    """A phone's Firebase token, for pushes to that phone."""
+    """A phone's Firebase token, for pushes to that phone. A session has at most one."""
 
     __tablename__ = "devices"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     # The sign-in that registered it; signing out there, or the session ending, deletes it.
-    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), unique=True)
     fcm_token: Mapped[str] = mapped_column(String, unique=True)
     platform: Mapped[str] = mapped_column(String)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime)

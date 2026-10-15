@@ -59,6 +59,11 @@ class FakeSessionManager : SessionManager {
         _state.value = state
     }
 
+    /** The session kept a `camera.state` whose `incoming` emission this screen did not see. */
+    fun setPeerCamera(state: CameraState?) {
+        _peerCamera.value = state
+    }
+
     fun deliver(message: SessionMessage) {
         if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
         if (message is SessionMessage.CameraStateUpdate) {

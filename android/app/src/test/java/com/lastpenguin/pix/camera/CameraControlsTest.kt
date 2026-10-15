@@ -1,6 +1,8 @@
 // AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.camera
 
+import com.lastpenguin.pix.guide.GuideGeometry
+import com.lastpenguin.pix.guide.GuideState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -12,6 +14,8 @@ import org.junit.Test
  * frameToBuffer: rotation 0, 90, 180, 270, and -90 (same as 270), and one that is not a quarter turn; a crop that
  * fills the buffer and one with an offset (16:9 cut from 4:3); a point inside the frame, at its corners, outside
  * it (below 0, above 1), and not finite.
+ * NARROWEST_FRAME_ASPECT (the subject's mirror): a state clamped for each ratio, for thin, square, and wide guides at
+ * the smallest and largest heights, pushed past every edge.
  */
 class CameraControlsTest {
     @Test
@@ -79,6 +83,31 @@ class CameraControlsTest {
     @Test
     fun frameToBuffer_rotationNotAQuarterTurn_isNull() {
         assertNull(frameToBuffer(0.5f, 0.5f, 45, 0, 0, 1440, 1080))
+    }
+
+    @Test
+    fun narrowestFrame_stateClampedForAnyRatio_isNotMovedAgain() {
+        assertEquals(9f / 16f, NARROWEST_FRAME_ASPECT, EPSILON)
+        for (ratio in AspectRatio.entries) {
+            for (guideAspect in listOf(0.3f, 1f, 4f)) {
+                for (height in listOf(GuideState.MIN_HEIGHT, 0.7f, GuideState.MAX_HEIGHT)) {
+                    for (cx in listOf(-50f, 0.5f, 50f)) {
+                        for (cy in listOf(-50f, 0.5f, 50f)) {
+                            val photographer = GuideGeometry.clamp(
+                                GuideState(cx = cx, cy = cy, height = height),
+                                guideAspect,
+                                ratio.frameAspect,
+                            )
+                            assertEquals(
+                                "$ratio $guideAspect $height $cx $cy",
+                                photographer,
+                                GuideGeometry.clamp(photographer, guideAspect, NARROWEST_FRAME_ASPECT),
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun assertPoint(x: Float, y: Float, point: BufferPoint?) {

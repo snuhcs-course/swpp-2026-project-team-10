@@ -17,6 +17,12 @@ val AspectRatio.frameAspect: Float
         AspectRatio.R1_1 -> 1f
     }
 
+/**
+ * The narrowest frame, 9:16. A guide's normalized width grows as the frame narrows, so its clamp limits contain those
+ * of every ratio: a state clamped for any frame stays where it is when clamped for this one (Design 2.6.2).
+ */
+val NARROWEST_FRAME_ASPECT: Float = AspectRatio.entries.minOf { it.frameAspect }
+
 /** Width and height of the portrait frame in its smallest whole numbers, for a CameraX `ViewPort`. */
 internal val AspectRatio.portraitParts: Pair<Int, Int>
     get() = when (this) {

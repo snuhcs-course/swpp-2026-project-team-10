@@ -2,6 +2,8 @@
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.FakeGuideRepository
 import com.lastpenguin.pix.session.FakeRemoteVideo
@@ -24,7 +26,8 @@ import org.junit.Test
 
 /*
  * Partitions: the photographer's frame on Subject view (AD-10). Before any camera.state (4:3); a ratio in a
- * camera.state; a later change; a ratio sent before the screen opened.
+ * camera.state; a later change; a ratio sent before the screen opened. The zoom from a camera.state the session kept
+ * without an `incoming` emission: outside a pinch (shown) and during one (the pinch's value stays).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelAspectTest {
@@ -65,6 +68,36 @@ class SubjectViewModelAspectTest {
         session.deliver(state(AspectRatio.R1_1))
         runCurrent()
         assertEquals(AspectRatio.R1_1, viewModel.uiState.value.aspect)
+    }
+
+    @Test
+    fun zoom_keptStateWithoutAnIncomingMessage_isShown() = runTest(dispatcher) {
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        runCurrent()
+
+        session.setPeerCamera(CameraState(zoom = 2.5f, aspect = AspectRatio.R1_1))
+        runCurrent()
+
+        assertEquals(2.5f, viewModel.uiState.value.zoom, 0f)
+        assertEquals(AspectRatio.R1_1, viewModel.uiState.value.aspect)
+    }
+
+    @Test
+    fun zoom_keptStateDuringAPinch_leavesThePinchValue() = runTest(dispatcher) {
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT))
+        session.deliver(
+            SessionMessage.Capabilities(
+                CameraCapabilities(0.6f, 10f, listOf(0.6f, 1f, 2f, 3f)),
+            ),
+        )
+        runCurrent()
+        viewModel.onZoomGesture(3f, final = false)
+
+        session.setPeerCamera(CameraState(zoom = 1.2f))
+        runCurrent()
+
+        assertEquals(3f, viewModel.uiState.value.zoom, 0f)
     }
 
     @Test

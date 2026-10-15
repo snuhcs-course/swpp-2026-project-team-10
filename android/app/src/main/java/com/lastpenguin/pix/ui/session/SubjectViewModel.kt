@@ -67,9 +67,15 @@ class SubjectViewModel(
         // The photographer may have echoed a zoom before this screen existed; later echoes come through incoming.
         session.peerCamera.value?.let { camera -> _uiState.update { it.copy(zoom = camera.zoom) } }
         viewModelScope.launch {
-            // Kept by the session, so a ratio chosen before this screen existed is here too.
+            // Kept by the session, so a state sent before this screen existed, or before `incoming` was collected,
+            // is here too. Outside a pinch it is also the zoom to show.
             session.peerCamera.collect { camera ->
-                _uiState.update { it.copy(aspect = camera?.aspect ?: AspectRatio.R4_3) }
+                _uiState.update {
+                    it.copy(
+                        aspect = camera?.aspect ?: AspectRatio.R4_3,
+                        zoom = camera?.zoom?.takeUnless { adjustingZoom } ?: it.zoom,
+                    )
+                }
             }
         }
         viewModelScope.launch {

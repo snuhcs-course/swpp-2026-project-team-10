@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 # One-time setup of a course server for the Pix server (server/README.md, Deploy). It installs no packages and
 # creates no users. Run it as root from the checkout, with the branch this server follows:
 #
@@ -47,7 +47,7 @@ echo "This server follows the branch: $BRANCH"
 echo
 echo "Next:"
 if [ "${NEW_ENV:-no}" = yes ]; then
-    echo "  1. Put the OpenRouter key in $PIX_HOME/.env:   sudoedit $PIX_HOME/.env"
+    echo "  1. Fill in the names $PIX_HOME/.env leaves empty, the OpenRouter key and the Google client ID:   sudoedit $PIX_HOME/.env"
 else
     echo "  1. $PIX_HOME/.env already exists and was kept."
 fi

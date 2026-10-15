@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """Environment configuration for the Pix server."""
 
 from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
@@ -20,6 +20,19 @@ class Settings(BaseSettings):
     # A worker that has not renewed its heartbeat for this long has lost its sockets.
     worker_ttl_seconds: PositiveFloat = 15
 
+    # The account database (Design Documentation 2.7). The default is a SQLite file in the working directory, for a
+    # laptop; the Compose file sets PostgreSQL.
+    database_url: str = "sqlite+aiosqlite:///pix.db"
+    # The web client ID that the app passes to Google sign-in as its server client ID; it is the audience of the ID
+    # tokens. Google sign-in answers UNAVAILABLE while it is unset.
+    google_client_id: str | None = None
+    # Signs the access tokens (JWT, HS256); every worker of both copies needs the same one. Unset, each process makes
+    # its own, which suits one worker on a laptop.
+    jwt_secret: SecretStr | None = None
+    access_token_minutes: PositiveFloat = 15
+    # How long a sign-in lasts without a refresh; every refresh starts it again.
+    session_ttl_days: PositiveFloat = 30
+
     # The vendor's own variable name, without the PIX_ prefix. Pose requests fail with UPSTREAM_ERROR while it is unset.
     openrouter_api_key: SecretStr | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
     # An OpenRouter image model id; append @low, @medium, or @high for a model that has quality tiers.
@@ -27,3 +40,12 @@ class Settings(BaseSettings):
     pose_upstream_timeout_seconds: PositiveFloat = 30
     pose_rate_limit: PositiveInt = 20
     pose_rate_window_seconds: PositiveFloat = 3600
+    # Pose requests over all clients together; it bounds what the image API can cost within the window.
+    pose_global_limit: PositiveInt = 500
+    pose_global_window_seconds: PositiveFloat = 86400
+
+    # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
+    # leaves the window, so codes cannot be guessed. High, because phones on one Wi-Fi or carrier address share it,
+    # and a room can be taken only in the seconds before the friend joins it.
+    join_failure_limit: PositiveInt = 100
+    join_failure_window_seconds: PositiveFloat = 600

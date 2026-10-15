@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """WebSocket transport with one ordered writer and a bounded queue per phone."""
 
 import asyncio
@@ -8,6 +8,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from redis.exceptions import RedisError
 from starlette.websockets import WebSocketState
 
+from pix_server.accounts.auth import socket_user
 from pix_server.signaling.messages import ProtocolError, parse_message
 from pix_server.signaling.registry import Peer, SessionRegistry
 
@@ -46,9 +47,11 @@ async def send_messages(websocket: WebSocket, registry: SessionRegistry, peer: P
 @router.websocket("/ws")
 async def signaling(websocket: WebSocket) -> None:
     registry: SessionRegistry = websocket.app.state.signaling
+    # A signed-in phone sends its Pix session token in the upgrade request (Design 2.5.2).
+    user = socket_user(websocket)
     await websocket.accept()
     try:
-        peer = await registry.connect()
+        peer = await registry.connect(user, websocket.client.host if websocket.client else "")
     except RedisError:
         # Without the session store this server cannot hold a room; 1013 asks the phone to try again later.
         await websocket.close(code=1013)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 # Deploys the Pix server on a course server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
 #
 #   deploy.sh auto           deploy the configured branch if it has a new commit; the systemd timer runs this
@@ -11,10 +11,10 @@
 # Settings come from /opt/pix/deploy.conf: BRANCH, and optionally HTTP_PORT, MAX_WAIT_SECONDS (600), and PROJECT.
 # MAX_WAIT_SECONDS given for one command, as in `sudo MAX_WAIT_SECONDS=0 deploy.sh deploy`, wins over the file.
 #
-# Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis (Design 2.7). A
-# deploy builds the image, starts it as the idle copy, waits until it is healthy, points nginx at it, and stops
-# the other copy. Stopping a copy closes its sockets, and a phone cannot come back to its room until the app can
-# rejoin (Design 2.6.7, #56), so the switch still waits until no room is open.
+# Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis and their accounts
+# through PostgreSQL (Design 2.7). A deploy builds the image, starts it as the idle copy, waits until it is healthy,
+# points nginx at it, and stops the other copy. Stopping a copy closes its sockets, and a phone cannot come back to
+# its room until the app can rejoin (Design 2.6.7, #56), so the switch still waits until no room is open.
 #
 # Everything is inside functions and the last line calls main, so bash has read the whole file before a deploy
 # checks out another version of it.
@@ -23,9 +23,15 @@ set -euo pipefail
 PIX_HOME=${PIX_HOME:-/opt/pix}
 REPO=$PIX_HOME/repo
 ENV_FILE=$PIX_HOME/.env
+DB_PASSWORD_FILE=$PIX_HOME/db-password
+JWT_SECRET_FILE=$PIX_HOME/jwt-secret
+# The account database's files (Design 2.7). Never delete it: it holds every account.
+POSTGRES_DIR=$PIX_HOME/postgres
 STATE_DIR=$PIX_HOME/state
 STATE_FILE=$STATE_DIR/deploy.state
 BUILD_LOG=$STATE_DIR/last-build.log
+# Names only, never values: what check_env found wrong with .env, for `status` and the login notice in pix.sh.
+ENV_CHECK=$STATE_DIR/env-check
 IMAGE=pix-server
 
 log() { echo "[deploy] $*"; }
@@ -66,11 +72,60 @@ set_commit() { if [ "$1" = blue ]; then BLUE_COMMIT=$2; else GREEN_COMMIT=$2; fi
 short() { printf '%s' "$1" | cut -c1-12; }
 server_tree() { git -C "$REPO" rev-parse --verify -q "$1:server" || true; }
 
+# --- settings ---------------------------------------------------------------------------------------------------
+
+# Compares .env with the checked-out server/.env.example, without changing either. A name the example lists with no
+# value (`KEY=`) needs a value on every server, such as an API key; one with a value is a default the app already
+# has, so it is not copied. A name .env sets that the example does not list at all is probably misspelled: the app
+# ignores names it does not know. Each finding is logged as a warning and written, as names only, to ENV_CHECK.
+check_env() {
+    # Its own temporary file, because `status` runs this without the deploy lock.
+    local example=$REPO/server/.env.example key missing="" unknown="" tmp
+    tmp=$(mktemp "$ENV_CHECK.XXXXXX")
+    if [ -f "$example" ] && [ -f "$ENV_FILE" ]; then
+        for key in $(sed -n 's/^\([A-Z][A-Z0-9_]*\)=[[:space:]]*$/\1/p' "$example"); do
+            if ! grep -q -i -E "^[[:space:]]*(export[[:space:]]+)?$key[[:space:]]*=[[:space:]]*([^[:space:]#\"']|\"[^\"]|'[^'])" "$ENV_FILE"; then
+                missing="$missing $key"
+            fi
+        done
+        for key in $(sed -n -E 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*/\2/p' "$ENV_FILE"); do
+            if ! grep -q -i -E "^(#[[:space:]]*)?$key=" "$example"; then unknown="$unknown $key"; fi
+        done
+    fi
+    if [ -n "$missing" ]; then
+        echo "missing:$missing" >> "$tmp"
+        log "WARNING: $ENV_FILE has no value for:$missing. server/.env.example says what each is for; set them with pix env, then pix restart"
+    fi
+    if [ -n "$unknown" ]; then
+        echo "unknown:$unknown" >> "$tmp"
+        log "WARNING: $ENV_FILE sets names that server/.env.example does not list, so the app ignores them:$unknown. Check their spelling"
+    fi
+    mv -f "$tmp" "$ENV_CHECK"
+}
+
 # --- docker and nginx -------------------------------------------------------------------------------------------
+
+# A random secret in a file, made on the first deploy and readable by root only, so nobody has to put it in .env:
+# the account database's password, which PostgreSQL takes when its directory is first filled, and the key that signs
+# access tokens, whose change signs everyone out within minutes. Keep both files as they are. They are not in the state directory,
+# which nginx reads.
+secret() {
+    local tmp
+    if [ ! -s "$1" ]; then
+        # mktemp makes the file readable by root only. A hard link is refused when the name exists, so if two runs
+        # make the secret at once (a first deploy and `status`, which takes no lock), the first one's value is kept.
+        tmp=$(mktemp "$1.XXXXXX")
+        od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$tmp"
+        ln "$tmp" "$1" 2> /dev/null || true
+        rm -f "$tmp"
+    fi
+    cat "$1"
+}
 
 compose() {
     PIX_BLUE_TAG=$(short "${BLUE_COMMIT:-none}") PIX_GREEN_TAG=$(short "${GREEN_COMMIT:-none}") \
-        PIX_ENV_FILE=$ENV_FILE PIX_STATE_DIR=$STATE_DIR PIX_HTTP_PORT=$HTTP_PORT \
+        PIX_ENV_FILE=$ENV_FILE PIX_STATE_DIR=$STATE_DIR PIX_POSTGRES_DIR=$POSTGRES_DIR PIX_HTTP_PORT=$HTTP_PORT \
+        PIX_DB_PASSWORD=$(secret "$DB_PASSWORD_FILE") PIX_JWT_SECRET=$(secret "$JWT_SECRET_FILE") \
         docker compose -p "$PROJECT" -f "$REPO/server/deploy/docker-compose.yml" "$@"
 }
 
@@ -243,6 +298,7 @@ deploy_commit() {
     idle_commit=$(commit_of "$idle")
     log "deploying $tag to app-$idle"
     git -C "$REPO" checkout -q --detach "$sha"
+    check_env
     build_image "$tag" || { give_up "$sha" "$idle" "$idle_commit" "$checkout" "the build or the tests failed"; return 1; }
     set_commit "$idle" "$sha"
     start_copy "$idle" || { give_up "$sha" "$idle" "$idle_commit" "$checkout" "the new copy did not start"; return 1; }
@@ -282,6 +338,7 @@ command_restart() {
     idle_commit=$(commit_of "$idle")
     sha=$(commit_of "$ACTIVE")
     : > "$BUILD_LOG"
+    check_env
     log "restarting $(short "$sha") as app-$idle"
     set_commit "$idle" "$sha"
     if ! start_copy "$idle" || ! activate "$idle" wait; then
@@ -333,6 +390,8 @@ command_status() {
     echo "through nginx: app-$(served_copy)"
     echo "open rooms:    ${rooms:-unknown}"
     if [ -n "$FAILED_TREE" ]; then echo "not retried:   server/ tree $(short "$FAILED_TREE") failed or was rolled back"; fi
+    check_env > /dev/null
+    if [ -s "$ENV_CHECK" ]; then sed 's/^/settings:      /' "$ENV_CHECK"; else echo "settings:      every value server/.env.example asks for is set"; fi
     compose ps -a
 }
 
@@ -360,7 +419,7 @@ main() {
     case "$MAX_WAIT_SECONDS" in
         "" | *[!0-9]*) die "MAX_WAIT_SECONDS must be a whole number of seconds, not '$MAX_WAIT_SECONDS'" ;;
     esac
-    mkdir -p "$STATE_DIR"
+    mkdir -p "$STATE_DIR" "$POSTGRES_DIR"
     load_state
 
     if [ "$command" != status ]; then

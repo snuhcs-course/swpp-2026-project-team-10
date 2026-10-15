@@ -5,13 +5,20 @@ description = "Pix server"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.20.0",
+    "argon2-cffi>=25.1.0",
+    "asyncpg>=0.32.0",
     "fastapi>=0.142.2",
+    "google-auth>=2.62.0",
     "httpx2>=2.13.1",
     "pillow>=12.3.0",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    "pyjwt>=2.15.1",
     "python-multipart>=0.0.32",
     "redis>=8.1.0",
+    "sqlalchemy[asyncio]>=2.1.4",
     "uvicorn>=0.54.0",
     "websockets>=17.1",
 ]

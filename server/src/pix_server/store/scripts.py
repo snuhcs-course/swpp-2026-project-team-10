@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """Lua scripts that change session state inside Redis (Design Documentation 2.7).
 
 Redis runs a script as one step, so two workers cannot interleave inside a room transition. Every script gets the
@@ -7,8 +7,9 @@ current time from its caller, which lets the tests move a fake clock, and return
 The scripts avoid `cjson` and `unpack`, which the in-process Redis used by the tests does not provide.
 
 Keys: `session:<id>` (hash), `code:<code>`, `conn:<id>` (hash), `conns:<worker>` (set), `worker:<worker>`
-(heartbeat with a real expiry), and the indexes `sessions`, `workers`, `deadlines` (sorted by the next time a
-session has to be looked at), and `expired` (recently expired codes, sorted by the time to forget them).
+(heartbeat with a real expiry), `presence:<user>` (the signed-in user's connections), and the indexes `sessions`,
+`workers`, `deadlines` (sorted by the next time a session has to be looked at), and `expired` (recently expired
+codes, sorted by the time to forget them).
 
 Only REGISTER adds a worker to `workers`. Every other script refuses to run for a worker that is not in it,
 because that worker has lost its state: Redis restarted empty, or the sweeper took the worker for dead.
@@ -64,10 +65,11 @@ end
 
 -- A socket is gone: free its place and tell the other phone, or start the empty-session timer.
 local function drop(conn)
-  local c = redis.call('HMGET', 'conn:' .. conn, 'worker', 'session')
+  local c = redis.call('HMGET', 'conn:' .. conn, 'worker', 'session', 'user')
   if not c[1] then return end
   redis.call('DEL', 'conn:' .. conn)
   redis.call('SREM', 'conns:' .. c[1], conn)
+  if c[3] and c[3] ~= '' then redis.call('SREM', 'presence:' .. c[3], conn) end
   local sid = c[2]
   if not sid or sid == '' then return end
   local s = redis.call('HMGET', 'session:' .. sid, 'photographer', 'subject')
@@ -150,12 +152,17 @@ return out
 """
 )
 
-# ARGV[6]: connection.
+# ARGV[6..7]: connection, and the signed-in user it belongs to or "" for an anonymous socket.
 CONNECT = (
     _PRELUDE
     + """
+local conn, user = ARGV[6], ARGV[7]
 sweep()
-touch(ARGV[6])
+touch(conn)
+if user ~= '' then
+  redis.call('HSET', 'conn:' .. conn, 'user', user)
+  redis.call('SADD', 'presence:' .. user, conn)
+end
 return out
 """
 )
@@ -184,15 +191,22 @@ return {status, out}
 """
 )
 
-# ARGV[6..7]: connection, room code. Returns {status, session id, out}.
+# ARGV[6..11]: connection, room code, and the window of wrong codes from the client's address ("" for none), its
+# limit, its length in seconds, and a unique member. Returns {status, session id, out}. A wrong code, unknown or
+# expired, counts in the window; while it is full, every join from that address answers RATE_LIMITED without the
+# code being looked at, so codes cannot be guessed.
 JOIN = (
     _PRELUDE
     + """
 local conn, code = ARGV[6], ARGV[7]
+local fails, fail_limit, fail_window = ARGV[8], tonumber(ARGV[9]), tonumber(ARGV[10])
 sweep()
 touch(conn)
 local status, sid = 'OK', ''
-if redis.call('HGET', 'conn:' .. conn, 'session') ~= '' then
+if fails ~= '' then redis.call('ZREMRANGEBYSCORE', fails, '-inf', num(now - fail_window)) end
+if fails ~= '' and redis.call('ZCARD', fails) >= fail_limit then
+  status = 'RATE_LIMITED'
+elseif redis.call('HGET', 'conn:' .. conn, 'session') ~= '' then
   status = 'INVALID_STATE'
 elseif redis.call('ZSCORE', 'expired', code) then
   status = 'EXPIRED'
@@ -210,6 +224,10 @@ else
     schedule(sid)
     emit(s[1], 'peer.joined')
   end
+end
+if fails ~= '' and (status == 'NOT_FOUND' or status == 'EXPIRED') then
+  redis.call('ZADD', fails, num(now), ARGV[11])
+  redis.call('EXPIRE', fails, math.floor(fail_window) + 1)
 end
 return {status, sid, out}
 """
@@ -314,13 +332,37 @@ return {tostring(redis.call('SCARD', 'sessions')), tostring(connections)}
 """
 )
 
-# KEYS[1]: the rate-limit window of one client. ARGV: now, window in seconds, limit, a unique member, key TTL
-# in seconds. Returns 1 if the request is allowed and counted.
+# ARGV: user ids. Returns {online, in a session} as 0 or 1 for each user, in order. A user is online while one of
+# their connections exists; the sweeper drops the connections of a worker that died. It only reads, so it runs for
+# any worker.
+PRESENCE = """
+local out = {}
+for i, user in ipairs(ARGV) do
+  local online, busy = 0, 0
+  for _, conn in ipairs(redis.call('SMEMBERS', 'presence:' .. user)) do
+    local sid = redis.call('HGET', 'conn:' .. conn, 'session')
+    if sid then
+      online = 1
+      if sid ~= '' then busy = 1 end
+    end
+  end
+  out[i] = {online, busy}
+end
+return out
+"""
+
+# KEYS: sliding windows that one request counts in. ARGV: now, a unique member, then the length in seconds and the
+# limit of each window in turn. If none is full, the request is counted in all of them and 0 is returned; otherwise
+# it is counted in none, and the 1-based index of the first full window is returned.
 RATE_LIMIT = """
 local now = tonumber(ARGV[1])
-redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', string.format('%.6f', now - tonumber(ARGV[2])))
-if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[3]) then return 0 end
-redis.call('ZADD', KEYS[1], string.format('%.6f', now), ARGV[4])
-redis.call('EXPIRE', KEYS[1], ARGV[5])
-return 1
+for i, key in ipairs(KEYS) do
+  redis.call('ZREMRANGEBYSCORE', key, '-inf', string.format('%.6f', now - tonumber(ARGV[1 + 2 * i])))
+  if redis.call('ZCARD', key) >= tonumber(ARGV[2 + 2 * i]) then return i end
+end
+for i, key in ipairs(KEYS) do
+  redis.call('ZADD', key, string.format('%.6f', now), ARGV[2])
+  redis.call('EXPIRE', key, math.floor(tonumber(ARGV[1 + 2 * i])) + 1)
+end
+return 0
 """

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """The registry on the session store, without sockets. Each registry stands for one worker process."""
 
 import asyncio
@@ -295,3 +295,49 @@ async def test_a_worker_taken_for_dead_closes_its_sockets_when_it_comes_back(mak
         await closed_for_retry(photographer)
     finally:
         resumed.cancel()
+
+
+async def test_presence_follows_a_users_sockets_on_every_worker(make_registry):
+    first, second = await make_registry(), await make_registry()
+    assert await first.store.presence(["u_A", "u_B"]) == {"u_A": (False, False), "u_B": (False, False)}
+    on_first = await first.connect("u_A")
+    on_second = await second.connect("u_A")
+    await second.connect()  # Anonymous sockets make nobody online.
+    assert await second.store.presence(["u_A", "u_B"]) == {"u_A": (True, False), "u_B": (False, False)}
+    await handle(second, on_second, type="room.create")
+    await receive(on_second)
+    assert await first.store.presence(["u_A"]) == {"u_A": (True, True)}
+    await second.disconnect(on_second)
+    assert await first.store.presence(["u_A"]) == {"u_A": (True, False)}
+    await first.disconnect(on_first)
+    assert await second.store.presence(["u_A"]) == {"u_A": (False, False)}
+
+
+async def test_user_on_a_worker_without_a_heartbeat_goes_offline_when_swept(make_registry, open_store):
+    alive, dead = await make_registry(), await make_registry()
+    await dead.connect("u_A")
+    await kill(dead, open_store)
+    assert await alive.store.presence(["u_A"]) == {"u_A": (True, False)}
+    await alive.sweep()
+    assert await alive.store.presence(["u_A"]) == {"u_A": (False, False)}
+
+
+async def test_wrong_codes_count_per_address_on_every_worker(make_registry, settings):
+    settings.join_failure_limit = 2
+    first, second = await make_registry(), await make_registry()
+    _, room = await create_room(first)
+    wrong = f"{(int(room['code']) + 1) % 1_000_000:06d}"
+    guesser = await first.connect(address="203.0.113.7")
+    for _ in range(2):
+        with pytest.raises(ProtocolError) as exc:
+            await handle(first, guesser, type="room.join", code=wrong)
+        assert exc.value.code == "NOT_FOUND"
+    same_address = await second.connect(address="203.0.113.7")
+    with pytest.raises(ProtocolError) as exc:
+        await handle(second, same_address, type="room.join", code=room["code"])
+    assert exc.value.code == "RATE_LIMITED"
+    # Another address, and a socket whose address is unknown, are not limited.
+    for peer in (await second.connect(address="198.51.100.4"), await second.connect()):
+        with pytest.raises(ProtocolError) as exc:
+            await handle(second, peer, type="room.join", code=wrong)
+        assert exc.value.code == "NOT_FOUND"

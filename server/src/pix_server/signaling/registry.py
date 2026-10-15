@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """The sockets of one server process, and the room protocol on top of the session store.
 
 Room state lives in Redis (Design Documentation 2.7), so a room created through one worker can be joined
@@ -20,7 +20,7 @@ from redis.exceptions import RedisError
 
 from pix_server.config import Settings
 from pix_server.signaling.messages import ClientMessage, Leave, ProtocolError, RoomCreate, RoomJoin, Signal
-from pix_server.store import Delivery, SessionStore
+from pix_server.store import Delivery, SessionStore, Window
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ JOIN_ERRORS = {
     "EXPIRED": EXPIRED.message,
     "NOT_FOUND": "No active room with this code",
     "FULL": "This room already has a subject",
+    "RATE_LIMITED": "Too many wrong codes from this network; wait a few minutes and try again",
 }
 
 
@@ -39,6 +40,8 @@ class Peer:
     outbox: asyncio.Queue[str]
     closing: asyncio.Event = field(default_factory=asyncio.Event)
     close_code: int = 1000
+    # The client's address, which wrong room codes count against; empty when it is not known.
+    address: str = ""
 
 
 def encode(message: dict) -> str:
@@ -147,11 +150,14 @@ class SessionRegistry:
 
     # --- sockets ---------------------------------------------------------------------------------------------------
 
-    async def connect(self) -> Peer:
-        peer = Peer(id=f"c_{uuid4().hex}", outbox=asyncio.Queue(maxsize=self.settings.outbound_queue_size))
+    async def connect(self, user: str | None = None, address: str = "") -> Peer:
+        """A socket of a signed-in `user` makes that user online until it closes."""
+        peer = Peer(
+            id=f"c_{uuid4().hex}", outbox=asyncio.Queue(maxsize=self.settings.outbound_queue_size), address=address
+        )
         self._peers[peer.id] = peer
         try:
-            await self._deliver(await self.store.connect(peer.id))
+            await self._deliver(await self.store.connect(peer.id, user))
         except RedisError:
             del self._peers[peer.id]
             raise
@@ -228,7 +234,14 @@ class SessionRegistry:
         raise ProtocolError("FULL", "No room code available; try again")
 
     async def _join(self, peer: Peer, code: str) -> None:
-        status, session_id, deliveries = await self.store.join(peer.id, code)
+        failures = None
+        if peer.address:
+            failures = Window(
+                f"rate:join:{peer.address}",
+                self.settings.join_failure_limit,
+                self.settings.join_failure_window_seconds,
+            )
+        status, session_id, deliveries = await self.store.join(peer.id, code, failures)
         if status == "OK":
             self.send(peer, {"type": "session.joined", "sessionId": session_id, "role": "SUBJECT", "iceServers": []})
         # The photographer's peer.joined is among these, and it must be on its way before this socket's next signal.

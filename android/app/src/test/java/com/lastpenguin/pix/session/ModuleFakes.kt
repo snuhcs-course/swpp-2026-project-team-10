@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -39,8 +39,8 @@ class FakeSessionManager : SessionManager {
     private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
     override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
 
-    private val _peerZoom = MutableStateFlow<Float?>(null)
-    override val peerZoom: StateFlow<Float?> = _peerZoom.asStateFlow()
+    private val _peerCamera = MutableStateFlow<CameraState?>(null)
+    override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
 
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
@@ -61,7 +61,9 @@ class FakeSessionManager : SessionManager {
 
     fun deliver(message: SessionMessage) {
         if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
-        if (message is SessionMessage.CameraStateUpdate) _peerZoom.value = message.zoom
+        if (message is SessionMessage.CameraStateUpdate) {
+            _peerCamera.value = CameraState(message.zoom, message.exposure, message.flash, message.aspect)
+        }
         check(_incoming.tryEmit(message))
     }
 }
@@ -82,7 +84,8 @@ class FakeCameraController(
     private val _zoom = MutableStateFlow(1f)
     override val zoom: StateFlow<Float> = _zoom.asStateFlow()
 
-    override val state: StateFlow<CameraState> = MutableStateFlow(CameraState(zoom = 1f))
+    /** Set by a test to stand for the photographer changing exposure, flash, or the aspect ratio. */
+    override val state = MutableStateFlow(CameraState(zoom = 1f))
 
     val requests = mutableListOf<Float>()
     var applies = true

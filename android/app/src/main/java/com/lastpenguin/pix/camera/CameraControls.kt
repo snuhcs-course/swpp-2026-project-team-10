@@ -1,6 +1,14 @@
 // AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.camera
 
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
 /** Width / height of the portrait frame: 3:4, 9:16, or 1:1 (AD-10). */
 val AspectRatio.frameAspect: Float
     get() = when (this) {
@@ -16,6 +24,23 @@ internal val AspectRatio.portraitParts: Pair<Int, Int>
         AspectRatio.R16_9 -> 9 to 16
         AspectRatio.R1_1 -> 1 to 1
     }
+
+/** `exposureRange` in `camera.capabilities`: `[min, max]` (Design 2.5.1). */
+object ExposureRangeSerializer : KSerializer<IntRange> {
+    private val ends = ListSerializer(Int.serializer())
+
+    override val descriptor: SerialDescriptor = ends.descriptor
+
+    override fun serialize(encoder: Encoder, value: IntRange) {
+        encoder.encodeSerializableValue(ends, listOf(value.first, value.last))
+    }
+
+    override fun deserialize(decoder: Decoder): IntRange {
+        val (min, max) = decoder.decodeSerializableValue(ends).takeIf { it.size == 2 && it[0] <= it[1] }
+            ?: throw SerializationException("exposureRange must be [min, max]")
+        return min..max
+    }
+}
 
 /** An exposure index within [range], or null for a camera without exposure compensation. */
 internal fun clampedExposure(index: Int, range: IntRange): Int? =

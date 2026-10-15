@@ -1,7 +1,9 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.session.protocol
 
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.Role
@@ -73,10 +75,20 @@ sealed interface SessionMessage {
         val final: Boolean = false,
     ) : SessionMessage
 
-    /** The zoom actually applied, and who changed it. */
+    /**
+     * The camera values actually applied, and who changed them. Iteration 2 adds [exposure], [flash], and [aspect],
+     * so the subject always has the whole camera state and fits its video, grid, and guide to [aspect] (AD-10).
+     */
     @Serializable
     @SerialName("camera.state")
-    data class CameraStateUpdate(val zoom: Float, val by: Role, val final: Boolean) : SessionMessage
+    data class CameraStateUpdate(
+        val zoom: Float,
+        val by: Role,
+        val final: Boolean,
+        val exposure: Int = 0,
+        val flash: FlashMode = FlashMode.OFF,
+        val aspect: AspectRatio = AspectRatio.R4_3,
+    ) : SessionMessage
 
     @Serializable
     @SerialName("session.leave")

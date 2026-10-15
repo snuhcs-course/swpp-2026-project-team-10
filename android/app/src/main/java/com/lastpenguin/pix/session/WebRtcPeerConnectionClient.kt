@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -122,8 +122,15 @@ class WebRtcPeerConnectionClient(
             ?: error("Could not create a peer connection")
         if (config.role == Role.PHOTOGRAPHER) {
             val source = factory.createVideoSource(false)
-            // Crops to 4:3 and scales down to 960×720 if the camera gives more (Design 2.6.4).
-            source.adaptOutputFormat(STREAM_LONG_SIDE, STREAM_SHORT_SIDE, STREAM_FPS)
+            // Frames arrive already cut to the chosen aspect ratio: keep that shape, and scale down only past
+            // 1280×720 pixels, so 960×720, 1280×720, and 720×720 go as they are (Design 2.6.4, AD-10).
+            source.adaptOutputFormat(
+                VideoSource.AspectRatio.UNDEFINED,
+                STREAM_MAX_PIXELS,
+                VideoSource.AspectRatio.UNDEFINED,
+                STREAM_MAX_PIXELS,
+                STREAM_FPS,
+            )
             videoSource = source
             frameSource.observer = source.capturerObserver
             source.capturerObserver.onCapturerStarted(true)
@@ -357,8 +364,7 @@ class WebRtcPeerConnectionClient(
         const val RELIABLE_LABEL = "reliable"
         const val VIDEO_TRACK_ID = "pix-video"
         const val STREAM_ID = "pix"
-        const val STREAM_LONG_SIDE = 960
-        const val STREAM_SHORT_SIDE = 720
+        const val STREAM_MAX_PIXELS = 1280 * 720
         const val STREAM_FPS = 30
         const val MAX_BITRATE_BPS = 2_500_000
     }

@@ -8,7 +8,6 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 
 /** The frame's shape (FR-1.13, AD-10), named as on a phone camera; the portrait frame is 3:4, 9:16, or 1:1. */
 enum class AspectRatio { R4_3, R16_9, R1_1 }
@@ -23,16 +22,15 @@ data class CameraCapabilities(
     val maxZoom: Float,
     /** Subject-side zoom stops, e.g. [0.5, 0.6, 1, 2, 3], filtered to [minZoom, maxZoom]. */
     val zoomStops: List<Float>,
-    // The controls below are not sent yet: their place in `camera.capabilities` comes with the remote controls
-    // (Design 2.5.1, #57), so the subject reads their defaults until then.
-    /** Exposure-compensation indexes; 0..0 when the camera has none (FR-1.11). */
-    @Transient val exposureRange: IntRange = 0..0,
+    // Iteration 2 (Design 2.5.1). The defaults are what a phone without these fields means.
+    /** Exposure-compensation indexes, sent as `[min, max]`; 0..0 when the camera has none (FR-1.11). */
+    @Serializable(with = ExposureRangeSerializer::class) val exposureRange: IntRange = 0..0,
     /** EV per index step. */
-    @Transient val exposureStep: Float = 0f,
-    @Transient val hasFlash: Boolean = false,
+    val exposureStep: Float = 0f,
+    val hasFlash: Boolean = false,
     /** The ratios this phone can bind; always contains [AspectRatio.R4_3]. */
-    @Transient val aspectRatios: List<AspectRatio> = listOf(AspectRatio.R4_3),
-    @Transient val supportsFocusPoint: Boolean = false,
+    val aspectRatios: List<AspectRatio> = listOf(AspectRatio.R4_3),
+    val supportsFocusPoint: Boolean = false,
 )
 
 /** The applied camera values in one place (Design 2.3), which the photographer echoes to the subject. */

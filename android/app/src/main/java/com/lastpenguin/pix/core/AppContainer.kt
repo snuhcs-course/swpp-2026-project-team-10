@@ -14,6 +14,7 @@ import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseGenerator
+import com.lastpenguin.pix.guide.GuideGeometry
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.MlKitReferenceGuideMaker
@@ -58,8 +59,13 @@ class AppContainer(context: Context) {
     /** The photographer's guide, clamped to the frame of the chosen aspect ratio (AD-10). */
     val guideRepository: GuideRepository = InMemoryGuideRepository { cameraController.state.value.aspect.frameAspect }
 
-    /** The subject's copy of the photographer's guide. A separate instance (GuideRepository.kt). */
-    val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository()
+    /**
+     * The subject's copy of the photographer's guide. A separate instance (GuideRepository.kt), clamped to the
+     * photographer's frame from `camera.state` (AD-10).
+     */
+    val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository {
+        sessionManager.peerCamera.value?.aspect?.frameAspect ?: GuideGeometry.DEFAULT_FRAME_ASPECT
+    }
 
     val referenceGuideMaker: ReferenceGuideMaker =
         MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())

@@ -159,9 +159,13 @@ async def sign_up(body: SignUpRequest, request: Request, db: Database) -> AuthOu
 @router.post("/auth/login")
 async def log_in(body: LogInRequest, request: Request, db: Database) -> AuthOut:
     user = await db.scalar(select(User).where(User.pix_id == normalize_pix_id(body.pixId)))
+    stored = user.password_hash if user is not None else None
+    # The read ends before the check waits for a hash slot, so a burst of sign-ins, which needs no account, does not
+    # hold the pool's connections, or SQLite's write lock, while it waits.
+    await db.commit()
     passwords: Passwords = request.app.state.passwords
     # One answer for an unknown Pix ID and a wrong password, so the answer does not tell which Pix IDs exist.
-    if not await passwords.verify(user.password_hash if user is not None else None, body.password):
+    if not await passwords.verify(stored, body.password):
         raise ApiError(401, "INVALID_CREDENTIALS", "The Pix ID or the password is wrong")
     return await signed_in(request, db, user)
 
@@ -272,9 +276,11 @@ async def update_me(body: AccountUpdate, request: Request, caller: SignedIn, db:
 
 @router.put("/me/google")
 async def add_google(body: GoogleRequest, request: Request, caller: SignedIn, db: Database) -> AccountOut:
-    """Lets the account sign in with this Google account too. Adding the same one again changes nothing. Google's
-    check comes first, so the row is not held while Google answers; then the row is locked, so of two Google accounts
-    added at once the second finds the first and is refused instead of replacing it."""
+    """Lets the account sign in with this Google account too. Adding the same one again changes nothing. The
+    transaction that found the caller ends before Google's check, so no connection, or SQLite's write lock, is held
+    while Google answers; then the row is locked, so of two Google accounts added at once the second finds the first
+    and is refused instead of replacing it."""
+    await db.commit()
     account = await google_account(request, body.idToken)
     user = await locked_user(db, caller)
     if user.google_sub == account.subject:

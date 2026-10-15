@@ -76,12 +76,17 @@ class ImageApi:
 
 class FakeGoogle:
     """Stands in for Google's token check. A token `google:<subject>` or `google:<subject>:<name>` is valid; any
-    other is invalid. `available = False` makes every check fail as if Google's keys could not be fetched."""
+    other is invalid. `available = False` makes every check fail as if Google's keys could not be fetched, and
+    `delay` makes Google slow to answer; `asked` is set once a check has started."""
 
     def __init__(self) -> None:
         self.available = True
+        self.delay = 0.0
+        self.asked = asyncio.Event()
 
     async def verify(self, id_token: str) -> GoogleAccount:
+        self.asked.set()
+        await asyncio.sleep(self.delay)
         if not self.available:
             raise GoogleUnavailable("Google's keys could not be fetched")
         prefix, _, rest = id_token.partition(":")

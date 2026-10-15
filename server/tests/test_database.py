@@ -6,11 +6,11 @@ Partitions:
 - migrate: an empty database; one already at the newest revision (data kept); two workers starting at once
 - schema: matches the models; a user with no way to sign in; a second user with the same Pix ID or Google account;
   several users without a Pix ID; a second device for one session
-- times: read back with their zone
+- times: read back with their zone; written from another zone, kept as the same instant
 """
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from alembic.autogenerate import compare_metadata
@@ -90,6 +90,15 @@ async def test_pix_ids_and_google_accounts_are_unique(engine, field, value):
 async def test_many_users_can_be_without_a_pix_id_or_google_account(engine):
     await migrate(engine)
     await save(engine, user(), user(), user(google_sub="sub-1", password_hash=None))
+
+
+async def test_a_time_in_another_zone_is_kept_as_the_same_instant(engine):
+    await migrate(engine)
+    seoul = NOW.astimezone(timezone(timedelta(hours=9)))
+    await save(engine, user(id="u_1", created_at=seoul))
+    async with engine.connect() as connection:
+        created = (await connection.execute(select(User.created_at))).scalar_one()
+    assert created == NOW
 
 
 async def test_times_are_read_back_in_utc(engine):

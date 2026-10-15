@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
@@ -30,6 +31,7 @@ from pix_server.errors import (
     ApiError,
     handle_api_error,
     handle_database_error,
+    handle_os_error,
     handle_store_error,
     handle_validation_error,
 )
@@ -136,8 +138,9 @@ def create_app(
     app.add_exception_handler(ApiError, handle_api_error)
     app.add_exception_handler(RequestValidationError, handle_validation_error)
     app.add_exception_handler(RedisError, handle_store_error)
-    for error in (OperationalError, InterfaceError, OSError):
+    for error in (OperationalError, InterfaceError, PoolTimeoutError):
         app.add_exception_handler(error, handle_database_error)
+    app.add_exception_handler(OSError, handle_os_error)
 
     @app.get("/health")
     async def health() -> JSONResponse:

@@ -26,7 +26,6 @@ import httpx2
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from pix_server.accounts import friends as friends_module
 from pix_server.db.models import FriendRequest
 
 
@@ -363,44 +362,6 @@ def test_one_request_at_most_between_two_users(client, two, first):
         insert_request(client, "fr_2", sender, receiver)
 
 
-def checks_before_the_other_save(monkeypatch):
-    """Makes a request's first look for a request it sent and first try to take one sent to it find nothing, as if
-    they ran just before another request between the same two users was saved; later calls see the database."""
-    for name in ("pending", "take_request"):
-        original = getattr(friends_module, name)
-        stale = [True]
-
-        async def first_misses(*args, original=original, stale=stale):
-            if stale:
-                stale.pop()
-                return None
-            return await original(*args)
-
-        monkeypatch.setattr(friends_module, name, first_misses)
-
-
-def test_requests_sent_to_each_other_at_once_make_the_two_friends(client, two, monkeypatch):
-    """Both save a request at once. The second save finds the pair taken and accepts Dongje's request instead of
-    leaving one request each way."""
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    insert_request(client, "fr_DONGJE", dongje_user, junhyeong_user)
-    checks_before_the_other_save(monkeypatch)
-    response = request_friend(client, junhyeong, dongje_user)
-    assert response.status_code == 200
-    assert response.json() == {"friend": offline(dongje_user)}
-    assert friends_of(client, dongje) == [offline(junhyeong_user)]
-    assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
-
-
-def test_the_same_request_sent_twice_at_once_is_saved_once(client, two, monkeypatch):
-    (dongje, _), (junhyeong, junhyeong_user) = two
-    dongje_user = client.get("/api/v1/me", headers=dongje).json()
-    insert_request(client, "fr_FIRST", dongje_user, junhyeong_user)
-    checks_before_the_other_save(monkeypatch)
-    assert_error(request_friend(client, dongje, junhyeong_user), 409, "ALREADY_REQUESTED")
-    assert [item["id"] for item in requests_of(client, junhyeong)["incoming"]] == ["fr_FIRST"]
-
-
 def at_once(client, *calls):
     """Sends requests to the app at the same moment and returns the answers in order. Each call is
     `(method, path, headers)` or `(method, path, headers, json)`."""
@@ -461,3 +422,27 @@ def test_accept_answers_unavailable_and_saves_nothing_while_the_session_store_is
     assert friends_of(client, dongje) == []
     assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong).status_code == 200
     assert friends_of(client, dongje) == [offline(junhyeong_user)]
+
+
+def test_requests_sent_to_each_other_at_once_make_the_two_friends(client, two):
+    """The second to run finds the first's request and accepts it, instead of leaving one request each way."""
+    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
+    answers = at_once(
+        client,
+        ("POST", "/api/v1/friend-requests", dongje, {"userId": junhyeong_user["id"]}),
+        ("POST", "/api/v1/friend-requests", junhyeong, {"userId": dongje_user["id"]}),
+    )
+    assert sorted(answer.status_code for answer in answers) == [200, 201]
+    assert friends_of(client, dongje) == [offline(junhyeong_user)]
+    assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
+    assert requests_of(client, junhyeong) == {"incoming": [], "outgoing": []}
+
+
+def test_the_same_request_sent_twice_at_once_is_saved_once(client, two):
+    (dongje, _), (junhyeong, junhyeong_user) = two
+    answers = at_once(
+        client,
+        *[("POST", "/api/v1/friend-requests", dongje, {"userId": junhyeong_user["id"]})] * 2,
+    )
+    assert sorted(answer.status_code for answer in answers) == [201, 409]
+    assert len(requests_of(client, junhyeong)["incoming"]) == 1

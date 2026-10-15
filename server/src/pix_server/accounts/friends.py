@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.dialects import postgresql, sqlite
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pix_server.accounts.auth import Caller, Database, SignedIn, millis, now_of
@@ -168,13 +167,13 @@ async def friend_requests(caller: Member, db: Database) -> FriendRequests:
         select(FriendRequest, User)
         .join(User, User.id == FriendRequest.from_user_id)
         .where(FriendRequest.to_user_id == me)
-        .order_by(FriendRequest.created_at.desc(), FriendRequest.id)
+        .order_by(FriendRequest.created_at.desc(), FriendRequest.id.desc())
     )
     sent = await db.execute(
         select(FriendRequest, User)
         .join(User, User.id == FriendRequest.to_user_id)
         .where(FriendRequest.from_user_id == me)
-        .order_by(FriendRequest.created_at.desc(), FriendRequest.id)
+        .order_by(FriendRequest.created_at.desc(), FriendRequest.id.desc())
     )
     return FriendRequests(
         incoming=[
@@ -219,17 +218,9 @@ async def send_friend_request(
         created_at=now_of(request.app),
     )
     db.add(sent)
-    try:
-        await db.commit()
-    except IntegrityError as exc:
-        # A request between the two was saved after the checks above, so the pair is taken. If it is theirs, both
-        # asked at once: theirs is accepted, as if it had been there first.
-        await db.rollback()
-        other = await db.get(User, other_id)
-        if await take_request(db, FriendRequest.from_user_id == other_id, FriendRequest.to_user_id == me) is not None:
-            response.status_code = 200
-            return await befriend(request, db, me, other)
-        raise ApiError(409, "ALREADY_REQUESTED", "You have already sent a request to this user") from exc
+    # `lock_pair` holds the two users, so no other request between them can be saved between the checks above and
+    # this insert; the pair's unique constraint is the database's own guard.
+    await db.commit()
     return OutgoingRequest(id=sent.id, to=UserOut.of(other), createdAt=millis(sent.created_at))
 
 

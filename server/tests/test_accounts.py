@@ -20,7 +20,9 @@ Partitions:
   two refreshes with one token at once (ends the session); spent longer ago than a session lasts (forgotten); just
   before and at 30 days without use; kept alive by use; after sign-out
 - no sign-in needed: pose templates and room codes, with no token or a bad one (FR-5.1)
-- the account database down: unreachable, or a connection lost
+- the account database down: unreachable (the driver cannot connect), or a connection lost; an OSError from
+  anywhere else (a bug, so a 500)
+- slow work holds no database: a sign-in waiting for its password check, and adding Google while Google answers
 - devices: new token, the same token from another account, a rotated token, two registrations at once for one
   session, one token registered by two sessions at once, sign-out, invalid body
 """
@@ -29,16 +31,23 @@ import asyncio
 import base64
 import json
 import logging
+import threading
+import time
 from datetime import timedelta
 
 import httpx2
 import jwt
 import pytest
+from argon2 import PasswordHasher
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from pix_server.accounts.passwords import Passwords
 from pix_server.config import Settings
+from pix_server.db import open_database
 from pix_server.db.models import AuthSession, Device, User
+from pix_server.errors import handle_os_error, raised_by_database
 from pix_server.main import HideQuery, jwt_secret
 
 PASSWORD = "sunset2026"
@@ -624,7 +633,8 @@ def test_each_sign_in_is_a_session_of_its_own(client, settings, sign_up):
     assert first["sid"] != second["sid"]
 
 
-def test_without_a_secret_each_process_signs_with_its_own():
+def test_without_a_secret_each_process_signs_with_its_own(monkeypatch):
+    monkeypatch.delenv("PIX_JWT_SECRET", raising=False)
     unset = Settings(_env_file=None)
     assert len(jwt_secret(unset)) == 64
     assert jwt_secret(unset) != jwt_secret(unset)
@@ -679,31 +689,34 @@ def test_signed_out_phone_cannot_register_a_device_with_its_unexpired_access_tok
 # --- the account database unavailable -------------------------------------------------------------------------------
 
 
-class Unreachable:
-    """An account database whose connection fails with `error`."""
-
-    def __init__(self, error: Exception) -> None:
-        self.error = error
+class LostConnection:
+    """An account database whose connection drops in the middle of a query."""
 
     def __call__(self):
         return self
 
     async def __aenter__(self):
-        raise self.error
+        raise OperationalError("SELECT 1", {}, Exception("connection lost"))
 
     async def __aexit__(self, *exc):
         return False
 
 
-@pytest.mark.parametrize(
-    "error",
-    [OSError("Name or service not known"), OperationalError("SELECT 1", {}, Exception("connection lost"))],
-    ids=["unreachable", "connection-lost"],
-)
-def test_account_endpoints_answer_unavailable_while_the_database_is_down(client, sign_up, error):
+@pytest.fixture
+def unreachable_database():
+    """A PostgreSQL address where nothing listens, so the driver itself fails to connect, as when the database
+    container is down."""
+    engine = open_database("postgresql+asyncpg://pix:pix@127.0.0.1:1/pix")
+    yield async_sessionmaker(engine, expire_on_commit=False)
+
+
+@pytest.mark.parametrize("failure", ["unreachable", "connection-lost"])
+def test_account_endpoints_answer_unavailable_while_the_database_is_down(
+    client, sign_up, unreachable_database, failure
+):
     headers, _ = sign_up("dongje.p")
     database = client.app.state.database
-    client.app.state.database = Unreachable(error)
+    client.app.state.database = unreachable_database if failure == "unreachable" else LostConnection()
     try:
         assert_error(log_in(client, "dongje.p"), 503, "UNAVAILABLE")
         assert_error(client.get("/api/v1/friends", headers=headers), 503, "UNAVAILABLE")
@@ -712,6 +725,83 @@ def test_account_endpoints_answer_unavailable_while_the_database_is_down(client,
     finally:
         client.app.state.database = database
     assert client.get("/api/v1/me", headers=headers).status_code == 200
+
+
+async def test_only_an_os_error_from_the_database_driver_means_unavailable(unreachable_database):
+    async with unreachable_database() as db:
+        with pytest.raises(OSError) as failed:
+            await db.execute(select(User))
+    assert raised_by_database(failed.value)
+    assert (await handle_os_error(None, failed.value)).status_code == 503
+    # Any other OSError is a bug, so it is raised again and answers 500.
+    other = OSError("No such file or directory")
+    assert not raised_by_database(other)
+    with pytest.raises(OSError):
+        await handle_os_error(None, other)
+
+
+# --- slow work holds no database ----------------------------------------------------------------------------------
+
+
+class SlowChecks:
+    """argon2 at its lowest cost, whose checks take a while; `checking` is set once one has started."""
+
+    def __init__(self) -> None:
+        self._hasher = PasswordHasher(time_cost=1, memory_cost=8, parallelism=1)
+        self.checking = threading.Event()
+
+    def hash(self, password: str) -> str:
+        return self._hasher.hash(password)
+
+    def verify(self, stored: str, password: str) -> bool:
+        self.checking.set()
+        time.sleep(0.4)
+        return self._hasher.verify(stored, password)
+
+
+def finishes_before(client, slow, started, quick):
+    """Starts `slow`, waits until `started` says it is in its slow part, then sends `quick`, and returns whether
+    `quick` finished first. Each is `(method, path, headers, json)`."""
+
+    async def run():
+        transport = httpx2.ASGITransport(app=client.app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://pix") as http:
+            slow_task = asyncio.create_task(http.request(slow[0], slow[1], headers=slow[2], json=slow[3]))
+            await started()
+            quick_task = asyncio.create_task(http.request(quick[0], quick[1], headers=quick[2], json=quick[3]))
+            done, _ = await asyncio.wait({slow_task, quick_task}, return_when=asyncio.FIRST_COMPLETED)
+            await asyncio.gather(slow_task, quick_task)
+            return quick_task in done and slow_task not in done, quick_task.result().status_code
+
+    return client.portal.call(run)
+
+
+def test_a_sign_in_waiting_for_its_password_check_holds_up_no_other_request(client, sign_up):
+    """Sign-in needs no account and has no attempt limit, so a burst of them must not hold the database while their
+    checks wait their turn: on SQLite the write lock, on PostgreSQL the pool's connections."""
+    headers, _ = sign_up("dongje.p")
+    checks = SlowChecks()
+    client.app.state.passwords = Passwords(checks, at_once=1)
+    first, status = finishes_before(
+        client,
+        ("POST", "/api/v1/auth/login", None, {"pixId": "dongje.p", "password": PASSWORD}),
+        lambda: asyncio.to_thread(checks.checking.wait),
+        ("GET", "/api/v1/me", headers, None),
+    )
+    assert (first, status) == (True, 200)
+
+
+def test_adding_google_holds_no_database_while_google_answers(client, sign_up, google):
+    adding, _ = sign_up("dongje.p")
+    other, _ = sign_up("junhyeong.h")
+    google.delay = 0.4
+    first, status = finishes_before(
+        client,
+        ("PUT", "/api/v1/me/google", adding, {"idToken": "google:sub-1"}),
+        google.asked.wait,
+        ("GET", "/api/v1/me", other, None),
+    )
+    assert (first, status) == (True, 200)
 
 
 # --- no sign-in needed ---------------------------------------------------------------------------------------------

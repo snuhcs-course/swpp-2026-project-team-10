@@ -110,9 +110,14 @@ check_env() {
 # access tokens, whose change signs everyone out within minutes. Keep both files as they are. They are not in the state directory,
 # which nginx reads.
 secret() {
+    local tmp
     if [ ! -s "$1" ]; then
-        (umask 077 && od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$1.tmp")
-        mv "$1.tmp" "$1"
+        # mktemp makes the file readable by root only. A hard link is refused when the name exists, so if two runs
+        # make the secret at once (a first deploy and `status`, which takes no lock), the first one's value is kept.
+        tmp=$(mktemp "$1.XXXXXX")
+        od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$tmp"
+        ln "$tmp" "$1" 2> /dev/null || true
+        rm -f "$tmp"
     fi
     cat "$1"
 }

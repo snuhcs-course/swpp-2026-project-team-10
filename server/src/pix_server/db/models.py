@@ -22,10 +22,16 @@ def new_id(prefix: str) -> str:
 
 
 class UtcDateTime(TypeDecorator):
-    """`timestamptz` on PostgreSQL. SQLite drops the zone, so a value read from it is marked UTC again."""
+    """`timestamptz` on PostgreSQL. SQLite drops the zone, so a value is converted to UTC when it is written and marked
+    UTC again when it is read."""
 
     impl = DateTime(timezone=True)
     cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:
+        if value is not None and value.tzinfo is not None:
+            return value.astimezone(UTC)
+        return value
 
     def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
         if value is not None and value.tzinfo is None:

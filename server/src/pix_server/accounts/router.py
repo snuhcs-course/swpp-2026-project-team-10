@@ -72,9 +72,10 @@ def google_in_use() -> ApiError:
 
 
 async def locked_user(db: Database, caller: Caller) -> User:
-    """The caller's row, read again and held until the transaction ends. Changing the Pix ID and adding a password
-    each check one against the other, so on PostgreSQL the second of two at once must wait and see the first's
-    result; SQLite already runs transactions one at a time."""
+    """The caller's row, read again and held until the transaction ends, for every change that decides from what the
+    row holds: the Pix ID and the password are checked against each other, and a Google account is added only if
+    none is. On PostgreSQL the second of two at once waits and sees the first's result; SQLite already runs
+    transactions one at a time."""
     return await db.scalar(
         select(User).where(User.id == caller.user.id).with_for_update().execution_options(populate_existing=True)
     )
@@ -271,9 +272,11 @@ async def update_me(body: AccountUpdate, request: Request, caller: SignedIn, db:
 
 @router.put("/me/google")
 async def add_google(body: GoogleRequest, request: Request, caller: SignedIn, db: Database) -> AccountOut:
-    """Lets the account sign in with this Google account too. Adding the same one again changes nothing."""
+    """Lets the account sign in with this Google account too. Adding the same one again changes nothing. Google's
+    check comes first, so the row is not held while Google answers; then the row is locked, so of two Google accounts
+    added at once the second finds the first and is refused instead of replacing it."""
     account = await google_account(request, body.idToken)
-    user = caller.user
+    user = await locked_user(db, caller)
     if user.google_sub == account.subject:
         return AccountOut.mine(user)
     if user.google_sub is not None:

@@ -9,7 +9,7 @@ Partitions:
 - Google: unknown account (NOT_REGISTERED); sign-up with a name, without one, with a long one; sign-up twice;
   invalid token; Google unavailable
 - adding Google to an account: the not-registered flow; the same Google again; a Google account another Pix account
-  uses; a second Google account
+  uses; a second Google account; two added at once
 - adding a password to a Google account: valid; before a Pix ID; breaking a rule; an account that has one; at the
   moment another phone changes the Pix ID to it
 - PUT /me: Pix ID for a Google account; invalid or taken Pix ID; display name only; the changed Pix ID as login name;
@@ -298,6 +298,28 @@ def test_adding_a_second_google_account_answers_already_added(client, sign_up):
     client.put("/api/v1/me/google", headers=headers, json={"idToken": "google:sub-1"})
     response = client.put("/api/v1/me/google", headers=headers, json={"idToken": "google:sub-2"})
     assert_error(response, 409, "GOOGLE_ALREADY_ADDED")
+
+
+def test_two_google_accounts_added_at_once_leave_the_first_and_refuse_the_second(client, sign_up):
+    first, _ = sign_up("dongje.p")
+    second = bearer(log_in(client, "dongje.p").json()["accessToken"])
+
+    async def both():
+        transport = httpx2.ASGITransport(app=client.app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://pix") as http:
+            return await asyncio.gather(
+                http.put("/api/v1/me/google", headers=first, json={"idToken": "google:sub-1"}),
+                http.put("/api/v1/me/google", headers=second, json={"idToken": "google:sub-2"}),
+            )
+
+    answers = client.portal.call(both)
+    assert sorted(answer.status_code for answer in answers) == [200, 409]
+    (added,) = [
+        subject for subject, answer in zip(("sub-1", "sub-2"), answers, strict=True) if answer.status_code == 200
+    ]
+    (refused,) = {"sub-1", "sub-2"} - {added}
+    assert client.post("/api/v1/auth/google", json={"idToken": f"google:{added}"}).status_code == 200
+    assert_error(client.post("/api/v1/auth/google", json={"idToken": f"google:{refused}"}), 404, "NOT_REGISTERED")
 
 
 def test_adding_google_with_an_invalid_token_answers_invalid_token(client, sign_up):

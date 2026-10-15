@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     pose_global_window_seconds: PositiveFloat = 86400
 
     # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
-    # leaves the window, so codes cannot be guessed.
-    join_failure_limit: PositiveInt = 10
+    # leaves the window, so codes cannot be guessed. High, because phones on one Wi-Fi or carrier address share it,
+    # and a room can be taken only in the seconds before the friend joins it.
+    join_failure_limit: PositiveInt = 100
     join_failure_window_seconds: PositiveFloat = 600

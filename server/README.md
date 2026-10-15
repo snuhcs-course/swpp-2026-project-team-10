@@ -60,7 +60,7 @@ Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active ro
 | `NOT_FOUND` | Unknown/cancelled room, or photographer disconnected. |
 | `FULL` | A subject already occupies the room, or no code could be allocated. |
 | `EXPIRED` | Room expired. Codes are remembered for another ten minutes, then report `NOT_FOUND`. |
-| `RATE_LIMITED` | The client's address sent `PIX_JOIN_FAILURE_LIMIT` (10) wrong codes, unknown or expired, within `PIX_JOIN_FAILURE_WINDOW_SECONDS` (600). Every join from it is refused, the right code included, until the oldest leaves the window, so codes cannot be guessed. The count is per address, in the session store. |
+| `RATE_LIMITED` | The client's address sent `PIX_JOIN_FAILURE_LIMIT` (100) wrong codes, unknown or expired, within `PIX_JOIN_FAILURE_WINDOW_SECONDS` (600). Every join from it is refused, the right code included, until the oldest leaves the window, so codes cannot be guessed. The count is per address, in the session store. |
 | `UNKNOWN_TYPE` | Unrecognized message type. |
 | `INVALID_MESSAGE` | Malformed JSON, binary frame, invalid fields, or invalid signaling payload. |
 | `INVALID_STATE` | Already in a room, signaling before joining, or SDP from the wrong role. |

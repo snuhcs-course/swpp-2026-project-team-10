@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -25,7 +25,8 @@ import kotlinx.coroutines.launch
 /**
  * Join with code, subject (R&S 6.7). *Join* is enabled once 6 digits are in (FR-8.2). A valid code opens
  * Subject view, an unknown or expired one opens Session not found with the code kept (FR-8.3), and any other
- * failure shows the same-Wi-Fi message here (FR-8.5). Owner: Real-time (#8).
+ * failure shows the same-Wi-Fi message here (FR-8.5). The kept code is offered only when Session not found opens
+ * this screen again (`keepCode`); otherwise the screen starts empty (#81). Owner: Real-time (#8).
  */
 class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
 
@@ -35,7 +36,13 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentJoinCodeBinding.bind(view)
 
-        if (binding.codeInput.text.isNullOrEmpty()) sessionViewModel.lastCode?.let(binding.codeInput::setText)
+        // The kept code is offered only when the screen opens to correct it, from Session not found (FR-8.3); a
+        // fresh Join from Shoot together starts empty (#81). Typing then replaces the whole code, while a tap still
+        // puts the cursor on one digit to change.
+        if (arguments?.getBoolean(ARG_KEEP_CODE) == true && binding.codeInput.text.isNullOrEmpty()) {
+            sessionViewModel.lastCode?.let(binding.codeInput::setText)
+            binding.codeInput.setSelectAllOnFocus(true)
+        }
         binding.codeInput.doAfterTextChanged {
             updateJoinButton(binding)
             renderDigits(binding)
@@ -122,5 +129,8 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
 
     private companion object {
         const val CODE_LENGTH = 6
+
+        /** The navigation argument Session not found sets (nav_graph.xml). */
+        const val ARG_KEEP_CODE = "keepCode"
     }
 }

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """Lua scripts that change session state inside Redis (Design Documentation 2.7).
 
 Redis runs a script as one step, so two workers cannot interleave inside a room transition. Every script gets the
@@ -7,8 +7,9 @@ current time from its caller, which lets the tests move a fake clock, and return
 The scripts avoid `cjson` and `unpack`, which the in-process Redis used by the tests does not provide.
 
 Keys: `session:<id>` (hash), `code:<code>`, `conn:<id>` (hash), `conns:<worker>` (set), `worker:<worker>`
-(heartbeat with a real expiry), and the indexes `sessions`, `workers`, `deadlines` (sorted by the next time a
-session has to be looked at), and `expired` (recently expired codes, sorted by the time to forget them).
+(heartbeat with a real expiry), `presence:<user>` (the signed-in user's connections), and the indexes `sessions`,
+`workers`, `deadlines` (sorted by the next time a session has to be looked at), and `expired` (recently expired
+codes, sorted by the time to forget them).
 
 Only REGISTER adds a worker to `workers`. Every other script refuses to run for a worker that is not in it,
 because that worker has lost its state: Redis restarted empty, or the sweeper took the worker for dead.
@@ -64,10 +65,11 @@ end
 
 -- A socket is gone: free its place and tell the other phone, or start the empty-session timer.
 local function drop(conn)
-  local c = redis.call('HMGET', 'conn:' .. conn, 'worker', 'session')
+  local c = redis.call('HMGET', 'conn:' .. conn, 'worker', 'session', 'user')
   if not c[1] then return end
   redis.call('DEL', 'conn:' .. conn)
   redis.call('SREM', 'conns:' .. c[1], conn)
+  if c[3] and c[3] ~= '' then redis.call('SREM', 'presence:' .. c[3], conn) end
   local sid = c[2]
   if not sid or sid == '' then return end
   local s = redis.call('HMGET', 'session:' .. sid, 'photographer', 'subject')
@@ -150,12 +152,17 @@ return out
 """
 )
 
-# ARGV[6]: connection.
+# ARGV[6..7]: connection, and the signed-in user it belongs to or "" for an anonymous socket.
 CONNECT = (
     _PRELUDE
     + """
+local conn, user = ARGV[6], ARGV[7]
 sweep()
-touch(ARGV[6])
+touch(conn)
+if user ~= '' then
+  redis.call('HSET', 'conn:' .. conn, 'user', user)
+  redis.call('SADD', 'presence:' .. user, conn)
+end
 return out
 """
 )
@@ -313,6 +320,25 @@ end
 return {tostring(redis.call('SCARD', 'sessions')), tostring(connections)}
 """
 )
+
+# ARGV: user ids. Returns {online, in a session} as 0 or 1 for each user, in order. A user is online while one of
+# their connections exists; the sweeper drops the connections of a worker that died. It only reads, so it runs for
+# any worker.
+PRESENCE = """
+local out = {}
+for i, user in ipairs(ARGV) do
+  local online, busy = 0, 0
+  for _, conn in ipairs(redis.call('SMEMBERS', 'presence:' .. user)) do
+    local sid = redis.call('HGET', 'conn:' .. conn, 'session')
+    if sid then
+      online = 1
+      if sid ~= '' then busy = 1 end
+    end
+  end
+  out[i] = {online, busy}
+end
+return out
+"""
 
 # KEYS[1]: the rate-limit window of one client. ARGV: now, window in seconds, limit, a unique member, key TTL
 # in seconds. Returns 1 if the request is allowed and counted.

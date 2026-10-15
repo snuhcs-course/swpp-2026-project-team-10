@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """The sockets of one server process, and the room protocol on top of the session store.
 
 Room state lives in Redis (Design Documentation 2.7), so a room created through one worker can be joined
@@ -147,11 +147,12 @@ class SessionRegistry:
 
     # --- sockets ---------------------------------------------------------------------------------------------------
 
-    async def connect(self) -> Peer:
+    async def connect(self, user: str | None = None) -> Peer:
+        """A socket of a signed-in `user` makes that user online until it closes."""
         peer = Peer(id=f"c_{uuid4().hex}", outbox=asyncio.Queue(maxsize=self.settings.outbound_queue_size))
         self._peers[peer.id] = peer
         try:
-            await self._deliver(await self.store.connect(peer.id))
+            await self._deliver(await self.store.connect(peer.id, user))
         except RedisError:
             del self._peers[peer.id]
             raise

@@ -25,6 +25,8 @@ dist/
 .coverage
 htmlcov/
 server/scripts/out/
+# The default account database of a server run on a laptop (PIX_DATABASE_URL unset)
+server/pix.db
 
 # IDEs
 .idea/

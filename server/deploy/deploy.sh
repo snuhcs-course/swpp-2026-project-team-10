@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 # Deploys the Pix server on a course server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
 #
 #   deploy.sh auto           deploy the configured branch if it has a new commit; the systemd timer runs this
@@ -11,10 +11,10 @@
 # Settings come from /opt/pix/deploy.conf: BRANCH, and optionally HTTP_PORT, MAX_WAIT_SECONDS (600), and PROJECT.
 # MAX_WAIT_SECONDS given for one command, as in `sudo MAX_WAIT_SECONDS=0 deploy.sh deploy`, wins over the file.
 #
-# Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis (Design 2.7). A
-# deploy builds the image, starts it as the idle copy, waits until it is healthy, points nginx at it, and stops
-# the other copy. Stopping a copy closes its sockets, and a phone cannot come back to its room until the app can
-# rejoin (Design 2.6.7, #56), so the switch still waits until no room is open.
+# Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis and their accounts
+# through PostgreSQL (Design 2.7). A deploy builds the image, starts it as the idle copy, waits until it is healthy,
+# points nginx at it, and stops the other copy. Stopping a copy closes its sockets, and a phone cannot come back to
+# its room until the app can rejoin (Design 2.6.7, #56), so the switch still waits until no room is open.
 #
 # Everything is inside functions and the last line calls main, so bash has read the whole file before a deploy
 # checks out another version of it.
@@ -23,6 +23,10 @@ set -euo pipefail
 PIX_HOME=${PIX_HOME:-/opt/pix}
 REPO=$PIX_HOME/repo
 ENV_FILE=$PIX_HOME/.env
+DB_PASSWORD_FILE=$PIX_HOME/db-password
+JWT_SECRET_FILE=$PIX_HOME/jwt-secret
+# The account database's files (Design 2.7). Never delete it: it holds every account.
+POSTGRES_DIR=$PIX_HOME/postgres
 STATE_DIR=$PIX_HOME/state
 STATE_FILE=$STATE_DIR/deploy.state
 BUILD_LOG=$STATE_DIR/last-build.log
@@ -68,9 +72,22 @@ server_tree() { git -C "$REPO" rev-parse --verify -q "$1:server" || true; }
 
 # --- docker and nginx -------------------------------------------------------------------------------------------
 
+# A random secret in a file, made on the first deploy and readable by root only, so nobody has to put it in .env:
+# the account database's password, which PostgreSQL takes when its directory is first filled, and the key that signs
+# access tokens, whose change signs everyone out within minutes. Keep both files as they are. They are not in the state directory,
+# which nginx reads.
+secret() {
+    if [ ! -s "$1" ]; then
+        (umask 077 && od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$1.tmp")
+        mv "$1.tmp" "$1"
+    fi
+    cat "$1"
+}
+
 compose() {
     PIX_BLUE_TAG=$(short "${BLUE_COMMIT:-none}") PIX_GREEN_TAG=$(short "${GREEN_COMMIT:-none}") \
-        PIX_ENV_FILE=$ENV_FILE PIX_STATE_DIR=$STATE_DIR PIX_HTTP_PORT=$HTTP_PORT \
+        PIX_ENV_FILE=$ENV_FILE PIX_STATE_DIR=$STATE_DIR PIX_POSTGRES_DIR=$POSTGRES_DIR PIX_HTTP_PORT=$HTTP_PORT \
+        PIX_DB_PASSWORD=$(secret "$DB_PASSWORD_FILE") PIX_JWT_SECRET=$(secret "$JWT_SECRET_FILE") \
         docker compose -p "$PROJECT" -f "$REPO/server/deploy/docker-compose.yml" "$@"
 }
 
@@ -360,7 +377,7 @@ main() {
     case "$MAX_WAIT_SECONDS" in
         "" | *[!0-9]*) die "MAX_WAIT_SECONDS must be a whole number of seconds, not '$MAX_WAIT_SECONDS'" ;;
     esac
-    mkdir -p "$STATE_DIR"
+    mkdir -p "$STATE_DIR" "$POSTGRES_DIR"
     load_state
 
     if [ "$command" != status ]; then

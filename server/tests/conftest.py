@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 import asyncio
 import base64
 import io
@@ -10,9 +10,13 @@ import fakeredis
 import httpx2
 import pytest
 import redis
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from PIL import Image
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
+from pix_server.accounts.google import GoogleAccount, GoogleUnavailable, InvalidGoogleToken
 from pix_server.config import Settings
 from pix_server.main import create_app
 from pix_server.signaling.registry import SessionRegistry
@@ -70,6 +74,31 @@ class ImageApi:
         return httpx2.Response(self.status, json=self.body)
 
 
+class FakeGoogle:
+    """Stands in for Google's token check. A token `google:<subject>` or `google:<subject>:<name>` is valid; any
+    other is invalid. `available = False` makes every check fail as if Google's keys could not be fetched."""
+
+    def __init__(self) -> None:
+        self.available = True
+
+    async def verify(self, id_token: str) -> GoogleAccount:
+        if not self.available:
+            raise GoogleUnavailable("Google's keys could not be fetched")
+        prefix, _, rest = id_token.partition(":")
+        subject, _, name = rest.partition(":")
+        if prefix != "google" or not subject:
+            raise InvalidGoogleToken("Not a test token")
+        return GoogleAccount(subject=subject, name=name or None)
+
+
+async def empty_database(url: str) -> None:
+    engine = create_async_engine(url)
+    async with engine.begin() as connection:
+        await connection.execute(text("DROP SCHEMA public CASCADE"))
+        await connection.execute(text("CREATE SCHEMA public"))
+    await engine.dispose()
+
+
 @pytest.fixture
 def clock():
     return Clock()
@@ -86,9 +115,25 @@ def image_api():
 
 
 @pytest.fixture
-def settings():
+def database_url(tmp_path):
+    """A new SQLite file per test, or, with PIX_TEST_DATABASE_URL set, that PostgreSQL emptied first, which shows
+    that the migrations and queries behave the same on the servers' database."""
+    url = os.environ.get("PIX_TEST_DATABASE_URL")
+    if url is None:
+        return f"sqlite+aiosqlite:///{tmp_path / 'pix.db'}"
+    asyncio.run(empty_database(url))
+    return url
+
+
+@pytest.fixture
+def settings(database_url):
     return Settings(
         _env_file=None,
+        database_url=database_url,
+        google_client_id="test-client.apps.googleusercontent.com",
+        jwt_secret="test-jwt-secret-that-is-long-enough-for-hs256",
+        access_token_minutes=15,
+        session_ttl_days=30,
         room_ttl_seconds=600,
         empty_session_ttl_seconds=60,
         cleanup_interval_seconds=0.01,
@@ -175,7 +220,35 @@ async def make_registry(settings, clock, open_store):
 
 
 @pytest.fixture
-def client(settings, clock, image_api, open_store):
-    app = create_app(settings, clock=clock, image_api=httpx2.MockTransport(image_api), redis=open_store)
+def google():
+    return FakeGoogle()
+
+
+@pytest.fixture
+def client(settings, clock, image_api, open_store, google):
+    app = create_app(
+        settings,
+        clock=clock,
+        image_api=httpx2.MockTransport(image_api),
+        redis=open_store,
+        google=google,
+        # Real argon2id at the lowest cost, so a test hashes in microseconds.
+        password_hasher=PasswordHasher(time_cost=1, memory_cost=8, parallelism=1),
+    )
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture
+def sign_up(client):
+    """Signs up a password account and returns the headers that authenticate it, and the account."""
+
+    def sign_up(pix_id: str, name: str | None = None, password: str = "sunset2026") -> tuple[dict, dict]:
+        response = client.post(
+            "/api/v1/auth/signup", json={"pixId": pix_id, "password": password, "displayName": name or pix_id}
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        return {"Authorization": f"Bearer {body['accessToken']}"}, body["user"]
+
+    return sign_up

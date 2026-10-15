@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """Session state shared by every server process, kept in Redis (Design Documentation 2.7, AD-18).
 
 Each server process is one worker with its own id. The store runs the room transitions as scripts, carries
@@ -70,6 +70,7 @@ class SessionStore:
         }
         self._register = redis.register_script(scripts.REGISTER)
         self._rate_limit = redis.register_script(scripts.RATE_LIMIT)
+        self._presence = redis.register_script(scripts.PRESENCE)
 
     def _heartbeat_ms(self) -> str:
         return str(max(1, round(self.settings.worker_ttl_seconds * 1000)))
@@ -127,8 +128,9 @@ class SessionStore:
 
     # --- room transitions ------------------------------------------------------------------------------------------
 
-    async def connect(self, connection: str) -> list[Delivery]:
-        return _deliveries(await self._run("CONNECT", connection))
+    async def connect(self, connection: str, user: str | None = None) -> list[Delivery]:
+        """Registers a socket; one with a signed-in `user` makes that user online (FR-5.9)."""
+        return _deliveries(await self._run("CONNECT", connection, user or ""))
 
     async def create(self, connection: str, session_id: str, code: str) -> tuple[str, list[Delivery]]:
         status, out = await self._run("CREATE", connection, session_id, code)
@@ -165,6 +167,15 @@ class SessionStore:
             return None
         connection, _, text = message["data"].partition("\n")
         return connection, text
+
+    # --- presence --------------------------------------------------------------------------------------------------
+
+    async def presence(self, users: list[str]) -> dict[str, tuple[bool, bool]]:
+        """`(online, in a session)` for each user."""
+        if not users:
+            return {}
+        flags = await self._presence(args=users)
+        return {user: (bool(online), bool(busy)) for user, (online, busy) in zip(users, flags, strict=True)}
 
     # --- rate limit ------------------------------------------------------------------------------------------------
 

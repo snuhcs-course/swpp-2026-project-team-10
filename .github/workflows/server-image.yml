@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 name: server-image
 
 on:
@@ -48,9 +48,12 @@ jobs:
             echo "PIX_HTTP_PORT=8080"
             echo "PIX_ENV_FILE=$RUNNER_TEMP/pix/.env"
             echo "PIX_STATE_DIR=$RUNNER_TEMP/pix/state"
+            echo "PIX_POSTGRES_DIR=$RUNNER_TEMP/pix/postgres"
+            echo "PIX_DB_PASSWORD=ci-password"
+            echo "PIX_JWT_SECRET=ci-jwt-secret-that-is-long-enough-for-hs256"
           } >> "$GITHUB_ENV"
 
-      # Starting the app also starts Redis, which the app depends on.
+      # Starting the app also starts Redis and PostgreSQL, which the app depends on.
       - name: Start nginx and one copy of the app
         run: docker compose -f server/deploy/docker-compose.yml up -d --wait app-blue nginx
 
@@ -61,6 +64,13 @@ jobs:
           test "$(curl -fsS http://127.0.0.1:8080/health)" = '{"status":"ok"}'
           test "$(curl -fsS http://127.0.0.1:8080/version)" = "$GITHUB_SHA"
           curl -fsS http://127.0.0.1:8080/api/v1/pose-templates > /dev/null
+          # The app migrated PostgreSQL when it started: an account can be made and read back.
+          token=$(curl -fsS -H 'Content-Type: application/json' -d '{"pixId":"ci.check","password":"ci-check-2026","displayName":"CI"}' \
+            http://127.0.0.1:8080/api/v1/auth/signup | python3 -c 'import json, sys; print(json.load(sys.stdin)["accessToken"])')
+          test "$(curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:8080/api/v1/me | python3 -c 'import json, sys; print(json.load(sys.stdin)["pixId"])')" = ci.check
+          # The access log leaves out the query, which can hold a Pix ID.
+          test "$(status -H "Authorization: Bearer $token" 'http://127.0.0.1:8080/api/v1/users?pixId=ci.check')" = 200
+          if docker compose -f server/deploy/docker-compose.yml logs nginx app-blue | grep -F 'pixId='; then exit 1; fi
           # A WebSocket upgrade reaches the app; curl then waits for frames until its time limit.
           test "$(status -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' http://127.0.0.1:8080/ws)" = 101
           # FastAPI's documentation and the app's internal routes are not public.

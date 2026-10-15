@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 # The Pix server on the course server. deploy.sh drives this file and supplies the variables
 # On the server, use deploy.sh instead of calling docker compose by hand.
 name: pix
@@ -13,10 +13,15 @@ x-logging: &logging
 x-app: &app
   env_file: ${PIX_ENV_FILE:-/opt/pix/.env}
   environment:
-    # Set here and not in .env, because this file is what names the service.
+    # Set here and not in .env, because this file is what names the services. deploy.sh supplies the secrets.
     PIX_REDIS_URL: redis://redis:6379/0
+    PIX_DATABASE_URL: postgresql+asyncpg://pix:${PIX_DB_PASSWORD:?deploy.sh sets PIX_DB_PASSWORD}@postgres:5432/pix
+    # Signs access tokens; both copies need the same one.
+    PIX_JWT_SECRET: ${PIX_JWT_SECRET:?deploy.sh sets PIX_JWT_SECRET}
   depends_on:
     redis:
+      condition: service_healthy
+    postgres:
       condition: service_healthy
   restart: unless-stopped
   # Longer than Uvicorn's 35 s graceful shutdown, so a pose request in flight finishes.
@@ -44,6 +49,30 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+      start_interval: 1s
+    restart: unless-stopped
+    logging: *logging
+
+  # The account database (Design 2.7): users, sessions, devices, and friends, shared by both copies. Its port is
+  # not published, so only the app containers reach it. Its files are in a directory of the server's own disk,
+  # /opt/pix/postgres, not in a Docker volume, so they outlive crashes, restarts, deploys, and reboots, and no Docker
+  # cleanup (`down -v`, a volume prune) can delete them. Every worker brings the schema up to date when it starts.
+  # A deploy starts it once and leaves it running.
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: pix
+      POSTGRES_DB: pix
+      # Taken only when the volume is first created, so the password file deploy.sh keeps must not change.
+      POSTGRES_PASSWORD: ${PIX_DB_PASSWORD:?deploy.sh sets PIX_DB_PASSWORD}
+    volumes:
+      - ${PIX_POSTGRES_DIR:-/opt/pix/postgres}:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "pix", "-d", "pix"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
       start_interval: 1s
     restart: unless-stopped
     logging: *logging

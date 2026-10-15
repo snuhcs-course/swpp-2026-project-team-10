@@ -1,8 +1,8 @@
 # Pix server
 
-FastAPI backend for Pix. The server's responsibilities include session signaling, pose generation, and planned APIs for friend invitations and other features as the project develops.
+FastAPI backend for Pix. The server's responsibilities include session signaling, pose generation, accounts and friends, and planned APIs for friend invitations and other features as the project develops.
 
-The current implementation provides iteration 1 signaling (anonymous room-code sessions and WebRTC SDP/ICE relay between one photographer and one subject) and the pose generation REST API, which turns a scene photo into pose candidates through an image-editing model on [OpenRouter](https://openrouter.ai/). Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. Rooms, room codes, and the pose rate limit are kept in a Redis session store, so the server can run several worker processes ([Session store](#session-store)). Database support and account and friend APIs are not implemented yet.
+The current implementation provides iteration 1 signaling (anonymous room-code sessions and WebRTC SDP/ICE relay between one photographer and one subject) and the pose generation REST API, which turns a scene photo into pose candidates through an image-editing model on [OpenRouter](https://openrouter.ai/). Video, guide images, guide state, and remote zoom go directly between the phones over WebRTC. Rooms, room codes, presence, and the pose rate limit are kept in a Redis session store, so the server can run several worker processes ([Session store](#session-store)). Accounts (sign-up with a Pix ID and a password, or Google), exact Pix ID lookup, friend requests, and the friend list with online status are kept in a database ([Accounts and friends](#accounts-and-friends), [Database](#database)). Invitations are not implemented yet.
 
 The wire contract comes from [Design Documentation §2.5.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt). Room behavior follows [FR-8 and FR-6](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications). The REST contract comes from Design Documentation §2.5.3 and Android's [PixApi.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/PixApi.kt) and [ApiModels.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/ApiModels.kt); pose generation follows §2.6.3 and FR-4.
 
@@ -17,7 +17,7 @@ uv sync --locked
 
 Optional settings are listed in `.env.example`. Copy it to `.env` in `server/` to override defaults, or export `PIX_` environment variables. The default waiting-room TTL is 600 seconds, empty-session TTL is 60 seconds, and cleanup runs every second. Expiry is also checked during message handling. If changing `PIX_MAX_MESSAGE_BYTES`, keep Uvicorn's `--ws-max-size` consistent.
 
-Pose generation needs `OPENROUTER_API_KEY`, an OpenRouter key with credits, in `.env` or the environment. Without it the server still runs, and `POST /poses` answers `UPSTREAM_ERROR`.
+Pose generation needs `OPENROUTER_API_KEY`, an OpenRouter key with credits, in `.env` or the environment. Without it the server still runs, and `POST /poses` answers `UPSTREAM_ERROR`. Google sign-in needs `PIX_GOOGLE_CLIENT_ID`, the web client ID that the app passes to Google sign-in; without it the Google endpoints answer `503 UNAVAILABLE`, and sign-up with a Pix ID and a password still works.
 
 ## Run on the test Wi-Fi
 
@@ -27,7 +27,7 @@ From `server/`, start the server:
 uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 65536
 ```
 
-Started this way, without `PIX_REDIS_URL`, the server keeps its rooms inside the process, so use **one worker**; a restart loses the rooms. For development, `--reload` can replace `--workers 1`; a reload ends existing sessions. To run several workers, or to keep rooms across a restart, give it a Redis ([Session store](#session-store)).
+Started this way, without `PIX_REDIS_URL`, the server keeps its rooms inside the process, so use **one worker**; a restart loses the rooms. Without `PIX_DATABASE_URL` the accounts are in `pix.db`, a SQLite file in `server/` that survives restarts; delete it to start over. For development, `--reload` can replace `--workers 1`; a reload ends existing sessions. To run several workers, or to keep rooms across a restart, give it a Redis ([Session store](#session-store)).
 
 Put the laptop and both phones on the same Wi-Fi. Connect Android to `ws://<laptop-Wi-Fi-IP>:8000/ws` for signaling and `http://<laptop-Wi-Fi-IP>:8000/api/v1` for the REST API (a phone's `localhost` refers to that phone). The network must allow device-to-device traffic and inbound TCP port 8000 on the laptop. Iteration 1 uses the debug-build HTTP/WS exception in Design §2.8. `iceServers` is always `[]`; STUN/TURN and cellular connectivity belong to later iterations.
 
@@ -37,7 +37,7 @@ Uvicorn's WebSocket ping/pong detects dead connections; no application heartbeat
 
 ## WebSocket protocol
 
-Send JSON **text** frames to `/ws` on a persistent connection. A socket belongs to at most one room. Messages and field casing match the Android contract.
+Send JSON **text** frames to `/ws` on a persistent connection. A socket belongs to at most one room. Messages and field casing match the Android contract. A signed-in phone sends `Authorization: Bearer <access token>` with the upgrade, which shows its user as online to their friends while the socket is open; without a token, or with an unknown or expired one, the socket works the same but shows nobody online.
 
 | Client message | Result |
 | --- | --- |
@@ -115,6 +115,38 @@ Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose tem
 
 The rate limit is counted per client IP address in the session store, so every worker counts against the same window; 20 requests are five sets of four poses. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
 
+## Accounts and friends
+
+The endpoints, request and response bodies, and error codes are in Design §2.5.3; the code is in [`src/pix_server/accounts/`](src/pix_server/accounts/). Every endpoint below except the four sign-ins and `/auth/refresh` needs `Authorization: Bearer <access token>` and answers `401 UNAUTHENTICATED` without it, or with an expired one. Pose generation and room codes need no sign-in (FR-5.1).
+
+| Endpoint | Result |
+| --- | --- |
+| `POST /auth/signup` | `{"pixId","password","displayName"}` → `201 {"accessToken","refreshToken","expiresIn","user"}`. A Pix ID is 4–20 of `a–z 0–9 . _`; a password is 8–64 characters with a letter and a digit, and not the Pix ID; `PIX_ID_INVALID` and `PASSWORD_INVALID` name the broken rule. |
+| `POST /auth/login` | `{"pixId","password"}` → `200`, as above, or `401 INVALID_CREDENTIALS` for a wrong password and an unknown Pix ID alike. |
+| `POST /auth/google` | `{"idToken"}` → `200`, as above, or `404 NOT_REGISTERED` when no account uses that Google account; the app then asks whether the person has a Pix account. |
+| `POST /auth/refresh` | `{"refreshToken"}` → `200 {"accessToken","refreshToken","expiresIn"}`; the old refresh token stops working, and one used twice ends the sign-in (`401 INVALID_REFRESH_TOKEN`). |
+| `POST /auth/google/signup` | `{"idToken"}` → `201`, a new account without a Pix ID, named after the Google account. |
+| `PUT /me/google` | `{"idToken"}` → the account, which now signs in with Google too (`409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`). |
+| `PUT /me/password` | `{"password"}` → the account of a Google sign-up, which now signs in with its Pix ID and this password too (`403 PIX_ID_REQUIRED` before it has a Pix ID, `409 PASSWORD_ALREADY_SET`). Changing a password is not offered, and there is no email or password reset. |
+| `DELETE /auth/session` | Ends this phone's sign-in: its refresh token stops working and its device token is deleted. Its access token works until it expires, at most 15 minutes later. |
+| `GET /me`, `PUT /me` | The account, with `hasPassword` and `hasGoogle`; `PUT` sets `pixId`, `displayName`, or both. |
+| `POST /devices` | `{"fcmToken","platform":"android"}` → `204`. |
+| `GET /users?pixId=` | `{"user","relation","requestId"}` for an exact Pix ID, or `404 NOT_FOUND`. |
+| `GET /friend-requests`, `POST /friend-requests`, `POST /friend-requests/{id}/accept`, `…/decline`, `DELETE /friend-requests/{id}` | Received and sent requests; send (`201`, or `200` with the new friend when the other user had already asked); accept; decline; withdraw. |
+| `GET /friends`, `DELETE /friends/{userId}` | `{"friends":[{"id","pixId","displayName","online","inSession"}]}`; remove a friend. |
+
+```sh
+curl -H 'Content-Type: application/json' -d '{"pixId":"dongje.p","password":"sunset2026","displayName":"Dongje"}' http://localhost:8000/api/v1/auth/signup
+curl -H "Authorization: Bearer eyJhbGciOi…" 'http://localhost:8000/api/v1/users?pixId=junhyeong.h'
+```
+
+- **Passwords** are hashed with argon2id on a worker thread, and only the hash is stored. They travel over plain HTTP to the course servers, which have no TLS (Design AD-11). Login attempts are not limited for now.
+- **Google ID tokens** are checked against Google's published keys, which the server fetches from Google and keeps for as long as Google allows, and against `PIX_GOOGLE_CLIENT_ID`. Only Google's subject id is stored.
+- **Tokens.** A sign-in gives an access token and a refresh token. The access token is a JWT signed with HS256 and `PIX_JWT_SECRET`, with the claims `iss` (`pix`), `sub` (the user), `sid` (the sign-in), `iat`, and `exp`, `PIX_ACCESS_TOKEN_MINUTES` (15) later; it is checked without the database and not stored. The refresh token is random, stored only as a SHA-256 hash in `sessions`, and lasts `PIX_SESSION_TTL_DAYS` (30) from its last use; each refresh replaces it, and an old one that comes back ends the sign-in. Without `PIX_JWT_SECRET` each process makes its own at start, so access tokens end on a restart (the app refreshes) and several workers would not accept each other's; on the course servers `deploy.sh` makes one in `/opt/pix/jwt-secret`.
+- **Database down.** An account request that cannot reach the database answers `503 UNAVAILABLE`; pose generation and rooms do not use it.
+- **Friend endpoints** answer `403 PIX_ID_REQUIRED` until the caller has a Pix ID, and a user without one cannot be found. Pushes for friend requests come with invitations (Iter2-P15).
+- **Logs.** Neither the app nor nginx logs a request's query string, which can hold a Pix ID, and nothing logs a password, a token, or a request body.
+
 ## Session store
 
 Room state is in Redis and not in the server process (Design §2.7, AD-18): sessions, room codes, recently expired codes, each socket's connection record, and the pose rate limit. The code is in [`src/pix_server/store/`](src/pix_server/store/).
@@ -130,6 +162,18 @@ Room state is in Redis and not in the server process (Design §2.7, AD-18): sess
 | Not set | Inside the server process, in [fakeredis](https://github.com/cunla/fakeredis-py), which runs the same scripts. This is for one worker on a laptop: nothing to install. fakeredis is a development dependency, so the deployed image does not have it and refuses to start without `PIX_REDIS_URL`. |
 | `redis://<host>:6379/0` | In that Redis. On the course servers [`deploy/docker-compose.yml`](deploy/docker-compose.yml) sets it to its own `redis` service. Locally, `docker run --rm -p 6379:6379 redis:8-alpine` gives one for trying several workers. |
 
+## Database
+
+Accounts, sessions (refresh tokens), devices, friend requests, and friendships are in a relational database through SQLAlchemy (Design §2.7). The models are in [`db/models.py`](src/pix_server/db/models.py) and the Alembic migrations in [`db/migrations/`](src/pix_server/db/migrations/).
+
+| `PIX_DATABASE_URL` | Where the accounts are |
+| --- | --- |
+| Not set | `sqlite+aiosqlite:///pix.db`, a file in the working directory. For one worker on a laptop. |
+| `postgresql+asyncpg://<user>:<password>@<host>:5432/<db>` | In that PostgreSQL. On the course servers the Compose file sets it to its own `postgres` service. |
+
+- **Migrations run at start.** Every worker brings the schema to the newest revision before it takes requests. On PostgreSQL an advisory lock makes one worker migrate while the others wait, so the two workers of each copy can start together. During a deploy the old copy keeps serving on the new schema, so a revision must not break the code before it: add a column before code uses it, and drop it a release after code stops using it.
+- **A new revision.** Change the models, then from `server/` run `uv run alembic upgrade head` and `uv run alembic revision --autogenerate -m "what changed"` (both use `PIX_DATABASE_URL`, or `pix.db`), read the generated file in `db/migrations/versions/`, and tidy it. `test_database.py` fails while the migrations and the models differ.
+
 ## Deploy
 
 The server runs on the two course servers (Design §2.8, Hosting and Deployment). Each is reachable only through the course's HTTP proxy on port 80, so there is no HTTPS or WSS, and the two cannot reach each other.
@@ -139,7 +183,7 @@ The server runs on the two course servers (Design §2.8, Hosting and Deployment)
 | A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds of the app use it. |
 | B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging; set `pix.serverUrl` to it in a debug build. |
 
-[`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs nginx on port 80, Redis, and two copies of the app, `app-blue` and `app-green`, built from the [`Dockerfile`](Dockerfile). One copy serves and the other is stopped; each copy runs two workers, and both copies use the same Redis, whose port is not published and which writes nothing to disk. nginx forwards `/api/v1/`, `/ws`, and `/health` to the serving copy, answers `/version` with the commit that is live, and answers `404` for everything else, so FastAPI's `/docs` and the app's `/internal` routes are not public. A new public route must be added to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf).
+[`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs nginx on port 80, Redis, PostgreSQL, and two copies of the app, `app-blue` and `app-green`, built from the [`Dockerfile`](Dockerfile). One copy serves and the other is stopped; each copy runs two workers, and both copies use the same Redis, whose port is not published and which writes nothing to disk, and the same PostgreSQL, whose port is not published either and whose files are in `/opt/pix/postgres` on the server's own disk. That is a directory mounted into the container, not a Docker volume, so the accounts survive a crash or restart of PostgreSQL, a deploy, a reboot, and even `docker compose down -v`; deleting the directory deletes them, and nothing backs it up yet. Its password is made by `deploy.sh` on the first deploy and kept in `/opt/pix/db-password`, readable by root only; PostgreSQL takes it when it first fills `/opt/pix/postgres`, so do not change or delete that file. `deploy.sh` makes the key that signs access tokens the same way, in `/opt/pix/jwt-secret`. nginx forwards `/api/v1/`, `/ws`, and `/health` to the serving copy, answers `/version` with the commit that is live, and answers `404` for everything else, so FastAPI's `/docs` and the app's `/internal` routes are not public. A new public route must be added to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf).
 
 ### How a deploy happens
 
@@ -148,7 +192,7 @@ GitHub cannot push to the servers: SSH goes through a campus-only relay with per
 1. It fetches the server's branch. If the commit is already recorded, it stops.
 2. If the commit does not change `server/`, it records the commit and restarts nothing.
 3. It builds the image. pytest runs as a build stage, so a commit whose tests fail stops here.
-4. It starts the image as the idle copy and waits for the container's health check, which also needs Redis. Redis is started with the first copy and is left running by later deploys.
+4. It starts the image as the idle copy and waits for the container's health check, which also needs Redis; PostgreSQL has to be healthy before the copy starts, and the copy migrates it as it starts. Redis and PostgreSQL are started with the first copy and are left running by later deploys.
 5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. The two copies share their rooms through Redis, but stopping a copy closes its sockets, and the app cannot come back to its room until it can rejoin (Design §2.6.7, #56); until then the wait stays. After 10 minutes it goes on anyway: sessions that are already live continue, because the video goes phone to phone, and rooms still waiting for a subject end.
 6. It points nginx at the new copy and reloads it, checks `/health` through nginx, and stops the old copy with 40 s for requests in flight.
 7. It records the commit, which `/version` then shows, and deletes images other than the two copies'.
@@ -177,7 +221,7 @@ sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 echo '[ -f /opt/pix/repo/server/deploy/pix.sh ] && . /opt/pix/repo/server/deploy/pix.sh' >> ~/.bashrc
 ```
 
-`pix help` lists the commands: `pix status`, `pix deploy [ref]`, `pix rollback`, `pix restart`, `pix logs` for the serving copy, `pix nginx`, `pix journal`, `pix build`, `pix timer`, `pix env`, `pix health`, and `pix redis`. They need an account that can use `sudo`. One deployment serves everyone on a server, so tell the team before a rollback, and never edit files in `/opt/pix/repo`, where each deploy checks out its commit.
+`pix help` lists the commands: `pix status`, `pix deploy [ref]`, `pix rollback`, `pix restart`, `pix logs` for the serving copy, `pix nginx`, `pix journal`, `pix build`, `pix timer`, `pix env`, `pix health`, `pix redis`, and `pix db`. They need an account that can use `sudo`. One deployment serves everyone on a server, so tell the team before a rollback, and never edit files in `/opt/pix/repo`, where each deploy checks out its commit.
 
 Without the shortcuts, run these on the server with `sudo`:
 
@@ -188,7 +232,7 @@ Without the shortcuts, run these on the server with `sudo`:
 | `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without waiting for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
 | `… deploy.sh restart` | Starts the other copy from the same image, for example after editing `/opt/pix/.env`. |
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
-| `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, and `pix-redis-1` for the session store. Logs rotate at 10 MB, five files each. |
+| `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. |
 
 A deploy waits at most `MAX_WAIT_SECONDS` (600) for open rooms. Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`), or in front of `pix deploy`, to switch without waiting for that one run. To change it for every deploy on a server, the timer's included, put `MAX_WAIT_SECONDS=<seconds>` in `/opt/pix/deploy.conf`; the timer's next run uses it, and a value given in front of a command still wins for that run.
 
@@ -200,7 +244,7 @@ Measured on Server B on 2026-10-13; nginx and the app are configured for it:
 - **The phone's address is the last `X-Forwarded-For` value.** The proxy adds it and passes on whatever the client sent before it. nginx takes the last value only and replaces the header on the way to the app, which Uvicorn trusts (`--forwarded-allow-ips "*"`) because nothing but nginx can reach its port. The rate limit therefore counts per phone address; phones behind one carrier or Wi-Fi gateway still share an address, so limit per user once accounts exist.
 - **A cancelled request does not reach the server.** The proxy keeps its connection open after the phone closes its side, so a pose request the user cancelled is still generated and billed. The rate limit bounds the cost.
 - **Uploads stay small and in memory.** nginx refuses a request over 1 MiB with its own 413 and buffers a smaller one in memory, and it never writes a pose answer to a temporary file (FR-4.9, NFR-13). What the course's proxy does with an upload is outside our control.
-- **Nothing is encrypted in transit.** A scene photo and the session token travel as plain HTTP between the phone and the server (NFR-14).
+- **Nothing is encrypted in transit.** A scene photo, a password at sign-in, and the access and refresh tokens travel as plain HTTP between the phone and the server (NFR-14).
 
 Docker Hub limits anonymous pulls per address, and the course servers share theirs. If a build fails with `toomanyrequests`, wait and run `deploy.sh deploy`; the base images are cached after the first pull.
 
@@ -213,12 +257,12 @@ Run these from `server/` before you push. On every pull request, the [server-lin
 | `uv run ruff format .` | Formats Python files with Ruff. |
 | `uv run ruff format --check .` | Fails if a file is not formatted. |
 | `uv run ruff check .` | Ruff lint. Add `--fix` to apply the fixes Ruff can make, such as import order. |
-| `uv run pytest` | Tests in `tests/`. They run in one process, without a running server, a Redis, or a phone. |
-| `PIX_TEST_REDIS_URL=redis://localhost:6379/0 uv run pytest` | The same tests on a real Redis, whose database they empty first. CI runs both. |
+| `uv run pytest` | Tests in `tests/`. They run in one process, without a running server, a Redis, a database server, or a phone. |
+| `PIX_TEST_REDIS_URL=redis://localhost:6379/0 PIX_TEST_DATABASE_URL=postgresql+asyncpg://pix:pix@localhost:5432/pix uv run pytest` | The same tests on a real Redis and PostgreSQL, which they empty first (Redis's database 0, PostgreSQL's `public` schema). Either variable works alone. CI runs both ways. |
 
 - **Rules.** Ruff rules are in `ruff.toml`: a 120-character line limit and the lint rule sets `E4`, `E7`, `E9`, `F`, and `I`.
 - **Suppressing.** For one line, use `# noqa: <rule>` with a comment that says why. To turn off a rule for some files or for the whole server, add it to `per-file-ignores` or `ignore` in `ruff.toml`.
-- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `client` also replaces OpenRouter with the fake `image_api`, which records requests and returns what the test sets, so tests never call the real service or need a key; `make_image` builds test photos. The session store in tests is an in-process Redis (fakeredis) that runs the real Lua scripts; `make_registry` starts registries that share it, each standing for one worker, and `outage` switches the store off and on. `async def` tests need no marker, and a test fails after 15 seconds.
+- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `client` also replaces OpenRouter with the fake `image_api`, which records requests and returns what the test sets, so tests never call the real service or need a key; `make_image` builds test photos. The session store in tests is an in-process Redis (fakeredis) that runs the real Lua scripts; `make_registry` starts registries that share it, each standing for one worker, and `outage` switches the store off and on. Each test gets a new SQLite file as its database (`database_url`), which the app migrates as it starts; `google` replaces Google's token check (a token `google:<subject>:<name>` is valid), `client` hashes passwords with argon2id at its lowest cost, and `sign_up` makes an account and returns its headers. `async def` tests need no marker, and a test fails after 15 seconds.
 
 ## Compare image-editing models
 

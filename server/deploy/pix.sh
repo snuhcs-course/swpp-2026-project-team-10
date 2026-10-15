@@ -51,7 +51,9 @@ pix: shortcuts for the Pix server on this machine (server/README.md, Deploy)
   pix journal [n]    the last n lines the timer's deploys printed (50)
   pix build          the last build log, opened at its end
   pix timer          when the deploy timer last ran and runs next
-  pix env            edit /opt/pix/.env, then run pix restart to apply it
+  pix env            edit /opt/pix/.env, then run pix restart to apply it;
+                     pix status lists the values server/.env.example asks for
+                     that it lacks
   pix health         /health and /version through nginx, and which copy answered
   pix redis          redis-cli in the session store; read only (SCARD sessions,
                      SMEMBERS workers): FLUSHALL or DEL would drop live rooms
@@ -74,3 +76,13 @@ EOF
             ;;
     esac
 }
+
+# At login, a reminder of what the last deploy found wrong with /opt/pix/.env. Only in an interactive shell, so the
+# output never reaches scp or a script.
+case $- in
+    *i*)
+        if [ -s /opt/pix/state/env-check ]; then
+            echo "pix: /opt/pix/.env needs attention ($(tr '\n' ';' < /opt/pix/state/env-check | sed 's/;$//')). Run pix env, then pix restart."
+        fi
+        ;;
+esac

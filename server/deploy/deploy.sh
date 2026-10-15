@@ -30,6 +30,8 @@ POSTGRES_DIR=$PIX_HOME/postgres
 STATE_DIR=$PIX_HOME/state
 STATE_FILE=$STATE_DIR/deploy.state
 BUILD_LOG=$STATE_DIR/last-build.log
+# Names only, never values: what check_env found wrong with .env, for `status` and the login notice in pix.sh.
+ENV_CHECK=$STATE_DIR/env-check
 IMAGE=pix-server
 
 log() { echo "[deploy] $*"; }
@@ -69,6 +71,36 @@ commit_of() { if [ "$1" = blue ]; then echo "$BLUE_COMMIT"; else echo "$GREEN_CO
 set_commit() { if [ "$1" = blue ]; then BLUE_COMMIT=$2; else GREEN_COMMIT=$2; fi; }
 short() { printf '%s' "$1" | cut -c1-12; }
 server_tree() { git -C "$REPO" rev-parse --verify -q "$1:server" || true; }
+
+# --- settings ---------------------------------------------------------------------------------------------------
+
+# Compares .env with the checked-out server/.env.example, without changing either. A name the example lists with no
+# value (`KEY=`) needs a value on every server, such as an API key; one with a value is a default the app already
+# has, so it is not copied. A name .env sets that the example does not list at all is probably misspelled: the app
+# ignores names it does not know. Each finding is logged as a warning and written, as names only, to ENV_CHECK.
+check_env() {
+    local example=$REPO/server/.env.example key missing="" unknown=""
+    : > "$ENV_CHECK.tmp"
+    if [ -f "$example" ] && [ -f "$ENV_FILE" ]; then
+        for key in $(sed -n 's/^\([A-Z][A-Z0-9_]*\)=[[:space:]]*$/\1/p' "$example"); do
+            if ! grep -q -i -E "^[[:space:]]*(export[[:space:]]+)?$key[[:space:]]*=[[:space:]]*([^[:space:]#\"']|\"[^\"]|'[^'])" "$ENV_FILE"; then
+                missing="$missing $key"
+            fi
+        done
+        for key in $(sed -n -E 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*/\2/p' "$ENV_FILE"); do
+            if ! grep -q -i -E "^(#[[:space:]]*)?$key=" "$example"; then unknown="$unknown $key"; fi
+        done
+    fi
+    if [ -n "$missing" ]; then
+        echo "missing:$missing" >> "$ENV_CHECK.tmp"
+        log "WARNING: $ENV_FILE has no value for:$missing. server/.env.example says what each is for; set them with pix env, then pix restart"
+    fi
+    if [ -n "$unknown" ]; then
+        echo "unknown:$unknown" >> "$ENV_CHECK.tmp"
+        log "WARNING: $ENV_FILE sets names that server/.env.example does not list, so the app ignores them:$unknown. Check their spelling"
+    fi
+    mv "$ENV_CHECK.tmp" "$ENV_CHECK"
+}
 
 # --- docker and nginx -------------------------------------------------------------------------------------------
 
@@ -260,6 +292,7 @@ deploy_commit() {
     idle_commit=$(commit_of "$idle")
     log "deploying $tag to app-$idle"
     git -C "$REPO" checkout -q --detach "$sha"
+    check_env
     build_image "$tag" || { give_up "$sha" "$idle" "$idle_commit" "$checkout" "the build or the tests failed"; return 1; }
     set_commit "$idle" "$sha"
     start_copy "$idle" || { give_up "$sha" "$idle" "$idle_commit" "$checkout" "the new copy did not start"; return 1; }
@@ -299,6 +332,7 @@ command_restart() {
     idle_commit=$(commit_of "$idle")
     sha=$(commit_of "$ACTIVE")
     : > "$BUILD_LOG"
+    check_env
     log "restarting $(short "$sha") as app-$idle"
     set_commit "$idle" "$sha"
     if ! start_copy "$idle" || ! activate "$idle" wait; then
@@ -350,6 +384,8 @@ command_status() {
     echo "through nginx: app-$(served_copy)"
     echo "open rooms:    ${rooms:-unknown}"
     if [ -n "$FAILED_TREE" ]; then echo "not retried:   server/ tree $(short "$FAILED_TREE") failed or was rolled back"; fi
+    check_env > /dev/null
+    if [ -s "$ENV_CHECK" ]; then sed 's/^/settings:      /' "$ENV_CHECK"; else echo "settings:      every value server/.env.example asks for is set"; fi
     compose ps -a
 }
 

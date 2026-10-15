@@ -207,12 +207,18 @@ The server needs Docker with the Compose and Buildx plugins (`sudo apt install -
 ```sh
 sudo git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git /opt/pix/repo
 sudo /opt/pix/repo/server/deploy/setup.sh dev        # "main" on Server A
-sudoedit /opt/pix/.env                               # put the OpenRouter key in
+sudoedit /opt/pix/.env                               # fill in the names left empty
 sudo /opt/pix/repo/server/deploy/deploy.sh deploy    # the first deploy, by hand
 sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 ```
 
 [`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It sets the branch in `/opt/pix/deploy.conf`, keeping any other setting there, creates `/opt/pix/.env` from `.env.example` (readable by root only), and installs the systemd units. Secrets exist only in `/opt/pix/.env`; `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before it is merged, pass it to the first deploy: `deploy.sh deploy feat/2-deploy`.
+
+### Settings
+
+[`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=` or `PIX_GOOGLE_CLIENT_ID=`, must be set on every server; every other name is commented and shows the default the app already has, or says where it is set. Uncomment a name in `/opt/pix/.env` only to give a server another value, so a default changed in the code still reaches it.
+
+Each deploy and `deploy.sh restart` compare `/opt/pix/.env` with the `.env.example` of the commit being started, and never change either file. They warn about a name the example leaves empty that `.env` has no value for, and about a name `.env` sets that the example does not list, which is probably misspelled, because the app ignores names it does not know. `pix status` shows the result, an operator sees it in one line on logging in, and the app logs which features are off at start. Fill in a value with `pix env`, then `pix restart`. A server set up before 2026-10-15 has every default uncommented in `/opt/pix/.env`, copied from the old example; those lines pin today's values, so delete the ones you did not mean to change.
 
 ### Operate it
 
@@ -222,7 +228,7 @@ sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 echo '[ -f /opt/pix/repo/server/deploy/pix.sh ] && . /opt/pix/repo/server/deploy/pix.sh' >> ~/.bashrc
 ```
 
-`pix help` lists the commands: `pix status`, `pix deploy [ref]`, `pix rollback`, `pix restart`, `pix logs` for the serving copy, `pix nginx`, `pix journal`, `pix build`, `pix timer`, `pix env`, `pix health`, `pix redis`, and `pix db`. They need an account that can use `sudo`. One deployment serves everyone on a server, so tell the team before a rollback, and never edit files in `/opt/pix/repo`, where each deploy checks out its commit.
+`pix help` lists the commands: `pix status`, `pix deploy [ref]`, `pix rollback`, `pix restart`, `pix logs` for the serving copy, `pix nginx`, `pix journal`, `pix build`, `pix timer`, `pix env`, `pix health`, `pix redis`, and `pix db`; `pix status` also lists the settings `/opt/pix/.env` lacks ([Settings](#settings)). They need an account that can use `sudo`. One deployment serves everyone on a server, so tell the team before a rollback, and never edit files in `/opt/pix/repo`, where each deploy checks out its commit.
 
 Without the shortcuts, run these on the server with `sudo`:
 

@@ -63,6 +63,15 @@ class HideQuery(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(HideQuery())
 
 
+def warn_about_missing_settings(settings: Settings) -> None:
+    """The settings .env.example leaves empty for each server to fill in; the server runs without them, but a feature
+    does not, so the log says which."""
+    if settings.openrouter_api_key is None or not settings.openrouter_api_key.get_secret_value():
+        logger.warning("OPENROUTER_API_KEY is not set: pose requests answer UPSTREAM_ERROR")
+    if not settings.google_client_id:
+        logger.warning("PIX_GOOGLE_CLIENT_ID is not set: Google sign-in answers UNAVAILABLE")
+
+
 def jwt_secret(settings: Settings) -> str:
     if settings.jwt_secret is not None and settings.jwt_secret.get_secret_value():
         return settings.jwt_secret.get_secret_value()
@@ -90,6 +99,7 @@ def create_app(
         connection = redis() if redis is not None else open_redis(config)
         store = SessionStore(connection, config, clock)
         registry = SessionRegistry(config, store)
+        warn_about_missing_settings(config)
         app.state.settings = config
         app.state.clock = clock
         app.state.store = store

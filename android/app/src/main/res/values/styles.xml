@@ -172,6 +172,15 @@
         <item name="iconTint">@color/button_danger_text</item>
     </style>
 
+    <!-- A glass button with only an icon, such as Flash in the top bar. -->
+    <style name="Widget.Pix.Button.Glass.Icon">
+        <item name="android:minWidth">48dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
     <!-- An icon-only round button, such as Remove guide. -->
     <style name="Widget.Pix.Button.Icon" parent="Widget.Material3.Button.IconButton">
         <item name="android:minWidth">48dp</item>

@@ -1,11 +1,14 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
+import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.PhotoSaver
+import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.network.PixApi
 import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.GenerationConsent
@@ -48,10 +51,12 @@ class AppContainer(context: Context) {
     // ---- Camera (#3) ----------------------------------------------------------
     val cameraController: CameraController = CameraXController(appContext, PhotoSaver(appContext))
 
+    val cameraSettings: CameraSettings = DataStoreCameraSettings(appContext)
+
     // ---- Guide (#5, #6) -------------------------------------------------------
 
-    /** The photographer's guide. */
-    val guideRepository: GuideRepository = InMemoryGuideRepository()
+    /** The photographer's guide, clamped to the frame of the chosen aspect ratio (AD-10). */
+    val guideRepository: GuideRepository = InMemoryGuideRepository { cameraController.state.value.aspect.frameAspect }
 
     /** The subject's copy of the photographer's guide. A separate instance (GuideRepository.kt). */
     val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository()

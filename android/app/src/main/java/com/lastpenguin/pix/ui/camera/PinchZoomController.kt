@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.annotation.SuppressLint
+import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
@@ -13,7 +14,8 @@ import android.view.View
  * with `final = true` when the fingers lift, the gesture is cancelled, or the screen stops accepting input.
  *
  * [enabled] is false while guide-edit mode is on: the overlay above owns every touch then, and whatever still
- * reaches the view is left alone. Shared by the Camera screen and Subject view.
+ * reaches the view is left alone. Shared by the Camera screen and Subject view. Since this controller owns the
+ * view's touches, it also reports a single tap to [onTap] (tap to focus on Camera, FR-1.4); a pinch is never a tap.
  */
 internal class PinchZoomController(
     view: View,
@@ -21,6 +23,8 @@ internal class PinchZoomController(
     private val range: () -> ClosedFloatingPointRange<Float>?,
     /** The zoom to start from: the applied ratio on Camera, the shown ratio on Subject view. */
     private val current: () -> Float,
+    /** A single-finger tap at view coordinates, or null for a view without taps. */
+    private val onTap: ((x: Float, y: Float) -> Unit)? = null,
     private val onZoom: (ratio: Float, final: Boolean) -> Unit,
 ) {
     var isTracking: Boolean = false
@@ -69,11 +73,25 @@ internal class PinchZoomController(
         handleTouch(view)
     }
 
+    // A second finger cancels the tap, so the end of a pinch is never reported as one.
+    private val tapDetector = onTap?.let { tap ->
+        GestureDetector(
+            view.context,
+            object : GestureDetector.SimpleOnGestureListener() {
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    if (!isTracking) tap(e.x, e.y)
+                    return true
+                }
+            },
+        )
+    }
+
     @SuppressLint("ClickableViewAccessibility") // The readout keeps the Zoom in / Zoom out accessibility actions.
     private fun handleTouch(view: View) {
         view.setOnTouchListener { _, event ->
             if (!enabled) return@setOnTouchListener false
             detector.onTouchEvent(event)
+            tapDetector?.onTouchEvent(event)
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
                 finishInteraction()
             }

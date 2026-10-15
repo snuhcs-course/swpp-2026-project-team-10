@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.view.InputDevice
@@ -121,11 +121,36 @@ class PinchZoomControllerTest {
         assertEquals(1.5f, fixture.requests.last().ratio, TOLERANCE)
     }
 
+    @Test
+    fun aSingleFingerTapIsReportedAtItsViewCoordinates() = onMain {
+        val fixture = fixture(current = 1f)
+
+        touch(fixture.view, MotionEvent.ACTION_DOWN, point(7, 120f, 340f))
+        touch(fixture.view, MotionEvent.ACTION_UP, point(7, 120f, 340f))
+
+        assertEquals(listOf(120f to 340f), fixture.taps)
+        assertTrue(fixture.requests.isEmpty())
+    }
+
+    @Test
+    fun aPinchOrADisabledControllerReportsNoTap() = onMain {
+        val pinched = fixture(current = 1f)
+        pinch(pinched.view, from = 300f, to = 600f)
+        assertTrue(pinched.taps.isEmpty())
+
+        val disabled = fixture(current = 1f)
+        disabled.controller.enabled = false
+        touch(disabled.view, MotionEvent.ACTION_DOWN, point(7, 120f, 340f))
+        touch(disabled.view, MotionEvent.ACTION_UP, point(7, 120f, 340f))
+        assertTrue(disabled.taps.isEmpty())
+    }
+
     private data class Request(val ratio: Float, val final: Boolean)
 
     private class Fixture(
         val view: View,
         val requests: MutableList<Request>,
+        val taps: MutableList<Pair<Float, Float>>,
         var current: Float,
         var range: ClosedFloatingPointRange<Float>?,
     ) {
@@ -134,11 +159,12 @@ class PinchZoomControllerTest {
 
     private fun fixture(current: Float, range: ClosedFloatingPointRange<Float>? = 1f..8f): Fixture {
         val view = View(instrumentation.targetContext).apply { layout(0, 0, 900, 1200) }
-        val fixture = Fixture(view, mutableListOf(), current, range)
+        val fixture = Fixture(view, mutableListOf(), mutableListOf(), current, range)
         fixture.controller = PinchZoomController(
             view,
             range = { fixture.range },
             current = { fixture.current },
+            onTap = { x, y -> fixture.taps += x to y },
         ) { ratio, final -> fixture.requests += Request(ratio, final) }
         return fixture
     }

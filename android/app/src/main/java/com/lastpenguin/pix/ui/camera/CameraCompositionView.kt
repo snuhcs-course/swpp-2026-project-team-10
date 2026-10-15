@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-05, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -36,6 +36,15 @@ class CameraCompositionView @JvmOverloads constructor(
     private var frame = ViewfinderFrame(0f, 0f, 0f, 0f)
     private var level: CameraLevel? = null
 
+    /** The frame's width / height (AD-10); the grid divides that image, not the letterbox around it (FR-1.9). */
+    var frameAspect: Float = 3f / 4f
+        set(value) {
+            if (field == value) return
+            field = value
+            frame = fitViewfinderFrame(width.toFloat(), height.toFloat(), value)
+            invalidate()
+        }
+
     init {
         // A non-clickable sibling lets touches reach PreviewView (or the editable guide) below it.
         isClickable = false
@@ -63,7 +72,7 @@ class CameraCompositionView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        frame = fitViewfinderFrame(w.toFloat(), h.toFloat())
+        frame = fitViewfinderFrame(w.toFloat(), h.toFloat(), frameAspect)
     }
 
     override fun onDraw(canvas: Canvas) {

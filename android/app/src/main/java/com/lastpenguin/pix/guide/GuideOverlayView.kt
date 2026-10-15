@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -45,6 +45,17 @@ class GuideOverlayView @JvmOverloads constructor(
         set(value) {
             field = value
             if (!value) finishGesture()
+        }
+
+    /** The frame's width / height (AD-10): 3:4 by default, 9:16, or 1:1. The guide is placed in that image. */
+    var frameAspect: Float = 3f / 4f
+        set(value) {
+            if (field == value || !value.isFinite() || value <= 0f) return
+            field = value
+            // A drag measured against the old image would land elsewhere in the new one.
+            finishGesture()
+            updateDrawing()
+            postInvalidateOnAnimation()
         }
 
     /**
@@ -215,7 +226,7 @@ class GuideOverlayView @JvmOverloads constructor(
             return
         }
 
-        val frame = GuideFrameTransform.fit(3f, 4f, width.toFloat(), height.toFloat())
+        val frame = GuideFrameTransform.fit(frameAspect, 1f, width.toFloat(), height.toFloat())
         val center = frame.frameToView(state.cx, state.cy)
         val guideHeight = state.height * frame.height
         val guideWidth = guideHeight * guide.aspect

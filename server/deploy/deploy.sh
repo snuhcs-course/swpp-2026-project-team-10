@@ -79,8 +79,9 @@ server_tree() { git -C "$REPO" rev-parse --verify -q "$1:server" || true; }
 # has, so it is not copied. A name .env sets that the example does not list at all is probably misspelled: the app
 # ignores names it does not know. Each finding is logged as a warning and written, as names only, to ENV_CHECK.
 check_env() {
-    local example=$REPO/server/.env.example key missing="" unknown=""
-    : > "$ENV_CHECK.tmp"
+    # Its own temporary file, because `status` runs this without the deploy lock.
+    local example=$REPO/server/.env.example key missing="" unknown="" tmp
+    tmp=$(mktemp "$ENV_CHECK.XXXXXX")
     if [ -f "$example" ] && [ -f "$ENV_FILE" ]; then
         for key in $(sed -n 's/^\([A-Z][A-Z0-9_]*\)=[[:space:]]*$/\1/p' "$example"); do
             if ! grep -q -i -E "^[[:space:]]*(export[[:space:]]+)?$key[[:space:]]*=[[:space:]]*([^[:space:]#\"']|\"[^\"]|'[^'])" "$ENV_FILE"; then
@@ -92,14 +93,14 @@ check_env() {
         done
     fi
     if [ -n "$missing" ]; then
-        echo "missing:$missing" >> "$ENV_CHECK.tmp"
+        echo "missing:$missing" >> "$tmp"
         log "WARNING: $ENV_FILE has no value for:$missing. server/.env.example says what each is for; set them with pix env, then pix restart"
     fi
     if [ -n "$unknown" ]; then
-        echo "unknown:$unknown" >> "$ENV_CHECK.tmp"
+        echo "unknown:$unknown" >> "$tmp"
         log "WARNING: $ENV_FILE sets names that server/.env.example does not list, so the app ignores them:$unknown. Check their spelling"
     fi
-    mv "$ENV_CHECK.tmp" "$ENV_CHECK"
+    mv -f "$tmp" "$ENV_CHECK"
 }
 
 # --- docker and nginx -------------------------------------------------------------------------------------------

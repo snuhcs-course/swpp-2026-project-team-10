@@ -301,11 +301,6 @@ async def register_device(body: DeviceRequest, request: Request, caller: SignedI
     signed in to another account. A session has one device, `session_id` being unique: a rotated token replaces the
     old one in place, in one upsert, so two registrations at once cannot leave two rows."""
     session_id = caller.session_id
-    if await db.get(AuthSession, session_id) is None:
-        # Signed out, with an access token that has not expired yet.
-        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
-    # The token leaves the session it was registered under, if another.
-    await db.execute(delete(Device).where(Device.fcm_token == body.fcmToken, Device.session_id != session_id))
     dialect = postgresql if db.get_bind().dialect.name == "postgresql" else sqlite
     values = {
         "user_id": caller.user.id,
@@ -313,9 +308,23 @@ async def register_device(body: DeviceRequest, request: Request, caller: SignedI
         "platform": body.platform,
         "updated_at": now_of(request.app),
     }
-    await db.execute(
-        dialect.insert(Device)
-        .values(id=new_id("d"), session_id=session_id, **values)
-        .on_conflict_do_update(index_elements=[Device.session_id], set_=values)
-    )
-    await db.commit()
+    for attempt in range(2):
+        if await db.get(AuthSession, session_id) is None:
+            # Signed out, with an access token that has not expired yet.
+            raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+        # The token leaves the session it was registered under, if another.
+        await db.execute(delete(Device).where(Device.fcm_token == body.fcmToken, Device.session_id != session_id))
+        try:
+            await db.execute(
+                dialect.insert(Device)
+                .values(id=new_id("d"), session_id=session_id, **values)
+                .on_conflict_do_update(index_elements=[Device.session_id], set_=values)
+            )
+            await db.commit()
+            return
+        except IntegrityError:
+            # Another session registered the same token at this moment. It has committed, so the second try finds
+            # its row and moves the token here.
+            await db.rollback()
+            if attempt:
+                raise

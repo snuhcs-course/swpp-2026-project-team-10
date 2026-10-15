@@ -104,6 +104,14 @@ async def take_request(db: AsyncSession, *conditions) -> FriendRequest | None:
     return FriendRequest(id=row.id, from_user_id=row.from_user_id, to_user_id=row.to_user_id) if row else None
 
 
+async def lock_pair(db: AsyncSession, first: str, second: str) -> None:
+    """Holds both user rows until the transaction ends, so that sending and accepting between the same two users run
+    one after the other on PostgreSQL. Without it, a request sent while its reverse is being accepted could miss the
+    reverse request and be saved next to the new friendship. On SQLite every transaction holds the write lock from
+    its start instead (`db.engine.open_database`)."""
+    await db.execute(select(User.id).where(User.id.in_(ordered(first, second))).order_by(User.id).with_for_update())
+
+
 async def befriend(request: Request, db: AsyncSession, me: str, other: User) -> NewFriend:
     """Makes the two friends and removes the requests between them. The friendship is inserted unless it exists, in
     one statement, so two requests that accept at the same moment both succeed."""
@@ -115,8 +123,10 @@ async def befriend(request: Request, db: AsyncSession, me: str, other: User) -> 
         .on_conflict_do_nothing()
     )
     await db.execute(delete(FriendRequest).where(between(me, other.id)))
+    # Read before the commit: if the session store fails, nothing is saved, and the same call can be repeated.
+    friend = (await with_presence(request, [other]))[0]
     await db.commit()
-    return NewFriend(friend=(await with_presence(request, [other]))[0])
+    return NewFriend(friend=friend)
 
 
 async def with_presence(request: Request, users: list[User]) -> list[FriendOut]:
@@ -189,6 +199,7 @@ async def send_friend_request(
     other = await db.get(User, body.userId)
     if other is None or other.pix_id is None:
         raise ApiError(404, "NOT_FOUND", "No user with this id")
+    await lock_pair(db, me, other.id)
     if await are_friends(db, me, other.id):
         raise ApiError(409, "ALREADY_FRIENDS", "You are already friends")
     if await pending(db, me, other.id) is not None:
@@ -229,6 +240,10 @@ def no_such_request() -> ApiError:
 @router.post("/friend-requests/{request_id}/accept")
 async def accept_friend_request(request_id: str, request: Request, caller: Member, db: Database) -> NewFriend:
     me = caller.user.id
+    found = await db.get(FriendRequest, request_id)
+    if found is None or found.to_user_id != me:
+        raise no_such_request()
+    await lock_pair(db, me, found.from_user_id)
     taken = await take_request(db, FriendRequest.id == request_id, FriendRequest.to_user_id == me)
     if taken is None:
         raise no_such_request()

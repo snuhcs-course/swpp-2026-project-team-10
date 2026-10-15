@@ -63,8 +63,7 @@ async def test_migrating_a_current_database_again_keeps_its_data(engine):
 
 
 async def test_workers_that_start_together_migrate_once(database_url):
-    if not database_url.startswith("postgresql"):
-        pytest.skip("Only PostgreSQL has the lock; a SQLite file serves one process on a laptop")
+    # PostgreSQL's advisory lock, or SQLite's write lock that every transaction takes at its start.
     engines = [open_database(database_url) for _ in range(2)]
     try:
         await asyncio.gather(*(migrate(engine) for engine in engines))

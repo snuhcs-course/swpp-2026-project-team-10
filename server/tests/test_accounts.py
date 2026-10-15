@@ -20,8 +20,8 @@ Partitions:
   before and at 30 days without use; kept alive by use; after sign-out
 - no sign-in needed: pose templates and room codes, with no token or a bad one (FR-5.1)
 - the account database down: unreachable, or a connection lost
-- devices: new token, the same token from another account, a rotated token, two registrations at once, sign-out,
-  invalid body
+- devices: new token, the same token from another account, a rotated token, two registrations at once for one
+  session, one token registered by two sessions at once, sign-out, invalid body
 """
 
 import asyncio
@@ -698,6 +698,24 @@ def test_two_registrations_at_once_leave_one_device_for_the_session(client, sign
     (device,) = devices(client)
     assert device[0] == user["id"]
     assert device[1] in {"fcm-1", "fcm-2"}
+
+
+def test_one_token_registered_by_two_sessions_at_once_ends_up_in_one(client, sign_up):
+    first, user = sign_up("dongje.p")
+    second = bearer(log_in(client, "dongje.p").json()["accessToken"])
+
+    async def both():
+        transport = httpx2.ASGITransport(app=client.app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://pix") as http:
+            return await asyncio.gather(
+                *(
+                    http.post("/api/v1/devices", headers=headers, json={"fcmToken": "fcm-1", "platform": "android"})
+                    for headers in (first, second)
+                )
+            )
+
+    assert [answer.status_code for answer in client.portal.call(both)] == [204, 204]
+    assert devices(client) == [(user["id"], "fcm-1")]
 
 
 @pytest.mark.parametrize("body", [{"fcmToken": "", "platform": "android"}, {"fcmToken": "fcm-1", "platform": "ios"}])

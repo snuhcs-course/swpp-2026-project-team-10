@@ -10,7 +10,8 @@ Partitions:
 - answer: accept or decline by the receiver; by the sender; an unknown or answered request; withdraw by the sender or
   by the receiver; ask again after a decline; accept a request for a pair who are already friends; requests saved at
   once, to each other (accepted) or the same one twice (saved once); accepting at the moment the request is withdrawn
-  or declined (one of the two happens)
+  or declined (one of the two happens), or at the moment the receiver also sends one (only the friendship is left);
+  accepting while the session store is down (nothing saved)
 - friend list: empty, one, several (ordered by name), both directions
 - remove: a friend, both directions, twice, with a pending request, and adding again
 - presence: no socket; a signed-in socket; in a room; an anonymous, invalid-token, or expired-token socket; two
@@ -402,13 +403,16 @@ def test_the_same_request_sent_twice_at_once_is_saved_once(client, two, monkeypa
 
 def at_once(client, *calls):
     """Sends requests to the app at the same moment and returns the answers in order. Each call is
-    `(method, path, headers)`."""
+    `(method, path, headers)` or `(method, path, headers, json)`."""
 
     async def send():
         transport = httpx2.ASGITransport(app=client.app)
         async with httpx2.AsyncClient(transport=transport, base_url="http://pix") as http:
             return await asyncio.gather(
-                *(http.request(method, path, headers=headers) for method, path, headers in calls)
+                *(
+                    http.request(call[0], call[1], headers=call[2], json=call[3] if len(call) > 3 else None)
+                    for call in calls
+                )
             )
 
     return client.portal.call(send)
@@ -428,3 +432,32 @@ def test_accepting_at_the_moment_the_request_is_withdrawn_or_declined_does_one_o
     expected = [offline(junhyeong_user)] if accepted.status_code == 200 else []
     assert friends_of(client, dongje) == expected
     assert requests_of(client, junhyeong)["incoming"] == []
+
+
+def test_sending_while_accepting_the_reverse_request_leaves_only_the_friendship(client, two):
+    """Junhyeong taps Add for Dongje at the moment he accepts Dongje's request. Whichever runs first, the other
+    finds the result, so no request is left next to the friendship."""
+    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
+    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    sent, accepted = at_once(
+        client,
+        ("POST", "/api/v1/friend-requests", junhyeong, {"userId": dongje_user["id"]}),
+        ("POST", f"/api/v1/friend-requests/{request_id}/accept", junhyeong, None),
+    )
+    assert 200 in (sent.status_code, accepted.status_code)
+    assert friends_of(client, dongje) == [offline(junhyeong_user)]
+    assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
+    assert requests_of(client, junhyeong) == {"incoming": [], "outgoing": []}
+
+
+def test_accept_answers_unavailable_and_saves_nothing_while_the_session_store_is_down(client, two, outage):
+    """Presence comes from the session store; it is read before the commit, so a failure leaves the request to
+    accept again."""
+    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
+    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    outage(True)
+    assert_error(client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong), 503, "UNAVAILABLE")
+    outage(False)
+    assert friends_of(client, dongje) == []
+    assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong).status_code == 200
+    assert friends_of(client, dongje) == [offline(junhyeong_user)]

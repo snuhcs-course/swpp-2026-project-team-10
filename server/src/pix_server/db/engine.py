@@ -17,11 +17,21 @@ def open_database(url: str) -> AsyncEngine:
     if engine.dialect.name == "sqlite":
 
         @event.listens_for(engine.sync_engine, "connect")
-        def enforce_foreign_keys(connection, _record) -> None:
+        def prepare(connection, _record) -> None:
             # SQLite ignores foreign keys unless each connection asks for them.
             cursor = connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
+            # The driver would start transactions lazily, and two of them could read before either writes; the
+            # listener below starts them instead.
+            connection.isolation_level = None
+
+        @event.listens_for(engine.sync_engine, "begin")
+        def begin(connection) -> None:
+            # Takes SQLite's write lock when the transaction starts, so transactions run one at a time. SQLite has no
+            # row locks for FOR UPDATE, and this is what keeps two requests on a laptop or in the tests from
+            # interleaving as they cannot on PostgreSQL.
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
 
     return engine
 

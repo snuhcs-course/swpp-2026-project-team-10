@@ -132,13 +132,13 @@ The endpoints, request and response bodies, and error codes are in Design §2.5.
 | `DELETE /auth/session` | Ends this phone's sign-in: its refresh token stops working and its device token is deleted. Its access token works until it expires, at most 15 minutes later. |
 | `GET /me`, `PUT /me` | The account, with `hasPassword` and `hasGoogle`; `PUT` sets `pixId`, `displayName`, or both. |
 | `POST /devices` | `{"fcmToken","platform":"android"}` → `204`. |
-| `GET /users?pixId=` | `{"user","relation","requestId"}` for an exact Pix ID, or `404 NOT_FOUND`. |
+| `POST /users/lookup` | `{"pixId"}` → `{"user","relation","requestId"}` for an exact Pix ID, or `404 NOT_FOUND`. |
 | `GET /friend-requests`, `POST /friend-requests`, `POST /friend-requests/{id}/accept`, `…/decline`, `DELETE /friend-requests/{id}` | Received and sent requests; send (`201`, or `200` with the new friend when the other user had already asked); accept; decline; withdraw. |
 | `GET /friends`, `DELETE /friends/{userId}` | `{"friends":[{"id","pixId","displayName","online","inSession"}]}`; remove a friend. |
 
 ```sh
 curl -H 'Content-Type: application/json' -d '{"pixId":"dongje.p","password":"sunset2026","displayName":"Dongje"}' http://localhost:8000/api/v1/auth/signup
-curl -H "Authorization: Bearer eyJhbGciOi…" 'http://localhost:8000/api/v1/users?pixId=junhyeong.h'
+curl -H "Authorization: Bearer eyJhbGciOi…" -H 'Content-Type: application/json' -d '{"pixId":"junhyeong.h"}' http://localhost:8000/api/v1/users/lookup
 ```
 
 - **Passwords** are hashed with argon2id on a worker thread, and only the hash is stored. They travel over plain HTTP to the course servers, which have no TLS (Design AD-11). Login attempts are not limited for now.
@@ -146,7 +146,8 @@ curl -H "Authorization: Bearer eyJhbGciOi…" 'http://localhost:8000/api/v1/user
 - **Tokens.** A sign-in gives an access token and a refresh token. The access token is a JWT signed with HS256 and `PIX_JWT_SECRET`, with the claims `iss` (`pix`), `sub` (the user), `sid` (the sign-in), `iat`, and `exp`, `PIX_ACCESS_TOKEN_MINUTES` (15) later; it is checked without the database and not stored. The refresh token is random, stored only as a SHA-256 hash in `sessions`, and lasts `PIX_SESSION_TTL_DAYS` (30) from its last use; each refresh replaces it, and an old one that comes back ends the sign-in. Without `PIX_JWT_SECRET` each process makes its own at start, so access tokens end on a restart (the app refreshes) and several workers would not accept each other's; on the course servers `deploy.sh` makes one in `/opt/pix/jwt-secret`.
 - **Database down.** An account request that cannot reach the database answers `503 UNAVAILABLE`; pose generation and rooms do not use it.
 - **Friend endpoints** answer `403 PIX_ID_REQUIRED` until the caller has a Pix ID, and a user without one cannot be found. Pushes for friend requests come with invitations (Iter2-P15).
-- **Logs.** Neither the app nor nginx logs a request's query string, which can hold a Pix ID, and nothing logs a password, a token, or a request body.
+- **Logs.** No URL carries a Pix ID, because nginx's error log prints a failed request's whole request line; the lookup takes it in the body. Neither the app nor nginx logs a request's query string, and nothing logs a password, a token, or a request body.
+- **Password hashing** runs two at a time per worker; each argon2id hash holds 64 MiB, so a burst of sign-ins waits instead of filling memory.
 
 ## Session store
 

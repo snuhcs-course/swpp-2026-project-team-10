@@ -1,5 +1,6 @@
 # AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
-"""Accounts and friends: users, sessions, devices, friend requests, and friendships (Design Documentation 2.7).
+"""Accounts and friends: users, sessions, spent refresh tokens, devices, friend requests, and friendships (Design
+Documentation 2.7).
 
 Revision ID: 0001
 Revises:
@@ -40,7 +41,6 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("user_id", sa.String(), nullable=False),
         sa.Column("refresh_hash", sa.String(), nullable=False),
-        sa.Column("previous_refresh_hash", sa.String(), nullable=True),
         timestamp("created_at"),
         timestamp("expires_at"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_sessions_user_id_users")),
@@ -48,7 +48,20 @@ def upgrade() -> None:
         sa.UniqueConstraint("refresh_hash", name=op.f("uq_sessions_refresh_hash")),
     )
     op.create_index(op.f("ix_sessions_user_id"), "sessions", ["user_id"])
-    op.create_index(op.f("ix_sessions_previous_refresh_hash"), "sessions", ["previous_refresh_hash"])
+    op.create_table(
+        "spent_refresh_tokens",
+        sa.Column("token_hash", sa.String(), nullable=False),
+        sa.Column("session_id", sa.String(), nullable=False),
+        timestamp("spent_at"),
+        sa.ForeignKeyConstraint(
+            ["session_id"],
+            ["sessions.id"],
+            name=op.f("fk_spent_refresh_tokens_session_id_sessions"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("token_hash", name=op.f("pk_spent_refresh_tokens")),
+    )
+    op.create_index(op.f("ix_spent_refresh_tokens_session_id"), "spent_refresh_tokens", ["session_id"])
     op.create_table(
         "devices",
         sa.Column("id", sa.String(), nullable=False),
@@ -71,11 +84,13 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("from_user_id", sa.String(), nullable=False),
         sa.Column("to_user_id", sa.String(), nullable=False),
+        sa.Column("user_a", sa.String(), nullable=False),
+        sa.Column("user_b", sa.String(), nullable=False),
         timestamp("created_at"),
         sa.ForeignKeyConstraint(["from_user_id"], ["users.id"], name=op.f("fk_friend_requests_from_user_id_users")),
         sa.ForeignKeyConstraint(["to_user_id"], ["users.id"], name=op.f("fk_friend_requests_to_user_id_users")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_friend_requests")),
-        sa.UniqueConstraint("from_user_id", "to_user_id", name=op.f("uq_friend_requests_from_user_id")),
+        sa.UniqueConstraint("user_a", "user_b", name=op.f("uq_friend_requests_user_a")),
     )
     op.create_index("ix_friend_requests_to_user_id", "friend_requests", ["to_user_id"])
     op.create_table(
@@ -94,5 +109,6 @@ def downgrade() -> None:
     op.drop_table("friendships")
     op.drop_table("friend_requests")
     op.drop_table("devices")
+    op.drop_table("spent_refresh_tokens")
     op.drop_table("sessions")
     op.drop_table("users")

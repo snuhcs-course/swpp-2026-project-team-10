@@ -10,7 +10,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from pix_server.accounts.auth import Database, SignedIn, Tokens, hash_token, new_refresh_token, now_of
@@ -18,7 +18,7 @@ from pix_server.accounts.google import GoogleAccount, GoogleUnavailable, GoogleV
 from pix_server.accounts.passwords import Passwords
 from pix_server.accounts.rules import DISPLAY_NAME_MAX, normalize_pix_id, password_problem, pix_id_problem
 from pix_server.accounts.schemas import AccountOut, AuthOut, DisplayName, TokensOut
-from pix_server.db.models import AuthSession, Device, User, new_id
+from pix_server.db.models import AuthSession, Device, SpentRefreshToken, User, new_id
 from pix_server.errors import ApiError
 
 router = APIRouter(prefix="/api/v1")
@@ -181,34 +181,40 @@ async def sign_up_with_google(body: GoogleRequest, request: Request, db: Databas
 @router.post("/auth/refresh")
 async def refresh(body: RefreshRequest, request: Request, db: Database) -> TokensOut:
     """Exchanges a refresh token for a new access token and a new refresh token; the old refresh token stops
-    working. One that was already exchanged and comes back may have been stolen, so it ends the session: the phone
-    and whoever holds a copy both have to sign in again."""
+    working. One that was already exchanged and comes back may have been copied, so it ends the session: the phone
+    and whoever holds the copy both have to sign in again."""
     now = now_of(request.app)
+    ttl = session_ttl(request)
     presented = hash_token(body.refreshToken)
-    session = await db.scalar(select(AuthSession).where(AuthSession.refresh_hash == presented))
-    if session is None:
-        await db.execute(delete(AuthSession).where(AuthSession.previous_refresh_hash == presented))
-        await db.commit()
-        raise invalid_refresh_token()
-    if session.expires_at <= now:
-        await db.delete(session)
-        await db.commit()
-        raise invalid_refresh_token()
     refresh_token = new_refresh_token()
-    # Only if the token is still the current one, so two refreshes with one token cannot both succeed.
-    rotated = await db.execute(
-        update(AuthSession)
-        .where(AuthSession.id == session.id, AuthSession.refresh_hash == presented)
-        .values(
-            previous_refresh_hash=presented,
-            refresh_hash=hash_token(refresh_token),
-            expires_at=now + session_ttl(request),
+    # One statement finds the session and replaces its token, so of two refreshes with one token only one can
+    # succeed; the other finds the token spent below, as any later reuse does.
+    rotated = (
+        await db.execute(
+            update(AuthSession)
+            .where(AuthSession.refresh_hash == presented, AuthSession.expires_at > now)
+            .values(refresh_hash=hash_token(refresh_token), expires_at=now + ttl)
+            .returning(AuthSession.id, AuthSession.user_id)
+        )
+    ).first()
+    if rotated is None:
+        # A spent token ends its session, and so does an expired current one; an unknown token changes nothing.
+        spent = select(SpentRefreshToken.session_id).where(SpentRefreshToken.token_hash == presented)
+        await db.execute(
+            delete(AuthSession).where(or_(AuthSession.id.in_(spent), AuthSession.refresh_hash == presented))
+        )
+        await db.commit()
+        raise invalid_refresh_token()
+    session_id, user_id = rotated
+    db.add(SpentRefreshToken(token_hash=presented, session_id=session_id, spent_at=now))
+    # A token spent longer ago than a session lasts would have expired by now, so it need not be kept.
+    await db.execute(
+        delete(SpentRefreshToken).where(
+            SpentRefreshToken.session_id == session_id, SpentRefreshToken.spent_at < now - ttl
         )
     )
     await db.commit()
-    if rotated.rowcount != 1:
-        raise invalid_refresh_token()
-    return issue(request, session.user_id, session.id, refresh_token)
+    return issue(request, user_id, session_id, refresh_token)
 
 
 @router.delete("/auth/session", status_code=204)

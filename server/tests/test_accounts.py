@@ -14,18 +14,21 @@ Partitions:
 - PUT /me: Pix ID for a Google account; invalid or taken Pix ID; display name only; the changed Pix ID as login name
 - access token: missing, wrong scheme, not a JWT; signed with another secret, with "none", or changed after signing;
   another issuer; a claim missing; an unknown user; just before and at its 15 minutes; the secret unset
-- refresh token: valid (rotated); unknown; empty; exchanged before (ends the session); just before and at 30 days
-  without use; kept alive by use; after sign-out
+- refresh token: valid (rotated); unknown; empty; exchanged before, or several rotations before (ends the session);
+  two refreshes with one token at once (ends the session); spent longer ago than a session lasts (forgotten); just
+  before and at 30 days without use; kept alive by use; after sign-out
 - no sign-in needed: pose templates and room codes, with no token or a bad one (FR-5.1)
 - the account database down: unreachable, or a connection lost
 - devices: new token, the same token from another account, a rotated token, sign-out, invalid body
 """
 
+import asyncio
 import base64
 import json
 import logging
 from datetime import timedelta
 
+import httpx2
 import jwt
 import pytest
 from sqlalchemy import select
@@ -387,7 +390,7 @@ def test_changed_pix_id_is_the_new_log_in_name(client, sign_up):
         ("PUT", "/api/v1/me/password"),
         ("DELETE", "/api/v1/auth/session"),
         ("POST", "/api/v1/devices"),
-        ("GET", "/api/v1/users?pixId=dongje.p"),
+        ("POST", "/api/v1/users/lookup"),
         ("GET", "/api/v1/friend-requests"),
         ("POST", "/api/v1/friend-requests"),
         ("POST", "/api/v1/friend-requests/fr_1/accept"),
@@ -456,6 +459,46 @@ def test_sign_in_ends_after_thirty_days_without_a_refresh(client, clock):
     assert renewed.status_code == 200
     clock.advance(timedelta(days=30).total_seconds())
     assert_error(refresh(client, renewed.json()["refreshToken"]), 401, "INVALID_REFRESH_TOKEN")
+
+
+def test_refresh_token_from_rotations_ago_still_ends_the_sign_in(client):
+    first = sign_up_with_tokens(client)
+    second = refresh(client, first["refreshToken"]).json()
+    third = refresh(client, second["refreshToken"]).json()
+    assert_error(refresh(client, first["refreshToken"]), 401, "INVALID_REFRESH_TOKEN")
+    assert_error(refresh(client, third["refreshToken"]), 401, "INVALID_REFRESH_TOKEN")
+
+
+def test_two_refreshes_with_one_token_at_once_end_the_sign_in(client):
+    """Whichever wins, the other finds the token spent, so neither keeps the session."""
+    tokens = sign_up_with_tokens(client)
+
+    async def both():
+        transport = httpx2.ASGITransport(app=client.app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://pix") as http:
+            return await asyncio.gather(
+                *(http.post("/api/v1/auth/refresh", json={"refreshToken": tokens["refreshToken"]}) for _ in range(2))
+            )
+
+    answers = client.portal.call(both)
+    assert sorted(answer.status_code for answer in answers) == [200, 401]
+    (winner,) = [answer.json() for answer in answers if answer.status_code == 200]
+    assert_error(refresh(client, winner["refreshToken"]), 401, "INVALID_REFRESH_TOKEN")
+
+
+def test_spent_tokens_are_forgotten_once_they_would_have_expired(client, clock):
+    day = 86400
+    first = sign_up_with_tokens(client)
+    clock.advance(20 * day)
+    second = refresh(client, first["refreshToken"]).json()
+    clock.advance(20 * day)
+    third = refresh(client, second["refreshToken"]).json()
+    clock.advance(20 * day)
+    # The first token was spent 40 days ago, longer than a sign-in lasts, so it is no longer recognized and no
+    # longer ends the session; it would have expired 30 days after it was issued anyway.
+    fourth = refresh(client, third["refreshToken"]).json()
+    assert_error(refresh(client, first["refreshToken"]), 401, "INVALID_REFRESH_TOKEN")
+    assert refresh(client, fourth["refreshToken"]).status_code == 200
 
 
 def test_sign_out_ends_the_refresh_token_of_this_phone_only(client):
@@ -627,10 +670,10 @@ def test_invalid_device_registration_is_rejected(client, sign_up, body):
 # --- logs ----------------------------------------------------------------------------------------------------------
 
 
-def test_access_log_leaves_out_the_query_that_holds_a_pix_id():
+def test_access_log_leaves_out_the_query():
     record = logging.LogRecord(
         "uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d',
-        ("10.0.0.1:5000", "GET", "/api/v1/users?pixId=dongje.p", "1.1", 200), None,
+        ("10.0.0.1:5000", "GET", "/api/v1/pose-templates?pixId=dongje.p", "1.1", 200), None,
     )  # fmt: skip
     assert HideQuery().filter(record)
-    assert record.getMessage() == '10.0.0.1:5000 - "GET /api/v1/users HTTP/1.1" 200'
+    assert record.getMessage() == '10.0.0.1:5000 - "GET /api/v1/pose-templates HTTP/1.1" 200'

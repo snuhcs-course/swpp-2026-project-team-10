@@ -4,7 +4,7 @@ FR-5.5–5.10). Only users with a Pix ID take part: nobody can be found or added
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.dialects import postgresql, sqlite
@@ -112,10 +112,15 @@ async def with_presence(request: Request, users: list[User]) -> list[FriendOut]:
     return [FriendOut.of(user, online=presence[user.id][0], inSession=presence[user.id][1]) for user in users]
 
 
-@router.get("/users")
-async def find_user(pix_id: Annotated[str, Query(alias="pixId")], caller: Member, db: Database) -> Lookup:
-    """Exact match only, with no partial search or listing (FR-5.5, NFR-15)."""
-    user = await db.scalar(select(User).where(User.pix_id == normalize_pix_id(pix_id)))
+class LookupRequest(BaseModel):
+    pixId: str
+
+
+@router.post("/users/lookup")
+async def find_user(body: LookupRequest, caller: Member, db: Database) -> Lookup:
+    """Exact match only, with no partial search or listing (FR-5.5, NFR-15). The Pix ID travels in the body, because
+    nginx's error log prints a failed request's whole request line, query included."""
+    user = await db.scalar(select(User).where(User.pix_id == normalize_pix_id(body.pixId)))
     if user is None:
         raise ApiError(404, "NOT_FOUND", "No user with this Pix ID")
     me = caller.user.id
@@ -178,11 +183,27 @@ async def send_friend_request(
     if await pending(db, other.id, me) is not None:
         response.status_code = 200
         return await befriend(request, db, me, other)
-    sent = FriendRequest(id=new_id("fr"), from_user_id=me, to_user_id=other.id, created_at=now_of(request.app))
+    other_id = other.id
+    user_a, user_b = ordered(me, other_id)
+    sent = FriendRequest(
+        id=new_id("fr"),
+        from_user_id=me,
+        to_user_id=other_id,
+        user_a=user_a,
+        user_b=user_b,
+        created_at=now_of(request.app),
+    )
     db.add(sent)
     try:
         await db.commit()
     except IntegrityError as exc:
+        # A request between the two was saved after the checks above, so the pair is taken. If it is theirs, both
+        # asked at once: theirs is accepted, as if it had been there first.
+        await db.rollback()
+        other = await db.get(User, other_id)
+        if await pending(db, other_id, me) is not None:
+            response.status_code = 200
+            return await befriend(request, db, me, other)
         raise ApiError(409, "ALREADY_REQUESTED", "You have already sent a request to this user") from exc
     return OutgoingRequest(id=sent.id, to=UserOut.of(other), createdAt=millis(sent.created_at))
 

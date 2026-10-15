@@ -4,11 +4,12 @@
 
 Partitions:
 - lookup: unknown Pix ID; the caller (SELF); a friend; a request sent (REQUESTED) or received (INCOMING); none;
-  capitals and spaces; a user without a Pix ID; a caller without a Pix ID; no query
+  capitals and spaces; a user without a Pix ID; a caller without a Pix ID; no Pix ID in the body
 - send: a new user; the caller; an unknown id; a user without a Pix ID; a friend; sent twice; the other already
   asked (accepted instead)
 - answer: accept or decline by the receiver; by the sender; an unknown or answered request; withdraw by the sender or
-  by the receiver; ask again after a decline; accept a request for a pair who are already friends
+  by the receiver; ask again after a decline; accept a request for a pair who are already friends; requests saved at
+  once, to each other (accepted) or the same one twice (saved once)
 - friend list: empty, one, several (ordered by name), both directions
 - remove: a friend, both directions, twice, with a pending request, and adding again
 - presence: no socket; a signed-in socket; in a room; an anonymous, invalid-token, or expired-token socket; two
@@ -21,6 +22,7 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from pix_server.accounts import friends as friends_module
 from pix_server.db.models import FriendRequest
 
 
@@ -30,7 +32,7 @@ def assert_error(response, status, code):
 
 
 def find(client, headers, pix_id):
-    return client.get("/api/v1/users", headers=headers, params={"pixId": pix_id})
+    return client.post("/api/v1/users/lookup", headers=headers, json={"pixId": pix_id})
 
 
 def request_friend(client, headers, user):
@@ -116,9 +118,9 @@ def test_a_user_without_a_pix_id_cannot_be_found_or_use_friends(client, two):
         assert_error(call(), 403, "PIX_ID_REQUIRED")
 
 
-def test_lookup_without_a_pix_id_query_is_invalid(client, two):
+def test_lookup_without_a_pix_id_is_invalid(client, two):
     (dongje, _), _ = two
-    assert_error(client.get("/api/v1/users", headers=dongje), 400, "INVALID_REQUEST")
+    assert_error(client.post("/api/v1/users/lookup", headers=dongje, json={}), 400, "INVALID_REQUEST")
 
 
 # --- sending -------------------------------------------------------------------------------------------------------
@@ -312,6 +314,27 @@ def test_socket_with_an_expired_token_works_but_shows_nobody_online(client, cloc
         assert presence(client, {"Authorization": f"Bearer {fresh.json()['accessToken']}"}) == (False, False)
 
 
+def insert_request(client, request_id, sender, receiver):
+    """Saves a request straight into the database, as one that slipped past the API's checks would be."""
+
+    async def insert():
+        user_a, user_b = sorted((sender["id"], receiver["id"]))
+        async with client.app.state.database() as db:
+            db.add(
+                FriendRequest(
+                    id=request_id,
+                    from_user_id=sender["id"],
+                    to_user_id=receiver["id"],
+                    user_a=user_a,
+                    user_b=user_b,
+                    created_at=datetime.now(UTC),
+                )
+            )
+            await db.commit()
+
+    client.portal.call(insert)
+
+
 def test_accepting_when_already_friends_keeps_one_friendship(client, two):
     """Both users answer at the same moment: the second answer finds the friendship already there."""
     (dongje, dongje_user), (junhyeong, junhyeong_user) = two
@@ -319,46 +342,55 @@ def test_accepting_when_already_friends_keeps_one_friendship(client, two):
     second = client.post("/api/v1/friend-requests", headers=junhyeong, json={"userId": dongje_user["id"]})
     assert second.status_code == 200
     # A request that slipped in before the friendship was seen is answered without a second row.
-    late_request = "fr_LATE"
-
-    async def insert_late_request():
-        async with client.app.state.database() as db:
-            db.add(
-                FriendRequest(
-                    id=late_request,
-                    from_user_id=dongje_user["id"],
-                    to_user_id=junhyeong_user["id"],
-                    created_at=datetime.now(UTC),
-                )
-            )
-            await db.commit()
-
-    client.portal.call(insert_late_request)
-    accepted = client.post(f"/api/v1/friend-requests/{late_request}/accept", headers=junhyeong)
+    insert_request(client, "fr_LATE", dongje_user, junhyeong_user)
+    accepted = client.post("/api/v1/friend-requests/fr_LATE/accept", headers=junhyeong)
     assert accepted.status_code == 200
     assert friends_of(client, dongje) == [offline(junhyeong_user)]
     assert friends_of(client, junhyeong) == [offline(dongje_user)]
 
 
-def test_requests_between_two_users_are_unique_in_one_direction(client, two):
-    """The database refuses a duplicate even if two requests race past the API's own check."""
+@pytest.mark.parametrize("first", ["same direction", "opposite direction"])
+def test_one_request_at_most_between_two_users(client, two, first):
+    """The database refuses a second request between the same two users, in either direction."""
     (_, dongje_user), (_, junhyeong_user) = two
+    insert_request(client, "fr_1", dongje_user, junhyeong_user)
+    sender, receiver = (dongje_user, junhyeong_user) if first == "same direction" else (junhyeong_user, dongje_user)
+    with pytest.raises(IntegrityError):
+        insert_request(client, "fr_2", sender, receiver)
 
-    async def insert_twice():
-        async with client.app.state.database() as db:
-            for request_id in ("fr_1", "fr_2"):
-                db.add(
-                    FriendRequest(
-                        id=request_id,
-                        from_user_id=dongje_user["id"],
-                        to_user_id=junhyeong_user["id"],
-                        created_at=datetime.now(UTC),
-                    )
-                )
-                try:
-                    await db.commit()
-                except IntegrityError:
-                    return request_id
-        return None
 
-    assert client.portal.call(insert_twice) == "fr_2"
+def checks_before_the_other_save(monkeypatch):
+    """Makes a request's two checks for a pending request see none, as if they ran just before another request
+    between the same two users was saved; later checks see the database as it is."""
+    original = friends_module.pending
+    stale = [True, True]
+
+    async def pending(db, sender, receiver):
+        if stale:
+            stale.pop()
+            return None
+        return await original(db, sender, receiver)
+
+    monkeypatch.setattr(friends_module, "pending", pending)
+
+
+def test_requests_sent_to_each_other_at_once_make_the_two_friends(client, two, monkeypatch):
+    """Both save a request at once. The second save finds the pair taken and accepts Dongje's request instead of
+    leaving one request each way."""
+    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
+    insert_request(client, "fr_DONGJE", dongje_user, junhyeong_user)
+    checks_before_the_other_save(monkeypatch)
+    response = request_friend(client, junhyeong, dongje_user)
+    assert response.status_code == 200
+    assert response.json() == {"friend": offline(dongje_user)}
+    assert friends_of(client, dongje) == [offline(junhyeong_user)]
+    assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
+
+
+def test_the_same_request_sent_twice_at_once_is_saved_once(client, two, monkeypatch):
+    (dongje, _), (junhyeong, junhyeong_user) = two
+    dongje_user = client.get("/api/v1/me", headers=dongje).json()
+    insert_request(client, "fr_FIRST", dongje_user, junhyeong_user)
+    checks_before_the_other_save(monkeypatch)
+    assert_error(request_friend(client, dongje, junhyeong_user), 409, "ALREADY_REQUESTED")
+    assert [item["id"] for item in requests_of(client, junhyeong)["incoming"]] == ["fr_FIRST"]

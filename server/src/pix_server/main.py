@@ -50,7 +50,8 @@ logger = logging.getLogger(__name__)
 
 
 class HideQuery(logging.Filter):
-    """Logs a request's path without its query, which can hold a Pix ID (`GET /users?pixId=`, NFR-13)."""
+    """Logs a request's path without its query, so no query parameter can put personal data in a log (NFR-13).
+    No endpoint takes a Pix ID in its URL; this keeps one added later out of the access log."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         # Uvicorn's access record: client, method, path with query, HTTP version, status.

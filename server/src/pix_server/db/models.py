@@ -63,18 +63,27 @@ class User(Base):
 
 
 class AuthSession(Base):
-    """One sign-in on one phone. Its refresh token is kept only as a hash and is replaced on every refresh; the
-    one it replaced is kept too, so a stolen token that comes back can end the session."""
+    """One sign-in on one phone. Its refresh token is kept only as a hash and is replaced on every refresh."""
 
     __tablename__ = "sessions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     refresh_hash: Mapped[str] = mapped_column(String, unique=True)
-    previous_refresh_hash: Mapped[str | None] = mapped_column(String, index=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime)
     # Moves forward on every refresh, so a phone in use stays signed in.
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime)
+
+
+class SpentRefreshToken(Base):
+    """A refresh token a session has already exchanged. One that comes back may have been copied, so it ends its
+    session. Kept for one session lifetime, after which the token would have expired anyway."""
+
+    __tablename__ = "spent_refresh_tokens"
+
+    token_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
+    spent_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 
 class Device(Base):
@@ -92,17 +101,20 @@ class Device(Base):
 
 
 class FriendRequest(Base):
-    """A pending request; it is deleted when it is answered or withdrawn."""
+    """A pending request; it is deleted when it is answered or withdrawn. At most one exists between two users, in
+    either direction: `user_a` and `user_b` are the pair with the smaller id first, and they are unique."""
 
     __tablename__ = "friend_requests"
     __table_args__ = (
-        UniqueConstraint("from_user_id", "to_user_id"),
+        UniqueConstraint("user_a", "user_b"),
         Index("ix_friend_requests_to_user_id", "to_user_id"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     from_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     to_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    user_a: Mapped[str] = mapped_column(String)
+    user_b: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -18,7 +18,7 @@ class SessionNotFoundFragment : Fragment(R.layout.fragment_failure) {
 
         binding.primaryButton.setText(R.string.try_again)
         binding.primaryButton.setOnClickListener {
-            // Join with code prefills the code kept in SessionViewModel (FR-8.3).
+            // The action carries keepCode, so Join with code offers the kept code for editing (FR-8.3, #81).
             findNavController().navigate(R.id.action_sessionNotFound_to_joinCode)
         }
         binding.secondaryButton.setText(R.string.back)

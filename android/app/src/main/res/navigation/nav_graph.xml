@@ -120,6 +120,11 @@
         android:id="@+id/joinCodeFragment"
         android:name="com.lastpenguin.pix.ui.session.JoinCodeFragment"
         android:label="Join with code">
+        <!-- True only from Session not found, which offers the kept code for editing (FR-8.3, #81). -->
+        <argument
+            android:name="keepCode"
+            android:defaultValue="false"
+            app:argType="boolean" />
         <action
             android:id="@+id/action_joinCode_to_subject"
             app:destination="@id/subjectFragment"
@@ -140,7 +145,12 @@
             android:id="@+id/action_sessionNotFound_to_joinCode"
             app:destination="@id/joinCodeFragment"
             app:popUpTo="@id/sessionNotFoundFragment"
-            app:popUpToInclusive="true" />
+            app:popUpToInclusive="true">
+            <argument
+                android:name="keepCode"
+                android:defaultValue="true"
+                app:argType="boolean" />
+        </action>
     </fragment>
 
     <!-- Flow 5: Subject view -->

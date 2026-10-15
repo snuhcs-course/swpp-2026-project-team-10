@@ -198,6 +198,16 @@ GitHub cannot push to the servers: SSH goes through a campus-only relay with per
 6. It points nginx at the new copy and reloads it, checks `/health` through nginx, and stops the old copy with 40 s for requests in flight.
 7. It records the commit, which `/version` then shows, and deletes images other than the two copies'.
 
+**A change that `deploy.sh` and the Compose file need together**, such as a new variable that `deploy.sh` must pass to Compose, cannot be deployed by the timer the first time: the timer runs the `deploy.sh` of the commit already deployed, and the new Compose file refuses to start without the variable. That try fails safely and is not retried. Deploy once by hand with the new script, taken from the fetched commit (`main` on Server A):
+
+```sh
+sudo git -C /opt/pix/repo fetch -q origin dev
+sudo git -C /opt/pix/repo show FETCH_HEAD:server/deploy/deploy.sh | sudo tee /tmp/pix-deploy.sh > /dev/null
+sudo bash /tmp/pix-deploy.sh deploy
+```
+
+The PR that makes such a change says so. The first was #50, which added PostgreSQL and the secrets `deploy.sh` makes.
+
 A failure at any step leaves the serving copy as it was, and the timer does not try that `server/` tree again; fix the branch, or run `deploy.sh deploy` to retry. On GitHub, the [server-image](../.github/workflows/server-image.yml) workflow builds the image and checks the routes through nginx on every pull request, and the [server-deploy](../.github/workflows/server-deploy.yml) workflow waits after a merge until `/version` shows the commit, so a deploy that failed is a red mark on the commit.
 
 ### Set up a server once

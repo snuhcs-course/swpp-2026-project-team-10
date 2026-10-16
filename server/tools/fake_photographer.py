@@ -1,12 +1,11 @@
-# AI-generated with Claude Code, 2026-10-06, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 """A photographer phone made of Python, for testing the subject's side with one phone or emulator.
-
 It creates a room and prints the code. When the subject joins, it offers a test-pattern video and the two data
-channels, exchanges `hello`, sends `camera.capabilities`, echoes every `camera.zoom.set` as `camera.state`, sends
-the guide image from `--guide` (a WebP cutout with alpha, as the app would send it) with its `guide.state`, then
-moves the guide back and forth for `--seconds` the way a drag would (steps every 50 ms, a final value every 2 s),
-and ends the session. It is a development tool, not part of the server.
-
+channels, exchanges `hello`, sends `camera.capabilities`, echoes every zoom, brightness, and flash request as
+`camera.state`, applies `guide.move` to its guide, sends the guide image from `--guide` (a WebP cutout with
+alpha, as the app would send it) with its `guide.state`, then moves the guide back and forth for `--seconds` the
+way a drag would (steps every 50 ms, a final value every 2 s), and ends the session. It is a development tool, not
+part of the server.
     pip install websockets aiortc pillow
     python tools/fake_photographer.py --guide cutout.webp [--seconds 20] [--clear] [--server ws://127.0.0.1:8000/ws]
 """
@@ -79,7 +78,26 @@ async def main(args):
     codec = Codec()
     pc = RTCPeerConnection(RTCConfiguration(iceServers=[]))
     channels = {}
-    state = {"hello": None, "open": 0, "done": asyncio.Event(), "zoom": 1.0}
+    state = {
+        "hello": None,
+        "open": 0,
+        "done": asyncio.Event(),
+        "zoom": 1.0,
+        "exposure": 0,
+        "flash": "OFF",
+        "moved": None,
+    }
+
+    def camera_state(by, final):
+        return {
+            "zoom": state["zoom"],
+            "exposure": state["exposure"],
+            "flash": state["flash"],
+            "aspect": "R4_3",
+            "by": by,
+            "final": final,
+        }
+
     guide_id = str(uuid.uuid4())
     with open(args.guide, "rb") as f:
         guide_bytes = f.read()
@@ -103,8 +121,27 @@ async def main(args):
             send(
                 "reliable" if body.get("final") else "realtime",
                 "camera.state",
-                {"zoom": state["zoom"], "by": "SUBJECT", "final": bool(body.get("final"))},
+                camera_state("SUBJECT", bool(body.get("final"))),
             )
+        elif kind == "camera.exposure.set":
+            state["exposure"] = max(-4, min(4, int(body["index"])))
+            log(f"camera.exposure.set index={body['index']} final={body.get('final')}")
+            send(
+                "reliable" if body.get("final") else "realtime",
+                "camera.state",
+                camera_state("SUBJECT", bool(body.get("final"))),
+            )
+        elif kind == "camera.flash.set":
+            state["flash"] = body["mode"]
+            log(f"camera.flash.set mode={body['mode']}")
+            send("reliable", "camera.state", camera_state("SUBJECT", True))
+        elif kind == "guide.move":
+            # Applied as the photographer would, and echoed as the subject's; the guide animation stops for it.
+            state["moved"] = {"cx": body["cx"], "cy": body["cy"], "height": body["height"]}
+            final = bool(body.get("final"))
+            log(f"guide.move cx={body['cx']:.3f} cy={body['cy']:.3f} height={body['height']:.3f} final={final}")
+            moved = guide_state(guide_id, cx=body["cx"], cy=body["cy"], height=body["height"])
+            send("reliable" if final else "realtime", "guide.state", {"state": moved, "final": final, "by": "SUBJECT"})
         elif kind == "session.leave":
             log("subject left:", body["reason"])
             state["done"].set()
@@ -175,9 +212,18 @@ async def main(args):
             send(
                 "reliable",
                 "camera.capabilities",
-                {"capabilities": {"minZoom": 1.0, "maxZoom": 4.0, "zoomStops": [1.0, 2.0, 3.0]}},
+                {
+                    "capabilities": {
+                        "minZoom": 1.0,
+                        "maxZoom": 4.0,
+                        "zoomStops": [1.0, 2.0, 3.0],
+                        "exposureRange": [-4, 4],
+                        "exposureStep": 0.5,
+                        "hasFlash": True,
+                    }
+                },
             )
-            send("reliable", "camera.state", {"zoom": 1.0, "by": "PHOTOGRAPHER", "final": True})
+            send("reliable", "camera.state", camera_state("PHOTOGRAPHER", True))
 
             if state["hello"].get("haveGuideId") == guide_id:
                 log("subject already has the guide image")
@@ -209,6 +255,10 @@ async def main(args):
             started = time.monotonic()
             step = 0
             while time.monotonic() - started < args.seconds and not state["done"].is_set():
+                if state["moved"]:
+                    # The subject took the guide; a moving animation would fight its hand.
+                    await asyncio.sleep(0.05)
+                    continue
                 t = time.monotonic() - started
                 cx = 0.5 + 0.25 * math.sin(t * 1.5)
                 height = 0.7 + 0.15 * math.sin(t * 0.7)

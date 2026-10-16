@@ -44,6 +44,14 @@
     <string name="remove_guide">Remove guide</string>
     <string name="edit_guide">Edit guide</string>
     <string name="hint_pinch_zoom">Pinch to zoom</string>
+    <string name="flash_off">Flash off</string>
+    <string name="flash_auto">Flash auto</string>
+    <string name="flash_on">Flash on</string>
+    <string name="aspect_ratio_description">Aspect ratio %1$s</string>
+    <string name="aspect_4_3">4:3</string>
+    <string name="aspect_16_9">16:9</string>
+    <string name="aspect_1_1">1:1</string>
+    <string name="brightness">Brightness</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
     <string name="peer_left">%1$s left</string>

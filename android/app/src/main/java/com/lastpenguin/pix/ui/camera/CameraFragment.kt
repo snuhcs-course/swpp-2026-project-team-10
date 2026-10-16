@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -36,7 +37,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.guide.GuideState
@@ -49,6 +53,7 @@ import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.text.DecimalFormat
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -71,8 +76,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
     private var opacitySlider: TrackedSliderController? = null
+    private var brightnessSlider: TrackedSliderController? = null
     private var previewLogged = false
     private var noticeJob: Job? = null
+
+    // The old ratio's last frame stays on screen until the rebound preview streams again (Design 2.6.2).
+    private var stillJob: Job? = null
+    private var stillSawIdle = false
+    private val evFormat = DecimalFormat("+0.0;-0.0")
 
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (binding != null) {
@@ -88,23 +99,46 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.previewView.scaleType = PreviewView.ScaleType.FIT_CENTER
         // TextureView composes predictably with guide and permission/error layers above it.
         controls.previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        // PreviewView fits the viewport's crop but still draws the camera image around it: show only the frame.
+        controls.previewView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            clipToFrame(controls.previewView, viewModel.uiState.value.aspect.frameAspect)
+        }
         controls.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
             if (state == PreviewView.StreamState.STREAMING && !previewLogged) {
                 previewLogged = true
                 Timings.mark("camera.preview")
             }
+            if (stillJob != null) {
+                if (state == PreviewView.StreamState.IDLE) stillSawIdle = true
+                if (state == PreviewView.StreamState.STREAMING && stillSawIdle) releaseStill()
+            }
         }
         // A pinch on the preview zooms while guide-edit mode is off (AD-17); each step is applied as it comes.
+        // A tap focuses there (FR-1.4); the pinch controller owns the preview's touches, so it reports the tap.
         pinchZoom = PinchZoomController(
             controls.previewView,
             range = ::zoomRange,
             current = { viewModel.uiState.value.zoom },
+            onTap = ::onPreviewTap,
         ) { ratio, _ -> viewModel.onZoomChanged(ratio) }
         opacitySlider = TrackedSliderController(
             controls.opacitySlider,
             { getString(R.string.guide_opacity_percent, (it * 100f).roundToInt()) },
             viewModel::onOpacityChange,
         )
+        // The slider runs from 1, because TrackedSliderController takes positive values; each step is an index.
+        brightnessSlider = TrackedSliderController(
+            controls.brightnessSlider,
+            { formatEv(sliderIndex(it)) },
+        ) { value, _ -> viewModel.onExposureChange(sliderIndex(value)) }
+        controls.flashButton.setOnClickListener { viewModel.onFlashTap() }
+        controls.aspectButton.setOnClickListener {
+            holdLastFrame(controls)
+            viewModel.onAspectTap()
+        }
+        controls.brightnessButton.setOnClickListener {
+            viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
+        }
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
         controls.cameraActionButton.setOnClickListener {
@@ -229,6 +263,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     override fun onPause() {
         pinchZoom?.finishInteraction()
         opacitySlider?.finishInteraction()
+        brightnessSlider?.finishInteraction()
         super.onPause()
     }
 
@@ -237,6 +272,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         pinchZoom = null
         opacitySlider?.finishInteraction()
         opacitySlider = null
+        brightnessSlider?.finishInteraction()
+        brightnessSlider = null
+        stillJob?.cancel()
+        stillJob = null
         binding = null
         sceneBack = null
         previewLogged = false
@@ -329,6 +368,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val ready = granted && state.cameraStatus == CameraStatus.READY
         val unavailable = state.cameraStatus == CameraStatus.UNAVAILABLE
         controls.compositionOverlay.isVisible = ready
+        // The grid and the guide follow the chosen frame (AD-10); a new ratio re-fits both at once.
+        controls.compositionOverlay.frameAspect = state.aspect.frameAspect
+        controls.guideOverlay.frameAspect = state.aspect.frameAspect
+        clipToFrame(controls.previewView, state.aspect.frameAspect)
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = ready
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
@@ -391,6 +434,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
 
+        renderCameraSettings(controls, state, ready)
+
         val ratio = zoomFormat.format(state.zoom)
         controls.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
         controls.zoomReadout.contentDescription = getString(R.string.camera_zoom_description, ratio)
@@ -440,6 +485,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.sceneStill.setImageBitmap(if (reviewing) scene.scene else null)
         // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
         controls.zoomReadout.isInvisible = reviewing
+        // The scene photo is a frame of the live preview: flash, ratio, and brightness do not apply to it.
+        if (active) {
+            controls.cameraSettings.isVisible = false
+            controls.brightnessButton.isVisible = false
+            controls.brightnessPanel.isVisible = false
+        }
         if (active) controls.editGuideButton.isVisible = false
         controls.captureControls.isVisible = !reviewing
         controls.sceneReviewControls.isVisible = reviewing
@@ -455,6 +506,120 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         } else {
             controls.captureStatus.isVisible = false
         }
+    }
+
+    /** Flash, aspect ratio, and brightness (FR-1.11–1.13). */
+    private fun renderCameraSettings(controls: FragmentCameraBinding, state: CameraUiState, ready: Boolean) {
+        controls.cameraSettings.isVisible = true
+        controls.flashButton.isVisible = state.hasFlash
+        controls.flashButton.isEnabled = ready
+        controls.flashButton.setIconResource(
+            when (state.flash) {
+                FlashMode.OFF -> R.drawable.ic_flash_off
+                FlashMode.AUTO -> R.drawable.ic_flash_auto
+                FlashMode.ON -> R.drawable.ic_flash_on
+            },
+        )
+        controls.flashButton.contentDescription = getString(
+            when (state.flash) {
+                FlashMode.OFF -> R.string.flash_off
+                FlashMode.AUTO -> R.string.flash_auto
+                FlashMode.ON -> R.string.flash_on
+            },
+        )
+        val aspect = getString(
+            when (state.aspect) {
+                AspectRatio.R4_3 -> R.string.aspect_4_3
+                AspectRatio.R16_9 -> R.string.aspect_16_9
+                AspectRatio.R1_1 -> R.string.aspect_1_1
+            },
+        )
+        controls.aspectButton.text = aspect
+        controls.aspectButton.contentDescription = getString(R.string.aspect_ratio_description, aspect)
+        // A rebind waits for a photo being saved, so the ratio cannot change under the shutter.
+        controls.aspectButton.isEnabled = ready && !state.isSaving
+
+        val range = state.exposureRange
+        val hasBrightness = range.first < range.last
+        controls.brightnessButton.isVisible = hasBrightness
+        controls.brightnessButton.isChecked = state.brightnessOpen
+        controls.brightnessButton.isEnabled = ready
+        controls.brightnessPanel.isVisible = state.brightnessOpen
+        brightnessSlider?.render(
+            1f,
+            (range.last - range.first + 1).toFloat(),
+            (state.exposure - range.first + 1).toFloat(),
+            enabled = ready && hasBrightness,
+        )
+        controls.brightnessValue.text = formatEv(state.exposure)
+    }
+
+    /** The exposure index for a brightness slider position (the slider runs from 1). */
+    private fun sliderIndex(value: Float): Int = value.roundToInt() - 1 + viewModel.uiState.value.exposureRange.first
+
+    /** An exposure index in EV, such as "+0.7" or "0". */
+    private fun formatEv(index: Int): String {
+        val ev = index * viewModel.uiState.value.exposureStep
+        return if (abs(ev) < 0.05f) "0" else evFormat.format(ev)
+    }
+
+    /** A tap on the preview: focus there if it is inside the camera image, and show where (FR-1.4). */
+    private fun onPreviewTap(x: Float, y: Float) {
+        val controls = binding ?: return
+        val state = viewModel.uiState.value
+        if (state.cameraStatus != CameraStatus.READY || !state.supportsFocusPoint || isScenePhotoActive()) return
+        val preview = controls.previewView
+        val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
+        if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return
+        viewModel.onFocusTap((x - frame.left) / frame.width, (y - frame.top) / frame.height)
+        val ring = controls.focusRing
+        ring.animate().cancel()
+        ring.translationX = x - ring.layoutParams.width / 2f
+        ring.translationY = y - ring.layoutParams.height / 2f
+        ring.alpha = 1f
+        ring.scaleX = FOCUS_RING_START_SCALE
+        ring.scaleY = FOCUS_RING_START_SCALE
+        ring.isVisible = true
+        ring.animate().scaleX(1f).scaleY(1f).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
+            ring.animate().alpha(0f).setStartDelay(FOCUS_RING_HOLD_MS).setDuration(FOCUS_RING_FADE_MS)
+                .withEndAction { ring.isVisible = false }
+        }
+    }
+
+    /** Keeps the preview's last frame on screen while the camera rebinds for a new ratio (Design 2.6.2). */
+    private fun holdLastFrame(controls: FragmentCameraBinding) {
+        val frame = controls.previewView.bitmap ?: return
+        controls.aspectStill.setImageBitmap(frame)
+        // The bitmap is the whole camera image; show the old frame only, as the preview did.
+        controls.aspectStill.clipBounds = controls.previewView.clipBounds
+        controls.aspectStill.isVisible = true
+        stillSawIdle = false
+        stillJob?.cancel()
+        // If the stream never reports a restart, the old frame still goes.
+        stillJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(STILL_TIMEOUT_MS)
+            releaseStill()
+        }
+    }
+
+    private fun releaseStill() {
+        stillJob?.cancel()
+        stillJob = null
+        binding?.aspectStill?.let {
+            it.isVisible = false
+            it.setImageDrawable(null)
+        }
+    }
+
+    /** Clips [view] to the fit-centered frame of [frameAspect] (AD-10); nothing is clipped before layout. */
+    private fun clipToFrame(view: View, frameAspect: Float) {
+        val frame = fitViewfinderFrame(view.width.toFloat(), view.height.toFloat(), frameAspect)
+        val clip = if (frame.width > 0f) {
+            Rect(frame.left.roundToInt(), frame.top.roundToInt(), frame.right.roundToInt(), frame.bottom.roundToInt())
+        } else {
+            null
+        }
+        if (view.clipBounds != clip) view.clipBounds = clip
     }
 
     /** Cutout / Outline: a tap on the style already shown changes nothing. */
@@ -534,5 +699,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     companion object {
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
+        private const val STILL_TIMEOUT_MS = 2_000L
+        private const val FOCUS_RING_START_SCALE = 1.25f
+        private const val FOCUS_RING_SHRINK_MS = 150L
+        private const val FOCUS_RING_HOLD_MS = 700L
+        private const val FOCUS_RING_FADE_MS = 200L
     }
 }

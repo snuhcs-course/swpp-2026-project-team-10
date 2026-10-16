@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
@@ -113,6 +113,24 @@ class GuideGeometryTest {
         assertEquals(-0.084f, state.cx, EPSILON)
         assertEquals(1.063f, state.cy, EPSILON)
         assertEquals(0.21f, state.height, EPSILON)
+    }
+
+    @Test
+    fun clamp_squareGuideInOtherFrames_measuresWidthAgainstThatFrame() {
+        val pushed = GuideState(cx = -10f, cy = 10f, height = 0f)
+        // At height .21 a square is .21 of a 1:1 frame's width and .373 of a 9:16 frame's (AD-10).
+        assertEquals(-0.063f, GuideGeometry.clamp(pushed, 1f, frameAspect = 1f).cx, EPSILON)
+        assertEquals(-0.112f, GuideGeometry.clamp(pushed, 1f, frameAspect = 9f / 16f).cx, EPSILON)
+        // Heights are fractions of the frame height in every ratio.
+        assertEquals(1.063f, GuideGeometry.clamp(pushed, 1f, frameAspect = 9f / 16f).cy, EPSILON)
+    }
+
+    @Test
+    fun clamp_invalidFrameAspect_isRejected() {
+        assertThrows(IllegalArgumentException::class.java) { GuideGeometry.clamp(GuideState(), 1f, frameAspect = 0f) }
+        assertThrows(IllegalArgumentException::class.java) {
+            GuideGeometry.clamp(GuideState(), 1f, frameAspect = Float.NaN)
+        }
     }
 
     @Test

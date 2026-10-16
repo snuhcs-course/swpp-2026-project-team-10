@@ -1,13 +1,16 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
@@ -36,8 +39,8 @@ class FakeSessionManager : SessionManager {
     private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
     override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
 
-    private val _peerZoom = MutableStateFlow<Float?>(null)
-    override val peerZoom: StateFlow<Float?> = _peerZoom.asStateFlow()
+    private val _peerCamera = MutableStateFlow<CameraState?>(null)
+    override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
 
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
@@ -61,9 +64,16 @@ class FakeSessionManager : SessionManager {
         _state.value = state
     }
 
+    /** The session kept a `camera.state` whose `incoming` emission this screen did not see. */
+    fun setPeerCamera(state: CameraState?) {
+        _peerCamera.value = state
+    }
+
     fun deliver(message: SessionMessage) {
         if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
-        if (message is SessionMessage.CameraStateUpdate) _peerZoom.value = message.zoom
+        if (message is SessionMessage.CameraStateUpdate) {
+            _peerCamera.value = CameraState(message.zoom, message.exposure, message.flash, message.aspect)
+        }
         check(_incoming.tryEmit(message))
     }
 }
@@ -84,6 +94,9 @@ class FakeCameraController(
     private val _zoom = MutableStateFlow(1f)
     override val zoom: StateFlow<Float> = _zoom.asStateFlow()
 
+    /** Set by a test to stand for the photographer changing exposure, flash, or the aspect ratio. */
+    override val state = MutableStateFlow(CameraState(zoom = 1f))
+
     val requests = mutableListOf<Float>()
     var applies = true
     var sink: FrameSink? = null
@@ -103,6 +116,14 @@ class FakeCameraController(
     fun setStatus(status: CameraStatus) {
         _status.value = status
     }
+
+    override fun setFocusPoint(x: Float, y: Float) = Unit
+
+    override fun setExposure(index: Int) = Unit
+
+    override fun setFlash(mode: FlashMode) = Unit
+
+    override fun setAspectRatio(ratio: AspectRatio) = Unit
 
     override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())
 

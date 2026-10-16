@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -17,6 +17,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
@@ -31,7 +32,7 @@ import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
 
 /**
- * Subject view (R&S 6.6): the photographer's live video, fitted to the 3:4 frame, with their name and *Leave*.
+ * Subject view (R&S 6.6): the photographer's live video, fitted to their frame, with their name and *Leave*.
  * A pinch on the video zooms the photographer's camera while guide-edit mode is off, with the Camera screen's
  * readout (FR-7.1, AD-17). System back asks first (R&S 6.9). Owner: Real-time (#8, #10), with the guide from #9.
  */
@@ -79,6 +80,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.photographerName.text = ui.photographerName
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
+                        // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
+                        binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
+                        binding.guideOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.render(ui.guide, ui.guideState)
                         binding.compositionOverlay.isVisible = ui.connected
                         // Guide-edit mode (AD-17): the overlay owns the video's touches while on; the pinch zooms while off.

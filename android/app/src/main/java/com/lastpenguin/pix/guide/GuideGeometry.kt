@@ -1,11 +1,12 @@
-// AI-generated with ChatGPT Codex, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.PointF
 import android.util.SizeF
 
 /**
- * Maps between normalized coordinates of the 3:4 frame and view pixels (Design 2.6.2).
+ * Maps between normalized coordinates of the frame and view pixels (Design 2.6.2). The frame is the photographer's
+ * chosen aspect ratio, 3:4, 9:16, or 1:1 in portrait (AD-10).
  * The frame spans 0..1 on each axis; a partially off-frame guide can have its center outside that range.
  * Both phones use it, so the guide lands on the same part of the image.
  * Owner: Camera/Overlay (#6).
@@ -32,15 +33,17 @@ object GuideGeometry {
     /**
      * Limits height and opacity, keeping 20% of each guide dimension inside the frame (FR-3.2–3.4).
      * If a dimension exceeds five frame lengths, keep the entire frame covered on that axis instead:
-     * showing 20% is then impossible without breaking the scale range. [aspect] must be positive and finite.
+     * showing 20% is then impossible without breaking the scale range. [aspect] is the guide's width / height and
+     * [frameAspect] the frame's, both positive and finite.
      * Non-finite state values reset to their defaults; identity, style, and visibility are preserved.
      */
-    fun clamp(state: GuideState, aspect: Float): GuideState {
+    fun clamp(state: GuideState, aspect: Float, frameAspect: Float = DEFAULT_FRAME_ASPECT): GuideState {
         require(aspect.isFinite() && aspect > 0f) { "Guide aspect must be positive and finite" }
+        require(frameAspect.isFinite() && frameAspect > 0f) { "Frame aspect must be positive and finite" }
         val height = (state.height.takeIf { it.isFinite() } ?: GuideState.DEFAULT_HEIGHT)
             .coerceIn(GuideState.MIN_HEIGHT, GuideState.MAX_HEIGHT)
-        // Height is relative to frame height; width must be relative to the narrower 3:4 frame width.
-        val width = height.toDouble() * aspect * 4.0 / 3.0
+        // Height is relative to the frame height; width must be relative to the frame width.
+        val width = height.toDouble() * aspect / frameAspect
         return state.copy(
             cx = clampCenter(state.cx, width),
             cy = clampCenter(state.cy, height.toDouble()),
@@ -49,6 +52,9 @@ object GuideGeometry {
                 .coerceIn(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY),
         )
     }
+
+    /** The 3:4 portrait frame of Iteration 1 and the default ratio (AD-10). */
+    const val DEFAULT_FRAME_ASPECT = 3f / 4f
 
     private fun clampCenter(center: Float, extent: Double): Float {
         val visible = minOf(extent * 0.2, 1.0)

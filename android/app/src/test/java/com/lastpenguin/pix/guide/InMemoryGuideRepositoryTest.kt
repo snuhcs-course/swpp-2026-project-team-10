@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -104,6 +104,28 @@ class InMemoryGuideRepositoryTest {
         assertEquals(-0.63f, applied.cy, EPSILON)
         assertEquals(0.1f, applied.opacity, EPSILON)
         assertEquals(listOf(GuideChange(applied, final = false)), changes)
+    }
+
+    @Test
+    fun finalUpdateAfterTheFrameChanges_clampsToTheNewFrameAndPublishesAFinalChange() = runTest {
+        var frameAspect = 3f / 4f
+        val repository = InMemoryGuideRepository { frameAspect }
+        repository.setGuide(guide("tall", aspect = 0.5f))
+        repository.update(final = true) { it.copy(cx = -10f) }
+        // Height .7 at aspect .5 is .467 of a 3:4 frame's width: the leftmost center keeps 20 % of it inside.
+        assertEquals(-0.14f, repository.state.value.cx, EPSILON)
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { repository.changes.collect { changes += it } }
+        runCurrent()
+
+        frameAspect = 1f
+        repository.update(final = true) { it }
+        runCurrent()
+
+        // In a 1:1 frame the same guide is .35 of the width, so it may go further left.
+        assertEquals(-0.105f, repository.state.value.cx, EPSILON)
+        assertEquals(0.7f, repository.state.value.height, EPSILON)
+        assertEquals(listOf(GuideChange(repository.state.value, final = true)), changes)
     }
 
     @Test

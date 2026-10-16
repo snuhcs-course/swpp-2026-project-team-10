@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
@@ -12,7 +12,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** A remote action the photographer's phone applied, for "Junhyeong set zoom to 2×" (FR-7.4). */
@@ -30,6 +33,10 @@ sealed interface RemoteAction {
  * current zoom so the subject's readout snaps back. The camera may hold a request while it opens another lens or
  * finishes saving a photo, so an answered request keeps its attribution for [PENDING_MS]: when the held request
  * is applied later, it is still the subject's and still gets its one notice.
+ *
+ * Every `camera.state` carries the whole applied camera state (Design 2.5.1): with the zoom also the exposure, the
+ * flash, and the aspect ratio. A change of those three on the photographer's phone is sent at once as a final
+ * state, so the subject fits its video, grid, and guide to a new ratio (AD-10).
  * Owner: Real-time (#10).
  */
 class RemoteControlHandler(
@@ -44,6 +51,7 @@ class RemoteControlHandler(
 
     private var scope: CoroutineScope? = null
     private var zoomJob: Job? = null
+    private var settingsJob: Job? = null
     private var finalJob: Job? = null
     private var timeoutJob: Job? = null
     private var pending: PendingZoom? = null
@@ -53,10 +61,18 @@ class RemoteControlHandler(
         stop()
         this.scope = scope
         zoomJob = scope.launch { camera.zoom.collect { zoom -> onApplied(zoom) } }
+        // The first zoom echo above already carries the current values.
+        settingsJob = scope.launch {
+            camera.state.map { Triple(it.exposure, it.flash, it.aspect) }.distinctUntilChanged().drop(1).collect {
+                send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
+            }
+        }
     }
 
     fun stop() {
         zoomJob?.cancel()
+        settingsJob?.cancel()
+        settingsJob = null
         finalJob?.cancel()
         timeoutJob?.cancel()
         zoomJob = null
@@ -129,7 +145,17 @@ class RemoteControlHandler(
     }
 
     private fun send(zoom: Float, by: Role, final: Boolean) {
-        session.send(SessionMessage.CameraStateUpdate(zoom = zoom, by = by, final = final))
+        val applied = camera.state.value
+        session.send(
+            SessionMessage.CameraStateUpdate(
+                zoom = zoom,
+                by = by,
+                final = final,
+                exposure = applied.exposure,
+                flash = applied.flash,
+                aspect = applied.aspect,
+            ),
+        )
     }
 
     private class PendingZoom(val ratio: Float, val at: Long, val final: Boolean) {

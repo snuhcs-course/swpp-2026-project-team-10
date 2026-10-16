@@ -12,7 +12,7 @@ import org.webrtc.VideoFrame
 
 /**
  * Feeds camera frames into the WebRTC video source (Design 2.6.4). The photographer passes it to
- * CameraController.setFrameSink while connected. Each frame is packed to NV21, cropped to the 3:4 viewport, and
+ * CameraController.setFrameSink while connected. Each frame is packed to NV21, cropped to the viewport of the chosen aspect ratio, and
  * handed over with its rotation, so the encoder sends the sensor's landscape buffer and the subject's renderer
  * turns it upright. A small pool reuses the NV21 arrays.
  * Owner: Real-time (#8).

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -8,8 +8,11 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.GuideStyle
@@ -20,6 +23,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -44,6 +50,19 @@ data class CameraUiState(
     val minZoom: Float = 1f,
     val maxZoom: Float = 1f,
     val zoom: Float = 1f,
+    /** Applied exposure-compensation index (FR-1.11), within [exposureRange]; 0..0 hides the brightness control. */
+    val exposure: Int = 0,
+    val exposureRange: IntRange = 0..0,
+    /** EV per exposure index, for the brightness label. */
+    val exposureStep: Float = 0f,
+    /** Whether the brightness slider is open above the controls. */
+    val brightnessOpen: Boolean = false,
+    /** False hides the flash button (FR-1.12). */
+    val hasFlash: Boolean = false,
+    val flash: FlashMode = FlashMode.OFF,
+    /** The frame's shape (FR-1.13, AD-10): the preview, the grid, the guide, and the saved photo follow it. */
+    val aspect: AspectRatio = AspectRatio.R4_3,
+    val supportsFocusPoint: Boolean = false,
     val isSaving: Boolean = false,
     /** "Saved without the guide" for [CameraViewModel.NOTICE_MS], or why the last photo failed until the next one. */
     val captureNotice: CaptureNotice? = null,
@@ -67,6 +86,7 @@ data class CameraUiState(
 class CameraViewModel(
     private val camera: CameraController,
     private val guides: GuideRepository,
+    private val settings: CameraSettings = CameraSettings.InMemory(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
@@ -74,17 +94,37 @@ class CameraViewModel(
     private var savedNoticeJob: Job? = null
 
     init {
+        // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
+        viewModelScope.launch { settings.aspectRatio()?.let(camera::setAspectRatio) }
         viewModelScope.launch {
             camera.status.collect { status -> _uiState.update { it.copy(cameraStatus = status) } }
         }
         viewModelScope.launch {
             camera.capabilities.collect { capabilities ->
                 _uiState.update {
+                    val exposureRange = capabilities?.exposureRange ?: 0..0
                     it.copy(
                         minZoom = capabilities?.minZoom ?: 1f,
                         maxZoom = capabilities?.maxZoom ?: 1f,
+                        exposureRange = exposureRange,
+                        exposureStep = capabilities?.exposureStep ?: 0f,
+                        brightnessOpen = it.brightnessOpen && exposureRange.first < exposureRange.last,
+                        hasFlash = capabilities?.hasFlash ?: false,
+                        supportsFocusPoint = capabilities?.supportsFocusPoint ?: false,
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            camera.state.collect { state ->
+                _uiState.update { it.copy(exposure = state.exposure, flash = state.flash, aspect = state.aspect) }
+            }
+        }
+        viewModelScope.launch {
+            // A new frame keeps the guide's center and height and clamps them again (Design 2.6.2); the repository
+            // reads the new frame, and the final change reaches a connected subject.
+            camera.state.map { it.aspect }.distinctUntilChanged().drop(1).collect {
+                guides.update(final = true) { state -> state }
             }
         }
         viewModelScope.launch {
@@ -149,6 +189,51 @@ class CameraViewModel(
         ) {
             camera.setZoom(ratio)
         }
+    }
+
+    /** A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4); the camera focuses and meters there. */
+    fun onFocusTap(x: Float, y: Float) {
+        val state = _uiState.value
+        if (state.cameraStatus != CameraStatus.READY || !state.supportsFocusPoint) return
+        if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
+        camera.setFocusPoint(x, y)
+    }
+
+    /** From the brightness slider: each step is applied as it comes, like a pinch zoom (FR-1.11). */
+    fun onExposureChange(index: Int) {
+        val range = _uiState.value.exposureRange
+        if (range.first >= range.last) return
+        camera.setExposure(index.coerceIn(range))
+    }
+
+    fun setBrightnessOpen(open: Boolean) {
+        _uiState.update { it.copy(brightnessOpen = open && it.exposureRange.first < it.exposureRange.last) }
+    }
+
+    /** The flash button cycles off, auto, on (FR-1.12). */
+    fun onFlashTap() {
+        val state = _uiState.value
+        if (!state.hasFlash) return
+        camera.setFlash(
+            when (state.flash) {
+                FlashMode.OFF -> FlashMode.AUTO
+                FlashMode.AUTO -> FlashMode.ON
+                FlashMode.ON -> FlashMode.OFF
+            },
+        )
+    }
+
+    /** The ratio button cycles 4:3, 16:9, 1:1 (FR-1.13), and the choice is kept for the next time. */
+    fun onAspectTap() {
+        val state = _uiState.value
+        if (state.isSaving) return
+        val next = when (state.aspect) {
+            AspectRatio.R4_3 -> AspectRatio.R16_9
+            AspectRatio.R16_9 -> AspectRatio.R1_1
+            AspectRatio.R1_1 -> AspectRatio.R4_3
+        }
+        camera.setAspectRatio(next)
+        viewModelScope.launch { settings.saveAspectRatio(next) }
     }
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */

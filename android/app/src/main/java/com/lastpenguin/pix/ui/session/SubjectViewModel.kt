@@ -1,8 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
@@ -31,6 +32,8 @@ data class SubjectUiState(
     val maxZoom: Float = 1f,
     /** The zoom to show: the pinch's value during the gesture, until the photographer echoes applied zoom in `camera.state`. */
     val zoom: Float = 1f,
+    /** The photographer's frame (AD-10), from `camera.state`: the video, the grid, and the guide fit to it. */
+    val aspect: AspectRatio = AspectRatio.R4_3,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
     /**
@@ -62,7 +65,19 @@ class SubjectViewModel(
 
     init {
         // The photographer may have echoed a zoom before this screen existed; later echoes come through incoming.
-        session.peerZoom.value?.let { zoom -> _uiState.update { it.copy(zoom = zoom) } }
+        session.peerCamera.value?.let { camera -> _uiState.update { it.copy(zoom = camera.zoom) } }
+        viewModelScope.launch {
+            // Kept by the session, so a state sent before this screen existed, or before `incoming` was collected,
+            // is here too. Outside a pinch it is also the zoom to show.
+            session.peerCamera.collect { camera ->
+                _uiState.update {
+                    it.copy(
+                        aspect = camera?.aspect ?: AspectRatio.R4_3,
+                        zoom = camera?.zoom?.takeUnless { adjustingZoom } ?: it.zoom,
+                    )
+                }
+            }
+        }
         viewModelScope.launch {
             session.state.collect { state ->
                 val connected = state as? SessionState.Connected

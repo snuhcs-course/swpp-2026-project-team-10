@@ -1,10 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
 import kotlinx.serialization.Serializable
-
-enum class GuideStyle { CUTOUT, OUTLINE }
 
 enum class GuideSource { GALLERY, GENERATED }
 
@@ -12,7 +10,10 @@ enum class GuideSource { GALLERY, GENERATED }
 data class ReferenceGuide(
     /** UUID; the subject uses it to tell whether it already has the image. */
     val id: String,
-    /** ARGB_8888, person only, transparent background, cropped to the person. */
+    /**
+     * ARGB_8888, person only, transparent background, cropped to the person. Never drawn as the guide, which is an
+     * outline only (FR-2.2, AD-15); it is sent to the subject until the mask alone is sent (Design 2.6.1, #57).
+     */
     val cutout: Bitmap,
     /** Same size as [cutout]; light stroke, about 8 px (3 dp) on screen. */
     val outline: Bitmap,
@@ -32,7 +33,6 @@ data class GuideState(
     /** Guide height / frame height. */
     val height: Float = DEFAULT_HEIGHT,
     val opacity: Float = 0.5f,
-    val style: GuideStyle = GuideStyle.OUTLINE,
     val visible: Boolean = true,
 ) {
     companion object {

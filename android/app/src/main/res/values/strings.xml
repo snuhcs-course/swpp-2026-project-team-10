@@ -67,8 +67,6 @@
     <string name="generate_poses_body">Four pose ideas for this scene, made by AI</string>
     <string name="reference_title">Your reference</string>
     <string name="reference_preview_description">The person from the reference photo</string>
-    <string name="cutout">Cutout</string>
-    <string name="outline">Outline</string>
     <string name="finding_person">Finding the person…</string>
     <string name="person_found">Person found</string>
     <string name="couldnt_use_photo">Couldn\'t use this photo. Try another one.</string>

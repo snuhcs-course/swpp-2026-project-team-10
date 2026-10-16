@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -8,7 +8,6 @@ import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
@@ -56,8 +55,7 @@ class ReferenceViewModelTest {
     }
 
     @Test
-    fun aPersonIsShownWithTheStyleTheCameraUsesNow() = runTest {
-        guides.state.value = GuideState(style = GuideStyle.CUTOUT)
+    fun onCandidatePicked_personFound_isReadyToConfirm() = runTest {
         val guide = guide()
 
         model.onCandidatePicked(bitmap())
@@ -67,7 +65,7 @@ class ReferenceViewModelTest {
         runCurrent()
 
         assertEquals(listOf(GuideSource.GENERATED), maker.sources)
-        assertEquals(ReferenceUiState.Ready(guide, GuideStyle.CUTOUT), model.uiState.value)
+        assertEquals(ReferenceUiState.Ready(guide), model.uiState.value)
     }
 
     @Test
@@ -86,22 +84,7 @@ class ReferenceViewModelTest {
     }
 
     @Test
-    fun theSwitchChangesOnlyAReadyGuide() = runTest {
-        model.onStylePreview(GuideStyle.CUTOUT)
-        assertEquals(ReferenceUiState.Idle, model.uiState.value)
-
-        val guide = guide()
-        model.onCandidatePicked(bitmap())
-        runCurrent()
-        maker.finish(Result.success(guide))
-        runCurrent()
-        model.onStylePreview(GuideStyle.CUTOUT)
-
-        assertEquals(ReferenceUiState.Ready(guide, GuideStyle.CUTOUT), model.uiState.value)
-    }
-
-    @Test
-    fun usingTheGuideStoresItWithTheChosenStyle() = runTest {
+    fun onUseGuide_readyGuide_isStoredWithoutAnotherChange() = runTest {
         model.onUseGuide()
         assertNull(guides.stored)
 
@@ -110,17 +93,16 @@ class ReferenceViewModelTest {
         runCurrent()
         maker.finish(Result.success(guide))
         runCurrent()
-        model.onStylePreview(GuideStyle.CUTOUT)
         model.onUseGuide()
 
+        // setGuide places it (FR-3.1); there is no style left to apply afterwards.
         assertSame(guide, guides.stored)
-        assertEquals(GuideStyle.CUTOUT, guides.state.value.style)
-        assertEquals(listOf(true), guides.finals)
+        assertEquals(emptyList<Boolean>(), guides.finals)
         assertEquals(ReferenceUiState.Idle, model.uiState.value)
     }
 
     @Test
-    fun usingANewGuideResetsTheRealRepositoryAndPublishesTheConfirmedStyle() = runTest {
+    fun onUseGuide_realRepository_replacesTheGuideWithOneFinalChange() = runTest {
         val repository = InMemoryGuideRepository()
         val reference = ReferenceViewModel(maker, repository)
         store.put("integration-reference", reference)
@@ -140,9 +122,8 @@ class ReferenceViewModelTest {
         runCurrent()
         maker.finish(Result.success(replacement))
         runCurrent()
-        reference.onStylePreview(GuideStyle.CUTOUT)
 
-        assertEquals(ReferenceUiState.Ready(replacement, GuideStyle.CUTOUT), reference.uiState.value)
+        assertEquals(ReferenceUiState.Ready(replacement), reference.uiState.value)
         assertSame(previous, repository.guide.value)
         assertEquals(previousState, repository.state.value)
         assertEquals(emptyList<GuideChange>(), changes)
@@ -151,13 +132,9 @@ class ReferenceViewModelTest {
         runCurrent()
 
         val initialState = GuideState(guideId = replacement.id)
-        val confirmedState = initialState.copy(style = GuideStyle.CUTOUT)
         assertSame(replacement, repository.guide.value)
-        assertEquals(confirmedState, repository.state.value)
-        assertEquals(
-            listOf(GuideChange(initialState, final = true), GuideChange(confirmedState, final = true)),
-            changes,
-        )
+        assertEquals(initialState, repository.state.value)
+        assertEquals(listOf(GuideChange(initialState, final = true)), changes)
         assertEquals(ReferenceUiState.Idle, reference.uiState.value)
     }
 
@@ -176,7 +153,7 @@ class ReferenceViewModelTest {
 
         maker.finish(Result.success(second))
         runCurrent()
-        assertEquals(ReferenceUiState.Ready(second, GuideStyle.OUTLINE), model.uiState.value)
+        assertEquals(ReferenceUiState.Ready(second), model.uiState.value)
     }
 
     private fun guide() = ReferenceGuide(

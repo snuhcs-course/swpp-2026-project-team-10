@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -15,7 +15,6 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -255,13 +254,6 @@ class CameraViewModel(
     fun onOpacityChange(opacity: Float, final: Boolean) {
         if (!opacity.isFinite()) return
         guides.update(final) { it.copy(opacity = opacity) }
-    }
-
-    /** Switches cutout ↔ outline; position and size are untouched (FR-3.5). */
-    fun onStyleToggle() {
-        guides.update(final = true) { state ->
-            state.copy(style = if (state.style == GuideStyle.CUTOUT) GuideStyle.OUTLINE else GuideStyle.CUTOUT)
-        }
     }
 
     /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
@@ -90,8 +90,8 @@ class GuideGeometryTest {
     }
 
     @Test
-    fun validStateIsPreservedIncludingIdentityStyleAndVisibility() {
-        val state = GuideState(guideId = "person", cx = 0.3f, cy = 0.6f, style = GuideStyle.CUTOUT, visible = false)
+    fun validStateIsPreservedIncludingIdentityAndVisibility() {
+        val state = GuideState(guideId = "person", cx = 0.3f, cy = 0.6f, visible = false)
         assertEquals(state, GuideGeometry.clamp(state, 0.5f))
         assertEquals(GuideState(), GuideGeometry.clamp(GuideState(), 0.5f))
     }
@@ -164,7 +164,7 @@ class GuideGeometryTest {
 
     @Test
     fun nonFiniteStateValuesResetToDefaultsWithoutChangingOtherFields() {
-        val expected = GuideState(guideId = "person", style = GuideStyle.CUTOUT, visible = false)
+        val expected = GuideState(guideId = "person", visible = false)
         for (invalid in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
             val input = expected.copy(cx = invalid, cy = invalid, height = invalid, opacity = invalid)
             assertEquals(expected, GuideGeometry.clamp(input, 0.5f))

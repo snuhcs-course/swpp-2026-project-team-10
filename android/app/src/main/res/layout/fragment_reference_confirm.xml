@@ -30,7 +30,7 @@
             android:textAppearance="@style/TextAppearance.Pix.Header" />
     </LinearLayout>
 
-    <!-- The cutout or the outline. Dark, so the light outline stroke stands out as it does on the camera. -->
+    <!-- The outline over a neutral background (FR-2.3). Dark, so the light stroke stands out as it does on the camera. -->
     <com.google.android.material.card.MaterialCardView
         style="@style/Widget.Pix.Card"
         android:layout_width="match_parent"
@@ -74,34 +74,6 @@
                 tools:visibility="visible" />
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
-
-    <!-- Cutout / Outline (FR-2.3); the chosen one is selected. -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/bg_segment_track"
-        android:padding="4dp">
-
-        <Button
-            android:id="@+id/cutoutButton"
-            style="@style/Widget.Pix.Button.Segment"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:minHeight="44dp"
-            android:text="@string/cutout" />
-
-        <Button
-            android:id="@+id/outlineButton"
-            style="@style/Widget.Pix.Button.Segment"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:minHeight="44dp"
-            android:text="@string/outline" />
-    </LinearLayout>
 
     <Button
         android:id="@+id/useGuideButton"

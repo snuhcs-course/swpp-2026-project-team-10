@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -239,10 +239,8 @@ class GuideOverlayView @JvmOverloads constructor(
         frameBounds.set(frame.left, frame.top, frame.left + frame.width, frame.top + frame.height)
         guideBounds.set(left, top, right, bottom)
         paint.alpha = (state.opacity.coerceIn(0f, 1f) * 255f).roundToInt()
-        bitmap = when (state.style) {
-            GuideStyle.CUTOUT -> guide.cutout
-            GuideStyle.OUTLINE -> guide.outline
-        }
+        // The guide is an outline only; the reference's pixels are never drawn (FR-2.2, AD-15).
+        bitmap = guide.outline
     }
 
     override fun onDraw(canvas: Canvas) {

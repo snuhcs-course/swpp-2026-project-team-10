@@ -299,28 +299,12 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <!-- Cutout / Outline (FR-3.5); the chosen one is selected. -->
-                <Button
-                    android:id="@+id/cutoutSegment"
-                    style="@style/Widget.Pix.Button.Segment"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/cutout" />
-
-                <Button
-                    android:id="@+id/outlineSegment"
-                    style="@style/Widget.Pix.Button.Segment"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="2dp"
-                    android:text="@string/outline" />
-
                 <com.google.android.material.slider.Slider
                     android:id="@+id/opacitySlider"
                     style="@style/Widget.Pix.Slider.Guide"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="2dp"
+                    android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/guide_opacity"
                     android:enabled="false"

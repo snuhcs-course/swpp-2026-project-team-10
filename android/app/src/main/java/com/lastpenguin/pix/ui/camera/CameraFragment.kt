@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -44,7 +44,6 @@ import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
@@ -171,8 +170,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { openLastPhoto() }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
-        controls.cutoutSegment.setOnClickListener { chooseStyle(GuideStyle.CUTOUT) }
-        controls.outlineSegment.setOnClickListener { chooseStyle(GuideStyle.OUTLINE) }
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         controls.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
@@ -378,11 +375,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // and hiding the bar then would move the controls under an active touch.
         val guideEditable = granted && !unavailable
         controls.guideControls.isVisible = state.guide != null
-        val cutout = state.guideState.style == GuideStyle.CUTOUT
-        controls.cutoutSegment.isSelected = cutout
-        controls.outlineSegment.isSelected = !cutout
-        controls.cutoutSegment.isEnabled = guideEditable
-        controls.outlineSegment.isEnabled = guideEditable
         opacitySlider?.render(
             GuideState.MIN_OPACITY,
             GuideState.MAX_OPACITY,
@@ -620,11 +612,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             null
         }
         if (view.clipBounds != clip) view.clipBounds = clip
-    }
-
-    /** Cutout / Outline: a tap on the style already shown changes nothing. */
-    private fun chooseStyle(style: GuideStyle) {
-        if (viewModel.uiState.value.guideState.style != style) viewModel.onStyleToggle()
     }
 
     /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */

@@ -24,9 +24,12 @@ class RemoteControlMessagesTest {
     @Test
     fun guideMove_designExample_decodes() {
         val text = """{ "v": 2, "t": "guide.move", "seq": 21, "ts": 1759212352100,
-            "b": { "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }"""
+            "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }"""
 
-        assertEquals(SessionMessage.GuideMove(0.41f, 0.52f, 0.82f, final = false), decode(text))
+        assertEquals(
+            SessionMessage.GuideMove("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", 0.41f, 0.52f, 0.82f, final = false),
+            decode(text),
+        )
     }
 
     @Test
@@ -58,7 +61,7 @@ class RemoteControlMessagesTest {
     @Test
     fun requests_roundTrip_keepEveryField() {
         val messages = listOf(
-            SessionMessage.GuideMove(0.1f, 0.2f, 0.3f, final = true),
+            SessionMessage.GuideMove("g", 0.1f, 0.2f, 0.3f, final = true),
             SessionMessage.ExposureSet(-2),
             SessionMessage.FlashSet(FlashMode.ON),
             SessionMessage.FocusSet(0.62f, 0.4f),
@@ -70,7 +73,7 @@ class RemoteControlMessagesTest {
 
     @Test
     fun step_withoutFinal_isAStep() {
-        val move = """{"v":2,"t":"guide.move","seq":1,"ts":0,"b":{"cx":0.5,"cy":0.5,"height":0.7}}"""
+        val move = """{"v":2,"t":"guide.move","seq":1,"ts":0,"b":{"guideId":"g","cx":0.5,"cy":0.5,"height":0.7}}"""
         val exposure = """{"v":2,"t":"camera.exposure.set","seq":1,"ts":0,"b":{"index":2}}"""
 
         assertFalse((decode(move) as SessionMessage.GuideMove).final)

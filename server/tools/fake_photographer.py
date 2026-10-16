@@ -135,6 +135,8 @@ async def main(args):
             state["flash"] = body["mode"]
             log(f"camera.flash.set mode={body['mode']}")
             send("reliable", "camera.state", camera_state("SUBJECT", True))
+        elif kind == "guide.move" and body.get("guideId") != guide_id:
+            log(f"guide.move for guide {body.get('guideId')} dropped: this phone shows {guide_id}")
         elif kind == "guide.move":
             # Applied as the photographer would, and echoed as the subject's; the guide animation stops for it.
             state["moved"] = {"cx": body["cx"], "cy": body["cy"], "height": body["height"]}

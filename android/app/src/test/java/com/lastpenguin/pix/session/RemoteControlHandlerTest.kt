@@ -410,7 +410,7 @@ class RemoteControlHandlerTest {
             advanceTimeBy(200)
             runCurrent()
 
-            handler.handle(SessionMessage.GuideMove(0.3f, 0.4f, 0.9f))
+            handler.handle(SessionMessage.GuideMove("g1", 0.3f, 0.4f, 0.9f))
             runCurrent()
             assertEquals(0.3f, guides.state.value.cx, EPSILON)
             assertEquals(0.4f, guides.state.value.cy, EPSILON)
@@ -419,7 +419,7 @@ class RemoteControlHandlerTest {
             assertTrue(actions.isEmpty())
 
             // The same limits as the photographer's own gestures (FR-3.2, FR-3.3).
-            handler.handle(SessionMessage.GuideMove(5f, 5f, 9f, final = true))
+            handler.handle(SessionMessage.GuideMove("g1", 5f, 5f, 9f, final = true))
             runCurrent()
             assertEquals(GuideState.MAX_HEIGHT, guides.state.value.height, EPSILON)
             assertTrue(guides.state.value.cx < 5f)
@@ -428,19 +428,73 @@ class RemoteControlHandlerTest {
         }
 
     @Test
+    fun `a final value the camera holds still supersedes an outstanding request, and is then confirmed`() =
+        runTest {
+            camera.applies = false // The step stays outstanding, as a slow CameraX future would.
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+            session.sent.clear()
+
+            handler.handle(SessionMessage.ExposureSet(2))
+            handler.handle(SessionMessage.ExposureSet(0, final = true))
+            runCurrent()
+            assertEquals(listOf(2, 0), camera.exposureRequests)
+            assertTrue(echoes().isEmpty())
+            advanceTimeBy(600)
+            runCurrent()
+            // The camera holds 0 and reported no change: the final request is the subject's, with its notice.
+            assertEquals(
+                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0),
+                echoes().single(),
+            )
+            assertEquals(listOf<RemoteAction>(RemoteAction.Brightness(0)), actions)
+
+            session.sent.clear()
+            actions.clear()
+            handler.handle(SessionMessage.FlashSet(FlashMode.AUTO))
+            handler.handle(SessionMessage.FlashSet(FlashMode.OFF))
+            runCurrent()
+            assertEquals(listOf(FlashMode.AUTO, FlashMode.OFF), camera.flashRequests)
+            advanceTimeBy(600)
+            runCurrent()
+            assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true), echoes().single())
+            assertEquals(listOf<RemoteAction>(RemoteAction.Flash(FlashMode.OFF)), actions)
+            handler.stop()
+        }
+
+    @Test
+    fun `a guide move for a guide that was replaced is dropped`() = runTest {
+        guides.setGuide(fakeGuide("g2"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideMove("g1", 0.3f, 0.4f, 0.9f, final = true))
+        runCurrent()
+
+        assertEquals(0.5f, guides.state.value.cx, EPSILON)
+        assertTrue(attributions.isEmpty())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
     fun `a guide move without a visible guide is dropped`() = runTest {
         backgroundScope.launch { handler.actions.collect { actions += it } }
         handler.start(this)
         advanceTimeBy(200)
         runCurrent()
 
-        handler.handle(SessionMessage.GuideMove(0.3f, 0.4f, 0.9f, final = true))
+        handler.handle(SessionMessage.GuideMove("g1", 0.3f, 0.4f, 0.9f, final = true))
         runCurrent()
         assertEquals(GuideState(), guides.state.value)
 
         guides.setGuide(fakeGuide("g1"))
         guides.update(final = true) { it.copy(visible = false) }
-        handler.handle(SessionMessage.GuideMove(0.3f, 0.4f, 0.9f, final = true))
+        handler.handle(SessionMessage.GuideMove("g1", 0.3f, 0.4f, 0.9f, final = true))
         runCurrent()
         assertEquals(0.5f, guides.state.value.cx, EPSILON)
         assertTrue(attributions.isEmpty())

@@ -46,8 +46,11 @@ sealed interface RemoteAction {
  *
  * **Brightness and flash (It 2, FR-7.3).** `camera.exposure.set` is clamped to the exposure range and applied
  * with the same step-then-final pattern, and `camera.flash.set` is applied when the camera has a flash; a request
- * the camera cannot take (no range, no flash) is answered with the unchanged state, and a final request the camera
- * does not report applied within [ECHO_TIMEOUT_MS] is answered the same way, so the subject's control snaps back. Every `camera.state` carries the whole applied camera state (Design 2.5.1):
+ * the camera cannot take (no range, no flash) is answered with the unchanged state. While an earlier request is
+ * still outstanding, even a value the camera holds now is submitted again, so the final value supersedes the
+ * earlier one. A final request the camera has not reported applied after [ECHO_TIMEOUT_MS] is confirmed if the
+ * camera holds its value by then, and otherwise answered with the current state, so the subject's control snaps
+ * back. Every `camera.state` carries the whole applied camera state (Design 2.5.1):
  * a change of exposure, flash, or aspect ratio, from either phone, is sent as soon as the camera reports it,
  * attributed to the subject when it matches the subject's pending request.
  *
@@ -55,7 +58,8 @@ sealed interface RemoteAction {
  * coordinates; [guides] clamps it with the limits of the photographer's frame and publishes the change, which
  * `GuideSyncer` echoes as `guide.state`; [attributeGuideChanges] tells the syncer that those changes are the
  * subject's. Requests are applied in arrival order, so the later change wins when both people move the guide
- * (FR-7.6). A move without a visible guide is dropped: a hidden guide cannot be edited on either phone.
+ * (FR-7.6). A move without a visible guide, or for a guide that has since been replaced, is dropped: a hidden
+ * guide cannot be edited on either phone, and a gesture never crosses guide identities.
  * Owner: Real-time (#10, #57).
  */
 class RemoteControlHandler(
@@ -149,7 +153,17 @@ class RemoteControlHandler(
         finalJob?.cancel()
         camera.setZoom(ratio)
         if (!request.final) return
-        timeoutJob = scope?.launch { answerIfStalled(queued) { pending === queued } }
+        timeoutJob = scope?.launch {
+            answerIfStalled(
+                queued,
+                isPending = { pending === queued },
+                holds = { abs(camera.zoom.value - ratio) < ZOOM_MATCH },
+            ) {
+                pending = null
+                confirm(RemoteAction.Zoom(ratio), "zoom.applied", "$ratio")
+                send(ratio, Role.SUBJECT, final = true)
+            }
+        }
     }
 
     /**
@@ -167,20 +181,32 @@ class RemoteControlHandler(
         val index = request.index.coerceIn(range)
         exposureTimeoutJob?.cancel()
         exposureTimeoutJob = null
-        if (camera.state.value.exposure == index) {
-            // Already there, so the camera will not emit again: a final request is confirmed and echoed now.
-            pendingExposure = null
+        if (pendingExposure == null && camera.state.value.exposure == index) {
+            // Already there and nothing outstanding, so the camera will not emit again: a final request is
+            // confirmed and echoed now.
             if (request.final) {
                 confirm(RemoteAction.Brightness(index), "exposure.applied", "$index")
                 send(camera.zoom.value, Role.SUBJECT, final = true)
             }
             return
         }
+        // An outstanding request may still move the camera, so the value is submitted even if held now: the
+        // newest request supersedes the earlier one.
         val queued = PendingValue(index, clock(), request.final)
         pendingExposure = queued
         camera.setExposure(index)
         if (!request.final) return
-        exposureTimeoutJob = scope?.launch { answerIfStalled(queued) { pendingExposure === queued } }
+        exposureTimeoutJob = scope?.launch {
+            answerIfStalled(
+                queued,
+                isPending = { pendingExposure === queued },
+                holds = { camera.state.value.exposure == index },
+            ) {
+                pendingExposure = null
+                confirm(RemoteAction.Brightness(index), "exposure.applied", "$index")
+                send(camera.zoom.value, Role.SUBJECT, final = true)
+            }
+        }
     }
 
     /** `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo. */
@@ -192,16 +218,26 @@ class RemoteControlHandler(
         }
         flashTimeoutJob?.cancel()
         flashTimeoutJob = null
-        if (camera.state.value.flash == request.mode) {
-            pendingFlash = null
+        if (pendingFlash == null && camera.state.value.flash == request.mode) {
             confirm(RemoteAction.Flash(request.mode), "flash.applied", "${request.mode}")
             send(camera.zoom.value, Role.SUBJECT, final = true)
             return
         }
+        // Several taps may be outstanding: the newest mode is submitted even if held now, so that it wins.
         val queued = PendingValue(request.mode, clock(), final = true)
         pendingFlash = queued
         camera.setFlash(request.mode)
-        flashTimeoutJob = scope?.launch { answerIfStalled(queued) { pendingFlash === queued } }
+        flashTimeoutJob = scope?.launch {
+            answerIfStalled(
+                queued,
+                isPending = { pendingFlash === queued },
+                holds = { camera.state.value.flash == request.mode },
+            ) {
+                pendingFlash = null
+                confirm(RemoteAction.Flash(request.mode), "flash.applied", "${request.mode}")
+                send(camera.zoom.value, Role.SUBJECT, final = true)
+            }
+        }
     }
 
     /** `guide.move`: the photographer's repository clamps and applies it; GuideSyncer echoes the result. */
@@ -214,7 +250,9 @@ class RemoteControlHandler(
             return
         }
         // A hidden or absent guide cannot be edited on either phone (Design 2.6.2); the subject's toggle is off then.
-        if (guides.guide.value == null || !guides.state.value.visible) return
+        // A move for another guide is a gesture that began before the guide was replaced: it never crosses over.
+        val guide = guides.guide.value ?: return
+        if (!guides.state.value.visible || guide.id != request.guideId) return
         attributeGuideChanges(Role.SUBJECT)
         guides.update(request.final) { it.copy(cx = request.cx, cy = request.cy, height = request.height) }
         if (request.final) {
@@ -223,15 +261,26 @@ class RemoteControlHandler(
     }
 
     /**
-     * After [ECHO_TIMEOUT_MS] with nothing applied, tells the subject where the camera is, so its control snaps
-     * back. The request is not forgotten: the camera may still be holding it (see the class comment), and
-     * [onApplied] or [onSettingsApplied] attributes it then, while [isPending] still says it is the newest one.
+     * After [ECHO_TIMEOUT_MS] without the camera reporting the request applied: if the camera [holds] its value by
+     * now (a request that superseded an earlier one, or that was already true, makes no state change to report),
+     * [confirmed] marks it the subject's; otherwise the subject is told where the camera is, so its control snaps
+     * back. The request is not forgotten then: the camera may still be holding it (see the class comment), and
+     * [onApplied] or [onSettingsApplied] attributes it later, while [isPending] still says it is the newest one.
      */
-    private suspend fun answerIfStalled(request: PendingValue<*>, isPending: () -> Boolean) {
+    private suspend fun answerIfStalled(
+        request: PendingValue<*>,
+        isPending: () -> Boolean,
+        holds: () -> Boolean,
+        confirmed: () -> Unit,
+    ) {
         delay(ECHO_TIMEOUT_MS)
         // While the camera opens another lens the request is certainly held: wait rather than answer with a stale state.
         camera.status.first { it != CameraStatus.STARTING }
         if (!isPending() || request.answered) return
+        if (holds()) {
+            confirmed()
+            return
+        }
         request.answered = true
         send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
     }

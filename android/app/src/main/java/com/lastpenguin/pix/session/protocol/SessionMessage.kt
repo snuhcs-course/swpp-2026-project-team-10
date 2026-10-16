@@ -77,13 +77,15 @@ sealed interface SessionMessage {
     ) : SessionMessage
 
     /**
-     * The subject's drag or pinch on the guide, in frame coordinates (FR-7.2): the center and height it asks for,
-     * realtime while the gesture runs and reliable when [final]. The photographer clamps and applies it, and the
-     * echo is a `guide.state` with `by: SUBJECT`.
+     * The subject's drag or pinch on the guide [guideId], in frame coordinates (FR-7.2): the center and height it
+     * asks for, realtime while the gesture runs and reliable when [final]. The photographer clamps and applies it,
+     * and the echo is a `guide.state` with `by: SUBJECT`; a move for a guide it no longer shows is dropped, so a
+     * gesture never crosses guide identities (Design 2.6.2).
      */
     @Serializable
     @SerialName("guide.move")
     data class GuideMove(
+        val guideId: String,
         val cx: Float,
         val cy: Float,
         val height: Float,

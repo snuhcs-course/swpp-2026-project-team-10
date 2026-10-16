@@ -49,6 +49,7 @@ async def main(args):
         "frames": 0,
         "request_sent_at": None,
         "move_sent_at": None,
+        "guide_id": None,
         "done": asyncio.Event(),
         "guide": None,
     }
@@ -132,6 +133,7 @@ async def main(args):
                     log("saved to", args.save_guide)
         elif kind == "guide.state":
             st = body["state"]
+            state["guide_id"] = st.get("guideId")
             sent_at = state["move_sent_at"]
             since = (
                 f" {1000 * (time.monotonic() - sent_at):.0f} ms after guide.move" if sent_at and body["final"] else ""
@@ -198,11 +200,15 @@ async def main(args):
                 state["request_sent_at"] = time.monotonic()
                 channels["reliable"].send(codec.encode("camera.zoom.set", {"ratio": args.zoom, "final": True}))
                 log(f"sent camera.zoom.set ratio={args.zoom}")
-            if args.move:
+            if args.move and not state["guide_id"]:
+                log("no guide.state received yet, so there is no guide to move")
+            elif args.move:
                 cx, cy, height = (float(part) for part in args.move.split(","))
+                guide_id = state["guide_id"]
                 # Three realtime steps on the way, then the final value reliably, like a finger would (Design 2.6.5).
                 for i in range(1, 4):
                     body = {
+                        "guideId": guide_id,
                         "cx": 0.5 + (cx - 0.5) * i / 3,
                         "cy": 0.5 + (cy - 0.5) * i / 3,
                         "height": 0.7 + (height - 0.7) * i / 3,
@@ -212,7 +218,9 @@ async def main(args):
                     await asyncio.sleep(0.05)
                 state["move_sent_at"] = time.monotonic()
                 channels["reliable"].send(
-                    codec.encode("guide.move", {"cx": cx, "cy": cy, "height": height, "final": True})
+                    codec.encode(
+                        "guide.move", {"guideId": guide_id, "cx": cx, "cy": cy, "height": height, "final": True}
+                    )
                 )
                 log(f"sent guide.move cx={cx} cy={cy} height={height} final")
             if args.exposure is not None:

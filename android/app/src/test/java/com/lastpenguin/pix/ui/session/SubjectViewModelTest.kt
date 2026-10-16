@@ -362,6 +362,24 @@ class SubjectViewModelTest {
         }
 
     @Test
+    fun `a move names its guide, and a replaced guide ends the gesture in flight`() = runTest(dispatcher) {
+        connectWithControls()
+        mirror.setGuide(fakeGuide("g1"))
+        runCurrent()
+        viewModel.setGuideEditing(true)
+
+        viewModel.onGuideGesture(0.1f, 0f, 1f, final = false)
+        viewModel.onGuideGesture(0.1f, 0f, 1f, final = false)
+        assertEquals("g1", moves().single().guideId)
+
+        mirror.setGuide(fakeGuide("g2"))
+        runCurrent()
+        advanceTimeBy(60)
+        assertEquals(1, moves().size)
+        assertEquals("g2", viewModel.uiState.value.guide?.id)
+    }
+
+    @Test
     fun `guide gestures do nothing without the mode, a guide, or a connection`() = runTest(dispatcher) {
         connectWithControls()
         runCurrent()

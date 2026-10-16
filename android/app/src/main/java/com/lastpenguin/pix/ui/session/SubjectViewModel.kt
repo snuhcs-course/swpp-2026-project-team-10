@@ -89,7 +89,8 @@ class SubjectViewModel(
         Timings.mark("exposure.sent", "$index${if (final) " final" else ""}")
     }
     private val guideSender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
-        session.send(SessionMessage.GuideMove(state.cx, state.cy, state.height, final))
+        val guideId = state.guideId ?: return@StepSender
+        session.send(SessionMessage.GuideMove(guideId, state.cx, state.cy, state.height, final))
         Timings.mark("move.sent", "${state.cx} ${state.cy} ${state.height}${if (final) " final" else ""}")
     }
 
@@ -162,8 +163,10 @@ class SubjectViewModel(
         // The mirror is written by GuideSyncer while the session runs; the overlay draws it (FR-6.7).
         viewModelScope.launch {
             mirror.guide.collect { guide ->
+                val previous = _uiState.value.guide
                 _uiState.update { it.copy(guide = guide, guideEditing = it.guideEditing && guide != null) }
-                if (guide == null) guideSender.cancel()
+                // A gesture never crosses guide identities (Design 2.6.2): a removed or replaced guide ends it.
+                if (guide?.id != previous?.id) guideSender.cancel()
             }
         }
         viewModelScope.launch {
@@ -205,7 +208,12 @@ class SubjectViewModel(
         }
         if (!dx.isFinite() || !dy.isFinite() || !scale.isFinite() || scale <= 0f) return
         val current = ui.guideState
-        val requested = current.copy(cx = current.cx + dx, cy = current.cy + dy, height = current.height * scale)
+        val requested = current.copy(
+            guideId = guide.id,
+            cx = current.cx + dx,
+            cy = current.cy + dy,
+            height = current.height * scale,
+        )
         val moved = GuideGeometry.clamp(requested, guide.aspect, ui.aspect.frameAspect)
         _uiState.update { it.copy(guideState = moved) }
         if (final) guideSender.finish(moved) else guideSender.step(moved)

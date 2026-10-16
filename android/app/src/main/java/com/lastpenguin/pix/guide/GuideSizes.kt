@@ -6,6 +6,9 @@ import kotlin.math.roundToInt
 /** The reference is segmented at this long side at most (Design 2.6.1, step 1). */
 internal const val MAX_REFERENCE_LONG_SIDE = 1280
 
+/** The reference kept for the Camera screen's thumbnail, enlarged to at most half a phone's width (FR-3.9). */
+internal const val REFERENCE_THUMBNAIL_LONG_SIDE = 512
+
 /**
  * The outline's stroke where the guide first appears: about 8 px on screen, 3 dp on a typical phone (Design 2.6.1,
  * step 5). Much lower values round to a 1 px stroke on the 720 px cutout the subject receives.

@@ -45,6 +45,13 @@
     <string name="hide_guide">Hide guide</string>
     <string name="show_guide">Show guide</string>
     <string name="hint_guide_hidden">Guide hidden</string>
+    <string name="reference_photo">Reference photo</string>
+    <string name="enlarge_reference">Enlarge</string>
+    <string name="shrink_reference">Make smaller</string>
+    <string name="move_reference_top_left">Move to the top left</string>
+    <string name="move_reference_top_right">Move to the top right</string>
+    <string name="move_reference_bottom_left">Move to the bottom left</string>
+    <string name="move_reference_bottom_right">Move to the bottom right</string>
     <string name="edit_guide">Edit guide</string>
     <string name="hint_pinch_zoom">Pinch to zoom</string>
     <string name="flash_off">Flash off</string>

@@ -25,6 +25,11 @@ data class ReferenceGuide(
      * takes its place from the photographer's `guide.state`.
      */
     val anchor: NormalizedRect? = null,
+    /**
+     * The reference photo itself, long side at most 512 px, for the Camera screen's corner thumbnail only (FR-3.9).
+     * Never sent to the subject and never drawn as the guide; null on the subject.
+     */
+    val reference: Bitmap? = null,
 )
 
 /** A box as fractions of an image's width and height, right and bottom exclusive (FR-3.1). */

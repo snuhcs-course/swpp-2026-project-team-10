@@ -193,6 +193,25 @@
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
+        <!-- The guide's reference photo in a corner (FR-3.9). A tap enlarges it to half the preview's width, under the
+             chips, and hides the hint; another tap makes it small again. A drag drops it into the nearest corner,
+             above the guide's controls; its size and place are set in code. -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/referenceThumbnail"
+            android:layout_width="54dp"
+            android:layout_height="72dp"
+            android:layout_gravity="top|left"
+            android:background="@color/pix_ground"
+            android:contentDescription="@string/reference_photo"
+            android:padding="0.5dp"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail"
+            app:strokeColor="@color/pix_glass_stroke"
+            app:strokeWidth="1dp"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible" />
+
         <!-- Chips over the top of the preview: what just happened, then what to do. They pass touches through.
              The status chip fades in and out instead of making the hint jump. -->
         <LinearLayout
@@ -226,6 +245,7 @@
 
         <!-- Over the bottom of the preview: remote action notices, then the guide's controls. -->
         <LinearLayout
+            android:id="@+id/bottomOverlays"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"

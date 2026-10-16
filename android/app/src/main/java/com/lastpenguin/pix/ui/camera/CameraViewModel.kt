@@ -72,6 +72,10 @@ data class CameraUiState(
      * zooms the camera. On when a guide is added, off on the shutter or when the guide goes (Design 2.6.2).
      */
     val guideEditing: Boolean = false,
+    /** The guide's reference is enlarged from its corner thumbnail (FR-3.9); every new guide starts small. */
+    val referenceExpanded: Boolean = false,
+    /** The preview corner the reference thumbnail sits in, kept from one guide to the next. */
+    val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
     /** The last saved photo, for the thumbnail and "Saved without the guide". */
     val lastPhoto: Uri? = null,
     /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
@@ -134,7 +138,8 @@ class CameraViewModel(
                 _uiState.update {
                     // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
                     val editing = guide != null && (guide !== it.guide || it.guideEditing)
-                    it.copy(guide = guide, guideEditing = editing)
+                    val expanded = it.referenceExpanded && guide === it.guide
+                    it.copy(guide = guide, guideEditing = editing, referenceExpanded = expanded)
                 }
             }
         }
@@ -263,6 +268,16 @@ class CameraViewModel(
     fun onHideToggle() {
         if (_uiState.value.guide == null) return
         guides.update(final = true) { it.copy(visible = !it.visible) }
+    }
+
+    /** A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). */
+    fun setReferenceExpanded(expanded: Boolean) {
+        _uiState.update { it.copy(referenceExpanded = expanded && it.guide?.reference != null) }
+    }
+
+    /** A drag drops the reference thumbnail into one of the preview's corners, and nowhere else (FR-3.9). */
+    fun setReferenceCorner(corner: ReferenceCorner) {
+        _uiState.update { it.copy(referenceCorner = corner) }
     }
 
     /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */

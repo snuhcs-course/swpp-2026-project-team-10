@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelStore
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.fakeGuide
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,8 +23,11 @@ import org.junit.Before
 import org.junit.Test
 
 /*
- * Partitions for the guide's *Hide* / *Show* on the Camera screen (FR-3.6), a state-based test of the guide's
- * visibility: hide a placed guide in guide-edit mode, show it again, and the toggle without a guide.
+ * Partitions for the guide's controls on the Camera screen, state-based.
+ * Hide / Show (FR-3.6): hide a placed guide in guide-edit mode, show it again, and the toggle without a guide.
+ * Reference thumbnail (FR-3.9): enlarge and shrink a guide's reference; a guide without a reference and no guide
+ * (stays small); the same guide's state changing (stays enlarged); a new guide and a removed guide (back to small);
+ * a corner chosen by a drop, kept for the next guide.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GuideControlsViewModelTest {
@@ -76,6 +80,71 @@ class GuideControlsViewModelTest {
 
         assertEquals(placed, guides.state.value)
         assertTrue(model.uiState.value.guideState.visible)
+    }
+
+    @Test
+    fun setReferenceExpanded_guideWithAReference_enlargesAndShrinks() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+
+        model.setReferenceExpanded(true)
+        assertTrue(model.uiState.value.referenceExpanded)
+        model.setReferenceExpanded(false)
+        assertFalse(model.uiState.value.referenceExpanded)
+    }
+
+    @Test
+    fun setReferenceExpanded_noReferenceOrNoGuide_staysSmall() = runTest(dispatcher) {
+        model.setReferenceExpanded(true)
+        assertFalse(model.uiState.value.referenceExpanded)
+
+        guides.setGuide(fakeGuide("without-reference"))
+        runCurrent()
+        model.setReferenceExpanded(true)
+
+        assertFalse(model.uiState.value.referenceExpanded)
+    }
+
+    @Test
+    fun referenceExpanded_sameGuideMovesOrHides_staysEnlarged() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+        model.setReferenceExpanded(true)
+
+        guides.update(final = true) { it.copy(cx = 0.3f) }
+        model.onHideToggle()
+        runCurrent()
+
+        assertTrue(model.uiState.value.referenceExpanded)
+    }
+
+    @Test
+    fun referenceExpanded_newOrRemovedGuide_isSmallAgain() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+        model.setReferenceExpanded(true)
+
+        guides.setGuide(fakeGuide("g2").copy(reference = fakeBitmap()))
+        runCurrent()
+        assertFalse(model.uiState.value.referenceExpanded)
+
+        model.setReferenceExpanded(true)
+        model.onRemoveGuide()
+        runCurrent()
+        assertFalse(model.uiState.value.referenceExpanded)
+    }
+
+    @Test
+    fun setReferenceCorner_thenANewGuide_keepsTheCorner() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+        assertEquals(ReferenceCorner.TOP_LEFT, model.uiState.value.referenceCorner)
+
+        model.setReferenceCorner(ReferenceCorner.BOTTOM_RIGHT)
+        guides.setGuide(fakeGuide("g2").copy(reference = fakeBitmap()))
+        runCurrent()
+
+        assertEquals(ReferenceCorner.BOTTOM_RIGHT, model.uiState.value.referenceCorner)
     }
 
     @Test

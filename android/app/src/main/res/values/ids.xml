@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TalkBack actions that move the reference thumbnail to another corner (FR-3.9). -->
+    <item name="move_reference_top_left" type="id" />
+    <item name="move_reference_top_right" type="id" />
+    <item name="move_reference_bottom_left" type="id" />
+    <item name="move_reference_bottom_right" type="id" />
+</resources>

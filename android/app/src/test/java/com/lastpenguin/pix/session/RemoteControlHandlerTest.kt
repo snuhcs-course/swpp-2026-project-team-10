@@ -1,7 +1,10 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -9,6 +12,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,9 +20,11 @@ import org.junit.Test
 class RemoteControlHandlerTest {
 
     private val session = FakeSessionManager()
-    private val camera = FakeCameraController()
+    private val camera = FakeCameraController(exposureRange = -4..4, hasFlash = true)
+    private val guides = InMemoryGuideRepository()
     private var now = 0L
-    private val handler = RemoteControlHandler(session, camera, clock = { now })
+    private val attributions = mutableListOf<Role?>()
+    private val handler = RemoteControlHandler(session, camera, guides, attributions::add, clock = { now })
     private val actions = mutableListOf<RemoteAction>()
 
     private fun echoes(): List<SessionMessage.CameraStateUpdate> =
@@ -255,6 +261,145 @@ class RemoteControlHandlerTest {
     }
 
     @Test
+    fun `brightness steps are applied and echoed as steps, and the final value makes one notice`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.ExposureSet(2))
+        runCurrent()
+        assertEquals(listOf(2), camera.exposureRequests)
+        assertEquals(2, echoes().last().exposure)
+        assertEquals(Role.SUBJECT, echoes().last().by)
+        assertFalse(echoes().last().final)
+        assertTrue(actions.isEmpty())
+
+        handler.handle(SessionMessage.ExposureSet(3, final = true))
+        runCurrent()
+        val last = echoes().last()
+        assertEquals(3, last.exposure)
+        assertEquals(Role.SUBJECT, last.by)
+        assertTrue(last.final)
+        assertEquals(listOf<RemoteAction>(RemoteAction.Brightness(3)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a brightness request is clamped to the range, and one already applied is confirmed at once`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.ExposureSet(9, final = true))
+        runCurrent()
+        assertEquals(listOf(4), camera.exposureRequests)
+        assertEquals(4, echoes().last().exposure)
+        assertEquals(listOf<RemoteAction>(RemoteAction.Brightness(4)), actions)
+
+        session.sent.clear()
+        actions.clear()
+        handler.handle(SessionMessage.ExposureSet(4, final = true))
+        runCurrent()
+        assertEquals(listOf(4), camera.exposureRequests)
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 4), echoes().single())
+        assertEquals(listOf<RemoteAction>(RemoteAction.Brightness(4)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `without an exposure range or a flash, a request is answered with the unchanged state`() = runTest {
+        val plain = FakeCameraController()
+        val handler = RemoteControlHandler(session, plain, guides, clock = { now })
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.ExposureSet(2, final = true))
+        handler.handle(SessionMessage.FlashSet(FlashMode.ON))
+        runCurrent()
+
+        assertTrue(plain.exposureRequests.isEmpty())
+        assertTrue(plain.flashRequests.isEmpty())
+        assertEquals(2, echoes().size)
+        assertTrue(echoes().all { it == SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true) })
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a flash request is applied, echoed as the subject's, and reported`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.FlashSet(FlashMode.AUTO))
+        runCurrent()
+
+        assertEquals(listOf(FlashMode.AUTO), camera.flashRequests)
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, flash = FlashMode.AUTO),
+            echoes().single(),
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Flash(FlashMode.AUTO)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a guide move is clamped by the repository, attributed to the subject, and reported once per gesture`() =
+        runTest {
+            guides.setGuide(fakeGuide("g1"))
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+
+            handler.handle(SessionMessage.GuideMove(0.3f, 0.4f, 0.9f))
+            runCurrent()
+            assertEquals(0.3f, guides.state.value.cx, EPSILON)
+            assertEquals(0.4f, guides.state.value.cy, EPSILON)
+            assertEquals(0.9f, guides.state.value.height, EPSILON)
+            assertEquals(listOf<Role?>(Role.SUBJECT), attributions)
+            assertTrue(actions.isEmpty())
+
+            // The same limits as the photographer's own gestures (FR-3.2, FR-3.3).
+            handler.handle(SessionMessage.GuideMove(5f, 5f, 9f, final = true))
+            runCurrent()
+            assertEquals(GuideState.MAX_HEIGHT, guides.state.value.height, EPSILON)
+            assertTrue(guides.state.value.cx < 5f)
+            assertEquals(listOf<RemoteAction>(RemoteAction.GuideMove), actions)
+            handler.stop()
+        }
+
+    @Test
+    fun `a guide move without a visible guide is dropped`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideMove(0.3f, 0.4f, 0.9f, final = true))
+        runCurrent()
+        assertEquals(GuideState(), guides.state.value)
+
+        guides.setGuide(fakeGuide("g1"))
+        guides.update(final = true) { it.copy(visible = false) }
+        handler.handle(SessionMessage.GuideMove(0.3f, 0.4f, 0.9f, final = true))
+        runCurrent()
+        assertEquals(0.5f, guides.state.value.cx, EPSILON)
+        assertTrue(attributions.isEmpty())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
     fun `other messages are ignored`() = runTest {
         handler.start(this)
         advanceTimeBy(200)
@@ -266,5 +411,9 @@ class RemoteControlHandlerTest {
         assertTrue(camera.requests.isEmpty())
         assertTrue(session.sent.isEmpty())
         handler.stop()
+    }
+
+    private companion object {
+        const val EPSILON = 0.0001f
     }
 }

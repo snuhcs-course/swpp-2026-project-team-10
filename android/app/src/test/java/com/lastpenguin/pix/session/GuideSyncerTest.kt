@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideState
@@ -45,6 +45,27 @@ class GuideSyncerTest {
     }
 
     // ---- sender --------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `after an attribution the states are the subject's until the final one is sent`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        connected()
+        val syncer = syncer()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+        session.sent.clear()
+
+        syncer.attribute(Role.SUBJECT)
+        guides.update(final = false) { it.copy(cx = 0.3f) }
+        runCurrent()
+        guides.update(final = true) { it.copy(cx = 0.35f) }
+        runCurrent()
+        assertEquals(listOf(Role.SUBJECT, Role.SUBJECT), states().map { it.by })
+
+        guides.update(final = true) { it.copy(cx = 0.4f) }
+        runCurrent()
+        assertEquals(Role.PHOTOGRAPHER, states().last().by)
+    }
 
     @Test
     fun `on connect the image goes first, then the state`() = runTest {

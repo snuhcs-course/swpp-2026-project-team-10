@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -17,7 +17,8 @@ const val PROTOCOL_VERSION = 1
 /**
  * Data channel messages between the two phones (Design 2.5.1).
  * The @SerialName goes into `t`, the class discriminator; the other fields form the body `b` of the
- * JSON envelope in Design 2.5.1. Only the photographer takes photos; the subject sends zoom requests.
+ * JSON envelope in Design 2.5.1. Only the photographer takes photos; the subject sends requests (zoom, brightness,
+ * flash, guide moves), which the photographer applies and echoes (AD-7).
  */
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("t")
@@ -58,10 +59,31 @@ sealed interface SessionMessage {
     @SerialName("guide.image.end")
     data class GuideImageEnd(val guideId: String, val crc32: Long) : SessionMessage
 
-    /** Realtime while a gesture runs; reliable when [final] (gesture ended). */
+    /**
+     * Realtime while a gesture runs; reliable when [final] (gesture ended). [by] is the subject when the state is
+     * the echo of its `guide.move` (FR-7.2); a phone without the field means the photographer.
+     */
     @Serializable
     @SerialName("guide.state")
-    data class GuideStateUpdate(val state: GuideState, val final: Boolean) : SessionMessage
+    data class GuideStateUpdate(
+        val state: GuideState,
+        val final: Boolean,
+        val by: Role = Role.PHOTOGRAPHER,
+    ) : SessionMessage
+
+    /**
+     * The subject's drag or pinch on the guide, in frame coordinates (FR-7.2): the center and height it asks for,
+     * realtime while the gesture runs and reliable when [final]. The photographer clamps and applies it, and the
+     * echo is a `guide.state` with `by: SUBJECT`.
+     */
+    @Serializable
+    @SerialName("guide.move")
+    data class GuideMove(
+        val cx: Float,
+        val cy: Float,
+        val height: Float,
+        val final: Boolean = false,
+    ) : SessionMessage
 
     @Serializable
     @SerialName("guide.clear")
@@ -74,6 +96,26 @@ sealed interface SessionMessage {
         /** True for the last value of a pinch (or a single tap). Only it travels reliably and gets a notice. */
         val final: Boolean = false,
     ) : SessionMessage
+
+    /** A step of the subject's brightness slider, an exposure-compensation index, or its final value (FR-7.3). */
+    @Serializable
+    @SerialName("camera.exposure.set")
+    data class ExposureSet(val index: Int, val final: Boolean = false) : SessionMessage
+
+    /** The subject's flash choice (FR-7.3). Ignored, with an unchanged echo, when the camera has no flash. */
+    @Serializable
+    @SerialName("camera.flash.set")
+    data class FlashSet(val mode: FlashMode) : SessionMessage
+
+    /** The subject's focus point in frame coordinates (FR-7.7, Could). No echo: focus has no lasting state. */
+    @Serializable
+    @SerialName("camera.focus.set")
+    data class FocusSet(val x: Float, val y: Float) : SessionMessage
+
+    /** Whether the photographer allows remote control (FR-7.5, Could). */
+    @Serializable
+    @SerialName("control.permission")
+    data class ControlPermission(val allowed: Boolean) : SessionMessage
 
     /**
      * The camera values actually applied, and who changed them. Iteration 2 adds [exposure], [flash], and [aspect],

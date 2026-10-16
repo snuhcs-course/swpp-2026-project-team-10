@@ -57,6 +57,11 @@
     <string name="peer_left">%1$s left</string>
     <string name="peer_disconnected">%1$s disconnected</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
+    <string name="remote_guide_move_notice">%1$s moved the guide</string>
+    <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
+    <string name="remote_flash_on_notice">%1$s turned the flash on</string>
+    <string name="remote_flash_off_notice">%1$s turned the flash off</string>
+    <string name="remote_flash_auto_notice">%1$s set the flash to auto</string>
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>

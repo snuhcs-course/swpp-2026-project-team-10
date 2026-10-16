@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -83,7 +83,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     // The old ratio's last frame stays on screen until the rebound preview streams again (Design 2.6.2).
     private var stillJob: Job? = null
     private var stillSawIdle = false
-    private val evFormat = DecimalFormat("+0.0;-0.0")
 
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (binding != null) {
@@ -215,6 +214,23 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                                     notice.name,
                                     DecimalFormat("0.#").format(notice.ratio),
                                 )
+
+                            is SessionNotice.RemoteGuideMove -> getString(
+                                R.string.remote_guide_move_notice,
+                                notice.name,
+                            )
+
+                            is SessionNotice.RemoteBrightness ->
+                                getString(R.string.remote_brightness_notice, notice.name, formatEv(notice.index))
+
+                            is SessionNotice.RemoteFlash -> getString(
+                                when (notice.mode) {
+                                    FlashMode.OFF -> R.string.remote_flash_off_notice
+                                    FlashMode.AUTO -> R.string.remote_flash_auto_notice
+                                    FlashMode.ON -> R.string.remote_flash_on_notice
+                                },
+                                notice.name,
+                            )
                         }
                         showNotice(controls, text)
                     }
@@ -547,21 +563,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.brightnessPanel.isVisible = state.brightnessOpen
         brightnessSlider?.render(
             1f,
-            (range.last - range.first + 1).toFloat(),
-            (state.exposure - range.first + 1).toFloat(),
+            ExposureScale.sliderMax(range),
+            ExposureScale.sliderValue(state.exposure, range),
             enabled = ready && hasBrightness,
         )
         controls.brightnessValue.text = formatEv(state.exposure)
     }
 
-    /** The exposure index for a brightness slider position (the slider runs from 1). */
-    private fun sliderIndex(value: Float): Int = value.roundToInt() - 1 + viewModel.uiState.value.exposureRange.first
+    /** The exposure index for a brightness slider position (ExposureScale, shared with Subject view). */
+    private fun sliderIndex(value: Float): Int = ExposureScale.index(value, viewModel.uiState.value.exposureRange)
 
     /** An exposure index in EV, such as "+0.7" or "0". */
-    private fun formatEv(index: Int): String {
-        val ev = index * viewModel.uiState.value.exposureStep
-        return if (abs(ev) < 0.05f) "0" else evFormat.format(ev)
-    }
+    private fun formatEv(index: Int): String = ExposureScale.formatEv(index, viewModel.uiState.value.exposureStep)
 
     /** A tap on the preview: focus there if it is inside the camera image, and show where (FR-1.4). */
     private fun onPreviewTap(x: Float, y: Float) {

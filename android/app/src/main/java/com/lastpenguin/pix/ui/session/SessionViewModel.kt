@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -7,6 +7,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.RemoteAction
@@ -33,6 +34,15 @@ sealed interface SessionNotice {
 
     /** The subject changed the zoom: "Junhyeong set zoom to 2×" (FR-7.4). */
     data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
+
+    /** The subject moved or resized the guide: "Junhyeong moved the guide" (FR-7.2, FR-7.4). */
+    data class RemoteGuideMove(val name: String) : SessionNotice
+
+    /** The subject set the brightness: "Junhyeong set brightness to +1"; [index] is the applied exposure index. */
+    data class RemoteBrightness(val name: String, val index: Int) : SessionNotice
+
+    /** The subject changed the flash: "Junhyeong turned the flash on". */
+    data class RemoteFlash(val name: String, val mode: FlashMode) : SessionNotice
 }
 
 /**
@@ -175,6 +185,13 @@ class SessionViewModel(
                             val name = peerName ?: return@collect
                             when (action) {
                                 is RemoteAction.Zoom -> _notices.tryEmit(SessionNotice.RemoteZoom(name, action.ratio))
+
+                                is RemoteAction.GuideMove -> _notices.tryEmit(SessionNotice.RemoteGuideMove(name))
+
+                                is RemoteAction.Brightness ->
+                                    _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))
+
+                                is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
                             }
                         }
                     }

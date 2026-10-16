@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 # Image of the Pix server (Design 2.8, Hosting). Build from server/:
 #   docker build --target test .                     runs pytest; the build fails if a test fails
 #   docker build --target runtime -t pix-server .    the image that deploy.sh starts
@@ -23,6 +23,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 COPY src ./src
 COPY tests ./tests
+# A test checks that it lists every setting.
+COPY .env.example ./
 # The code is tested from src/ as it is, without building the package.
 RUN PYTHONPATH=src .venv/bin/python -m pytest -q
 

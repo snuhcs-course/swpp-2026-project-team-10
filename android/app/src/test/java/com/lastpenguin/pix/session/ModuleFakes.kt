@@ -45,7 +45,12 @@ class FakeSessionManager : SessionManager {
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
 
-    override suspend fun start(entry: SessionEntry, role: Role) = Unit
+    /** Every `start`, so a test can see what was joined or opened, and as which role. */
+    val starts = mutableListOf<Pair<SessionEntry, Role>>()
+
+    override suspend fun start(entry: SessionEntry, role: Role) {
+        starts += entry to role
+    }
 
     override fun send(message: SessionMessage) {
         sent += message

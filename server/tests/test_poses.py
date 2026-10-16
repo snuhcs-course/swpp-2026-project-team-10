@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 import asyncio
 import base64
 import io
@@ -12,8 +12,9 @@ from pydantic import SecretStr
 from starlette.formparsers import MultiPartParser
 
 from pix_server.main import MAX_REQUEST_BYTES, create_app
-from pix_server.poses.limiter import RateLimiter
+from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.templates import TEMPLATES
+from pix_server.store import Window
 
 
 def create_pose(client, image, template_id="wave", seed="1829304756"):
@@ -197,25 +198,49 @@ def test_rate_limit_counts_only_requests_sent_to_the_image_api(client, image_api
     assert create_pose(client, make_image()).status_code == 200
 
 
-async def test_rate_limiter_slides_and_separates_clients(clock, make_registry):
-    limiter = RateLimiter((await make_registry()).store, limit=2, window_seconds=60)
-    assert await limiter.allow("a")
-    clock.advance(30)
-    assert await limiter.allow("a")
-    assert not await limiter.allow("a")
-    assert await limiter.allow("b")
-    clock.advance(30)
-    assert await limiter.allow("a")
-    assert not await limiter.allow("a")
+def test_global_limit_refuses_every_client_once_the_day_is_used_up(client, image_api, make_image, settings, clock):
+    settings.pose_global_limit = 3
+    for _ in range(3):
+        assert create_pose(client, make_image()).status_code == 200
+    message = assert_error(create_pose(client, make_image()), 429, "RATE_LIMITED")
+    assert "today" in message
+    assert len(image_api.requests) == 3
+    clock.advance(settings.pose_global_window_seconds)
+    assert create_pose(client, make_image()).status_code == 200
 
 
-async def test_rate_limit_is_shared_by_all_workers(make_registry):
-    first = RateLimiter((await make_registry()).store, limit=2, window_seconds=60)
-    second = RateLimiter((await make_registry()).store, limit=2, window_seconds=60)
-    assert await first.allow("a")
-    assert await second.allow("a")
-    assert not await first.allow("a")
-    assert not await second.allow("a")
+async def test_window_slides_and_separates_keys(clock, make_registry):
+    store = (await make_registry()).store
+    a, b = Window("rate:test:a", 2, 60), Window("rate:test:b", 2, 60)
+    assert await store.allow(a) is None
+    clock.advance(30)
+    assert await store.allow(a) is None
+    assert await store.allow(a) == a
+    assert await store.allow(b) is None
+    clock.advance(30)
+    assert await store.allow(a) is None
+    assert await store.allow(a) == a
+
+
+async def test_windows_are_shared_by_all_workers(make_registry):
+    first, second = (await make_registry()).store, (await make_registry()).store
+    window = Window("rate:test:a", 2, 60)
+    assert await first.allow(window) is None
+    assert await second.allow(window) is None
+    assert await first.allow(window) == window
+    assert await second.allow(window) == window
+
+
+async def test_pose_limiter_counts_a_refused_request_in_neither_window(settings, make_registry):
+    settings.pose_rate_limit, settings.pose_global_limit = 2, 3
+    limiter = PoseLimiter((await make_registry()).store, settings)
+    assert [await limiter.refuse("a") for _ in range(3)] == [None, None, "client"]
+    # The third request of "a" was refused by its own window, so the global window holds two and has room for one.
+    assert await limiter.refuse("b") is None
+    assert await limiter.refuse("c") == "global"
+    # Refused by the global window, so "c" has not used its own.
+    settings.pose_global_limit = 10
+    assert [await limiter.refuse("c") for _ in range(3)] == [None, None, "client"]
 
 
 def test_pose_request_is_refused_while_the_session_store_is_down(client, image_api, make_image, outage):

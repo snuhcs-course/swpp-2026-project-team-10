@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from pix_server.errors import ApiError
 from pix_server.poses.generator import PoseGenerator, check_scene
-from pix_server.poses.limiter import RateLimiter
+from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.templates import TEMPLATES
 
 router = APIRouter(prefix="/api/v1")
@@ -49,10 +49,13 @@ async def create_pose(
     scene = await image.read()
     check_scene(scene)
 
-    # Only requests that reach the image API count, because the limit exists to control its cost.
-    limiter: RateLimiter = request.app.state.pose_limiter
-    if not await limiter.allow(request.client.host if request.client else ""):
+    # Only requests that reach the image API count, because the limits exist to control its cost.
+    limiter: PoseLimiter = request.app.state.pose_limiter
+    refused = await limiter.refuse(request.client.host if request.client else "")
+    if refused == "client":
         raise ApiError(429, "RATE_LIMITED", "Too many pose requests from this device; try again later")
+    if refused == "global":
+        raise ApiError(429, "RATE_LIMITED", "Pix has made as many poses as it can for today; try again later")
 
     generator: PoseGenerator = request.app.state.pose_generator
     call = asyncio.create_task(generator.generate(scene, template, seed))

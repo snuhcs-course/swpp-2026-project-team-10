@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 # shellcheck shell=bash
 # Shortcuts for operating the Pix server on a course server (server/README.md, Deploy). It is not run but loaded
 # into your shell, from the checkout that deploys update, so every account gets the same commands:
@@ -29,6 +29,7 @@ pix() {
             ;;
         nginx) sudo docker logs -f --tail "${2:-100}" pix-nginx-1 ;;
         redis) sudo docker exec -it pix-redis-1 redis-cli ;;
+        db) sudo docker exec -it pix-postgres-1 psql -U pix pix ;;
         journal) sudo journalctl -u pix-deploy -n "${2:-50}" --no-pager ;;
         build) less +G "$state/last-build.log" ;;
         timer) systemctl list-timers pix-deploy.timer ;;
@@ -50,10 +51,14 @@ pix: shortcuts for the Pix server on this machine (server/README.md, Deploy)
   pix journal [n]    the last n lines the timer's deploys printed (50)
   pix build          the last build log, opened at its end
   pix timer          when the deploy timer last ran and runs next
-  pix env            edit /opt/pix/.env, then run pix restart to apply it
+  pix env            edit /opt/pix/.env, then run pix restart to apply it;
+                     pix status lists the values server/.env.example asks for
+                     that it lacks
   pix health         /health and /version through nginx, and which copy answered
   pix redis          redis-cli in the session store; read only (SCARD sessions,
                      SMEMBERS workers): FLUSHALL or DEL would drop live rooms
+  pix db             psql in the account database; read only (\dt, SELECT
+                     count(*) FROM users): a change there is a change to accounts
   pix help           this list
 
 MAX_WAIT_SECONDS=0 pix deploy switches without waiting for open rooms.
@@ -62,7 +67,7 @@ server: tell the team before a rollback, and never edit files in /opt/pix/repo.
 EOF
             ;;
         "")
-            echo "usage: pix status | deploy [ref] | restart | rollback | logs [n] | nginx [n] | journal [n] | build | timer | env | health | redis | help"
+            echo "usage: pix status | deploy [ref] | restart | rollback | logs [n] | nginx [n] | journal [n] | build | timer | env | health | redis | db | help"
             echo "Run 'pix help' for what each one does."
             ;;
         *)
@@ -71,3 +76,13 @@ EOF
             ;;
     esac
 }
+
+# At login, a reminder of what the last deploy found wrong with /opt/pix/.env. Only in an interactive shell, so the
+# output never reaches scp or a script.
+case $- in
+    *i*)
+        if [ -s /opt/pix/state/env-check ]; then
+            echo "pix: /opt/pix/.env needs attention ($(tr '\n' ';' < /opt/pix/state/env-check | sed 's/;$//')). Run pix env, then pix restart."
+        fi
+        ;;
+esac

@@ -21,5 +21,9 @@
   <li type="none"><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-CLAUDE-md-History">CLAUDE.md History</a></li>
   <li type="none"><details><summary>Prompt History</summary><ul>
   <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Documents">Documents</a></li>
+  <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Server-and-Deployment">Server and Deployment</a></li>
+  <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Camera-and-Guide">Camera and Guide</a></li>
+  <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control">Real-time and Remote Control</a></li>
+  <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Code-Reviews">Code Reviews</a></li>
   </ul></details></li>
   </ul>

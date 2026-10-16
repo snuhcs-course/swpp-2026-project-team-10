@@ -42,6 +42,9 @@
     <string name="guide_opacity">Guide opacity</string>
     <string name="guide_opacity_percent">%1$d%%</string>
     <string name="remove_guide">Remove guide</string>
+    <string name="hide_guide">Hide guide</string>
+    <string name="show_guide">Show guide</string>
+    <string name="hint_guide_hidden">Guide hidden</string>
     <string name="edit_guide">Edit guide</string>
     <string name="hint_pinch_zoom">Pinch to zoom</string>
     <string name="flash_off">Flash off</string>
@@ -61,6 +64,9 @@
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>
     <string name="add_guide_body">Pix cuts the person out of a photo and shows them on your camera, so you can frame the same pose.</string>
+    <string name="replace_guide_title">Replace the pose guide?</string>
+    <string name="replace_guide_body">Choose a new reference, and its guide takes the place of the current one.</string>
+    <string name="keep_current_guide">Keep the current guide</string>
     <string name="upload_reference">Upload a reference</string>
     <string name="upload_reference_body">A photo from your gallery with one person in it</string>
     <string name="generate_poses">Generate poses here</string>

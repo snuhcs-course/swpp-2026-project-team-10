@@ -213,8 +213,8 @@
         <item name="thumbTrackGapSize">0dp</item>
         <item name="trackStopIndicatorSize">0dp</item>
         <item name="trackInsideCornerSize">2dp</item>
-        <item name="thumbColor">@color/pix_text</item>
-        <item name="trackColorActive">@color/pix_accent</item>
+        <item name="thumbColor">@color/slider_thumb</item>
+        <item name="trackColorActive">@color/slider_track_active</item>
         <item name="trackColorInactive">#33FFFFFF</item>
         <item name="haloColor">#33F2C14E</item>
         <item name="haloRadius">18dp</item>
@@ -224,7 +224,7 @@
 
     <!-- The guide's own controls use the guide color. -->
     <style name="Widget.Pix.Slider.Guide">
-        <item name="trackColorActive">@color/pix_guide</item>
+        <item name="trackColorActive">@color/slider_guide_track_active</item>
         <item name="haloColor">#335EEAD4</item>
     </style>
 

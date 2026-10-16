@@ -47,6 +47,10 @@ class ReferenceViewModel(
 
     private var making: Job? = null
 
+    /** Whether a guide is on the camera, so Add a pose guide asks to replace it (FR-3.6). */
+    val replacing: Boolean
+        get() = guides.guide.value != null
+
     /** A photo from the system photo picker. */
     fun onPhotoPicked(uri: Uri) {
         make { maker.make(uri) }

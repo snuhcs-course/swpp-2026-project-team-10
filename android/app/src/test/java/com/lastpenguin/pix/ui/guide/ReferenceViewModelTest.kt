@@ -69,6 +69,15 @@ class ReferenceViewModelTest {
     }
 
     @Test
+    fun replacing_guideOnTheCamera_isTrueOnlyThen() = runTest {
+        assertEquals(false, model.replacing)
+
+        guides.guide.value = guide()
+
+        assertEquals(true, model.replacing)
+    }
+
+    @Test
     fun noPersonAndOtherFailuresAreTold() = runTest {
         model.onCandidatePicked(bitmap())
         runCurrent()

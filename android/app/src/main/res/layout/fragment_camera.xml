@@ -294,17 +294,26 @@
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_glass_panel"
                 android:gravity="center_vertical"
-                android:paddingStart="6dp"
+                android:paddingStart="2dp"
                 android:paddingEnd="2dp"
                 android:visibility="gone"
                 tools:visibility="visible">
+
+                <!-- Hide / Show (FR-3.6): the guide goes away for a moment and comes back where it was. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/hideGuideButton"
+                    style="@style/Widget.Pix.Button.Icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/hide_guide"
+                    app:icon="@drawable/ic_visibility_off" />
 
                 <com.google.android.material.slider.Slider
                     android:id="@+id/opacitySlider"
                     style="@style/Widget.Pix.Slider.Guide"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
+                    android:layout_marginStart="0dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/guide_opacity"
                     android:enabled="false"
@@ -320,6 +329,7 @@
                     android:importantForAccessibility="no"
                     android:minWidth="34dp"
                     android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/slider_value_text"
                     tools:text="50%" />
 
                 <Button

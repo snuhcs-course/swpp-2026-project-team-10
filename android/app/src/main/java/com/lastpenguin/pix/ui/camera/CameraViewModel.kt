@@ -256,6 +256,15 @@ class CameraViewModel(
         guides.update(final) { it.copy(opacity = opacity) }
     }
 
+    /**
+     * *Hide* / *Show* (FR-3.6): the guide goes away for a moment and comes back where it was. Hiding ends the
+     * guide-edit mode (Design 2.6.2); a connected subject's copy follows through `guide.state` (FR-6.7).
+     */
+    fun onHideToggle() {
+        if (_uiState.value.guide == null) return
+        guides.update(final = true) { it.copy(visible = !it.visible) }
+    }
+
     /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */
     fun onRemoveGuide() {
         guides.setGuide(null)

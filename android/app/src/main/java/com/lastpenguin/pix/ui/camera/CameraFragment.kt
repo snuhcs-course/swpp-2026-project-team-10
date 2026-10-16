@@ -171,6 +171,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.galleryButton.setOnClickListener { openLastPhoto() }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
+        controls.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
         controls.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
         }
@@ -375,15 +376,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // and hiding the bar then would move the controls under an active touch.
         val guideEditable = granted && !unavailable
         controls.guideControls.isVisible = state.guide != null
-        opacitySlider?.render(
-            GuideState.MIN_OPACITY,
-            GuideState.MAX_OPACITY,
-            state.guideState.opacity,
-            enabled = guideEditable && state.guide != null,
-        )
+        val opacityEnabled = guideEditable && state.guide != null && state.guideState.visible
+        opacitySlider?.render(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY, state.guideState.opacity, opacityEnabled)
+        controls.opacityValue.isEnabled = opacityEnabled
         controls.opacityValue.text =
             getString(R.string.guide_opacity_percent, (state.guideState.opacity * 100f).roundToInt())
         controls.removeGuideButton.isEnabled = guideEditable
+        val hidden = !state.guideState.visible
+        controls.hideGuideButton.setIconResource(if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off)
+        controls.hideGuideButton.contentDescription =
+            getString(if (hidden) R.string.show_guide else R.string.hide_guide)
+        controls.hideGuideButton.isEnabled = guideEditable
         // Guide-edit mode (AD-17): the overlay owns the preview's touches while on; the pinch zooms while off.
         // Its toggle sits beside the zoom readout, so it stays when the guide's panel changes (Iter2-P11).
         controls.editGuideButton.isVisible = state.guide != null
@@ -407,6 +410,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         when {
             state.guide == null ->
                 showHint(controls.hintText, R.string.hint_add_guide, R.drawable.ic_target_small, R.color.pix_accent)
+
+            !state.guideState.visible ->
+                showHint(controls.hintText, R.string.hint_guide_hidden, R.drawable.ic_visibility_off_small)
 
             state.guideEditing ->
                 showHint(controls.hintText, R.string.hint_edit_guide, R.drawable.ic_move_small, R.color.pix_guide)

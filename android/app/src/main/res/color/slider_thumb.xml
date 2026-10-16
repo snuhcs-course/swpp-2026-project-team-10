@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A slider's thumb, dimmed while the slider cannot be dragged (a hidden guide, a photo being saved). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_text_faint" android:state_enabled="false" />
+    <item android:color="@color/pix_text" />
+</selector>

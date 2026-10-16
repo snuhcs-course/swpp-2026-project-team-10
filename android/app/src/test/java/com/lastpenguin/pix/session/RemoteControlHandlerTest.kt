@@ -333,6 +333,55 @@ class RemoteControlHandlerTest {
     }
 
     @Test
+    fun `a final brightness or flash request the camera does not apply is answered with the current state`() =
+        runTest {
+            camera.applies = false
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+            session.sent.clear()
+
+            handler.handle(SessionMessage.ExposureSet(3, final = true))
+            runCurrent()
+            assertTrue(echoes().isEmpty())
+            advanceTimeBy(600)
+            runCurrent()
+            assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+
+            session.sent.clear()
+            handler.handle(SessionMessage.FlashSet(FlashMode.ON))
+            runCurrent()
+            assertTrue(echoes().isEmpty())
+            advanceTimeBy(600)
+            runCurrent()
+            assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+            assertTrue(actions.isEmpty())
+            handler.stop()
+        }
+
+    @Test
+    fun `a brightness request applied late is still the subject's`() = runTest {
+        camera.applies = false
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.ExposureSet(2, final = true))
+        advanceTimeBy(600)
+        runCurrent()
+        assertEquals(Role.PHOTOGRAPHER, echoes().single().by)
+
+        camera.state.value = camera.state.value.copy(exposure = 2)
+        runCurrent()
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 2), echoes().last())
+        assertEquals(listOf<RemoteAction>(RemoteAction.Brightness(2)), actions)
+        handler.stop()
+    }
+
+    @Test
     fun `a flash request is applied, echoed as the subject's, and reported`() = runTest {
         backgroundScope.launch { handler.actions.collect { actions += it } }
         handler.start(this)

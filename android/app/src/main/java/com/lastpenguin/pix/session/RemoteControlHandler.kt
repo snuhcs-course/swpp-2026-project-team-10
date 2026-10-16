@@ -45,8 +45,9 @@ sealed interface RemoteAction {
  * when the held request is applied later, it is still the subject's and still gets its one notice.
  *
  * **Brightness and flash (It 2, FR-7.3).** `camera.exposure.set` is clamped to the exposure range and applied
- * with the same step-then-final pattern; `camera.flash.set` is applied when the camera has a flash and otherwise
- * answered with the unchanged state. Every `camera.state` carries the whole applied camera state (Design 2.5.1):
+ * with the same step-then-final pattern, and `camera.flash.set` is applied when the camera has a flash; a request
+ * the camera cannot take (no range, no flash) is answered with the unchanged state, and a final request the camera
+ * does not report applied within [ECHO_TIMEOUT_MS] is answered the same way, so the subject's control snaps back. Every `camera.state` carries the whole applied camera state (Design 2.5.1):
  * a change of exposure, flash, or aspect ratio, from either phone, is sent as soon as the camera reports it,
  * attributed to the subject when it matches the subject's pending request.
  *
@@ -74,7 +75,9 @@ class RemoteControlHandler(
     private var settingsJob: Job? = null
     private var finalJob: Job? = null
     private var timeoutJob: Job? = null
-    private var pending: PendingZoom? = null
+    private var exposureTimeoutJob: Job? = null
+    private var flashTimeoutJob: Job? = null
+    private var pending: PendingValue<Float>? = null
     private var pendingExposure: PendingValue<Int>? = null
     private var pendingFlash: PendingValue<FlashMode>? = null
 
@@ -99,9 +102,13 @@ class RemoteControlHandler(
         settingsJob = null
         finalJob?.cancel()
         timeoutJob?.cancel()
+        exposureTimeoutJob?.cancel()
+        flashTimeoutJob?.cancel()
         zoomJob = null
         finalJob = null
         timeoutJob = null
+        exposureTimeoutJob = null
+        flashTimeoutJob = null
         pending = null
         pendingExposure = null
         pendingFlash = null
@@ -135,14 +142,14 @@ class RemoteControlHandler(
             send(ratio, Role.SUBJECT, final = true)
             return
         }
-        val queued = PendingZoom(ratio, clock(), request.final)
+        val queued = PendingValue(ratio, clock(), request.final)
         pending = queued
         // A final echo still due for the previous step would send a stale zoom after the subject's pinch ended.
         // The newer request brings its own echoes: when applied, or from the timeout answer.
         finalJob?.cancel()
         camera.setZoom(ratio)
         if (!request.final) return
-        timeoutJob = scope?.launch { answerIfStalled(queued) }
+        timeoutJob = scope?.launch { answerIfStalled(queued) { pending === queued } }
     }
 
     /**
@@ -158,6 +165,8 @@ class RemoteControlHandler(
             return
         }
         val index = request.index.coerceIn(range)
+        exposureTimeoutJob?.cancel()
+        exposureTimeoutJob = null
         if (camera.state.value.exposure == index) {
             // Already there, so the camera will not emit again: a final request is confirmed and echoed now.
             pendingExposure = null
@@ -167,8 +176,11 @@ class RemoteControlHandler(
             }
             return
         }
-        pendingExposure = PendingValue(index, clock(), request.final)
+        val queued = PendingValue(index, clock(), request.final)
+        pendingExposure = queued
         camera.setExposure(index)
+        if (!request.final) return
+        exposureTimeoutJob = scope?.launch { answerIfStalled(queued) { pendingExposure === queued } }
     }
 
     /** `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo. */
@@ -178,14 +190,18 @@ class RemoteControlHandler(
             send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
             return
         }
+        flashTimeoutJob?.cancel()
+        flashTimeoutJob = null
         if (camera.state.value.flash == request.mode) {
             pendingFlash = null
             confirm(RemoteAction.Flash(request.mode), "flash.applied", "${request.mode}")
             send(camera.zoom.value, Role.SUBJECT, final = true)
             return
         }
-        pendingFlash = PendingValue(request.mode, clock(), final = true)
+        val queued = PendingValue(request.mode, clock(), final = true)
+        pendingFlash = queued
         camera.setFlash(request.mode)
+        flashTimeoutJob = scope?.launch { answerIfStalled(queued) { pendingFlash === queued } }
     }
 
     /** `guide.move`: the photographer's repository clamps and applies it; GuideSyncer echoes the result. */
@@ -207,21 +223,22 @@ class RemoteControlHandler(
     }
 
     /**
-     * After [ECHO_TIMEOUT_MS] with nothing applied, tells the subject where the zoom is. The request is not
-     * forgotten: the camera may still be holding it (see the class comment), and [onApplied] attributes it then.
+     * After [ECHO_TIMEOUT_MS] with nothing applied, tells the subject where the camera is, so its control snaps
+     * back. The request is not forgotten: the camera may still be holding it (see the class comment), and
+     * [onApplied] or [onSettingsApplied] attributes it then, while [isPending] still says it is the newest one.
      */
-    private suspend fun answerIfStalled(request: PendingZoom) {
+    private suspend fun answerIfStalled(request: PendingValue<*>, isPending: () -> Boolean) {
         delay(ECHO_TIMEOUT_MS)
-        // While the camera opens another lens the request is certainly held: wait rather than answer with a stale zoom.
+        // While the camera opens another lens the request is certainly held: wait rather than answer with a stale state.
         camera.status.first { it != CameraStatus.STARTING }
-        if (pending !== request || request.answered) return
+        if (!isPending() || request.answered) return
         request.answered = true
         send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
     }
 
     private fun onApplied(zoom: Float) {
         val request = pending
-        val bySubject = request != null && abs(zoom - request.ratio) < ZOOM_MATCH && clock() - request.at <= PENDING_MS
+        val bySubject = request != null && abs(zoom - request.value) < ZOOM_MATCH && clock() - request.at <= PENDING_MS
         if (bySubject) {
             pending = null
             timeoutJob?.cancel()
@@ -247,10 +264,12 @@ class RemoteControlHandler(
         val flashRequest = pendingFlash?.takeIf { it.value == flash && now - it.at <= PENDING_MS }
         if (exposureRequest != null) {
             pendingExposure = null
+            exposureTimeoutJob?.cancel()
             if (exposureRequest.final) confirm(RemoteAction.Brightness(exposure), "exposure.applied", "$exposure")
         }
         if (flashRequest != null) {
             pendingFlash = null
+            flashTimeoutJob?.cancel()
             confirm(RemoteAction.Flash(flash), "flash.applied", "$flash")
         }
         val bySubject = exposureRequest != null || flashRequest != null
@@ -276,12 +295,11 @@ class RemoteControlHandler(
         )
     }
 
-    private class PendingZoom(val ratio: Float, val at: Long, val final: Boolean) {
+    /** A zoom, brightness, or flash request waiting for the camera to report it applied. */
+    private class PendingValue<T>(val value: T, val at: Long, val final: Boolean) {
+        /** Answered by the timeout with the current state; a late application is still attributed. */
         var answered = false
     }
-
-    /** A brightness or flash request waiting for the camera to report it applied. */
-    private class PendingValue<T>(val value: T, val at: Long, val final: Boolean)
 
     private companion object {
         const val ZOOM_MATCH = 0.01f

@@ -126,3 +126,67 @@
 | 한준형 | Reviewed the AI collaboration report | – | – |
 
 </details>
+
+## Iteration 2
+
+The kickoff on 2026-10-09 replaced that day's standup ([[Team Meetings|Team-Meetings]]). Weekend standups are flexible.
+
+<details>
+<summary><b>2026-10-12 (Mon)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | – (weekend) | Iter2-P7 (#49): smooth the guide outline | – |
+| 박재완 | Merged dev into main for Iteration 1 (#63); approved the AI marker rule and PR template (#62) and the Iteration 2 requirements (#66); updated the CLAUDE.md history on the wiki (#64) | Review the Iteration 2 design (#67); start deploying the server to the course servers (#46) | – |
+| 조성민 | – (weekend) | Close Iteration 1 (the AI collaboration report draft); start Iter2-P6 (#48) | – |
+| 한준형 | Wrote the Iteration 2 R&S (v1.0, #66) from the kickoff notes and the issues, and the Iteration 2 design (v1.0, #67) with the undecided details under *Still open* | Renumber the issues to the Iteration numbering; the Testing Documentation issue and format (Iter2-A1) | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-13 (Tue)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter2-P7 (#49): made the guide outline a smooth line; tried lines for arms and legs in front of the body on test photos | Decide on the arm and leg lines; update the documents and open the PR | – |
+| 박재완 | Approved the Iteration 2 design (#67) and the Testing Documentation (#70); decided the hosting: the two course servers over HTTP on port 80, Cloudflare TURN, and Redis for sessions (Design 1.1); built the Docker, nginx, and blue-green deploy pulled by a timer, and opened #71 | Merge #71 and set up Server B on dev; file the issue for the Redis session store and start it | – |
+| 조성민 | Closed Iteration 1 (the AI collaboration report draft); started Iteration 2: cleaned up the branches and went through the assigned issues; Iter2-P6 (#48): pinch zoom on both screens with the guide-edit mode toggle in place of the zoom slider, the mode on when a guide is added and off on the shutter; tried on the S25 Ultra and S23 Ultra | Push the branch, open the P6 PR, and address the review comments | – |
+| 한준형 | Before today: the AI marker rule in `CLAUDE.md` and the AI usage section in the PR template (#62); the Iteration 2 schedule and issues (#44–#61); the R&S v1.0 (#66) and Design v1.0 (#67) merged. Today: renumbered all issues to `Iter1-Pn` / `Iter2-Pn` in titles and bodies and the two documents; fixed the version sequence (#68); wrote the Testing Documentation issue (#69) and the page format v1.0 from the course guidelines (#70) | Add the testing lectures' principles to the Testing Documentation; the `CLAUDE.md` rule to follow and update it | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-14 (Wed)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Recorded the arm and leg lines as out of scope; updated Design and R&S to 1.2; fixed the review comments and merged #72 | Iter2-P10 (#51): tap to focus, brightness, flash | – |
+| 박재완 | Merged the server deploy (#71) and set up Server B on dev with the deploy timer; redrew the target architecture figure; moved sessions and room codes to a Redis session store so the server runs two workers (#73, #75), with its tests in the Testing Documentation (v1.1); added `pix` shortcuts for operating the servers (#77); approved #76 | Start the accounts server (#50): decide the database engine and the session token lifetime, set up the Google OAuth client, and build the tables, migrations, and Google sign-in | – |
+| 조성민 | Iter2-P6 (#48): resolved the Design Documentation conflicts with dev (1.4), fixed the Codex and review comments, added the Testing Documentation entries and the Iteration 2 AI collaboration report with the prompt log, and merged #74; assessed sessions across networks for Iter2-P16 (#56): the app already takes `iceServers`, a TURN relay is needed, and the server's reachability off campus is still to be checked; started Iter2-P5 (#47): `Timings` marks and the measurement script, zoom requests coalesced per frame, the lens held during a pinch, and the last frame kept on screen through a lens switch | Measure before and after on the S23 Ultra and S25 Ultra (S21 if available), fill in the NFR-19 numbers, and open the P5 PR | – |
+| 한준형 | Testing Documentation v1.0 merged (#70) with the Week 6 and 7 lecture principles: test quality rules, design techniques with Pix's partitions, mutation analysis, CI and flaky-test policies; the `CLAUDE.md` rule to always refer to and update the Testing Documentation, with the Iteration 2 CLAUDE.md history, the AI collaboration report format, and the documents prompt log (#76) | Review the feature PRs; prepare the demo recording with 조성민 | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-15 (Thu)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter2-P10 (#51): tap to focus, brightness slider, flash, and the `CameraController` additions | Aspect ratio; open the P10 PR | – |
+| 박재완 | Accounts server (#50): the database in the Compose file, with migrations for users, devices, friend requests, and friendships; Google sign-in that returns our own session token; Pix ID rules; recorded the database engine and the token lifetime in the Design | Pix ID lookup, friend requests, the friend list with online status, and removing a friend; tests with a fake Google verifier; open the #50 PR | – |
+| 조성민 | Iter2-P5 (#47): before and after numbers on the S23 Ultra, S25 Ultra, and S21; decided the preview mode and the shutter capture mode on them; opened the PR | Address the review comments on the P5 PR; Iter2-P17 (#57): guide moves from Subject view and the guide-edit mode toggle shown there | – |
+| 한준형 | Recorded the Iteration 2 demo video with 조성민: the Iteration 2 features merged so far on two phones | Edit the demo video; prepare the midterm presentation materials | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-16 (Fri)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter2-P10 (#51): aspect ratio (4:3, 16:9, 1:1); opened the PR (#80); started Iter2-P11 (#52): hiding and replacing the guide | Reference thumbnail and the guide's starting position | – |
+| 박재완 | Finished the accounts server (#50) and merged its PR (#78), with the Design and Testing Documentation updated; two test accounts became friends through the API on Server B; agreed the order of the invitation work with 조성민 (#55) | Over the weekend, both due 10/18: pose description on the server (#53), an optional description in `POST /poses` and the prompt, tried with `compare_image_edit_apis.py`; Sign-in, Pix ID, and Friends screens (#54) | – |
+| 조성민 | Iter2-P17 (#57): guide moves from Subject view (`guide.move` steps every 50 ms and a reliable final value), the toggle shown on Subject view, and the notices on the photographer's phone; remote brightness and flash on the P10 `CameraController` additions; opened the PR | Iter2-P16 (#56): STUN and TURN from `room.created` and `session.joined`, and a first session across Wi-Fi and LTE | – |
+| 한준형 | Edited the demo video and prepared the midterm presentation materials (slides and the demo flow) | Finish the presentation for the midterm on 10/21; Iter2-P21 (#59): integration tests for the Iteration 2 flows | – |
+
+</details>

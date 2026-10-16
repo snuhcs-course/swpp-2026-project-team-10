@@ -39,7 +39,7 @@ class Codec:
 
     def encode(self, kind, body):
         self.seq[kind] = self.seq.get(kind, 0) + 1
-        return json.dumps({"v": 1, "t": kind, "seq": self.seq[kind], "ts": int(time.time() * 1000), "b": body})
+        return json.dumps({"v": 2, "t": kind, "seq": self.seq[kind], "ts": int(time.time() * 1000), "b": body})
 
 
 class PatternVideo(VideoStreamTrack):
@@ -160,7 +160,7 @@ async def main(args):
                 send(
                     "reliable",
                     "hello",
-                    {"protocol": 1, "appVersion": "fake", "role": "PHOTOGRAPHER", "name": "fake-photographer"},
+                    {"protocol": 2, "appVersion": "fake", "role": "PHOTOGRAPHER", "name": "fake-photographer"},
                 )
 
         channel.on("message", on_message)

@@ -23,7 +23,7 @@ class RemoteControlMessagesTest {
 
     @Test
     fun guideMove_designExample_decodes() {
-        val text = """{ "v": 1, "t": "guide.move", "seq": 21, "ts": 1759212352100,
+        val text = """{ "v": 2, "t": "guide.move", "seq": 21, "ts": 1759212352100,
             "b": { "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }"""
 
         assertEquals(SessionMessage.GuideMove(0.41f, 0.52f, 0.82f, final = false), decode(text))
@@ -31,7 +31,7 @@ class RemoteControlMessagesTest {
 
     @Test
     fun exposureSet_designExample_decodes() {
-        val text = """{ "v": 1, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000,
+        val text = """{ "v": 2, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000,
             "b": { "index": 3, "final": true } }"""
 
         assertEquals(SessionMessage.ExposureSet(3, final = true), decode(text))
@@ -39,16 +39,16 @@ class RemoteControlMessagesTest {
 
     @Test
     fun flashSet_designExample_decodes() {
-        val text = """{ "v": 1, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }"""
+        val text = """{ "v": 2, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }"""
 
         assertEquals(SessionMessage.FlashSet(FlashMode.AUTO), decode(text))
     }
 
     @Test
     fun focusSetAndPermission_designExamples_decode() {
-        val focus = """{ "v": 1, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000,
+        val focus = """{ "v": 2, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000,
             "b": { "x": 0.62, "y": 0.4 } }"""
-        val permission = """{ "v": 1, "t": "control.permission", "seq": 1, "ts": 1759212340000,
+        val permission = """{ "v": 2, "t": "control.permission", "seq": 1, "ts": 1759212340000,
             "b": { "allowed": false } }"""
 
         assertEquals(SessionMessage.FocusSet(0.62f, 0.4f), decode(focus))
@@ -70,8 +70,8 @@ class RemoteControlMessagesTest {
 
     @Test
     fun step_withoutFinal_isAStep() {
-        val move = """{"v":1,"t":"guide.move","seq":1,"ts":0,"b":{"cx":0.5,"cy":0.5,"height":0.7}}"""
-        val exposure = """{"v":1,"t":"camera.exposure.set","seq":1,"ts":0,"b":{"index":2}}"""
+        val move = """{"v":2,"t":"guide.move","seq":1,"ts":0,"b":{"cx":0.5,"cy":0.5,"height":0.7}}"""
+        val exposure = """{"v":2,"t":"camera.exposure.set","seq":1,"ts":0,"b":{"index":2}}"""
 
         assertFalse((decode(move) as SessionMessage.GuideMove).final)
         assertFalse((decode(exposure) as SessionMessage.ExposureSet).final)

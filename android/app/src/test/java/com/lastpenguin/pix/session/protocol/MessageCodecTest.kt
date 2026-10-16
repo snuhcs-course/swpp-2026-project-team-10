@@ -27,12 +27,12 @@ class MessageCodecTest {
         val text = codec.encode(SessionMessage.Hello(appVersion = "0.1.0", role = Role.PHOTOGRAPHER, name = "Dongje"))
 
         val envelope = Json.parseToJsonElement(text).jsonObject
-        assertEquals(1, envelope.getValue("v").jsonPrimitive.int)
+        assertEquals(2, envelope.getValue("v").jsonPrimitive.int)
         assertEquals("hello", envelope.getValue("t").jsonPrimitive.content)
         assertEquals(1, envelope.getValue("seq").jsonPrimitive.int)
         assertEquals(1_759_212_345_678L, envelope.getValue("ts").jsonPrimitive.long)
         val body = envelope.getValue("b").jsonObject
-        assertEquals(1, body.getValue("protocol").jsonPrimitive.int)
+        assertEquals(2, body.getValue("protocol").jsonPrimitive.int)
         assertEquals("0.1.0", body.getValue("appVersion").jsonPrimitive.content)
         assertEquals("PHOTOGRAPHER", body.getValue("role").jsonPrimitive.content)
         assertEquals("Dongje", body.getValue("name").jsonPrimitive.content)
@@ -87,7 +87,7 @@ class MessageCodecTest {
     @Test
     fun `decodes the guide state example from the design`() {
         val text = """
-            {"v": 1, "t": "guide.state", "seq": 412, "ts": 1759212349120,
+            {"v": 2, "t": "guide.state", "seq": 412, "ts": 1759212349120,
              "b": {"state": {"guideId": "5f0c2b9e", "cx": 0.32, "cy": 0.55, "height": 0.7,
                              "opacity": 0.5, "style": "OUTLINE", "visible": true}, "final": false}}
         """.trimIndent()

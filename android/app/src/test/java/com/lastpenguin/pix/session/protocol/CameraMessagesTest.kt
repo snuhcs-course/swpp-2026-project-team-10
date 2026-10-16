@@ -23,7 +23,7 @@ class CameraMessagesTest {
 
     @Test
     fun capabilities_designExample_decodesEveryField() {
-        val text = """{"v":1,"t":"camera.capabilities","seq":2,"ts":1759212345690,"b":{"capabilities":{
+        val text = """{"v":2,"t":"camera.capabilities","seq":2,"ts":1759212345690,"b":{"capabilities":{
             "minZoom":0.6,"maxZoom":10.0,"zoomStops":[0.6,1.0,2.0,3.0],
             "exposureRange":[-12,12],"exposureStep":0.1667,"hasFlash":true,
             "aspectRatios":["R4_3","R16_9","R1_1"],"supportsFocusPoint":true}}}"""
@@ -74,7 +74,7 @@ class CameraMessagesTest {
 
     @Test
     fun state_designExample_decodesExposureFlashAndRatio() {
-        val text = """{ "v": 1, "t": "camera.state", "seq": 58, "ts": 1759212352342,
+        val text = """{ "v": 2, "t": "camera.state", "seq": 58, "ts": 1759212352342,
             "b": { "zoom": 2.0, "exposure": 3, "flash": "AUTO", "aspect": "R16_9", "by": "SUBJECT", "final": true } }"""
 
         assertEquals(

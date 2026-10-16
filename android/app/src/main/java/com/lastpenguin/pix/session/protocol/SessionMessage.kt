@@ -12,7 +12,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 
-const val PROTOCOL_VERSION = 1
+/**
+ * Checked in `hello`: a phone that speaks another version ends the session. 2 since the subject's requests of
+ * Iteration 2 (`guide.move`, `camera.exposure.set`, `camera.flash.set`, Iter2-P17), which a version-1 phone would
+ * drop without an answer while still advertising the capabilities for them.
+ */
+const val PROTOCOL_VERSION = 2
 
 /**
  * Data channel messages between the two phones (Design 2.5.1).

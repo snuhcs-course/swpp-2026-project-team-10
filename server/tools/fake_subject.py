@@ -37,7 +37,7 @@ class Codec:
 
     def encode(self, kind, body):
         self.seq[kind] = self.seq.get(kind, 0) + 1
-        return json.dumps({"v": 1, "t": kind, "seq": self.seq[kind], "ts": int(time.time() * 1000), "b": body})
+        return json.dumps({"v": 2, "t": kind, "seq": self.seq[kind], "ts": int(time.time() * 1000), "b": body})
 
 
 async def main(args):
@@ -82,7 +82,7 @@ async def main(args):
         if kind == "hello":
             log(f"hello from {body['name']} ({body['role']}, protocol {body['protocol']})")
             hello = {
-                "protocol": 1,
+                "protocol": 2,
                 "appVersion": "fake",
                 "role": "SUBJECT",
                 "name": "fake-subject",

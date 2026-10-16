@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import kotlin.math.roundToInt
@@ -51,6 +51,14 @@ internal fun cropWithMargin(bounds: PixelRect, width: Int, height: Int, fraction
         bottom = minOf(height, bounds.bottom + margin),
     )
 }
+
+/** This rectangle as fractions of a [width]×[height] image: where the cutout lies in the reference (FR-3.1). */
+internal fun PixelRect.relativeTo(width: Int, height: Int): NormalizedRect = NormalizedRect(
+    left = left.toFloat() / width,
+    top = top.toFloat() / height,
+    right = right.toFloat() / width,
+    bottom = bottom.toFloat() / height,
+)
 
 /**
  * The outline stroke in cutout pixels, scaled so it is about [STROKE_ON_SCREEN_PX] when the guide first appears

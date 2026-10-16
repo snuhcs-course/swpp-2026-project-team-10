@@ -70,6 +70,30 @@ class InMemoryGuideRepositoryTest {
     }
 
     @Test
+    fun setGuide_guidesWithAnchors_eachStartsWhereItsPersonIsInTheCurrentFrame() = runTest {
+        var frameAspect = 3f / 4f
+        val repository = InMemoryGuideRepository { frameAspect }
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { repository.changes.collect { changes += it } }
+        runCurrent()
+
+        repository.setGuide(guide("left").copy(anchor = NormalizedRect(0.1f, 0.2f, 0.3f, 0.9f)))
+        repository.update(final = true) { it.copy(cx = 0.8f, height = 1.4f) }
+        // A replacement starts at its own reference's place, not where the previous guide was moved (FR-3.1).
+        frameAspect = 9f / 16f
+        repository.setGuide(guide("right", aspect = 0.4f).copy(anchor = NormalizedRect(0.5f, 0.3f, 0.9f, 0.8f)))
+        runCurrent()
+
+        assertEquals(GuideState(guideId = "left", cx = 0.2f, cy = 0.55f, height = 0.7f), changes.first().state)
+        val started = repository.state.value
+        assertEquals("right", started.guideId)
+        assertEquals(0.7f, started.cx, EPSILON)
+        assertEquals(0.55f, started.cy, EPSILON)
+        assertEquals(0.5f, started.height, EPSILON)
+        assertEquals(GuideChange(started, final = true), changes.last())
+    }
+
+    @Test
     fun clearingDropsTheImageAndEmitsAFinalResetEvenWhenAlreadyEmpty() = runTest {
         repository.setGuide(guide("first"))
         repository.update(final = true) { it.copy(opacity = 0.9f) }

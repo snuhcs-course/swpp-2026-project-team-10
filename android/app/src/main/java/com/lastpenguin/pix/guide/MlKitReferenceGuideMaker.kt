@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-14, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -62,8 +62,9 @@ class MlKitReferenceGuideMaker(
         }
 
     /**
-     * Steps 2–5 on an upright image: segment, smooth the mask, crop to the person plus 2%, and outline. The cutout's
-     * alpha is the smoothed mask, so the subject, which rebuilds the outline from it, draws the same line (FR-2.9).
+     * Steps 2–5 on an upright image: segment, smooth the mask, crop to the person plus 2% and keep where that crop
+     * lies as the anchor (FR-3.1), and outline. The cutout's alpha is the smoothed mask, so the subject, which
+     * rebuilds the outline from it, draws the same line (FR-2.9).
      */
     private suspend fun build(input: Bitmap, source: GuideSource): ReferenceGuide {
         val bitmap = prepare(input)
@@ -97,6 +98,7 @@ class MlKitReferenceGuideMaker(
             outline = outline,
             aspect = crop.width.toFloat() / crop.height,
             source = source,
+            anchor = crop.relativeTo(width, height),
         )
     }
 

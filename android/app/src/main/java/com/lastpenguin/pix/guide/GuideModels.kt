@@ -20,7 +20,19 @@ data class ReferenceGuide(
     /** cutout width / height. */
     val aspect: Float,
     val source: GuideSource,
+    /**
+     * The cutout's box in the reference photo, where a new guide starts (FR-3.1). null on the subject, whose guide
+     * takes its place from the photographer's `guide.state`.
+     */
+    val anchor: NormalizedRect? = null,
 )
+
+/** A box as fractions of an image's width and height, right and bottom exclusive (FR-3.1). */
+data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+    val height: Float get() = bottom - top
+    val centerX: Float get() = (left + right) / 2f
+    val centerY: Float get() = (top + bottom) / 2f
+}
 
 /** Everything needed to place the guide, in frame coordinates (Design 2.3, 2.6.2). */
 @Serializable

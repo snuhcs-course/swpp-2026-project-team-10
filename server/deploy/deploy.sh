@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-16, reviewed by Jaewan Park
 # Deploys the Pix server on a course server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
 #
 #   deploy.sh auto           deploy the configured branch if it has a new commit; the systemd timer runs this
@@ -82,6 +82,8 @@ check_env() {
     # Its own temporary file, because `status` runs this without the deploy lock.
     local example=$REPO/server/.env.example key missing="" unknown="" tmp
     tmp=$(mktemp "$ENV_CHECK.XXXXXX")
+    # mktemp makes the file its owner's alone, but every operator reads it at login (pix.sh); it holds names only.
+    chmod 644 "$tmp"
     if [ -f "$example" ] && [ -f "$ENV_FILE" ]; then
         for key in $(sed -n 's/^\([A-Z][A-Z0-9_]*\)=[[:space:]]*$/\1/p' "$example"); do
             if ! grep -q -i -E "^[[:space:]]*(export[[:space:]]+)?$key[[:space:]]*=[[:space:]]*([^[:space:]#\"']|\"[^\"]|'[^'])" "$ENV_FILE"; then

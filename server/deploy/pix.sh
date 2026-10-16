@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-16, reviewed by Jaewan Park
 # shellcheck shell=bash
 # Shortcuts for operating the Pix server on a course server (server/README.md, Deploy). It is not run but loaded
 # into your shell, from the checkout that deploys update, so every account gets the same commands:
@@ -81,8 +81,10 @@ EOF
 # output never reaches scp or a script.
 case $- in
     *i*)
-        if [ -s /opt/pix/state/env-check ]; then
+        if [ -s /opt/pix/state/env-check ] && [ -r /opt/pix/state/env-check ]; then
             echo "pix: /opt/pix/.env needs attention ($(tr '\n' ';' < /opt/pix/state/env-check | sed 's/;$//')). Run pix env, then pix restart."
+        elif [ -s /opt/pix/state/env-check ]; then
+            echo "pix: /opt/pix/.env needs attention. Run pix status to see what, then pix env and pix restart."
         fi
         ;;
 esac

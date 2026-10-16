@@ -67,6 +67,7 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-14] "what happens to the timer we set initially? this uses 600? if we change to 0 then will that be updated automatically?"
 - [Jaewan, 10-14] "fix both of those in this branch"
 - [Jaewan, 10-14] "commit and push"
+- [Jaewan, 10-16] "when i ssh into the server, i get the error `-bash: /opt/pix/state/env-check: Permission denied pix: /opt/pix/.env needs attention (). Run pix env, then pix restart.`. what's wrong?"
 
 ## ## User CRUD and friends server APIs (#50)
 

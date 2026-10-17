@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -541,11 +541,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /**
      * The guide's reference in its corner while there is one (FR-3.9): small, or half the preview's width when
      * enlarged. It glides to a new place, and stays while the guide is hidden; the scene photo step hides it and
-     * shows its own hint.
+     * shows its own hint. Layout changes call this alone, so it applies every rule of its own, the scene photo's too.
      */
     private fun renderReference(controls: FragmentCameraBinding, state: CameraUiState) {
         val thumbnail = controls.referenceThumbnail
-        val reference = state.guide?.reference
+        // The scene photo frames a new scene, which an earlier guide's reference is not part of.
+        val reference = state.guide?.reference?.takeUnless { isScenePhotoActive() }
         val shown = thumbnail.isVisible
         thumbnail.isVisible = reference != null
         // The enlarged photo reaches under the chips: the hint steps aside, and a capture status stays on top.
@@ -621,8 +622,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false
-        controls.referenceThumbnail.isVisible = false
-        controls.hintText.isVisible = true
         if (scene.shotFailed) {
             showStatus(controls.captureStatus, R.string.scene_shot_failed, StatusLook.ERROR)
         } else {

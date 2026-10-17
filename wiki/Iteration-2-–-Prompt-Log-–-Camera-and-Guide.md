@@ -102,6 +102,16 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-18] "Reply to it and resolve it."
 - [Dongje, 10-18] "Another review came in; check it the same way. Also review the PR once yourself." (Codex asked to anchor the thumbnail to the camera frame's corners instead of the preview's; 박동제 kept the preview's corners, like the chips and the guide's panel, and the reply says why. The agent's own review found a thumbnail that seemed to glide in from the screen's corner; recordings of the old and new builds showed it never does, so that change was dropped, and only two comments were fixed.)
 
+## Subject view's aspect ratio (#86, [#89])
+
+**Two phones (10/18)**
+
+- [Dongje, 10-18] "Check it with two phones, the S22 and the emulator." (The course servers did not answer, so the server ran on the laptop and both phones joined it over the same Wi-Fi. The starting position, hiding, and a replacement reached the subject's phone.)
+- [Dongje, 10-18] "The external servers can be used only on the school network; that has to wait until it opens."
+- [Dongje, 10-18] "When the ratio changes, the subject's phone should change the guide's ratio and the screen's ratio too. Can you check?" (The grid and the guide followed, but the video was cropped to the view's shape, so the guide lay on another part of the scene; the agent found the cause and tried a fix on the S22 without committing it.)
+- [Dongje, 10-18] "I posted an A4 issue; is this related?" (It was #86, Sungmin's issue for the same symptom.)
+- [Dongje, 10-18] "No, assign me to issue A4 and open a new PR that fixes it."
+
 ## Daily standup rows (10/14)
 
 - [Dongje, 10-14] "Write my rows of the daily standup log from Tuesday on. For Tuesday and Wednesday, split the task we merged into two parts. Over Thursday, Friday, and Saturday I will work on #52 (Iter2-P11) and #51 (Iter2-P10): split them into tasks per day, very briefly."
@@ -111,3 +121,4 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#72]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/72
 [#80]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/80
 [#83]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/83
+[#89]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/89

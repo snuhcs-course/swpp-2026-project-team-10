@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -78,16 +78,28 @@ class FakeSessionManager : SessionManager {
     }
 }
 
-/** A camera whose zoom applies at once (or not at all when [applies] is false). */
+/**
+ * A camera whose zoom, exposure, and flash apply at once (or not at all when [applies] is false), within the
+ * capabilities it was given: no exposure range and no flash unless a test asks for them.
+ */
 class FakeCameraController(
     minZoom: Float = 0.6f,
     maxZoom: Float = 10f,
+    exposureRange: IntRange = 0..0,
+    hasFlash: Boolean = false,
 ) : CameraController {
     private val _status = MutableStateFlow(CameraStatus.READY)
     override val status: StateFlow<CameraStatus> = _status.asStateFlow()
 
     private val _capabilities = MutableStateFlow<CameraCapabilities?>(
-        CameraCapabilities(minZoom, maxZoom, listOf(0.6f, 1f, 2f, 3f).filter { it in minZoom..maxZoom }),
+        CameraCapabilities(
+            minZoom,
+            maxZoom,
+            listOf(0.6f, 1f, 2f, 3f).filter { it in minZoom..maxZoom },
+            exposureRange = exposureRange,
+            exposureStep = if (exposureRange.first < exposureRange.last) 0.5f else 0f,
+            hasFlash = hasFlash,
+        ),
     )
     override val capabilities: StateFlow<CameraCapabilities?> = _capabilities.asStateFlow()
 
@@ -119,9 +131,19 @@ class FakeCameraController(
 
     override fun setFocusPoint(x: Float, y: Float) = Unit
 
-    override fun setExposure(index: Int) = Unit
+    val exposureRequests = mutableListOf<Int>()
+    val flashRequests = mutableListOf<FlashMode>()
 
-    override fun setFlash(mode: FlashMode) = Unit
+    override fun setExposure(index: Int) {
+        exposureRequests += index
+        val range = _capabilities.value?.exposureRange ?: 0..0
+        if (applies) state.value = state.value.copy(exposure = index.coerceIn(range))
+    }
+
+    override fun setFlash(mode: FlashMode) {
+        flashRequests += mode
+        if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(flash = mode)
+    }
 
     override fun setAspectRatio(ratio: AspectRatio) = Unit
 

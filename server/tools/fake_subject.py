@@ -1,13 +1,15 @@
-# AI-generated with Claude Code, 2026-10-05, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 """A subject phone made of Python, for testing the photographer's side with one phone or emulator.
 
 It joins a room code through the signaling server, answers the WebRTC offer, exchanges `hello` on the data
-channels, counts the video frames it receives, optionally sends `camera.zoom.set`, and reports the echoed
-`camera.state` with its delay. It also receives the photographer's guide: the image chunks are reassembled and
-checked against the CRC, and every `guide.state` is printed. It is a development tool, not part of the server.
+channels, counts the video frames it receives, optionally sends the subject's requests (`camera.zoom.set`,
+`guide.move`, `camera.exposure.set`, `camera.flash.set`), and reports the echoed `camera.state` and `guide.state`
+with their delay. It also receives the photographer's guide: the image chunks are reassembled and checked against
+the CRC, and every `guide.state` is printed. It is a development tool, not part of the server.
 
     pip install websockets aiortc
-    python tools/fake_subject.py <code> [--seconds 20] [--zoom 2.0] [--have-guide <id>] [--save-guide guide.webp]
+    python tools/fake_subject.py <code> [--seconds 20] [--zoom 2.0] [--move 0.3,0.5,0.9] [--exposure 2]
+                                 [--flash AUTO] [--have-guide <id>] [--save-guide guide.webp]
                                  [--server ws://127.0.0.1:8000/ws]
 """
 
@@ -35,14 +37,22 @@ class Codec:
 
     def encode(self, kind, body):
         self.seq[kind] = self.seq.get(kind, 0) + 1
-        return json.dumps({"v": 1, "t": kind, "seq": self.seq[kind], "ts": int(time.time() * 1000), "b": body})
+        return json.dumps({"v": 2, "t": kind, "seq": self.seq[kind], "ts": int(time.time() * 1000), "b": body})
 
 
 async def main(args):
     codec = Codec()
     pc = RTCPeerConnection(RTCConfiguration(iceServers=[]))
     channels = {}
-    state = {"hello": False, "frames": 0, "zoom_sent_at": None, "done": asyncio.Event(), "guide": None}
+    state = {
+        "hello": False,
+        "frames": 0,
+        "request_sent_at": None,
+        "move_sent_at": None,
+        "guide_id": None,
+        "done": asyncio.Event(),
+        "guide": None,
+    }
 
     async def count_frames(track):
         while True:
@@ -73,7 +83,7 @@ async def main(args):
         if kind == "hello":
             log(f"hello from {body['name']} ({body['role']}, protocol {body['protocol']})")
             hello = {
-                "protocol": 1,
+                "protocol": 2,
                 "appVersion": "fake",
                 "role": "SUBJECT",
                 "name": "fake-subject",
@@ -86,9 +96,12 @@ async def main(args):
         elif kind == "camera.capabilities":
             log("capabilities:", body["capabilities"])
         elif kind == "camera.state":
-            sent_at = state["zoom_sent_at"]
-            since = f" {1000 * (time.monotonic() - sent_at):.0f} ms after zoom.set" if sent_at else ""
-            log(f"camera.state zoom={body['zoom']} by={body['by']} final={body['final']}{since}")
+            sent_at = state["request_sent_at"]
+            since = f" {1000 * (time.monotonic() - sent_at):.0f} ms after the request" if sent_at else ""
+            log(
+                f"camera.state zoom={body['zoom']} exposure={body.get('exposure')} flash={body.get('flash')} "
+                f"by={body['by']} final={body['final']}{since}"
+            )
         elif kind == "guide.image.begin":
             log(
                 f"guide.image.begin {body['guideId']} {body['format']} {body['width']}x{body['height']} "
@@ -120,10 +133,15 @@ async def main(args):
                     log("saved to", args.save_guide)
         elif kind == "guide.state":
             st = body["state"]
+            state["guide_id"] = st.get("guideId")
+            sent_at = state["move_sent_at"]
+            since = (
+                f" {1000 * (time.monotonic() - sent_at):.0f} ms after guide.move" if sent_at and body["final"] else ""
+            )
             log(
                 f"guide.state {st.get('guideId')} cx={st.get('cx'):.3f} cy={st.get('cy'):.3f} "
                 f"height={st.get('height'):.3f} opacity={st.get('opacity'):.2f} style={st.get('style')} "
-                f"visible={st.get('visible')} final={body['final']}"
+                f"visible={st.get('visible')} by={body.get('by', 'PHOTOGRAPHER')} final={body['final']}{since}"
             )
         elif kind == "guide.clear":
             log("guide.clear")
@@ -179,9 +197,42 @@ async def main(args):
                 return
             await asyncio.sleep(2)
             if args.zoom is not None:
-                state["zoom_sent_at"] = time.monotonic()
+                state["request_sent_at"] = time.monotonic()
                 channels["reliable"].send(codec.encode("camera.zoom.set", {"ratio": args.zoom, "final": True}))
                 log(f"sent camera.zoom.set ratio={args.zoom}")
+            if args.move and not state["guide_id"]:
+                log("no guide.state received yet, so there is no guide to move")
+            elif args.move:
+                cx, cy, height = (float(part) for part in args.move.split(","))
+                guide_id = state["guide_id"]
+                # Three realtime steps on the way, then the final value reliably, like a finger would (Design 2.6.5).
+                for i in range(1, 4):
+                    body = {
+                        "guideId": guide_id,
+                        "cx": 0.5 + (cx - 0.5) * i / 3,
+                        "cy": 0.5 + (cy - 0.5) * i / 3,
+                        "height": 0.7 + (height - 0.7) * i / 3,
+                        "final": False,
+                    }
+                    channels["realtime"].send(codec.encode("guide.move", body))
+                    await asyncio.sleep(0.05)
+                state["move_sent_at"] = time.monotonic()
+                channels["reliable"].send(
+                    codec.encode(
+                        "guide.move", {"guideId": guide_id, "cx": cx, "cy": cy, "height": height, "final": True}
+                    )
+                )
+                log(f"sent guide.move cx={cx} cy={cy} height={height} final")
+            if args.exposure is not None:
+                await asyncio.sleep(0.5)
+                state["request_sent_at"] = time.monotonic()
+                channels["reliable"].send(codec.encode("camera.exposure.set", {"index": args.exposure, "final": True}))
+                log(f"sent camera.exposure.set index={args.exposure} final")
+            if args.flash:
+                await asyncio.sleep(0.5)
+                state["request_sent_at"] = time.monotonic()
+                channels["reliable"].send(codec.encode("camera.flash.set", {"mode": args.flash}))
+                log(f"sent camera.flash.set mode={args.flash}")
             try:
                 await asyncio.wait_for(state["done"].wait(), args.seconds)
             except asyncio.TimeoutError:
@@ -201,6 +252,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("code")
 parser.add_argument("--seconds", type=float, default=20)
 parser.add_argument("--zoom", type=float, default=None)
+parser.add_argument("--move", default=None, help="a guide move to send as cx,cy,height in frame coordinates")
+parser.add_argument("--exposure", type=int, default=None, help="a brightness request, as an exposure index")
+parser.add_argument("--flash", default=None, choices=["OFF", "AUTO", "ON"], help="a flash request")
 parser.add_argument("--have-guide", default=None, help="guide id to report in hello, to test that the image is skipped")
 parser.add_argument("--save-guide", default=None, help="write the received guide image (WebP) to this file")
 parser.add_argument("--server", default="ws://127.0.0.1:8000/ws")

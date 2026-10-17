@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -65,8 +65,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
+        // The whole area takes the pinch, the margins beside a video of another shape too.
         pinchZoom = PinchZoomController(
-            live,
+            binding.videoContainer,
             range = { viewModel.uiState.value.let { if (it.canZoom) it.minZoom..it.maxZoom else null } },
             current = { viewModel.uiState.value.zoom },
             onZoom = viewModel::onZoomGesture,

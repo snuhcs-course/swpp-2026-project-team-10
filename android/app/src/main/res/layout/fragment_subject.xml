@@ -61,6 +61,7 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <FrameLayout
+        android:id="@+id/videoContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@color/pix_ground"
@@ -69,11 +70,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topBar">
 
-        <!-- The photographer's live video, aspect-fit so the whole 3:4 frame is visible (Design 2.6.4, AD-10). -->
+        <!-- The photographer's live video, the whole frame in the ratio they chose (Design 2.6.4, AD-10). It wraps
+             its content so that it measures itself to the video's shape and is centered, the same rectangle the
+             grid and the guide fit; at match_parent the renderer would crop every frame to the view's shape. -->
         <org.webrtc.SurfaceViewRenderer
             android:id="@+id/liveView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
 
         <!-- The same 3×3 grid as the photographer's preview, over the same fitted image; no level bar here. -->
         <com.lastpenguin.pix.ui.camera.CameraCompositionView

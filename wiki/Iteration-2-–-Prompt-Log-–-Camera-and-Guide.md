@@ -111,6 +111,7 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-18] "When the ratio changes, the subject's phone should change the guide's ratio and the screen's ratio too. Can you check?" (The grid and the guide followed, but the video was cropped to the view's shape, so the guide lay on another part of the scene; the agent found the cause and tried a fix on the S22 without committing it.)
 - [Dongje, 10-18] "I posted an A4 issue; is this related?" (It was #86, Sungmin's issue for the same symptom.)
 - [Dongje, 10-18] "No, assign me to issue A4 and open a new PR that fixes it."
+- [Dongje, 10-18] "Stop the server, and fix the documents and the rest for the conflicts with Sungmin's PR, now merged. Then bring our code up to date, check it, and commit again if nothing is wrong." (#85 kept Design 1.8 and Testing 1.7, so this PR's rows became 1.9 and 1.8.)
 
 ## Daily standup rows (10/14)
 

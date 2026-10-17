@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Rect
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -21,8 +22,11 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
+import androidx.core.view.children
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.widget.TextViewCompat
@@ -44,7 +48,6 @@ import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
@@ -75,6 +78,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
+    private var referenceDrag: ReferenceDragController? = null
     private var opacitySlider: TrackedSliderController? = null
     private var brightnessSlider: TrackedSliderController? = null
     private var previewLogged = false
@@ -170,9 +174,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { openLastPhoto() }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
-        controls.cutoutSegment.setOnClickListener { chooseStyle(GuideStyle.CUTOUT) }
-        controls.outlineSegment.setOnClickListener { chooseStyle(GuideStyle.OUTLINE) }
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
+        controls.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
+        setupReference(controls)
         controls.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
         }
@@ -286,6 +290,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     override fun onDestroyView() {
         pinchZoom?.finishInteraction()
         pinchZoom = null
+        referenceDrag = null
         opacitySlider?.finishInteraction()
         opacitySlider = null
         brightnessSlider?.finishInteraction()
@@ -334,6 +339,76 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             AccessibilityActionCompat.ACTION_SCROLL_BACKWARD,
             getString(R.string.zoom_out),
         ) { _, _ -> adjust(1f / 1.1f) }
+    }
+
+    /**
+     * The reference thumbnail (FR-3.9): a tap enlarges it or makes it small again, and a drag drops it into the
+     * nearest corner. TalkBack gets the same tap and an action for each other corner.
+     */
+    private fun setupReference(controls: FragmentCameraBinding) {
+        val thumbnail = controls.referenceThumbnail
+        referenceDrag = ReferenceDragController(
+            thumbnail,
+            area = { referenceArea(controls) },
+            onTap = { viewModel.setReferenceExpanded(!viewModel.uiState.value.referenceExpanded) },
+        ) { corner ->
+            corner?.let(viewModel::setReferenceCorner)
+            renderReference(controls, viewModel.uiState.value)
+        }
+        ViewCompat.setAccessibilityDelegate(
+            thumbnail,
+            object : AccessibilityDelegateCompat() {
+                override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+                    super.onInitializeAccessibilityNodeInfo(host, info)
+                    val state = viewModel.uiState.value
+                    val label = if (state.referenceExpanded) R.string.shrink_reference else R.string.enlarge_reference
+                    info.addAction(
+                        AccessibilityActionCompat(AccessibilityNodeInfoCompat.ACTION_CLICK, getString(label)),
+                    )
+                    for ((corner, move) in REFERENCE_MOVES) {
+                        if (corner != state.referenceCorner) {
+                            info.addAction(AccessibilityActionCompat(move.first, getString(move.second)))
+                        }
+                    }
+                }
+
+                override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean {
+                    val corner = REFERENCE_MOVES.entries.firstOrNull { it.value.first == action }?.key
+                        ?: return super.performAccessibilityAction(host, action, args)
+                    viewModel.setReferenceCorner(corner)
+                    return true
+                }
+            },
+        )
+        // The corners follow the preview's size and the panels at its bottom, which grow when brightness or a notice
+        // opens; both are known only after layout.
+        val relayout = View.OnLayoutChangeListener {
+                _,
+                left,
+                top,
+                right,
+                bottom,
+                oldLeft,
+                oldTop,
+                oldRight,
+                oldBottom,
+            ->
+            if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
+                thumbnail.post { binding?.let { renderReference(it, viewModel.uiState.value) } }
+            }
+        }
+        controls.previewContainer.addOnLayoutChangeListener(relayout)
+        controls.bottomOverlays.addOnLayoutChangeListener(relayout)
+    }
+
+    /** Inside the preview's margins and above the first panel at its bottom (the guide's controls, at least). */
+    private fun referenceArea(controls: FragmentCameraBinding): ReferenceArea {
+        val margin = (REFERENCE_MARGIN_DP * resources.displayMetrics.density).roundToInt()
+        val container = controls.previewContainer
+        val panels = controls.bottomOverlays
+        val panel = panels.children.firstOrNull { it.isVisible }
+        val bottom = if (panel == null) container.height - margin else panels.top + panel.top - margin
+        return ReferenceArea(margin, margin, container.width - margin, bottom)
     }
 
     private fun setupCompositionLevel(overlay: CameraCompositionView) {
@@ -394,20 +469,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // and hiding the bar then would move the controls under an active touch.
         val guideEditable = granted && !unavailable
         controls.guideControls.isVisible = state.guide != null
-        val cutout = state.guideState.style == GuideStyle.CUTOUT
-        controls.cutoutSegment.isSelected = cutout
-        controls.outlineSegment.isSelected = !cutout
-        controls.cutoutSegment.isEnabled = guideEditable
-        controls.outlineSegment.isEnabled = guideEditable
-        opacitySlider?.render(
-            GuideState.MIN_OPACITY,
-            GuideState.MAX_OPACITY,
-            state.guideState.opacity,
-            enabled = guideEditable && state.guide != null,
-        )
+        val opacityEnabled = guideEditable && state.guide != null && state.guideState.visible
+        opacitySlider?.render(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY, state.guideState.opacity, opacityEnabled)
+        controls.opacityValue.isEnabled = opacityEnabled
         controls.opacityValue.text =
             getString(R.string.guide_opacity_percent, (state.guideState.opacity * 100f).roundToInt())
         controls.removeGuideButton.isEnabled = guideEditable
+        val hidden = !state.guideState.visible
+        controls.hideGuideButton.setIconResource(if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off)
+        controls.hideGuideButton.contentDescription =
+            getString(if (hidden) R.string.show_guide else R.string.hide_guide)
+        controls.hideGuideButton.isEnabled = guideEditable
         // Guide-edit mode (AD-17): the overlay owns the preview's touches while on; the pinch zooms while off.
         // Its toggle sits beside the zoom readout, so it stays when the guide's panel changes (Iter2-P11).
         controls.editGuideButton.isVisible = state.guide != null
@@ -431,6 +503,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         when {
             state.guide == null ->
                 showHint(controls.hintText, R.string.hint_add_guide, R.drawable.ic_target_small, R.color.pix_accent)
+
+            !state.guideState.visible ->
+                showHint(controls.hintText, R.string.hint_guide_hidden, R.drawable.ic_visibility_off_small)
 
             state.guideEditing ->
                 showHint(controls.hintText, R.string.hint_edit_guide, R.drawable.ic_move_small, R.color.pix_guide)
@@ -475,7 +550,53 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 if (notice == CaptureNotice.SAVED) StatusLook.SUCCESS else StatusLook.ERROR,
             )
         }
+        renderReference(controls, state)
         renderScenePhoto(controls, generationViewModel.uiState.value)
+    }
+
+    /**
+     * The guide's reference in its corner while there is one (FR-3.9): small, or half the preview's width when
+     * enlarged. It glides to a new place, and stays while the guide is hidden; the scene photo step hides it and
+     * shows its own hint. Layout changes call this alone, so it applies every rule of its own, the scene photo's too.
+     */
+    private fun renderReference(controls: FragmentCameraBinding, state: CameraUiState) {
+        val thumbnail = controls.referenceThumbnail
+        // The scene photo frames a new scene, which an earlier guide's reference is not part of.
+        val reference = state.guide?.reference?.takeUnless { isScenePhotoActive() }
+        val shown = thumbnail.isVisible
+        thumbnail.isVisible = reference != null
+        // The enlarged photo reaches under the chips: the hint steps aside, and a capture status stays on top.
+        controls.hintText.isInvisible = reference != null && state.referenceExpanded
+        if (reference == null) {
+            thumbnail.setImageDrawable(null)
+            return
+        }
+        // Set only when it changes: a new drawable would lay the screen out again on every render.
+        if ((thumbnail.drawable as? BitmapDrawable)?.bitmap !== reference) thumbnail.setImageBitmap(reference)
+        if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) return
+        val placement = placeReference(
+            aspect = reference.width.toFloat() / reference.height,
+            expanded = state.referenceExpanded,
+            corner = state.referenceCorner,
+            smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
+            previewWidth = controls.previewContainer.width,
+            area = referenceArea(controls),
+        )
+        val params = thumbnail.layoutParams
+        if (params.width != placement.width || params.height != placement.height) {
+            params.width = placement.width
+            params.height = placement.height
+            thumbnail.layoutParams = params
+        }
+        val x = placement.x.toFloat()
+        val y = placement.y.toFloat()
+        if (!shown) {
+            thumbnail.animate().cancel()
+            thumbnail.translationX = x
+            thumbnail.translationY = y
+        } else if (thumbnail.translationX != x || thumbnail.translationY != y) {
+            thumbnail.animate().translationX(x).translationY(y).setDuration(REFERENCE_MOVE_MS).start()
+        }
     }
 
     /** Whether the scene photo for poses is being framed or reviewed; the top bar is its title then. */
@@ -635,11 +756,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         if (view.clipBounds != clip) view.clipBounds = clip
     }
 
-    /** Cutout / Outline: a tap on the style already shown changes nothing. */
-    private fun chooseStyle(style: GuideStyle) {
-        if (viewModel.uiState.value.guideState.style != style) viewModel.onStyleToggle()
-    }
-
     /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */
     private fun showHint(
         chip: TextView,
@@ -717,5 +833,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_SHRINK_MS = 150L
         private const val FOCUS_RING_HOLD_MS = 700L
         private const val FOCUS_RING_FADE_MS = 200L
+
+        /** The reference thumbnail's long side while small, and its margin in the preview's corners (FR-3.9). */
+        private const val REFERENCE_SMALL_DP = 72f
+        private const val REFERENCE_MARGIN_DP = 12f
+        private const val REFERENCE_MOVE_MS = 150L
+
+        /** TalkBack's way to move the reference thumbnail: an action id and its label for each corner. */
+        private val REFERENCE_MOVES = mapOf(
+            ReferenceCorner.TOP_LEFT to (R.id.move_reference_top_left to R.string.move_reference_top_left),
+            ReferenceCorner.TOP_RIGHT to (R.id.move_reference_top_right to R.string.move_reference_top_right),
+            ReferenceCorner.BOTTOM_LEFT to (R.id.move_reference_bottom_left to R.string.move_reference_bottom_left),
+            ReferenceCorner.BOTTOM_RIGHT to (R.id.move_reference_bottom_right to R.string.move_reference_bottom_right),
+        )
     }
 }

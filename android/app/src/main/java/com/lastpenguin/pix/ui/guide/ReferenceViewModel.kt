@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
@@ -25,7 +24,7 @@ sealed interface ReferenceUiState {
     /** Separating the person; at most 2 s (NFR-3). */
     data object Working : ReferenceUiState
 
-    data class Ready(val guide: ReferenceGuide, val style: GuideStyle) : ReferenceUiState
+    data class Ready(val guide: ReferenceGuide) : ReferenceUiState
 
     data object NoPersonFound : ReferenceUiState
 
@@ -48,6 +47,10 @@ class ReferenceViewModel(
 
     private var making: Job? = null
 
+    /** Whether a guide is on the camera, so Add a pose guide asks to replace it (FR-3.6). */
+    val replacing: Boolean
+        get() = guides.guide.value != null
+
     /** A photo from the system photo picker. */
     fun onPhotoPicked(uri: Uri) {
         make { maker.make(uri) }
@@ -58,16 +61,10 @@ class ReferenceViewModel(
         make { maker.make(image, GuideSource.GENERATED) }
     }
 
-    /** The Cutout/Outline switch on Reference confirm. */
-    fun onStylePreview(style: GuideStyle) {
-        _uiState.update { if (it is ReferenceUiState.Ready) it.copy(style = style) else it }
-    }
-
     /** *Use this guide*. */
     fun onUseGuide() {
         val ready = _uiState.value as? ReferenceUiState.Ready ?: return
         guides.setGuide(ready.guide)
-        guides.update(final = true) { it.copy(style = ready.style) }
         _uiState.value = ReferenceUiState.Idle
     }
 
@@ -77,8 +74,7 @@ class ReferenceViewModel(
         _uiState.value = ReferenceUiState.Working
         making = viewModelScope.launch {
             _uiState.value = block().fold(
-                // Start from the style the camera shows now, so the user's last choice carries over.
-                onSuccess = { ReferenceUiState.Ready(it, guides.state.value.style) },
+                onSuccess = { ReferenceUiState.Ready(it) },
                 onFailure = {
                     if (it is NoPersonFoundException) ReferenceUiState.NoPersonFound else ReferenceUiState.Failed
                 },

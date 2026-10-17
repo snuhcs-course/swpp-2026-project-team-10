@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.PointF
@@ -35,7 +35,7 @@ object GuideGeometry {
      * If a dimension exceeds five frame lengths, keep the entire frame covered on that axis instead:
      * showing 20% is then impossible without breaking the scale range. [aspect] is the guide's width / height and
      * [frameAspect] the frame's, both positive and finite.
-     * Non-finite state values reset to their defaults; identity, style, and visibility are preserved.
+     * Non-finite state values reset to their defaults; identity and visibility are preserved.
      */
     fun clamp(state: GuideState, aspect: Float, frameAspect: Float = DEFAULT_FRAME_ASPECT): GuideState {
         require(aspect.isFinite() && aspect > 0f) { "Guide aspect must be positive and finite" }
@@ -51,6 +51,22 @@ object GuideGeometry {
             opacity = (state.opacity.takeIf { it.isFinite() } ?: 0.5f)
                 .coerceIn(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY),
         )
+    }
+
+    /**
+     * Where [guide] starts in a frame of [frameAspect] (FR-3.1): its [ReferenceGuide.anchor] keeps its height as a
+     * fraction of the frame height and its center as fractions of the frame, whatever the reference photo's ratio,
+     * and is then clamped like every change. Without an anchor, the guide starts centered at
+     * [GuideState.DEFAULT_HEIGHT].
+     */
+    fun start(guide: ReferenceGuide, frameAspect: Float = DEFAULT_FRAME_ASPECT): GuideState {
+        val anchor = guide.anchor
+        val placed = if (anchor == null) {
+            GuideState(guideId = guide.id)
+        } else {
+            GuideState(guideId = guide.id, cx = anchor.centerX, cy = anchor.centerY, height = anchor.height)
+        }
+        return clamp(placed, guide.aspect, frameAspect)
     }
 
     /** The 3:4 portrait frame of Iteration 1 and the default ratio (AD-10). */

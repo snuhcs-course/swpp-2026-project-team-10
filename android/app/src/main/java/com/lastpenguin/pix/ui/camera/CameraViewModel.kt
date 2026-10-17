@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -15,7 +15,6 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -73,6 +72,10 @@ data class CameraUiState(
      * zooms the camera. On when a guide is added, off on the shutter or when the guide goes (Design 2.6.2).
      */
     val guideEditing: Boolean = false,
+    /** The guide's reference is enlarged from its corner thumbnail (FR-3.9); every new guide starts small. */
+    val referenceExpanded: Boolean = false,
+    /** The preview corner the reference thumbnail sits in, kept from one guide to the next. */
+    val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
     /** The last saved photo, for the thumbnail and "Saved without the guide". */
     val lastPhoto: Uri? = null,
     /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
@@ -135,7 +138,8 @@ class CameraViewModel(
                 _uiState.update {
                     // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
                     val editing = guide != null && (guide !== it.guide || it.guideEditing)
-                    it.copy(guide = guide, guideEditing = editing)
+                    val expanded = it.referenceExpanded && guide === it.guide
+                    it.copy(guide = guide, guideEditing = editing, referenceExpanded = expanded)
                 }
             }
         }
@@ -257,11 +261,23 @@ class CameraViewModel(
         guides.update(final) { it.copy(opacity = opacity) }
     }
 
-    /** Switches cutout ↔ outline; position and size are untouched (FR-3.5). */
-    fun onStyleToggle() {
-        guides.update(final = true) { state ->
-            state.copy(style = if (state.style == GuideStyle.CUTOUT) GuideStyle.OUTLINE else GuideStyle.CUTOUT)
-        }
+    /**
+     * *Hide* / *Show* (FR-3.6): the guide goes away for a moment and comes back where it was. Hiding ends the
+     * guide-edit mode (Design 2.6.2); a connected subject's copy follows through `guide.state` (FR-6.7).
+     */
+    fun onHideToggle() {
+        if (_uiState.value.guide == null) return
+        guides.update(final = true) { it.copy(visible = !it.visible) }
+    }
+
+    /** A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). */
+    fun setReferenceExpanded(expanded: Boolean) {
+        _uiState.update { it.copy(referenceExpanded = expanded && it.guide?.reference != null) }
+    }
+
+    /** A drag drops the reference thumbnail into one of the preview's corners, and nowhere else (FR-3.9). */
+    fun setReferenceCorner(corner: ReferenceCorner) {
+        _uiState.update { it.copy(referenceCorner = corner) }
     }
 
     /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */

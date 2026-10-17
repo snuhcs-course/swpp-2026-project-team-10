@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -34,9 +34,9 @@ class InMemoryGuideRepository(
 
     @Synchronized
     override fun setGuide(guide: ReferenceGuide?) {
-        val initial = GuideState(guideId = guide?.id)
-        // Validate before publishing either value, so an invalid replacement leaves the previous guide intact.
-        val state = if (guide == null) initial else GuideGeometry.clamp(initial, guide.aspect, frameAspect())
+        // A new or replacing guide starts where the person is in its reference (FR-3.1). Validate before publishing
+        // either value, so an invalid replacement leaves the previous guide intact.
+        val state = if (guide == null) GuideState() else GuideGeometry.start(guide, frameAspect())
         _guide.value = guide
         publish(state, final = true)
     }

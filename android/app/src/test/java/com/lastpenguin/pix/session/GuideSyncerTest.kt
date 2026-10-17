@@ -1,8 +1,7 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -118,10 +117,10 @@ class GuideSyncerTest {
         assertEquals(listOf("begin", "chunk", "chunk", "chunk", "end", "state.final"), sentTypes())
 
         session.sent.clear()
-        guides.update(final = true) { it.copy(style = GuideStyle.CUTOUT) }
+        guides.update(final = true) { it.copy(visible = false) }
         runCurrent()
         assertEquals(listOf("state.final"), sentTypes())
-        assertEquals(GuideStyle.CUTOUT, states().single().state.style)
+        assertEquals(false, states().single().state.visible)
     }
 
     @Test

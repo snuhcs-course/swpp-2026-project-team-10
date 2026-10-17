@@ -68,6 +68,40 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-16] "More has been merged: check for conflicts, and check last that the document versions are right; fix whatever is off."
 - [Dongje, 10-16] "#82 is merged too. Put the prompts and the AI collaboration notes I kept locally into the documents now, as the others do."
 
+## Guide controls (#52, [#83])
+
+**Plan (10/16)**
+
+- [Dongje, 10-16] "I will do Iter2-P11 too. Report to me first, as you did when starting P10." (The agent listed the tasks, the overlaps with Iter2-P12, P17, and P18, and four open points with a proposal for each.)
+- [Dongje, 10-16] "Sungmin implements the mask-only transfer. For items 1–4, do as you proposed. Since UI matters here, prepare screenshots for me to review each time a task is done."
+
+**Outline only, then hide, show, and replace (10/16)**
+
+- [Dongje, 10-16] "Commit it and continue with the next task."
+- [Dongje, 10-16] "How is it different from the Guide button below?" (about the new *Replace* button)
+- [Dongje, 10-16] "How about removing the Replace button, and when a guide is on the camera, the Guide button asks whether to replace the pose?"
+- [Dongje, 10-16] "Isn't the replace button still in the third photo?" (The review image reused a screenshot from before the button was removed; retaken, and the disabled opacity slider, which looked enabled, now dims.)
+- [Dongje, 10-16] "Commit it and continue with the next task."
+
+**Starting position (10/16)**
+
+- [Dongje, 10-16] "Commit it and continue with the next task. Put the decisions above into the PR, and summarize what Sungmin has to do, as last time." (The size limits stay fixed for every start, so FR-3.3 is revised.)
+
+**Reference thumbnail (10/16)**
+
+- [Dongje, 10-16] "What did sending only the mask in P10 mean?" (It came from the P11 plan: the subject still receives the cutout with the reference's pixels, and the design sends only the smoothed mask.)
+- [Dongje, 10-16] "So P10 and P11 change nothing on the subject's phone yet?" (Both do, through the existing sync: the ratio, the outline only, hiding, and the starting position.)
+- [Dongje, 10-16] "Then what has to be done in #57?"
+- [Dongje, 10-16] "I checked the screens. A tap enlarges the photo, and only the X button makes it small again. It would be better if the same tap made it small instead of an X. Also, the reference sits fixed at the top left: it would be good to drag it to the top right, bottom right, or bottom left, but do not let it sit anywhere else on the camera screen."
+- [Dongje, 10-16] "When the photographer changes the ratio, the subject's phone changes too, and the guide's size follows the ratio there as well, right?"
+- [Dongje, 10-16] "Commit it and continue with the next task."
+
+**Review (10/18)**
+
+- [Dongje, 10-18] "Update the branch to the latest `dev`, apply whatever that changes, and commit again. Fix what the review found if it needs fixing, and push the fix." (After #88 the CLAUDE.md history records only the root file's project instructions, so this PR's entry for `android/CLAUDE.md` was dropped. The one Codex finding was fixed: a layout change could bring the thumbnail back during the scene photo.)
+- [Dongje, 10-18] "Reply to it and resolve it."
+- [Dongje, 10-18] "Another review came in; check it the same way. Also review the PR once yourself." (Codex asked to anchor the thumbnail to the camera frame's corners instead of the preview's; 박동제 kept the preview's corners, like the chips and the guide's panel, and the reply says why. The agent's own review found a thumbnail that seemed to glide in from the screen's corner; recordings of the old and new builds showed it never does, so that change was dropped, and only two comments were fixed.)
+
 ## Daily standup rows (10/14)
 
 - [Dongje, 10-14] "Write my rows of the daily standup log from Tuesday on. For Tuesday and Wednesday, split the task we merged into two parts. Over Thursday, Friday, and Saturday I will work on #52 (Iter2-P11) and #51 (Iter2-P10): split them into tasks per day, very briefly."
@@ -76,3 +110,4 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 
 [#72]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/72
 [#80]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/80
+[#83]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/83

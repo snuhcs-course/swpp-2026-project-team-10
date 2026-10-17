@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.Role
 import kotlinx.serialization.json.Json
@@ -48,7 +47,7 @@ class MessageCodecTest {
             SessionMessage.GuideImageBegin("g1", "webp", 540, 720, 48213, 5),
             SessionMessage.GuideImageChunk("g1", 0, "UklGRl68AABXRUJQ"),
             SessionMessage.GuideImageEnd("g1", 3735928559L),
-            SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, GuideStyle.CUTOUT, true), false),
+            SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, false), false),
             SessionMessage.GuideClear,
             SessionMessage.ZoomSet(2f),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
@@ -98,7 +97,8 @@ class MessageCodecTest {
         val update = envelope.message as SessionMessage.GuideStateUpdate
         assertEquals("5f0c2b9e", update.state.guideId)
         assertEquals(0.32f, update.state.cx, 0f)
-        assertEquals(GuideStyle.OUTLINE, update.state.style)
+        // The style an Iteration 1 phone still sends is ignored: the guide is an outline only (FR-2.2).
+        assertEquals(true, update.state.visible)
         assertFalse(update.final)
     }
 

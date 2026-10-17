@@ -96,6 +96,10 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-16] "When the photographer changes the ratio, the subject's phone changes too, and the guide's size follows the ratio there as well, right?"
 - [Dongje, 10-16] "Commit it and continue with the next task."
 
+**Review (10/18)**
+
+- [Dongje, 10-18] "Update the branch to the latest `dev`, apply whatever that changes, and commit again. Fix what the review found if it needs fixing, and push the fix." (After #88 the CLAUDE.md history records only the root file's project instructions, so this PR's entry for `android/CLAUDE.md` was dropped. The one Codex finding was fixed: a layout change could bring the thumbnail back during the scene photo.)
+
 ## Daily standup rows (10/14)
 
 - [Dongje, 10-14] "Write my rows of the daily standup log from Tuesday on. For Tuesday and Wednesday, split the task we merged into two parts. Over Thursday, Friday, and Saturday I will work on #52 (Iter2-P11) and #51 (Iter2-P10): split them into tasks per day, very briefly."

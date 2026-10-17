@@ -99,6 +99,8 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 **Review (10/18)**
 
 - [Dongje, 10-18] "Update the branch to the latest `dev`, apply whatever that changes, and commit again. Fix what the review found if it needs fixing, and push the fix." (After #88 the CLAUDE.md history records only the root file's project instructions, so this PR's entry for `android/CLAUDE.md` was dropped. The one Codex finding was fixed: a layout change could bring the thumbnail back during the scene photo.)
+- [Dongje, 10-18] "Reply to it and resolve it."
+- [Dongje, 10-18] "Another review came in; check it the same way. Also review the PR once yourself." (Codex asked to anchor the thumbnail to the camera frame's corners instead of the preview's; 박동제 kept the preview's corners, like the chips and the guide's panel, and the reply says why. The agent's own review found a thumbnail that seemed to glide in from the screen's corner; recordings of the old and new builds showed it never does, so that change was dropped, and only two comments were fixed.)
 
 ## Daily standup rows (10/14)
 

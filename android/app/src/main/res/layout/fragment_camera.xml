@@ -193,6 +193,25 @@
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
+        <!-- The guide's reference photo in a corner (FR-3.9). A tap enlarges it to half the preview's width, under the
+             chips, and hides the hint; another tap makes it small again. A drag drops it into the nearest corner,
+             above the guide's controls; its size and place are set in code. -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/referenceThumbnail"
+            android:layout_width="54dp"
+            android:layout_height="72dp"
+            android:layout_gravity="top|left"
+            android:background="@color/pix_ground"
+            android:contentDescription="@string/reference_photo"
+            android:padding="0.5dp"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail"
+            app:strokeColor="@color/pix_glass_stroke"
+            app:strokeWidth="1dp"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible" />
+
         <!-- Chips over the top of the preview: what just happened, then what to do. They pass touches through.
              The status chip fades in and out instead of making the hint jump. -->
         <LinearLayout
@@ -226,6 +245,7 @@
 
         <!-- Over the bottom of the preview: remote action notices, then the guide's controls. -->
         <LinearLayout
+            android:id="@+id/bottomOverlays"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
@@ -294,33 +314,26 @@
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_glass_panel"
                 android:gravity="center_vertical"
-                android:paddingStart="6dp"
+                android:paddingStart="2dp"
                 android:paddingEnd="2dp"
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <!-- Cutout / Outline (FR-3.5); the chosen one is selected. -->
-                <Button
-                    android:id="@+id/cutoutSegment"
-                    style="@style/Widget.Pix.Button.Segment"
+                <!-- Hide / Show (FR-3.6): the guide goes away for a moment and comes back where it was. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/hideGuideButton"
+                    style="@style/Widget.Pix.Button.Icon"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/cutout" />
-
-                <Button
-                    android:id="@+id/outlineSegment"
-                    style="@style/Widget.Pix.Button.Segment"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="2dp"
-                    android:text="@string/outline" />
+                    android:contentDescription="@string/hide_guide"
+                    app:icon="@drawable/ic_visibility_off" />
 
                 <com.google.android.material.slider.Slider
                     android:id="@+id/opacitySlider"
                     style="@style/Widget.Pix.Slider.Guide"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="2dp"
+                    android:layout_marginStart="0dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/guide_opacity"
                     android:enabled="false"
@@ -336,6 +349,7 @@
                     android:importantForAccessibility="no"
                     android:minWidth="34dp"
                     android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/slider_value_text"
                     tools:text="50%" />
 
                 <Button

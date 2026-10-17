@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-18, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -14,7 +14,10 @@ import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 
-/** Add a pose guide (R&S 6.2). Owner: PM (#5); *Generate poses here* starts #7. */
+/**
+ * Add a pose guide, or Replace the pose guide with one on the camera (R&S 6.2).
+ * Owner: PM (#5); *Generate poses here* starts #7.
+ */
 class AddGuideSheet : BottomSheetDialogFragment() {
 
     private val referenceViewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
@@ -35,6 +38,12 @@ class AddGuideSheet : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = SheetAddGuideBinding.bind(view)
+        // The Guide button opens this sheet in both cases; with a guide on the camera it is the way to replace it.
+        if (referenceViewModel.replacing) {
+            binding.titleText.setText(R.string.replace_guide_title)
+            binding.bodyText.setText(R.string.replace_guide_body)
+            binding.cancelButton.setText(R.string.keep_current_guide)
+        }
 
         binding.uploadButton.setOnClickListener { pickPhoto() }
         binding.generateButton.setOnClickListener {

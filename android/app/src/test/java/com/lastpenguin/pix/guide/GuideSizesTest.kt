@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import org.junit.Assert.assertEquals
@@ -35,6 +35,12 @@ class GuideSizesTest {
             PixelRect(0, 0, 100, 100),
             cropWithMargin(PixelRect(0, 0, 100, 100), 100, 100),
         )
+    }
+
+    @Test
+    fun relativeTo_cropInsideAndAtTheEdgesOfThePhoto_isKeptAsFractionsOfItsSides() {
+        assertEquals(NormalizedRect(0.25f, 0.1f, 0.75f, 0.9f), PixelRect(240, 128, 720, 1152).relativeTo(960, 1280))
+        assertEquals(NormalizedRect(0f, 0f, 1f, 1f), PixelRect(0, 0, 1280, 720).relativeTo(1280, 720))
     }
 
     @Test

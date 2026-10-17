@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -13,11 +13,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentReferenceConfirmBinding
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
-/** Reference confirm (R&S 6.2). Owner: PM (#5). */
+/** Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*. Owner: PM (#5). */
 class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
     private val viewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
@@ -29,8 +28,6 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
 
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
-        binding.cutoutButton.setOnClickListener { viewModel.onStylePreview(GuideStyle.CUTOUT) }
-        binding.outlineButton.setOnClickListener { viewModel.onStylePreview(GuideStyle.OUTLINE) }
         binding.useGuideButton.setOnClickListener {
             viewModel.onUseGuide()
             findNavController().popBackStack(R.id.cameraFragment, false)
@@ -57,15 +54,9 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             0,
             0,
         )
-        binding.cutoutButton.isEnabled = ready != null
-        binding.outlineButton.isEnabled = ready != null
         binding.useGuideButton.isEnabled = ready != null
-        if (ready != null) {
-            val cutout = ready.style == GuideStyle.CUTOUT
-            binding.referenceImage.setImageBitmap(if (cutout) ready.guide.cutout else ready.guide.outline)
-            binding.cutoutButton.isSelected = cutout
-            binding.outlineButton.isSelected = !cutout
-        }
+        // The outline alone, over the card's neutral background (FR-2.3); the reference's pixels are not shown.
+        if (ready != null) binding.referenceImage.setImageBitmap(ready.guide.outline)
 
         when (state) {
             ReferenceUiState.NoPersonFound -> findNavController().navigate(

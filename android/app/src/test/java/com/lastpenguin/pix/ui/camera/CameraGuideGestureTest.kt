@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -16,7 +16,6 @@ import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlinx.coroutines.Dispatchers
@@ -164,7 +163,7 @@ class CameraGuideGestureTest {
     fun guideGesturesPreserveOtherPropertiesAndDoNotZoomTheCamera() {
         val guide = guide()
         guides.setGuide(guide)
-        guides.update(final = true) { it.copy(opacity = 0.8f, style = GuideStyle.CUTOUT, visible = false) }
+        guides.update(final = true) { it.copy(opacity = 0.8f, visible = false) }
         val before = guides.state.value
 
         model.onGuideGesture(0.1f, -0.1f, 2f, final = true)
@@ -211,31 +210,12 @@ class CameraGuideGestureTest {
     }
 
     @Test
-    fun styleToggleSwitchesBothWaysAndKeepsPositionSizeAndOpacity() = runTest {
-        guides.setGuide(guide())
-        guides.update(final = true) { it.copy(cx = 0.3f, cy = 0.6f, height = 1.2f, opacity = 0.8f) }
-        val placed = guides.state.value
-        val changes = mutableListOf<GuideChange>()
-        backgroundScope.launch { guides.changes.collect { changes += it } }
-        runCurrent()
-
-        model.onStyleToggle()
-        assertEquals(placed.copy(style = GuideStyle.CUTOUT), guides.state.value)
-        model.onStyleToggle()
-        runCurrent()
-
-        assertEquals(placed, guides.state.value)
-        assertEquals(listOf(true, true), changes.map { it.final })
-    }
-
-    @Test
-    fun opacityAndStyleWithoutAGuideDoNothing() = runTest {
+    fun opacityWithoutAGuideDoesNothing() = runTest {
         val changes = mutableListOf<GuideChange>()
         backgroundScope.launch { guides.changes.collect { changes += it } }
         runCurrent()
 
         model.onOpacityChange(0.3f, final = true)
-        model.onStyleToggle()
         runCurrent()
 
         assertEquals(GuideState(), guides.state.value)

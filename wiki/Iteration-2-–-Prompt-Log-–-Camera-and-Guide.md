@@ -112,6 +112,8 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-18] "I posted an A4 issue; is this related?" (It was #86, Sungmin's issue for the same symptom.)
 - [Dongje, 10-18] "No, assign me to issue A4 and open a new PR that fixes it."
 - [Dongje, 10-18] "Stop the server, and fix the documents and the rest for the conflicts with Sungmin's PR, now merged. Then bring our code up to date, check it, and commit again if nothing is wrong." (#85 kept Design 1.8 and Testing 1.7, so this PR's rows became 1.9 and 1.8.)
+- [Dongje, 10-18] "Shut down the emulator. And add one later task to the documents: the subject's phone shows the guide's photo the same way. Whether we do it in this iteration is not decided." (A *Still open* row in the Design Documentation; it needs the reference sent to the subject, which AD-6 and AD-15 now rule out.)
+- [Dongje, 10-18] "Commit it to #89 as well and push it."
 
 ## Daily standup rows (10/14)
 

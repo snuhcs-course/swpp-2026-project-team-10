@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -12,7 +12,7 @@ data class ReferenceGuide(
     val id: String,
     /**
      * ARGB_8888, person only, transparent background, cropped to the person. Never drawn as the guide, which is an
-     * outline only (FR-2.2, AD-15); it is sent to the subject until the mask alone is sent (Design 2.6.1, #57).
+     * outline only (FR-2.2, AD-15); it is sent to the subject until the mask alone is sent (Design 2.6.1, 2.9).
      */
     val cutout: Bitmap,
     /** Same size as [cutout]; light stroke, about 8 px (3 dp) on screen. */

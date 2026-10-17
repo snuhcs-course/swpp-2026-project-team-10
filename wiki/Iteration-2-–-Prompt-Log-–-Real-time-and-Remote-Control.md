@@ -47,3 +47,24 @@ Questions asked while #74 was in review; no code was changed.
 - [Sungmin, 10-15] "Push it."
 - [Sungmin, 10-15] "Write the PR body."
 - [Sungmin, 10-15] "Add the prompt log and the AI collaboration report entries too, and push."
+
+## Remote brightness, flash, and guide moves (#57, PR #85)
+
+**Plan and build (10/16)**
+
+- [Sungmin, 10-16] "Now I want to implement issue #57. Write the implementation plan first; don't change any code."
+- [Sungmin, 10-16] "OK, start implementing."
+- [Sungmin, 10-16] "What should I test on the phones now?"
+- [Sungmin, 10-16] "Remote moves and brightness work. But when the photographer changes the aspect ratio, the subject's screen does not change. Is that in this issue's scope? Just tell me whether it is or not."
+- [Sungmin, 10-16] "It works. Push it, and write the PR body so I can paste it; I'll open the PR myself."
+- [Sungmin, 10-16] "(pasted a screenshot of Subject view) Not fixing this now, but I want to file it as a bug: the ratio on the subject's phone looks off, the 3×3 grid leaves space above and below, and the subject does not follow the photographer's ratio change. Write the issue text so I can paste it."
+
+**Review (10/16)**
+
+- [Sungmin, 10-16] "(pasted a Codex comment: a final exposure request CameraX fails to apply gets no echo) Does this need a fix?"
+- [Sungmin, 10-16] "OK, fix it, commit, and push."
+- [Sungmin, 10-16] "(pasted a Codex comment: bump the protocol version for the new request types) Does this need a fix?"
+- [Sungmin, 10-16] "OK, fix it, commit, and push."
+- [Sungmin, 10-16] "(pasted two Codex comments: supersede queued settings before confirming the current value; bind guide moves to the guide being edited) Do these need fixes?"
+- [Sungmin, 10-16] "OK, fix them, commit, and push."
+- [Sungmin, 10-16] "Now update the AI collaboration report and the prompt log, commit, and push."

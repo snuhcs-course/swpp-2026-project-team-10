@@ -48,7 +48,8 @@ class SessionViewModelTest {
     fun setup() {
         Dispatchers.setMain(dispatcher)
         val syncer = GuideSyncer(session, InMemoryGuideRepository(), InMemoryGuideRepository(), FakeGuideImageCodec())
-        model = SessionViewModel(session, camera, syncer, RemoteControlHandler(session, camera))
+        model =
+            SessionViewModel(session, camera, syncer, RemoteControlHandler(session, camera, InMemoryGuideRepository()))
         store.put("session", model)
     }
 

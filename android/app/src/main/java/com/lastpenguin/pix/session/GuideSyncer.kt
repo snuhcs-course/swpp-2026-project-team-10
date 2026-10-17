@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -39,6 +39,18 @@ class GuideSyncer(
 ) {
     /** Encoded images by guide id, so a reconnecting subject or a replaced subject does not cost another encode. */
     private val encoded = LinkedHashMap<String, EncodedGuideImage>()
+
+    /** Who the next `guide.state` messages are attributed to: the subject while its `guide.move` gesture runs. */
+    @Volatile
+    private var attributedTo: Role? = null
+
+    /**
+     * From RemoteControlHandler, before it applies a `guide.move`: the guide changes that follow come from [role]'s
+     * request, until the gesture's final state has been sent (Design 2.5.1, `guide.state` with `by`).
+     */
+    fun attribute(role: Role?) {
+        attributedTo = role
+    }
 
     /** Photographer: sends the guide image once and every state change while [scope] is active. */
     fun startAsSender(scope: CoroutineScope) {
@@ -173,8 +185,12 @@ class GuideSyncer(
     }
 
     private fun sendState(state: GuideState, final: Boolean) {
-        session.send(SessionMessage.GuideStateUpdate(state, final))
-        if (final) Timings.mark("guide.sent", "state ${state.guideId} final")
+        val by = attributedTo ?: Role.PHOTOGRAPHER
+        session.send(SessionMessage.GuideStateUpdate(state, final, by))
+        if (final) {
+            Timings.mark("guide.sent", "state ${state.guideId} final by $by")
+            if (by == Role.SUBJECT) attributedTo = null
+        }
     }
 
     private fun sendClear() {

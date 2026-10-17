@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -110,5 +110,10 @@ class AppContainer(context: Context) {
 
     val guideSyncer = GuideSyncer(sessionManager, guideRepository, mirrorGuideRepository, WebpGuideImageCodec())
 
-    val remoteControlHandler = RemoteControlHandler(sessionManager, cameraController)
+    val remoteControlHandler = RemoteControlHandler(
+        sessionManager,
+        cameraController,
+        guideRepository,
+        attributeGuideChanges = guideSyncer::attribute,
+    )
 }

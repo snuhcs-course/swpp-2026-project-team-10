@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.update
@@ -22,7 +23,7 @@ import org.junit.Test
 class RemoteCameraStateTest {
     private val session = FakeSessionManager()
     private val camera = FakeCameraController()
-    private val handler = RemoteControlHandler(session, camera, clock = { 0L })
+    private val handler = RemoteControlHandler(session, camera, InMemoryGuideRepository(), clock = { 0L })
 
     private fun echoes(): List<SessionMessage.CameraStateUpdate> =
         session.sent.filterIsInstance<SessionMessage.CameraStateUpdate>()

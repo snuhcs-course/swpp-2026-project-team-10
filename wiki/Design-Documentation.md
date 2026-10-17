@@ -18,6 +18,7 @@
 | 1.5 | 2026-10-15 | Accounts and friends server built (Iter2-P8, #50). Sign-up and sign-in with a Pix ID and a password are added next to Google (decided 2026-10-15): a password account can add Google, an account made with Google can add a password once it has a Pix ID, and a Google sign-in that no account uses answers `NOT_REGISTERED`, so the app can offer to connect an existing Pix account first (AD-12 revised; 1.1, 1.2, 2.1, 2.3, 2.5.3). Passwords are argon2id hashes and need 8–64 characters with a letter and a digit; login attempts are not limited for now (2.8, Accounts). New endpoints `POST /auth/signup`, `POST /auth/login`, `POST /auth/google/signup`, `DELETE /auth/session`, `PUT /me/google`, `PUT /me/password`, `GET /friend-requests`, and `DELETE /friend-requests/{id}`; the sign-in requests no longer carry `deviceName`, which nothing used; a lookup returns the pending request's ID; the friend endpoints need a Pix ID (2.5.3). The database is PostgreSQL in the Compose file with its password made by `deploy.sh`, and a SQLite file on a laptop and in tests; every worker migrates at start (2.7; 2.8, Hosting, Configuration). Presence as built: a signed-in socket records its user (2.5.2, 2.7). No URL carries a Pix ID: the lookup is `POST /users/lookup`, and the access logs leave out query strings (2.8, Privacy). A sign-in gives an access token, a JWT that lasts 15 minutes and is checked without the database, and a refresh token that lasts 30 days from its last use, is stored only as a hash, and is replaced on every refresh; a refresh token used twice ends the sign-in, and sign-out ends it at once (decided 2026-10-15; `POST /auth/refresh`; 2.5.3, 2.7, 2.8, Accounts). PostgreSQL keeps its files in `/opt/pix/postgres` on the server's disk, and an account request that cannot reach it answers `503 UNAVAILABLE` (2.7, 2.8). The endpoints that need no account get abuse limits: a global pose window, 500 requests in 24 hours over all clients, next to the per-address one, and at most 100 wrong room codes per address in 10 minutes, after which joins answer `RATE_LIMITED` (2.5.2, 2.7; 2.8, Privacy). The *Database engine* and *Session token lifetime* rows of Still open are closed: PostgreSQL, and 30 days. Still open gains the decisions the app side leaves: the sign-in screens, the account actions, the Google sign-in setup, and the tokens on the phone (Iter2-P13), and the wrong-code message on *Join* (Iter2-P16). |
 | 1.6 | 2026-10-15 | Camera controls as built (Iter2-P10, #51). The flash and aspect-ratio buttons are in the Camera screen's top bar, a brightness button beside the zoom readout opens the brightness slider, and a tap on the preview focuses there; there is no *detail settings* panel (Decided, 2.6.2). Each ratio is cut from the middle of the sensor's 4:3, the saved JPEG already has that crop, and the preview is clipped to the frame (AD-10, 2.6.2). `CameraXController` keeps the exposure, the flash, and the ratio across rebinds and lens switches, and the ratio across app starts (2.8). The ratio can change during a session: `camera.state` carries the exposure, the flash, and the ratio and is sent whenever one changes, `camera.capabilities` sends the new fields, `SessionManager.peerZoom` becomes `peerCamera`, and Subject view fits its grid and guide to the ratio; the stream keeps the frame's shape up to 1280×720 pixels (2.1, 2.5.1, 2.6.4). The *Aspect-ratio cropping* and *Zoom slider in a detail panel* rows of Still open are closed. |
 | 1.7 | 2026-10-16 | Guide controls as built (Iter2-P11, #52). The guide is an outline only on both phones and on *Reference confirm*, which shows it on a dark neutral card, and `GuideStyle` is gone from the code too (Decided, 2.3, 2.6.2). *Hide* / *Show* sets `visible` with a final change, ends guide-edit mode, and shows the hint "Guide hidden"; there is no *Replace* button: with a guide on the camera, *Guide* opens *Add a pose guide* as "Replace the pose guide?" (2.6.2). A new guide starts from its `anchor`, the box of the person and its 2 % margin in the reference: the box's height fraction and center are kept in any frame ratio, then clamped; the height limits stay 0.21–2.1 of the frame height for every start, and the outline is about 3 dp wide only at the default height (2.3, 2.6.1, 2.6.2). The subject takes the start from `guide.state`, so `anchor` leaves `guide.image.begin` (2.5.1, 2.9). The reference thumbnail sits in a corner of the preview: a tap enlarges it to half the preview's width and another makes it small, and a drag drops it into the nearest corner, above the guide's controls (2.6.2). The *Starting position mapping* and *Reference confirm background* rows of Still open are closed, and the mask-only transfer is 조성민's, in Guide sync (2.9). |
+| 1.8 | 2026-10-16 | Remote brightness, flash, and guide moves as built (Iter2-P17, #57): the subject's requests of 2.5.1 as messages (`guide.move`, `camera.exposure.set`, `camera.flash.set`; `camera.focus.set` and `control.permission` defined but not yet handled), `guide.state` with `by`, the subject's own guide clamped for the photographer's frame with echoes held until the gesture ends, unchanged echoes for a camera without a range or a flash, and the notices (2.6.5, 2.9); the protocol version is 2 from this change (2.5.1). |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.5). Testing plans will be in the Testing Documentation.
 
@@ -877,7 +878,7 @@ Each protocol has a summary table, followed by a JSON example for every message 
 
 #### 2.5.1 Data channel protocol (phone ↔ phone)
 
-The photographer opens two channels when it creates the offer: `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). Every message uses one JSON envelope: `v` is the protocol version, `t` the type, `seq` a counter per type, `ts` the send time in milliseconds, and `b` the body. In code, `SessionMessage` uses `t` as its class discriminator, so the codec keeps `t` at the top and moves the other fields into `b`. Receivers ignore unknown types and unknown fields, so older builds keep working, and drop a `realtime` message whose `seq` is not newer than the last one applied for that type. Iteration 2 raises `protocol` in `hello` to 2, because `guide.state` loses `style` and the guide image becomes a mask; both phones update together. Only the photographer takes photos; the subject sends requests.
+The photographer opens two channels when it creates the offer: `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). Every message uses one JSON envelope: `v` is the protocol version (2 since the subject's requests of Iter2-P17 were added on 2026-10-16; `hello` ends the session with a phone that speaks another version, because a version-1 phone would advertise the capabilities for brightness and flash yet drop those requests without an answer), `t` the type, `seq` a counter per type, `ts` the send time in milliseconds, and `b` the body. In code, `SessionMessage` uses `t` as its class discriminator, so the codec keeps `t` at the top and moves the other fields into `b`. Receivers ignore unknown types and unknown fields, so older builds keep working, and drop a `realtime` message whose `seq` is not newer than the last one applied for that type. Iteration 2 raises `protocol` in `hello` to 2, because `guide.state` loses `style` and the guide image becomes a mask; both phones update together. Only the photographer takes photos; the subject sends requests.
 
 | Type | Channel | Dir. | Purpose |
 |----|----|----|----|
@@ -903,7 +904,7 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
 
 ```json
 {
-  "v": 1, "t": "hello", "seq": 1, "ts": 1759212345678,
+  "v": 2, "t": "hello", "seq": 1, "ts": 1759212345678,
   "b": {
     "protocol": 2,
     "appVersion": "0.2.0",
@@ -923,7 +924,7 @@ Sent by both phones as soon as the channels open. A different `protocol` ends th
 
 ```json
 {
-  "v": 1, "t": "camera.capabilities", "seq": 2, "ts": 1759212345690,
+  "v": 2, "t": "camera.capabilities", "seq": 2, "ts": 1759212345690,
   "b": {
     "capabilities": {
       "minZoom": 0.6, "maxZoom": 10.0, "zoomStops": [0.6, 1.0, 2.0, 3.0],
@@ -943,7 +944,7 @@ Sent after `hello`. The subject clamps its pinch-zoom requests to `minZoom`–`m
 
 ```json
 {
-  "v": 1, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
+  "v": 2, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
   "b": {
     "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17",
     "format": "mask-png", "width": 540, "height": 720, "bytes": 9120, "chunks": 1, "aspect": 0.75
@@ -960,7 +961,7 @@ Skipped if the subject reported the same `haveGuideId`. From Iteration 2 the ima
 
 ```json
 {
-  "v": 1, "t": "guide.image.chunk", "seq": 4, "ts": 1759212345705,
+  "v": 2, "t": "guide.image.chunk", "seq": 4, "ts": 1759212345705,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "index": 0, "data": "UklGRl68AABXRUJQVlA4WAoAAAAQAAAAHwIAzwIA..." }
 }
 ```
@@ -974,7 +975,7 @@ Skipped if the subject reported the same `haveGuideId`. From Iteration 2 the ima
 
 ```json
 {
-  "v": 1, "t": "guide.image.end", "seq": 9, "ts": 1759212345760,
+  "v": 2, "t": "guide.image.end", "seq": 9, "ts": 1759212345760,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "crc32": 3735928559 }
 }
 ```
@@ -988,7 +989,7 @@ The subject checks the CRC, decodes the mask, and draws the outline from it with
 
 ```json
 {
-  "v": 1, "t": "guide.state", "seq": 412, "ts": 1759212349120,
+  "v": 2, "t": "guide.state", "seq": 412, "ts": 1759212349120,
   "b": {
     "state": {
       "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17",
@@ -1008,7 +1009,7 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 <summary><code>guide.clear</code> · reliable · P→S</summary>
 
 ```json
-{ "v": 1, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
+{ "v": 2, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
 ```
 
 </details>
@@ -1017,10 +1018,11 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 <summary><code>guide.move</code> · realtime / reliable · S→P · It 2</summary>
 
 ```json
-{ "v": 1, "t": "guide.move", "seq": 21, "ts": 1759212352100, "b": { "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }
+{ "v": 2, "t": "guide.move", "seq": 21, "ts": 1759212352100,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }
 ```
 
-The subject's drag or pinch on the guide, in frame coordinates, at most every 50 ms on `realtime` and once with `"final": true` on `reliable`. The photographer clamps it with `GuideGeometry` (the same limits as its own gestures, FR-3.2, FR-3.3), applies it to `GuideRepository`, and echoes `guide.state` with `by: SUBJECT`. Opacity and `visible` are not in this message; only the photographer changes them.
+The subject's drag or pinch on the guide `guideId`, in frame coordinates, at most every 50 ms on `realtime` and once with `"final": true` on `reliable`. The photographer clamps it with `GuideGeometry` (the same limits as its own gestures, FR-3.2, FR-3.3), applies it to `GuideRepository`, and echoes `guide.state` with `by: SUBJECT`. A move for a guide the photographer no longer shows, because it was replaced while the gesture was in flight, is dropped: a gesture never crosses guide identities (2.6.2). Opacity and `visible` are not in this message; only the photographer changes them.
 
 </details>
 
@@ -1028,7 +1030,7 @@ The subject's drag or pinch on the guide, in frame coordinates, at most every 50
 <summary><code>camera.zoom.set</code> · realtime / reliable · S→P</summary>
 
 ```json
-{ "v": 1, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
+{ "v": 2, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
 Sent on `realtime` at most every 50 ms during a pinch on the live video, then once with `"final": true` on `reliable` when the pinch ends, is cancelled, or the screen pauses. The readout's Zoom in / Zoom out accessibility actions send a single final request. Unchanged from Iteration 1 except for the gesture (AD-17).
@@ -1039,7 +1041,7 @@ Sent on `realtime` at most every 50 ms during a pinch on the live video, then on
 <summary><code>camera.state</code> · realtime / reliable · P→S</summary>
 
 ```json
-{ "v": 1, "t": "camera.state", "seq": 58, "ts": 1759212352342,
+{ "v": 2, "t": "camera.state", "seq": 58, "ts": 1759212352342,
   "b": { "zoom": 2.0, "exposure": 3, "flash": "AUTO", "aspect": "R16_9", "by": "SUBJECT", "final": true } }
 ```
 
@@ -1051,7 +1053,7 @@ Same realtime-then-final pattern as `guide.state`. Iteration 2 adds `exposure`, 
 <summary><code>camera.exposure.set</code> · realtime / reliable · S→P · It 2</summary>
 
 ```json
-{ "v": 1, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000, "b": { "index": 3, "final": true } }
+{ "v": 2, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000, "b": { "index": 3, "final": true } }
 ```
 
 An exposure-compensation index within `exposureRange`, with the same step-then-final pattern as zoom. The photographer clamps it, calls `setExposure`, and echoes `camera.state`.
@@ -1062,7 +1064,7 @@ An exposure-compensation index within `exposureRange`, with the same step-then-f
 <summary><code>camera.flash.set</code> · reliable · S→P · It 2</summary>
 
 ```json
-{ "v": 1, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }
+{ "v": 2, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }
 ```
 
 Ignored, with an unchanged echo, when `hasFlash` is false.
@@ -1073,7 +1075,7 @@ Ignored, with an unchanged echo, when `hasFlash` is false.
 <summary><code>camera.focus.set</code> · reliable · S→P · It 2, Could</summary>
 
 ```json
-{ "v": 1, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
+{ "v": 2, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
 A tap on the live video, in frame coordinates (2.6.2). The photographer calls `setFocusPoint` and shows the focus ring; there is no echo, because focus has no lasting state.
@@ -1084,7 +1086,7 @@ A tap on the live video, in frame coordinates (2.6.2). The photographer calls `s
 <summary><code>control.permission</code> · reliable · P→S · It 2, Could</summary>
 
 ```json
-{ "v": 1, "t": "control.permission", "seq": 1, "ts": 1759212340000, "b": { "allowed": false } }
+{ "v": 2, "t": "control.permission", "seq": 1, "ts": 1759212340000, "b": { "allowed": false } }
 ```
 
 Sent after `hello` and whenever the photographer changes the switch (FR-7.5). While `allowed` is false the subject disables its controls and the photographer ignores `camera.*.set` and `guide.move`. Until the switch is built, the subject assumes `true`.
@@ -1096,7 +1098,7 @@ Sent after `hello` and whenever the photographer changes the switch (FR-7.5). Wh
 <summary><code>session.leave</code> · reliable · both</summary>
 
 ```json
-{ "v": 1, "t": "session.leave", "seq": 60, "ts": 1759212399000, "b": { "reason": "LEFT" } }
+{ "v": 2, "t": "session.leave", "seq": 60, "ts": 1759212399000, "b": { "reason": "LEFT" } }
 ```
 
 Sent before closing, so the other phone shows "left" instead of "connection lost".
@@ -1107,8 +1109,8 @@ Sent before closing, so the other phone shows "left" instead of "connection lost
 <summary><code>ping / pong</code> · realtime · both</summary>
 
 ```json
-{ "v": 1, "t": "ping", "seq": 30, "ts": 1759212360000, "b": { "ts": 1759212360000 } }
-{ "v": 1, "t": "pong", "seq": 30, "ts": 1759212360041, "b": { "ts": 1759212360000 } }
+{ "v": 2, "t": "ping", "seq": 30, "ts": 1759212360000, "b": { "ts": 1759212360000 } }
+{ "v": 2, "t": "pong", "seq": 30, "ts": 1759212360041, "b": { "ts": 1759212360000 } }
 ```
 
 Every 2 s, from both phones. `pong` echoes the `ts` of the `ping`. The phone that receives a `ping` logs `ping.received ts=<ts>`, and the phone that sent it logs `rtt <ms> ms ts=<ts>` when the `pong` arrives. `Timings` times start at each phone's boot, so for one `ts` the receiver's clock minus the sender's is `t(ping.received) − t(rtt) + rtt/2`, within ±rtt/2. This offset aligns the two phones' logs for cross-phone latencies such as `guide.sent` → `guide.applied` (NFR-7).
@@ -1578,10 +1580,10 @@ Ten other model configurations were screened with one image each and left out, a
 #### 2.6.5 Remote control
 
 - **Zoom.** The subject pinches the live video (AD-17) while guide-edit mode is off. `SubjectViewModel.onZoomGesture(ratio, final)` receives the pinch, as it received the slider: each step updates the subject's readout immediately (optimistic) and is sent as a non-final `camera.zoom.set` on the realtime channel at most every 50 ms, the newest value winning; the pinch's end, cancellation, or the screen pausing sends one final request on the reliable channel. The photographer clamps every request to `[minZoom, maxZoom]`, applies it through `CameraController.setZoom`, and echoes the applied value in `camera.state`; the subject's readout settles on that echo (AD-7).
-- **Brightness and flash (It 2, FR-7.3).** The brightness slider sends `camera.exposure.set` with the same step-then-final pattern, and the flash button sends `camera.flash.set`. The photographer applies them through `setExposure` and `setFlash` and echoes `camera.state`. The photographer's own brightness slider and flash button (FR-1.11, FR-1.12) call the same controller methods, so a change from either side ends in the same echoed state.
-- **Guide moves (It 2, FR-7.2).** With guide-edit mode on, the subject's drag and pinch on the guide send `guide.move` in frame coordinates. `RemoteControlHandler` clamps them with `GuideGeometry` and applies them to the photographer's `GuideRepository`, which emits a `GuideChange`; `GuideSyncer` sends the resulting `guide.state` with `by: SUBJECT`, and the subject's mirror settles on it. The subject's mirror follows its own gesture optimistically meanwhile. If both people move the guide at once, the photographer applies the requests in arrival order, so the later change wins and both phones agree (FR-7.6).
-- **Remote focus (It 2, Could, FR-7.7).** A tap on the live video sends `camera.focus.set`; the photographer calls `setFocusPoint`. No echo.
-- **Permission (It 2, Could, FR-7.5).** `control.permission` from the photographer disables the subject's controls and makes the photographer drop every request while `allowed` is false. Until it is built, remote control is always allowed.
+- **Brightness and flash (It 2, FR-7.3; built 2026-10-16, Iter2-P17).** Subject view's brightness button opens the Camera screen's slider on the photographer's exposure range (`camera.capabilities`), and its flash button sits in the top bar; both are hidden when the photographer's camera has no range or no flash. The slider sends `camera.exposure.set` with the same step-then-final pattern as zoom (`StepSender`), and the flash button sends `camera.flash.set` and shows the tapped mode until the echo confirms or reverts it. The photographer clamps the index to the range and applies it through `setExposure`, and applies the flash through `setFlash` when it has one; a request the camera cannot take (no range, no flash) is answered with the unchanged `camera.state`. A change of exposure, flash, or ratio on the camera, from either phone, goes out as `camera.state` as soon as the camera reports it, `by: SUBJECT` when it matches the subject's pending request, and a step of the subject's slider is echoed as a step. The photographer's own brightness slider and flash button (FR-1.11, FR-1.12) call the same controller methods, so a change from either side ends in the same echoed state.
+- **Guide moves (It 2, FR-7.2; built 2026-10-16, Iter2-P17).** Subject view shows the guide-edit mode toggle while a guide is on the video (off by default, 2.6.2). With the mode on, the subject's drag and pinch on the guide are applied on the subject's phone first, clamped with `GuideGeometry` for the photographer's frame (`camera.state.aspect`) so the finger never leaves the photographer's limits, and sent as `guide.move` with the resulting center and height in frame coordinates, steps at most every 50 ms and the final value at once. `RemoteControlHandler` drops a move while the photographer has no guide or has hidden it, or for a guide it has since replaced (the move names its guide), and otherwise applies it to the photographer's `GuideRepository`, which clamps again like the photographer's own gestures and emits a `GuideChange`; `GuideSyncer` sends the resulting `guide.state` with `by: SUBJECT` (`attribute`), and the final move makes one notice. While the subject's gesture runs, its screen keeps its own guide and takes only the photographer's `visible` and `opacity` from the mirror; the first `guide.state` after the final value settles the guide. If both people move the guide at once, the photographer applies the requests in arrival order, so the later change wins and both phones agree (FR-7.6).
+- **Remote focus (It 2, Could, FR-7.7).** A tap on the live video sends `camera.focus.set`; the photographer calls `setFocusPoint`. No echo. **TODO** Iter2-P17 (Could): the message is in the protocol since 2026-10-16; the subject's tap and the handler are not built.
+- **Permission (It 2, Could, FR-7.5).** `control.permission` from the photographer disables the subject's controls and makes the photographer drop every request while `allowed` is false. Until it is built, remote control is always allowed. **TODO** Iter2-P17 (Could): the message is in the protocol since 2026-10-16; the switch and the subject's disabled state are not built.
 - **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing, so every ratio on both phones is in primary-relative units.
 - **Zoom without stutter (It 2, Must, NFR-19).** On the Galaxy S21 the preview stutters on every zoom change and pauses to load below 1×. **TODO** Iter2-P5: measure first, then fix the cause among lens rebinding, the rate of `setZoomRatio` calls, and the analysis stream during zoom. Rules that hold whatever the cause: zoom requests are coalesced to the newest value per frame; a lens switch, when it cannot be avoided, keeps the last frame on screen instead of a blank preview and completes the pending request when the new lens is `READY`; the same applies to an aspect-ratio rebind. The shutter freeze is handled the same way if time allows (`CAPTURE_MODE_MINIMIZE_LATENCY`, no preview freeze effect).
 - **Photos.** Only the photographer takes photos, with the camera screen's own shutter. The subject adjusts the shot, and the photographer decides when to take the photo.
@@ -1747,7 +1749,7 @@ erDiagram
 | **Accounts and friends** | 박재완 | — | Database, sign-in with a Pix ID and a password or with Google, Pix IDs, friend requests, friend list, presence (Iter2-P8, #50); Sign-in, Pix ID, and Friends screens (Iter2-P13, #54) | Invitations |
 | **Pose generation** | 박재완 | API choice, `POST /poses`, templates, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, prompt (Iter2-P12, #53) | Reference guide |
 | **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | TURN through Cloudflare, `ws://` to the course server, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter2-P16, #56); invitations with push and link (Iter2-P15, #55) | Guide sync, remote control |
-| **Remote control** | 조성민 | `RemoteControlHandler` (zoom), pinch zoom on Subject view | Brightness, flash, guide moves, notices; remote focus and the permission switch if time allows (Iter2-P17, #57); pinch zoom and the guide-edit mode toggle on Subject view, replacing its slider (Iter2-P6, #48); zoom stutter (Iter2-P5, #47) | UI |
+| **Remote control** | 조성민 | `RemoteControlHandler` (zoom), pinch zoom on Subject view | Brightness, flash, guide moves, and notices (Iter2-P17, #57, built); remote focus and the permission switch if time allows (Iter2-P17, Could); pinch zoom and the guide-edit mode toggle on Subject view, replacing its slider (Iter2-P6, #48, built); zoom stutter (Iter2-P5, #47) | UI |
 | **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state` (in use since Iter2-P11); the mask-only transfer in `GuideImageCodec` and the syncer (decided 2026-10-16); no `anchor` is sent (2.5.1) | UI |
 
 The friends feature needs both the accounts server (박재완) and the session entry point (조성민); Iter2-P8 lands before Iter2-P15 and Iter2-P16, and the two owners agree the order of the invitation work (Team Meetings 2026-10-09).

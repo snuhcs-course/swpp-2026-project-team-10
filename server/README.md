@@ -89,15 +89,16 @@ The base URL is `http://<laptop-Wi-Fi-IP>:8000/api/v1`.
 | Endpoint | Result |
 | --- | --- |
 | `GET /pose-templates` | `[{"id":"hands_on_hips","label":"Hands on hips"}, …]` with the four templates `hands_on_hips`, `wave`, `walking`, and `arms_crossed`. The pose descriptions stay on the server. |
-| `POST /poses` | One candidate for one template: `{"templateId":"wave","image":"<Base64 JPEG>","elapsedMs":9961}`. The app sends one request per template in parallel. |
+| `POST /poses` | One candidate for one template or for a pose description: `{"templateId":"wave","image":"<Base64 JPEG>","elapsedMs":9961}`, with `"templateId":null` for a description. The app sends four requests in parallel, one per template or four with the same description. |
 
-`POST /poses` takes `multipart/form-data` with three parts: `image` (a JPEG with a long side of at most 1024 px and no EXIF), `templateId`, and `seed` (an integer). The whole request may be at most 1 MiB; a photo prepared as Design §2.6.3 describes is a few hundred KB.
+`POST /poses` takes `multipart/form-data` with `image` (a JPEG with a long side of at most 1024 px and no EXIF), `seed` (an integer), and either `templateId` or `description`, the pose in the user's words in Korean or English. The description is trimmed, each run of whitespace becomes one space, and it may then be 1–100 characters; an empty `description` counts as none. The whole request may be at most 1 MiB; a photo prepared as Design §2.6.3 describes is a few hundred KB.
 
 ```sh
 curl -F "image=@scene.jpg" -F templateId=wave -F seed=1829304756 http://localhost:8000/api/v1/poses
+curl -F "image=@scene.jpg" -F "description=벽에 기대서 카메라 보며 살짝 웃기" -F seed=1829304756 http://localhost:8000/api/v1/poses
 ```
 
-The server wraps the template's pose description in the prompt in [templates.py](src/pix_server/poses/templates.py) and sends it with the photo to OpenRouter's Image API. `PIX_POSE_MODEL` chooses the model; it defaults to `openai/gpt-image-2.5-flare@low` and takes any OpenRouter image model id, with `@low`, `@medium`, or `@high` appended for a model that has quality tiers. The seed is reduced to 0…2³¹−1, the range a model such as Seedream accepts; a model without seed support, like the default one, ignores it. A candidate that arrives in another format is converted to JPEG. The server waits at most `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (30) for the image service.
+The server wraps the template's pose in the template prompt, or the user's description in the description prompt, and sends the prompt with the photo to OpenRouter's Image API. Both prompts and the templates (id, label, and the pose sent to the model) are in [prompts.toml](src/pix_server/poses/prompts.toml), which explains its rules at the top; the server reads it when it starts and refuses to start if it is wrong, and `scripts/compare_image_edit_apis.py` reads the same file. The description prompt sets only the pose, the expression, and where the person is in the scene, and keeps the person, the background, and the framing whatever the description asks. `PIX_POSE_MODEL` chooses the model; it defaults to `openai/gpt-image-2.5-flare@low` and takes any OpenRouter image model id, with `@low`, `@medium`, or `@high` appended for a model that has quality tiers. The seed is reduced to 0…2³¹−1, the range a model such as Seedream accepts; a model without seed support, like the default one, ignores it. A candidate that arrives in another format is converted to JPEG. The server waits at most `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (30) for the image service.
 
 When the phone cancels a request by closing its connection (Design §2.6.3), the server stops its call to the image service within a quarter of a second, and OpenRouter does not bill the unfinished image. A cancelled request still counts toward the rate limit and leaves no line in the access log. A phone that loses its network without closing the connection is not noticed; the 30-second timeout ends that call.
 
@@ -107,15 +108,15 @@ Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose tem
 | --- | --- |
 | `400 INVALID_IMAGE` | Not a readable JPEG, a long side over 1024 px, or EXIF metadata. |
 | `400 UNKNOWN_TEMPLATE` | No template has that `templateId`. |
-| `400 INVALID_REQUEST` | A part is missing or `seed` is not an integer. It replaces FastAPI's default 422, which this API uses for `REJECTED`. |
+| `400 INVALID_REQUEST` | A part is missing, `seed` is not an integer, both or neither of `templateId` and `description` were sent, or the description is blank or longer than 100 characters. It replaces FastAPI's default 422, which this API uses for `REJECTED`. |
 | `413` | The request is larger than 1 MiB. It is refused before the upload is read, so it carries Starlette's own body (`Content Too Large`) and not the error shape above. |
-| `422 REJECTED` | The image service declined the photo or pose (a content filter or a model refusal). |
+| `422 REJECTED` | The image service declined the photo or pose (a content filter or a model refusal). For a description the message is "Try a different description", which the app shows (US-5). |
 | `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600), or all clients together more than `PIX_POSE_GLOBAL_LIMIT` (500) within `PIX_POSE_GLOBAL_WINDOW_SECONDS` (86400); the message says which. Requests refused before that point are not counted, and a request refused by one window is counted in neither. |
 | `503 UNAVAILABLE` | The session store, which counts the rate limit, does not answer. Nothing is sent to the image service. |
 | `502 UPSTREAM_ERROR` | The image service failed, could not be reached, or gave an unreadable answer, or `OPENROUTER_API_KEY` is not set. The server log gives OpenRouter's status code, for example 402 when the credits run out, and never the text of its answer. |
 | `504 UPSTREAM_TIMEOUT` | The image service did not answer in time. |
 
-The rate limits are counted in the session store, so every worker counts against the same windows; 20 requests are five sets of four poses, and the global 500 bound what the image service can cost in a day however many addresses send requests. Set a spending limit on the OpenRouter key as well, in OpenRouter's dashboard, as the last bound. The scene photo and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
+The rate limits are counted in the session store, so every worker counts against the same windows; 20 requests are five sets of four poses, and the global 500 bound what the image service can cost in a day however many addresses send requests. Set a spending limit on the OpenRouter key as well, in OpenRouter's dashboard, as the last bound. The scene photo, the description, and the candidate exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13). The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
 
 ## Accounts and friends
 
@@ -329,4 +330,4 @@ uv run scripts/compare_image_edit_apis.py photo.jpg --pose-text "벽에 기대�
 - **Cost.** A run requests photos × models × poses images. Only returned images are billed; failed and timed-out requests are not. If lines show `Insufficient credits`, the OpenRouter account is empty.
 - **Photos.** Use JPEG, PNG, or WebP with the whole person in the frame; HEIC does not open. Portrait 3:4 matches the app's frame.
 - **Privacy.** Photos are sent to OpenRouter and the model's provider. `scripts/out/` holds the photos and results and is git-ignored; do not commit them.
-- **Defaults.** The default models, prompt, and pose descriptions are `DEFAULT_MODELS`, `PROMPT`, and `POSES` at the top of the script.
+- **Defaults.** The default models are `DEFAULT_MODELS` at the top of the script. The prompts and the templates' poses come from the server's [prompts.toml](src/pix_server/poses/prompts.toml), so a run tries what the server sends; `--prompt` and `--description-prompt` try another wording without editing it.

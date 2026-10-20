@@ -20,6 +20,7 @@
 | 1.7 | 2026-10-16 | Guide controls as built (Iter2-P11, #52). The guide is an outline only on both phones and on *Reference confirm*, which shows it on a dark neutral card, and `GuideStyle` is gone from the code too (Decided, 2.3, 2.6.2). *Hide* / *Show* sets `visible` with a final change, ends guide-edit mode, and shows the hint "Guide hidden"; there is no *Replace* button: with a guide on the camera, *Guide* opens *Add a pose guide* as "Replace the pose guide?" (2.6.2). A new guide starts from its `anchor`, the box of the person and its 2 % margin in the reference: the box's height fraction and center are kept in any frame ratio, then clamped; the height limits stay 0.21–2.1 of the frame height for every start, and the outline is about 3 dp wide only at the default height (2.3, 2.6.1, 2.6.2). The subject takes the start from `guide.state`, so `anchor` leaves `guide.image.begin` (2.5.1, 2.9). The reference thumbnail sits in a corner of the preview: a tap enlarges it to half the preview's width and another makes it small, and a drag drops it into the nearest corner, above the guide's controls (2.6.2). The *Starting position mapping* and *Reference confirm background* rows of Still open are closed, and the mask-only transfer is 조성민's, in Guide sync (2.9). |
 | 1.8 | 2026-10-16 | Remote brightness, flash, and guide moves as built (Iter2-P17, #57): the subject's requests of 2.5.1 as messages (`guide.move`, `camera.exposure.set`, `camera.flash.set`; `camera.focus.set` and `control.permission` defined but not yet handled), `guide.state` with `by`, the subject's own guide clamped for the photographer's frame with echoes held until the gesture ends, unchanged echoes for a camera without a range or a flash, and the notices (2.6.5, 2.9); the protocol version is 2 from this change (2.5.1). |
 | 1.9 | 2026-10-18 | Subject view's video fitted to the frame (Iter2-A4, #86). The subject's `SurfaceViewRenderer` wraps its content and is centered, so it measures itself to the video's shape and covers the rectangle the grid and the guide fit. At `match_parent` the renderer cropped every frame to the view's shape despite aspect-fit scaling, so the guide lay on another part of the scene than on the photographer's phone: about 6 % off at 4:3, 26 % at 16:9, and 41 % at 1:1. A pinch anywhere in the video area, the margins around the video included, zooms (2.6.4). *Still open* gains whether Subject view also shows the reference thumbnail. |
+| 1.10 | 2026-10-20 | Pose descriptions on the server (Iter2-P12, #53). `POST /poses` takes `templateId` or a `description` of 1–100 characters after trimming, answers a description with `"templateId": null`, and answers "Try a different description" when the service refuses one; the `candidateId` the server was to echo is dropped, and the app names its four requests itself (2.3, 2.5.3). The idea chips are string resources in the app, and `GET /pose-ideas` and `PoseGenerator.ideas()` are dropped (2.1, 2.2, 2.5.3, 2.6.3). A description has a prompt of its own, tried on three scenes with `compare_image_edit_apis.py`, with the results (2.6.3). The prompts and the templates move from code to `server/src/pix_server/poses/prompts.toml`, which the server checks when it starts and the comparison script reads too (2.6.3). The description prompt as tried is decided, and the pose ideas leave *Still open*. |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.5). Testing plans will be in the Testing Documentation.
 
@@ -45,13 +46,14 @@ Audience: the development team. This page describes the design of Iterations 1 a
 
 **Decided (2026-10-16, guide controls, Iter2-P11):** a new guide keeps the height fraction and the center of its `anchor`, the box of the person and its 2 % margin in the reference, whatever the reference's ratio, and is then clamped by the 20 % rule (2.6.2) · the size limits stay 0.21–2.1 of the frame height for every start, so both phones clamp alike without knowing the start (FR-3.3, 2.6.2) · *Reference confirm* shows the outline on a dark neutral card (FR-2.3) · there is no *Replace* button: *Guide* asks to replace a guide on the camera, and the new guide starts at its own reference's place (2.6.2) · the reference thumbnail starts in the preview's top-left corner; a tap enlarges it to half the preview's width and another tap makes it small; a drag drops it into the nearest of the four corners and nowhere else (2.6.2) · the subject places the guide from the `guide.state` that follows every image, so `anchor` is not sent (2.5.1) · the mask-only transfer is built by 조성민 in Guide sync (2.9).
 
+**Decided (2026-10-20, pose descriptions, Iter2-P12):** the idea chips are string resources in the app, so they are translated with it and cost no request, and `GET /pose-ideas` is dropped (2.6.3) · a response to a description has `"templateId": null`, and the app names its four requests itself instead of sending a `candidateId` for the server to echo (2.5.3) · a description has a prompt of its own, which changes only the pose, the expression, and where the person is in the scene, and keeps the person, the clothing, the background, and the framing whatever the description asks; the prompt as tried on 2026-10-20 is the one Pix uses, although on an open scene it can still add a wall to lean on and a description can still change the clothing (2.6.3) · the prompts and the templates are data in `server/src/pix_server/poses/prompts.toml`, not code (2.6.3).
+
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | Zoom stutter cause | Lens rebinding, the rate of `setZoomRatio` calls, or the stream during zoom; measured first on the Galaxy S21 (2.6.5) | 조성민 (Iter2-P5) | 10/15 |
 | Invite link format | A verified Android App Link needs HTTPS, which the course servers do not have (AD-11). Proposal: `http://<host>/i/<invitationId>` opens a small page from nginx that hands over to Pix through a custom scheme (`pix://i/<invitationId>`) and otherwise says to install Pix (2.6.6) | 박재완 with 조성민 (Iter2-P15) | 10/20 |
-| Pose ideas | The chip texts and whether they come from `GET /pose-ideas` or ship in the app (2.6.3); the preset images still to collect | 박재완 (Iter2-P12) | 10/18 |
 | Sign-in screens | One *Sign in* screen from *Shoot together* with Pix ID and password, *Sign up*, and *Continue with Google*; after Google's `NOT_REGISTERED`, the step "Do you already have a Pix account?" (log in, then `PUT /me/google`; or `POST /auth/google/signup`); then *Pix ID setup* for a new Google account (2.5.3; R&S 6.8, FR-5.2, FR-5.13). Wireframes still to be drawn | 박재완 (Iter2-P13) | 10/17 |
 | Account actions | No settings screen until Iterations 3–4 (R&S 6.8), but Iteration 2 needs a place to change the display name, *Add Google* or *Add a password* (FR-5.12, FR-5.14), and *Sign out*. Proposal: tapping one's own name and Pix ID on *Friends* opens an account sheet with them, while a plain tap on the Pix ID still copies it (FR-5.4) | 박재완 (Iter2-P13) | 10/17 |
 | Google sign-in setup | A Google Cloud project with a web OAuth client, whose ID is `PIX_GOOGLE_CLIENT_ID` on both servers and the app's server client ID for Credential Manager, set per build like the server URL (2.8, Configuration); and Android OAuth clients for `com.lastpenguin.pix` with the SHA-1 of every signing key: each developer's debug key and the release key. Who owns the project, and how a new debug key is added | 박재완 (Iter2-P13) | 10/17 |
@@ -393,7 +395,6 @@ interface SavedGuideStore {                              // It 2 (FR-3.8, AD-16)
 
 interface PoseGenerator {
     suspend fun templates(): List<PoseTemplate>                     // GET /pose-templates
-    suspend fun ideas(): List<PoseIdea>                             // It 2: GET /pose-ideas, the chip texts (TODO Iter2-P12: or shipped in the app)
     fun generate(scene: Bitmap, request: GenerationRequest, seed: Long): Flow<CandidateEvent>   // one event per candidate
 }
 
@@ -629,7 +630,6 @@ classDiagram
     <<Retrofit>>
     +createPose(image, templateId, description, seed)
     +templates()
-    +ideas()
   }
   GenerationViewModel --> PoseGenerator
   RemotePoseGenerator ..|> PoseGenerator
@@ -823,13 +823,13 @@ enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, CANCELLED, EXPIRED }
 
 // ---- Generation -----------------------------------------------------------
 data class PoseTemplate(val id: String, val label: String)   // the prompt text stays on the server
-data class PoseIdea(val id: String, val text: String)        // It 2: an idea chip; tapping it fills the description field
+data class PoseIdea(val id: String, val text: String)        // It 2: an idea chip from the app's string resources; tapping it fills the description field
 data class GenerationRequest(                                // It 2
     val templates: List<PoseTemplate>,                       // the four presets, used when description is null (Skip)
     val description: String? = null,                         // 1..100 characters, Korean or English (FR-4.8)
 )
 sealed interface CandidateEvent {
-    val templateId: String       // with a description: "custom-1" .. "custom-4"
+    val templateId: String       // with a description: "custom-1" .. "custom-4", the app's own names for its four requests
     data class Ready(override val templateId: String, val image: Bitmap) : CandidateEvent
     data class Failed(override val templateId: String, val error: GenerationError) : CandidateEvent
 }
@@ -1244,7 +1244,6 @@ Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteratio
 | Endpoint | Purpose | Errors |
 |----|----|----|
 | `GET /pose-templates` | The pose templates, so they can change without an app update | — |
-| `GET /pose-ideas` (It 2) | The idea chips for *Generate poses* (**TODO** Iter2-P12: or shipped in the app) | — |
 | `POST /poses` | One pose candidate for one template, or for a description (It 2); the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `400 INVALID_REQUEST`, `413`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `503 UNAVAILABLE` (the session store, which counts the rate limit, does not answer), `504 UPSTREAM_TIMEOUT` |
 | `POST /auth/signup` (It 2) | Create an account with a Pix ID, a display name, and a password; return its tokens (FR-5.2, FR-5.11) | `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` |
 | `POST /auth/login` (It 2) | Sign in with a Pix ID and a password; return an access and a refresh token | `401 INVALID_CREDENTIALS` |
@@ -1283,36 +1282,25 @@ Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteratio
 ```jsonc
 // request: multipart/form-data, at most 1 MiB in total
 //   image       scene.jpg (JPEG, long side ≤ 1024 px, no EXIF)
-//   templateId  "wave"                      (omit when description is sent)
-//   description "벽에 기대서 한 손은 주머니에"   (It 2, optional, 1..100 characters; exactly one of templateId or description)
+//   templateId  "wave"                      (or description)
+//   description "벽에 기대서 한 손은 주머니에"   (It 2; 1..100 characters after trimming; exactly one of templateId or description)
 //   seed        "1829304756" (an integer)
 
 // response 200
 { "templateId": "wave", "image": "/9j/4AAQSkZJRgABAQAAAQABAAD...", "elapsedMs": 11840 }
 
+// response 200 to a description
+{ "templateId": null, "image": "/9j/4AAQSkZJRgABAQAAAQABAAD...", "elapsedMs": 13210 }
+
 // response 504
 { "error": { "code": "UPSTREAM_TIMEOUT", "message": "The image service did not answer within 30 s" } }
 ```
 
-`image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9). With a `description`, the response's `templateId` echoes the request's `candidateId` (`custom-1` … `custom-4`), and a description the image service refuses answers `422 REJECTED` with the message "Try a different description" (US-5).
+`image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9). With a `description`, the response's `templateId` is `null`: the app tells its four requests apart by itself and names them `custom-1` … `custom-4` (2.3; changed on 2026-10-20 from a `candidateId` that the server echoed, which the app never needed). A description the image service refuses answers `422 REJECTED` with the message "Try a different description" (US-5).
 
-The server checks the photo and does not repair it: one that is not a readable JPEG, is over 1024 px on its long side, or has EXIF gets `INVALID_IMAGE`. `INVALID_REQUEST` means that a part is missing or that `seed` is not an integer. The server reduces `seed` to 0…2³¹−1, the range the image models accept.
+**The description.** The server trims it and turns each run of whitespace, line breaks included, into one space; it then has to be 1–100 characters. Characters are Unicode code points, which are never more than what the app's field counts, so whatever the field accepts passes. An empty `description` is the same as none, so one next to a `templateId` asks for the template. The description is passed in Korean or English as written, inside its own prompt (2.6.3), and is never written to a log (NFR-13).
 
-</details>
-
-<details>
-<summary><code>GET /pose-ideas</code> · It 2</summary>
-
-```jsonc
-// response 200
-[
-  { "id": "lean_wall", "text": "Leaning on the wall, one hand in a pocket" },
-  { "id": "look_back", "text": "Looking back over the shoulder" },
-  { "id": "sit_steps", "text": "Sitting on the steps, elbows on knees" }
-]
-```
-
-Cached in the app like the templates. Tapping a chip puts its `text` into the description field (FR-4.8).
+The server checks the photo and does not repair it: one that is not a readable JPEG, is over 1024 px on its long side, or has EXIF gets `INVALID_IMAGE`. `INVALID_REQUEST` means that a part is missing, that `seed` is not an integer, that both or neither of `templateId` and `description` were sent, or that the description is blank or longer than 100 characters. Nothing is sent to the image service or counted by the rate limit in any of these cases. The server reduces `seed` to 0…2³¹−1, the range the image models accept.
 
 </details>
 
@@ -1541,12 +1529,21 @@ The guide's normalized width is `height × aspect × (H / W)` of the current fra
 #### 2.6.3 Pose generation
 
 1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, the Camera screen takes the scene photo. It is a state of that screen (`GenerationUiState.phase`), not a screen of its own, so the camera keeps running and zoom and the composition aids stay available. The shutter then copies the latest analysis frame, already upright, instead of saving a photo, and the user confirms it with *Use this photo* or takes another with *Shoot again*; nothing is sent before that. The app then resizes the photo so the long side is at most 1024 px and encodes it as JPEG (quality 85), which leaves out location and other metadata. This preparation is the app's job: the server checks the photo but does not resize or repair it, and rejects one that is not prepared this way (2.5.3). Doing it on the phone keeps the four uploads small and keeps location data on the phone.
-2.  **Requests.** Without a description, send one `POST /poses` per template (4 in parallel), each with a new random `seed`; with a description (It 2), send four requests with the same description and different seeds, `candidateId` `custom-1` … `custom-4`. *Try other poses* repeats the same request with new seeds. A model without seed support ignores the seed, and its results still differ from one request to the next.
-3.  **Server prompt.** Each template holds a pose description. The server wraps it in a fixed prompt, which lets the model move the person to a better spot while the camera framing stays fixed: *"Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting exactly as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer would: judge whether the person is too far, too close, or poorly placed, and if so move them to a better spot and distance in this scene. Change the person's pose to: {pose}. Show the full body, standing on the ground at a natural scale. Photorealistic."*
+2.  **Requests.** Without a description, send one `POST /poses` per template (4 in parallel), each with a new random `seed`; with a description (It 2), send four requests with the same description and different seeds, which the app names `custom-1` … `custom-4`. *Try other poses* repeats the same request with new seeds. A model without seed support ignores the seed, and its results still differ from one request to the next.
+3.  **Server prompt.** Each template holds a pose description. The server wraps it in a fixed prompt, kept with the templates in `server/src/pix_server/poses/prompts.toml` (It 2), which lets the model move the person to a better spot while the camera framing stays fixed: *"Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting exactly as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer would: judge whether the person is too far, too close, or poorly placed, and if so move them to a better spot and distance in this scene. Change the person's pose to: {pose}. Show the full body, standing on the ground at a natural scale. Photorealistic."*
 4.  **Progressive results.** The app maps each response to a `CandidateEvent`. The screen fills its slots as events arrive and moves to *Pick a pose* when all are done, or at 30 s if at least one is ready. The 30 s are one limit for the whole run, counted from *Use this photo* and including the request for the templates; the requests still open at the limit are cancelled. Zero candidates means *Couldn't create poses* (FR-4.7). After *Use this pose*, the app discards the scene photo and the other candidates.
 5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices that the phone closed its connection and cancels its own call to the image API, which then does not bill that image. The server also stops waiting for the image API after 30 s. On the course servers the course's proxy does not pass the phone's cancel on to the server (measured 2026-10-13; 2.8, Hosting), so there a cancelled request runs to the end and is billed; the rate limit bounds that cost.
 
-**Pose description and idea chips (It 2, FR-4.8).** After *Use this photo*, the *Generate poses* screen shows the scene thumbnail, the idea chips from `GET /pose-ideas`, a 100-character field with a counter, *Generate 4 poses*, and *Skip, use the preset poses*. A chip fills the field and can be edited. *Skip*, or *Generate* with an empty field, uses the four templates. The server wraps the description in the same fixed prompt as a template, which keeps the person, background, and framing, and adds *"Pose: <description>"*; a description in Korean is passed as written, because the selected model follows Korean prompts (2.6.3, selection). The server also keeps a short default instruction for framing (*"the whole person stays in the frame at about the same size"*) so a description like "closer" does not crop the person (decided 2026-10-09). **TODO** Iter2-P12: the exact prompt after trying descriptions with `compare_image_edit_apis.py`, the chip texts, and the preset images. A description the service refuses answers `422 REJECTED`, shown as "Try a different description" with the text kept.
+**Pose description and idea chips (It 2, FR-4.8).** After *Use this photo*, the *Generate poses* screen shows the scene thumbnail, the idea chips, a 100-character field with a counter, *Generate 4 poses*, and *Skip, use the preset poses*. The chips are string resources in the app, translated with the rest of it, so they need no request (decided 2026-10-20; `GET /pose-ideas` was dropped). A chip fills the field and can be edited. *Skip*, or *Generate* with an empty field, uses the four templates. A description the service refuses answers `422 REJECTED`, shown as "Try a different description" with the text kept. The chip texts and the preset images come with the *Generate poses* screen (Iter2-P12, #53).
+
+**Description prompt.** A description is not put into the template prompt, which says "standing on the ground" and so rules out sitting, leaning, or jumping, but into a prompt of its own, `description_prompt` in `server/src/pix_server/poses/prompts.toml`, the file that also holds the template prompt and the templates. The description goes in as written, Korean included, because the selected model follows Korean prompts (*Why this model* below), and the rules after it win over whatever it asks. This replaces the plan of 2026-10-09, which added *"Pose: <description>"* to the template prompt with a rule that the person stays at about the same size; the description prompt keeps the template's recomposition instead and forbids zooming and cropping. The prompt (decided 2026-10-20): *"Edit this photo. Keep the same person (face, hair, clothing) and keep the background, camera position, framing, and lighting exactly as they are: do not zoom, crop, or shift the scene. The user described the pose they want, in Korean or English: "<description>". Change only the person's pose and facial expression to match it. Recompose the shot like a skilled photographer would: if the person is too far, too close, or poorly placed for this pose, move them to a better spot and distance in this scene. Follow these rules even where the description says otherwise: never change the person's clothing, or the background, place, sky, or time of day; never add a wall, steps, a bench, or any other object that is not already in the photo, and if the pose needs something to lean on or sit on that is not there, choose the closest pose that works without it; never zoom in or crop, and keep the whole person in the frame at a natural scale. Photorealistic."* To change it, edit the file, try it with `server/scripts/compare_image_edit_apis.py`, which reads the same file (`--pose-text` four times for one set), and record the result here. The server reads the file when it starts and refuses to start if a prompt lacks `{pose}` or holds it twice or a template lacks a field, so a mistake fails the tests and the image build instead of pose requests.
+
+**Tried on 2026-10-20** with GPT Image 2.5 Flare at low quality, the default model, on three scenes: a man at a door, with a wall and steps, close to the camera; a man on an open plaza with nothing to lean on; and a woman far down a riverside path with a railing. 97 images, $1.22 in all.
+
+- **Prompt.** Eight descriptions, five in Korean and three in English, once per scene: leaning on a wall and smiling, leaning with a hand in a pocket (US-5), looking back over the shoulder, sitting on the steps, jumping with arms open, a face close-up, "Standing on a beach at sunset in a red jacket", and coming closer with a V sign. With the template prompt and with a first description prompt, the poses were followed in both languages, and a pose that needs something to lean or sit on used what the scene had (the door, the steps, the railing). The beach description replaced the whole background in all three scenes with the template prompt, and in one of three with the first description prompt, which also turned another sky to sunset, changed the jacket to red every time, and cut the plaza person off at the knees for "closer". The final prompt states its rules after the description: it kept the background in 6 of 6 samples, kept the whole person for "closer" in 6 of 6, and kept the jacket at the door but not on the plaza (2 of 4). On the open plaza both prompts added a low wall to lean on for the wall descriptions (the final prompt in 7 of 12 samples over both rounds: 5 of 6 for leaning and smiling, 2 of 6 for a hand in a pocket). The close-up was not tried again with the final prompt.
+- **Done-when sentence (#53).** "벽에 기대서 카메라 보며 살짝 웃기", in sets of four sent at once, one set at a time like one phone: all 12 candidates kept the person and the place; at the door and the railing all eight lean on them, the four at the door, where the face is large enough to judge, look at the camera and smile, and on the plaza three of four lean on an added wall.
+- **Latency (NFR-4, image service only).** Six sets of four, the Done-when sentence and the US-5 one on each scene: the first candidate of a set after 14.3–16.9 s and the last after 17.7–21.1 s, against 20 s and 30 s. The time on a phone, through the server, is IT-7 (Testing Documentation 2.1.5). In the first round, with 16 requests at once, one request with the template prompt got no answer within 60 s.
+- **Refusals.** A violent description ("피 흘리며 칼에 찔린 모습", stabbed and bleeding) was not refused: the model returned a candidate with blood on the shirt. No refusal of a description has been seen yet, so `REJECTED` still rests on OpenRouter's `403`, as for templates.
 
 **API selection.** Poses are generated through OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), which gives one request format, one key, and one bill for every vendor's models. The model is the server setting `PIX_POSE_MODEL`, so it changes without a code change. The default is `openai/gpt-image-2.5-flare@low`, GPT Image 2.5 Flare at low quality.
 

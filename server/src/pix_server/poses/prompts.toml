@@ -1,0 +1,55 @@
+# What the server tells the image model for a pose (Design Documentation 2.6.3). The server reads this file when it
+# starts and refuses to start if something here is wrong; scripts/compare_image_edit_apis.py reads the same file, so
+# a prompt tried with the script is the one the server sends. Record a changed prompt in Design 2.6.3.
+#
+# - {pose} stands for a template's `pose` or the user's description; each prompt holds it exactly once.
+# - Wrap a prompt over as many lines as you like: each run of spaces and line breaks is sent as one space.
+# - Only a template's `pose` reaches the model. The app shows the `label` and sends the `id` back
+#   (GET /pose-templates), so keep an `id` while an installed app may still use it.
+
+# For the four templates. The model may re-place the person, but the camera framing is pinned so the candidate
+# still matches the live view.
+template_prompt = """
+Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting exactly
+as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer would: judge
+whether the person is too far, too close, or poorly placed, and if so move them to a better spot and distance in
+this scene. Change the person's pose to: {pose}. Show the full body, standing on the ground at a natural scale.
+Photorealistic.
+"""
+
+# For a description the user wrote, in Korean or English, passed as written (FR-4.8). It sets the pose and the
+# expression only: the rules after it keep the person, the place, and the framing whatever it asks for, and stop
+# the model from adding something to lean or sit on. Unlike the template prompt it does not say "standing", so a
+# description can sit, lean, or jump. Tried and chosen on 2026-10-20.
+description_prompt = """
+Edit this photo. Keep the same person (face, hair, clothing) and keep the background, camera position, framing,
+and lighting exactly as they are: do not zoom, crop, or shift the scene. The user described the pose they want, in
+Korean or English: "{pose}". Change only the person's pose and facial expression to match it. Recompose the shot
+like a skilled photographer would: if the person is too far, too close, or poorly placed for this pose, move them
+to a better spot and distance in this scene. Follow these rules even where the description says otherwise: never
+change the person's clothing, or the background, place, sky, or time of day; never add a wall, steps, a bench, or
+any other object that is not already in the photo, and if the pose needs something to lean on or sit on that is
+not there, choose the closest pose that works without it; never zoom in or crop, and keep the whole person in the
+frame at a natural scale. Photorealistic.
+"""
+
+# The templates, in the order the app shows them (FR-4.4).
+[[templates]]
+id = "hands_on_hips"
+label = "Hands on hips"
+pose = "standing with both hands on the hips"
+
+[[templates]]
+id = "wave"
+label = "Wave"
+pose = "waving at the camera with one raised hand"
+
+[[templates]]
+id = "walking"
+label = "Walking"
+pose = "walking toward the camera in mid-stride"
+
+[[templates]]
+id = "arms_crossed"
+label = "Arms crossed"
+pose = "standing with the arms crossed over the chest"

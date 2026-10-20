@@ -1,4 +1,10 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-20, reviewed by Jaewan Park
+# POST /poses partitions (Testing Documentation 2.1.6). What to pose: a template only, a description only, both,
+# neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
+# whitespace and line breaks, blank, 100 characters (after trimming) and 101. Scene: a JPEG within the contract, at
+# 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short. Image API: a candidate in JPEG, PNG,
+# or WEBP; a refusal (403) of a template and of a description; another failing status; an unreadable answer; no
+# answer in time; no key. Limits: each window full, and a request refused before the image API, which is not counted.
 import asyncio
 import base64
 import io
@@ -13,16 +19,21 @@ from starlette.formparsers import MultiPartParser
 
 from pix_server.main import MAX_REQUEST_BYTES, create_app
 from pix_server.poses.limiter import PoseLimiter
-from pix_server.poses.templates import TEMPLATES
+from pix_server.poses.templates import DESCRIPTION_MAX_LENGTH, TEMPLATES
 from pix_server.store import Window
 
 
-def create_pose(client, image, template_id="wave", seed="1829304756"):
-    return client.post(
-        "/api/v1/poses",
-        files={"image": ("scene.jpg", image, "image/jpeg")},
-        data={"templateId": template_id, "seed": seed},
-    )
+def create_pose(client, image, template_id="wave", seed="1829304756", description=None):
+    data = {"seed": seed}
+    if template_id is not None:
+        data["templateId"] = template_id
+    if description is not None:
+        data["description"] = description
+    return client.post("/api/v1/poses", files={"image": ("scene.jpg", image, "image/jpeg")}, data=data)
+
+
+def describe_pose(client, image, description):
+    return create_pose(client, image, template_id=None, description=description)
 
 
 def assert_error(response, status, code):
@@ -68,7 +79,7 @@ def test_pose_is_generated_from_the_scene_and_template(client, image_api, make_i
     assert payload["aspect_ratio"] == "3:4"
     assert payload["resolution"] == "1K"
     assert "quality" not in payload
-    assert TEMPLATES["wave"].description in payload["prompt"]
+    assert TEMPLATES["wave"].pose in payload["prompt"]
     assert "{pose}" not in payload["prompt"]
     [reference] = payload["input_references"]
     assert reference["image_url"]["url"] == "data:image/jpeg;base64," + base64.b64encode(scene).decode()
@@ -80,7 +91,67 @@ def test_every_template_sends_its_own_pose_description(client, image_api, make_i
     prompts = [payload["prompt"] for payload in image_api.payloads]
     assert len(set(prompts)) == len(TEMPLATES)
     for template, prompt in zip(TEMPLATES.values(), prompts):
-        assert template.description in prompt
+        assert template.pose in prompt
+
+
+def test_pose_is_generated_from_a_description(client, image_api, make_image):
+    candidate = make_image(size=(832, 1110))
+    image_api.returns(candidate)
+
+    response = describe_pose(client, make_image(), "벽에 기대서 카메라 보며 살짝 웃기")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"templateId", "image", "elapsedMs"}
+    assert body["templateId"] is None
+    assert base64.b64decode(body["image"]) == candidate
+    [payload] = image_api.payloads
+    assert "벽에 기대서 카메라 보며 살짝 웃기" in payload["prompt"]
+    assert "{pose}" not in payload["prompt"]
+    assert not any(template.pose in payload["prompt"] for template in TEMPLATES.values())
+
+
+def test_description_reaches_the_prompt_on_one_line(client, image_api, make_image):
+    assert describe_pose(client, make_image(), "  벽에 기대서\n한 손은\t\t주머니에 \r\n").status_code == 200
+    [payload] = image_api.payloads
+    assert "벽에 기대서 한 손은 주머니에" in payload["prompt"]
+    assert not any(character in payload["prompt"] for character in "\n\r\t")
+
+
+@pytest.mark.parametrize(
+    "description",
+    ["가" * DESCRIPTION_MAX_LENGTH, " " + "가" * DESCRIPTION_MAX_LENGTH + "\n", "a" * 50 + "  " + "b" * 49],
+)
+def test_description_of_the_longest_length_is_accepted(client, image_api, make_image, description):
+    assert describe_pose(client, make_image(), description).status_code == 200
+    assert " ".join(description.split()) in image_api.payloads[0]["prompt"]
+
+
+@pytest.mark.parametrize("description", ["가" * (DESCRIPTION_MAX_LENGTH + 1), " \n\t "])
+def test_description_too_long_or_blank_is_invalid(client, image_api, make_image, description):
+    message = assert_error(describe_pose(client, make_image(), description), 400, "INVALID_REQUEST")
+    assert message.startswith("description")
+    assert description not in message
+    assert image_api.requests == []
+
+
+def test_template_and_description_together_are_invalid(client, image_api, make_image):
+    response = create_pose(client, make_image(), "wave", description="Looking back over the shoulder")
+    assert "templateId or description" in assert_error(response, 400, "INVALID_REQUEST")
+    assert image_api.requests == []
+
+
+def test_request_without_template_or_description_is_invalid(client, image_api, make_image):
+    for response in (create_pose(client, make_image(), None), describe_pose(client, make_image(), "")):
+        assert "templateId or description" in assert_error(response, 400, "INVALID_REQUEST")
+    assert image_api.requests == []
+
+
+def test_empty_description_next_to_a_template_asks_for_the_template(client, image_api, make_image):
+    response = create_pose(client, make_image(), "wave", description="")
+    assert response.status_code == 200
+    assert response.json()["templateId"] == "wave"
+    assert TEMPLATES["wave"].pose in image_api.payloads[0]["prompt"]
 
 
 def test_model_and_quality_come_from_settings(client, image_api, make_image, settings):
@@ -140,8 +211,10 @@ def test_malformed_request_uses_the_api_error_shape(client, image_api, make_imag
     assert "seed" in assert_error(create_pose(client, make_image(), seed="abc"), 400, "INVALID_REQUEST")
     missing_image = client.post("/api/v1/poses", data={"templateId": "wave", "seed": "1"})
     assert "image" in assert_error(missing_image, 400, "INVALID_REQUEST")
-    missing_fields = client.post("/api/v1/poses", files={"image": ("scene.jpg", make_image(), "image/jpeg")})
-    assert "templateId" in assert_error(missing_fields, 400, "INVALID_REQUEST")
+    missing_seed = client.post(
+        "/api/v1/poses", files={"image": ("scene.jpg", make_image(), "image/jpeg")}, data={"templateId": "wave"}
+    )
+    assert "seed" in assert_error(missing_seed, 400, "INVALID_REQUEST")
     assert image_api.requests == []
 
 
@@ -149,6 +222,18 @@ def test_declined_request_is_rejected(client, image_api, make_image):
     image_api.fails(403, "Input flagged by moderation")
     message = assert_error(create_pose(client, make_image()), 422, "REJECTED")
     assert "moderation" not in message
+    assert "description" not in message
+
+
+def test_declined_description_asks_for_another(client, image_api, make_image):
+    image_api.fails(403, "Input flagged by moderation")
+    message = assert_error(describe_pose(client, make_image(), "Looking back over the shoulder"), 422, "REJECTED")
+    assert message == "Try a different description"
+
+
+def test_failure_with_a_description_still_answers_its_own_error(client, image_api, make_image):
+    image_api.fails(500)
+    assert_error(describe_pose(client, make_image(), "Looking back over the shoulder"), 502, "UPSTREAM_ERROR")
 
 
 @pytest.mark.parametrize("status", [400, 401, 402, 429, 500, 502, 524])
@@ -189,6 +274,8 @@ def test_missing_api_key_is_an_upstream_error(client, image_api, make_image, set
 def test_rate_limit_counts_only_requests_sent_to_the_image_api(client, image_api, make_image, settings, clock):
     assert_error(create_pose(client, make_image("PNG")), 400, "INVALID_IMAGE")
     assert_error(create_pose(client, make_image(), template_id="cartwheel"), 400, "UNKNOWN_TEMPLATE")
+    assert_error(describe_pose(client, make_image(), "가" * 101), 400, "INVALID_REQUEST")
+    assert_error(create_pose(client, make_image(), "wave", description="Waving"), 400, "INVALID_REQUEST")
     for _ in range(settings.pose_rate_limit):
         assert create_pose(client, make_image()).status_code == 200
     assert_error(create_pose(client, make_image()), 429, "RATE_LIMITED")
@@ -337,3 +424,12 @@ def test_upstream_body_is_not_logged(client, image_api, make_image, caplog, stat
     assert "OpenRouter answered" in caplog.text
     assert str(status) in caplog.text
     assert "SECRET" not in caplog.text
+
+
+@pytest.mark.parametrize("status", [403, 502])
+def test_description_is_not_logged(client, image_api, make_image, caplog, status):
+    image_api.fails(status)
+    assert describe_pose(client, make_image(), "SECRET-DESCRIPTION 벽에 기대서").status_code in (422, 502)
+    assert "OpenRouter" in caplog.text
+    assert "SECRET" not in caplog.text
+    assert "벽에" not in caplog.text

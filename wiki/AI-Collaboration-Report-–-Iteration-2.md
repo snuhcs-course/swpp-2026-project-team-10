@@ -2,26 +2,32 @@
 
 **Tools used:** Claude Code (Claude Fable 5.1; Claude Opus 5.5 for the camera and guide tasks and 박동제's code reviews), ChatGPT Codex (TBD), GitHub Copilot code review (TBD)
 
-This page is written as we go: each pull request's *AI usage* section (tools used, what AI did well, what we had to fix, prompts) feeds sections 3–6 below, so the report is not written at the end as in Iteration 1 (Team Meetings 2026-10-09, item 8). Items marked **TBD** are filled in by the owner of the task when its PR is merged.
+**How this report was prepared.** Each PR's *AI usage* section (tools, what AI did well, what we fixed, its input prompts) was written when the PR was opened, so the material was collected as we went (Team Meetings 2026-10-09, item 8). For the iteration-level findings, every member's Claude Code and Codex sessions for 10/11–10/25 are reviewed with the course's AI Agent Session Exporter after a check for personal or sensitive information; the sessions are source material only and are not attached. **TBD at the close:** who reviewed which sessions (member, tool, count, dates). The per-PR evidence is folded under *Evidence by PR* so the findings read as one page.
 
 ## 1. Where AI Was Used
 
-- **Documents:** the AI rules in `CLAUDE.md` and the PR template ([#62]), the Iteration 2 requirements (R&S v1.0, [#66]) and design (Design v1.0, [#67]), the issue renumbering to `Iter1-Pn` / `Iter2-Pn`, the Testing Documentation format (v1.0, [#70]), the Testing Documentation rule in `CLAUDE.md` and the CLAUDE.md history ([#76]): Claude Code.
-- **Server:** deployment on the course servers with Docker and nginx ([#71]), sessions and room codes in Redis ([#75]), accounts and friends (TBD), invitations (TBD), pose descriptions (TBD): TBD.
-- **Android:** smooth guide outlines ([#72]: Claude Code wrote the mask smoothing, the contour tracing, 19 tests, and the documents; the lines for arms and legs it prototyped were dropped), pinch zoom with the guide-edit mode ([#74]: Claude Code wrote `PinchZoomController`, the overlay's edit-mode rule, both screens' changes, 17 tests, and the documents), the kept room code on *Join with code* ([#81]: Claude Code wrote the issue text, the `SessionViewModel` rule, the Join screen's navigation argument, 7 tests, and the documents), zoom stutter (TBD), camera controls ([#80]: Claude Code wrote the camera contract additions, the controller's focus, exposure, flash, and aspect ratio, the Camera screen's controls, the subject's side of the ratio, 45 tests, and the documents), Subject view's video fit ([#89]: Claude Code found the cause on two phones, fixed the layout, and wrote 3 tests and the documents), guide controls ([#83]: Claude Code wrote the outline-only guide on both screens, *Hide* / *Show* and the replace prompt, the anchor and the starting position, the reference thumbnail with its corner drag, 29 tests, and the documents), saved guides (TBD), sign-in and friends screens (TBD), remote brightness, flash, and guide moves ([#85]: Claude Code wrote the five request messages, the handler's brightness, flash, and guide-move paths, Subject view's controls, `StepSender` and `ExposureScale`, 34 tests, the fake phones' new options, and the documents): TBD for the rest.
-- **Code review:** Claude Code (Claude Opus 5.5, effort xhigh) wrote 박동제's reviews of [#74] (4 comments), [#75] (1), and [#78] (2, both fixed; then 1 in a second round) ([[log|Iteration-2-–-Prompt-Log-–-Code-Reviews]]). The Codex reviewer on [#72] (2 findings: 1 fixed, 1 answered with clearer documents) [#80] (4, all fixed, one in a different way than suggested), and [#83] (2: 1 fixed, 1 kept by 박동제's decision, with the reason in the reply). TBD for the rest (which PRs the Codex reviewer and Copilot checked, how many findings, and how they were judged).
-- **CLAUDE.md:** `/CLAUDE.md`, `/android/CLAUDE.md`, and `/server/CLAUDE.md` are updated by the feature PRs with the code; the Iteration 2 rules add the AI-generated marker rule and the Testing Documentation rule ([[history|Iteration-2-–-CLAUDE-md-History]]).
-- **AI-generated code markers:** every AI-written source file starts with the marker, added or updated in the same PR as the code ([all markers](https://github.com/search?q=repo%3Asnuhcs-course%2Fswpp-2026-project-team-10+%22AI-generated+with%22&type=code)).
-- **Not used:** TBD (for example tests on real phones, product decisions, the kickoff decisions themselves; AI wrote the text and the code against them).
+- **Documents:** the AI rules ([#62]), the Iteration 2 R&S and design ([#66], [#67]), the issue renumbering, the Testing Documentation ([#70]), and the CLAUDE.md rules and history ([#76]): Claude Code.
+- **Server:** deployment on the course servers with Docker and nginx ([#71]), sessions and room codes in Redis ([#75]), accounts and friends ([#78]), pose descriptions and suggested poses ([#90]), invitations (TBD): TBD which tool wrote which part.
+- **Android:** smooth outlines ([#72]), pinch zoom and the guide-edit mode ([#74]), the Join code fix ([#81]), camera controls ([#80]), guide controls and the thumbnail ([#83]), remote brightness, flash, and guide moves ([#85]), Subject view's video fit ([#89]): Claude Code wrote the code, the tests (154 in all), and the documents; humans reviewed on phones and decided. Zoom stutter, saved guides, sign-in and friends screens: TBD.
+- **Code review:** Claude Code wrote 박동제's reviews of [#74], [#75], and [#78] ([[log|Iteration-2-–-Prompt-Log-–-Code-Reviews]]); the Codex reviewer commented on seven feature PRs, and the author judged each finding before fixing or declining it (section 4).
+- **CLAUDE.md:** updated by the feature PRs with the code; Iteration 2 adds the marker, Testing Documentation, and no-force-push rules ([[history|Iteration-2-–-CLAUDE-md-History]]).
+- **Markers in the code:** every AI-written source file starts with `AI-generated with <tool>, <date>, reviewed by <name>` ([all markers](https://github.com/search?q=repo%3Asnuhcs-course%2Fswpp-2026-project-team-10+%22AI-generated+with%22&type=code)), more than guidelines v1.1 require. The `manually fixed by <name>, <date>` note it asks for next to hand-edited code has not been needed: no merged PR edited code by hand (TBD if that changes).
+- **Not used:** the kickoff and product decisions (what the guide shows, where controls sit, what is Could), tests on real phones, and the final review verdicts; AI wrote text and code against them. TBD for the remaining tasks.
 
 ## 2. Prompt History
 
-Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server and deployment|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[Pose Generation|Iteration-2-–-Prompt-Log-–-Pose-Generation]] · [[Android camera and guide|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · Accounts, friends, and invitations (TBD) · [[Real-time and remote control|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Code reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]]
+Full input prompt logs, one page per task, with the prompts as they were sent and none of the agents' responses: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server and deployment|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[Pose Generation|Iteration-2-–-Prompt-Log-–-Pose-Generation]] · [[Android camera and guide|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · Accounts, friends, and invitations (TBD) · [[Real-time and remote control|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Code reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]]
 
 ## 3. What AI Did Well
 
-- **Time:** TBD (planned hours of the Iteration 2 tasks against the human and agent time from the team schedule).
-- **Documents before code ([#66], [#67]):** the R&S and the design for Iteration 2 were written from the kickoff notes and the issues before feature work, with every undecided detail listed under *Still open* with an owner, so the owners could build against the interfaces from 10/13.
+- **Fast from plan to device:** 15 minutes to 1.5 hours of agent time per feature PR against 1–4 planned hours ([#74], [#81], [#80], [#83], [#85]), with first test runs mostly passing. TBD: the iteration's hours from the team schedule.
+- **It checked before it wrote:** listing the overlaps with other tasks before coding ([#80], [#83]), prototyping the smoothing in Python before Kotlin ([#72]), and reusing what the previous PR had laid down instead of re-doing it ([#85]).
+- **It found what tests could not:** running the server on a laptop and two phones found the cropped subject video that unit tests cannot see ([#89]); emulator screenshots showed `PreviewView` drawing outside the crop ([#80]) and the hidden-guide states ([#83]).
+- **Documents before code ([#66], [#67]):** the R&S and the design were written before feature work, with every undecided detail under *Still open* with an owner, so the owners built against the interfaces from 10/13.
+
+<details>
+<summary>Evidence by PR</summary>
+
 - **Pinch zoom with the guide-edit mode ([#74]):** from the approved plan to a device-testable APK in about 30 minutes of agent time (planned 2.5 h; about 0.5 h of mine for the plan review, the two-phone check, and the PR). `PinchZoomController` and its six Robolectric tests, which drive the real `ScaleGestureDetector` with two-finger `MotionEvent`s, passed on the first run, as did the view-level test that one pinch zooms or edits the guide by the mode alone. The four review comments on the PR were triaged and fixed in one pass (two view-model rules with tests, a checkable toggle, the subject's toggle hidden until #57).
 - **Join with code's kept code ([#81]):** from a one-line bug report to the issue text in the team's format, then from the issue to the fix in about 15 minutes of agent time (planned 1 h; about 0.2 h of mine for the title scheme and the review). The agent found both halves of the cause, the code never cleared in `SessionViewModel` and the Join screen filling it however it was opened, kept the two cases the requirements need (FR-8.3, FR-6.11), and its seven state-based tests in `SessionViewModelTest` passed on the first run.
 - **Smooth guide outlines ([#72]):** before writing Kotlin, the agent prototyped the smoothing in Python on a mask from our Iteration 1 demo video and checked that the subject's copy, sent as WebP, draws the same line. On the emulator with the real ML Kit models a photo becomes a guide in 0.25–0.35 s. For the arms and legs it ran three approaches on four Wikimedia test photos and showed them side by side, which made the decision to drop them take one look.
@@ -29,9 +35,19 @@ Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-
 - **Guide controls ([#83]):** before writing code, the agent listed what P11 changes in the shared contracts and which parts belong to other owners, so the mask-only transfer was left to 조성민 and nothing in the sync code changed. Each of the four UI steps came with emulator screenshots of the real app, which is where 박동제 changed two of them (no *Replace* button, no close button on the thumbnail). The starting position was checked with two references, one taller and one wider than the frame, in all three ratios. From the plan to the PR in about 1.5 hours of one session (planned 3 h).
 - **Remote brightness, flash, and guide moves ([#85]):** from the plan to a build that passed every item of the two-phone check in about 1.5 hours of agent time (planned 4 h; about 1 h of mine for the plan, the two-phone check, and four review rounds). The plan started from what [#80] had already laid down (`camera.state` with exposure, flash, and aspect; `setExposure` and `setFlash`) instead of re-doing it, reused the zoom path's step-then-final and echo-held rules for the two new controls through one small class, and sent guide moves through the existing repository so the photographer's limits held without new clamping code. Each of the four Codex findings was assessed first and then fixed with a test in about ten minutes.
 - **Subject view's video ([#89]):** with the course servers closed off campus, the agent ran the server on the laptop and joined the emulator and the S22 over the same Wi-Fi, which found a bug that #80's unit tests could not: the subject's video was cropped while the grid and the guide fit the frame. It measured the offset in each ratio, traced it to WebRTC's renderer cropping a `match_parent` view, tried the fix on the S22 before committing, and wrote a test that fails on the old layout.
-- TBD (one bullet per feature PR, taken from its *AI usage* section: what the agent got right first time, with a number where there is one).
+- TBD (one bullet per remaining feature PR, from its *AI usage* section).
+
+</details>
 
 ## 4. Hallucinations / Errors
+
+- **Platform behaviour asserted, not checked:** `PreviewView` assumed to clip to the viewport ([#80]); the subject's renderer said to "already fit the stream" when at `match_parent` it crops every frame, which put the guide 26–41 % off in 16:9 and 1:1 ([#80], found in [#89]). Both were caught on a device, not by the 45 unit tests; the second cost a separate fix PR.
+- **Asynchronous and cross-device states missed:** the camera READY before the exposure was restored, a flash reported on an ultrawide without one ([#80]); four edge cases in the remote controls, including the protocol version left at 1 ([#85]); the subject's edit mode surviving a hidden guide ([#74]). All caught by the Codex reviewer, none by the agent's own review or its new tests; each fixed with a test in about ten minutes.
+- **Stale context after a merge:** a revision number from the scheme that [#68] had replaced ([#74]); a review screenshot from an older build ([#83]); a PR number written before it was looked up ([#85]). Caught in human review.
+- **Decisions it should have left open:** the first design plan chose a guide style and put the subject's pinch zoom under Could ([#67]); a *Replace* button that duplicated *Guide* ([#83]); a fix for a bug that recordings showed was not there ([#83]).
+
+<details>
+<summary>Evidence by PR</summary>
 
 - **Open items decided by the agent ([#67]):** the first design plan left the guide style open and put the subject's pinch zoom under Could; the team decided both (outline only, the toggle on both phones) and the text was corrected.
 - **The subject's edit mode survived a hidden guide ([#74]):** the Camera screen cleared the mode when the guide was hidden, but the agent's Subject view did not, which would have left the video unresponsive to pinches. Caught by the Codex reviewer, not by the 17 new tests; fixed in ten minutes with a test.
@@ -51,26 +67,36 @@ Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-
 - **A control that duplicated another ([#83]):** the agent built *Replace* as its own button, as the screen list in R&S 6.2 had it, although *Guide* already opens the same sheet; 박동제 asked how the two differ, and the button became the sheet's replace prompt.
 - **Four edge cases in the remote controls ([#85]):** a final brightness request that CameraX failed to apply got no echo, because the controller republishes an unchanged value that the StateFlow drops, so the subject kept its optimistic value; the protocol version stayed at 1 although Design 2.5.1 had planned 2 for the new requests, so a mixed build would show controls that do nothing; the "already at that value" shortcut confirmed a final brightness or flash value while an earlier request was still in flight, which could then move the camera away from it; and `guide.move` did not name its guide, so a move from before a replacement would have landed on the new guide. All four caught by the Codex reviewer, none by the 34 new tests; each fixed with a test in about ten minutes.
 - **A wrong PR number in a commit message ([#85]):** the agent wrote "the Codex review of #83" before looking the number up; corrected to #85 with an amended commit and a force push of its own branch.
-- TBD (one bullet per PR where the agent was wrong, what caught it, and what it cost).
+- TBD (one bullet per remaining PR: what the agent asserted, why it was wrong, what caught it, and what it cost).
+
+</details>
 
 ## 5. Prompt Revisions
 
-- **Guide style**
+- **Name what is about to change ([#74])**
+  - Before: "Implement the toggle as an icon button." The agent put it in the guide's Cutout / Outline row.
+  - After: "That row will go away later anyway. Put the toggle on the camera screen itself." It moved beside the zoom readout, where it stayed.
+  - Why: naming what another issue (Iter2-P11) is about to change made the agent choose a place that lasts.
+- **Give experiments an exit condition ([#72])**
+  - Before: "Do the smooth outline first, then the arms and legs." Three tries traced the wrong lines.
+  - After: "An outline good enough to refer to while shooting. Show me screenshots. If lines alone cannot read as arms, I will not implement this part."
+  - Why: an acceptance criterion and an exit condition turned an open-ended attempt into a decision.
+- **Ask before "fix it" ([#85])**
+  - Before: paste the review comment and "fix it".
+  - After: paste it and "does this need a fix?", then "fix it, commit, and push" once the answer holds up.
+  - Why: the agent checked each code path first and said what the fix would be; all four findings were real, and no wrong fix went in.
+
+<details>
+<summary>More revisions by PR</summary>
+
+- **Guide style ([#67])**
   - Before: "Write the design document from the decided items." The agent proposed its own guide style.
   - After: "The guide shows only the outline, never the reference's background; the exact style is decided in P23. If-possible items are Could."
   - Why: it fixed the decision and the priority rule before the text was written.
-- **Where the toggle goes ([#74])**
-  - Before: "I agree that the shutter turns the mode off; implement the toggle as an icon button." The agent put it in the guide's Cutout / Outline row.
-  - After: "That row will go away later anyway. Put the toggle on the camera screen itself, at the top or the bottom." It moved beside the zoom readout under the preview, the same place as on Subject view.
-  - Why: naming what another issue (Iter2-P11) is about to change made the agent choose a place that stays.
 - **An unscheduled issue's title ([#81])**
   - Before: "Write the issue like #47." The agent titled it `[Bug] …`, because the issues it had seen only showed `Iter2-Pn` for scheduled tasks.
   - After: "The title should be like `[Iter2-A2] Move live preview room sessions to Redis`." It found the `Iter2-An` series for items added outside the schedule and numbered the issue `Iter2-A3`.
   - Why: pointing at one example of the convention was enough; the rule itself is written nowhere.
-- **Lines for arms and legs ([#72])**
-  - Before: "Do the smooth outline first, then the arms and legs." The first lines also traced the upper arms along the silhouette and drew lines on loose shorts.
-  - After: "They do not need to be detected perfectly: an outline good enough to refer to while shooting. Show me screenshots." Then: "If lines alone cannot read as arms, I will not implement this part."
-  - Why: an acceptance criterion and an exit condition turned an open-ended attempt into a decision after three tries.
 - **Conflicts before code ([#80])**
   - Before ([#72]): "Start the issue."
   - After: "First list exactly what P10 has to build, and before implementing, review what could conflict with other work."
@@ -87,42 +113,39 @@ Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-
   - Before: the screen list in R&S 6.2, which named a *Replace* button.
   - After: "How is it different from the Guide button below?", then "Remove the Replace button; with a guide on the camera, Guide asks whether to replace the pose."
   - Why: asking for the difference showed that the planned button repeated *Guide*.
-- **Review findings as a question first ([#85])**
-  - Before: paste the review comment and "fix it".
-  - After: paste the review comment and "does this need a fix?", then "fix it, commit, and push" once the answer holds up.
-  - Why: the agent checked the code path each finding named (the controller's republish, the `hello` version check, CameraX's cancel order) and said what the fix would be and how big, before any code changed; all four turned out to be real, and the fixes were the ones proposed.
 - **A scope question with a yes-or-no answer ([#85])**
   - Before: "the subject's view doesn't follow the photographer's ratio change, why?"
   - After: "...is this in this issue's scope? Just tell me whether it is or not."
   - Why: the answer named the owning task ([#80]) in two sentences, and the finding became a separate bug issue (Iter2-A4) instead of growing this PR.
 - TBD
 
+</details>
+
 ## 6. Manual Fixes and Why
 
-- **Version and numbering (10/13):** the agent wrote "versions continue as 1.10, 1.11", which read as a jump from 1.0; corrected to 1.0, 1.1, 1.2, …, 1.10. The R&S edits were first applied on `dev` while [#66] already held the file; redone on that branch.
-- **Our decisions:** the guide-edit mode toggle on both phones, the zoom slider out of the main layouts, only the smoothed mask sent to the subject, the Could list for Iteration 2.
-- **Guide-edit mode ([#74]):** no code was edited by hand. Decisions made in review rather than by the agent: the mode turns off on the shutter; the toggle is an icon beside the zoom readout; the subject's toggle stays hidden until guide moves exist (#57), from 박동제's review; a hidden guide cannot be edited on either phone.
-- **Smooth outlines ([#72]):** no code was edited by hand. Decisions by 박동제: keep the 3 dp white line with no fill; the lines for arms and legs in front of the body are out of scope rather than moved to a later iteration; the test photos are credited in the PR and not added to the repository.
-- **Camera controls ([#80]):** no code was edited by hand. Decisions by 박동제 and the team: the controls' places (flash and ratio in the top bar, brightness behind a button, no detail panel); the ratio may change during a session; the subject's side of the ratio is built in P10 and the remote requests are left to Iter2-P17; the daily standup rows the agent drafted were edited by hand before they were saved.
-- **Guide controls ([#83]):** no code was edited by hand. Decisions by 박동제: the mask-only transfer is 조성민's; the four open points as the agent proposed (a new guide keeps the height and center of the person's box, *Reference confirm* on a neutral single color, a replacement starts at its own reference's place, the thumbnail in the top-left corner); no *Replace* button, *Guide* asks to replace instead; a tap, not a close button, makes the thumbnail small again, and a drag moves it only between the four corners; the size limits stay fixed for every start (FR-3.3 revised).
-- **Join with code ([#81]):** no code edited by hand. That the code is offered only from *Session not found*, and selected so that typing replaces it, was the agent's proposal in the issue text, accepted when the issue was posted.
-- **Remote controls ([#85]):** no code edited by hand. Decisions taken at the plan: the brightness panel copied into Subject view's layout instead of a shared include, so the Camera layout stays 박동제's; `by` on `guide.state` through the syncer's attribution instead of a repository change; the Could items (remote focus, the permission switch) left as protocol messages only, with a Design TODO.
+- **No code was edited by hand** in the merged feature PRs ([#72], [#74], [#80], [#81], [#83], [#85]): when the agent was wrong, we told it what was wrong and it fixed it with a test. What humans did instead was decide: the guide-edit mode toggle on both phones and its defaults, the zoom slider out of the main layouts, only the smoothed mask sent to the subject, the Could list, the controls' places, no *Replace* button, the thumbnail's corners, and the scope boundaries between owners ([#80], [#83], [#85]). TBD if a later PR edits code by hand; it then gets a `manually fixed by` note at the spot.
+- **Documents edited by hand (10/13):** the agent's version-sequence sentence ("continue as 1.10, 1.11") and the R&S edits it first applied on `dev` while [#66] held the file; both redone. The daily standup rows the agent drafted were edited before they were saved ([#80]).
+
+<details>
+<summary>Decisions by PR</summary>
+
+- **Guide-edit mode ([#74]):** decisions made in review rather than by the agent: the mode turns off on the shutter; the toggle is an icon beside the zoom readout; the subject's toggle stays hidden until guide moves exist (#57), from 박동제's review; a hidden guide cannot be edited on either phone.
+- **Smooth outlines ([#72]):** decisions by 박동제: keep the 3 dp white line with no fill; the lines for arms and legs in front of the body are out of scope rather than moved to a later iteration; the test photos are credited in the PR and not added to the repository.
+- **Camera controls ([#80]):** decisions by 박동제 and the team: the controls' places (flash and ratio in the top bar, brightness behind a button, no detail panel); the ratio may change during a session; the subject's side of the ratio is built in P10 and the remote requests are left to Iter2-P17.
+- **Guide controls ([#83]):** decisions by 박동제: the mask-only transfer is 조성민's; the four open points as the agent proposed (a new guide keeps the height and center of the person's box, *Reference confirm* on a neutral single color, a replacement starts at its own reference's place, the thumbnail in the top-left corner); no *Replace* button, *Guide* asks to replace instead; a tap, not a close button, makes the thumbnail small again, and a drag moves it only between the four corners; the size limits stay fixed for every start (FR-3.3 revised).
+- **Join with code ([#81]):** that the code is offered only from *Session not found*, and selected so that typing replaces it, was the agent's proposal in the issue text, accepted when the issue was posted.
+- **Remote controls ([#85]):** decisions taken at the plan: the brightness panel copied into Subject view's layout instead of a shared include, so the Camera layout stays 박동제's; `by` on `guide.state` through the syncer's attribution instead of a repository change; the Could items (remote focus, the permission switch) left as protocol messages only, with a Design TODO.
 - TBD
+
+</details>
 
 ## 7. Takeaway for Iteration 3
 
-- Before placing a control, tell the agent which neighbouring parts other issues are about to change ([#74]).
-- After merging `dev`, have the agent re-read the document's current numbering and decisions instead of reusing what it read before ([#74]).
-- Write the task-ID scheme for unscheduled items (`Iter2-An`) into the docs, so the agent does not have to be told per issue ([#81]).
-- Give experimental work an acceptance criterion and an exit condition up front ([#72]).
-- Ask the agent for the overlaps with other tasks before it writes code, and hold the parts another owner has to agree on ([#80]).
-- Check camera code on an emulator with screenshots at each step: CameraX behaviour such as `PreviewView` drawing outside the crop is invisible to JVM tests ([#80]).
-- Have the Codex reviewer read camera and session code before merging: it found asynchronous states the agent's own review missed ([#80]).
-- Review UI on screenshots of the current build, and ask what each planned control adds over the existing ones ([#83]).
-- Have the agent reproduce a bug found by reading code, on a device or in a test, before it commits a fix ([#83]).
-- Paste a review finding as a question before "fix it": the agent's assessment costs a minute and keeps a wrong fix out ([#85]).
-- When the protocol grows, point the agent at the Design's version rule; a PR that only adds fields with defaults leaves the version behind, and the next one has to catch up ([#85]).
-- Run the two-phone check before merging anything the subject sees; unit tests of the messages and the state did not show that the video and its overlays disagreed ([#80], [#89]).
+- Check camera and video code on a device or emulator with screenshots at each step, and run the two-phone check before merging anything the subject sees; JVM tests did not show `PreviewView` drawing outside the crop or the cropped subject video ([#80], [#89]).
+- Keep the Codex reviewer on camera and session code: it found the asynchronous and cross-device states that the agent's own review and tests missed ([#74], [#80], [#85]).
+- Before coding, ask the agent for the overlaps with other tasks and for what nearby parts other issues will change; hold what another owner must agree on ([#74], [#80], [#83]).
+- Paste a review finding as a question before "fix it", and give experiments an acceptance criterion and an exit condition ([#85], [#72]).
+- After merging `dev`, have the agent re-read the documents' current numbering and decisions ([#74]); write conventions such as `Iter2-An` and the protocol version rule into the documents so they need not be told per issue ([#81], [#85]).
 - TBD
 
 [#62]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/62
@@ -141,3 +164,4 @@ Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-
 [#83]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/83
 [#85]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/85
 [#89]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/89
+[#90]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/90

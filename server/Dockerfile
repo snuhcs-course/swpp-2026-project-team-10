@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 # Image of the Pix server (Design 2.8, Hosting). Build from server/:
 #   docker build --target test .                     runs pytest; the build fails if a test fails
 #   docker build --target runtime -t pix-server .    the image that deploy.sh starts
@@ -48,6 +48,7 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --start-interval=1s -
 # Two workers share rooms through the Redis session store (Design AD-18). The count is explicit, because the
 # course servers report 38 CPUs for the 8 cores we get.
 # --forwarded-allow-ips "*" is safe only because port 8000 is not published: nginx is the one client, and it
-# replaces X-Forwarded-For with the phone's address. 35 s lets a pose request in flight finish on shutdown.
+# replaces X-Forwarded-For with the phone's address. 65 s lets a pose request in flight, which may take 60 s, finish on
+# shutdown.
 CMD ["uvicorn", "pix_server.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", \
-     "--ws-max-size", "65536", "--proxy-headers", "--forwarded-allow-ips", "*", "--timeout-graceful-shutdown", "35"]
+     "--ws-max-size", "65536", "--proxy-headers", "--forwarded-allow-ips", "*", "--timeout-graceful-shutdown", "65"]

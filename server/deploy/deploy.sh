@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-16, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 # Deploys the Pix server on a course server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
 #
 #   deploy.sh auto           deploy the configured branch if it has a new commit; the systemd timer runs this
@@ -242,7 +242,7 @@ activate() {
     fi
     ACTIVE=$new
     if [ -n "$was_active" ]; then
-        log "now serving from app-$new; stopping app-$old (requests in flight get up to 40 s)"
+        log "now serving from app-$new; stopping app-$old (requests in flight get up to 70 s)"
         compose stop "app-$old" >> "$BUILD_LOG" 2>&1 || true
     else
         log "now serving from app-$new"

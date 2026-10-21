@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generate poses (R&S 6.3, FR-4.8): what to pose, asked before anything is sent. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp">
+
+            <!-- Cancel (R&S 6.3): back to the camera, discarding the scene photo. -->
+            <ImageButton
+                android:id="@+id/cancelButton"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/cancel" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:accessibilityHeading="true"
+                    android:text="@string/describe_title"
+                    android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/describe_body"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- The scene photo the poses are made from. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_info_card"
+            android:gravity="center_vertical"
+            android:padding="10dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/sceneImage"
+                android:layout_width="56dp"
+                android:layout_height="72dp"
+                android:background="@color/pix_surface_2"
+                android:contentDescription="@string/scene_photo_description"
+                android:scaleType="centerCrop"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/your_photo"
+                    android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+                    android:textColor="@color/pix_text" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/generating_scene_caption"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/descriptionLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/describe_label"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <!-- Korean or English; input stops at 100 characters (FR-4.8). It wraps, and Done closes the keyboard. The hint
+             is its accessibility label, so the label above does not point at it (lint LabelFor). -->
+        <EditText
+            android:id="@+id/descriptionInput"
+            style="@style/Widget.Pix.TextField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="@string/describe_hint"
+            android:imeOptions="actionDone"
+            android:importantForAutofill="no"
+            android:inputType="textCapSentences"
+            android:maxLength="100" />
+
+        <!-- The counter stays at the end, under the field's right edge, with or without the message. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="end">
+
+            <!-- Shown after the service refused every pose of the description, for the photo or the text; the text is kept (US-5). -->
+            <TextView
+                android:id="@+id/descriptionError"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:accessibilityLiveRegion="polite"
+                android:text="@string/description_refused"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                android:textColor="@color/pix_danger_text"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/descriptionCounter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:textAppearance="@style/TextAppearance.Pix.Caption"
+                tools:text="0/100" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/ideas_label"
+            android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+        <!-- The idea chips (R.array.pose_ideas); a tap fills the field, which can then be edited. -->
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/ideaChips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:chipSpacingHorizontal="8dp"
+            app:chipSpacingVertical="0dp" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="24dp" />
+
+        <!-- With an empty field this asks for suggested poses, as Skip does (US-5). -->
+        <Button
+            android:id="@+id/generateButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/generate_four_poses"
+            app:icon="@drawable/ic_sparkle"
+            app:iconSize="18dp" />
+
+        <Button
+            android:id="@+id/suggestButton"
+            style="@style/Widget.Pix.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/skip_suggest_poses" />
+    </LinearLayout>
+</ScrollView>

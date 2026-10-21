@@ -16,7 +16,7 @@ This page is written as we go: each pull request's *AI usage* section (tools use
 
 ## 2. Prompt History
 
-Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server and deployment|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[Android camera and guide|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · Accounts, friends, and invitations (TBD) · [[Real-time and remote control|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Code reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]]
+Full prompt logs, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server and deployment|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[Pose Generation|Iteration-2-–-Prompt-Log-–-Pose-Generation]] · [[Android camera and guide|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · Accounts, friends, and invitations (TBD) · [[Real-time and remote control|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Code reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]]
 
 ## 3. What AI Did Well
 

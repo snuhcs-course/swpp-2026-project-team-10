@@ -20,6 +20,7 @@
 | 1.7 | 2026-10-16 | Guide controls as built (Iter2-P11, #52). The guide is an outline only on both phones and on *Reference confirm*, which shows it on a dark neutral card, and `GuideStyle` is gone from the code too (Decided, 2.3, 2.6.2). *Hide* / *Show* sets `visible` with a final change, ends guide-edit mode, and shows the hint "Guide hidden"; there is no *Replace* button: with a guide on the camera, *Guide* opens *Add a pose guide* as "Replace the pose guide?" (2.6.2). A new guide starts from its `anchor`, the box of the person and its 2 % margin in the reference: the box's height fraction and center are kept in any frame ratio, then clamped; the height limits stay 0.21–2.1 of the frame height for every start, and the outline is about 3 dp wide only at the default height (2.3, 2.6.1, 2.6.2). The subject takes the start from `guide.state`, so `anchor` leaves `guide.image.begin` (2.5.1, 2.9). The reference thumbnail sits in a corner of the preview: a tap enlarges it to half the preview's width and another makes it small, and a drag drops it into the nearest corner, above the guide's controls (2.6.2). The *Starting position mapping* and *Reference confirm background* rows of Still open are closed, and the mask-only transfer is 조성민's, in Guide sync (2.9). |
 | 1.8 | 2026-10-16 | Remote brightness, flash, and guide moves as built (Iter2-P17, #57): the subject's requests of 2.5.1 as messages (`guide.move`, `camera.exposure.set`, `camera.flash.set`; `camera.focus.set` and `control.permission` defined but not yet handled), `guide.state` with `by`, the subject's own guide clamped for the photographer's frame with echoes held until the gesture ends, unchanged echoes for a camera without a range or a flash, and the notices (2.6.5, 2.9); the protocol version is 2 from this change (2.5.1). |
 | 1.9 | 2026-10-18 | Subject view's video fitted to the frame (Iter2-A4, #86). The subject's `SurfaceViewRenderer` wraps its content and is centered, so it measures itself to the video's shape and covers the rectangle the grid and the guide fit. At `match_parent` the renderer cropped every frame to the view's shape despite aspect-fit scaling, so the guide lay on another part of the scene than on the photographer's phone: about 6 % off at 4:3, 26 % at 16:9, and 41 % at 1:1. A pinch anywhere in the video area, the margins around the video included, zooms (2.6.4). *Still open* gains whether Subject view also shows the reference thumbnail. |
+| 1.10 | 2026-10-21 | Pose descriptions and suggested poses (Iter2-P12, #53). Every candidate is generated with one prompt, whose pose is the user's description or, without one, one of four poses that a vision model suggests for the scene through the new `POST /pose-suggestions`; the template prompt is gone, and the four predefined poses stay as the default poses when the suggestion model fails and for apps from before Iteration 2, which still call `GET /pose-templates` (2.5.3, 2.6.3). The prompt lets the model frame the person closer or from a slightly different height, never wider than the scene photo (2.6.3). The suggestion model, Gemini 3.1 Flash Lite, was chosen from ten on 2026-10-21 with `compare_suggestion_models.py` (2.6.3). `POST /poses` takes a `description` of 1–100 characters after trimming, answers it with `"templateId": null`, and answers `422 REJECTED` when the service refuses it, with the same message as for a template, because the service does not say whether it refused the photo or the text; the app names its four requests `pose-1` … `pose-4`, and the `candidateId` the server was to echo is dropped (2.3, 2.5.3). The app: *Generate poses* between *Use this photo* and Generating poses, with idea chips from string resources (`GET /pose-ideas` and `PoseGenerator.ideas()` are dropped), `PoseGenerator.generate(scene, request, seed)` reporting the poses before the candidates, and, when the service rejected every pose of a description, *Couldn't create poses* asking for a different description or another photo, with *Edit description*, which goes back to *Generate poses* with the text kept, as *Try other poses* on *Pick a pose* now does too (2.1–2.3, 2.6.3). With a description, the same vision model writes three variations of it for the scene (`POST /pose-suggestions` with a `description`), so the four candidates differ instead of repeating one pose; the description's own request goes out at once (2.1, 2.5.3, 2.6.3). The prompts and the default poses are data in `server/src/pix_server/poses/prompts.toml`, which the server checks when it starts and both comparison scripts read (2.6.3). Suggestion requests have rate limits of their own (2.8). A run, and each call to the image API, may now take 60 s instead of 30 s (2.6.3, 2.8). 2.6.3 keeps the decisions and their reasons, without the test logs. The pose ideas leave *Still open*. |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.5). Testing plans will be in the Testing Documentation.
 
@@ -45,13 +46,14 @@ Audience: the development team. This page describes the design of Iterations 1 a
 
 **Decided (2026-10-16, guide controls, Iter2-P11):** a new guide keeps the height fraction and the center of its `anchor`, the box of the person and its 2 % margin in the reference, whatever the reference's ratio, and is then clamped by the 20 % rule (2.6.2) · the size limits stay 0.21–2.1 of the frame height for every start, so both phones clamp alike without knowing the start (FR-3.3, 2.6.2) · *Reference confirm* shows the outline on a dark neutral card (FR-2.3) · there is no *Replace* button: *Guide* asks to replace a guide on the camera, and the new guide starts at its own reference's place (2.6.2) · the reference thumbnail starts in the preview's top-left corner; a tap enlarges it to half the preview's width and another tap makes it small; a drag drops it into the nearest of the four corners and nowhere else (2.6.2) · the subject places the guide from the `guide.state` that follows every image, so `anchor` is not sent (2.5.1) · the mask-only transfer is built by 조성민 in Guide sync (2.9).
 
+**Decided (2026-10-20 and 2026-10-21, pose descriptions and suggested poses, Iter2-P12):** the idea chips are string resources in the app, so they are translated with it and cost no request, and `GET /pose-ideas` is dropped (2.6.3) · a response to a description has `"templateId": null`, and the app names its four requests itself instead of sending a `candidateId` for the server to echo (2.5.3) · one prompt for every candidate, with a description or without: without one, a vision model first suggests four poses for the scene, and the predefined poses are the default when it fails (2.6.3; decided 2026-10-21, replacing the template prompt and the separate description prompt of 2026-10-20) · the prompt may frame the person closer or from a slightly different height, but never wider than the scene photo, so a candidate can be tighter than the live view (2.6.3) · the suggestion model is a server setting, like the image model; the default is Gemini 3.1 Flash Lite (2.6.3) · with a description, one candidate follows it as written and three follow variations that the suggestion model writes for the scene, because four requests with one text gave nearly the same image (2.6.3; decided 2026-10-21) · the prompts and the default poses are data in `server/src/pix_server/poses/prompts.toml`, not code (2.6.3) · a run, and each call to the image API, may take 60 s instead of 30 s, because on a slow day single requests took up to 46 s and a late candidate is better than none (2.6.3, 2.8).
+
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | Zoom stutter cause | Lens rebinding, the rate of `setZoomRatio` calls, or the stream during zoom; measured first on the Galaxy S21 (2.6.5) | 조성민 (Iter2-P5) | 10/15 |
 | Invite link format | A verified Android App Link needs HTTPS, which the course servers do not have (AD-11). Proposal: `http://<host>/i/<invitationId>` opens a small page from nginx that hands over to Pix through a custom scheme (`pix://i/<invitationId>`) and otherwise says to install Pix (2.6.6) | 박재완 with 조성민 (Iter2-P15) | 10/20 |
-| Pose ideas | The chip texts and whether they come from `GET /pose-ideas` or ship in the app (2.6.3); the preset images still to collect | 박재완 (Iter2-P12) | 10/18 |
 | Sign-in screens | One *Sign in* screen from *Shoot together* with Pix ID and password, *Sign up*, and *Continue with Google*; after Google's `NOT_REGISTERED`, the step "Do you already have a Pix account?" (log in, then `PUT /me/google`; or `POST /auth/google/signup`); then *Pix ID setup* for a new Google account (2.5.3; R&S 6.8, FR-5.2, FR-5.13). Wireframes still to be drawn | 박재완 (Iter2-P13) | 10/17 |
 | Account actions | No settings screen until Iterations 3–4 (R&S 6.8), but Iteration 2 needs a place to change the display name, *Add Google* or *Add a password* (FR-5.12, FR-5.14), and *Sign out*. Proposal: tapping one's own name and Pix ID on *Friends* opens an account sheet with them, while a plain tap on the Pix ID still copies it (FR-5.4) | 박재완 (Iter2-P13) | 10/17 |
 | Google sign-in setup | A Google Cloud project with a web OAuth client, whose ID is `PIX_GOOGLE_CLIENT_ID` on both servers and the app's server client ID for Credential Manager, set per build like the server URL (2.8, Configuration); and Android OAuth clients for `com.lastpenguin.pix` with the SHA-1 of every signing key: each developer's debug key and the release key. Who owns the project, and how a new debug key is added | 박재완 (Iter2-P13) | 10/17 |
@@ -100,7 +102,7 @@ Pix is one Android app that runs in two roles, **photographer** and **subject**,
 | **Pix app, photographer role** | Android | Owns the camera: zoom, focus, exposure, flash, and aspect ratio. Builds, smooths, and edits the guide, captures photos, requests pose generation, streams video, and applies remote commands. Signs in with a Pix ID and a password or with Google, keeps friends, and sends invitations. | CameraX; ML Kit; WebRTC (sends video); data channels; REST; signaling; FCM token |
 | **Pix app, subject role** | Android | Shows the live video with a locally drawn copy of the guide, and sends zoom, brightness, flash, and guide-move requests. Receives invitations as push notifications or links. | WebRTC (receives video); data channels; signaling; FCM |
 | **Signaling hub** | Pix server | Creates room-code sessions and relays SDP offers, answers, and ICE candidates. It never sees media. | WebSocket, JSON (2.5.2) |
-| **Pose proxy** | Pix server | Holds the API key, validates the scene photo, calls the image-editing API with a template prompt, enforces the 30 s upstream timeout and rate limits, and cancels the upstream call when the phone drops the request. | REST `POST /api/v1/poses` (2.5.3) |
+| **Pose proxy** | Pix server | Holds the API key, validates the scene photo, asks a vision model for four poses when the user wrote none, or for three variations of a description (It 2), calls the image-editing API with one prompt around the pose, enforces the 60 s upstream timeout and rate limits, and cancels the upstream call when the phone drops the request. | REST `POST /api/v1/pose-suggestions`, `POST /api/v1/poses` (2.5.3) |
 | **Account and friends API** (It 2) | Pix server | Signs users up and in with a Pix ID and a password or with Google, and issues session tokens; Pix IDs; exact-match lookup; friend requests, friendships, online presence; device tokens for push. | REST `/auth`, `/me`, `/users`, `/friend-requests`, `/friends`, `/devices` (2.5.3); database (2.7) |
 | **Invitation service** (It 2) | Pix server | Creates, accepts, declines, cancels, and expires invitations (30 s); sends the push through FCM; mints the invite link; hands an accepted invitation a `sessionId` in the signaling hub (AD-8). | REST `/invitations` (2.5.3); FCM; signaling hub |
 | **TURN relay** (It 2) | External (Cloudflare) | Forwards encrypted media when the phones cannot connect directly. Credentials are short-lived; the Pix server requests them from Cloudflare for each session. | Cloudflare Realtime TURN; its `iceServers` passed on in signaling (2.5.2) |
@@ -392,9 +394,9 @@ interface SavedGuideStore {                              // It 2 (FR-3.8, AD-16)
 }
 
 interface PoseGenerator {
-    suspend fun templates(): List<PoseTemplate>                     // GET /pose-templates
-    suspend fun ideas(): List<PoseIdea>                             // It 2: GET /pose-ideas, the chip texts (TODO Iter2-P12: or shipped in the app)
-    fun generate(scene: Bitmap, request: GenerationRequest, seed: Long): Flow<CandidateEvent>   // one event per candidate
+    // POST /pose-suggestions first: suggested poses, or variations of a description, whose own POST /poses goes out at
+    // once. Emits Planned with the four poses, then one CandidateEvent each.
+    fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent>
 }
 
 interface AuthRepository {                               // It 2 (FR-5.1–5.3, FR-5.11–5.13, AD-12)
@@ -612,14 +614,17 @@ classDiagram
     +takeScene()
     +retakeScene()
     +useScene()
-    +start(scene)
+    +onDescriptionChanged(text)
+    +generate(description)
+    +suggestPoses()
+    +describeAgain()
     +retry()
     +cancel()
-    +select(templateId)
+    +select(poseId)
   }
   class PoseGenerator {
     <<interface>>
-    +generate(scene, templates) Flow~CandidateEvent~
+    +generate(scene, request, seed) Flow~GenerationEvent~
   }
   class RemotePoseGenerator {
     -api PixApi
@@ -627,9 +632,8 @@ classDiagram
   }
   class PixApi {
     <<Retrofit>>
-    +createPose(image, templateId, description, seed)
-    +templates()
-    +ideas()
+    +suggestPoses(image, description)
+    +createPose(image, description, seed)
   }
   GenerationViewModel --> PoseGenerator
   RemotePoseGenerator ..|> PoseGenerator
@@ -719,7 +723,7 @@ classDiagram
 |----|----|
 | `signaling` | WebSocket hub; `SessionRegistry` (sessionId → up to two peers, room codes, and TTLs); relays `signal` messages. Iteration 1 keeps the registry as an in-memory map in one process; from Iteration 2 it is backed by the session store, and a signal for a socket on another worker travels through it (AD-18, 2.7) |
 | `store` (It 2) | The Redis connection, the scripts for room transitions, delivery of messages between workers, the sweeper for expiry and dead workers, and the rate-limit windows (2.7) |
-| `poses` | The REST endpoints (scene photo validation, rate limiting, cancelling when the phone disconnects); `PoseGenerator`, the one client of OpenRouter's Image API, with the model as a setting; the template catalog and prompt |
+| `poses` | The REST endpoints (scene photo validation, rate limiting, cancelling when the phone disconnects); `PoseGenerator`, the one client of OpenRouter's Image API, and `PoseSuggester`, which asks a vision model for four poses through OpenRouter's chat completions, each with its model as a setting; the prompts and the default poses (`prompts.toml`, read by `prompts.py`) |
 | `accounts` (It 2) | Sign-up and sign-in with a Pix ID and a password (argon2id) or with Google (ID token verification), session tokens, Pix IDs, exact lookup, friend requests, friendships, device tokens; presence from the signaling hub's signed-in sockets, kept in the session store |
 | `invitations` (It 2) | Create, accept, decline, cancel, 30 s expiry; FCM sends; invite links; hands the `sessionId` to `signaling` on accept |
 | `turn` (It 2) | Requests short-lived credentials from Cloudflare's TURN API and returns its `iceServers` for a session (AD-14) |
@@ -822,18 +826,21 @@ data class Invitation(
 enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, CANCELLED, EXPIRED }
 
 // ---- Generation -----------------------------------------------------------
-data class PoseTemplate(val id: String, val label: String)   // the prompt text stays on the server
-data class PoseIdea(val id: String, val text: String)        // It 2: an idea chip; tapping it fills the description field
-data class GenerationRequest(                                // It 2
-    val templates: List<PoseTemplate>,                       // the four presets, used when description is null (Skip)
-    val description: String? = null,                         // 1..100 characters, Korean or English (FR-4.8)
-)
-sealed interface CandidateEvent {
-    val templateId: String       // with a description: "custom-1" .. "custom-4"
-    data class Ready(override val templateId: String, val image: Bitmap) : CandidateEvent
-    data class Failed(override val templateId: String, val error: GenerationError) : CandidateEvent
+// The prompt around the pose stays on the server (2.6.3). The idea chips are a string array in the app's resources.
+sealed interface PoseRequest {                               // It 2 (FR-4.4, FR-4.8)
+    data class Described(val text: String) : PoseRequest     // the user's description, 1..100 characters, Korean or English
+    data object Suggested : PoseRequest                      // Skip, or Generate with an empty field: the server suggests four
 }
-enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, SERVER }   // REJECTED with a description: "Try a different description" 
+data class PlannedPose(val id: String, val text: String)     // "pose-1" .. "pose-4", the app's own names for its four requests
+sealed interface GenerationEvent {
+    data class Planned(val poses: List<PlannedPose>) : GenerationEvent   // first, once the poses are known: the slots
+}
+sealed interface CandidateEvent : GenerationEvent {
+    val poseId: String
+    data class Ready(override val poseId: String, val image: Bitmap) : CandidateEvent
+    data class Failed(override val poseId: String, val error: GenerationError) : CandidateEvent
+}
+enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, SERVER }   // every pose of a description REJECTED: another description or photo (US-5)
 ```
 
 ### 2.4 State machines
@@ -1239,13 +1246,13 @@ A session is removed when the photographer leaves, or 60 s after its last phone 
 
 #### 2.5.3 REST API (phone ↔ server)
 
-Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteration 1: `http://<laptop address>:8000/api/v1`), JSON responses. Errors use one shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. The one exception is a request over 1 MiB, which is refused with a plain `413` before it is read. Endpoints marked *auth* need `Authorization: Bearer <access token>` from a sign-in or a refresh (`POST /auth/signup`, `/auth/login`, `/auth/google`, or `/auth/google/signup`) and answer `401 UNAUTHENTICATED` without it or with an expired one; `/poses` and `/pose-templates` work without an account (FR-5.1). `/users/lookup`, `/friend-requests`, and `/friends` also answer `403 PIX_ID_REQUIRED` until the caller has chosen a Pix ID.
+Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteration 1: `http://<laptop address>:8000/api/v1`), JSON responses. Errors use one shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. The one exception is a request over 1 MiB, which is refused with a plain `413` before it is read. Endpoints marked *auth* need `Authorization: Bearer <access token>` from a sign-in or a refresh (`POST /auth/signup`, `/auth/login`, `/auth/google`, or `/auth/google/signup`) and answer `401 UNAUTHENTICATED` without it or with an expired one; `/pose-suggestions`, `/poses`, and `/pose-templates` work without an account (FR-5.1). `/users/lookup`, `/friend-requests`, and `/friends` also answer `403 PIX_ID_REQUIRED` until the caller has chosen a Pix ID.
 
 | Endpoint | Purpose | Errors |
 |----|----|----|
-| `GET /pose-templates` | The pose templates, so they can change without an app update | — |
-| `GET /pose-ideas` (It 2) | The idea chips for *Generate poses* (**TODO** Iter2-P12: or shipped in the app) | — |
-| `POST /poses` | One pose candidate for one template, or for a description (It 2); the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `400 INVALID_REQUEST`, `413`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `503 UNAVAILABLE` (the session store, which counts the rate limit, does not answer), `504 UPSTREAM_TIMEOUT` |
+| `GET /pose-templates` | The default poses by id, for apps from before Iteration 2; the current app does not call it | — |
+| `POST /pose-suggestions` (It 2) | Four poses for the scene, chosen by a vision model, or, with a `description`, the description and three variations of it; the app asks once per set | `400 INVALID_IMAGE`, `400 INVALID_REQUEST`, `413`, `429 RATE_LIMITED`, `503 UNAVAILABLE` |
+| `POST /poses` | One pose candidate for a description, the user's or a suggested pose (It 2), or for a template id from an app before Iteration 2; the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `400 INVALID_REQUEST`, `413`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `503 UNAVAILABLE` (the session store, which counts the rate limit, does not answer), `504 UPSTREAM_TIMEOUT` |
 | `POST /auth/signup` (It 2) | Create an account with a Pix ID, a display name, and a password; return its tokens (FR-5.2, FR-5.11) | `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` |
 | `POST /auth/login` (It 2) | Sign in with a Pix ID and a password; return an access and a refresh token | `401 INVALID_CREDENTIALS` |
 | `POST /auth/refresh` (It 2) | Exchange a refresh token for a new access token and a new refresh token | `401 INVALID_REFRESH_TOKEN` |
@@ -1278,41 +1285,60 @@ Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteratio
 </details>
 
 <details>
+<summary><code>POST /pose-suggestions</code> (It 2)</summary>
+
+```jsonc
+// request: multipart/form-data, at most 1 MiB in total
+//   image        scene.jpg (JPEG, long side ≤ 1024 px, no EXIF), the same photo the four POST /poses send
+//   description  "벽에 기대서 카메라 보며 살짝 웃기"   (optional; 1..100 characters after trimming, as in POST /poses)
+
+// response 200 without a description: four different poses in English, each 1..100 characters, in the order of the
+// slots
+{ "poses": [
+  "Lean your back against the black door, cross one ankle, and look at the camera.",
+  "Walk slowly past the flower cart while looking off to the side with a smile.",
+  "Stand near the cart and gently touch the flower display while looking down.",
+  "Stand straight facing front with hands in your pockets and a relaxed smile."
+] }
+
+// response 200 with a description: the description as the server folded it, then three variations in English
+{ "poses": [
+  "벽에 기대서 카메라 보며 살짝 웃기",
+  "Lean against the door, face the camera, and smile slightly with hands in pockets.",
+  "Lean against the door, face the camera, smile slightly, and cross your ankles.",
+  "Lean against the door, face the camera, smile slightly, and tilt your head to one side."
+] }
+```
+
+The server sends the photo and the suggestion prompt to the suggestion model (2.6.3) and checks its answer: it keeps the first four different poses of 1–100 characters, each on one line, and fills the rest with the default poses in their order. A model that fails, answers after `PIX_SUGGESTION_TIMEOUT_SECONDS` (8 s), or answers nothing usable gives the four default poses, so this endpoint fails only for the photo, the rate limit, or the session store, never for the model. With a `description`, the server checks it like `POST /poses` (`400 INVALID_REQUEST` when it is blank or longer than 100 characters, before any call and without counting it), sends the variation prompt instead, and keeps the first three usable variations that are not the description itself; the description fills in for any it cannot use, so a failing model gives the description four times. An empty `description` is read as left out. The answer is not cached: every call, *Try other poses* included, asks the model again. The poses, the description, and the variations describe the person in the photo, so they are never written to a log.
+
+</details>
+
+<details>
 <summary><code>POST /poses</code></summary>
 
 ```jsonc
 // request: multipart/form-data, at most 1 MiB in total
 //   image       scene.jpg (JPEG, long side ≤ 1024 px, no EXIF)
-//   templateId  "wave"                      (omit when description is sent)
-//   description "벽에 기대서 한 손은 주머니에"   (It 2, optional, 1..100 characters; exactly one of templateId or description)
+//   description "벽에 기대서 한 손은 주머니에"   (It 2; 1..100 characters after trimming; the user's text or a suggested pose)
+//   templateId  "wave"                      (instead of description, from apps before Iteration 2; exactly one of the two)
 //   seed        "1829304756" (an integer)
 
-// response 200
+// response 200 to a description
+{ "templateId": null, "image": "/9j/4AAQSkZJRgABAQAAAQABAAD...", "elapsedMs": 13210 }
+
+// response 200 to a template
 { "templateId": "wave", "image": "/9j/4AAQSkZJRgABAQAAAQABAAD...", "elapsedMs": 11840 }
 
 // response 504
-{ "error": { "code": "UPSTREAM_TIMEOUT", "message": "The image service did not answer within 30 s" } }
+{ "error": { "code": "UPSTREAM_TIMEOUT", "message": "The image service did not answer within 60 s" } }
 ```
 
-`image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9). With a `description`, the response's `templateId` echoes the request's `candidateId` (`custom-1` … `custom-4`), and a description the image service refuses answers `422 REJECTED` with the message "Try a different description" (US-5).
+`image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9). With a `description`, the response's `templateId` is `null`: the app tells its four requests apart by itself and names them `pose-1` … `pose-4` (2.3; changed on 2026-10-20 from a `candidateId` that the server echoed, which the app never needed). A refusal answers `422 REJECTED` with the same message for a description as for a template: the image service does not say whether it refused the photo or the text, and the app's suggested poses and variations are sent as descriptions too (US-5). A `templateId` names a default pose (`GET /pose-templates`), which goes into the same prompt as a description.
 
-The server checks the photo and does not repair it: one that is not a readable JPEG, is over 1024 px on its long side, or has EXIF gets `INVALID_IMAGE`. `INVALID_REQUEST` means that a part is missing or that `seed` is not an integer. The server reduces `seed` to 0…2³¹−1, the range the image models accept.
+**The description.** The server trims it and turns each run of whitespace, line breaks included, into one space; it then has to be 1–100 characters. Characters are Unicode code points, which are never more than what the app's field counts, so whatever the field accepts passes; the app sends it as a `text/plain; charset=utf-8` part. An empty `description` is the same as none, so one next to a `templateId` asks for the template. The description is passed in Korean or English as written, inside the pose prompt (2.6.3), and is never written to a log (NFR-13).
 
-</details>
-
-<details>
-<summary><code>GET /pose-ideas</code> · It 2</summary>
-
-```jsonc
-// response 200
-[
-  { "id": "lean_wall", "text": "Leaning on the wall, one hand in a pocket" },
-  { "id": "look_back", "text": "Looking back over the shoulder" },
-  { "id": "sit_steps", "text": "Sitting on the steps, elbows on knees" }
-]
-```
-
-Cached in the app like the templates. Tapping a chip puts its `text` into the description field (FR-4.8).
+The server checks the photo and does not repair it: one that is not a readable JPEG, is over 1024 px on its long side, or has EXIF gets `INVALID_IMAGE`. `INVALID_REQUEST` means that a part is missing, that `seed` is not an integer, that both or neither of `templateId` and `description` were sent, or that the description is blank or longer than 100 characters. Nothing is sent to the image service or counted by the rate limit in any of these cases. The server reduces `seed` to 0…2³¹−1, the range the image models accept.
 
 </details>
 
@@ -1540,37 +1566,23 @@ The guide's normalized width is `height × aspect × (H / W)` of the current fra
 
 #### 2.6.3 Pose generation
 
-1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, the Camera screen takes the scene photo. It is a state of that screen (`GenerationUiState.phase`), not a screen of its own, so the camera keeps running and zoom and the composition aids stay available. The shutter then copies the latest analysis frame, already upright, instead of saving a photo, and the user confirms it with *Use this photo* or takes another with *Shoot again*; nothing is sent before that. The app then resizes the photo so the long side is at most 1024 px and encodes it as JPEG (quality 85), which leaves out location and other metadata. This preparation is the app's job: the server checks the photo but does not resize or repair it, and rejects one that is not prepared this way (2.5.3). Doing it on the phone keeps the four uploads small and keeps location data on the phone.
-2.  **Requests.** Without a description, send one `POST /poses` per template (4 in parallel), each with a new random `seed`; with a description (It 2), send four requests with the same description and different seeds, `candidateId` `custom-1` … `custom-4`. *Try other poses* repeats the same request with new seeds. A model without seed support ignores the seed, and its results still differ from one request to the next.
-3.  **Server prompt.** Each template holds a pose description. The server wraps it in a fixed prompt, which lets the model move the person to a better spot while the camera framing stays fixed: *"Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting exactly as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer would: judge whether the person is too far, too close, or poorly placed, and if so move them to a better spot and distance in this scene. Change the person's pose to: {pose}. Show the full body, standing on the ground at a natural scale. Photorealistic."*
-4.  **Progressive results.** The app maps each response to a `CandidateEvent`. The screen fills its slots as events arrive and moves to *Pick a pose* when all are done, or at 30 s if at least one is ready. The 30 s are one limit for the whole run, counted from *Use this photo* and including the request for the templates; the requests still open at the limit are cancelled. Zero candidates means *Couldn't create poses* (FR-4.7). After *Use this pose*, the app discards the scene photo and the other candidates.
-5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices that the phone closed its connection and cancels its own call to the image API, which then does not bill that image. The server also stops waiting for the image API after 30 s. On the course servers the course's proxy does not pass the phone's cancel on to the server (measured 2026-10-13; 2.8, Hosting), so there a cancelled request runs to the end and is billed; the rate limit bounds that cost.
+1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, the Camera screen takes the scene photo. It is a state of that screen (`GenerationUiState.phase`), so the camera keeps running with zoom and the composition aids, and the shutter copies the latest analysis frame instead of saving a photo. Nothing is sent before *Use this photo*. The app resizes the photo to a long side of at most 1024 px and encodes it as JPEG (quality 85), which leaves out location and other metadata; the server checks this and rejects any other photo, but never resizes it (2.5.3). Preparing the photo on the phone keeps the four uploads small and the location data on the phone.
+2.  **What to pose (It 2, FR-4.8).** *Generate poses* shows the scene thumbnail, a field for a description of up to 100 characters in Korean or English with a counter, six idea chips, *Generate 4 poses*, and *Skip, suggest poses for me*. The chips are short English poses in the app's string resources, so they need no request; a chip fills the field, which can then be edited. A blank field counts as *Skip*.
+3.  **Requests.** Without a description, the app sends the photo to `POST /pose-suggestions`, which answers with four poses chosen for the scene (*Suggested poses* below), and then one `POST /poses` per pose. With a description, it sends the description's own `POST /poses` at once and asks `POST /pose-suggestions` for three variations of it (*Pose variations* below), then sends one `POST /poses` per variation. The description's request goes first so that the first candidate does not wait, and variations that do not come within 10 s, or at all, are replaced by the description. The four requests (`pose-1` … `pose-4`) each get a `seed` drawn from one seed for the set; a model without seed support ignores it. *Try again* sends the same request again; *Try other poses* goes back to *Generate poses* with the photo and the description kept, so the next set can ask for something else.
+4.  **Progressive results.** The screen shows its four slots once the poses are known ("Choosing poses…" until then), fills them as candidates arrive, and moves to *Pick a pose* when all four are done, or at 60 s if at least one is ready (*Time limit* below). Requests still open at the limit are cancelled. Zero candidates means *Couldn't create poses* (FR-4.7). When the service refused every pose of a description, that screen says it would not create poses for that description with this photo, and offers *Edit description* in place of *Try again*; *Back to camera* leads to another photo. The service does not say which of the two it refused (US-5). After *Use this pose*, the app discards the scene photo and the other candidates.
+5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices the closed connection and cancels its own call to the image API, which then does not bill that image. On the course servers the course's proxy does not pass the phone's cancel on (measured 2026-10-13; 2.8, Hosting), so there a cancelled request runs to the end and is billed; the rate limit bounds that cost.
 
-**Pose description and idea chips (It 2, FR-4.8).** After *Use this photo*, the *Generate poses* screen shows the scene thumbnail, the idea chips from `GET /pose-ideas`, a 100-character field with a counter, *Generate 4 poses*, and *Skip, use the preset poses*. A chip fills the field and can be edited. *Skip*, or *Generate* with an empty field, uses the four templates. The server wraps the description in the same fixed prompt as a template, which keeps the person, background, and framing, and adds *"Pose: <description>"*; a description in Korean is passed as written, because the selected model follows Korean prompts (2.6.3, selection). The server also keeps a short default instruction for framing (*"the whole person stays in the frame at about the same size"*) so a description like "closer" does not crop the person (decided 2026-10-09). **TODO** Iter2-P12: the exact prompt after trying descriptions with `compare_image_edit_apis.py`, the chip texts, and the preset images. A description the service refuses answers `422 REJECTED`, shown as "Try a different description" with the text kept.
+**Pose prompt.** Every candidate uses one prompt, `pose_prompt` in `server/src/pix_server/poses/prompts.toml`, with the pose in place of `{pose}`: the user's description as written (Korean included, which the image model follows), a suggested pose, a variation, or a default pose. The prompt changes the pose and the expression and lets the model act as a photographer in three ways only: move the person within the scene, frame them closer (knee-up or waist-up), and raise, lower, or tilt the camera a little. It never shows more than the scene photo does, and its rules come after the pose so that they win over it: the same person, clothing, place, and light, and nothing added to lean or sit on. *Why:* the template prompt it replaced (decided 2026-10-21) kept the framing fixed, so a person photographed from afar stayed small in every candidate, and it still widened the view when a pose needed the whole body. With the pose prompt, 13 of 16 descriptions were followed in all eight test photos with the same person and place. A candidate can be tighter than the live view; the photographer then zooms in or steps closer to match the guide. *Known limits:* a description can still add a prop, clothing, or a second person it asks for (a cup, a suit, a friend); walking toward the camera is mostly cut at the knees; and the image service, not Pix, decides what to refuse (a violent description was not refused in testing).
 
-**API selection.** Poses are generated through OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), which gives one request format, one key, and one bill for every vendor's models. The model is the server setting `PIX_POSE_MODEL`, so it changes without a code change. The default is `openai/gpt-image-2.5-flare@low`, GPT Image 2.5 Flare at low quality.
+**Suggested poses.** Without a description, the server sends the photo with `suggestion_prompt` to a vision model through OpenRouter's chat completions, with the same key as the image model: `PIX_SUGGESTION_MODEL`, by default `google/gemini-3.1-flash-lite`, with the least reasoning it allows and a JSON schema. The prompt's rules match the pose prompt's (only what is in the photo; no props, other people, or other clothes), so a suggestion does not ask for what the image model must leave out. The server keeps the first four different poses of 1–100 characters and fills the rest with the four default poses (hands on hips, wave, walking, arms crossed): all four when the model fails or takes longer than 8 s, so the endpoint never fails because of the model. Apps from before Iteration 2 still ask for the default poses by id. *Why suggestions:* they use the place, such as leaning on a door or sitting on a step, which the four fixed standing poses cannot. *Why this model:* of ten vision models tried on 2026-10-21, it gave usable poses in all 24 calls, 1.7 s median and 2.8 s at most, at about $0.0005 a call, and its poses fit each place best; `z-ai/glm-5.3-flash` did nearly as well and is the alternative. *Known limit:* the first suggested pose is often the same relaxed standing one; asking the model to avoid the previous set's poses is left for later.
 
-**Why this model.** GPT Image 2.5 Flare at low quality, Seedream 5.0 Flash, and Gemini 3.1 Flash have similar latency, and all three gave decent results. Among them cost decided: GPT Image 2.5 Flare is the cheapest, at $0.012 per image against $0.018 for Seedream and $0.068 for Gemini.
+**Pose variations.** With a description, the same model gets `variation_prompt` with the description in place of `{description}` and writes three variations that keep everything the description says and change what it leaves open: the arms and hands, the stance, the turn of the body, the head, or the spot. The server leaves out the description if the model repeats it, and puts the description in place of any variation it cannot use. *Why:* four requests with one description give four nearly identical images, because the image model reads one text the same way every time and ignores the seed. In 24 sets on three photos (2026-10-21), the description with three variations held 3.4 different poses of 4 against 2.0 for the description four times, while 90 of 96 images against 94 still followed the description; the first candidate keeps the user's own words in front of the image model. *Known limit:* a variation can add something in the place that competes with the request, such as touching a door while walking toward the camera; a prompt that forbade this did no better overall and is not used.
 
-The models were compared on 2026-10-03 and 2026-10-04 with `server/scripts/compare_image_edit_apis.py`, on eight real photos with all four pose templates (32 images per model):
+**Prompts as data.** The three prompts and the default poses are data in `prompts.toml`. The server checks the file when it starts: a prompt without its placeholder or with it twice, an empty prompt, or anything but four default poses of at most 100 characters stops it, so a mistake fails the tests and the image build instead of pose requests. `server/scripts/compare_image_edit_apis.py` (pose prompt) and `compare_suggestion_models.py` (suggestion and variation prompts, with `--description`) read the same file, so a change can be tried before it ships.
 
-| Model | Median | Slowest | Within 25 s | Cost per image |
-|----|----|----|----|----|
-| `openai/gpt-image-2.5-flare` at low quality (default) | 14.8 s | 25.1 s | 31/32 | $0.012 |
-| `bytedance-seed/seedream-5-0-flash` | 11.4 s | 21.0 s | 32/32 | $0.018 |
-| `google/gemini-3.1-flash-image` | 11.5 s | 13.0 s | 32/32 | $0.068 |
-| `google/gemini-3.1-flash-lite-image` | 6.2 s | 8.3 s | 32/32 | $0.034 |
+**Image model.** Poses are generated through OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), which gives one request format, one key, and one bill for every vendor's models. The model is the server setting `PIX_POSE_MODEL`, by default `openai/gpt-image-2.5-flare@low`, GPT Image 2.5 Flare at low quality. *Why:* on eight photos with four poses each (2026-10-03 and 2026-10-04), it, Seedream 5.0 Flash, and Gemini 3.1 Flash kept faces and backgrounds with similar latency; GPT gave the most natural poses and is the cheapest ($0.012 per image, about $0.05 a set, against $0.018 and $0.068), and with the pose prompt it frames closer most naturally (2026-10-21). Gemini 3.1 Flash Lite, the fastest, changed faces and scenes. Seedream 5.0 Flash and Gemini 3.1 Flash are the alternatives.
 
-Results against the selection criteria:
-
-- **Identity and background preservation.** Judged on eight real photos and three generated ones. All kept faces close to the original. Gemini kept the camera framing most consistently, and GPT moved the person farther back in a few candidates. Gemini 3.1 Flash Lite changed faces and re-framed scenes.
-- **Pose quality.** All four produced well-posed candidates, while GPT Image 2.5 Flare at low quality in general gave the most natural and appealing results. Gemini 3.1 Flash Lite produced some candidates with unnatural poses.
-- **Latency (median ≤ 15 s).** All four meet the median requirement. GPT Image 2.5 Flare at low quality was the slowest on one photo, but still under 30 s.
-- **Cost per image and free quota.** GPT Image 2.5 Flare at low quality is the cheapest, about $0.05 for a set of four.
-- **Rate limits.** OpenRouter sets no request cap for paid models; 16 simultaneous requests ran without a rate-limit error.
-- **Support for Korean prompts.** The one free-text Korean pose that was tried was followed by all four models.
-
-Ten other model configurations were screened with one image each and left out, among them FLUX.3, Qwen Image 3, and GPT Image 2 at medium quality, which took over 30 s. Seedream 5.0 Flash and Gemini 3.1 Flash are the alternatives.
+**Time limit.** 60 s for a whole run on the phone, counted from the tap on *Generate 4 poses* or *Skip* with the suggestions or variations included, and 60 s for each call from the server to the image API (`PIX_POSE_UPSTREAM_TIMEOUT_SECONDS`); the phone's HTTP client waits 65 s, so the run's limit decides (decided 2026-10-21). *Why:* GPT Image 2.5 Flare usually finishes a set within NFR-4's 20 s and 30 s, but on a slow day single requests took up to 46 s, and at the earlier limit of 30 s two of four in one set failed although a late candidate is better than none. nginx waits 75 s for an answer, and a deploy lets requests in flight finish.
 
 #### 2.6.4 Video pipeline
 
@@ -1723,13 +1735,13 @@ erDiagram
 | **Concurrency** | Segmentation, outline, and image encoding run on `Dispatchers.Default`; network and file work on `Dispatchers.IO`. CameraX analysis uses its own single-thread executor. All WebRTC and WebSocket callbacks hop onto one serial session scope (`limitedParallelism(1)`), so session state changes never race. WebRTC's own threads are never blocked. |
 | **Message rate** | `guide.state` and `camera.state` are throttled to 20 Hz during gestures, and the final value goes on the reliable channel (2.5.1). Receivers drop stale `seq`. |
 | **Backpressure** | Image chunks are sent only while the reliable channel's `bufferedAmount` is below 256 KiB, so large transfers never delay control messages. |
-| **Caching** | The current guide and the last candidate set are kept in memory for the app process only; no gallery or generated images are written to disk. The template list is cached in memory after the first call. The subject keeps the last received guide image by `guideId`, so a reconnect does not resend it. |
+| **Caching** | The current guide and the last candidate set are kept in memory for the app process only; no gallery or generated images are written to disk. The subject keeps the last received guide image by `guideId`, so a reconnect does not resend it. |
 | **Guide store** | Each phone uses `InMemoryGuideRepository`, with separate instances for the photographer's guide and the subject's mirror. `setGuide` resets the display state to the guide's `anchor` (or clears it for null); `update` is ignored without an image, keeps the stored image's ID, and clamps through `GuideGeometry`. Writes are serialized. Every applied operation emits a `GuideChange`, including the hidden flag. **Saved guides (It 2, AD-16)** are written by `SavedGuideStore` under `filesDir/guides/<id>/` as `mask.png`, `reference.webp` (the 512 px thumbnail source), and `meta.json` (`GuideState`, `anchor`, `aspect`, `savedAt`); at most 20, oldest deleted first; nothing is written to MediaStore. |
 | **Lifecycle** | The camera binds to the lifecycle of the camera screen; ViewModels keep UI state across rotation. If the photographer's app goes to the background, the camera is released and the video pauses. The session stays open for 60 s, and the subject sees that the camera is paused. No foreground service is used. From Iteration 2 a drop moves both phones to `Reconnecting` for up to 10 s before the session ends (2.6.7). The aspect ratio, brightness, and flash are restored when the camera rebinds; the last ratio is kept in DataStore. |
 | **Error handling** | Module interfaces return `Result` with typed errors (`NoPersonFound`, `GenerationError`, `EndReason`). ViewModels map them to the failure screens in the wireframe, and each maps to exactly one screen. |
-| **Timeouts** | Pose generation: 30 s on the client for a whole run, and 30 s from server to API for each request. Because the phone's limit starts first, it usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. Room code: 10 min. Invitation: 30 s on the server (It 2). Reconnection: 10 s (It 2). TURN credentials: the session's lifetime plus 10 min (It 2). |
+| **Timeouts** | Pose generation: 60 s on the client for a whole run, and 60 s from server to API for each request (2.6.3, *Time limit*). Because the phone's limit starts first, it usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. Room code: 10 min. Invitation: 30 s on the server (It 2). Reconnection: 10 s (It 2). TURN credentials: the session's lifetime plus 10 min (It 2). |
 | **Configuration and secrets** | The server URL is set per build type in `BuildConfig`: Server A for release, and for debug Server B or a laptop on the test Wi-Fi (`pix.serverUrl`). The course servers have no TLS (AD-11), so release builds allow plain HTTP and WebSocket traffic to the two course hostnames only, through the network security config; debug builds allow it to any host. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. Iteration 2 adds `PIX_DATABASE_URL` (on the course servers the Compose file sets it, with a password that `deploy.sh` makes once and keeps in `/opt/pix/db-password`), `PIX_JWT_SECRET` (made by `deploy.sh` in `/opt/pix/jwt-secret` on the course servers), `PIX_ACCESS_TOKEN_MINUTES` (15), `PIX_SESSION_TTL_DAYS` (30), `PIX_REDIS_URL` (AD-18), `PIX_GOOGLE_CLIENT_ID`, `PIX_FCM_CREDENTIALS` (path to the Firebase service-account file), `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (Cloudflare's TURN key, AD-14), and `PIX_PUBLIC_URL` for invite links. `.env.example` lists every name, which a test keeps in step with the settings in code: a name with no value must be set on each server, and every other name is commented, showing the default the app already has. The Firebase file and the secrets live only in a `.env` file on each server. Each deploy and restart compares that file with the example and warns, in its log, in `pix status`, and at an operator's login, about a required name without a value and about a name the example does not list, which the app would ignore; it never writes the file, so a default changed in code is not pinned on a server (decided 2026-10-15). |
-| **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, and over all clients together, 500 in 24 hours by default (`PIX_POSE_GLOBAL_LIMIT`, `PIX_POSE_GLOBAL_WINDOW_SECONDS`), counting only requests sent to the image API, to control cost; both answer `429 RATE_LIMITED`, with a message that says which. The global limit bounds what the image API can cost in a day however many addresses send requests; the OpenRouter key's own spending limit, set in OpenRouter's dashboard, is the last bound. A `room.join` with a wrong code counts against the address too, 100 in 10 minutes (`PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS`; 2.5.2); on the course servers the address is the last `X-Forwarded-For` value, which the course's proxy adds. Requests to the course servers travel over plain HTTP (AD-11), so a scene photo, a password at sign-in, and the access and refresh tokens are not encrypted between the phone and the server; the live view is, because it goes phone to phone (NFR-14). No endpoint takes a Pix ID or other personal data in its URL, because nginx's error log prints a failed request's whole request line; the lookup is `POST /users/lookup`. The access logs of nginx and Uvicorn also leave out query strings, and the server never logs a password, a token, or a request body. Password hashes run two at a time per worker, so a burst of sign-ins, which needs no account, queues instead of using a 64 MiB argon2id buffer per thread of the pool. |
+| **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, and over all clients together, 500 in 24 hours by default (`PIX_POSE_GLOBAL_LIMIT`, `PIX_POSE_GLOBAL_WINDOW_SECONDS`), counting only requests sent to the image API, to control cost; `POST /pose-suggestions` has windows of its own of the same lengths, 10 per address and 500 over all (`PIX_SUGGESTION_RATE_LIMIT`, `PIX_SUGGESTION_GLOBAL_LIMIT`). All answer `429 RATE_LIMITED`, with a message that says which. Neither a description, a suggested pose, nor a variation is written to a log, because all of them describe the person in the photo. The global limit bounds what the image API can cost in a day however many addresses send requests; the OpenRouter key's own spending limit, set in OpenRouter's dashboard, is the last bound. A `room.join` with a wrong code counts against the address too, 100 in 10 minutes (`PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS`; 2.5.2); on the course servers the address is the last `X-Forwarded-For` value, which the course's proxy adds. Requests to the course servers travel over plain HTTP (AD-11), so a scene photo, a password at sign-in, and the access and refresh tokens are not encrypted between the phone and the server; the live view is, because it goes phone to phone (NFR-14). No endpoint takes a Pix ID or other personal data in its URL, because nginx's error log prints a failed request's whole request line; the lookup is `POST /users/lookup`. The access logs of nginx and Uvicorn also leave out query strings, and the server never logs a password, a token, or a request body. Password hashes run two at a time per worker, so a burst of sign-ins, which needs no account, queues instead of using a 64 MiB argon2id buffer per thread of the pool. |
 | **Measurement hooks** | `Timings` logs named timestamps with a shared tag, so NFR latencies can be read from logcat without extra tools. Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping. Times are each phone's own clock; the `ping.received` and `rtt` lines align two phones' logs (2.5.1). |
 | **Hosting (It 2, AD-11)** | Two course-provided servers, each behind the course's HTTP proxy and reachable only on port 80: Server A, `http://swpp26t10.147-46-242-169.sslip.io`, runs `main` as production, and Server B, `http://swpp26t10.147-46-242-174.sslip.io`, runs `dev` as staging. They cannot reach each other, so each has its own database and session store. `server/deploy/` holds a `docker-compose.yml` with `nginx` on port 80 (`/api/v1`, `/ws`, `/health`, `/version`, and the `/i/<id>` page; anything else answers `404`, so FastAPI's `/docs` is not public), two copies of the app (`app-blue` and `app-green`; Uvicorn with two workers, a count set explicitly because the servers report 38 CPUs for the 8 cores we get), `redis`, and `postgres` with its files in `/opt/pix/postgres` on the server's disk (not a Docker volume, so no Docker cleanup can delete them), plus the nginx configuration. The course's proxy, measured on 2026-10-13: WebSockets pass and stay open (300 s with pings, 200 s idle), although the course cuts a plain HTTP response after 120 s; the proxy adds the phone's address as the last `X-Forwarded-For` value and passes on any value the client sent, so nginx trusts only the proxy and takes the last value; and it does not pass a client's cancel on to the server (2.6.3). |
 | **Deployment (It 2)** | GitHub cannot push to the servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights the team does not have and is advised against on a public repository. So each server pulls. A systemd timer runs `server/deploy/deploy.sh` every minute, which compares its branch with the deployed commit. A merge that does not change `server/` only records the commit. Otherwise the script builds the image on the server, with the tests as a build stage, starts it as the idle copy (blue or green), and waits for its `/health`. It then waits until the old copy has no open room, for at most 10 min, then switches nginx, checks `/health` through it, and stops the old copy with a grace period long enough for a pose request in flight. Last it records the commit in `/version`. A failure at any step leaves the running copy serving, and that commit is not tried again; `deploy.sh rollback` switches back to the previous image. The two copies share their rooms through the session store (AD-18), but the wait stays until phones can rejoin a room after their socket drops (2.6.7, Iter2-P16): stopping a copy closes its sockets, and in a room that spans both copies the phone on the new copy would be told that its peer was lost, which ends a live session on the subject's phone. A workflow on GitHub's own runners builds the image on every pull request and, after a merge, waits until `/version` shows the commit, so a failed deploy is visible on the commit. |
@@ -1749,7 +1761,7 @@ erDiagram
 | **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, #52); saved guides (Iter2-P18, #58) | Guide sync, Subject view |
 | **Server deployment** | 박재완 | Running on the laptop on the test Wi-Fi | The course servers with Docker, nginx, and blue-green deploys (Iter2-P4, #46); the Redis session store (AD-18; issue to be filed, Still open) | Everything |
 | **Accounts and friends** | 박재완 | — | Database, sign-in with a Pix ID and a password or with Google, Pix IDs, friend requests, friend list, presence (Iter2-P8, #50); Sign-in, Pix ID, and Friends screens (Iter2-P13, #54) | Invitations |
-| **Pose generation** | 박재완 | API choice, `POST /poses`, templates, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, prompt (Iter2-P12, #53) | Reference guide |
+| **Pose generation** | 박재완 | API choice, `POST /poses`, templates, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, one prompt, suggested poses (Iter2-P12, #53) | Reference guide |
 | **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | TURN through Cloudflare, `ws://` to the course server, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter2-P16, #56); invitations with push and link (Iter2-P15, #55) | Guide sync, remote control |
 | **Remote control** | 조성민 | `RemoteControlHandler` (zoom), pinch zoom on Subject view | Brightness, flash, guide moves, and notices (Iter2-P17, #57, built); remote focus and the permission switch if time allows (Iter2-P17, Could); pinch zoom and the guide-edit mode toggle on Subject view, replacing its slider (Iter2-P6, #48, built); zoom stutter (Iter2-P5, #47) | UI |
 | **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state` (in use since Iter2-P11); the mask-only transfer in `GuideImageCodec` and the syncer (decided 2026-10-16); no `anchor` is sent (2.5.1) | UI |

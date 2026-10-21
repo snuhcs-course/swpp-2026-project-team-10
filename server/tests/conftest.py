@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 import asyncio
 import base64
 import io
@@ -43,14 +43,27 @@ def encode_image(image_format: str = "JPEG", size: tuple[int, int] = (768, 1024)
     return buffer.getvalue()
 
 
+SUGGESTED_POSES = [
+    "Lean one shoulder on the door and smile at the camera",
+    "Walk toward the camera and look to the side",
+    "Sit on the step with the elbows on the knees",
+    "Wave with one hand and laugh",
+]
+
+
 class ImageApi:
-    """Stands in for OpenRouter's Image API: records each request and answers with `status` and `body`."""
+    """Stands in for OpenRouter. The Image API records each request in `requests` and answers with `status` and
+    `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
+    `suggestion_status` and `suggestion_body` after `suggestion_delay`."""
 
     def __init__(self) -> None:
         self.requests: list[httpx2.Request] = []
+        self.suggestion_requests: list[httpx2.Request] = []
         self.delay = 0.0
+        self.suggestion_delay = 0.0
         self.cancelled = asyncio.Event()
         self.returns(encode_image())
+        self.suggests(SUGGESTED_POSES)
 
     def returns(self, image: bytes) -> None:
         self.status = 200
@@ -60,11 +73,31 @@ class ImageApi:
         self.status = status
         self.body = {"error": {"code": status, "message": message}}
 
+    def suggests(self, poses: object) -> None:
+        self.answers(json.dumps({"poses": poses}))
+
+    def answers(self, content: object) -> None:
+        """The suggestion model's message, as written; `suggests` writes the JSON the prompt asks for."""
+        self.suggestion_status = 200
+        self.suggestion_body: object = {"choices": [{"message": {"role": "assistant", "content": content}}]}
+
+    def suggestion_fails(self, status: int, message: str = "Provider returned error") -> None:
+        self.suggestion_status = status
+        self.suggestion_body = {"error": {"code": status, "message": message}}
+
     @property
     def payloads(self) -> list[dict]:
         return [json.loads(request.content) for request in self.requests]
 
+    @property
+    def suggestion_payloads(self) -> list[dict]:
+        return [json.loads(request.content) for request in self.suggestion_requests]
+
     async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/api/v1/chat/completions":
+            self.suggestion_requests.append(request)
+            await asyncio.sleep(self.suggestion_delay)
+            return httpx2.Response(self.suggestion_status, json=self.suggestion_body)
         self.requests.append(request)
         try:
             await asyncio.sleep(self.delay)
@@ -152,6 +185,10 @@ def settings(database_url):
         pose_rate_window_seconds=3600,
         pose_global_limit=500,
         pose_global_window_seconds=86400,
+        suggestion_model="z-ai/glm-5.3-flash",
+        suggestion_timeout_seconds=8,
+        suggestion_rate_limit=10,
+        suggestion_global_limit=500,
         join_failure_limit=10,
         join_failure_window_seconds=600,
     )

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -13,9 +13,13 @@ internal fun testBitmap(): Bitmap {
     return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, Bitmap::class.java) as Bitmap
 }
 
-internal val FOUR_TEMPLATES = listOf(
-    PoseTemplate("hands_on_hips", "Hands on hips"),
-    PoseTemplate("wave", "Wave"),
-    PoseTemplate("walking", "Walking"),
-    PoseTemplate("arms_crossed", "Arms crossed"),
+/** Four poses as the server suggests them, in its order. */
+internal val SUGGESTED = listOf(
+    "Lean on the door and smile",
+    "Walk toward the camera",
+    "Sit on the step, hugging the knees",
+    "Wave and laugh",
 )
+
+/** The set's slots for [texts], as RemotePoseGenerator names them. */
+internal fun planned(texts: List<String>) = texts.mapIndexed { index, text -> PlannedPose("pose-${index + 1}", text) }

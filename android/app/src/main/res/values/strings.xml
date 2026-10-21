@@ -107,17 +107,39 @@
     <string name="shoot_again">Shoot again</string>
     <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>
     <string name="your_photo">Your photo</string>
+    <string name="describe_title">Generate poses</string>
+    <string name="describe_body">Describe a pose, or let Pix suggest four for this place</string>
+    <string name="describe_label">Describe the pose</string>
+    <string name="describe_hint">e.g. Leaning on the wall, one hand in a pocket</string>
+    <string name="description_counter">%1$d/%2$d</string>
+    <string name="description_refused">The last set was refused. Try a different description, or another photo.</string>
+    <string name="description_rejected_message">The AI service would not create poses for “%1$s” with this photo. Try a different description, or go back to the camera and take another photo.</string>
+    <string name="edit_description">Edit description</string>
+    <string name="ideas_label">Ideas</string>
+    <string name="generate_four_poses">Generate 4 poses</string>
+    <string name="skip_suggest_poses">Skip, suggest poses for me</string>
+    <string name="choosing_poses">Choosing poses…</string>
+    <!-- Idea chips on Generate poses (FR-4.8). Each fills the description field, so keep them under 100 characters
+         and possible anywhere: the image model adds nothing to lean or sit on that the scene does not have. -->
+    <string-array name="pose_ideas">
+        <item>Looking back over my shoulder</item>
+        <item>Walking toward the camera, smiling</item>
+        <item>Hands in pockets, looking up</item>
+        <item>Leaning on something, arms crossed</item>
+        <item>Sitting down, hugging my knees</item>
+        <item>Jumping with both arms up</item>
+    </string-array>
     <string name="scene_photo_description">The photo of the scene the poses are made from</string>
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
     <string name="ready_count">%1$d of %2$d ready</string>
-    <string name="generating_scene_caption">Same person and place · up to 30 s</string>
+    <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
     <string name="pick_pose_body">Tap one to use it as the guide</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>
-    <string name="generation_failed_message">The request failed or took longer than 30 seconds. Your photo is kept, so you can try again.</string>
+    <string name="generation_failed_message">The request failed or took longer than 60 seconds. Your photo is kept, so you can try again.</string>
 
     <!-- Flow 6: Room code -->
     <string name="room_code_title">Your room code</string>

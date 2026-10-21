@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 """Environment configuration for the Pix server."""
 
 from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
@@ -37,12 +37,21 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
     # An OpenRouter image model id; append @low, @medium, or @high for a model that has quality tiers.
     pose_model: str = "openai/gpt-image-2.5-flare@low"
-    pose_upstream_timeout_seconds: PositiveFloat = 30
+    # As long as the app's own limit for a run (Design 2.6.3); the image model takes 15-20 s, and more on slow days.
+    pose_upstream_timeout_seconds: PositiveFloat = 60
     pose_rate_limit: PositiveInt = 20
     pose_rate_window_seconds: PositiveFloat = 3600
     # Pose requests over all clients together; it bounds what the image API can cost within the window.
     pose_global_limit: PositiveInt = 500
     pose_global_window_seconds: PositiveFloat = 86400
+    # An OpenRouter model that takes an image and answers in text; it suggests the four poses for a scene when the user
+    # wrote no description (Design Documentation 2.6.3).
+    suggestion_model: str = "google/gemini-3.1-flash-lite"
+    # The suggestions come first within the 30 s a set may take (NFR-4); after this the default poses are used.
+    suggestion_timeout_seconds: PositiveFloat = 8
+    # Suggestion requests, counted apart from pose requests in windows of the same lengths.
+    suggestion_rate_limit: PositiveInt = 10
+    suggestion_global_limit: PositiveInt = 500
 
     # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
     # leaves the window, so codes cannot be guessed. High, because phones on one Wi-Fi or carrier address share it,

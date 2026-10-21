@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -12,6 +12,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentGeneratingBinding
+import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
@@ -45,11 +46,11 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
     private fun render(binding: FragmentGeneratingBinding, candidates: PoseCandidateAdapter, state: GenerationUiState) {
         binding.sceneImage.setImageBitmap(state.scene)
         candidates.submitList(state.slots())
-        // Until the templates are there, the number of poses is not known.
-        binding.readyCount.text = if (state.templates.isEmpty()) {
-            getString(R.string.creating_pose)
-        } else {
-            getString(R.string.ready_count, state.readyCount, state.templates.size)
+        // Until the poses are there, the number of slots is not known; suggestions take the first seconds.
+        binding.readyCount.text = when {
+            state.poses.isNotEmpty() -> getString(R.string.ready_count, state.readyCount, state.poses.size)
+            state.request == PoseRequest.Suggested -> getString(R.string.choosing_poses)
+            else -> getString(R.string.creating_pose)
         }
 
         // A phase change can arrive twice before this screen is gone; navigate only while it is still in front.
@@ -66,6 +67,7 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
             GenerationUiState.Phase.IDLE,
             GenerationUiState.Phase.FRAMING,
             GenerationUiState.Phase.REVIEWING,
+            GenerationUiState.Phase.DESCRIBING,
             -> navController.popBackStack(R.id.cameraFragment, false)
         }
     }

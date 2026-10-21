@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 """Compare image-editing models on OpenRouter for pose generation (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY set:
@@ -10,7 +10,9 @@ It does not import pix_server. Run it through uv from server/ with OPENROUTER_AP
     uv run scripts/compare_image_edit_apis.py --list-models
 
 Each scene is prepared the way the app sends it (upright, long side 1024 px, JPEG 85, no EXIF). For every
-scene and model the poses are requested in parallel, like the app's four POST /poses calls. The images,
+scene and model the poses are requested in parallel, like the app's four POST /poses calls: the four default poses,
+or each --pose-text (pass the same one four times to request one set for a description). Every pose goes into
+--prompt, which defaults to the server's pose prompt in src/pix_server/poses/prompts.toml. The images,
 results.json, and report.html (originals next to the candidates, for judging identity and background
 preservation) go to scripts/out/<timestamp>/. Every returned image is billed to the OpenRouter key.
 """
@@ -27,6 +29,7 @@ import random
 import statistics
 import sys
 import time
+import tomllib
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -47,25 +50,29 @@ DEFAULT_MODELS = [
     "google/gemini-3.1-flash-lite-image",
 ]
 
-# The server's prompt (Design Documentation 2.6.3), which wraps each template's pose description. It lets the
-# model re-place the person, and pins the camera framing so the candidate still lines up with the live view.
-PROMPT = (
-    "Keep the same person (face, hair, clothing). Keep the background, camera position, framing, and lighting "
-    "exactly as they are: do not zoom, crop, or shift the scene. Recompose the shot like a skilled photographer "
-    "would: judge whether the person is too far, too close, or poorly placed, and if so move them to a better "
-    "spot and distance in this scene. Change the person's pose to: {pose}. Show the full body, standing on the "
-    "ground at a natural scale. Photorealistic."
-)
-POSES = {
-    "hands_on_hips": "standing with both hands on the hips",
-    "wave": "waving at the camera with one raised hand",
-    "walking": "walking toward the camera in mid-stride",
-    "arms_crossed": "standing with the arms crossed over the chest",
-}
+# The server's pose prompt and default poses (Design Documentation 2.6.3), read from the file the server reads, so a
+# run tries what the server sends; --prompt tries another wording without editing it.
+PROMPTS_FILE = Path(__file__).resolve().parents[1] / "src" / "pix_server" / "poses" / "prompts.toml"
+
+
+def one_line(text: str) -> str:
+    """Each run of whitespace becomes one space, as the server reads the file."""
+    return " ".join(text.split())
+
+
+def load_prompts() -> tuple[str, dict[str, str]]:
+    """The pose prompt and each default pose; the server checks the file."""
+    with PROMPTS_FILE.open("rb") as file:
+        data = tomllib.load(file)
+    poses = {default["id"]: one_line(default["pose"]) for default in data["default_poses"]}
+    return one_line(data["pose_prompt"]), poses
+
+
+PROMPT, POSES = load_prompts()
 
 SCENE_LONG_SIDE = 1024
 SCENE_JPEG_QUALITY = 85
-UPSTREAM_BUDGET = 30.0  # the server stops waiting for the image API after this (PIX_POSE_UPSTREAM_TIMEOUT_SECONDS)
+UPSTREAM_BUDGET = 60.0  # the server stops waiting for the image API after this (PIX_POSE_UPSTREAM_TIMEOUT_SECONDS)
 RESOLUTIONS = ["1K", "1.5K", "2K", "4K"]  # first match wins: candidates only need to match the 1024 px scene
 
 
@@ -213,7 +220,7 @@ def summarize(results: list[Result]) -> list[dict[str, str]]:
 
 
 def write_report(
-    out: Path, prompt: str, poses: dict[str, str], results: list[Result], summary: list[dict[str, str]]
+    out: Path, prompts: dict[str, str], poses: dict[str, str], results: list[Result], summary: list[dict[str, str]]
 ) -> None:
     def row(cells: list[str], tag: str = "td") -> str:
         return "<tr>" + "".join(f"<{tag}>{cell}</{tag}>" for cell in cells) + "</tr>"
@@ -231,7 +238,9 @@ def write_report(
         "<style>:root{color-scheme:light dark}body{font:14px/1.4 system-ui,sans-serif;margin:24px}"
         "table{border-collapse:collapse;margin:12px 0 32px}th,td{border:1px solid #8886;padding:6px 8px;"
         "text-align:left;vertical-align:top}img{width:220px;display:block}.bad{color:#d33}</style>",
-        f"<h1>Image edit comparison</h1><p>Prompt: {html.escape(prompt)}</p><ul>",
+        "<h1>Image edit comparison</h1>",
+        *(f"<p>{kind.capitalize()} prompt: {html.escape(prompt)}</p>" for kind, prompt in prompts.items()),
+        "<ul>",
         *(f"<li><b>{pose}</b>: {html.escape(text)}</li>" for pose, text in poses.items()),
         f"</ul><p>Red: failed, or slower than the server's {UPSTREAM_BUDGET:g} s upstream timeout.</p><table>",
         row(list(summary[0]), "th"),
@@ -315,9 +324,10 @@ async def run(args: argparse.Namespace) -> None:
 
     results = [result for results in sets for result in results]
     summary = summarize(results)
-    record = {"prompt": args.prompt, "poses": poses, "results": [asdict(result) for result in results]}
+    prompts = {"pose": args.prompt}
+    record = {"prompts": prompts, "poses": poses, "results": [asdict(result) for result in results]}
     (out / "results.json").write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-    write_report(out, args.prompt, poses, results, summary)
+    write_report(out, prompts, poses, results, summary)
     total = sum(result.cost or 0 for result in results)
     print(f"\n{table(summary)}\n\nTotal cost ${total:.3f}. Report: {out / 'report.html'}")
 
@@ -326,9 +336,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("scenes", nargs="*", type=Path, help="scene photos with the subject in frame")
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS, metavar="ID[@QUALITY]")
-    parser.add_argument("--poses", nargs="+", choices=list(POSES), help="pose templates (default: all four)")
+    parser.add_argument("--poses", nargs="+", choices=list(POSES), help="default poses (default: all)")
     parser.add_argument("--pose-text", action="append", default=[], metavar="TEXT", help="free-text pose, repeatable")
-    parser.add_argument("--prompt", default=PROMPT, metavar="TEMPLATE", help="prompt to try; {pose} becomes the pose")
+    parser.add_argument("--prompt", default=PROMPT, metavar="TEMPLATE", help="pose prompt; {pose} becomes the pose")
     parser.add_argument("--out", type=Path, help="output directory (default: scripts/out/<timestamp>)")
     parser.add_argument("--timeout", type=float, default=60.0, help="give up on a request after this many seconds")
     parser.add_argument("--concurrency", type=int, default=1, help="scene x model sets in flight; 1 is one user")

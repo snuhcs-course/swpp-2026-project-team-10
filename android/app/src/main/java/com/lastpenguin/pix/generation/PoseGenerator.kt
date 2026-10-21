@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -9,9 +9,10 @@ import kotlinx.coroutines.flow.Flow
  * Owner: Server/AI/Sync.
  */
 interface PoseGenerator {
-    /** GET /api/v1/pose-templates. */
-    suspend fun templates(): List<PoseTemplate>
-
-    /** Emits one [CandidateEvent] per template as each finishes. Cancel the collector to cancel the requests. */
-    fun generate(scene: Bitmap, templates: List<PoseTemplate>, seed: Long): Flow<CandidateEvent>
+    /**
+     * Emits [GenerationEvent.Planned] with the [POSE_COUNT] poses of [request] (for [PoseRequest.Suggested] once the
+     * server has chosen them), then one [CandidateEvent] per pose as each finishes. Throws when the poses cannot be
+     * had, for example offline. Cancel the collector to cancel the requests.
+     */
+    fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent>
 }

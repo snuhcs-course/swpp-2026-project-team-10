@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -438,8 +438,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             val navController = findNavController()
             val reviewing = generationViewModel.uiState.value.phase == GenerationUiState.Phase.REVIEWING
             if (reviewing && navController.currentDestination?.id == R.id.cameraFragment) {
+                // Generate poses asks what to pose before anything is sent (FR-4.8).
                 generationViewModel.useScene()
-                navController.navigate(R.id.action_camera_to_generating)
+                navController.navigate(R.id.action_camera_to_describePose)
             }
         }
         // System back does the same as the secondary action (R&S 6.9): Shoot again on the photo, Cancel on the camera.

@@ -281,6 +281,31 @@
     </style>
 
     <!-- A Generating poses / Pick a pose candidate. -->
+    <!-- A text field, such as the pose description on Generate poses (FR-4.8). -->
+    <style name="Widget.Pix.TextField" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/bg_text_field</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.BodyLarge</item>
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:textColorHint">@color/pix_text_faint</item>
+        <item name="android:textCursorDrawable">@null</item>
+    </style>
+
+    <!-- An idea chip on Generate poses (FR-4.8): a short pose that fills the description field when tapped. -->
+    <style name="Widget.Pix.IdeaChip" parent="Widget.Material3.Chip.Suggestion">
+        <item name="chipBackgroundColor">@color/pix_surface_2</item>
+        <item name="chipStrokeColor">@color/pix_outline</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
+        <item name="android:textColor">@color/pix_text_soft</item>
+        <item name="rippleColor">#14FFFFFF</item>
+    </style>
+
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">
         <item name="cardBackgroundColor">@color/pix_surface</item>
         <item name="cardCornerRadius">18dp</item>

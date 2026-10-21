@@ -21,8 +21,8 @@
             app:destination="@id/roomCodeSheet" />
         <!-- The scene photo is taken and confirmed on Camera (R&S 6.3); *Use this photo* starts Flow 2. -->
         <action
-            android:id="@+id/action_camera_to_generating"
-            app:destination="@id/generatingFragment" />
+            android:id="@+id/action_camera_to_describePose"
+            app:destination="@id/describePoseFragment" />
     </fragment>
 
     <!-- Flow 1: Add a pose guide -->
@@ -61,6 +61,17 @@
 
     <!-- Flow 2: Pose generation -->
     <fragment
+        android:id="@+id/describePoseFragment"
+        android:name="com.lastpenguin.pix.ui.generation.DescribePoseFragment"
+        android:label="Generate poses">
+        <action
+            android:id="@+id/action_describePose_to_generating"
+            app:destination="@id/generatingFragment"
+            app:popUpTo="@id/describePoseFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
         android:id="@+id/generatingFragment"
         android:name="com.lastpenguin.pix.ui.generation.GeneratingFragment"
         android:label="Generating poses">
@@ -85,9 +96,10 @@
             app:destination="@id/referenceConfirmFragment"
             app:popUpTo="@id/pickPoseFragment"
             app:popUpToInclusive="true" />
+        <!-- Try other poses: Generate poses again, with the photo and the description kept. -->
         <action
-            android:id="@+id/action_pickPose_to_generating"
-            app:destination="@id/generatingFragment"
+            android:id="@+id/action_pickPose_to_describePose"
+            app:destination="@id/describePoseFragment"
             app:popUpTo="@id/pickPoseFragment"
             app:popUpToInclusive="true" />
     </fragment>
@@ -99,6 +111,12 @@
         <action
             android:id="@+id/action_generationFailed_to_generating"
             app:destination="@id/generatingFragment"
+            app:popUpTo="@id/generationFailedFragment"
+            app:popUpToInclusive="true" />
+        <!-- The service rejected the description: Generate poses again, with the text kept (US-5). -->
+        <action
+            android:id="@+id/action_generationFailed_to_describePose"
+            app:destination="@id/describePoseFragment"
             app:popUpTo="@id/generationFailedFragment"
             app:popUpToInclusive="true" />
     </fragment>

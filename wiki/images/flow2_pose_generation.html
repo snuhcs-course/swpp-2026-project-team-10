@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pix · Wireflow 2: pose generation</title>
+<!--
+  Source of Figure 2 in the Requirements and Specifications (wiki/Requirements-and-Specifications.md, 6.3). The caption
+  and the screen table are in that page; this file holds only the drawing, on a 2500 × 1330 canvas.
+
+  To change the figure: edit this file, then render it over the image the page uses, for example on macOS:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
+      --force-device-scale-factor=1 --window-size=2500,1330 --screenshot=/tmp/flow2.png flow2_pose_generation.html
+    sips -s format jpeg -s formatOptions 92 /tmp/flow2.png --out flow2_pose_generation.jpg
+-->
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #1c1d22; }
+  .canvas { position: relative; width: 2500px; height: 1330px; background: #1c1d22; color: #e8eaf0; overflow: hidden;
+    font-family: "Pretendard", "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  .title { position: absolute; left: 42px; top: 38px; font-size: 38px; font-weight: 700; letter-spacing: -0.3px; }
+  .legend { position: absolute; left: 474px; top: 50px; width: 860px; font-size: 19px; line-height: 1.5; color: #b3b8c2; }
+
+  .phone { position: absolute; top: 138px; width: 250px; height: 502px; background: #262b31; border: 2px solid #3b414d;
+    border-radius: 26px; overflow: hidden; }
+  .phone.low { top: 787px; }
+  .phone.failure { border: 2px dashed #e3a196; }
+  .label { position: absolute; left: 20px; top: 16px; font-size: 13px; font-weight: 700; letter-spacing: 1.4px;
+    color: #a9afbb; }
+  .cam { position: absolute; left: 0; right: 0; top: 46px; height: 318px; background: #3a4151; }
+  .topbar { position: absolute; left: 18px; right: 12px; top: 13px; display: flex; justify-content: space-between;
+    align-items: center; font-size: 12.5px; font-weight: 700; }
+  .pill { background: #262b31; border-radius: 14px; padding: 5px 11px; font-size: 12px; font-weight: 600; }
+  .note { position: absolute; left: 18px; right: 18px; text-align: center; font-size: 12px; line-height: 1.35;
+    color: #b6bbc5; }
+  .btn { position: absolute; left: 18px; right: 18px; height: 40px; border-radius: 21px; display: flex;
+    align-items: center; justify-content: center; font-size: 13.5px; font-weight: 700; }
+  .btn.accent { background: #8fa7d7; color: #1c2030; }
+  .btn.outline { border: 1.5px solid #4c5363; color: #e3e6ec; }
+  .link { position: absolute; left: 0; right: 0; text-align: center; font-size: 13px; color: #b6bbc5; }
+  .shutter { position: absolute; left: 96px; top: 418px; width: 58px; height: 58px; border: 3px solid #e8eaf0;
+    border-radius: 50%; }
+  .dots { position: absolute; left: 0; right: 0; top: 330px; display: flex; justify-content: center; gap: 12px; }
+  .dots i { width: 22px; height: 22px; border-radius: 50%; background: #262b31; display: block; }
+  .dots i.on { background: transparent; border: 2.5px solid #8fa7d7; }
+  .figure { position: absolute; }
+
+  .photo-row { position: absolute; left: 18px; right: 18px; display: flex; align-items: center; gap: 12px; }
+  .thumb { width: 52px; height: 68px; border-radius: 9px; background: #3a4151; flex: none; }
+  .photo-row b { display: block; font-size: 12.5px; }
+  .photo-row span { display: block; font-size: 11.5px; color: #b6bbc5; margin-top: 2px; }
+  .slots { position: absolute; left: 18px; right: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .slot { height: 116px; border-radius: 9px; background: #2c3039; display: flex; align-items: center;
+    justify-content: center; font-size: 11.5px; color: #b6bbc5; }
+  .slot.creating { background: transparent; border: 2px dashed #4f5664; }
+  .slot.selected { outline: 2.5px solid #9fb0d4; outline-offset: -2.5px; }
+  .slots.pick .slot { height: 148px; }
+
+  .sub { position: absolute; left: 18px; right: 18px; font-size: 11px; line-height: 1.35; color: #b6bbc5; }
+  .field-label { position: absolute; left: 18px; font-size: 12px; font-weight: 700; }
+  .field { position: absolute; left: 18px; right: 18px; height: 34px; border-radius: 9px; border: 1.5px solid #4c5363;
+    background: #2c3039; font-size: 10.5px; color: #8d93a0; display: flex; align-items: center; padding: 0 10px; }
+  .counter { position: absolute; left: 26px; font-size: 10.5px; color: #8d93a0; }
+  .ideas-label { position: absolute; left: 18px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: #a9afbb; }
+  .chips { position: absolute; left: 18px; right: 18px; display: flex; flex-direction: column; align-items: flex-start;
+    gap: 5px; }
+  .chips span { font-size: 10.5px; border: 1.5px solid #4c5363; border-radius: 7px; padding: 4px 8px; background: #2c3039; }
+
+  .badge { position: absolute; left: 18px; top: 16px; background: #4a3436; color: #e9b3ab; font-size: 11.5px;
+    font-weight: 700; letter-spacing: 0.8px; border-radius: 8px; padding: 4px 9px; }
+  .fail-title { position: absolute; left: 18px; top: 50px; font-size: 16px; font-weight: 700; }
+  .fail-icon { position: absolute; left: 95px; top: 104px; width: 60px; height: 60px; border: 2.5px solid #e3a196;
+    border-radius: 50%; }
+  .refused { position: absolute; left: 18px; right: 18px; border-radius: 9px; background: #2f2a2e; color: #e2b9b2;
+    font-size: 11px; line-height: 1.4; padding: 8px 10px; }
+
+  .dialog { position: absolute; left: 18px; right: 18px; top: 84px; border-radius: 14px; background: #3a4151;
+    padding: 16px; }
+  .dialog b { display: block; font-size: 14px; line-height: 1.35; }
+  .dialog p { margin: 9px 0 14px; font-size: 11.5px; line-height: 1.45; color: #c7cbd4; }
+  .dialog .actions { display: flex; justify-content: flex-end; gap: 14px; font-size: 12px; font-weight: 700;
+    color: #9fb4e2; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 152px; background: #2b3037;
+    border-top-left-radius: 18px; border-top-right-radius: 18px; }
+  .sheet i { position: absolute; left: 108px; top: 12px; width: 34px; height: 4px; border-radius: 2px; background: #555c69; }
+  .sheet span { position: absolute; left: 18px; top: 36px; font-size: 15px; color: #8d93a0; font-weight: 600; }
+
+  .box { position: absolute; width: 250px; border: 2px dashed #6b707c; border-radius: 16px; display: flex;
+    flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 18px;
+    line-height: 1.35; color: #e8eaf0; padding: 12px; }
+  .box b { font-weight: 700; }
+  svg.arrows { position: absolute; left: 0; top: 0; }
+  svg.arrows text { font-size: 20px; fill: #b3b8c2; font-family: inherit; }
+  svg.arrows text.error { fill: #e3a196; }
+  svg.arrows text.small { font-size: 16px; fill: #8f95a1; }
+</style>
+</head>
+<body>
+<!-- Figures: grey people in the poses of the drawing, reused with <use>. -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="head"><circle cx="30" cy="13" r="9" fill="#7d8699"/></g>
+    <symbol id="fig-stand" viewBox="0 0 60 120"><use href="#head"/>
+      <g stroke="#7d8699" stroke-linecap="round" fill="none"><path d="M30 27 V70" stroke-width="13"/>
+      <path d="M24 31 L20 64 M36 31 L40 64" stroke-width="7"/><path d="M27 70 L26 114 M33 70 L34 114" stroke-width="8"/></g></symbol>
+    <symbol id="fig-hips" viewBox="0 0 60 120"><use href="#head"/>
+      <g stroke="#7d8699" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M30 27 V70" stroke-width="13"/>
+      <path d="M24 31 L14 47 L25 60 M36 31 L46 47 L35 60" stroke-width="7"/><path d="M27 70 L26 114 M33 70 L34 114" stroke-width="8"/></g></symbol>
+    <symbol id="fig-wave" viewBox="0 0 60 120"><use href="#head"/>
+      <g stroke="#7d8699" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M30 27 V70" stroke-width="13"/>
+      <path d="M24 31 L20 64 M36 31 L45 17 L47 3" stroke-width="7"/><path d="M27 70 L26 114 M33 70 L34 114" stroke-width="8"/></g></symbol>
+    <symbol id="fig-walk" viewBox="0 0 60 120"><use href="#head"/>
+      <g stroke="#7d8699" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M30 27 V70" stroke-width="13"/>
+      <path d="M24 31 L17 60 M36 31 L42 58" stroke-width="7"/><path d="M28 70 L19 113 M32 70 L41 111" stroke-width="8"/></g></symbol>
+    <symbol id="fig-cross" viewBox="0 0 60 120"><use href="#head"/>
+      <g stroke="#7d8699" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M30 27 V70" stroke-width="13"/>
+      <path d="M23 32 L21 44 L39 46 M37 32 L39 42 L22 48" stroke-width="6"/><path d="M27 70 L26 114 M33 70 L34 114" stroke-width="8"/></g></symbol>
+    <symbol id="fig-lean" viewBox="0 0 60 120"><use href="#head"/>
+      <g stroke="#7d8699" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M30 27 L33 70" stroke-width="13"/>
+      <path d="M24 31 L18 52 L24 60 M36 31 L42 62" stroke-width="7"/><path d="M30 70 L36 114 M36 70 L28 100 L37 113" stroke-width="8"/></g></symbol>
+  </defs>
+</svg>
+
+<div class="canvas">
+  <div class="title">2 · Pose generation</div>
+  <div class="legend">Arrows are user actions. Dashed coral frames are failure cases. Grey figures are the person; the
+    poses on the last two screens are examples.</div>
+
+  <!-- Entry -->
+  <div class="box" style="left:42px; top:337px; height:106px"><b>From Add a pose guide</b>tap Generate poses here</div>
+
+  <!-- Scene photo -->
+  <div class="phone" style="left:474px">
+    <div class="label">SCENE PHOTO</div>
+    <div class="cam">
+      <div class="topbar"><span>Take the scene photo</span><span class="pill">Cancel</span></div>
+      <svg class="figure" style="left:85px; top:120px" width="80" height="160"><use href="#fig-stand"/></svg>
+      <div class="dots" style="top:278px"><i></i><i class="on"></i><i></i></div>
+    </div>
+    <div class="note" style="top:376px">Frame the person and the place, then press the shutter.</div>
+    <div class="shutter"></div>
+  </div>
+
+  <!-- Scene photo · Review -->
+  <div class="phone" style="left:906px">
+    <div class="label">SCENE PHOTO · REVIEW</div>
+    <div class="cam">
+      <div class="topbar"><span>Use this photo?</span><span class="pill">Cancel</span></div>
+      <svg class="figure" style="left:85px; top:120px" width="80" height="160"><use href="#fig-stand"/></svg>
+    </div>
+    <div class="note" style="top:376px">Pix sends this photo to create the poses.</div>
+    <div class="btn outline" style="top:432px; right:136px; height:40px; font-size:12.5px">Shoot again</div>
+    <div class="btn accent" style="top:432px; left:124px; font-size:12.5px">Use this photo</div>
+  </div>
+
+  <!-- Generate poses (It 2) -->
+  <div class="phone" style="left:1338px">
+    <div class="label">GENERATE POSES</div>
+    <div class="sub" style="top:44px">← Describe a pose, or let Pix suggest four for this place</div>
+    <div class="photo-row" style="top:80px"><div class="thumb" style="width:40px; height:52px"></div>
+      <div><b>Your photo</b><span>Same person and place · up to 60 s</span></div></div>
+    <div class="field-label" style="top:144px">Describe the pose</div>
+    <div class="field" style="top:164px">e.g. Leaning on the wall, one hand in a pocket</div>
+    <div class="counter" style="top:202px">0/100</div>
+    <div class="ideas-label" style="top:224px">IDEAS</div>
+    <div class="chips" style="top:238px">
+      <span>Looking back over my shoulder</span><span>Walking toward the camera, smiling</span>
+      <span>Hands in pockets, looking up</span><span>Leaning on something, arms crossed</span>
+      <span>Sitting down, hugging my knees</span><span>Jumping with both arms up</span>
+    </div>
+    <div class="btn accent" style="top:412px; height:36px">Generate 4 poses</div>
+    <div class="btn outline" style="top:455px; height:36px; font-size:12.5px">Skip, suggest poses for me</div>
+  </div>
+
+  <!-- Generating poses -->
+  <div class="phone" style="left:1770px">
+    <div class="label">GENERATING POSES</div>
+    <div class="photo-row" style="top:50px"><div class="thumb"></div>
+      <div><b>Your photo</b><span>Same person and place · up to 60 s</span></div></div>
+    <div class="slots" style="top:136px">
+      <div class="slot"><svg width="54" height="108"><use href="#fig-lean"/></svg></div>
+      <div class="slot"><svg width="54" height="108"><use href="#fig-wave"/></svg></div>
+      <div class="slot creating">Creating…</div>
+      <div class="slot creating">Creating…</div>
+    </div>
+    <div class="note" style="top:400px; font-size:13.5px; font-weight:700; color:#e8eaf0">2 of 4 ready</div>
+    <div class="note" style="top:422px; font-size:11px">"Choosing poses…" until the poses are known</div>
+    <div class="link" style="top:462px">Cancel</div>
+  </div>
+
+  <!-- Pick a pose -->
+  <div class="phone" style="left:2202px">
+    <div class="label">PICK A POSE</div>
+    <div class="slots pick" style="top:46px">
+      <div class="slot selected"><svg width="62" height="124"><use href="#fig-lean"/></svg></div>
+      <div class="slot"><svg width="62" height="124"><use href="#fig-wave"/></svg></div>
+      <div class="slot"><svg width="62" height="124"><use href="#fig-walk"/></svg></div>
+      <div class="slot"><svg width="62" height="124"><use href="#fig-cross"/></svg></div>
+    </div>
+    <div class="btn accent" style="top:394px">Use this pose</div>
+    <div class="link" style="top:454px">Try other poses</div>
+  </div>
+
+  <!-- Consent notice -->
+  <div class="phone low" style="left:42px">
+    <div class="label">CONSENT NOTICE</div>
+    <div class="dialog"><b>Send this photo to an AI service?</b>
+      <p>To create poses, Pix sends the scene photo you take next through the Pix server to an external AI image
+        service. The Pix server does not keep the photo.</p>
+      <div class="actions"><span>Not now</span><span>Agree and continue</span></div></div>
+    <div class="sheet"><i></i><span>Add a pose guide</span></div>
+  </div>
+
+  <!-- Couldn't create poses -->
+  <div class="phone low failure" style="left:1770px">
+    <div class="badge">FAILURE</div>
+    <div class="fail-title">Couldn't create poses</div>
+    <div class="fail-icon"><svg width="56" height="56" viewBox="0 0 56 56"><g stroke="#e3a196" stroke-width="2.5"
+      stroke-linecap="round" fill="none"><path d="M17 25 Q28 16 39 25 M21 31 Q28 25 35 31"/><path d="M17 39 L39 17"/>
+      <circle cx="28" cy="37" r="1.5" fill="#e3a196"/></g></svg></div>
+    <div class="note" style="top:184px">The request failed or took longer than 60 seconds. Your photo is kept, so you
+      can try again.</div>
+    <div class="photo-row" style="top:240px"><div class="thumb"></div><div><span style="font-size:12px">Your photo</span></div></div>
+    <div class="refused" style="top:326px">If the service refused the description: "Try a different description" and
+      <b>Edit description</b> in place of Try again</div>
+    <div class="btn accent" style="top:404px">Try again</div>
+    <div class="link" style="top:458px">Back to camera</div>
+  </div>
+
+  <!-- To Reference confirm -->
+  <div class="box" style="left:2202px; top:787px; height:106px"><b>To Reference confirm</b>same step as an uploaded photo</div>
+
+  <!-- Arrows -->
+  <svg class="arrows" width="2500" height="1330" viewBox="0 0 2500 1330">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8f9a"/></marker></defs>
+    <g stroke="#7f848f" stroke-width="2.5" fill="none" marker-end="url(#ah)">
+      <path d="M292 390 H470"/>
+      <path d="M167 443 V783"/>
+      <path d="M292 1038 H599 V644"/>
+      <path d="M724 348 H902"/>
+      <path d="M906 432 H728"/>
+      <path d="M1156 390 H1334"/>
+      <path d="M1588 390 H1766"/>
+      <path d="M2020 390 H2198"/>
+      <path d="M1852 640 V783"/>
+      <path d="M1938 787 V644"/>
+      <path d="M1770 1150 H1463 V644"/>
+      <path d="M2327 138 V104 H1463 V134"/>
+      <path d="M2327 640 V783"/>
+    </g>
+    <text x="381" y="368" text-anchor="middle">later times</text>
+    <text x="190" y="620">first time</text>
+    <text x="446" y="1016" text-anchor="middle">agree</text>
+    <text x="813" y="326" text-anchor="middle">shutter</text>
+    <text x="813" y="466" text-anchor="middle">shoot again</text>
+    <text x="1247" y="368" text-anchor="middle">use this photo</text>
+    <text x="1679" y="352" text-anchor="middle">generate 4 poses</text>
+    <text x="1679" y="376" text-anchor="middle">or skip</text>
+    <text x="2111" y="368" text-anchor="middle">ready</text>
+    <text x="1838" y="720" text-anchor="end" class="error">error</text>
+    <text x="1956" y="720">try again</text>
+    <text x="1616" y="1132" text-anchor="middle">edit description</text>
+    <text x="1616" y="1180" text-anchor="middle" class="small">when the description was refused</text>
+    <text x="1895" y="92" text-anchor="middle">try other poses · photo and description kept</text>
+    <text x="2348" y="720">select</text>
+  </svg>
+</div>
+</body>
+</html>

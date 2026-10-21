@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-20, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 """Compare image-editing models on OpenRouter for pose generation (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY set:
@@ -7,13 +7,12 @@ It does not import pix_server. Run it through uv from server/ with OPENROUTER_AP
     uv run scripts/compare_image_edit_apis.py scene.jpg --models openai/gpt-image-2@low qwen/qwen-image-3
     uv run scripts/compare_image_edit_apis.py scene.jpg --pose-text "벽에 기대서 한 손은 주머니에"
     uv run scripts/compare_image_edit_apis.py scene.jpg --prompt "Same person and place. New pose: {pose}."
-    uv run scripts/compare_image_edit_apis.py scene.jpg --pose-text "jumping" --description-prompt "Pose: {pose}."
     uv run scripts/compare_image_edit_apis.py --list-models
 
 Each scene is prepared the way the app sends it (upright, long side 1024 px, JPEG 85, no EXIF). For every
-scene and model the poses are requested in parallel, like the app's four POST /poses calls; pass the same
---pose-text four times to request one set for a description. Templates use --prompt and descriptions use
---description-prompt, which default to the server's two prompts in src/pix_server/poses/prompts.toml. The images,
+scene and model the poses are requested in parallel, like the app's four POST /poses calls: the four default poses,
+or each --pose-text (pass the same one four times to request one set for a description). Every pose goes into
+--prompt, which defaults to the server's pose prompt in src/pix_server/poses/prompts.toml. The images,
 results.json, and report.html (originals next to the candidates, for judging identity and background
 preservation) go to scripts/out/<timestamp>/. Every returned image is billed to the OpenRouter key.
 """
@@ -51,8 +50,8 @@ DEFAULT_MODELS = [
     "google/gemini-3.1-flash-lite-image",
 ]
 
-# The server's prompts and templates (Design Documentation 2.6.3), read from the file the server reads, so a run tries
-# what the server sends; --prompt and --description-prompt try another wording without editing it.
+# The server's pose prompt and default poses (Design Documentation 2.6.3), read from the file the server reads, so a
+# run tries what the server sends; --prompt tries another wording without editing it.
 PROMPTS_FILE = Path(__file__).resolve().parents[1] / "src" / "pix_server" / "poses" / "prompts.toml"
 
 
@@ -61,15 +60,15 @@ def one_line(text: str) -> str:
     return " ".join(text.split())
 
 
-def load_prompts() -> tuple[str, str, dict[str, str]]:
-    """The template prompt, the description prompt, and each template's pose; the server checks the file."""
+def load_prompts() -> tuple[str, dict[str, str]]:
+    """The pose prompt and each default pose; the server checks the file."""
     with PROMPTS_FILE.open("rb") as file:
         data = tomllib.load(file)
-    poses = {template["id"]: one_line(template["pose"]) for template in data["templates"]}
-    return one_line(data["template_prompt"]), one_line(data["description_prompt"]), poses
+    poses = {default["id"]: one_line(default["pose"]) for default in data["default_poses"]}
+    return one_line(data["pose_prompt"]), poses
 
 
-PROMPT, DESCRIPTION_PROMPT, POSES = load_prompts()
+PROMPT, POSES = load_prompts()
 
 SCENE_LONG_SIDE = 1024
 SCENE_JPEG_QUALITY = 85
@@ -315,10 +314,7 @@ async def run(args: argparse.Namespace) -> None:
 
         async def run_set(scene: Scene, model: Model) -> list[Result]:
             async with gate:
-                prompts = {
-                    pose: (args.prompt if pose in POSES else args.description_prompt).replace("{pose}", text)
-                    for pose, text in poses.items()
-                }
+                prompts = {pose: args.prompt.replace("{pose}", text) for pose, text in poses.items()}
                 requests = (
                     edit(client, scene, model, pose, prompt, out, args.timeout) for pose, prompt in prompts.items()
                 )
@@ -328,9 +324,7 @@ async def run(args: argparse.Namespace) -> None:
 
     results = [result for results in sets for result in results]
     summary = summarize(results)
-    prompts = {"template": args.prompt} if templates else {}
-    if args.pose_text:
-        prompts["description"] = args.description_prompt
+    prompts = {"pose": args.prompt}
     record = {"prompts": prompts, "poses": poses, "results": [asdict(result) for result in results]}
     (out / "results.json").write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
     write_report(out, prompts, poses, results, summary)
@@ -342,15 +336,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("scenes", nargs="*", type=Path, help="scene photos with the subject in frame")
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS, metavar="ID[@QUALITY]")
-    parser.add_argument("--poses", nargs="+", choices=list(POSES), help="pose templates (default: all)")
+    parser.add_argument("--poses", nargs="+", choices=list(POSES), help="default poses (default: all)")
     parser.add_argument("--pose-text", action="append", default=[], metavar="TEXT", help="free-text pose, repeatable")
-    parser.add_argument("--prompt", default=PROMPT, metavar="TEMPLATE", help="template prompt; {pose} becomes the pose")
-    parser.add_argument(
-        "--description-prompt",
-        default=DESCRIPTION_PROMPT,
-        metavar="TEMPLATE",
-        help="prompt for --pose-text; {pose} becomes the text",
-    )
+    parser.add_argument("--prompt", default=PROMPT, metavar="TEMPLATE", help="pose prompt; {pose} becomes the pose")
     parser.add_argument("--out", type=Path, help="output directory (default: scripts/out/<timestamp>)")
     parser.add_argument("--timeout", type=float, default=60.0, help="give up on a request after this many seconds")
     parser.add_argument("--concurrency", type=int, default=1, help="scene x model sets in flight; 1 is one user")
@@ -358,8 +346,8 @@ def main() -> None:
     args = parser.parse_args()
     if not args.scenes and not args.list_models:
         parser.error("give at least one scene photo, or --list-models")
-    if "{pose}" not in args.prompt or "{pose}" not in args.description_prompt:
-        parser.error("--prompt and --description-prompt need a {pose} placeholder")
+    if "{pose}" not in args.prompt:
+        parser.error("--prompt needs a {pose} placeholder")
     asyncio.run(run(args))
 
 

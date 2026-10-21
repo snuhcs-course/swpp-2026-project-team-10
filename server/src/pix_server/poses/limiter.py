@@ -1,13 +1,15 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
-"""How many poses the image API is asked for (Design Documentation 2.8, Privacy): per client address, so one phone
-cannot use up the image API, and over everyone, which bounds what a day can cost."""
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+"""How many poses and suggestions the models are asked for (Design Documentation 2.8, Privacy): per client address,
+so one phone cannot use up the models, and over everyone, which bounds what a day can cost. Poses and suggestions
+are counted apart, in windows of the same lengths."""
 
 from typing import Literal
 
 from pix_server.config import Settings
 from pix_server.store import SessionStore, Window
 
-GLOBAL_KEY = "rate:pose:all"
+Kind = Literal["poses", "suggestions"]
+PREFIXES: dict[Kind, str] = {"poses": "rate:pose", "suggestions": "rate:suggest"}
 
 
 class PoseLimiter:
@@ -18,12 +20,16 @@ class PoseLimiter:
         self._store = store
         self._settings = settings
 
-    async def refuse(self, client: str) -> Literal["client", "global"] | None:
-        """Counts a request for `client`; returns the window that refused it, or None."""
-        per_client = Window(
-            f"rate:pose:{client}", self._settings.pose_rate_limit, self._settings.pose_rate_window_seconds
-        )
-        overall = Window(GLOBAL_KEY, self._settings.pose_global_limit, self._settings.pose_global_window_seconds)
+    async def refuse(self, client: str, kind: Kind = "poses") -> Literal["client", "global"] | None:
+        """Counts a request of `kind` for `client`; returns the window that refused it, or None."""
+        settings = self._settings
+        if kind == "poses":
+            limit, global_limit = settings.pose_rate_limit, settings.pose_global_limit
+        else:
+            limit, global_limit = settings.suggestion_rate_limit, settings.suggestion_global_limit
+        prefix = PREFIXES[kind]
+        per_client = Window(f"{prefix}:{client}", limit, settings.pose_rate_window_seconds)
+        overall = Window(f"{prefix}:all", global_limit, settings.pose_global_window_seconds)
         full = await self._store.allow(per_client, overall)
         if full is None:
             return None

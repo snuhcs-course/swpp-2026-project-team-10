@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -38,6 +38,7 @@ from pix_server.errors import (
 from pix_server.poses.generator import PoseGenerator
 from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.router import router as poses_router
+from pix_server.poses.suggester import PoseSuggester
 from pix_server.signaling.registry import SessionRegistry
 from pix_server.signaling.router import router as signaling_router
 from pix_server.store import SessionStore, open_redis
@@ -91,9 +92,10 @@ def create_app(
     google: GoogleVerifier | None = None,
     password_hasher: PasswordHasher | None = None,
 ) -> FastAPI:
-    """`image_api` replaces the network connection to the image API, `redis` opens the session store, `google`
-    verifies Google ID tokens, and `password_hasher` sets the cost of argon2id; tests pass fakes or cheaper ones.
-    `clock` is wall-clock time, because every worker compares it with times other workers stored."""
+    """`image_api` replaces the network connection to OpenRouter, for the image and suggestion models, `redis` opens
+    the session store, `google` verifies Google ID tokens, and `password_hasher` sets the cost of argon2id; tests pass
+    fakes or cheaper ones. `clock` is wall-clock time, because every worker compares it with times other workers
+    stored."""
     config = settings if settings is not None else Settings()
 
     @asynccontextmanager
@@ -119,6 +121,7 @@ def create_app(
                 httpx2.AsyncClient() as google_http,
             ):
                 app.state.pose_generator = PoseGenerator(config, http)
+                app.state.pose_suggester = PoseSuggester(config, http)
                 app.state.google = google or GoogleTokenVerifier(config.google_client_id, google_http, clock)
                 await registry.start()
                 try:

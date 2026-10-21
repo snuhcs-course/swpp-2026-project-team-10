@@ -265,7 +265,7 @@ class GenerationViewModelTest {
         run.send(*(1..4).map { failed("pose-$it", GenerationError.REJECTED) }.toTypedArray())
         run.finish()
         runCurrent()
-        // Couldn't create poses says "Try a different description" (US-5).
+        // Couldn't create poses offers a different description or another photo (US-5).
         assertEquals(GenerationUiState.Phase.FAILED, state.phase)
         assertTrue(state.descriptionRejected)
 

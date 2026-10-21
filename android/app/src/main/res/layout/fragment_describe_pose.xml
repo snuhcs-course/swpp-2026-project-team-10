@@ -119,14 +119,14 @@
             android:layout_marginTop="6dp"
             android:gravity="end">
 
-            <!-- Shown after the service rejected every pose of the description; the text is kept (US-5). -->
+            <!-- Shown after the service refused every pose of the description, for the photo or the text; the text is kept (US-5). -->
             <TextView
                 android:id="@+id/descriptionError"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:accessibilityLiveRegion="polite"
-                android:text="@string/try_different_description"
+                android:text="@string/description_refused"
                 android:textAppearance="@style/TextAppearance.Pix.Body.Small"
                 android:textColor="@color/pix_danger_text"
                 android:visibility="gone"

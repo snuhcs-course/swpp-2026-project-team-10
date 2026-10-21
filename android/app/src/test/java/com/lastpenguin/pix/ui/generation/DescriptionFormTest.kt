@@ -125,7 +125,7 @@ class DescriptionFormTest {
 
         assertEquals(View.VISIBLE, binding.descriptionError.visibility)
         assertEquals(
-            binding.root.context.getString(R.string.try_different_description),
+            binding.root.context.getString(R.string.description_refused),
             binding.descriptionError.text.toString(),
         )
         assertEquals("피 흘리는 모습", binding.descriptionInput.text.toString())

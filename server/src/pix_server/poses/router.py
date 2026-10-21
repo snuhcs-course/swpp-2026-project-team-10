@@ -105,12 +105,9 @@ async def create_pose(
             if await request.is_disconnected():
                 raise ApiError(499, "CLIENT_CLOSED_REQUEST", "The request was cancelled")
             await asyncio.wait({call}, timeout=DISCONNECT_POLL_SECONDS)
+        # A refusal keeps the generator's own message: the image service does not say whether it refused the photo or
+        # the text, and every pose of the current app, suggested ones included, arrives as a description (US-5).
         candidate = call.result()
-    except ApiError as exc:
-        if exc.code == "REJECTED" and description is not None:
-            # A refused description gets the message the app shows for it (US-5).
-            raise ApiError(exc.status, exc.code, "Try a different description") from None
-        raise
     finally:
         call.cancel()
     return PoseResponse(

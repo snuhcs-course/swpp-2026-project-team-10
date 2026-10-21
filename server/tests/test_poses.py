@@ -4,7 +4,7 @@
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
 # whitespace and line breaks, blank, 100 characters (after trimming) and 101. Scene: a JPEG within the contract, at
 # 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short. Image API: a candidate in JPEG, PNG,
-# or WEBP; a refusal (403) of a template and of a description; another failing status; an unreadable answer; no
+# or WEBP; a refusal (403) of a template and of a description, with one message for both; another failing status; an unreadable answer; no
 # answer in time; no key. Limits: each window full, and a request refused before the image API, which is not counted.
 import asyncio
 import base64
@@ -233,10 +233,12 @@ def test_declined_request_is_rejected(client, image_api, make_image):
     assert "description" not in message
 
 
-def test_declined_description_asks_for_another(client, image_api, make_image):
+def test_declined_description_gets_the_same_message_as_a_template(client, image_api, make_image):
+    # The image service does not say whether it refused the photo or the text, so the description is not blamed.
     image_api.fails(403, "Input flagged by moderation")
-    message = assert_error(describe_pose(client, make_image(), "Looking back over the shoulder"), 422, "REJECTED")
-    assert message == "Try a different description"
+    template = assert_error(create_pose(client, make_image()), 422, "REJECTED")
+    described = assert_error(describe_pose(client, make_image(), "Looking back over the shoulder"), 422, "REJECTED")
+    assert described == template
 
 
 def test_failure_with_a_description_still_answers_its_own_error(client, image_api, make_image):

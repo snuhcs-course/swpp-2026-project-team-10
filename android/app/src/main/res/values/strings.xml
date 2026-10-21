@@ -112,8 +112,8 @@
     <string name="describe_label">Describe the pose</string>
     <string name="describe_hint">e.g. Leaning on the wall, one hand in a pocket</string>
     <string name="description_counter">%1$d/%2$d</string>
-    <string name="try_different_description">Try a different description</string>
-    <string name="description_rejected_message">Try a different description. The AI service would not create “%1$s”. Your photo and text are kept.</string>
+    <string name="description_refused">The last set was refused. Try a different description, or another photo.</string>
+    <string name="description_rejected_message">The AI service would not create poses for “%1$s” with this photo. Try a different description, or go back to the camera and take another photo.</string>
     <string name="edit_description">Edit description</string>
     <string name="ideas_label">Ideas</string>
     <string name="generate_four_poses">Generate 4 poses</string>

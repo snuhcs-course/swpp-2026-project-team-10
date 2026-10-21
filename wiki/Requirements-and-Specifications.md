@@ -550,7 +550,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 2: pose generation](images/flow2_pose_generation.jpg)
 
-*Figure 2. Consent notice (the first time) → Scene photo → Scene photo · Review → Generate poses → Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. *Try other poses* goes back to Generate poses with the photo and the description kept, and so does *Edit description* when the service refused the description. The Scene photo frame draws zoom as in Figure 1, before the zoom slider (6.8); the table below defines the current controls. Redrawn on 2026-10-21 from `images/flow2_pose_generation.html`.*
+*Figure 2. Consent notice (the first time) → Scene photo → Scene photo · Review → Generate poses → Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. *Try other poses* goes back to Generate poses with the photo and the description kept, and so does *Edit description* when the service refused the description. The Scene photo frame draws zoom as in Figure 1, before the zoom slider (6.8); the table below defines the current controls. Redrawn on 2026-10-21.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|

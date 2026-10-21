@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 # The Pix server on the course server. deploy.sh drives this file and supplies the variables
 # On the server, use deploy.sh instead of calling docker compose by hand.
 name: pix
@@ -24,8 +24,8 @@ x-app: &app
     postgres:
       condition: service_healthy
   restart: unless-stopped
-  # Longer than Uvicorn's 35 s graceful shutdown, so a pose request in flight finishes.
-  stop_grace_period: 40s
+  # Longer than Uvicorn's 65 s graceful shutdown, so a pose request in flight finishes.
+  stop_grace_period: 70s
   logging: *logging
 
 services:

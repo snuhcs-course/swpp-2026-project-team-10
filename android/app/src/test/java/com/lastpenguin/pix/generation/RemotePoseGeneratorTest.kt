@@ -46,7 +46,7 @@ class RemotePoseGeneratorTest {
 
     private fun TestScope.generator() = RemotePoseGenerator(
         api,
-        timeoutMs = 30_000,
+        timeoutMs = RemotePoseGenerator.TIMEOUT_MS,
         images = images,
         imageDispatcher = StandardTestDispatcher(testScheduler),
     )
@@ -194,7 +194,7 @@ class RemotePoseGeneratorTest {
             .exceptionOrNull()
 
         assertTrue("$error", error is SocketTimeoutException)
-        assertEquals(30_000, currentTime)
+        assertEquals(RemotePoseGenerator.TIMEOUT_MS, currentTime)
         assertTrue(api.requests.isEmpty())
     }
 
@@ -279,7 +279,7 @@ class RemotePoseGeneratorTest {
 
         assertEquals(CandidateEvent.Failed("pose-3", GenerationError.TIMEOUT), events.last())
         assertEquals(3, events.count { it is CandidateEvent.Ready })
-        assertEquals(30_000, currentTime)
+        assertEquals(RemotePoseGenerator.TIMEOUT_MS, currentTime)
         assertEquals(listOf(SUGGESTED[2]), api.cancelled)
     }
 

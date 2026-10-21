@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -74,7 +74,7 @@ class AppContainer(context: Context) {
     private val pixApi: PixApi = Retrofit.Builder()
         .baseUrl(BuildConfig.SERVER_URL)
         // A pose arrives in one piece after 10–25 s. OkHttp's default gives up after 10 s without data, so wait
-        // past the generator's own 30 s limit and let that limit decide.
+        // past the generator's own 60 s limit and let that limit decide.
         .client(
             OkHttpClient.Builder()
                 .readTimeout(RemotePoseGenerator.TIMEOUT_MS + 5_000, TimeUnit.MILLISECONDS)

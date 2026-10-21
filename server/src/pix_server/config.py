@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
     # An OpenRouter image model id; append @low, @medium, or @high for a model that has quality tiers.
     pose_model: str = "openai/gpt-image-2.5-flare@low"
-    pose_upstream_timeout_seconds: PositiveFloat = 30
+    # As long as the app's own limit for a run (Design 2.6.3); the image model takes 15-20 s, and more on slow days.
+    pose_upstream_timeout_seconds: PositiveFloat = 60
     pose_rate_limit: PositiveInt = 20
     pose_rate_window_seconds: PositiveFloat = 3600
     # Pose requests over all clients together; it bounds what the image API can cost within the window.

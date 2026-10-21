@@ -226,7 +226,7 @@ class GenerationViewModel(
     /**
      * Ends in PICKING when at least one candidate arrived and in FAILED otherwise (FR-4.7), saying so when the service
      * rejected every pose of a description (US-5). One limit covers the whole run, the suggestions included, so
-     * Generating poses never lasts longer than the 30 s it says (NFR-4).
+     * Generating poses never lasts longer than the 60 s it says (NFR-4).
      */
     private suspend fun generate(scene: Bitmap, request: PoseRequest) {
         Timings.mark("pose.start", if (request is PoseRequest.Suggested) "suggested" else "described")

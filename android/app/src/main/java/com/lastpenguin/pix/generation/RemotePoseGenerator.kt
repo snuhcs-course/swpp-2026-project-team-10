@@ -162,8 +162,11 @@ class RemotePoseGenerator(
     }
 
     companion object {
-        /** Requests stop at 30 s (NFR-4). The HTTP client must wait longer than this, so that this limit decides. */
-        const val TIMEOUT_MS = 30_000L
+        /**
+         * Requests stop at 60 s (NFR-4), and a whole run too. The HTTP client must wait longer than this, so that this
+         * limit decides.
+         */
+        const val TIMEOUT_MS = 60_000L
 
         /** The server gives up on its model after 8 s and answers anyway; past this the description is repeated. */
         const val VARIATION_TIMEOUT_MS = 10_000L

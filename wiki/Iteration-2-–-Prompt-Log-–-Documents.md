@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]]
 
-One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11–10/23. Each prompt is quoted as it was sent; attachments are named in a note, and (…) marks a part of a long prompt that only repeated links or page text. Prompts are given in the order they were sent, translated from Korean where needed and shortened to the instruction; follow-ups that only confirmed a result are left out. The session was told, through `CLAUDE.md`, to commit or push only when asked, so each "commit" below is an explicit instruction.
+One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11–10/23. Each prompt is quoted as it was sent; attachments are named in a note, and (…) marks a part of a long prompt that only repeated links or page text. Prompts are given in the order they were sent; follow-ups that only confirmed a result are left out. The session was told, through `CLAUDE.md`, to commit or push only when asked, so each "commit" below is an explicit instruction.
 
 ## AI rules in CLAUDE.md and the PR template (#44, [#62])
 

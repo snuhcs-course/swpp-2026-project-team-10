@@ -400,7 +400,7 @@ interface PoseGenerator {
     fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent>
 }
 
-interface AuthRepository {                               // It 2 (FR-5.1–5.3, FR-5.11–5.14, AD-12); failures are AccountException
+interface AuthRepository {                               // It 2 (FR-5.1–5.3, FR-5.11–5.15, AD-12); failures are AccountException
     val state: StateFlow<AuthState>                      // Loading, SignedOut, or SignedIn(account); everything but friends works signed out
     val expired: SharedFlow<Unit>                        // the server refused the refresh token: ask to sign in again
     suspend fun signUp(pixId: String, password: String, displayName: String): Result<Account>  // PIX_ID_TAKEN, PIX_ID_INVALID, PASSWORD_INVALID
@@ -416,7 +416,7 @@ interface AuthRepository {                               // It 2 (FR-5.1–5.3, 
     suspend fun signOut()                                // on the server if it answers, on the phone always
 }
 
-interface FriendsRepository {                            // It 2 (FR-5.4–5.10); failures are AccountException
+interface FriendsRepository {                            // It 2 (FR-5.4–5.10, FR-5.16); failures are AccountException
     val friends: StateFlow<List<Friend>>
     val requests: StateFlow<List<FriendRequest>>         // received, pending
     val sentRequests: StateFlow<List<SentRequest>>       // sent, not answered yet (FR-5.16)

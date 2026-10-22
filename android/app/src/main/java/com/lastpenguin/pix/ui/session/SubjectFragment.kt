@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -106,8 +106,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         pinchZoom?.enabled = !ui.guideEditing
                         // The toggle sits beside the readout while a guide is on the video; a hidden guide cannot be edited.
                         binding.editGuideButton.isVisible = ui.guide != null
-                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
+                        // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
+                        // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
+                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)

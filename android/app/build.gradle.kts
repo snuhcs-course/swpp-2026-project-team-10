@@ -158,5 +158,6 @@ dependencies {
     testImplementation(libs.androidx.test.ext.junit)
     // Screen tests: FragmentScenario launches a Fragment in a debug-only activity under Robolectric.
     testImplementation(libs.androidx.fragment.testing)
+    testImplementation(libs.androidx.navigation.testing)
     debugImplementation(libs.androidx.fragment.testing.manifest)
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -147,9 +147,17 @@ class FakeCameraController(
 
     override fun setAspectRatio(ratio: AspectRatio) = Unit
 
-    override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())
+    /** When set, [takePhoto] saves to it; otherwise saving fails, as it does without a camera. */
+    var photo: Uri? = null
 
-    override suspend fun grabFrame(): Result<Bitmap> = Result.failure(UnsupportedOperationException())
+    /** When set, [grabFrame] returns it, so the scene photo step can be driven in a screen test. */
+    var frame: Bitmap? = null
+
+    override suspend fun takePhoto(): Result<Uri> =
+        photo?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+
+    override suspend fun grabFrame(): Result<Bitmap> =
+        frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
 
     override fun setFrameSink(sink: FrameSink?) {
         this.sink = sink

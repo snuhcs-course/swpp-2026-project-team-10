@@ -120,7 +120,10 @@ class AppContainer(
             // A pose arrives in one piece after 10–25 s. OkHttp's default gives up after 10 s without data, so wait
             // past the generator's own 60 s limit and let that limit decide.
             val pixApi: PixApi = retrofit(
-                OkHttpClient.Builder().readTimeout(RemotePoseGenerator.TIMEOUT_MS + 5_000, TimeUnit.MILLISECONDS).build(),
+                OkHttpClient.Builder().readTimeout(
+                    RemotePoseGenerator.TIMEOUT_MS + 5_000,
+                    TimeUnit.MILLISECONDS,
+                ).build(),
             ).create(PixApi::class.java)
 
             // Three clients, each with its own dispatcher: the refresh in AuthTokens must never queue behind the

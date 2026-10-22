@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -243,7 +243,7 @@ class CameraGuideGestureTest {
         val zoomRequests = mutableListOf<Float>()
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
-        override fun setZoom(ratio: Float) {
+        override fun setZoom(ratio: Float, final: Boolean) {
             zoomRequests += ratio
         }
 

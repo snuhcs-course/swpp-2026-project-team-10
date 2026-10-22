@@ -122,11 +122,12 @@ The rate limits are counted in the session store, so every worker counts against
 
 ## Accounts and friends
 
-The endpoints, request and response bodies, and error codes are in Design §2.5.3; the code is in [`src/pix_server/accounts/`](src/pix_server/accounts/). Every endpoint below except the four sign-ins and `/auth/refresh` needs `Authorization: Bearer <access token>` and answers `401 UNAUTHENTICATED` without it, or with an expired one. Pose generation and room codes need no sign-in (FR-5.1).
+The endpoints, request and response bodies, and error codes are in Design §2.5.3; the code is in [`src/pix_server/accounts/`](src/pix_server/accounts/). Every endpoint below except the four sign-ins, `/auth/check-pix-id`, and `/auth/refresh` needs `Authorization: Bearer <access token>` and answers `401 UNAUTHENTICATED` without it, or with an expired one. Pose generation and room codes need no sign-in (FR-5.1).
 
 | Endpoint | Result |
 | --- | --- |
 | `POST /auth/signup` | `{"pixId","password","displayName"}` → `201 {"accessToken","refreshToken","expiresIn","user"}`. A Pix ID is 4–20 of `a–z 0–9 . _`; a password is 8–64 characters with a letter and a digit, and not the Pix ID; `PIX_ID_INVALID` and `PASSWORD_INVALID` name the broken rule. |
+| `POST /auth/check-pix-id` | `{"pixId"}` → `{"available": true}` or `false`, for *Check* on Sign up and the Pix ID setup; `400 PIX_ID_INVALID` names the broken rule. Sign-up still refuses a Pix ID taken in the meantime. |
 | `POST /auth/login` | `{"pixId","password"}` → `200`, as above, or `401 INVALID_CREDENTIALS` for a wrong password and an unknown Pix ID alike. |
 | `POST /auth/google` | `{"idToken"}` → `200`, as above, or `404 NOT_REGISTERED` when no account uses that Google account; the app then asks whether the person has a Pix account. |
 | `POST /auth/refresh` | `{"refreshToken"}` → `200 {"accessToken","refreshToken","expiresIn"}`; the old refresh token stops working, and one used twice ends the sign-in (`401 INVALID_REFRESH_TOKEN`). |

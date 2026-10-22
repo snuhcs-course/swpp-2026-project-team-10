@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -21,6 +21,11 @@ val debugServerUrl: String = providers.gradleProperty("pix.serverUrl").orNull
     ?: "http://10.0.2.2:8000/"
 val releaseServerUrl = "http://swpp26t10.147-46-242-169.sslip.io/"
 
+// The web OAuth client of the team's Google Cloud project "Pix" (Design 2.8, Configuration). The app asks Google for
+// ID tokens addressed to it, and both servers check them against the same ID in `PIX_GOOGLE_CLIENT_ID`. It is not a
+// secret: every APK contains it.
+val googleServerClientId = "572788944856-cr72pqlradqibnep626t672driie7537.apps.googleusercontent.com"
+
 android {
     namespace = "com.lastpenguin.pix"
     compileSdk {
@@ -33,6 +38,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
     }
 
     buildTypes {
@@ -149,6 +155,11 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.constraintlayout)
 
+    // Accounts and friends (#54): Google sign-in through Credential Manager; the sign-in is kept in DataStore.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.
 
@@ -160,4 +171,7 @@ dependencies {
     testImplementation(libs.androidx.fragment.testing)
     testImplementation(libs.androidx.navigation.testing)
     debugImplementation(libs.androidx.fragment.testing.manifest)
+    // A real HTTP server on the JVM for the token refresh path, which lives in OkHttp's interceptor and
+    // authenticator, and for the signaling socket's client.
+    testImplementation(libs.okhttp.mockwebserver)
 }

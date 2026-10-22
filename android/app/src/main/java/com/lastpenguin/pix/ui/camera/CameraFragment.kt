@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -84,9 +84,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var previewLogged = false
     private var noticeJob: Job? = null
 
-    // The old ratio's last frame stays on screen until the rebound preview streams again (Design 2.6.2).
+    // The last frame stays on screen through a ratio change or a lens switch, until the rebound preview streams
+    // again (NFR-19, Design 2.6.2, 2.6.5).
+    private var previewHold: PreviewHold? = null
     private var stillJob: Job? = null
-    private var stillSawIdle = false
+
+    // The frame's ratio when the held frame was taken: the grid and the guide stay over a held frame of that ratio.
+    private var stillAspect: AspectRatio? = null
 
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (binding != null) {
@@ -99,6 +103,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val controls = FragmentCameraBinding.bind(view)
         binding = controls
         permissionRequested = savedInstanceState?.getBoolean(PERMISSION_REQUESTED) ?: permissionRequested
+        previewHold = PreviewHold(show = ::showStill, hide = ::hideStill)
         controls.previewView.scaleType = PreviewView.ScaleType.FIT_CENTER
         // TextureView composes predictably with guide and permission/error layers above it.
         controls.previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
@@ -107,13 +112,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             clipToFrame(controls.previewView, viewModel.uiState.value.aspect.frameAspect)
         }
         controls.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
+            Timings.mark("preview.stream", state.name)
             if (state == PreviewView.StreamState.STREAMING && !previewLogged) {
                 previewLogged = true
                 Timings.mark("camera.preview")
             }
-            if (stillJob != null) {
-                if (state == PreviewView.StreamState.IDLE) stillSawIdle = true
-                if (state == PreviewView.StreamState.STREAMING && stillSawIdle) releaseStill()
+            val hold = previewHold
+            if (hold != null) {
+                val holding = hold.holding
+                hold.onStream(state == PreviewView.StreamState.STREAMING)
+                if (hold.holding != holding) render(viewModel.uiState.value)
             }
         }
         // A pinch on the preview zooms while guide-edit mode is off (AD-17); each step is applied as it comes.
@@ -123,7 +131,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             range = ::zoomRange,
             current = { viewModel.uiState.value.zoom },
             onTap = ::onPreviewTap,
-        ) { ratio, _ -> viewModel.onZoomChanged(ratio) }
+        ) { ratio, final -> viewModel.onZoomChanged(ratio, final) }
         opacitySlider = TrackedSliderController(
             controls.opacitySlider,
             { getString(R.string.guide_opacity_percent, (it * 100f).roundToInt()) },
@@ -136,7 +144,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         ) { value, _ -> viewModel.onExposureChange(sliderIndex(value)) }
         controls.flashButton.setOnClickListener { viewModel.onFlashTap() }
         controls.aspectButton.setOnClickListener {
-            holdLastFrame(controls)
+            previewHold?.hold()
             viewModel.onAspectTap()
         }
         controls.brightnessButton.setOnClickListener {
@@ -159,9 +167,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.setOnClickListener {
             findNavController().navigate(R.id.action_camera_to_addGuide)
         }
+        // Friends, which also offers the room code without signing in (FR-8.1).
         controls.shootTogetherButton.setOnClickListener {
-            sessionViewModel.startRoom()
-            findNavController().navigate(R.id.action_camera_to_roomCode)
+            findNavController().navigate(R.id.action_camera_to_friends)
         }
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
@@ -295,8 +303,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         opacitySlider = null
         brightnessSlider?.finishInteraction()
         brightnessSlider = null
-        stillJob?.cancel()
-        stillJob = null
+        previewHold?.release()
+        previewHold = null
         binding = null
         sceneBack = null
         previewLogged = false
@@ -459,13 +467,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val granted = hasCameraPermission()
         val ready = granted && state.cameraStatus == CameraStatus.READY
         val unavailable = state.cameraStatus == CameraStatus.UNAVAILABLE
-        controls.compositionOverlay.isVisible = ready
+        // First, so a frame held from here on also hides the spinner below.
+        previewHold?.onStatus(state.cameraStatus)
+        // Over a held frame of the same ratio (a lens switch) the grid and the guide stay; after a ratio change they
+        // would not fit the old frame.
+        val overlays = ready || (previewHold?.holding == true && stillAspect == state.aspect)
+        controls.compositionOverlay.isVisible = overlays
         // The grid and the guide follow the chosen frame (AD-10); a new ratio re-fits both at once.
         controls.compositionOverlay.frameAspect = state.aspect.frameAspect
         controls.guideOverlay.frameAspect = state.aspect.frameAspect
         clipToFrame(controls.previewView, state.aspect.frameAspect)
         controls.guideOverlay.render(state.guide, state.guideState)
-        controls.guideOverlay.isVisible = ready
+        controls.guideOverlay.isVisible = overlays
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
         // and hiding the bar then would move the controls under an active touch.
         val guideEditable = granted && !unavailable
@@ -518,7 +531,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)
         controls.requestPermissionButton.isVisible =
             !granted && shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
-        controls.cameraProgress.isVisible = granted && !ready && !unavailable
+        // The held last frame stands for a camera that is about to stream again, so it shows no spinner.
+        controls.cameraProgress.isVisible = granted && !ready && !unavailable && previewHold?.holding != true
         controls.shutterButton.isEnabled = ready && !state.isSaving
         controls.shutterButton.contentDescription =
             getString(if (state.isSaving) R.string.saving_photo else R.string.shutter)
@@ -721,23 +735,28 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    /** Keeps the preview's last frame on screen while the camera rebinds for a new ratio (Design 2.6.2). */
-    private fun holdLastFrame(controls: FragmentCameraBinding) {
-        val frame = controls.previewView.bitmap ?: return
+    /** Puts the preview's last frame over it while the camera rebinds (PreviewHold); false without a frame. */
+    private fun showStill(): Boolean {
+        val controls = binding ?: return false
+        val frame = controls.previewView.bitmap ?: return false
         controls.aspectStill.setImageBitmap(frame)
         // The bitmap is the whole camera image; show the old frame only, as the preview did.
         controls.aspectStill.clipBounds = controls.previewView.clipBounds
         controls.aspectStill.isVisible = true
-        stillSawIdle = false
+        stillAspect = viewModel.uiState.value.aspect
+        Timings.mark("preview.still", "on")
         stillJob?.cancel()
         // If the stream never reports a restart, the old frame still goes.
         stillJob = viewLifecycleOwner.lifecycleScope.launch {
             delay(STILL_TIMEOUT_MS)
-            releaseStill()
+            previewHold?.release()
+            render(viewModel.uiState.value)
         }
+        return true
     }
 
-    private fun releaseStill() {
+    private fun hideStill() {
+        Timings.mark("preview.still", "off")
         stillJob?.cancel()
         stillJob = null
         binding?.aspectStill?.let {

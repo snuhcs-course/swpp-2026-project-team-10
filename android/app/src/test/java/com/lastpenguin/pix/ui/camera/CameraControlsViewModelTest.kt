@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -269,7 +269,7 @@ class CameraControlsViewModelTest {
         val focusRequests = mutableListOf<Pair<Float, Float>>()
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
-        override fun setZoom(ratio: Float) = Unit
+        override fun setZoom(ratio: Float, final: Boolean) = Unit
         override fun setFocusPoint(x: Float, y: Float) {
             focusRequests += x to y
         }

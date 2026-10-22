@@ -1,10 +1,13 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.lastpenguin.pix.PixApplication
+import com.lastpenguin.pix.account.FakeAuthRepository
+import com.lastpenguin.pix.account.FakeFriendsRepository
+import com.lastpenguin.pix.account.FakeGoogleIdTokens
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
@@ -33,7 +36,7 @@ import kotlinx.coroutines.flow.flow
 /**
  * An [AppContainer] of fakes for screen tests under Robolectric (Testing Documentation 2.1.3): the camera, the
  * session, and the guide stores are the fakes of the module tests; the guide maker and pose generation answer when
- * the test says so ([maker], [generator]), and consent is already given. [install] puts it where [PixViewModels]
+ * the test says so ([maker], [generator]), consent is already given, and the account is signed out ([auth]). [install] puts it where [PixViewModels]
  * looks, so a Fragment launched by FragmentScenario gets its ViewModels with these modules.
  */
 class TestAppContainer(
@@ -47,6 +50,8 @@ class TestAppContainer(
     val consent = IdleConsent()
     val maker = ScriptedGuideMaker()
     val generator = ScriptedPoseGenerator()
+    val auth = FakeAuthRepository()
+    val friends = FakeFriendsRepository()
     private val syncer = GuideSyncer(session, guides, mirror, FakeGuideImageCodec())
 
     val container = AppContainer(
@@ -57,6 +62,9 @@ class TestAppContainer(
         referenceGuideMaker = maker,
         poseGenerator = generator,
         generationConsent = consent,
+        authRepository = auth,
+        friendsRepository = friends,
+        googleIdTokens = FakeGoogleIdTokens(),
         sessionManager = session,
         remoteVideo = FakeRemoteVideo(),
         guideSyncer = syncer,

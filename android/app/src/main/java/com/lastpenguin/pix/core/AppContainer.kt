@@ -1,8 +1,22 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.lastpenguin.pix.BuildConfig
+import com.lastpenguin.pix.account.AuthRepository
+import com.lastpenguin.pix.account.AuthTokens
+import com.lastpenguin.pix.account.BearerTokens
+import com.lastpenguin.pix.account.CredentialManagerGoogleIdTokens
+import com.lastpenguin.pix.account.DataStoreSignInStore
+import com.lastpenguin.pix.account.FriendsRepository
+import com.lastpenguin.pix.account.GoogleIdTokens
+import com.lastpenguin.pix.account.OkHttpPresenceSockets
+import com.lastpenguin.pix.account.PresenceConnection
+import com.lastpenguin.pix.account.RemoteAuthRepository
+import com.lastpenguin.pix.account.RemoteFriendsRepository
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
@@ -10,7 +24,9 @@ import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.NARROWEST_FRAME_ASPECT
 import com.lastpenguin.pix.camera.PhotoSaver
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixApi
+import com.lastpenguin.pix.core.network.PixAuthApi
 import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
@@ -33,7 +49,12 @@ import com.lastpenguin.pix.session.WebRtcRuntime
 import com.lastpenguin.pix.session.WebpGuideImageCodec
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
+import com.lastpenguin.pix.session.signalingUrl
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -64,6 +85,10 @@ class AppContainer(
     // ---- Pose generation (#7) ---------------------------------------------------
     val poseGenerator: PoseGenerator,
     val generationConsent: GenerationConsent,
+    // ---- Accounts and friends (#54) ---------------------------------------------
+    val authRepository: AuthRepository,
+    val friendsRepository: FriendsRepository,
+    val googleIdTokens: GoogleIdTokens,
     // ---- Session, guide sync, remote zoom (#8, #9, #10) -------------------------
     val sessionManager: SessionManager,
     /** The photographer's live video for the Subject view. */
@@ -72,7 +97,10 @@ class AppContainer(
     val remoteControlHandler: RemoteControlHandler,
 ) {
     companion object {
-        /** The real modules, created once per process by [PixApplication]. */
+        /** Like the session's socket, so the course's proxy never sees it idle. */
+        private const val PRESENCE_PING_SECONDS = 15L
+
+        /** The real modules, created once per process by [PixApplication]; presence starts with them. */
         fun create(context: Context): AppContainer {
             val appContext = context.applicationContext
             val cameraController: CameraController = CameraXController(appContext, PhotoSaver(appContext))
@@ -80,20 +108,47 @@ class AppContainer(
                 InMemoryGuideRepository { cameraController.state.value.aspect.frameAspect }
             val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository { NARROWEST_FRAME_ASPECT }
 
-            val pixApi: PixApi = Retrofit.Builder()
+            /** Work that outlives every screen: loading the sign-in, presence. */
+            val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val json = Json { ignoreUnknownKeys = true }
+            fun retrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
                 .baseUrl(BuildConfig.SERVER_URL)
-                // A pose arrives in one piece after 10–25 s. OkHttp's default gives up after 10 s without data, so
-                // wait past the generator's own 60 s limit and let that limit decide.
-                .client(
-                    OkHttpClient.Builder()
-                        .readTimeout(RemotePoseGenerator.TIMEOUT_MS + 5_000, TimeUnit.MILLISECONDS)
-                        .build(),
-                )
-                .addConverterFactory(
-                    Json { ignoreUnknownKeys = true }.asConverterFactory("application/json".toMediaType()),
-                )
+                .client(client)
+                .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()
-                .create(PixApi::class.java)
+
+            // A pose arrives in one piece after 10–25 s. OkHttp's default gives up after 10 s without data, so wait
+            // past the generator's own 60 s limit and let that limit decide.
+            val pixApi: PixApi = retrofit(
+                OkHttpClient.Builder().readTimeout(RemotePoseGenerator.TIMEOUT_MS + 5_000, TimeUnit.MILLISECONDS).build(),
+            ).create(PixApi::class.java)
+
+            // Three clients, each with its own dispatcher: the refresh in AuthTokens must never queue behind the
+            // account calls that wait for it, or behind four pose requests (Design 2.5.3, Session tokens).
+            val authApi: PixAuthApi = retrofit(OkHttpClient()).create(PixAuthApi::class.java)
+            val authTokens = AuthTokens(DataStoreSignInStore(appContext), authApi, appScope)
+            val accountApi: PixAccountApi = BearerTokens(authTokens).let { bearer ->
+                retrofit(OkHttpClient.Builder().addInterceptor(bearer).authenticator(bearer).build())
+                    .create(PixAccountApi::class.java)
+            }
+            val authRepository: AuthRepository = RemoteAuthRepository(authApi, accountApi, authTokens)
+
+            // Whether any of Pix is in front. The container is created on the main thread, where observers are added.
+            val foreground = MutableStateFlow(false).also { flow ->
+                val lifecycle = ProcessLifecycleOwner.get().lifecycle
+                lifecycle.addObserver(
+                    LifecycleEventObserver { _, _ ->
+                        flow.value = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                    },
+                )
+            }
+            val presenceClient = OkHttpClient.Builder().pingInterval(PRESENCE_PING_SECONDS, TimeUnit.SECONDS).build()
+            PresenceConnection(
+                authRepository,
+                foreground,
+                OkHttpPresenceSockets(presenceClient, signalingUrl(BuildConfig.SERVER_URL)),
+                appScope,
+            ).start()
 
             val frameSource = CameraFrameSource()
             val rtcSessionManager = RtcSessionManager(
@@ -118,6 +173,9 @@ class AppContainer(
                     MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor()),
                 poseGenerator = RemotePoseGenerator(pixApi),
                 generationConsent = DataStoreGenerationConsent(appContext),
+                authRepository = authRepository,
+                friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),
+                googleIdTokens = CredentialManagerGoogleIdTokens(BuildConfig.GOOGLE_SERVER_CLIENT_ID),
                 sessionManager = rtcSessionManager,
                 remoteVideo = rtcSessionManager,
                 guideSyncer = guideSyncer,

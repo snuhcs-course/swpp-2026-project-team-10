@@ -33,10 +33,12 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 5. On the S22 and S23 Ultra, compare preview, saved image, and `grabFrame()` framing/rotation. Verify file-write/camera failures keep the shutter usable for retry.
 6. Switch the ratio 4:3 → 16:9 → 1:1 with a guide on: the preview, grid, and guide follow without a blank frame, and a photo in each ratio has that shape. Cycle the flash and take a photo with it on, move the brightness slider, and tap near and far objects to focus. With a subject connected, the subject's video, grid, and guide follow each ratio.
 6. Check that the grid divides only the camera image into equal thirds, including after a save message changes the preview area. Tilt the phone left/right: the center bar should rotate, then align in dark yellow near level. Point it straight down/up: the ambiguous level bar should disappear. Confirm guide drag/pinch still works through the grid, photos omit the aids, and the bar resumes after returning from the gallery.
-7. On phones exposing native logical zoom below 1× and phones exposing a separate rear ultrawide, pinch out to the widest available field of view. Verify the actual minimum: 0.5× only when supported, 0.6× on a 0.6× device, and 1× when no usable ultrawide is exposed. Continue the same pinch across 1× in both directions, including reversing during a lens switch's `STARTING` state; the latest requested zoom should apply after any brief preview pause. The readout must remain in primary-camera units, rather than resetting to the ultrawide's native 1×.
+7. On phones exposing native logical zoom below 1× and phones exposing a separate rear ultrawide, pinch out to the widest available field of view. Verify the actual minimum: 0.5× only when supported, 0.6× on a 0.6× device, and 1× when no usable ultrawide is exposed. Continue the same pinch across 1× in both directions, including reversing during a lens switch's `STARTING` state: the lens changes only below 0.95× or above 1.05× while the fingers are down, so wavering at 1× does not switch back and forth, and the pinch's last value settles on its own lens. A switch shows the last frame, without the spinner, until the new lens streams, and the latest requested zoom then applies. The readout must remain in primary-camera units, rather than resetting to the ultrawide's native 1×.
 8. Capture a photo while crossing the lens boundary, then keep pinching. The photo should finish saving before a queued lens change applies, without interrupting the capture. Check preview, saved photo, analysis, and live-stream framing at both lens ranges. If an ultrawide bind fails, verify that the primary preview recovers, its supported range is updated, and zoom/capture still work. Cancel a pinch or pause the screen and verify the interaction finishes cleanly; recheck zoom restoration after gallery and background return at a sub-1× ratio.
 
-`PixTimings` logcat events include `app.start`, `camera.preview`, and camera capture events. Emulator smoke checks do not establish real-device resolution, startup latency, or frame rate.
+9. Measure the zoom (NFR-19, IT-10): `adb logcat -c`, pinch for about ten seconds, crossing 1× a few times, press the shutter, then `adb logcat -d -s PixTimings > zoom.log` and `python3 scripts/zoom_timings.py zoom.log` from `android/`. It prints the frame intervals and drops of each pinch, request-to-frame latency, each lens switch, and the shutter as Markdown tables for the PR.
+
+`PixTimings` logcat events include `app.start`, `camera.preview`, camera capture events, and the zoom measurement's `zoom.*`, `camera.status`, `preview.stream`, and `preview.still` (Design 2.6.5). Emulator smoke checks do not establish real-device resolution, startup latency, or frame rate.
 
 ### Shared contracts
 
@@ -49,11 +51,12 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 | `session/SessionModels.kt`, `session/SessionManager.kt` | Roles, entries, session states, session interface | 2.1, 2.3, 2.4 |
 | `session/protocol/SessionMessage.kt` | Data channel messages between the two phones | 2.5.1 |
 | `session/signaling/SignalMessage.kt` | WebSocket signaling messages | 2.5.2 |
-| `core/network/PixApi.kt`, `core/network/ApiModels.kt` | REST API used by the app | 2.5.3 |
+| `core/network/PixApi.kt`, `core/network/ApiModels.kt` | REST API used by the app: `PixApi` (poses), `PixAuthApi` (sign-in), `PixAccountApi` (endpoints with a token) | 2.5.3 |
+| `account/AccountModels.kt`, `account/AuthRepository.kt`, `account/FriendsRepository.kt` | `Account`, `AuthState`, friends and requests, `AccountError`; the sign-in and friends interfaces | 2.1, 2.3 |
 
 ### Screens
 
-All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera. Screens of one flow share a ViewModel (activity scope).
+All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera. *Shoot together* opens Friends. Screens of one flow share a ViewModel (activity scope).
 
 | Screen (R&S 6) | Class in `ui/` | ViewModel | Issue |
 |---|---|---|---|
@@ -61,6 +64,10 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Add a pose guide (bottom sheet), Consent notice | `guide/AddGuideSheet` | `ReferenceViewModel`, `GenerationViewModel` | #5, #7 |
 | Reference confirm, No person found | `guide/ReferenceConfirmFragment`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` | #5 |
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` | #7 |
+| Friends, Friends (signed out) | `account/FriendsFragment` | `FriendsViewModel`, `SessionViewModel` | #54 |
+| Add a friend, No user found | `account/AddFriendFragment` | `FriendsViewModel` | #54 |
+| Sent requests | `account/SentRequestsFragment` | `FriendsViewModel` | #54 |
+| Sign in, Sign up, Pix ID setup, Account (bottom sheet) | `account/SignInFragment`, `SignUpFragment`, `PixIdSetupFragment`, `AccountSheet` | `AccountViewModel` | #54 |
 | Room code (bottom sheet) | `session/RoomCodeSheet` | `SessionViewModel` | #8 |
 | Join with code, Session not found | `session/JoinCodeFragment`, `SessionNotFoundFragment` | `SessionViewModel` | #8 |
 | Subject view, Connection lost | `session/SubjectFragment`, `ConnectionLostFragment` | `SubjectViewModel`, `SessionViewModel` | #8, #9, #10 |
@@ -80,6 +87,7 @@ The failure screens share `fragment_failure.xml`.
 | `session/` | `RtcSessionManager`, `SignalingClient` + `OkHttpSignalingClient`, `PeerConnectionClient` + `WebRtcPeerConnectionClient`, `WebRtcRuntime`, `CameraFrameSource` + `YuvToNv21`, `RemoteVideo`, `SessionIdentity`, `protocol/MessageCodec`, `protocol/ChannelRouter`, `signaling/SignalCodec` | #8 |
 | `session/` | `GuideSyncer` | #9 |
 | `session/` | `RemoteControlHandler` | #10 |
+| `account/` | `AuthTokens` + `DataStoreSignInStore`, `BearerTokens`, `RemoteAuthRepository`, `RemoteFriendsRepository`, `PresenceConnection` + `OkHttpPresenceSockets`, `CredentialManagerGoogleIdTokens` | #54 |
 | `core/` | `AppContainer` (creates every module), `Timings` (Design 2.8) | #3 |
 
 ## How to work on it
@@ -122,6 +130,16 @@ Two phones connect with a room code over the Pix server and then stream phone to
 - **Screens.** While the scene photo is taken, system back is *Shoot again* when the photo is shown and *Cancel* before that. Generating poses moves to Pick a pose when at least one candidate arrived and to Couldn't create poses otherwise; a pose that failed is left out of Pick a pose. *Use this pose* hands the chosen image to Reference confirm and then discards the scene photo and the other candidates. System back does what *Cancel* and *Back to camera* do: it stops the requests and discards the scene photo and the candidates.
 - **Watch it.** `adb logcat -s PixTimings PixPoses` shows `pose.start described` or `pose.start suggested`, `pose.planned` (the poses are known), `pose.first`, and `pose.done 3 of 4 ready` (NFR-4), and one `PixPoses` line for each failed request with the server's error code and message.
 - **Tests.** `generation/RemotePoseGeneratorTest` covers a description with its variations, and without them, and suggestions, the parallel requests, the seeds, the error mapping, the timeouts, and cancellation with a fake `PixApi`; `ui/generation/GenerationViewModelTest` covers taking and confirming the photo, *Generate poses*, the phases, a rejected description, partial failure, *Try other poses*, retry, cancel, selection, and consent; `ui/generation/DescriptionFormTest` (Robolectric) covers the form.
+
+## Accounts and friends (#54)
+
+*Shoot together* opens Friends. Signed out, it offers *Sign in to add friends* and *Use a room code instead*; signed in, it lists friends with their online status and received requests, *Sent requests · N* opens the requests the user sent with *Withdraw*, and *Use a room code* stays under the list, because room codes need no account (R&S F5, 6.4; Design 2.5.3). *Check* on Sign up and Pix ID setup asks `POST /auth/check-pix-id` whether the Pix ID is free, so it needs a server with that endpoint.
+
+- **Run it.** Point `pix.serverUrl` at a server with the accounts endpoints (Server B, or a laptop as above). Sign-up and sign-in with a Pix ID and a password work everywhere. Google sign-in also needs `PIX_GOOGLE_CLIENT_ID` on that server, the web client ID in `app/build.gradle.kts`, and your debug key registered in the team's Google Cloud project: run `./gradlew :app:signingReport`, and have a project owner add the `SHA1` of `Variant: debug` as an Android OAuth client for `com.lastpenguin.pix`. Without it, Google's sheet fails and the app says so. An emulator needs a Google Play image signed in to a test user.
+- **Tokens.** `AuthTokens` keeps the account and its tokens in DataStore (`account`), outside backups and device transfers (`res/xml/data_extraction_rules.xml`), and runs one refresh at a time for every caller: a refresh token is spent by its refresh, and a spent one ends the session. `BearerTokens` adds the access token to `PixAccountApi` calls and answers `401 UNAUTHENTICATED` with one refresh and one retry. The three REST clients in `AppContainer` each have their own dispatcher, so a refresh on the `PixAuthApi` client never queues behind the calls waiting for it. A refused refresh signs the phone out and Friends says so.
+- **Presence.** While someone is signed in and Pix is in front, `PresenceConnection` holds one signaling socket opened with the access token, which marks the user online for friends (Design 2.5.2); it retries after 1 s, doubling to 30 s, and closes in the background. Sessions keep their own socket. Friends asks for its lists every 10 s while it is shown, until push arrives with invitations (Iter2-P15); *Invite* stays disabled until then.
+- **Watch it.** `adb logcat -s PixAccount PixPresence` shows a refused refresh, Google sign-in failures, and "Online" when the presence socket opens.
+- **Tests.** `account/` covers the rules, the tokens and their refresh, the repositories with fakes of the REST interfaces (`AccountFakes.kt`), presence in virtual time, and the account client against OkHttp's MockWebServer (`BearerTokensTest`); `ui/account/` covers both ViewModels and, under Robolectric, the Friends and Sent requests screens and the forms on their real layouts.
 
 ## Lint, format, and test
 

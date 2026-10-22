@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -115,13 +115,17 @@ class FakeCameraController(
     override val state = MutableStateFlow(CameraState(zoom = 1f))
 
     val requests = mutableListOf<Float>()
+
+    /** The `final` flag of each of [requests]. */
+    val requestFinals = mutableListOf<Boolean>()
     var applies = true
     var sink: FrameSink? = null
 
     override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
 
-    override fun setZoom(ratio: Float) {
+    override fun setZoom(ratio: Float, final: Boolean) {
         requests += ratio
+        requestFinals += final
         if (applies) _zoom.value = ratio
     }
 

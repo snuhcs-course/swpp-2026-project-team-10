@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sign in (R&S 6.4, 6.8; FR-5.2, FR-5.13): a Pix ID and a password, or Continue with Google, or Sign up. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/back" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:accessibilityHeading="true"
+                android:text="@string/sign_in_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+        </LinearLayout>
+
+        <!-- After "Yes, sign in": the Google account waits to be added (FR-5.13). -->
+        <TextView
+            android:id="@+id/bodyText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:lineSpacingMultiplier="1.2"
+            android:text="@string/sign_in_body"
+            android:textAppearance="@style/TextAppearance.Pix.BodyLarge"
+            android:textColor="@color/pix_text_muted" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:labelFor="@id/pixIdInput"
+            android:text="@string/pix_id_label"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <EditText
+            android:id="@+id/pixIdInput"
+            style="@style/Widget.Pix.TextField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints="username"
+            android:imeOptions="actionNext"
+            android:inputType="textNoSuggestions|textVisiblePassword"
+            android:maxLength="40" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:labelFor="@id/passwordInput"
+            android:text="@string/password_label"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <EditText
+            android:id="@+id/passwordInput"
+            style="@style/Widget.Pix.TextField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints="password"
+            android:imeOptions="actionDone"
+            android:inputType="textPassword"
+            android:maxLength="64" />
+
+        <TextView
+            android:id="@+id/errorText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite"
+            android:textAppearance="@style/TextAppearance.Pix.Body"
+            android:textColor="@color/pix_danger_text"
+            android:visibility="gone"
+            tools:text="@string/wrong_credentials"
+            tools:visibility="visible" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="24dp" />
+
+        <Button
+            android:id="@+id/signInButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:enabled="false"
+            android:text="@string/sign_in" />
+
+        <TextView
+            android:id="@+id/orText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginVertical="8dp"
+            android:text="@string/or"
+            android:textAppearance="@style/TextAppearance.Pix.Caption" />
+
+        <Button
+            android:id="@+id/googleButton"
+            style="@style/Widget.Pix.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/continue_with_google" />
+
+        <Button
+            android:id="@+id/signUpButton"
+            style="@style/Widget.Pix.Button.Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/new_to_pix" />
+    </LinearLayout>
+</ScrollView>

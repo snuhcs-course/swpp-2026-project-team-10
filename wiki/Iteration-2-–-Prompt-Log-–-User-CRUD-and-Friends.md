@@ -35,4 +35,6 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-22] "also commit and push this"
 - [Jaewan, 10-22] "is any change to the docs updated?"
 - [Jaewan, 10-22] "commit and push this"
+- [Jaewan, 10-22] "There are reviews from pkdje's Claude. tell me if we should fix them"
+- [Jaewan, 10-22] "I fixed 4 and pushed it. Make the fixes 1-3"
 

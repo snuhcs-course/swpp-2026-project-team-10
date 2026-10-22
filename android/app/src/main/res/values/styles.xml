@@ -120,6 +120,16 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
+    <!-- A small button inside a row, such as Invite and Accept on Friends. -->
+    <style name="Widget.Pix.Button.Small">
+        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
     <style name="Widget.Pix.Button.Secondary" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:minHeight">52dp</item>
         <item name="android:insetTop">0dp</item>
@@ -137,6 +147,16 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
+    <!-- An outlined button inside a row, such as Invite on Friends while invitations are not built (Iter2-P15). -->
+    <style name="Widget.Pix.Button.Secondary.Small">
+        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
     <style name="Widget.Pix.Button.Text" parent="Widget.Material3.Button.TextButton">
         <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
@@ -148,6 +168,21 @@
     </style>
 
     <!-- A pill over the preview: 44 dp of glass inside a 48 dp touch target. -->
+    <style name="Widget.Pix.Button.Text.Small">
+        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+    </style>
+
+    <!-- A friend's initial in a circle. -->
+    <style name="Widget.Pix.Avatar" parent="">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:background">@drawable/bg_avatar</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Header</item>
+    </style>
+
     <style name="Widget.Pix.Button.Glass" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">2dp</item>

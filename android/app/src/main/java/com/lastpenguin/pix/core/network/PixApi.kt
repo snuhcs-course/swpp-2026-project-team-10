@@ -3,11 +3,16 @@ package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Part
+import retrofit2.http.Path
 
-/** Pix server REST API (Design 2.5.3). */
+/** Pix server REST API (Design 2.5.3): pose generation, which works without an account (FR-5.1). */
 interface PixApi {
 
     /**
@@ -29,4 +34,85 @@ interface PixApi {
         @Part("description") description: RequestBody,
         @Part("seed") seed: RequestBody,
     ): PoseResponseDto
+}
+
+/**
+ * The sign-in endpoints, which give a phone its tokens and need none themselves. Their client is not the pose client,
+ * whose four long requests would hold up a refresh, and not the account client, whose calls wait for the refresh.
+ */
+interface PixAuthApi {
+
+    /** `201`; `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` (FR-5.2, FR-5.11). */
+    @POST("api/v1/auth/signup")
+    suspend fun signUp(@Body body: SignUpBody): AuthDto
+
+    /** `401 INVALID_CREDENTIALS` for a wrong password and an unknown Pix ID alike. */
+    @POST("api/v1/auth/login")
+    suspend fun logIn(@Body body: LogInBody): AuthDto
+
+    /** New tokens for a refresh token, which then stops working; `401 INVALID_REFRESH_TOKEN` ends the sign-in. */
+    @POST("api/v1/auth/refresh")
+    suspend fun refresh(@Body body: RefreshBody): TokensDto
+
+    /** `404 NOT_REGISTERED` when no account uses this Google account (FR-5.13); `401 INVALID_TOKEN`; `503`. */
+    @POST("api/v1/auth/google")
+    suspend fun signInWithGoogle(@Body body: GoogleTokenBody): AuthDto
+
+    /** A new account named after the Google account, without a Pix ID yet; `409 GOOGLE_IN_USE`. */
+    @POST("api/v1/auth/google/signup")
+    suspend fun signUpWithGoogle(@Body body: GoogleTokenBody): AuthDto
+}
+
+/**
+ * The endpoints marked *auth* in Design 2.5.3. Their client adds the access token and refreshes it once on
+ * `401 UNAUTHENTICATED` (`account/BearerTokens.kt`); a `401` that still comes through means the sign-in ended.
+ */
+interface PixAccountApi {
+
+    /** Signs this phone out: its refresh token and device token stop working at once. */
+    @DELETE("api/v1/auth/session")
+    suspend fun signOut()
+
+    @GET("api/v1/me")
+    suspend fun me(): AccountDto
+
+    /** `409 PIX_ID_TAKEN`, `400 PIX_ID_INVALID`, `401 INVALID_CREDENTIALS` (a password account's wrong password). */
+    @PUT("api/v1/me")
+    suspend fun updateMe(@Body body: UpdateMeBody): AccountDto
+
+    /** `409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`, `401 INVALID_TOKEN` (FR-5.12, FR-5.13). */
+    @PUT("api/v1/me/google")
+    suspend fun addGoogle(@Body body: GoogleTokenBody): AccountDto
+
+    /** `400 PASSWORD_INVALID`, `403 PIX_ID_REQUIRED`, `409 PASSWORD_ALREADY_SET` (FR-5.14). */
+    @PUT("api/v1/me/password")
+    suspend fun addPassword(@Body body: PasswordBody): AccountDto
+
+    /** Exact Pix ID only, in the body so that no log prints it (FR-5.5); `404 NOT_FOUND`. */
+    @POST("api/v1/users/lookup")
+    suspend fun lookUp(@Body body: LookupBody): LookupDto
+
+    @GET("api/v1/friend-requests")
+    suspend fun friendRequests(): FriendRequestsDto
+
+    @POST("api/v1/friend-requests")
+    suspend fun sendFriendRequest(@Body body: FriendRequestBody): SentRequestDto
+
+    @POST("api/v1/friend-requests/{id}/accept")
+    suspend fun acceptFriendRequest(@Path("id") requestId: String): AcceptedRequestDto
+
+    @POST("api/v1/friend-requests/{id}/decline")
+    suspend fun declineFriendRequest(@Path("id") requestId: String)
+
+    /** Withdraws a request the caller sent. */
+    @DELETE("api/v1/friend-requests/{id}")
+    suspend fun withdrawFriendRequest(@Path("id") requestId: String)
+
+    /** Friends ordered by display name, with `online` and `inSession` (FR-5.9). */
+    @GET("api/v1/friends")
+    suspend fun friends(): FriendsDto
+
+    /** `204` also for someone who is not a friend (FR-5.10). */
+    @DELETE("api/v1/friends/{userId}")
+    suspend fun removeFriend(@Path("userId") userId: String)
 }

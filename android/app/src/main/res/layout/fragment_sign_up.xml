@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, US-6). Each rule shows under its
+     field, in the danger color once it is broken, and Sign up waits until all hold. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/back" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:accessibilityHeading="true"
+                android:text="@string/sign_up_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:lineSpacingMultiplier="1.2"
+            android:text="@string/sign_up_body"
+            android:textAppearance="@style/TextAppearance.Pix.BodyLarge"
+            android:textColor="@color/pix_text_muted" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:labelFor="@id/pixIdInput"
+            android:text="@string/pix_id_label"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <EditText
+            android:id="@+id/pixIdInput"
+            style="@style/Widget.Pix.TextField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints="newUsername"
+            android:imeOptions="actionNext"
+            android:inputType="textNoSuggestions|textVisiblePassword"
+            android:maxLength="40"
+            tools:text="test1" />
+
+        <TextView
+            android:id="@+id/pixIdRule"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/pix_id_rule"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            android:textColor="@color/pix_text_faint" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:labelFor="@id/nameInput"
+            android:text="@string/name_label"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <EditText
+            android:id="@+id/nameInput"
+            style="@style/Widget.Pix.TextField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints="name"
+            android:imeOptions="actionNext"
+            android:inputType="textPersonName|textCapWords"
+            android:maxLength="40"
+            tools:text="Test Account 1" />
+
+        <TextView
+            android:id="@+id/nameRule"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/name_rule"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            android:textColor="@color/pix_text_faint" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:labelFor="@id/passwordInput"
+            android:text="@string/password_label"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <EditText
+            android:id="@+id/passwordInput"
+            style="@style/Widget.Pix.TextField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints="newPassword"
+            android:imeOptions="actionDone"
+            android:inputType="textPassword"
+            android:maxLength="80" />
+
+        <TextView
+            android:id="@+id/passwordRule"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/password_rule"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            android:textColor="@color/pix_text_faint" />
+
+        <TextView
+            android:id="@+id/errorText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite"
+            android:textAppearance="@style/TextAppearance.Pix.Body"
+            android:textColor="@color/pix_danger_text"
+            android:visibility="gone" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="24dp" />
+
+        <Button
+            android:id="@+id/signUpButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:enabled="false"
+            android:text="@string/sign_up" />
+    </LinearLayout>
+</ScrollView>

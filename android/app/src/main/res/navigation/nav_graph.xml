@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Iteration 1 screens and transitions, following the wireframe (R&S 6.2, 6.3, 6.6, 6.7).
+    Screens and transitions, following the wireframe (R&S 6.2–6.4, 6.6–6.8).
     "Back to camera" pops the back stack to cameraFragment instead of using an action.
 -->
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
@@ -16,9 +16,10 @@
         <action
             android:id="@+id/action_camera_to_addGuide"
             app:destination="@id/addGuideSheet" />
+        <!-- Shoot together opens Friends, which also offers the room code (FR-8.1). -->
         <action
-            android:id="@+id/action_camera_to_roomCode"
-            app:destination="@id/roomCodeSheet" />
+            android:id="@+id/action_camera_to_friends"
+            app:destination="@id/friendsFragment" />
         <!-- The scene photo is taken and confirmed on Camera (R&S 6.3); *Use this photo* starts Flow 2. -->
         <action
             android:id="@+id/action_camera_to_describePose"
@@ -120,6 +121,63 @@
             app:popUpTo="@id/generationFailedFragment"
             app:popUpToInclusive="true" />
     </fragment>
+
+    <!-- Flow 3: Friends, Add a friend; Sign in, Sign up, Pix ID setup, Account (R&S 6.4, 6.8) -->
+    <fragment
+        android:id="@+id/friendsFragment"
+        android:name="com.lastpenguin.pix.ui.account.FriendsFragment"
+        android:label="Friends">
+        <action
+            android:id="@+id/action_friends_to_signIn"
+            app:destination="@id/signInFragment" />
+        <action
+            android:id="@+id/action_friends_to_pixIdSetup"
+            app:destination="@id/pixIdSetupFragment" />
+        <action
+            android:id="@+id/action_friends_to_addFriend"
+            app:destination="@id/addFriendFragment" />
+        <action
+            android:id="@+id/action_friends_to_account"
+            app:destination="@id/accountSheet" />
+        <action
+            android:id="@+id/action_friends_to_roomCode"
+            app:destination="@id/roomCodeSheet" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/addFriendFragment"
+        android:name="com.lastpenguin.pix.ui.account.AddFriendFragment"
+        android:label="Add a friend" />
+
+    <!-- A signed-in screen returns to Friends by popping back to it. -->
+    <fragment
+        android:id="@+id/signInFragment"
+        android:name="com.lastpenguin.pix.ui.account.SignInFragment"
+        android:label="Sign in">
+        <action
+            android:id="@+id/action_signIn_to_signUp"
+            app:destination="@id/signUpFragment" />
+        <!-- A new Google account chooses its Pix ID next; back from there is Friends (FR-5.13). -->
+        <action
+            android:id="@+id/action_signIn_to_pixIdSetup"
+            app:destination="@id/pixIdSetupFragment"
+            app:popUpTo="@id/friendsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/signUpFragment"
+        android:name="com.lastpenguin.pix.ui.account.SignUpFragment"
+        android:label="Sign up" />
+
+    <fragment
+        android:id="@+id/pixIdSetupFragment"
+        android:name="com.lastpenguin.pix.ui.account.PixIdSetupFragment"
+        android:label="Pix ID setup" />
+
+    <dialog
+        android:id="@+id/accountSheet"
+        android:name="com.lastpenguin.pix.ui.account.AccountSheet"
+        android:label="Account" />
 
     <!-- Flow 6: Room code (photographer) -->
     <dialog

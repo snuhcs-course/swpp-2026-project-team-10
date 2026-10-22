@@ -16,6 +16,7 @@
 | 1.11 | 2026-10-22 | Screen tests on the real Fragments (Iter2-A1): `CameraFragmentRenderTest` launches `CameraFragment` with `FragmentScenario` on a container of fakes (`TestAppContainer`) and checks its render paths by partition: permission denied or granted; STARTING and READY; a guide added, hidden, removed, and the shutter's end of edit mode; a photo saved (notice for 3 s) or failed (reason kept); flash and brightness with and without the capability; 4:3 and 16:9 on the button and the overlays; the scene photo step framing, reviewing, shooting again, and cancelled; a session connected and a peer leaving (notice for 3 s). 14 tests (1.1, 2.1.1, 2.1.6). The *Views and Fragments* layer of 2.1.2 is now measured on the screens, not only on the custom Views. |
 | 1.12 | 2026-10-22 | Screen tests for the session screens (Iter2-A1): `SubjectFragmentRenderTest` (9: not connected / connected, the photographer's capabilities, the camera state's zoom, flash, and ratio, a guide arriving and the edit-mode toggle, a hidden guide, the brightness panel and a flash request, Leave, the back button's question, a lost connection to *Connection lost*, the photographer ending the session), `JoinCodeFragmentTest` (7: the field empty, 5 and 6 digits, the kept code, Join then connecting / not found / another failure, Back), and `ConnectionLostFragmentTest` (6: Reconnect without and with a kept code, the reconnect connecting / room gone / failing, Leave), with `TestNavHostController` for the navigation and `ShadowSurfaceViewRenderer` for WebRTC's renderer (1.1, 2.1.1, 2.1.6). The subject test found that a hidden guide left the edit toggle drawn as on, because `MaterialButton` ignores `setChecked` while disabled; fixed by setting checked before enabled. |
 | 1.13 | 2026-10-22 | Screen tests for the remaining screens (Iter2-A1): `RoomCodeSheetTest` (6: Idle, Waiting with the formatted code, Connecting, Connected closes the sheet, expired and other failures, Join with a code instead, Cancel), `SessionNotFoundFragmentTest` (1), `AddGuideSheetTest` (5: add or replace, Generate poses here with consent given or asked first, Cancel), `ReferenceConfirmFragmentTest` (4: working, ready and Use this guide, no person found, a photo that cannot be used), `NoPersonFoundFragmentTest` (1), and `GenerationScreensTest` (11: Generate poses with the scene and the ideas, Generate and Skip, Cancel; Generating poses counting the candidates, all ready to Pick a pose, none ready to Couldn't create poses, Cancel; Pick a pose with the ready candidates only, Use this pose to Reference confirm, Try other poses, back; Couldn't create poses with Try again, a rejected description with Edit description, Back to camera). Every screen of the app now has a render test; `launchPrepared` puts the shared ViewModels in the right phase before a screen's view is created (1.1, 2.1.1, 2.1.6). |
+| 1.14 | 2026-10-22 | First results of Iteration 2 (2.2.1): the unit, Robolectric, and screen tests (468) and the server tests (423) on commit `39c013c`, all passing; line and branch coverage per layer against the proposed targets, with the JaCoCo and pytest-cov reports as screenshots; the untested regions the reports show and the one shortfall (platform adapters 23.2 % against the proposed 30 %, with the two ways to settle it). The integration runs (2.2.2) and the NFR measurements (2.2.3) stay for 10/24. The Test Log gets its first row. |
 
 Audience: the development team and the course staff. This page makes our testing explicit and reproducible: anyone on the team can run the same commands, get the same numbers, and compare them with the goals set here in advance. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications) page, and section numbers in the form "Design 2.x" to the [Design Documentation](Design-Documentation). **TBD** marks a value the team still has to set; **TODO** marks a part that is filled in when its iteration comes.
 
@@ -235,37 +236,53 @@ Coverage shows which lines ran, not whether the tests would notice a change. Fro
 
 Results are added per iteration and never overwritten; each iteration gets its own subsection.
 
-#### 2.2.1 Iteration 2 (**TODO**: filled in at the close of Iteration 2, by 10/24)
+#### 2.2.1 Iteration 2 · unit and integration tests, coverage
 
-**Run.** Date: 2026-10-DD · Commit: `<hash>` on `dev` · Tester: <name> · Commands: those in 2.1.4.
+**Run.** Date: 2026-10-22 · Commit: `39c013c` on `chore/a1-coverage` (#94; the same code goes to `dev` with that PR) · Tester: 한준형 · Commands: those in 2.1.4, on a MacBook Air (Apple silicon) with JDK 21.0.12 and Python 3.11.17; the server suite on fakeredis and SQLite (the CI run on a real Redis and PostgreSQL is the same suite). The layer of each app class follows 2.1.2: `*ViewModel` are ViewModels; everything under `ui/` and the custom Views are Views; `CameraXController`, `CameraControls`, `MlKit…`, `Rtc…`, `WebRtc…`, `…SignalingClient`, `CameraFrameSource`, `CameraFrameCache`, `SubjectSegmenter`, `AndroidPose…`, `PhotoSaver`, `CameraLevelMonitor`, and the DataStore classes are platform adapters; `core/`, `MainActivity`, and `PixApplication` are glue, outside the targets; the rest are managers and repositories.
 
 **Summary table.**
 
 | Component | Frameworks | Target (2.1.2, line) | Actual line | Actual branch | Date | Command / Report |
 |---|---|---|---|---|---|---|
-| App · managers and repositories | JUnit 4, coroutines-test, JaCoCo | TBD % | — % | — % | 10/DD | `./gradlew :app:jacocoTestReport` · [report](images/testing_it2_jacoco.png) |
-| App · ViewModels | JUnit 4, coroutines-test, JaCoCo | TBD % | — % | — % | 10/DD | same |
-| App · Views and Fragments | JUnit 4, Robolectric, JaCoCo | TBD % | — % | — % | 10/DD | same |
-| App · platform adapters | — | TBD % | — % | — % | 10/DD | same |
-| Server · signaling, store, accounts, invitations, turn | pytest, pytest-cov | TBD % | — % | — % | 10/DD | `uv run pytest --cov=pix_server --cov-branch` · [report](images/testing_it2_pytest_cov.png) |
-| Server · poses | pytest, pytest-cov | TBD % | — % | — % | 10/DD | same |
-| Server · main, config, db | pytest, pytest-cov | TBD % | — % | — % | 10/DD | same |
+| App · managers and repositories | JUnit 4, coroutines-test, JaCoCo | 80 % (proposal) | **93.0 %** (1,121/1,205) | 71.8 % | 10/22 | `./gradlew :app:jacocoTestReport` · [report](images/testing_it2_jacoco.png) |
+| App · ViewModels | JUnit 4, coroutines-test, JaCoCo | 75 % (proposal) | **94.1 %** (507/539) | 81.4 % | 10/22 | same |
+| App · Views and Fragments | JUnit 4, Robolectric, FragmentScenario, JaCoCo | 40 % (proposal) | **85.9 %** (1,484/1,727) | 70.1 % | 10/22 | same |
+| App · platform adapters | — (integration tests instead) | 30 % (proposal) | 23.2 % (325/1,398) | 18.5 % | 10/22 | same |
+| App · whole module (JaCoCo total) | | — | 70.5 % (3,403/4,829) | 59.5 % (2,289/3,846) | 10/22 | same |
+| Server · `signaling`, `store`, `accounts` | pytest, pytest-cov | 90 % (proposal) | **97.6 %** (937/960) | 89.2 % | 10/22 | `uv run pytest --cov=pix_server --cov-branch` · [report](images/testing_it2_pytest_cov.png) |
+| Server · `poses` | pytest, pytest-cov | 85 % (proposal) | **99.3 %** (304/306) | 98.6 % | 10/22 | same |
+| Server · `main`, `config`, `errors`, `db` | pytest, pytest-cov | 60 % (proposal) | **98.9 %** (270/273) | 84.6 % | 10/22 | same |
+| Server · whole package (pytest-cov total) | | — | 98.2 % (1,511/1,539) | 91.2 % (268/294) | 10/22 | same |
+
+`invitations` and `turn` have no code yet (Iter2-P15, Iter2-P16 open), so the server's first row covers the three modules that exist. The migration versions are omitted (2.1.3).
 
 **Test counts.**
 
-| Suite | Tests | Passed | Failed | Skipped | Evidence |
-|---|---|---|---|---|---|
-| Android unit and Robolectric (`:app:testDebugUnitTest`) | — | — | — | — | [screenshot](images/testing_it2_android_tests.png) |
-| Server (`uv run pytest`) | — | — | — | — | [screenshot](images/testing_it2_server_tests.png) |
-| Server on Redis (`PIX_TEST_REDIS_URL=… uv run pytest`) | — | — | — | — | the `server-test` log |
+| Suite | Tests | Passed | Failed | Skipped | Time | Evidence |
+|---|---|---|---|---|---|---|
+| Android JVM, Robolectric, and screen tests (`:app:testDebugUnitTest`) | 468 | 468 | 0 | 0 | about 4 min (Robolectric's first SDK 36 sandbox included) | [screenshot](images/testing_it2_android_tests.png) |
+| Server (`uv run pytest`, fakeredis and SQLite) | 423 | 423 | 0 | 0 | 49 s | [screenshot](images/testing_it2_server_tests.png) |
 
-**Known failing or skipped tests.** None, or one line each: the test, why, and the issue that tracks it. Quarantined flaky tests (1.3) are listed here with the date they were quarantined.
+Iteration 1 ended with 240 Android tests; Iteration 2 adds 228, of which 78 are the screen tests on the real Fragments (2.1.1). The server suite is new since Iteration 1's 97.
 
-**Untested regions found by the coverage report.** The branches and files the report shows as untaken, with the case that is missing and the issue that adds it, or the reason it stays untested (2.1.3).
+**Known failing or skipped tests.** None. No test is quarantined.
 
-**Shortfalls against the targets.** For each component below its target: the reason and what will be done, with the issue number.
+**Untested regions found by the coverage report.** Read from the untaken lines and branches, not added as cases yet:
+
+- App · adapters: `CameraXController` (0 of 421 lines), `WebRtcPeerConnectionClient` (0 of 158), `MlKitReferenceGuideMaker` (0 of 53), `CameraLevelMonitor` (0 of 36), `CameraFrameSource` (2 of 36): they need CameraX, libwebrtc, ML Kit, or a sensor, and are covered by the integration tests of 2.1.5 (IT-1, IT-5, IT-6, IT-8, IT-10). The parts that are pure decisions (`analysisSize`, the flash and exposure restore rules, the capability assembly) could be split out and tested on the JVM; not scheduled in Iteration 2.
+- App · glue: `AppContainer.create` (0 of 37) wires the real modules and runs only in the app; candidate for the exclusion list in 2.1.3.
+- App · screens: `CameraFragment` 73.5 %: the gallery intent, the focus-ring animation, the last-frame hold during a ratio change, and the clicks that navigate; `AddGuideSheet` 85.3 % and `NoPersonFoundFragment` 77.8 %: the photo picker's result callbacks, which Robolectric cannot answer.
+- Server: `store/session_store.py` 91.0 % (the Redis-outage branch, lines 35–42), `signaling/registry.py` 93.7 % (the worker-lost and disconnect-while-sending paths), `signaling/router.py` 93.8 % (a close while a message is in flight). All are failure paths of a real Redis that fakeredis does not raise; the CI run on a real Redis exercises some of them.
+
+**Shortfalls against the targets.** The targets of 2.1.2 are still the proposals (the team confirms them with this record). Against the proposals, one component is short:
+
+- *Platform adapters, 23.2 % against 30 %.* The adapters wrap CameraX, libwebrtc, and ML Kit, which the JVM cannot run; `RtcSessionManager` is tested (246 of 279 lines) but the three classes above are not. Plan: confirm the target at 20 % with the reason recorded next to the original 30 %, or exclude `CameraXController` and `WebRtcPeerConnectionClient` from the report with their verification named in 2.1.3 (IT-1, IT-5, IT-6, IT-8, IT-10); either is decided with the targets. The other three app components and the three server components are above their proposals.
+
+**Mutation analysis (2.1.7).** Not run in Iteration 2; the tooling is set up in Iteration 3.
 
 #### 2.2.2 Iteration 2 · integration tests (2.1.5)
+
+**TODO** (by 10/24, Iter2-P21): the runs on the phones. IT-2, IT-3, IT-4 (invitations, the link, reconnection), IT-9 (saved guides), and IT-10 (the zoom stutter) depend on Iter2-P15, P16, P18, and P5, which are not merged; they are recorded as *not run, feature not merged* if that stays so.
 
 Device and network pairs follow the pairwise table of 2.1.6; the pair actually used is in the *Devices* column.
 
@@ -284,6 +301,8 @@ Device and network pairs follow the pairwise table of 2.1.6; the pair actually u
 
 #### 2.2.3 Iteration 2 · NFR measurements
 
+**TODO** (by 10/24): measured together with 2.2.2.
+
 One row per NFR that the iteration's features touch (R&S 5, "How we check it"), with the method named there.
 
 | NFR | Target | Measured | Device, network | Date | Evidence |
@@ -294,8 +313,6 @@ One row per NFR that the iteration's features touch (R&S 5, "How we check it"), 
 | NFR-10 | ≥ 90 % per network pair | — / 10 per pair | | | |
 | NFR-11 | recover ≤ 10 s | — | | | |
 | NFR-19 | no stutter, no blank preview | — | S21, S22 | | |
-
-**Mutation analysis (2.1.7).** Not run in Iteration 2; the tooling is set up in Iteration 3.
 
 #### 2.2.4 Iteration 3
 
@@ -366,5 +383,5 @@ One line per recorded run, newest first, so the history of the numbers is visibl
 
 | Date | Iteration | What ran | Commit | Outcome | Section |
 |---|---|---|---|---|---|
-| 2026-10-DD | 2 | Unit, Robolectric, server, coverage | `<hash>` | — tests, — failed; coverage app — % / server — % | 2.2.1 |
-| 2026-10-DD | 2 | Integration IT-1 … IT-10 | `<hash>` | — of 10 passed | 2.2.2 |
+| 2026-10-22 | 2 | Unit, Robolectric, and screen tests; server; coverage | `39c013c` | 468 + 423 tests, 0 failed; line coverage app 70.5 % (managers 93.0, ViewModels 94.1, Views 85.9, adapters 23.2) / server 98.2 % | 2.2.1 |
+| 2026-10-DD | 2 | Integration IT-1 … IT-10 (pending) | | | 2.2.2 |

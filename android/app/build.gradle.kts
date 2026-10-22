@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Joonhyung Han
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -112,4 +112,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.ext.junit)
+    // Screen tests: FragmentScenario launches a Fragment in a debug-only activity under Robolectric.
+    testImplementation(libs.androidx.fragment.testing)
+    debugImplementation(libs.androidx.fragment.testing.manifest)
 }

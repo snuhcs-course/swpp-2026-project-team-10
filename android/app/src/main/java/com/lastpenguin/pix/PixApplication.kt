@@ -1,7 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Joonhyung Han
 package com.lastpenguin.pix
 
 import android.app.Application
+import androidx.annotation.VisibleForTesting
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.core.Timings
 
@@ -11,6 +12,18 @@ class PixApplication : Application() {
         Timings.mark("app.start")
     }
 
+    private var installed: AppContainer? = null
+
     /** Creates every module once. ViewModels get their modules from here (see ui/PixViewModels.kt). */
-    val container: AppContainer by lazy { AppContainer(this) }
+    val container: AppContainer
+        get() = installed ?: AppContainer.create(this).also { installed = it }
+
+    /**
+     * A screen test under Robolectric installs a container of fakes before the screen is launched, so no screen
+     * creates the real camera, ML Kit, WebRTC, or network modules (Testing Documentation 2.1.3).
+     */
+    @VisibleForTesting
+    fun installContainer(container: AppContainer) {
+        installed = container
+    }
 }

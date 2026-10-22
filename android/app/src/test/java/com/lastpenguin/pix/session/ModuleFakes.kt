@@ -58,7 +58,12 @@ class FakeSessionManager : SessionManager {
 
     override fun videoSink(): FrameSink = frameSink
 
-    override suspend fun leave(reason: EndReason) = Unit
+    /** Every `leave`, with its reason, so a screen test can see a cancelled room or a left session. */
+    val leaves = mutableListOf<EndReason>()
+
+    override suspend fun leave(reason: EndReason) {
+        leaves += reason
+    }
 
     fun setState(state: SessionState) {
         _state.value = state

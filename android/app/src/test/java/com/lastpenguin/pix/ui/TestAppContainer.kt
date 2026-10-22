@@ -10,6 +10,7 @@ import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.GenerationEvent
+import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.guide.GuideRepository
@@ -23,14 +24,17 @@ import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 
 /**
  * An [AppContainer] of fakes for screen tests under Robolectric (Testing Documentation 2.1.3): the camera, the
- * session, and the guide stores are the fakes of the module tests, and the modules a screen test never drives
- * (the guide maker, pose generation, consent) do nothing. [install] puts it where [PixViewModels] looks, so a
- * Fragment launched by FragmentScenario gets its ViewModels with these modules.
+ * session, and the guide stores are the fakes of the module tests; the guide maker and pose generation answer when
+ * the test says so ([maker], [generator]), and consent is already given. [install] puts it where [PixViewModels]
+ * looks, so a Fragment launched by FragmentScenario gets its ViewModels with these modules.
  */
 class TestAppContainer(
     val camera: FakeCameraController = FakeCameraController(),
@@ -41,6 +45,8 @@ class TestAppContainer(
     val mirror: GuideRepository = InMemoryGuideRepository()
     val settings = CameraSettings.InMemory()
     val consent = IdleConsent()
+    val maker = ScriptedGuideMaker()
+    val generator = ScriptedPoseGenerator()
     private val syncer = GuideSyncer(session, guides, mirror, FakeGuideImageCodec())
 
     val container = AppContainer(
@@ -48,8 +54,8 @@ class TestAppContainer(
         cameraSettings = settings,
         guideRepository = guides,
         mirrorGuideRepository = mirror,
-        referenceGuideMaker = IdleGuideMaker(),
-        poseGenerator = IdlePoseGenerator(),
+        referenceGuideMaker = maker,
+        poseGenerator = generator,
         generationConsent = consent,
         sessionManager = session,
         remoteVideo = FakeRemoteVideo(),
@@ -63,18 +69,59 @@ class TestAppContainer(
         return this
     }
 
-    /** Never asked to make a guide in a screen test; fails loudly if it is. */
-    class IdleGuideMaker : ReferenceGuideMaker {
-        override suspend fun make(source: Uri): Result<ReferenceGuide> =
-            Result.failure(UnsupportedOperationException("not in this test"))
+    /** Makes a guide when the test says so: each request waits for [finish]. */
+    class ScriptedGuideMaker : ReferenceGuideMaker {
+        val pending = ArrayDeque<CompletableDeferred<Result<ReferenceGuide>>>()
+        val sources = mutableListOf<GuideSource>()
 
-        override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> =
-            Result.failure(UnsupportedOperationException("not in this test"))
+        override suspend fun make(source: Uri): Result<ReferenceGuide> = next(GuideSource.GALLERY)
+
+        override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> = next(source)
+
+        fun finish(result: Result<ReferenceGuide>) {
+            pending.removeFirst().complete(result)
+        }
+
+        private suspend fun next(source: GuideSource): Result<ReferenceGuide> {
+            sources += source
+            return CompletableDeferred<Result<ReferenceGuide>>().also(pending::addLast).await()
+        }
     }
 
-    /** Generates nothing; the screens that would collect it are not launched. */
-    class IdlePoseGenerator : PoseGenerator {
-        override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> = emptyFlow()
+    /** Generates what the test sends: one [Run] per request, whose events the test feeds and closes. */
+    class ScriptedPoseGenerator : PoseGenerator {
+        val runs = mutableListOf<Run>()
+
+        override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> {
+            val run = Run(scene, request).also(runs::add)
+            return flow {
+                try {
+                    for (event in run.events) emit(event)
+                } catch (error: CancellationException) {
+                    run.cancelled = true
+                    throw error
+                }
+            }
+        }
+
+        class Run(val scene: Bitmap, val request: PoseRequest) {
+            val events = Channel<GenerationEvent>(Channel.UNLIMITED)
+            var cancelled = false
+
+            /** The poses of the set are known, `pose-1` … `pose-n`. */
+            fun plan(texts: List<String>) = send(
+                GenerationEvent.Planned(texts.mapIndexed { index, text -> PlannedPose("pose-${index + 1}", text) }),
+            )
+
+            fun send(vararg sent: GenerationEvent) {
+                for (event in sent) check(events.trySend(event).isSuccess)
+            }
+
+            /** The run ends; the ViewModel then goes to PICKING or FAILED. */
+            fun finish() {
+                events.close()
+            }
+        }
     }
 
     /** Consent already given, so the scene photo step opens without the notice. */

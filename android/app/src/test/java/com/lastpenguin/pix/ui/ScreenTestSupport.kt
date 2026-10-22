@@ -3,10 +3,14 @@ package com.lastpenguin.pix.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.os.Bundle
 import android.os.Looper
 import androidx.annotation.IdRes
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
+import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -48,4 +52,38 @@ object ScreenTestSupport {
         }
         return nav
     }
+
+    /**
+     * Launches [F] stopped at CREATED, where the Fragment has an activity but no view yet: the NavController goes
+     * on the activity's content view, which the Fragment's `findNavController` reaches through its view's parents,
+     * and [prepare] puts the activity's ViewModels in the state the screen renders from. Then the screen is resumed,
+     * so both a screen that reads its ViewModel once in `onViewCreated` and one that collects a flow see that state.
+     */
+    inline fun <reified F : Fragment> launchPrepared(
+        @IdRes destination: Int,
+        args: Bundle? = null,
+        crossinline prepare: (FragmentActivity) -> Unit,
+    ): Pair<FragmentScenario<F>, TestNavHostController> {
+        val scenario = launchFragmentInContainer<F>(
+            fragmentArgs = args,
+            themeResId = R.style.Theme_Pix,
+            initialState = Lifecycle.State.CREATED,
+        )
+        val nav = TestNavHostController(ApplicationProvider.getApplicationContext())
+        scenario.onFragment { fragment ->
+            val activity = fragment.requireActivity()
+            nav.setGraph(R.navigation.nav_graph)
+            nav.setCurrentDestination(destination)
+            Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
+            prepare(activity)
+        }
+        idle()
+        scenario.moveToState(Lifecycle.State.RESUMED)
+        idle()
+        return scenario to nav
+    }
+
+    /** The activity-scoped ViewModel of [activity], the one its screens share. */
+    inline fun <reified VM : androidx.lifecycle.ViewModel> FragmentActivity.viewModel(): VM =
+        androidx.lifecycle.ViewModelProvider(this, PixViewModels.Factory)[VM::class.java]
 }

@@ -164,9 +164,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.setOnClickListener {
             findNavController().navigate(R.id.action_camera_to_addGuide)
         }
+        // Friends, which also offers the room code without signing in (FR-8.1).
         controls.shootTogetherButton.setOnClickListener {
-            sessionViewModel.startRoom()
-            findNavController().navigate(R.id.action_camera_to_roomCode)
+            findNavController().navigate(R.id.action_camera_to_friends)
         }
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.

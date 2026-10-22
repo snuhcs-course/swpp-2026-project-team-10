@@ -21,9 +21,11 @@
 | 1.8 | 2026-10-16 | Remote brightness, flash, and guide moves as built (Iter2-P17, #57): the subject's requests of 2.5.1 as messages (`guide.move`, `camera.exposure.set`, `camera.flash.set`; `camera.focus.set` and `control.permission` defined but not yet handled), `guide.state` with `by`, the subject's own guide clamped for the photographer's frame with echoes held until the gesture ends, unchanged echoes for a camera without a range or a flash, and the notices (2.6.5, 2.9); the protocol version is 2 from this change (2.5.1). |
 | 1.9 | 2026-10-18 | Subject view's video fitted to the frame (Iter2-A4, #86). The subject's `SurfaceViewRenderer` wraps its content and is centered, so it measures itself to the video's shape and covers the rectangle the grid and the guide fit. At `match_parent` the renderer cropped every frame to the view's shape despite aspect-fit scaling, so the guide lay on another part of the scene than on the photographer's phone: about 6 % off at 4:3, 26 % at 16:9, and 41 % at 1:1. A pinch anywhere in the video area, the margins around the video included, zooms (2.6.4). *Still open* gains whether Subject view also shows the reference thumbnail. |
 | 1.10 | 2026-10-21 | Pose descriptions and suggested poses (Iter2-P12, #53). Every candidate is generated with one prompt, whose pose is the user's description or, without one, one of four poses that a vision model suggests for the scene through the new `POST /pose-suggestions`; the template prompt is gone, and the four predefined poses stay as the default poses when the suggestion model fails and for apps from before Iteration 2, which still call `GET /pose-templates` (2.5.3, 2.6.3). The prompt lets the model frame the person closer or from a slightly different height, never wider than the scene photo (2.6.3). The suggestion model, Gemini 3.1 Flash Lite, was chosen from ten on 2026-10-21 with `compare_suggestion_models.py` (2.6.3). `POST /poses` takes a `description` of 1–100 characters after trimming, answers it with `"templateId": null`, and answers `422 REJECTED` when the service refuses it, with the same message as for a template, because the service does not say whether it refused the photo or the text; the app names its four requests `pose-1` … `pose-4`, and the `candidateId` the server was to echo is dropped (2.3, 2.5.3). The app: *Generate poses* between *Use this photo* and Generating poses, with idea chips from string resources (`GET /pose-ideas` and `PoseGenerator.ideas()` are dropped), `PoseGenerator.generate(scene, request, seed)` reporting the poses before the candidates, and, when the service rejected every pose of a description, *Couldn't create poses* asking for a different description or another photo, with *Edit description*, which goes back to *Generate poses* with the text kept, as *Try other poses* on *Pick a pose* now does too (2.1–2.3, 2.6.3). With a description, the same vision model writes three variations of it for the scene (`POST /pose-suggestions` with a `description`), so the four candidates differ instead of repeating one pose; the description's own request goes out at once (2.1, 2.5.3, 2.6.3). The prompts and the default poses are data in `server/src/pix_server/poses/prompts.toml`, which the server checks when it starts and both comparison scripts read (2.6.3). Suggestion requests have rate limits of their own (2.8). A run, and each call to the image API, may now take 60 s instead of 30 s (2.6.3, 2.8). 2.6.3 keeps the decisions and their reasons, without the test logs. The pose ideas leave *Still open*. |
-| 1.11 | 2026-10-22 | Zoom without stutter as built (Iter2-P5, #47; 2.6.5). `CameraController.setZoom` takes `final` and applies only the newest request, once per display frame; during a pinch, the photographer's or the subject's, the bound lens stays until the ratio is 5 % past the primary's minimum, and the pinch's last value settles on its own lens; the Camera screen keeps the last frame on screen without the spinner from the moment the camera leaves `READY` for `STARTING` until the rebound preview streams, as it already did for a ratio change (`PreviewHold`, 2.6.2). `Timings` marks and `android/scripts/zoom_timings.py` measure it (2.1, 2.6.5, 2.8). Still open: *Zoom stutter cause* becomes what is left after the measured numbers. |
+| 1.11 | 2026-10-21 | Sign-in, Pix ID, and Friends screens as built (Iter2-P13, #54). The four *Still open* rows of Iter2-P13 are decided (Decided): *Shoot together* opens *Friends*, which, signed out, offers *Sign in to add friends* and *Use a room code instead*; one *Sign in* screen with *Continue with Google* and *Sign up*; an *Account* sheet from the account button on *Friends*; the team's Google Cloud project with the web client ID in the app's build script; the tokens in DataStore without Keystore encryption and out of backups and device transfers. The contracts follow the server (2.1, 2.3, 2.5.3): `PixAuthApi` holds the sign-in endpoints and `PixAccountApi` those with a token, each on its own HTTP client, so a refresh never waits behind the calls that wait for it; `AuthRepository.state` is an `AuthState`, and the tokens stay in `AuthTokens`; `setDisplayName` and `freshAccessToken` are added; `Friend.inSession`, `PixUser`, `RequestOutcome`, and one `AccountError` with `AccountException` replace `PixIdError` and `PasswordError`. Presence: the app holds one signed-in signaling socket while Pix is in front (2.5.2). Without push (Iter2-P15), *Friends* refreshes its lists every 10 s while it is shown (2.8). |
+| 1.12 | 2026-10-22 | *Check* and *Sent requests* (Iter2-P13, #54; R&S FR-5.15, FR-5.16). New endpoint `POST /auth/check-pix-id`, without a token: whether a sign-up could take a Pix ID now, with the Pix ID in the body and `400 PIX_ID_INVALID` as at sign-up; sign-up and `PUT /me` still answer `409 PIX_ID_TAKEN` for a Pix ID taken in the meantime (2.5.3). Contracts (2.1, 2.3): `AuthRepository.isPixIdAvailable`, on `PixAuthApi`; `FriendsRepository.sentRequests` with the new `SentRequest`, from the `outgoing` list that `GET /friend-requests` already answered, and `cancel` takes a withdrawn request off it, also when the server answers `404`. *Sent requests* is a screen of its own from *Friends* that refreshes like it. Whether a Pix ID exists is not secret: the lookup and the check tell it, and neither is limited for now (2.5.3; 2.8, Accounts). The room code sheet from *Friends* floats over *Camera*, so the camera already streams when the subject joins, and *Cancel* goes back to *Camera* (Decided, Iter2-P13). *In a session* does not show until a session's socket carries the token (#55, #56; 2.5.2, 2.5.3). |
+| 1.13 | 2026-10-22 | Zoom without stutter as built (Iter2-P5, #47; 2.6.5). `CameraController.setZoom` takes `final` and applies only the newest request, once per display frame; during a pinch, the photographer's or the subject's, the bound lens stays until the ratio is 5 % past the primary's minimum, and the pinch's last value settles on its own lens; the Camera screen keeps the last frame on screen without the spinner from the moment the camera leaves `READY` for `STARTING` until the rebound preview streams, as it already did for a ratio change (`PreviewHold`, 2.6.2). `Timings` marks and `android/scripts/zoom_timings.py` measure it (2.1, 2.6.5, 2.8). Still open: *Zoom stutter cause* becomes what is left after the measured numbers. |
 
-Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.5). Testing plans will be in the Testing Documentation.
+Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.7). Testing plans will be in the Testing Documentation.
 
 **Decided (2026-09-30):** XML Views with ViewBinding and the Navigation component · FastAPI (Python) server · package `com.lastpenguin.pix` · minSdk 29 (Android 10), target and compile SDK 36 · Iteration 1 test setup: both phones and the server, which runs on a laptop, on the same Wi-Fi network.
 
@@ -49,16 +51,14 @@ Audience: the development team. This page describes the design of Iterations 1 a
 
 **Decided (2026-10-20 and 2026-10-21, pose descriptions and suggested poses, Iter2-P12):** the idea chips are string resources in the app, so they are translated with it and cost no request, and `GET /pose-ideas` is dropped (2.6.3) · a response to a description has `"templateId": null`, and the app names its four requests itself instead of sending a `candidateId` for the server to echo (2.5.3) · one prompt for every candidate, with a description or without: without one, a vision model first suggests four poses for the scene, and the predefined poses are the default when it fails (2.6.3; decided 2026-10-21, replacing the template prompt and the separate description prompt of 2026-10-20) · the prompt may frame the person closer or from a slightly different height, but never wider than the scene photo, so a candidate can be tighter than the live view (2.6.3) · the suggestion model is a server setting, like the image model; the default is Gemini 3.1 Flash Lite (2.6.3) · with a description, one candidate follows it as written and three follow variations that the suggestion model writes for the scene, because four requests with one text gave nearly the same image (2.6.3; decided 2026-10-21) · the prompts and the default poses are data in `server/src/pix_server/poses/prompts.toml`, not code (2.6.3) · a run, and each call to the image API, may take 60 s instead of 30 s, because on a slow day single requests took up to 46 s and a late candidate is better than none (2.6.3, 2.8).
 
+**Decided (2026-10-21, sign-in and friends, Iter2-P13):** *Shoot together* opens *Friends*. Signed out, it shows *Sign in to add friends* and *Use a room code instead*, so a room code never asks for a sign-in; signed in, *Use a room code* stays under the friend list (FR-5.1, FR-8.1; R&S 6.4). The room code sheet replaces *Friends* and floats over *Camera*, as in Iteration 1, so the camera already streams when the subject joins; *Cancel* goes back to *Camera* · one *Sign in* screen with a Pix ID and a password, *Continue with Google*, and *Sign up*. After Google's `NOT_REGISTERED` the app asks "Do you already have a Pix account?": *Yes* stays on *Sign in*, and the Google account is added to the account the person signs in to; *No* makes a new account and opens *Pix ID setup* (FR-5.13) · the account actions are on an *Account* sheet that the account button in *Friends*' header opens: the display name, *Add Google* or *Add a password*, and *Sign out*; a tap on "My Pix ID" only copies it (FR-5.4, FR-5.12, FR-5.14) · Google sign-in setup: the team's Google Cloud project, whose web OAuth client is `PIX_GOOGLE_CLIENT_ID` on both servers and the app's server client ID, committed in `app/build.gradle.kts` because every APK contains it anyway; each member's debug signing key is an Android OAuth client for `com.lastpenguin.pix`, added by a project owner from the SHA-1 that `./gradlew :app:signingReport` prints; 박재완 made the project and owns it, and all four members are owners, so any of them can add a key (2.8, Configuration) · the tokens on the phone are in DataStore in the app's private files, without Keystore encryption, which would protect them only on a rooted phone and could sign the person out when the key is lost; `data_extraction_rules.xml` keeps the file out of backups and transfers to a new phone, where a copied refresh token would be spent twice and end the session (2.8, Accounts) · one refresh at a time for every caller, and the signaling socket opens with a fresh access token (2.5.3, *Session tokens*) · presence: while someone is signed in and Pix is in front, the app holds one signaling socket opened with the access token, so friends see the person online (FR-5.9, 2.5.2) · without push before Iter2-P15, *Friends* asks for the friend list and the received requests every 10 s while it is shown · received requests are a section of *Friends*, not a screen of their own, and a sent request is withdrawn from its search result (R&S 6.4).
+
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | Zoom stutter: what is left | Built in Iter2-P5 (2.6.5): requests applied once per display frame, the lens held during a pinch, the last frame kept through a lens switch. Open on the before and after numbers on the S21 and S22: `PreviewView` in `PERFORMANCE` mode (`SurfaceView`) if the preview still stutters, and the shutter freeze (Could). Was: lens rebinding, the rate of `setZoomRatio` calls, or the stream during zoom, measured first on the Galaxy S21 | 조성민 (Iter2-P5) | 10/23 |
 | Invite link format | A verified Android App Link needs HTTPS, which the course servers do not have (AD-11). Proposal: `http://<host>/i/<invitationId>` opens a small page from nginx that hands over to Pix through a custom scheme (`pix://i/<invitationId>`) and otherwise says to install Pix (2.6.6) | 박재완 with 조성민 (Iter2-P15) | 10/20 |
-| Sign-in screens | One *Sign in* screen from *Shoot together* with Pix ID and password, *Sign up*, and *Continue with Google*; after Google's `NOT_REGISTERED`, the step "Do you already have a Pix account?" (log in, then `PUT /me/google`; or `POST /auth/google/signup`); then *Pix ID setup* for a new Google account (2.5.3; R&S 6.8, FR-5.2, FR-5.13). Wireframes still to be drawn | 박재완 (Iter2-P13) | 10/17 |
-| Account actions | No settings screen until Iterations 3–4 (R&S 6.8), but Iteration 2 needs a place to change the display name, *Add Google* or *Add a password* (FR-5.12, FR-5.14), and *Sign out*. Proposal: tapping one's own name and Pix ID on *Friends* opens an account sheet with them, while a plain tap on the Pix ID still copies it (FR-5.4) | 박재완 (Iter2-P13) | 10/17 |
-| Google sign-in setup | A Google Cloud project with a web OAuth client, whose ID is `PIX_GOOGLE_CLIENT_ID` on both servers and the app's server client ID for Credential Manager, set per build like the server URL (2.8, Configuration); and Android OAuth clients for `com.lastpenguin.pix` with the SHA-1 of every signing key: each developer's debug key and the release key. Who owns the project, and how a new debug key is added | 박재완 (Iter2-P13) | 10/17 |
-| Tokens on the phone | The access and refresh tokens in DataStore (1.2, 2.8). The refresh token is a credential for 30 days, so whether to encrypt it with an Android Keystore key; one refresh at a time shared by REST calls and the signaling socket, which needs a fresh access token when it opens (2.5.3, *Session tokens*) | 박재완 (Iter2-P13) | 10/17 |
 | Wrong-code message on *Join* | The server answers `room.join` with `RATE_LIMITED` after 100 wrong codes from one address in 10 minutes (2.5.2); the app shows "Couldn't connect…" for any code it does not know. The count is per network address, so phones on one Wi-Fi or behind one carrier address share it. Proposal: "Too many wrong codes from this network. Try again in a few minutes." on *Join with code* | 조성민 (Iter2-P16) | 10/20 |
 | Reference thumbnail on Subject view | Whether the subject's phone also shows the guide's reference photo in a corner, the same as the photographer's thumbnail (FR-3.9), so the subject sees the pose to copy. It needs the photo on the subject's phone, which AD-6 and AD-15 now rule out (only the smoothed mask travels, 2.5.1), so it starts with that decision. Proposal: send a copy with its long side at most 512 px once per guide, used only for the thumbnail. Iteration 2 or later, not decided | 박동제 with 조성민 (guide sync) | TBD |
 **Contents**
@@ -124,7 +124,7 @@ Pix is one Android app that runs in two roles, **photographer** and **subject**,
 | **Guide sync** | Guide store (photographer) → `guide.state` → subject's guide store → overlay | Data channel | ≤ 0.3 s (NFR-7) |
 | **Remote zoom** | Subject → `camera.zoom.set` → clamp → CameraX → echo of the applied zoom | Data channel | ≤ 0.5 s (NFR-7) |
 | **Remote brightness, flash, guide move** (It 2) | Subject → `camera.exposure.set` / `camera.flash.set` / `guide.move` → apply → echo in `camera.state` / `guide.state` | Data channel | ≤ 0.5 s (NFR-7) |
-| **Sign-in** (It 2) | Pix ID and password → `POST /auth/login` (or `/auth/signup`), or Credential Manager → Google ID token → `POST /auth/google` → access and refresh tokens kept in DataStore | HTTP | — |
+| **Sign-in** (It 2) | Pix ID and password → `POST /auth/login` (or `/auth/signup`), or Credential Manager → Google ID token → `POST /auth/google` → access and refresh tokens kept in DataStore; a signed-in phone in front holds a signaling socket for presence | HTTP, WebSocket | — |
 | **Invitation** (It 2) | *Invite* → `POST /invitations` → database → FCM push (or a shared link) → `POST /invitations/{id}/accept` → `sessionId` to both phones → session setup as with a room code | HTTP, FCM, then WebSocket and WebRTC | Push ≤ 5 s, live view ≤ 10 s after Accept (NFR-9) |
 | **Reconnection** (It 2) | ICE disconnected → ICE restart through signaling → connected, or *Connection lost* after 10 s | WebSocket, WebRTC | ≤ 10 s (NFR-11) |
 | **Saved guide** (It 2) | Guide store → app private storage → guide store | On device only | — |
@@ -341,12 +341,13 @@ android/app/src/main/java/com/lastpenguin/pix/
 ├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore* (It 2),
 │               GuideGeometry, SubjectSegmenter, MaskSmoother (It 2), OutlineExtractor, overlay view
 ├─ generation/  GenerationModels*, PoseGenerator*, RemotePoseGenerator
-├─ account/     AccountModels*, AuthRepository*, FriendsRepository*, InvitationManager*, PushTokenRegistrar (It 2)
+├─ account/     AccountModels*, AuthRepository*, FriendsRepository*, InvitationManager*, AuthTokens, BearerTokens,
+│               RemoteAuthRepository, RemoteFriendsRepository, PresenceConnection, GoogleIdTokens, PushTokenRegistrar (It 2)
 ├─ session/     SessionModels*, SessionManager*, RtcSessionManager, SignalingClient,
 │               GuideSyncer, RemoteControlHandler
 │  ├─ protocol/  SessionMessage*, message codec, channel routing
 │  └─ signaling/ SignalMessage*
-└─ core/        network/PixApi*, network/ApiModels*, dependency wiring, timing logs
+└─ core/        network/PixApi* (PixApi, PixAuthApi, PixAccountApi), network/ApiModels*, dependency wiring, timing logs
 ```
 
 #### Module interfaces
@@ -401,25 +402,31 @@ interface PoseGenerator {
     fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent>
 }
 
-interface AuthRepository {                               // It 2 (FR-5.1–5.3, FR-5.11–5.13, AD-12)
-    val session: StateFlow<AccountSession?>              // null = not signed in; everything but friends works without it
-    suspend fun signUp(pixId: String, password: String, displayName: String): Result<AccountSession>  // PixIdError, PasswordError
-    suspend fun logIn(pixId: String, password: String): Result<AccountSession>   // fails with INVALID_CREDENTIALS
+interface AuthRepository {                               // It 2 (FR-5.1–5.3, FR-5.11–5.15, AD-12); failures are AccountException
+    val state: StateFlow<AuthState>                      // Loading, SignedOut, or SignedIn(account); everything but friends works signed out
+    val expired: SharedFlow<Unit>                        // the server refused the refresh token: ask to sign in again
+    suspend fun signUp(pixId: String, password: String, displayName: String): Result<Account>  // PIX_ID_TAKEN, PIX_ID_INVALID, PASSWORD_INVALID
+    suspend fun isPixIdAvailable(pixId: String): Result<Boolean>   // Check on Sign up and Pix ID setup, without a sign-in; PIX_ID_INVALID
+    suspend fun logIn(pixId: String, password: String): Result<Account>   // INVALID_CREDENTIALS
     suspend fun signInWithGoogle(idToken: String): Result<GoogleSignIn>   // NotRegistered: ask about an existing Pix account
-    suspend fun signUpWithGoogle(idToken: String): Result<AccountSession>   // a new account; the Pix ID comes next
-    suspend fun addGoogle(idToken: String): Result<AccountSession>   // fails with GOOGLE_IN_USE or GOOGLE_ALREADY_ADDED
-    suspend fun addPassword(password: String): Result<AccountSession>   // a Google account with a Pix ID; PasswordError
-    suspend fun setPixId(pixId: String, password: String? = null): Result<AccountSession>   // TAKEN or INVALID; a password account changing it sends its password
-    suspend fun signOut()
+    suspend fun signUpWithGoogle(idToken: String): Result<Account>   // a new account; the Pix ID comes next
+    suspend fun addGoogle(idToken: String): Result<Account>   // GOOGLE_IN_USE or GOOGLE_ALREADY_ADDED
+    suspend fun addPassword(password: String): Result<Account>   // a Google account with a Pix ID; PASSWORD_INVALID
+    suspend fun setPixId(pixId: String, password: String? = null): Result<Account>   // TAKEN or INVALID; a password account changing it sends its password
+    suspend fun setDisplayName(displayName: String): Result<Account>   // 1–30 characters after trimming
+    suspend fun freshAccessToken(): String?              // for the signaling socket, which sends it only when it opens
+    suspend fun signOut()                                // on the server if it answers, on the phone always
 }
 
-interface FriendsRepository {                            // It 2 (FR-5.4–5.10)
+interface FriendsRepository {                            // It 2 (FR-5.4–5.10, FR-5.16); failures are AccountException
     val friends: StateFlow<List<Friend>>
     val requests: StateFlow<List<FriendRequest>>         // received, pending
+    val sentRequests: StateFlow<List<SentRequest>>       // sent, not answered yet (FR-5.16)
+    suspend fun refresh(): Result<Unit>                  // the three lists; Friends and Sent requests call it every 10 s while shown
     suspend fun search(pixId: String): Result<UserLookup> // exact match only
-    suspend fun request(userId: String): Result<Unit>
-    suspend fun accept(requestId: String): Result<Unit>
-    suspend fun cancel(requestId: String): Result<Unit>  // withdraws a request the user sent
+    suspend fun request(userId: String): Result<RequestOutcome>   // Sent, or BecameFriends when they had asked
+    suspend fun accept(requestId: String): Result<Friend>
+    suspend fun cancel(requestId: String): Result<Unit>  // withdraws a request the user sent; it leaves sentRequests, on NOT_FOUND too
     suspend fun decline(requestId: String): Result<Unit>
     suspend fun remove(userId: String): Result<Unit>
 }
@@ -649,22 +656,30 @@ classDiagram
   direction LR
   class AccountViewModel {
     +uiState StateFlow~AccountUiState~
-    +signUp(pixId, password, displayName)
+    +events SharedFlow~AccountEvent~
     +logIn(pixId, password)
-    +signInWithGoogle(idToken)
-    +addGoogle(idToken)
-    +addPassword(password)
+    +continueWithGoogle(activity)
+    +answerExistingAccount(hasAccount)
+    +signUp(pixId, displayName, password)
+    +checkPixId(pixId)
     +savePixId(pixId)
+    +saveDisplayName(name)
+    +addGoogle(activity)
+    +addPassword(password)
+    +signOut()
   }
   class FriendsViewModel {
     +uiState StateFlow~FriendsUiState~
+    +search StateFlow~SearchUiState~
+    +keepRefreshing()
     +search(pixId)
-    +request(userId)
-    +accept(requestId)
-    +decline(requestId)
-    +cancel(requestId)
-    +remove(userId)
-    +invite(friendId)
+    +addFound()
+    +acceptFound()
+    +withdrawFound()
+    +accept(request)
+    +decline(request)
+    +withdraw(sent)
+    +remove(friend)
   }
   class InvitationViewModel {
     +uiState StateFlow~InvitationUiState~
@@ -676,20 +691,34 @@ classDiagram
   }
   class AuthRepository {
     <<interface>>
-    +session StateFlow
+    +state StateFlow~AuthState~
     +signUp(pixId, password, displayName)
+    +isPixIdAvailable(pixId)
     +logIn(pixId, password)
     +signInWithGoogle(idToken)
     +signUpWithGoogle(idToken)
     +addGoogle(idToken)
     +addPassword(password)
     +setPixId(pixId)
+    +setDisplayName(name)
+    +freshAccessToken()
   }
   class FriendsRepository {
     <<interface>>
     +friends StateFlow
     +requests StateFlow
+    +sentRequests StateFlow
+    +refresh()
     +search(pixId)
+    +request(userId)
+  }
+  class AuthTokens {
+    +state StateFlow~AuthState~
+    +freshAccessToken()
+    +refreshAfterRejection(token)
+  }
+  class PresenceConnection {
+    +start()
   }
   class InvitationManager {
     <<interface>>
@@ -702,7 +731,10 @@ classDiagram
   class PushTokenRegistrar {
     +register(token)
   }
-  class PixApi {
+  class PixAuthApi {
+    <<Retrofit>>
+  }
+  class PixAccountApi {
     <<Retrofit>>
   }
   AccountViewModel --> AuthRepository
@@ -710,11 +742,15 @@ classDiagram
   FriendsViewModel --> InvitationManager
   InvitationViewModel --> InvitationManager
   InvitationViewModel --> SessionManager
-  AuthRepository --> PixApi
-  FriendsRepository --> PixApi
-  InvitationManager --> PixApi
+  AuthRepository --> PixAuthApi : sign-in
+  AuthRepository --> AuthTokens : the sign-in, one refresh at a time
+  AuthRepository --> PixAccountApi
+  FriendsRepository --> PixAccountApi
+  PixAccountApi --> AuthTokens : bearer token, refresh on 401
+  PresenceConnection --> AuthRepository : socket while in front
+  InvitationManager --> PixAccountApi
   InvitationManager --> SessionManager : accepted invitation → SessionEntry.Invitation
-  PushTokenRegistrar --> PixApi
+  PushTokenRegistrar --> PixAccountApi
 ```
 
 *Figure 8b. Account, friends, and invitation classes (Iteration 2). An accepted invitation becomes a `SessionEntry.Invitation` for the existing session code.*
@@ -801,24 +837,38 @@ data class PeerInfo(
 enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, DECLINED, BUSY, ERROR }
 
 // ---- Account (It 2) --------------------------------------------------------
-data class AccountSession(
+data class Account(
     val userId: String, val pixId: String?, val displayName: String,   // pixId null until chosen
-    val accessToken: String, val refreshToken: String,   // the app refreshes on 401 and signs out if that fails
     val hasPassword: Boolean, val hasGoogle: Boolean,   // the ways the account signs in; offer "Add Google" without it
-)
+)   // the tokens stay inside AuthTokens and DataStore, never in UI state
+sealed interface AuthState {
+    data object Loading : AuthState                    // the kept sign-in is being read at app start
+    data object SignedOut : AuthState
+    data class SignedIn(val account: Account) : AuthState
+}
 sealed interface GoogleSignIn {
-    data class SignedIn(val session: AccountSession) : GoogleSignIn
+    data class SignedIn(val account: Account) : GoogleSignIn
     data object NotRegistered : GoogleSignIn   // ask whether the person already has a Pix account (FR-5.13)
 }
-data class Friend(val userId: String, val pixId: String, val displayName: String, val online: Boolean)
-data class FriendRequest(val id: String, val from: Friend, val createdAt: Long)
+data class PixUser(val userId: String, val pixId: String, val displayName: String)   // a lookup result or a request's sender
+data class Friend(val userId: String, val pixId: String, val displayName: String, val online: Boolean, val inSession: Boolean)
+data class FriendRequest(val id: String, val from: PixUser, val createdAt: Long)
+data class SentRequest(val id: String, val to: PixUser, val createdAt: Long)   // a request the user sent, not answered yet (FR-5.16)
 sealed interface UserLookup {
-    data class Found(val user: Friend, val relation: Relation, val requestId: String?) : UserLookup   // relation decides the button (FR-5.8); requestId for REQUESTED and INCOMING
+    data class Found(val user: PixUser, val relation: Relation, val requestId: String?) : UserLookup   // relation decides the button (FR-5.8); requestId for REQUESTED and INCOMING
     data object NotFound : UserLookup
 }
 enum class Relation { NONE, SELF, FRIEND, REQUESTED, INCOMING }
-enum class PixIdError { TAKEN, INVALID }
-data class PasswordError(val rule: String)   // the broken rule, as the server names it (FR-5.11)
+sealed interface RequestOutcome {
+    data class Sent(val requestId: String) : RequestOutcome
+    data class BecameFriends(val friend: Friend) : RequestOutcome   // they had already asked, so their request is accepted
+}
+enum class AccountError {   // the server's code (2.5.3), or the phone's own reason
+    PIX_ID_TAKEN, PIX_ID_INVALID, PASSWORD_INVALID, INVALID_CREDENTIALS, INVALID_GOOGLE_TOKEN, GOOGLE_IN_USE,
+    GOOGLE_ALREADY_ADDED, PIX_ID_REQUIRED, PASSWORD_ALREADY_SET, NOT_FOUND, INVALID_REQUEST, UNAVAILABLE,
+    SIGNED_OUT, OFFLINE, UNKNOWN,
+}
+class AccountException(val error: AccountError, val serverMessage: String = "")   // serverMessage names the broken rule (FR-5.3, FR-5.11)
 data class Invitation(
     val id: String, val from: Friend, val to: Friend,
     val status: InvitationStatus, val expiresAt: Long,
@@ -1130,7 +1180,7 @@ Every 2 s, from both phones. `pong` echoes the `ts` of the `ping`. The phone tha
 
 #### 2.5.2 Signaling protocol (phone ↔ server, WebSocket)
 
-JSON text frames over `ws://<host>/ws` (the course servers have no TLS, AD-11; Iteration 1: `ws://<laptop address>:8000/ws` on the test Wi-Fi), each with a `type` field. A signed-in phone sends its access token in the `Authorization: Bearer` header of the WebSocket upgrade; it is required for invitation sessions and optional for room codes, and it marks the user online for the friend list (presence, FR-5.9). A missing, unknown, or expired token, or an account database that does not answer, leaves the socket anonymous: room codes still work, and the user does not show as online.
+JSON text frames over `ws://<host>/ws` (the course servers have no TLS, AD-11; Iteration 1: `ws://<laptop address>:8000/ws` on the test Wi-Fi), each with a `type` field. A signed-in phone sends its access token in the `Authorization: Bearer` header of the WebSocket upgrade; it is required for invitation sessions and optional for room codes, and it marks the user online for the friend list (presence, FR-5.9). A missing, unknown, or expired token, or an account database that does not answer, leaves the socket anonymous: room codes still work, and the user does not show as online. While someone is signed in and Pix is in front, the app holds one such socket that sends nothing, apart from any session's own (`PresenceConnection`; decided 2026-10-21): it opens again 1 s after it closes, doubling up to 30 s while it keeps failing, and closes when the app goes to the background or the person signs out. This socket never joins a session, and the session's own socket opens without a token until invitations (#55, #56), so no friend is `inSession` yet and *Friends* never shows *In a session*.
 
 | Client → server | Server → client | Purpose |
 |----|----|----|
@@ -1256,6 +1306,7 @@ Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteratio
 | `POST /pose-suggestions` (It 2) | Four poses for the scene, chosen by a vision model, or, with a `description`, the description and three variations of it; the app asks once per set | `400 INVALID_IMAGE`, `400 INVALID_REQUEST`, `413`, `429 RATE_LIMITED`, `503 UNAVAILABLE` |
 | `POST /poses` | One pose candidate for a description, the user's or a suggested pose (It 2), or for a template id from an app before Iteration 2; the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `400 INVALID_REQUEST`, `413`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `503 UNAVAILABLE` (the session store, which counts the rate limit, does not answer), `504 UPSTREAM_TIMEOUT` |
 | `POST /auth/signup` (It 2) | Create an account with a Pix ID, a display name, and a password; return its tokens (FR-5.2, FR-5.11) | `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` |
+| `POST /auth/check-pix-id` (It 2) | Whether a sign-up could take a Pix ID now, for *Check* on Sign up and Pix ID setup (FR-5.15) | `400 PIX_ID_INVALID` |
 | `POST /auth/login` (It 2) | Sign in with a Pix ID and a password; return an access and a refresh token | `401 INVALID_CREDENTIALS` |
 | `POST /auth/refresh` (It 2) | Exchange a refresh token for a new access token and a new refresh token | `401 INVALID_REFRESH_TOKEN` |
 | `POST /auth/google` (It 2) | Verify a Google ID token and sign in the account that uses it; return an access and a refresh token | `401 INVALID_TOKEN`, `404 NOT_REGISTERED`, `503 UNAVAILABLE` |
@@ -1364,11 +1415,13 @@ The server checks the photo and does not repair it: one that is not a readable J
 
 The Pix ID is the login name; `POST /auth/login` ignores capitals and spaces around it. A password has 8–64 characters, at least one letter and one digit, and is not the Pix ID (FR-5.11); `PASSWORD_INVALID` names the broken rule, as `PIX_ID_INVALID` does. A display name has 1–30 characters after trimming, otherwise `400 INVALID_REQUEST`. The server keeps only an argon2id hash of the password (2.8, Accounts). An unknown Pix ID and a wrong password get the same answer, and the server checks a stand-in hash for an unknown Pix ID, so both take as long. Login attempts are not limited for now (decided 2026-10-15). Each sign-in issues a new token for that phone, valid for 30 days.
 
+**Checking a Pix ID (FR-5.15, added 2026-10-22).** `POST /auth/check-pix-id` `{ "pixId": "test5" }` answers `200 { "available": true }`, or `false` when an account has that Pix ID, and `400 PIX_ID_INVALID`, naming the rule, for one that breaks the rules as at sign-up (no capitals or spaces are taken off). It needs no token, so *Check* on Sign up and on the Pix ID setup of a Google account use it alike; whether a Pix ID exists is not secret (2.8, Accounts), and, like log-in and the lookup, it is not limited for now. The answer can change before the form is sent, so sign-up and `PUT /me` still answer `409 PIX_ID_TAKEN`. The Pix ID travels in the body, as in the lookup, so no log prints it.
+
 **Session tokens.** A sign-in starts a session for that phone and answers with two tokens.
 
 - `accessToken` is a JWT signed with HS256 and the server's `PIX_JWT_SECRET`. Its claims are `iss` (`"pix"`), `sub` (the user's ID), `sid` (the session), `iat`, and `exp`, 15 minutes later (`expiresIn`, in seconds). The app sends it as `Authorization: Bearer <accessToken>` on every *auth* endpoint and on the signaling upgrade. The server checks the signature, the issuer, the expiry, and that the user exists, without looking up the session, and stores no copy.
 - `refreshToken` is 32 random bytes, which the server keeps only as a SHA-256 hash in `sessions` (2.7). It lasts 30 days from its last use, so a phone in use stays signed in. `POST /auth/refresh` `{ "refreshToken": "kq3V9x0Rz8..." }` answers `{ "accessToken", "refreshToken", "expiresIn" }`, and the old refresh token stops working. A refresh token that was already exchanged and comes back, from a copy or after an answer the phone never got, ends the session, so every holder has to sign in again; an unknown or expired one answers `401 INVALID_REFRESH_TOKEN` too.
-- The app refreshes when an *auth* endpoint answers `401 UNAUTHENTICATED`, or just before `expiresIn` runs out, and retries once; if the refresh fails it signs out and asks the person to sign in. A signaling socket keeps the user online after its access token expires, because the token is checked only when the socket opens.
+- The app refreshes when an *auth* endpoint answers `401 UNAUTHENTICATED`, or within a minute of `expiresIn`, and retries once; if the refresh is refused (`401`) it signs out and asks the person to sign in, and a refresh without an answer keeps the tokens. As built (Iter2-P13): `AuthTokens` runs one refresh at a time for every caller, and a caller that waited for one takes its new token instead of refreshing again, because a spent refresh token would end the session; `BearerTokens` adds the token and answers the `401` on the account client. The sign-in endpoints (`PixAuthApi`) have a client of their own, so the refresh never queues behind the account calls that wait for it or behind pose requests. A signaling socket keeps the user online after its access token expires, because the token is checked only when the socket opens.
 - Sign-out (`DELETE /auth/session`) deletes the session: its refresh token stops working at once, its device token goes with it, and its access token works until it expires.
 
 </details>
@@ -1477,7 +1530,7 @@ Exact match only; no partial search or listing (FR-5.5, NFR-15). Capitals and sp
 // DELETE /friend-requests/fr_77       → 204   (the sender withdraws it)
 ```
 
-The receiver gets an FCM push `friend.request` and sees it under received requests (FR-5.7); **TODO** Iter2-P15: the push is sent once the server has its FCM sender. A declined or withdrawn request is deleted and can be sent again later (US-8). Only the receiver can accept or decline, and only the sender can withdraw; anyone else, and a request already answered, get `404 NOT_FOUND`. Each of these, and a request that accepts the other user's, takes the request with one `DELETE … RETURNING`, so of two at the same moment only one succeeds: an accept and a withdrawal at once never leave the two as friends after the request was withdrawn. Sending and accepting between the same two users also lock both user rows (`SELECT … FOR UPDATE`) and run one after the other, so a request sent while the reverse one is accepted finds the friendship instead of being saved next to it. An accept reads the new friend's presence before it commits, so if the session store fails it answers `503 UNAVAILABLE` and saves nothing, and the same call can be repeated. Sending a request to oneself is `400 INVALID_REQUEST`. `createdAt` is in milliseconds since the epoch.
+The receiver gets an FCM push `friend.request` and sees it under received requests (FR-5.7), and the sender sees it on *Sent requests* until it is answered or withdrawn (FR-5.16, added 2026-10-22); **TODO** Iter2-P15: the push is sent once the server has its FCM sender. A declined or withdrawn request is deleted and can be sent again later (US-8). Only the receiver can accept or decline, and only the sender can withdraw; anyone else, and a request already answered, get `404 NOT_FOUND`. Each of these, and a request that accepts the other user's, takes the request with one `DELETE … RETURNING`, so of two at the same moment only one succeeds: an accept and a withdrawal at once never leave the two as friends after the request was withdrawn. Sending and accepting between the same two users also lock both user rows (`SELECT … FOR UPDATE`) and run one after the other, so a request sent while the reverse one is accepted finds the friendship instead of being saved next to it. An accept reads the new friend's presence before it commits, so if the session store fails it answers `503 UNAVAILABLE` and saves nothing, and the same call can be repeated. Sending a request to oneself is `400 INVALID_REQUEST`. `createdAt` is in milliseconds since the epoch.
 
 </details>
 
@@ -1489,7 +1542,7 @@ The receiver gets an FCM push `friend.request` and sees it under received reques
 { "friends": [ { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong", "online": true, "inSession": false } ] }
 ```
 
-`online` is true while the friend's phone holds an authenticated signaling socket; `inSession` is true while that socket is in a session, a waiting room included (FR-6.9). Friends are ordered by display name. `DELETE /friends/u_02AB` answers `204`, removes both directions and any pending request between the two (FR-5.10), and answers `204` for someone who is not a friend as well.
+`online` is true while the friend's phone holds an authenticated signaling socket; `inSession` is true while that socket is in a session, a waiting room included (FR-6.9); until a session's socket carries the token (#55, #56) it is always false (2.5.2). Friends are ordered by display name. `DELETE /friends/u_02AB` answers `204`, removes both directions and any pending request between the two (FR-5.10), and answers `204` for someone who is not a friend as well.
 
 </details>
 
@@ -1742,12 +1795,12 @@ erDiagram
 | **Lifecycle** | The camera binds to the lifecycle of the camera screen; ViewModels keep UI state across rotation. If the photographer's app goes to the background, the camera is released and the video pauses. The session stays open for 60 s, and the subject sees that the camera is paused. No foreground service is used. From Iteration 2 a drop moves both phones to `Reconnecting` for up to 10 s before the session ends (2.6.7). The aspect ratio, brightness, and flash are restored when the camera rebinds; the last ratio is kept in DataStore. |
 | **Error handling** | Module interfaces return `Result` with typed errors (`NoPersonFound`, `GenerationError`, `EndReason`). ViewModels map them to the failure screens in the wireframe, and each maps to exactly one screen. |
 | **Timeouts** | Pose generation: 60 s on the client for a whole run, and 60 s from server to API for each request (2.6.3, *Time limit*). Because the phone's limit starts first, it usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. Room code: 10 min. Invitation: 30 s on the server (It 2). Reconnection: 10 s (It 2). TURN credentials: the session's lifetime plus 10 min (It 2). |
-| **Configuration and secrets** | The server URL is set per build type in `BuildConfig`: Server A for release, and for debug Server B or a laptop on the test Wi-Fi (`pix.serverUrl`). The course servers have no TLS (AD-11), so release builds allow plain HTTP and WebSocket traffic to the two course hostnames only, through the network security config; debug builds allow it to any host. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. Iteration 2 adds `PIX_DATABASE_URL` (on the course servers the Compose file sets it, with a password that `deploy.sh` makes once and keeps in `/opt/pix/db-password`), `PIX_JWT_SECRET` (made by `deploy.sh` in `/opt/pix/jwt-secret` on the course servers), `PIX_ACCESS_TOKEN_MINUTES` (15), `PIX_SESSION_TTL_DAYS` (30), `PIX_REDIS_URL` (AD-18), `PIX_GOOGLE_CLIENT_ID`, `PIX_FCM_CREDENTIALS` (path to the Firebase service-account file), `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (Cloudflare's TURN key, AD-14), and `PIX_PUBLIC_URL` for invite links. `.env.example` lists every name, which a test keeps in step with the settings in code: a name with no value must be set on each server, and every other name is commented, showing the default the app already has. The Firebase file and the secrets live only in a `.env` file on each server. Each deploy and restart compares that file with the example and warns, in its log, in `pix status`, and at an operator's login, about a required name without a value and about a name the example does not list, which the app would ignore; it never writes the file, so a default changed in code is not pinned on a server (decided 2026-10-15). |
+| **Configuration and secrets** | The server URL is set per build type in `BuildConfig`: Server A for release, and for debug Server B or a laptop on the test Wi-Fi (`pix.serverUrl`). The Google web client ID is one constant in `app/build.gradle.kts` (`BuildConfig.GOOGLE_SERVER_CLIENT_ID`), the same as the servers' `PIX_GOOGLE_CLIENT_ID`; Google accepts sign-in only from an APK whose signing key is registered as an Android OAuth client in the same project (decided 2026-10-21). The course servers have no TLS (AD-11), so release builds allow plain HTTP and WebSocket traffic to the two course hostnames only, through the network security config; debug builds allow it to any host. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. Iteration 2 adds `PIX_DATABASE_URL` (on the course servers the Compose file sets it, with a password that `deploy.sh` makes once and keeps in `/opt/pix/db-password`), `PIX_JWT_SECRET` (made by `deploy.sh` in `/opt/pix/jwt-secret` on the course servers), `PIX_ACCESS_TOKEN_MINUTES` (15), `PIX_SESSION_TTL_DAYS` (30), `PIX_REDIS_URL` (AD-18), `PIX_GOOGLE_CLIENT_ID`, `PIX_FCM_CREDENTIALS` (path to the Firebase service-account file), `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (Cloudflare's TURN key, AD-14), and `PIX_PUBLIC_URL` for invite links. `.env.example` lists every name, which a test keeps in step with the settings in code: a name with no value must be set on each server, and every other name is commented, showing the default the app already has. The Firebase file and the secrets live only in a `.env` file on each server. Each deploy and restart compares that file with the example and warns, in its log, in `pix status`, and at an operator's login, about a required name without a value and about a name the example does not list, which the app would ignore; it never writes the file, so a default changed in code is not pinned on a server (decided 2026-10-15). |
 | **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, and over all clients together, 500 in 24 hours by default (`PIX_POSE_GLOBAL_LIMIT`, `PIX_POSE_GLOBAL_WINDOW_SECONDS`), counting only requests sent to the image API, to control cost; `POST /pose-suggestions` has windows of its own of the same lengths, 10 per address and 500 over all (`PIX_SUGGESTION_RATE_LIMIT`, `PIX_SUGGESTION_GLOBAL_LIMIT`). All answer `429 RATE_LIMITED`, with a message that says which. Neither a description, a suggested pose, nor a variation is written to a log, because all of them describe the person in the photo. The global limit bounds what the image API can cost in a day however many addresses send requests; the OpenRouter key's own spending limit, set in OpenRouter's dashboard, is the last bound. A `room.join` with a wrong code counts against the address too, 100 in 10 minutes (`PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS`; 2.5.2); on the course servers the address is the last `X-Forwarded-For` value, which the course's proxy adds. Requests to the course servers travel over plain HTTP (AD-11), so a scene photo, a password at sign-in, and the access and refresh tokens are not encrypted between the phone and the server; the live view is, because it goes phone to phone (NFR-14). No endpoint takes a Pix ID or other personal data in its URL, because nginx's error log prints a failed request's whole request line; the lookup is `POST /users/lookup`. The access logs of nginx and Uvicorn also leave out query strings, and the server never logs a password, a token, or a request body. Password hashes run two at a time per worker, so a burst of sign-ins, which needs no account, queues instead of using a 64 MiB argon2id buffer per thread of the pool. |
 | **Measurement hooks** | `Timings` logs named timestamps with a shared tag, so NFR latencies can be read from logcat without extra tools. Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping. Times are each phone's own clock; the `ping.received` and `rtt` lines align two phones' logs (2.5.1). The zoom marks and the frames after each zoom request feed `android/scripts/zoom_timings.py` (2.6.5). |
 | **Hosting (It 2, AD-11)** | Two course-provided servers, each behind the course's HTTP proxy and reachable only on port 80: Server A, `http://swpp26t10.147-46-242-169.sslip.io`, runs `main` as production, and Server B, `http://swpp26t10.147-46-242-174.sslip.io`, runs `dev` as staging. They cannot reach each other, so each has its own database and session store. `server/deploy/` holds a `docker-compose.yml` with `nginx` on port 80 (`/api/v1`, `/ws`, `/health`, `/version`, and the `/i/<id>` page; anything else answers `404`, so FastAPI's `/docs` is not public), two copies of the app (`app-blue` and `app-green`; Uvicorn with two workers, a count set explicitly because the servers report 38 CPUs for the 8 cores we get), `redis`, and `postgres` with its files in `/opt/pix/postgres` on the server's disk (not a Docker volume, so no Docker cleanup can delete them), plus the nginx configuration. The course's proxy, measured on 2026-10-13: WebSockets pass and stay open (300 s with pings, 200 s idle), although the course cuts a plain HTTP response after 120 s; the proxy adds the phone's address as the last `X-Forwarded-For` value and passes on any value the client sent, so nginx trusts only the proxy and takes the last value; and it does not pass a client's cancel on to the server (2.6.3). |
 | **Deployment (It 2)** | GitHub cannot push to the servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights the team does not have and is advised against on a public repository. So each server pulls. A systemd timer runs `server/deploy/deploy.sh` every minute, which compares its branch with the deployed commit. A merge that does not change `server/` only records the commit. Otherwise the script builds the image on the server, with the tests as a build stage, starts it as the idle copy (blue or green), and waits for its `/health`. It then waits until the old copy has no open room, for at most 10 min, then switches nginx, checks `/health` through it, and stops the old copy with a grace period long enough for a pose request in flight. Last it records the commit in `/version`. A failure at any step leaves the running copy serving, and that commit is not tried again; `deploy.sh rollback` switches back to the previous image. The two copies share their rooms through the session store (AD-18), but the wait stays until phones can rejoin a room after their socket drops (2.6.7, Iter2-P16): stopping a copy closes its sockets, and in a room that spans both copies the phone on the new copy would be told that its peer was lost, which ends a live session on the subject's phone. A workflow on GitHub's own runners builds the image on every pull request and, after a merge, waits until `/version` shows the commit, so a failed deploy is visible on the commit. |
-| **Accounts (It 2, AD-12)** | The app sends the access token as a bearer header on REST calls and the signaling upgrade. A person signs up with a Pix ID, a display name, and a password, or with Google; either kind of account can add the other way to sign in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the sockets of the same worker; only the hash is stored. They cross plain HTTP to the course servers (AD-11, NFR-14), and login attempts are not limited for now (decided 2026-10-15). There is no email, so a forgotten password cannot be reset. The server verifies Google ID tokens with `google-auth` against Google's published keys and our web client ID, and stores only the Google subject. Each sign-in gives a 15-minute access token, a JWT signed with HS256 (`PyJWT`) and `PIX_JWT_SECRET` (`PIX_ACCESS_TOKEN_MINUTES`), and a refresh token that lasts 30 days from its last use (`PIX_SESSION_TTL_DAYS`); the app keeps both in DataStore (decided 2026-10-15; 2.5.3, *Session tokens*). Checking an access token needs no database, so the signaling upgrade marks a user online from the token alone; REST endpoints still load the user. A refresh is one `UPDATE … WHERE refresh_hash = … RETURNING`, so two refreshes with one token cannot both succeed: the second finds the token spent and ends the session, as any later use of a spent token does. Sign-out ends the session at once for refreshes and within 15 minutes for the access token. Changing `PIX_JWT_SECRET` ends every access token, and the app refreshes. Without it a server process makes its own secret at start, which suits one worker on a laptop; on the course servers `deploy.sh` makes one once in `/opt/pix/jwt-secret` and Compose passes it to both copies. Everything but friends and invitations works without a token (FR-5.1). |
+| **Accounts (It 2, AD-12)** | The app sends the access token as a bearer header on REST calls and the signaling upgrade. A person signs up with a Pix ID, a display name, and a password, or with Google; either kind of account can add the other way to sign in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the sockets of the same worker; only the hash is stored. They cross plain HTTP to the course servers (AD-11, NFR-14), and login attempts are not limited for now (decided 2026-10-15). Whether a Pix ID exists is not secret: the lookup tells any signed-in user and `POST /auth/check-pix-id` anyone, each for an exact Pix ID only (NFR-15), and neither is limited for now; a failed log-in still gives one answer for an unknown Pix ID and a wrong password (decided 2026-10-22). There is no email, so a forgotten password cannot be reset. The server verifies Google ID tokens with `google-auth` against Google's published keys and our web client ID, and stores only the Google subject. Each sign-in gives a 15-minute access token, a JWT signed with HS256 (`PyJWT`) and `PIX_JWT_SECRET` (`PIX_ACCESS_TOKEN_MINUTES`), and a refresh token that lasts 30 days from its last use (`PIX_SESSION_TTL_DAYS`); the app keeps both in DataStore (decided 2026-10-15; 2.5.3, *Session tokens*), in its private files without Keystore encryption, and `data_extraction_rules.xml` keeps them out of backups and transfers to a new phone (decided 2026-10-21). Checking an access token needs no database, so the signaling upgrade marks a user online from the token alone; REST endpoints still load the user. A refresh is one `UPDATE … WHERE refresh_hash = … RETURNING`, so two refreshes with one token cannot both succeed: the second finds the token spent and ends the session, as any later use of a spent token does. Sign-out ends the session at once for refreshes and within 15 minutes for the access token. Changing `PIX_JWT_SECRET` ends every access token, and the app refreshes. Without it a server process makes its own secret at start, which suits one worker on a laptop; on the course servers `deploy.sh` makes one once in `/opt/pix/jwt-secret` and Compose passes it to both copies. Everything but friends and invitations works without a token (FR-5.1). |
 | **Push (It 2, AD-13)** | FCM data messages only, so the app renders every notification itself. A message for an invitation that is no longer `PENDING` when the app handles it opens the "no longer available" screen. The server deletes a device row when FCM reports the token unregistered. |
 | **Aspect ratio and camera controls (It 2)** | `setAspectRatio` rebinds the `UseCaseGroup` with a `ViewPort` of the new ratio once no photo is being saved; the default is 4:3, and the last choice is restored from DataStore (`camera_settings`). CameraX starts every binding without the exposure index and the flash mode, so `CameraXController` keeps them, as it keeps the zoom, and applies them again after a rebind, a lens switch, or the screen coming back; the camera stays `STARTING` until the exposure index is back, so no photo is taken at 0 EV. While a separately exposed ultrawide without a flash is bound, the capabilities report no flash and the state reports it off, so the flash button is hidden; the chosen mode returns with the primary camera. The capabilities come from the primary rear camera. A tap focuses, meters, and sets the white balance at that point and returns to continuous focus after 5 s (`FocusMeteringAction`); the point is mapped from the frame to the preview buffer through its crop and rotation. |
 | **Guide-edit mode (It 2, AD-17)** | A boolean in the screen's UI state, not in `GuideState`, so it is never synchronized; each phone has its own. It switches the overlay's `editable` flag and whether the preview's pinch detector is active. |

@@ -17,6 +17,8 @@
 | 1.4 | 2026-10-15 | Camera controls as built (Iter2-P10, #51). FR-1.13 says how each ratio is cut from the sensor. 6.2 places the flash and aspect-ratio buttons in the top bar and the brightness slider behind a button beside the zoom readout, and the last ratio is kept for the next time. |
 | 1.5 | 2026-10-16 | Guide controls as built (Iter2-P11, #52). FR-3.3 is revised, with the original kept: the size limits are 21–210 % of the frame height for every start, because the guide now starts at the person's size in the reference (FR-3.1). FR-3.6 and 6.2: there is no *Replace* button; *Guide* asks to replace a guide that is on the camera. FR-3.9 and 6.2: a tap on the reference thumbnail enlarges it and another tap makes it small, and a drag moves it to another corner. *Reference confirm* shows the outline on a dark neutral card (6.2). US-3 follows. |
 | 1.6 | 2026-10-21 | Poses without a description are suggested for the scene (Iter2-P12, #53). FR-4.4 is revised, with the original kept: without a description the Pix server suggests four poses for the scene, and the predefined poses are used only when it cannot. *Skip, use the preset poses* becomes *Skip, suggest poses for me* (FR-4.8, US-5, 6.3, 6.8), Generating poses says "Choosing poses…" until the suggested poses are known (6.3), and FR-4.8 says that the server's prompt may frame the person closer. *Try other poses* goes back to *Generate poses* with the scene photo and the description kept instead of requesting a new set at once (FR-4.6, revised with the original kept; US-4, 6.3). With a description, one candidate follows it as written and three follow variations of it that the Pix server writes for the scene, so the four differ (FR-4.8, US-5 revised with the original kept, 6.3). The glossary gains *Suggested pose* and *Pose variation*. Pose requests stop at 60 s instead of 30 s, while the targets of 20 s and 30 s stay (NFR-4, FR-4.5, FR-4.7, US-4, 6.3; revised with the originals kept). Figure 2 now includes Generate poses, which leaves 6.8. A refused description no longer takes the blame alone: the service does not say whether it refused the photo or the text, so Pix offers another description or another photo (US-5, 6.3, revised with the originals kept). |
+| 1.7 | 2026-10-21 | Sign-in, Pix ID, and Friends screens as built (Iter2-P13, #54). FR-5.2 is revised, with the original kept: *Shoot together* opens *Friends*, which, signed out, offers *Sign in to add friends* and *Use a room code instead* instead of asking for a sign-in first, so the room code stays without an account (FR-5.1, FR-8.1). 6.4 adds *Friends (signed out)*, *Sign in*, *Sign up*, "Do you already have a Pix account?", *Pix ID setup*, and the *Account* sheet, which the account button on *Friends* opens; received requests are a section of *Friends*; *Invite* stays disabled until invitations (Iter2-P15). 6.7: the room code opens from *Friends*. 6.8: *Pix ID setup*, *Account*, and *Friend requests* are drawn in Figure 3b and leave the list. |
+| 1.8 | 2026-10-22 | *Check* and *Sent requests* (Iter2-P13, #54). FR-5.15: *Check* beside the Pix ID field of *Sign up* and *Pix ID setup* tells whether the Pix ID is free before the form is sent. FR-5.16: *Friends* shows *Sent requests · N* while requests the user sent wait for an answer, and *Sent requests* lists them with *Withdraw*. US-6 and US-7 gain a case each; 6.4 adds the *Sent requests* screen and *Check* to *Sign up* and *Pix ID setup*; 6.8 lists both for the wireframe. 6.4: *In a session* waits for signed-in session connections (#55, #56). |
 
 Items marked **TBD** need a team decision.
 
@@ -207,7 +209,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
 | FR-5.1 | Pix works without an account: single-phone features (F1–F4), room codes (F8), and QR connections (F9) need no sign-in. Only friends and invitations need one. | Must | It 2 |
-| FR-5.2 | The first time the user opens the friend list in *Shoot together*, Pix asks them to sign in with their Google account and choose a Pix ID. The server verifies the Google sign-in and issues Pix's own session token, which the phone keeps. A Pix ID is 4–20 characters of lowercase letters, digits, "." and "_". *Revised 2026-10-15:* Pix also offers *Sign up* with a Pix ID, a display name, and a password, and sign-in with that Pix ID and password; Google sign-in stays. The server issues the same session token either way. Reason: the team wants Pix usable without a Google account (Iter2-P8). | Must | It 2 |
+| FR-5.2 | The first time the user opens the friend list in *Shoot together*, Pix asks them to sign in with their Google account and choose a Pix ID. The server verifies the Google sign-in and issues Pix's own session token, which the phone keeps. A Pix ID is 4–20 characters of lowercase letters, digits, "." and "_". *Revised 2026-10-15:* Pix also offers *Sign up* with a Pix ID, a display name, and a password, and sign-in with that Pix ID and password; Google sign-in stays. The server issues the same session token either way. Reason: the team wants Pix usable without a Google account (Iter2-P8). *Revised 2026-10-21 (Iter2-P13):* *Shoot together* opens *Friends*; signed out, it offers *Sign in to add friends* and *Use a room code instead* rather than asking for a sign-in first, so a room code never needs an account (FR-5.1, FR-8.1); an account made with Google chooses its Pix ID right after signing up. Original: "The first time the user opens the friend list in *Shoot together*, Pix asks them to sign in with their Google account and choose a Pix ID." | Must | It 2 |
 | FR-5.3 | A Pix ID that is taken or breaks the rules is rejected with the reason, and nothing is saved. | Must | It 2 |
 | FR-5.4 | The Friends screen shows the user's own Pix ID. Tapping it copies the ID. | Should | It 2 |
 | FR-5.5 | *Add a friend* finds users only by their exact Pix ID. There is no public list or partial-match search. | Must | It 2 |
@@ -220,6 +222,8 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-5.12 | A user who signed up with a Pix ID and a password can add their Google account, and then sign in with either. (Added 2026-10-15) | Should | It 2 |
 | FR-5.13 | When someone signs in with a Google account that no Pix account uses, Pix asks whether they already have a Pix account. If they do, they sign in with its Pix ID and password, and the Google account is added to it; if not, a new account is created and they choose a Pix ID. (Added 2026-10-15) | Should | It 2 |
 | FR-5.14 | A user who signed up with Google can add a password once they have a Pix ID, and then sign in with the Pix ID and the password too. The password rules of FR-5.11 apply. (Added 2026-10-15) | Should | It 2 |
+| FR-5.15 | *Sign up* and *Pix ID setup* have *Check* beside the Pix ID field. It tells whether the Pix ID is free before the form is sent, without signing in. A Pix ID that someone takes in the meantime is still rejected when the form is sent (FR-5.3). (Added 2026-10-22) | Should | It 2 |
+| FR-5.16 | *Friends* shows how many friend requests the user sent that are not answered yet. *Sent requests* lists them with each user's name and Pix ID, and *Withdraw* takes one back; a request that was answered in the meantime leaves the list. (Added 2026-10-22) | Should | It 2 |
 
 #### F6 · Shoot-together session
 *The subject sees what the camera sees, with the same guide.*
@@ -365,7 +369,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Failure** | The AI service refuses every pose of my description; it does not say whether the photo or the text was the reason | The response arrives | Pix says it could not create poses for my description with this photo, and offers *Edit description* with my text kept, or *Back to camera* for another photo (revised 2026-10-21; was: "Pix shows "Try a different description" and keeps my text."). |
 
 #### US-6 · Get my Pix ID
-<sub>F5 · FR-5.1–5.4, FR-5.11–5.14 · Iteration 2</sub>
+<sub>F5 · FR-5.1–5.4, FR-5.11–5.15 · Iteration 2</sub>
 
 > As a new user, I want to create a Pix ID the first time I use Shoot together, so that my friends can find me.
 
@@ -379,9 +383,10 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Normal** (added 2026-10-15) | I signed up as "dongje.p" with a password, and no Pix account uses my Google account | I tap *Continue with Google*, answer that I already have a Pix account, and sign in as "dongje.p" | My Google account is added, and from then on Google alone signs me in as "dongje.p". |
 | **Normal** (added 2026-10-15) | I signed up with Google and chose the Pix ID "junhyeong.h" | I add a password in my account | On a phone without my Google account, "junhyeong.h" and the password sign me in. |
 | **Failure** (added 2026-10-15) | I am signing up | I enter "abcdefgh" as the password | The rule (8–64 characters with a letter and a digit) is shown, and no account is created. |
+| **Normal** (added 2026-10-22) | I am signing up and typed the Pix ID "test5" | I tap *Check* | "test5 is available" appears under the field, or "This Pix ID is taken" if someone uses it, before I fill in the rest. |
 
 #### US-7 · Add a friend by Pix ID
-<sub>F5 · FR-5.5–5.9 · Iteration 2</sub>
+<sub>F5 · FR-5.5–5.9, FR-5.16 · Iteration 2</sub>
 
 > As a user, I want to find my friend by their Pix ID and send a friend request, so that I can invite them with one tap later.
 
@@ -392,6 +397,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Failure** | No user has the ID "junhyeong.hh" | I search for it | *No user found* appears. *Search again* keeps my text so I can fix it. |
 | **Edge** | I type only part of an ID, such as "junhyeong" | I search | *No user found* appears, because only exact IDs match. |
 | **Edge** | I search for my own ID or for an existing friend | The result appears | It shows "This is you" or "Friends" instead of *Add*. |
+| **Normal** (added 2026-10-22) | I sent a request to "test3", who has not answered | I tap *Sent requests · 1* on *Friends*, then *Withdraw* | The request leaves the list, and test3 no longer sees it. |
 
 #### US-8 · Answer a friend request
 <sub>F5 · FR-5.6–5.7 · Iteration 2</sub>
@@ -568,12 +574,24 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 *Figure 3. Friends (empty) → Add a friend → Friends (list), with the "No user found" failure*
 
+![Wireflow 3b: sign in, Pix ID, and account](images/flow3b_sign_in.jpg)
+
+*Figure 3b (added 2026-10-21). Friends (signed out) → Sign in → "Do you already have a Pix account?" → Pix ID setup → Friends with a request; below, Sign up with a broken rule, Sign in to add Google, "This Pix ID is taken", and the Account sheet.*
+
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Friends (empty)** | "Shoot together · Invite a friend to see your camera live"; "No friends yet"; "My Pix ID: dongje.p". | *Add a friend* → Add a friend · Tap own Pix ID → copied · System back → Camera. | No account yet → Google sign-in, then Pix ID setup first (screen to be drawn, see 6.8). Since 2026-10-15 the sign-in screen also offers a Pix ID and a password, and *Sign up*. |
+| **Friends (empty)** | "Shoot together · Invite a friend to see your camera live"; "No friends yet"; "My Pix ID: dongje.p". | *Add a friend* → Add a friend · Tap own Pix ID → copied · System back → Camera. | No account yet → *Friends (signed out)* (revised 2026-10-21; was: Google sign-in, then Pix ID setup first). |
 | **Add a friend** | Search field for a Pix ID; result card with name, @ID, and *Add*; note "Junhyeong gets a friend request and accepts it in Pix." | Type an ID and search → result or No user found · *Add* → "Requested" · *Back* → Friends. | Characters other than a–z, 0–9, ".", "_" are not accepted. Search is disabled while the field is empty. Own ID, an existing friend, or a pending request → labeled instead of *Add*. |
 | **Friends (list)** | Friend rows with name, Online/Offline, and *Invite*; *Add a friend*; "Works on Wi-Fi or cellular data". | *Invite* → Invite sent (Flow 4) · *Add a friend* → Add a friend · Long-press a friend → *Remove friend*. | Friend already in a session → "&lt;name&gt; is in another session". |
 | **No user found** | The searched ID highlighted; "Check the Pix ID with your friend and try again." | *Search again* → Add a friend with the text kept · *Back* → Friends. | — |
+| **Friends (signed out)** (added 2026-10-21) | "Shoot together · Invite a friend to see your camera live"; "Shoot with friends: Sign in to add friends by their Pix ID and invite them to shoot together." | *Sign in to add friends* → Sign in · *Use a room code instead* → Room code (Flow 6) · System back → Camera. | An account made with Google without a Pix ID sees "Choose your Pix ID" and *Choose a Pix ID* → Pix ID setup instead. |
+| **Friends (requests)** (added 2026-10-21) | Received friend requests above the friend list, each with name, @ID, *Accept*, and *Decline*. Lists refresh every 10 s while the screen is shown; online friends show "Online", friends in a session "In a session", which shows once a session's own connection is signed in (#55, #56; until then such a friend shows "Online"). *Added 2026-10-22:* "Sent requests · 2" above the list while requests the user sent wait for an answer (FR-5.16). | *Accept* → the friend joins the list · *Decline* → the request disappears (US-8) · *Sent requests · 2* → Sent requests. | A request already withdrawn → "This request is no longer there." *Invite* stays disabled until invitations are built (Iter2-P15). |
+| **Sign in** (added 2026-10-21) | Pix ID and password fields; *Sign in*; *Continue with Google*; "New to Pix? Sign up". | *Sign in* → Friends (or Pix ID setup for an account without one) · *Continue with Google* → Google's account chooser → Friends, or "Do you already have a Pix account?" · *Sign up* → Sign up · *Back* → Friends. | *Sign in* is disabled until both fields are filled. A wrong Pix ID or password → "The Pix ID or the password is wrong." |
+| **"Do you already have a Pix account?"** (added 2026-10-21) | A dialog after a Google account that no Pix account uses (FR-5.13). | *Yes, sign in* → Sign in, now saying the Google account is added once the person signs in, without Google and *Sign up* · *No, make one* → a new account → Pix ID setup. | Closing it forgets the Google account. |
+| **Sign up** (added 2026-10-21) | Pix ID, name, and password fields, each with its rule under it: "4–20 characters: a–z, 0–9, ".", "_"", "1–30 characters", "8–64 characters with a letter and a digit"; "There is no email, so a forgotten password can't be reset." *Added 2026-10-22:* *Check* beside the Pix ID field (FR-5.15). | *Sign up* → Friends, signed in · *Back* → Sign in · *Check* → "Checking…", then "test5 is available" or "This Pix ID is taken" under the field, until the field changes. | A broken rule turns red and *Sign up* stays disabled (US-6); a password equal to the Pix ID says so; a taken Pix ID → "This Pix ID is taken" under the field, with the input kept. *Check* is disabled until the Pix ID follows the rule; no answer → "Couldn't reach Pix. Check your connection and try again." under the field. |
+| **Pix ID setup** (added 2026-10-21) | "Choose your Pix ID"; one field with the rule under it, and *Check* beside it (added 2026-10-22). | *Save* → Friends · *Back* → Friends, which asks again · *Check* → as on Sign up. | As on Sign up: the rule in red and *Save* disabled; "This Pix ID is taken" with the input kept (US-6). |
+| **Sent requests** (added 2026-10-22) | "Sent requests · They become your friends once they accept"; each request the user sent and nobody answered yet, with name, @ID, and *Withdraw*; "No sent requests" when there are none. The list refreshes every 10 s while the screen is shown (FR-5.16). | *Withdraw* → the request leaves the list · *Back* → Friends. | A request answered in the meantime → "This request is no longer there.", and it leaves the list. A failed refresh → "Couldn't update your friends. Check your connection." Signed out → Friends. |
+| **Account** (sheet, added 2026-10-21) | The name with *Edit name*, the @ID, how the account signs in, *Add Google* (without Google) or *Add a password* (a Google account with a Pix ID), and *Sign out*. | *Edit name* → a dialog with the name rule · *Add Google* → Google's account chooser · *Add a password* → a dialog with the password rule · *Sign out* → Friends (signed out). | Google already used by another account → "Another Pix account uses this Google account." |
 
 ### 6.5 Flow 4 · Shoot together, photographer's phone
 
@@ -603,7 +621,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 ![Wireflow 6: room code prototype](images/flow6_room_code_prototype.jpg)
 
-*Figure 6. Room code → Join with code → Subject view, with the "Session not found" failure. From Iteration 2 it stays next to the friend list for people without an account. Subject view uses the zoom slider specified in Flow 5; the original wireframe predates that control.*
+*Figure 6. Room code → Join with code → Subject view, with the "Session not found" failure. From Iteration 2 it opens from *Friends*: *Use a room code instead* when signed out, *Use a room code* under the friend list (revised 2026-10-21). Subject view uses the zoom slider specified in Flow 5; the original wireframe predates that control.*
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -618,9 +636,6 @@ These screens follow from the requirements above but are not yet in the wirefram
 | Screen | Purpose | Requirement |
 |---|---|---|
 | Camera permission denied | Explain why the camera is needed; *Open settings*. Built in Iteration 1; the wireframe is still to be drawn. | FR-1.2 |
-| Pix ID setup | Sign in, then choose a Pix ID with live rule checking. Since 2026-10-15: sign in with a Pix ID and a password or with Google, or *Sign up* with a Pix ID, a name, and a password; after a Google sign-in that no account uses, "Do you already have a Pix account?"; *Add Google* for a password account; *Add a password* for a Google account. | FR-5.2, FR-5.3, FR-5.11–5.14 |
-| Account (It 2, added 2026-10-15) | The user's display name and Pix ID, *Add Google* or *Add a password*, and *Sign out*. Where it opens from is decided in Iter2-P13 (Design, Still open), since the settings screen comes in Iterations 3–4. | FR-5.12, FR-5.14 |
-| Friend requests | List of received requests with *Accept* / *Decline*. | FR-5.7 |
 | Invitation no longer available | Shown when an expired or cancelled invitation is opened. | FR-6.4 |
 | Camera and Subject view (update) | Draw the zoom slider and actual hardware endpoint labels in Flows 1, 2, 5, and 6; remove *Take photo* from Subject view; add the aspect-ratio control, brightness slider, and flash button; draw the outline-only guide, the reference thumbnail in its corners, *Hide* / *Show*, the replace prompt of *Add a pose guide*, and *Save guide*; the guide-edit mode toggle in place of the zoom slider (It 2). | FR-1.3, FR-1.11–1.13, FR-3.6, FR-3.8, FR-3.9, FR-7.1–7.3 |
 | Reference confirm (update) | Remove the Cutout/Outline switch; show the outline style chosen in Iter2-P3. | FR-2.2, FR-2.3 |
@@ -629,6 +644,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 | Saved guides | *Save guide* on Camera + guide; the saved list on Add a pose guide. | FR-3.8 |
 | Selfie mode and Settings | Front camera; a settings screen with the guide color, a frame-delay indicator for remote sessions, and the language (It 3–4). | Iteration 3–4 scope (4.1) |
 | Show QR, Scan QR, Connected | The QR code and hotspot status; the scanner; both phones confirm with *Resume*. | FR-9.1–9.4 |
+| Check, Sent requests (added 2026-10-22) | *Check* beside the Pix ID field of Sign up and Pix ID setup, with its answers; *Sent requests · 2* on Friends and the *Sent requests* screen. Built in Iteration 2 (#54); Figure 3b does not show them yet. | FR-5.15, FR-5.16 |
 
 ### 6.9 Rules for every screen
 

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 """Password hashing with argon2id (Design Documentation 2.8, Accounts). Only the hash is stored."""
 
 import asyncio
@@ -18,8 +18,8 @@ class Passwords:
     def __init__(self, hasher: PasswordHasher, at_once: int = HASHES_AT_ONCE) -> None:
         self._hasher = hasher
         self._slots = asyncio.Semaphore(at_once)
-        # Checked when a Pix ID has no password, so that answer takes as long as a wrong password and does not
-        # tell which Pix IDs exist.
+        # Checked when a Pix ID has no password, so that answer takes as long as a wrong password and a failed
+        # log-in looks the same either way. Whether a Pix ID exists is not secret (Design 2.8, Accounts).
         self._stand_in = hasher.hash("pix stand-in password")
 
     async def hash(self, password: str) -> str:

@@ -240,17 +240,17 @@ Results are added per iteration and never overwritten; each iteration gets its o
 
 #### 2.2.1 Iteration 2 · unit and integration tests, coverage
 
-**Run.** Date: 2026-10-22 · Commit: `39c013c` on `chore/a1-coverage` (#94; the same code goes to `dev` with that PR) · Tester: 한준형 · Commands: those in 2.1.4, on a MacBook Air (Apple silicon) with JDK 21.0.12 and Python 3.11.17; the server suite on fakeredis and SQLite (the CI run on a real Redis and PostgreSQL is the same suite). The layer of each app class follows 2.1.2: `*ViewModel` are ViewModels; everything under `ui/` and the custom Views are Views; `CameraXController`, `CameraControls`, `MlKit…`, `Rtc…`, `WebRtc…`, `…SignalingClient`, `CameraFrameSource`, `CameraFrameCache`, `SubjectSegmenter`, `AndroidPose…`, `PhotoSaver`, `CameraLevelMonitor`, and the DataStore classes are platform adapters; `core/`, `MainActivity`, and `PixApplication` are glue, outside the targets; the rest are managers and repositories.
+**Run.** Date: 2026-10-22 · Commit: `0234b41` on `chore/a1-coverage` (#94; the same code goes to `dev` with that PR) · Tester: 한준형 · Commands: those in 2.1.4, on a MacBook Air (Apple silicon) with JDK 21.0.12 and Python 3.11.17; the server suite on fakeredis and SQLite (the CI run on a real Redis and PostgreSQL is the same suite). The layer of each app class follows 2.1.2: `*ViewModel` are ViewModels; everything under `ui/` and the custom Views are Views; `CameraXController`, `CameraControls`, `MlKit…`, `Rtc…`, `WebRtc…`, `…SignalingClient`, `CameraFrameSource`, `CameraFrameCache`, `SubjectSegmenter`, `AndroidPose…`, `PhotoSaver`, `CameraLevelMonitor`, and the DataStore classes are platform adapters; `core/`, `MainActivity`, and `PixApplication` are glue, outside the targets; the rest are managers and repositories.
 
 **Summary table.**
 
 | Component | Frameworks | Target (2.1.2, line) | Actual line | Actual branch | Date | Command / Report |
 |---|---|---|---|---|---|---|
-| App · managers and repositories | JUnit 4, coroutines-test, JaCoCo | 80 % (proposal) | **93.0 %** (1,121/1,205) | 71.8 % | 10/22 | `./gradlew :app:jacocoTestReport` · [report](images/testing_it2_jacoco.png) |
+| App · managers and repositories | JUnit 4, coroutines-test, JaCoCo | 80 % (proposal) | **93.6 %** (1,128/1,205) | 71.8 % | 10/22 | `./gradlew :app:jacocoTestReport` · [report](images/testing_it2_jacoco.png) |
 | App · ViewModels | JUnit 4, coroutines-test, JaCoCo | 75 % (proposal) | **94.1 %** (507/539) | 81.4 % | 10/22 | same |
 | App · Views and Fragments | JUnit 4, Robolectric, FragmentScenario, JaCoCo | 40 % (proposal) | **85.9 %** (1,484/1,727) | 70.1 % | 10/22 | same |
-| App · platform adapters | — (integration tests instead) | 30 % (proposal) | 23.2 % (325/1,398) | 18.5 % | 10/22 | same |
-| App · whole module (JaCoCo total) | | — | 70.5 % (3,403/4,829) | 59.5 % (2,289/3,846) | 10/22 | same |
+| App · platform adapters | JUnit 4, Robolectric (where the JVM can run them); integration tests for the rest | 30 % (proposal) | **34.6 %** (484/1,398) | 24.9 % | 10/22 | same |
+| App · whole module (JaCoCo total) | | — | 73.8 % (3,564/4,829) | 61.0 % (2,347/3,846) | 10/22 | same |
 | Server · `signaling`, `store`, `accounts` | pytest, pytest-cov | 90 % (proposal) | **97.6 %** (937/960) | 89.2 % | 10/22 | `uv run pytest --cov=pix_server --cov-branch` · [report](images/testing_it2_pytest_cov.png) |
 | Server · `poses` | pytest, pytest-cov | 85 % (proposal) | **99.3 %** (304/306) | 98.6 % | 10/22 | same |
 | Server · `main`, `config`, `errors`, `db` | pytest, pytest-cov | 60 % (proposal) | **98.9 %** (270/273) | 84.6 % | 10/22 | same |
@@ -262,23 +262,21 @@ Results are added per iteration and never overwritten; each iteration gets its o
 
 | Suite | Tests | Passed | Failed | Skipped | Time | Evidence |
 |---|---|---|---|---|---|---|
-| Android JVM, Robolectric, and screen tests (`:app:testDebugUnitTest`) | 468 | 468 | 0 | 0 | about 4 min (Robolectric's first SDK 36 sandbox included) | [screenshot](images/testing_it2_android_tests.png) |
+| Android JVM, Robolectric, and screen tests (`:app:testDebugUnitTest`) | 482 | 482 | 0 | 0 | about 4 min (Robolectric's first SDK 36 sandbox included) | [screenshot](images/testing_it2_android_tests.png) |
 | Server (`uv run pytest`, fakeredis and SQLite) | 423 | 423 | 0 | 0 | 49 s | [screenshot](images/testing_it2_server_tests.png) |
 
-Iteration 1 ended with 240 Android tests; Iteration 2 adds 228, of which 78 are the screen tests on the real Fragments (2.1.1). The server suite is new since Iteration 1's 97.
+Iteration 1 ended with 240 Android tests; Iteration 2 adds 242, of which 78 are the screen tests on the real Fragments and 14 the adapter tests with the segmenter double and `FakeImageProxy` (2.1.1). The server suite is new since Iteration 1's 97.
 
 **Known failing or skipped tests.** None. No test is quarantined.
 
 **Untested regions found by the coverage report.** Read from the untaken lines and branches, not added as cases yet:
 
-- App · adapters: `CameraXController` (0 of 421 lines), `WebRtcPeerConnectionClient` (0 of 158), `MlKitReferenceGuideMaker` (0 of 53), `CameraLevelMonitor` (0 of 36), `CameraFrameSource` (2 of 36): they need CameraX, libwebrtc, ML Kit, or a sensor, and are covered by the integration tests of 2.1.5 (IT-1, IT-5, IT-6, IT-8, IT-10). The parts that are pure decisions (`analysisSize`, the flash and exposure restore rules, the capability assembly) could be split out and tested on the JVM; not scheduled in Iteration 2.
+- App · adapters: `CameraXController` (0 of 480 lines), `WebRtcPeerConnectionClient` (0 of 221), `WebRtcRuntime` (0 of 21), `OkHttpSignalingClient` (0 of 42), and the ML Kit call in `SubjectSegmenter` (2 of 50): they need CameraX, libwebrtc, a WebSocket, or ML Kit, and are covered by the integration tests of 2.1.5 (IT-1, IT-5, IT-6, IT-8, IT-10). `MlKitReferenceGuideMaker` (85.5 %), `CameraFrameCache` (100 %), `CameraFrameSource` (94.4 %), and the DataStore classes (75 %) are tested on the JVM since revision 1.15; what is left in them is the `content://` decode, the native crop-and-scale, and the storage-error branches. The parts that are pure decisions (`analysisSize`, the flash and exposure restore rules, the capability assembly) could be split out and tested on the JVM; not scheduled in Iteration 2.
 - App · glue: `AppContainer.create` (0 of 37) wires the real modules and runs only in the app; candidate for the exclusion list in 2.1.3.
 - App · screens: `CameraFragment` 73.5 %: the gallery intent, the focus-ring animation, the last-frame hold during a ratio change, and the clicks that navigate; `AddGuideSheet` 85.3 % and `NoPersonFoundFragment` 77.8 %: the photo picker's result callbacks, which Robolectric cannot answer.
 - Server: `store/session_store.py` 91.0 % (the Redis-outage branch, lines 35–42), `signaling/registry.py` 93.7 % (the worker-lost and disconnect-while-sending paths), `signaling/router.py` 93.8 % (a close while a message is in flight). All are failure paths of a real Redis that fakeredis does not raise; the CI run on a real Redis exercises some of them.
 
-**Shortfalls against the targets.** The targets of 2.1.2 are still the proposals (the team confirms them with this record). Against the proposals, one component is short:
-
-- *Platform adapters, 23.2 % against 30 %.* The adapters wrap CameraX, libwebrtc, and ML Kit, which the JVM cannot run; `RtcSessionManager` is tested (246 of 279 lines) but the three classes above are not. Plan: confirm the target at 20 % with the reason recorded next to the original 30 %, or exclude `CameraXController` and `WebRtcPeerConnectionClient` from the report with their verification named in 2.1.3 (IT-1, IT-5, IT-6, IT-8, IT-10); either is decided with the targets. The other three app components and the three server components are above their proposals.
+**Shortfalls against the targets.** The targets of 2.1.2 are still the proposals (the team confirms them with this record). Against the proposals, no component is short. Platform adapters stood at 23.2 % on `39c013c` and reached 34.6 % on this commit by testing the adapters the JVM can run (revision 1.15); the rest of that layer (`CameraXController`, `WebRtcPeerConnectionClient`, `WebRtcRuntime`, `OkHttpSignalingClient`) stays with the integration tests, and splitting `CameraXController`'s decisions (the capability assembly, the restore-after-rebind rules) into testable objects is the next step if the target is raised, after Iter2-P5 (#47) has touched that file.
 
 **Mutation analysis (2.1.7).** Not run in Iteration 2; the tooling is set up in Iteration 3.
 
@@ -385,5 +383,6 @@ One line per recorded run, newest first, so the history of the numbers is visibl
 
 | Date | Iteration | What ran | Commit | Outcome | Section |
 |---|---|---|---|---|---|
-| 2026-10-22 | 2 | Unit, Robolectric, and screen tests; server; coverage | `39c013c` | 468 + 423 tests, 0 failed; line coverage app 70.5 % (managers 93.0, ViewModels 94.1, Views 85.9, adapters 23.2) / server 98.2 % | 2.2.1 |
+| 2026-10-22 | 2 | Unit, Robolectric, screen, and adapter tests; server; coverage | `0234b41` | 482 + 423 tests, 0 failed; line coverage app 73.8 % (managers 93.6, ViewModels 94.1, Views 85.9, adapters 34.6) / server 98.2 % | 2.2.1 |
+| 2026-10-22 | 2 | Unit, Robolectric, and screen tests; server; coverage | `39c013c` | 468 + 423 tests, 0 failed; line coverage app 70.5 % (managers 93.0, ViewModels 94.1, Views 85.9, adapters 23.2) / server 98.2 % | 2.2.1 (superseded above) |
 | 2026-10-DD | 2 | Integration IT-1 … IT-10 (pending) | | | 2.2.2 |

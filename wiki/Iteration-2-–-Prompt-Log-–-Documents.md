@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]]
 
-One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11–10/23. Each prompt is quoted as it was sent; attachments are named in a note, and (…) marks a part of a long prompt that only repeated links or page text. Prompts are given in the order they were sent; follow-ups that only confirmed a result are left out. The session was told, through `CLAUDE.md`, to commit or push only when asked, so each "commit" below is an explicit instruction.
+One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11–10/23. Each prompt is quoted as it was sent; attachments are named in a note. Prompts are given in the order they were sent; follow-ups that only confirmed a result are left out. The session was told, through `CLAUDE.md`, to commit or push only when asked, so each "commit" below is an explicit instruction.
 
 ## AI rules in CLAUDE.md and the PR template (#44, [#62])
 
@@ -48,7 +48,7 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 
 ## Daily Standup Meeting Log, 10/12–10/16 ([#87])
 
-- [Joonhyung, 10-16] "Daily Standup meeting을 작성하려 한다. 10/13부터 10/16까지 작성한다. 10/15은 조성민과 데모영상 촬영 및 10/16 데모영상 편집 및 발표자료 준비로 해줘. 그리고 다른 팀원들의 할일이다." (The notes of 박동제, 박재완, and 조성민 were pasted after the prompt; the agent wrote the five days from them and from the conversation's own history.)
+- [Joonhyung, 10-16] "Daily Standup meeting을 작성하려 한다. 나는 지금까지 대화를 바탕으로 10/13부터 10/16까지 작성한다. (그 이전에 한 일들에 대해서 10/13일에 Done에 작성하고, 나머지 부분들은 여러 날에 나눠서 작성하면 된다.) 10/15은 조성민과 데모 영상 촬영 및 10/16 데모 영상 편집 및 발표 자료 준비로 해 줘. 그리고 다른 팀원들의 할 일이다." (The notes of 박동제, 박재완, and 조성민 were pasted after the prompt; the agent wrote the five days from them and from the conversation's own history.)
 - [Joonhyung, 10-16] "10/12(월)부터 10/16(금) 까지이다. 날짜 수정해줘. (커밋할 필요 없음)"
 
 ## CLAUDE.md: never force-push or rebase

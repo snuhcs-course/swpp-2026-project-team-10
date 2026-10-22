@@ -28,6 +28,8 @@ robolectric = "4.17"
 # Formatting and style checks: Spotless runs ktlint (see build.gradle.kts and .editorconfig).
 spotless = "8.10.3"
 ktlint = "1.8.0"
+# Coverage of the JVM and Robolectric tests (app/build.gradle.kts, jacocoTestReport); 0.8.13 reads Java 21 classes.
+jacoco = "0.8.13"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

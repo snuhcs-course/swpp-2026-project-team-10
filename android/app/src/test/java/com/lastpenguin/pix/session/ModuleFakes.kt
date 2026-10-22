@@ -92,6 +92,7 @@ class FakeCameraController(
     maxZoom: Float = 10f,
     exposureRange: IntRange = 0..0,
     hasFlash: Boolean = false,
+    supportsFocusPoint: Boolean = false,
 ) : CameraController {
     private val _status = MutableStateFlow(CameraStatus.READY)
     override val status: StateFlow<CameraStatus> = _status.asStateFlow()
@@ -104,6 +105,7 @@ class FakeCameraController(
             exposureRange = exposureRange,
             exposureStep = if (exposureRange.first < exposureRange.last) 0.5f else 0f,
             hasFlash = hasFlash,
+            supportsFocusPoint = supportsFocusPoint,
         ),
     )
     override val capabilities: StateFlow<CameraCapabilities?> = _capabilities.asStateFlow()
@@ -138,7 +140,12 @@ class FakeCameraController(
         _status.value = status
     }
 
-    override fun setFocusPoint(x: Float, y: Float) = Unit
+    /** Every focus point asked for, in frame fractions. */
+    val focusPoints = mutableListOf<Pair<Float, Float>>()
+
+    override fun setFocusPoint(x: Float, y: Float) {
+        focusPoints += x to y
+    }
 
     val exposureRequests = mutableListOf<Int>()
     val flashRequests = mutableListOf<FlashMode>()
@@ -162,8 +169,13 @@ class FakeCameraController(
     /** When set, [grabFrame] returns it, so the scene photo step can be driven in a screen test. */
     var frame: Bitmap? = null
 
-    override suspend fun takePhoto(): Result<Uri> =
-        photo?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    /** When set, [takePhoto] fails with it, so a screen test can see each failure's message. */
+    var photoFailure: Throwable? = null
+
+    override suspend fun takePhoto(): Result<Uri> {
+        photoFailure?.let { return Result.failure(it) }
+        return photo?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    }
 
     override suspend fun grabFrame(): Result<Bitmap> =
         frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())

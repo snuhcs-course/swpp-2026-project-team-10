@@ -1,6 +1,5 @@
 Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]]
 
-
 ## Server APIs (#50)
 
 - [Jaewan, 10-15] "Now we are going to implement the server APIs for user CRUD/friends. What APIs do we have in plan?"
@@ -37,4 +36,3 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-22] "commit and push this"
 - [Jaewan, 10-22] "There are reviews from pkdje's Claude. tell me if we should fix them"
 - [Jaewan, 10-22] "I fixed 4 and pushed it. Make the fixes 1-3"
-

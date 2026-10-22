@@ -28,6 +28,7 @@ GESTURE_GAP_MS = 500
 DROP_FACTOR = 1.5  # an interval this many times the median is a dropped frame
 MATCH = 0.005  # a frame shows a requested native ratio when within 0.5 %
 SETTLE_MS = 400  # frames of a pinch still arriving after its last request
+SWITCH_WINDOW_MS = 5000  # how far after a lens switch its own marks are looked for
 
 
 @dataclass
@@ -130,21 +131,34 @@ class Frozen:
         return f"{self.frozen} of {self.moving} ({100 * self.frozen / self.moving:.0f} %), longest {self.longest_ms:.0f} ms"
 
 
-def frozen_of(frames: list[Frame], requests: list[Mark], lag_ms: float) -> Frozen:
-    """A frame is moving when the fingers moved during the frame time before it, shifted back by the camera's lag
-    from request to picture, so a pinch that pauses is not counted; it is frozen when it is moving and shows the
-    same zoom as the frame before it."""
-    values = [(m.ms, number(m.detail.split()[0] if m.detail else None)) for m in requests]
-    values = [(ms, value) for ms, value in values if value]
+def changes_of(marks: list[Mark]) -> list[Mark]:
+    """The `zoom.apply` marks that ask the camera for a new native ratio. A held lens gets the same ratio for every
+    step inside the hold band (and a pinch held at either end gets its limit): those change nothing on screen, so they
+    are neither stutter nor a latency."""
+    changes, last = [], {}
+    for apply in (m for m in marks if m.name == "zoom.apply"):
+        native, lens = number(apply.field("native")), apply.field("lens")
+        if native is None:
+            continue
+        before = last.get(lens)
+        if before is None or abs(native - before) > MATCH * before:
+            changes.append(apply)
+        last = {lens: native}  # a lens switch starts its lens afresh
+    return changes
+
+
+def frozen_of(frames: list[Frame], changes: list[Mark], lag_ms: float) -> Frozen:
+    """A frame is moving when a new ratio was asked for during the frame time before it, shifted back by the camera's
+    lag from request to picture, so a pinch that pauses or a held lens is not counted; it is frozen when it is moving
+    and shows the same zoom as the frame before it."""
+    times = [m.ms for m in changes]
     result, run = Frozen(), 0.0
     for previous, frame in zip(frames, frames[1:]):
         if previous.lens != frame.lens:
             run = 0.0
             continue
         start, end = previous.ms - lag_ms, frame.ms - lag_ms
-        before = next((value for ms, value in reversed(values) if ms <= start), None)
-        inside = [value for ms, value in values if start < ms <= end]
-        moved = before is not None and any(abs(value - before) > MATCH * before for value in inside)
+        moved = any(start < ms <= end for ms in times)
         if not moved:
             run = 0.0
             continue
@@ -168,7 +182,9 @@ def fmt(value: float | None) -> str:
     return "—" if value is None else f"{value:.0f}"
 
 
-def pinch_rows(marks: list[Mark], frames: list[Frame], lag_ms: float) -> tuple[list[list[object]], list[float], Frozen]:
+def pinch_rows(
+    marks: list[Mark], frames: list[Frame], changes: list[Mark], lag_ms: float
+) -> tuple[list[list[object]], list[float], Frozen]:
     rows, all_intervals, all_frozen = [], [], Frozen()
     applies = [m for m in marks if m.name == "zoom.apply"]
     switches = [m for m in marks if m.name == "zoom.lens"]
@@ -180,7 +196,7 @@ def pinch_rows(marks: list[Mark], frames: list[Frame], lag_ms: float) -> tuple[l
         all_intervals += gaps
         median = statistics.median(gaps) if gaps else None
         drops = sum(1 for gap in gaps if median and gap > DROP_FACTOR * median)
-        frozen = frozen_of(inside, requests, lag_ms)
+        frozen = frozen_of(inside, changes, lag_ms)
         all_frozen.add(frozen)
         rows.append(
             [
@@ -200,10 +216,10 @@ def pinch_rows(marks: list[Mark], frames: list[Frame], lag_ms: float) -> tuple[l
     return rows, all_intervals, all_frozen
 
 
-def latencies(marks: list[Mark], frames: list[Frame]) -> tuple[list[float], int]:
-    """Request to the first frame showing it; a request the camera replaced before showing it is not counted."""
+def latencies(changes: list[Mark], frames: list[Frame]) -> tuple[list[float], int]:
+    """A new ratio to the first frame showing it; a request the camera replaced before showing it is not counted."""
     found, missed = [], 0
-    for apply in (m for m in marks if m.name == "zoom.apply"):
+    for apply in changes:
         native, lens = number(apply.field("native")), apply.field("lens")
         if native is None:
             continue
@@ -222,24 +238,36 @@ def latencies(marks: list[Mark], frames: list[Frame]) -> tuple[list[float], int]
     return found, missed
 
 
-def first_after(marks: list[Mark], start: int, name: str, detail: str | None = None) -> Mark | None:
+def first_after(marks: list[Mark], start: int, until: int, name: str, detail: str | None = None) -> Mark | None:
+    """The first such mark from [start] up to [until], so a mark missing for one event is not taken from a later one."""
     return next(
-        (m for m in marks if m.ms >= start and m.name == name and (detail is None or m.detail.startswith(detail))),
+        (
+            m
+            for m in marks
+            if start <= m.ms <= until and m.name == name and (detail is None or m.detail.startswith(detail))
+        ),
         None,
     )
 
 
 def switch_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
     rows = []
-    for switch in (m for m in marks if m.name == "zoom.lens"):
+    switches = [m for m in marks if m.name == "zoom.lens"]
+    for i, switch in enumerate(switches):
+        # Each switch's marks come before the next switch, and within a few seconds.
+        until = switch.ms + SWITCH_WINDOW_MS
+        if i + 1 < len(switches):
+            until = min(until, switches[i + 1].ms)
         before = [f for f in frames if f.ms <= switch.ms]
-        after = next((f for f in frames if f.ms > switch.ms and (not before or f.lens != before[-1].lens)), None)
-        ready = first_after(marks, switch.ms, "camera.status", "READY")
-        idle = first_after(marks, switch.ms, "preview.stream", "IDLE")
-        streaming = first_after(marks, idle.ms if idle else switch.ms, "preview.stream", "STREAMING") if idle else None
-        still = first_after(marks, switch.ms - 50, "preview.still", "on")
-        held = still is not None and still.ms <= switch.ms + 200
-        released = first_after(marks, still.ms, "preview.still", "off") if held else None
+        after = next(
+            (f for f in frames if switch.ms < f.ms <= until and (not before or f.lens != before[-1].lens)), None
+        )
+        ready = first_after(marks, switch.ms, until, "camera.status", "READY")
+        idle = first_after(marks, switch.ms, until, "preview.stream", "IDLE")
+        streaming = first_after(marks, idle.ms, until, "preview.stream", "STREAMING") if idle else None
+        still = first_after(marks, switch.ms - 50, switch.ms + 200, "preview.still", "on")
+        held = still is not None
+        released = first_after(marks, still.ms, until, "preview.still", "off") if still else None
         rows.append(
             [
                 f"{switch.detail.removeprefix('from=')} → {after.lens if after else '?'}",
@@ -256,7 +284,14 @@ def capture_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
     rows = []
     for start in (m for m in marks if m.name == "camera.capture.start"):
         end = next(
-            (m for m in marks if m.ms >= start.ms and m.name.startswith("camera.capture.") and m is not start), None
+            (
+                m
+                for m in marks
+                if start.ms <= m.ms <= start.ms + SWITCH_WINDOW_MS
+                and m.name.startswith("camera.capture.")
+                and m is not start
+            ),
+            None,
         )
         window = [f for f in frames if start.ms - 200 <= f.ms <= (end.ms if end else start.ms) + 300]
         gaps = intervals(window)
@@ -272,8 +307,9 @@ def capture_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
 
 def report(marks: list[Mark]) -> str:
     frames = frames_of(marks)
-    found, missed = latencies(marks, frames)
-    rows, all_intervals, frozen = pinch_rows(marks, frames, statistics.median(found) if found else 0.0)
+    changes = changes_of(marks)
+    found, missed = latencies(changes, frames)
+    rows, all_intervals, frozen = pinch_rows(marks, frames, changes, statistics.median(found) if found else 0.0)
     out = []
     if all_intervals:
         median = statistics.median(all_intervals)

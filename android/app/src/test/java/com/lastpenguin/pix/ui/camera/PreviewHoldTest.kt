@@ -25,7 +25,7 @@ class PreviewHoldTest {
     }
 
     @Test
-    fun aLensSwitchHoldsTheFrameUntilTheReboundPreviewStreams() {
+    fun aLensSwitchHoldsTheFrameUntilReadyWithTheReboundPreviewStreaming() {
         streamingAndReady()
 
         hold.onStatus(CameraStatus.STARTING)
@@ -42,19 +42,50 @@ class PreviewHoldTest {
     }
 
     @Test
+    fun aReboundPreviewStreamingBeforeReadyIsNotYetRestored() {
+        streamingAndReady()
+        hold.onStatus(CameraStatus.STARTING)
+        hold.onStream(false)
+
+        // The new lens streams at its own 1× until its zoom is restored, which only READY reports.
+        hold.onStream(true)
+        assertTrue(hold.holding)
+        hold.onStatus(CameraStatus.STARTING)
+        assertTrue(hold.holding)
+        hold.onStatus(CameraStatus.READY)
+        assertFalse(hold.holding)
+        assertEquals(1, hidden)
+    }
+
+    @Test
     fun aRatioChangeHoldsWhileTheCameraStillReportsReady() {
         streamingAndReady()
 
         hold.hold()
         hold.onStatus(CameraStatus.READY)
-        hold.onStatus(CameraStatus.STARTING)
         assertTrue(hold.holding)
+        hold.onStatus(CameraStatus.STARTING)
         assertEquals(1, shown)
 
         hold.onStream(false)
         hold.onStream(true)
+        assertTrue(hold.holding)
+        hold.onStatus(CameraStatus.READY)
         assertFalse(hold.holding)
         assertEquals(1, hidden)
+    }
+
+    @Test
+    fun aRatioChangeHoldsBeforeThePreviewReportsStreaming() {
+        // Back on Camera, READY can come before PreviewView's first STREAMING report; a frame on screen is enough.
+        hold.onStatus(CameraStatus.READY)
+        hold.hold()
+        assertTrue(hold.holding)
+
+        hold.onStatus(CameraStatus.STARTING)
+        hold.onStream(true)
+        hold.onStatus(CameraStatus.READY)
+        assertFalse(hold.holding)
     }
 
     @Test
@@ -71,7 +102,7 @@ class PreviewHoldTest {
     }
 
     @Test
-    fun nothingIsHeldWithoutAStreamingPreviewOrAFrame() {
+    fun nothingIsHeldWithoutAFrameOrForALensSwitchWithoutAStream() {
         hold.onStatus(CameraStatus.READY)
         hold.onStatus(CameraStatus.STARTING)
         assertFalse(hold.holding)

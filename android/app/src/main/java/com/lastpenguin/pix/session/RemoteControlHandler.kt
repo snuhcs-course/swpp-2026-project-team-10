@@ -82,6 +82,9 @@ class RemoteControlHandler(
     private var exposureTimeoutJob: Job? = null
     private var flashTimeoutJob: Job? = null
     private var pending: PendingValue<Float>? = null
+
+    // False while the subject's pinch has sent steps but not its last value, so the camera still holds its lens.
+    private var zoomSettled = true
     private var pendingExposure: PendingValue<Int>? = null
     private var pendingFlash: PendingValue<FlashMode>? = null
 
@@ -101,6 +104,12 @@ class RemoteControlHandler(
     }
 
     fun stop() {
+        // A pinch whose last value never came (the link dropped, the session ended) would leave the camera holding a
+        // lens, so every later photo could be an ultrawide crop: end it where the camera is (Design 2.6.5).
+        if (!zoomSettled) {
+            zoomSettled = true
+            camera.setZoom(camera.zoom.value, final = true)
+        }
         zoomJob?.cancel()
         settingsJob?.cancel()
         settingsJob = null
@@ -136,9 +145,10 @@ class RemoteControlHandler(
         val ratio = if (caps == null) request.ratio else request.ratio.coerceIn(caps.minZoom, caps.maxZoom)
         if (!ratio.isFinite()) return
         Timings.mark("zoom.received", "$ratio${if (request.final) " final" else ""}")
+        zoomSettled = request.final
         timeoutJob?.cancel()
         timeoutJob = null
-        if (request.final && abs(camera.zoom.value - ratio) < ZOOM_MATCH) {
+        if (request.final && abs(camera.zoom.value - ratio) < SHOWN_MATCH) {
             // The pinch's last step already landed, so the camera will not emit again: confirm it now. The camera
             // still learns that the pinch ended, so a lens it held can settle (Design 2.6.5).
             pending = null
@@ -355,6 +365,10 @@ class RemoteControlHandler(
 
     private companion object {
         const val ZOOM_MATCH = 0.01f
+
+        // How close the shown zoom must be for a pinch's last value to count as already applied: well inside the lens
+        // hold band (CameraZoomPlan.HOLD_BAND), where a held lens shows its edge rather than the pinch's value.
+        const val SHOWN_MATCH = 0.001f
 
         /** How long a request stays the subject's: long enough for a lens switch or a photo save to finish. */
         const val PENDING_MS = 5_000L

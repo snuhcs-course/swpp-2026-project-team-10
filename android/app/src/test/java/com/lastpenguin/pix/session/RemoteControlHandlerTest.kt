@@ -162,6 +162,53 @@ class RemoteControlHandlerTest {
     }
 
     @Test
+    fun `a last value the held lens does not show waits for the camera`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        session.sent.clear()
+        // The pinch's steps asked for less than 1×, but the camera held the primary, which shows 1.0×.
+        camera.applies = false
+
+        handler.handle(SessionMessage.ZoomSet(0.995f, final = true))
+        runCurrent()
+        // 0.005 off the shown zoom is not "already applied": the camera gets the value, and nothing is confirmed yet.
+        assertEquals(listOf(0.995f), camera.requests)
+        assertEquals(listOf(true), camera.requestFinals)
+        assertTrue(actions.isEmpty())
+        assertTrue(echoes().none { it.by == Role.SUBJECT })
+
+        // The ultrawide takes over and shows it: now it is the subject's.
+        camera.applyLocally(0.995f)
+        runCurrent()
+        assertEquals(listOf<RemoteAction>(RemoteAction.Zoom(0.995f)), actions)
+        assertEquals(SessionMessage.CameraStateUpdate(0.995f, Role.SUBJECT, final = false), echoes().last())
+        handler.stop()
+    }
+
+    @Test
+    fun `a pinch whose last value never came is ended when the handler stops`() = runTest {
+        handler.start(this)
+        advanceTimeBy(200)
+
+        handler.handle(SessionMessage.ZoomSet(1.04f))
+        runCurrent()
+        assertEquals(listOf(false), camera.requestFinals)
+
+        // The link dropped mid-pinch: the camera is told the pinch ended where it is, so it can settle its lens.
+        handler.stop()
+        assertEquals(listOf(1.04f, 1.04f), camera.requests)
+        assertEquals(listOf(false, true), camera.requestFinals)
+
+        // A pinch that ended normally needs nothing more.
+        handler.start(this)
+        handler.handle(SessionMessage.ZoomSet(2f, final = true))
+        runCurrent()
+        handler.stop()
+        assertEquals(listOf(false, true, true), camera.requestFinals)
+    }
+
+    @Test
     fun `a step the camera does not apply is not answered but the final value is`() = runTest {
         handler.start(this)
         advanceTimeBy(200)

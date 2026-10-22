@@ -89,6 +89,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var previewHold: PreviewHold? = null
     private var stillJob: Job? = null
 
+    // The frame's ratio when the held frame was taken: the grid and the guide stay over a held frame of that ratio.
+    private var stillAspect: AspectRatio? = null
+
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (binding != null) {
             render(viewModel.uiState.value)
@@ -466,13 +469,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val unavailable = state.cameraStatus == CameraStatus.UNAVAILABLE
         // First, so a frame held from here on also hides the spinner below.
         previewHold?.onStatus(state.cameraStatus)
-        controls.compositionOverlay.isVisible = ready
+        // Over a held frame of the same ratio (a lens switch) the grid and the guide stay; after a ratio change they
+        // would not fit the old frame.
+        val overlays = ready || (previewHold?.holding == true && stillAspect == state.aspect)
+        controls.compositionOverlay.isVisible = overlays
         // The grid and the guide follow the chosen frame (AD-10); a new ratio re-fits both at once.
         controls.compositionOverlay.frameAspect = state.aspect.frameAspect
         controls.guideOverlay.frameAspect = state.aspect.frameAspect
         clipToFrame(controls.previewView, state.aspect.frameAspect)
         controls.guideOverlay.render(state.guide, state.guideState)
-        controls.guideOverlay.isVisible = ready
+        controls.guideOverlay.isVisible = overlays
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
         // and hiding the bar then would move the controls under an active touch.
         val guideEditable = granted && !unavailable
@@ -737,6 +743,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The bitmap is the whole camera image; show the old frame only, as the preview did.
         controls.aspectStill.clipBounds = controls.previewView.clipBounds
         controls.aspectStill.isVisible = true
+        stillAspect = viewModel.uiState.value.aspect
         Timings.mark("preview.still", "on")
         stillJob?.cancel()
         // If the stream never reports a restart, the old frame still goes.

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 // Accounts and friends (Design 2.3, R&S F5). Shared contract: change only with the Design Documentation.
@@ -46,6 +46,9 @@ data class Friend(
 
 /** A pending request someone sent this user (FR-5.7). */
 data class FriendRequest(val id: String, val from: PixUser, val createdAt: Long)
+
+/** A pending request this user sent, which [to] has not answered yet (FR-5.16). */
+data class SentRequest(val id: String, val to: PixUser, val createdAt: Long)
 
 sealed interface UserLookup {
     /** [relation] decides the button (FR-5.8); [requestId] is the pending request for REQUESTED and INCOMING. */

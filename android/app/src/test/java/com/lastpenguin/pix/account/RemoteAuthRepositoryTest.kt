@@ -3,6 +3,7 @@ package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.GoogleTokenBody
 import com.lastpenguin.pix.core.network.LogInBody
+import com.lastpenguin.pix.core.network.PixIdCheckBody
 import com.lastpenguin.pix.core.network.SignUpBody
 import com.lastpenguin.pix.core.network.UpdateMeBody
 import java.io.IOException
@@ -16,8 +17,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /*
- * Partitions for signing up, in, and out (FR-5.2, FR-5.11–5.14; Design 2.5.3). Sign-up: accepted, PIX_ID_TAKEN,
- * PASSWORD_INVALID with the rule. Log-in: accepted with capitals and spaces around the Pix ID, INVALID_CREDENTIALS.
+ * Partitions for signing up, in, and out (FR-5.2, FR-5.11–5.15; Design 2.5.3). Sign-up: accepted, PIX_ID_TAKEN,
+ * PASSWORD_INVALID with the rule. Check: free, taken (sent as typed, without signing in), PIX_ID_INVALID with the
+ * rule, no answer (OFFLINE). Log-in: accepted with capitals and spaces around the Pix ID, INVALID_CREDENTIALS.
  * Google: a registered account, NOT_REGISTERED (404, no sign-in), a new account without a Pix ID. Account changes:
  * addGoogle GOOGLE_IN_USE, setPixId (the account changes, the tokens stay), the display name trimmed. Any call without
  * an answer: OFFLINE. Sign-out: answered, and without an answer (the phone signs out either way).
@@ -64,6 +66,33 @@ class RemoteAuthRepositoryTest {
 
         assertEquals(AccountError.PASSWORD_INVALID, error.error)
         assertEquals("A password needs at least one letter and one digit", error.serverMessage)
+    }
+
+    @Test
+    fun isPixIdAvailable_answersForThePixIdAsTypedWithoutSigningIn() = runTest {
+        val repository = repository()
+
+        assertEquals(true, repository.isPixIdAvailable("test5").getOrThrow())
+        assertEquals(false, repository.isPixIdAvailable("test1").getOrThrow())
+        assertEquals(listOf(PixIdCheckBody("test5"), PixIdCheckBody("test1")), authApi.calls)
+        assertEquals(AuthState.SignedOut, repository.state.value)
+    }
+
+    @Test
+    fun isPixIdAvailable_brokenRule_carriesTheRuleTheServerNames() = runTest {
+        authApi.checkPixId = { throw httpError(400, "PIX_ID_INVALID", "A Pix ID has at least 4 characters") }
+
+        val error = repository().isPixIdAvailable("abc").exceptionOrNull() as AccountException
+
+        assertEquals(AccountError.PIX_ID_INVALID, error.error)
+        assertEquals("A Pix ID has at least 4 characters", error.serverMessage)
+    }
+
+    @Test
+    fun isPixIdAvailable_withoutAnAnswer_isOffline() = runTest {
+        authApi.checkPixId = { throw IOException("no route") }
+
+        assertEquals(AccountError.OFFLINE, repository().isPixIdAvailable("test5").error())
     }
 
     @Test

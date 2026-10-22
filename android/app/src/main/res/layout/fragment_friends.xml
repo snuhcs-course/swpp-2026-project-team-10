@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Friends, from Shoot together (R&S 6.4; FR-5.4, FR-5.7, FR-5.9, FR-8.1). Signed out, it offers Sign in and the room
-     code instead of the list; a Google account without a Pix ID is asked to choose one first. -->
+<!-- Friends, from Shoot together (R&S 6.4; FR-5.4, FR-5.7, FR-5.9, FR-5.16, FR-8.1). Signed out, it offers Sign in and
+     the room code instead of the list; a Google account without a Pix ID is asked to choose one first. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -150,6 +150,24 @@
                 android:layout_marginBottom="16dp"
                 android:orientation="vertical"
                 android:visibility="gone"
+                tools:visibility="visible" />
+
+            <!-- Requests the user sent and nobody answered yet, which Sent requests lists with Withdraw (FR-5.16). -->
+            <Button
+                android:id="@+id/sentRequestsButton"
+                style="@style/Widget.Pix.Button.Text.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginEnd="-12dp"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone"
+                app:icon="@drawable/ic_chevron_right"
+                app:iconGravity="end"
+                app:iconPadding="2dp"
+                app:iconSize="18dp"
+                app:iconTint="@color/button_text_text"
+                tools:text="Sent requests · 2"
                 tools:visibility="visible" />
 
             <!-- No friends yet. -->

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import kotlinx.coroutines.flow.SharedFlow
@@ -17,6 +17,12 @@ interface AuthRepository {
 
     /** Fails with PIX_ID_TAKEN, PIX_ID_INVALID, or PASSWORD_INVALID. */
     suspend fun signUp(pixId: String, password: String, displayName: String): Result<Account>
+
+    /**
+     * Whether a sign-up or the Pix ID setup could take [pixId] now (FR-5.15), without signing in; fails with
+     * PIX_ID_INVALID. Someone may take it before the form is sent, so those still fail with PIX_ID_TAKEN then.
+     */
+    suspend fun isPixIdAvailable(pixId: String): Result<Boolean>
 
     /** Fails with INVALID_CREDENTIALS. */
     suspend fun logIn(pixId: String, password: String): Result<Account>

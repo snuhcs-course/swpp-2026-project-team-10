@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -37,7 +37,8 @@ interface PixApi {
 }
 
 /**
- * The sign-in endpoints, which give a phone its tokens and need none themselves. Their client is not the pose client,
+ * The sign-in endpoints, which give a phone its tokens and need none themselves, and sign-up's Pix ID check, which
+ * needs none either. Their client is not the pose client,
  * whose four long requests would hold up a refresh, and not the account client, whose calls wait for the refresh.
  */
 interface PixAuthApi {
@@ -45,6 +46,10 @@ interface PixAuthApi {
     /** `201`; `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` (FR-5.2, FR-5.11). */
     @POST("api/v1/auth/signup")
     suspend fun signUp(@Body body: SignUpBody): AuthDto
+
+    /** Whether a sign-up could take the Pix ID now, for *Check* (FR-5.15); `400 PIX_ID_INVALID`. */
+    @POST("api/v1/auth/check-pix-id")
+    suspend fun checkPixId(@Body body: PixIdCheckBody): PixIdCheckDto
 
     /** `401 INVALID_CREDENTIALS` for a wrong password and an unknown Pix ID alike. */
     @POST("api/v1/auth/login")

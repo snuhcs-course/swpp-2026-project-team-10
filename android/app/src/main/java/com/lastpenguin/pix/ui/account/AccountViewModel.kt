@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.AccountException
 import com.lastpenguin.pix.account.AuthRepository
 import com.lastpenguin.pix.account.AuthState
@@ -11,6 +12,7 @@ import com.lastpenguin.pix.account.GoogleIdTokens
 import com.lastpenguin.pix.account.GoogleSignIn
 import com.lastpenguin.pix.account.GoogleSignInException
 import com.lastpenguin.pix.account.GoogleSignInProblem
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,7 +29,14 @@ data class AccountUiState(
     val error: Exception? = null,
     /** A Google account no Pix account uses waits to be added once the person signs in (FR-5.13). */
     val linkingGoogle: Boolean = false,
+    /** The last *Check* of a Pix ID; a form shows it while its field still holds that Pix ID (FR-5.15). */
+    val pixIdCheck: PixIdCheck? = null,
 )
+
+/** *Check* of [pixId]: asked while both [available] and [error] are null, then answered with one of them. */
+data class PixIdCheck(val pixId: String, val available: Boolean? = null, val error: AccountException? = null) {
+    val checking: Boolean get() = available == null && error == null
+}
 
 /** One-shot results for navigation and short messages. */
 sealed interface AccountEvent {
@@ -68,6 +77,8 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
 
     /** The ID token of a Google account no Pix account uses, while the person decides or signs in (FR-5.13). */
     private var pendingGoogleToken: String? = null
+
+    private var pixIdCheckJob: Job? = null
 
     fun logIn(pixId: String, password: String) = call {
         val account = auth.logIn(pixId, password).getOrThrow()
@@ -119,6 +130,28 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
         _events.emit(AccountEvent.SignedIn(needsPixId = false))
     }
 
+    /**
+     * *Check* on Sign up and the Pix ID setup (FR-5.15): whether [pixId] is free now. It runs beside the screen's own
+     * call, and a newer check replaces one still waiting.
+     */
+    fun checkPixId(pixId: String) {
+        pixIdCheckJob?.cancel()
+        _uiState.update { it.copy(pixIdCheck = PixIdCheck(pixId)) }
+        pixIdCheckJob = viewModelScope.launch {
+            val check = auth.isPixIdAvailable(pixId).fold(
+                onSuccess = { PixIdCheck(pixId, available = it) },
+                onFailure = {
+                    PixIdCheck(
+                        pixId,
+                        error =
+                            it as? AccountException ?: AccountException(AccountError.UNKNOWN),
+                    )
+                },
+            )
+            _uiState.update { it.copy(pixIdCheck = check) }
+        }
+    }
+
     fun savePixId(pixId: String) = call {
         auth.setPixId(pixId).getOrThrow()
         _events.emit(AccountEvent.PixIdSaved)
@@ -148,6 +181,12 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
     /** A screen opens without the failure another one showed. */
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    /** Sign up and the Pix ID setup open without the failure, or the *Check* answer, another screen showed. */
+    fun startForm() {
+        pixIdCheckJob?.cancel()
+        _uiState.update { it.copy(error = null, pixIdCheck = null) }
     }
 
     /** Google's ID token, or null when the person closed Google's sheet, which needs no message. */

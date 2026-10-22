@@ -64,6 +64,7 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` | #7 |
 | Friends, Friends (signed out) | `account/FriendsFragment` | `FriendsViewModel`, `SessionViewModel` | #54 |
 | Add a friend, No user found | `account/AddFriendFragment` | `FriendsViewModel` | #54 |
+| Sent requests | `account/SentRequestsFragment` | `FriendsViewModel` | #54 |
 | Sign in, Sign up, Pix ID setup, Account (bottom sheet) | `account/SignInFragment`, `SignUpFragment`, `PixIdSetupFragment`, `AccountSheet` | `AccountViewModel` | #54 |
 | Room code (bottom sheet) | `session/RoomCodeSheet` | `SessionViewModel` | #8 |
 | Join with code, Session not found | `session/JoinCodeFragment`, `SessionNotFoundFragment` | `SessionViewModel` | #8 |
@@ -130,13 +131,13 @@ Two phones connect with a room code over the Pix server and then stream phone to
 
 ## Accounts and friends (#54)
 
-*Shoot together* opens Friends. Signed out, it offers *Sign in to add friends* and *Use a room code instead*; signed in, it lists friends with their online status and received requests, and *Use a room code* stays under the list, because room codes need no account (R&S F5, 6.4; Design 2.5.3).
+*Shoot together* opens Friends. Signed out, it offers *Sign in to add friends* and *Use a room code instead*; signed in, it lists friends with their online status and received requests, *Sent requests · N* opens the requests the user sent with *Withdraw*, and *Use a room code* stays under the list, because room codes need no account (R&S F5, 6.4; Design 2.5.3). *Check* on Sign up and Pix ID setup asks `POST /auth/check-pix-id` whether the Pix ID is free, so it needs a server with that endpoint.
 
 - **Run it.** Point `pix.serverUrl` at a server with the accounts endpoints (Server B, or a laptop as above). Sign-up and sign-in with a Pix ID and a password work everywhere. Google sign-in also needs `PIX_GOOGLE_CLIENT_ID` on that server, the web client ID in `app/build.gradle.kts`, and your debug key registered in the team's Google Cloud project: run `./gradlew :app:signingReport`, and have a project owner add the `SHA1` of `Variant: debug` as an Android OAuth client for `com.lastpenguin.pix`. Without it, Google's sheet fails and the app says so. An emulator needs a Google Play image signed in to a test user.
 - **Tokens.** `AuthTokens` keeps the account and its tokens in DataStore (`account`), outside backups and device transfers (`res/xml/data_extraction_rules.xml`), and runs one refresh at a time for every caller: a refresh token is spent by its refresh, and a spent one ends the session. `BearerTokens` adds the access token to `PixAccountApi` calls and answers `401 UNAUTHENTICATED` with one refresh and one retry. The three REST clients in `AppContainer` each have their own dispatcher, so a refresh on the `PixAuthApi` client never queues behind the calls waiting for it. A refused refresh signs the phone out and Friends says so.
 - **Presence.** While someone is signed in and Pix is in front, `PresenceConnection` holds one signaling socket opened with the access token, which marks the user online for friends (Design 2.5.2); it retries after 1 s, doubling to 30 s, and closes in the background. Sessions keep their own socket. Friends asks for its lists every 10 s while it is shown, until push arrives with invitations (Iter2-P15); *Invite* stays disabled until then.
 - **Watch it.** `adb logcat -s PixAccount PixPresence` shows a refused refresh, Google sign-in failures, and "Online" when the presence socket opens.
-- **Tests.** `account/` covers the rules, the tokens and their refresh, the repositories with fakes of the REST interfaces (`AccountFakes.kt`), presence in virtual time, and the account client against OkHttp's MockWebServer (`BearerTokensTest`); `ui/account/` covers both ViewModels and, under Robolectric, the Friends screen and the forms on their real layouts.
+- **Tests.** `account/` covers the rules, the tokens and their refresh, the repositories with fakes of the REST interfaces (`AccountFakes.kt`), presence in virtual time, and the account client against OkHttp's MockWebServer (`BearerTokensTest`); `ui/account/` covers both ViewModels and, under Robolectric, the Friends and Sent requests screens and the forms on their real layouts.
 
 ## Lint, format, and test
 

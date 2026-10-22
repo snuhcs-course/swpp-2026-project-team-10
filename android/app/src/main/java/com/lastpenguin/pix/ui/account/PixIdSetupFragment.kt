@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -21,8 +21,9 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Pix ID setup, for an account made with Google (R&S 6.8; FR-5.2, FR-5.3, US-6). *Save* waits until the Pix ID follows
- * the rule; a taken one keeps the input. Back leaves without one, and Friends asks again. Owner: Accounts (#54).
+ * Pix ID setup, for an account made with Google (R&S 6.8; FR-5.2, FR-5.3, FR-5.15, US-6). *Save* waits until the Pix
+ * ID follows the rule, and *Check* tells whether it is free first; a taken one keeps the input. Back leaves without
+ * one, and Friends asks again. Owner: Accounts (#54).
  */
 class PixIdSetupFragment : Fragment(R.layout.fragment_pix_id_setup) {
 
@@ -30,8 +31,13 @@ class PixIdSetupFragment : Fragment(R.layout.fragment_pix_id_setup) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentPixIdSetupBinding.bind(view)
-        if (savedInstanceState == null) viewModel.clearError()
-        val form = PixIdForm(binding, onSave = viewModel::savePixId, onEdited = viewModel::clearError)
+        if (savedInstanceState == null) viewModel.startForm()
+        val form = PixIdForm(
+            binding,
+            onCheck = viewModel::checkPixId,
+            onSave = viewModel::savePixId,
+            onEdited = viewModel::clearError,
+        )
         binding.backButton.setOnClickListener { findNavController().popBackStack() }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -47,9 +53,10 @@ class PixIdSetupFragment : Fragment(R.layout.fragment_pix_id_setup) {
     }
 }
 
-/** The Pix ID field, its rule, and *Save*. Apart from the fragment, so it can be tested on the real layout. */
+/** The Pix ID field, its rule, *Check*, and *Save*. Apart from the fragment, so it can be tested on the real layout. */
 class PixIdForm(
     private val binding: FragmentPixIdSetupBinding,
+    onCheck: (String) -> Unit,
     onSave: (String) -> Unit,
     private val onEdited: () -> Unit,
 ) {
@@ -66,6 +73,9 @@ class PixIdForm(
             (actionId == EditorInfo.IME_ACTION_DONE).also { if (it) submit() }
         }
         binding.saveButton.setOnClickListener { submit() }
+        binding.checkButton.setOnClickListener {
+            if (binding.checkButton.isEnabled) onCheck(binding.pixIdInput.text.toString())
+        }
         renderRule()
     }
 
@@ -78,14 +88,8 @@ class PixIdForm(
         val pixId = binding.pixIdInput.text.toString()
         val error = state.error as? AccountException
         val atField = error?.error == AccountError.PIX_ID_TAKEN || error?.error == AccountError.PIX_ID_INVALID
-        if (error != null && atField) {
-            binding.pixIdRule.showRule(context.accountMessage(error), broken = true)
-        } else {
-            binding.pixIdRule.showRule(
-                context.getString(R.string.pix_id_rule),
-                pixId.isNotEmpty() && pixIdProblem(pixId) != null,
-            )
-        }
+        binding.pixIdRule.showPixIdStatus(pixId, error?.takeIf { atField }, state.pixIdCheck)
+        binding.checkButton.isEnabled = !state.busy && canCheckPixId(pixId, state.pixIdCheck)
         binding.errorText.isVisible = state.error != null && !atField
         binding.errorText.text = state.error?.let(context::accountMessage)
         binding.saveButton.isEnabled = !state.busy && pixIdProblem(pixId) == null

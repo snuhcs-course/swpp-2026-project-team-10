@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.AccountDto
@@ -6,6 +6,7 @@ import com.lastpenguin.pix.core.network.ApiErrorBody
 import com.lastpenguin.pix.core.network.FriendDto
 import com.lastpenguin.pix.core.network.IncomingRequestDto
 import com.lastpenguin.pix.core.network.LookupDto
+import com.lastpenguin.pix.core.network.OutgoingRequestDto
 import com.lastpenguin.pix.core.network.UserDto
 import java.io.IOException
 import kotlinx.serialization.SerializationException
@@ -22,6 +23,8 @@ internal fun UserDto.toPixUser() = PixUser(id, pixId.orEmpty(), displayName)
 internal fun FriendDto.toFriend() = Friend(id, pixId.orEmpty(), displayName, online, inSession)
 
 internal fun IncomingRequestDto.toFriendRequest() = FriendRequest(id, from.toPixUser(), createdAt)
+
+internal fun OutgoingRequestDto.toSentRequest() = SentRequest(id, to.toPixUser(), createdAt)
 
 internal fun LookupDto.toLookup(): UserLookup.Found {
     val relation = Relation.entries.firstOrNull { it.name == relation } ?: Relation.NONE

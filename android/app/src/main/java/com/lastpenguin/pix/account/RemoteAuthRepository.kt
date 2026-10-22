@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.GoogleTokenBody
@@ -6,6 +6,7 @@ import com.lastpenguin.pix.core.network.LogInBody
 import com.lastpenguin.pix.core.network.PasswordBody
 import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixAuthApi
+import com.lastpenguin.pix.core.network.PixIdCheckBody
 import com.lastpenguin.pix.core.network.SignUpBody
 import com.lastpenguin.pix.core.network.UpdateMeBody
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,6 +28,10 @@ class RemoteAuthRepository(
 
     override suspend fun signUp(pixId: String, password: String, displayName: String) = accountCall {
         tokens.signIn(authApi.signUp(SignUpBody(pixId, password, displayName.trim())))
+    }
+
+    override suspend fun isPixIdAvailable(pixId: String) = accountCall {
+        authApi.checkPixId(PixIdCheckBody(pixId)).available
     }
 
     override suspend fun logIn(pixId: String, password: String) = accountCall {

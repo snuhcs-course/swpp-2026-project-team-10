@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -24,8 +24,9 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, US-6). The account is signed in at
- * once and Friends opens. Owner: Accounts (#54).
+ * Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, FR-5.15, US-6). *Check* tells
+ * whether the Pix ID is free before the form is sent. The account is signed in at once and Friends opens. Owner:
+ * Accounts (#54).
  */
 class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
 
@@ -33,8 +34,13 @@ class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSignUpBinding.bind(view)
-        if (savedInstanceState == null) viewModel.clearError()
-        val form = SignUpForm(binding, onSignUp = viewModel::signUp, onEdited = viewModel::clearError)
+        if (savedInstanceState == null) viewModel.startForm()
+        val form = SignUpForm(
+            binding,
+            onCheck = viewModel::checkPixId,
+            onSignUp = viewModel::signUp,
+            onEdited = viewModel::clearError,
+        )
         binding.backButton.setOnClickListener { findNavController().popBackStack() }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -51,12 +57,13 @@ class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
 }
 
 /**
- * The fields of Sign up, each with its rule under it (US-6). A rule shows faint until the field breaks it; the server's
- * answer for a taken Pix ID or a refused password shows in the same place. Apart from the fragment, so it can be tested
- * on the real layout.
+ * The fields of Sign up, each with its rule under it (US-6). A rule shows faint until the field breaks it; the answer
+ * to *Check*, and the server's answer for a taken Pix ID or a refused password, show in the same place. Apart from the
+ * fragment, so it can be tested on the real layout.
  */
 class SignUpForm(
     private val binding: FragmentSignUpBinding,
+    onCheck: (pixId: String) -> Unit,
     onSignUp: (pixId: String, displayName: String, password: String) -> Unit,
     private val onEdited: () -> Unit,
 ) {
@@ -79,6 +86,7 @@ class SignUpForm(
             (actionId == EditorInfo.IME_ACTION_DONE).also { if (it) submit() }
         }
         binding.signUpButton.setOnClickListener { submit() }
+        binding.checkButton.setOnClickListener { if (binding.checkButton.isEnabled) onCheck(pixId()) }
         renderRules()
     }
 
@@ -92,13 +100,9 @@ class SignUpForm(
     private fun renderRules() {
         val error = state.error as? AccountException
         val pixId = pixId()
-        val pixIdBroken = pixId.isNotEmpty() && pixIdProblem(pixId) != null
-        when (error?.error) {
-            AccountError.PIX_ID_TAKEN, AccountError.PIX_ID_INVALID ->
-                binding.pixIdRule.showRule(context.accountMessage(error), broken = true)
-
-            else -> binding.pixIdRule.showRule(context.getString(R.string.pix_id_rule), pixIdBroken)
-        }
+        val refusal = error?.takeIf { it.error == AccountError.PIX_ID_TAKEN || it.error == AccountError.PIX_ID_INVALID }
+        binding.pixIdRule.showPixIdStatus(pixId, refusal, state.pixIdCheck)
+        binding.checkButton.isEnabled = !state.busy && canCheckPixId(pixId, state.pixIdCheck)
 
         val name = binding.nameInput.text.toString()
         binding.nameRule.showRule(context.getString(R.string.name_rule), name.isNotEmpty() && !isValidDisplayName(name))

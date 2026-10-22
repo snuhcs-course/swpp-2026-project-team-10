@@ -11,6 +11,7 @@ import com.lastpenguin.pix.account.FakeGoogleIdTokens
 import com.lastpenguin.pix.account.GoogleSignIn
 import com.lastpenguin.pix.account.GoogleSignInException
 import com.lastpenguin.pix.account.GoogleSignInProblem
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
@@ -30,12 +31,14 @@ import org.junit.Before
 import org.junit.Test
 
 /*
- * Partitions for Sign in, Sign up, Pix ID setup, and the Account sheet (FR-5.2, FR-5.3, FR-5.11–5.14, US-6). Log-in:
+ * Partitions for Sign in, Sign up, Pix ID setup, and the Account sheet (FR-5.2, FR-5.3, FR-5.11–5.15, US-6). Log-in:
  * accepted (to Friends), refused (the error stays on the screen), an account without a Pix ID (to Pix ID setup).
  * Google: registered, NOT_REGISTERED (the question), the sheet closed (nothing shown), no Google account on the phone
  * (an error). The question: Yes (sign in, then Google is added; adding fails: the sign-in stands and says so), No (a new
  * account, then Pix ID setup), closed (the Google account is forgotten). Sign-up, Pix ID, name, Add Google, Add a
- * password, Sign out: each answered with its event. A second tap while a call runs does nothing.
+ * password, Sign out: each answered with its event. A second tap while a call runs does nothing. Check: asked (shown as
+ * checking, beside a running sign-up), free, taken, failed (the reason kept), replaced by a newer check before it is
+ * answered (only the newer one shows); a form that opens forgets the last check.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AccountViewModelTest {
@@ -252,5 +255,80 @@ class AccountViewModelTest {
         runCurrent()
 
         assertEquals(1, auth.calls.size)
+    }
+
+    @Test
+    fun checkPixId_showsCheckingThenTheAnswer() = runTest {
+        auth.checkGate = CompletableDeferred()
+
+        model.checkPixId("test5")
+        runCurrent()
+
+        assertEquals(PixIdCheck("test5"), model.uiState.value.pixIdCheck)
+        assertTrue(model.uiState.value.pixIdCheck!!.checking)
+        assertFalse(model.uiState.value.busy)
+
+        auth.checkGate!!.complete(Unit)
+        runCurrent()
+
+        assertEquals(PixIdCheck("test5", available = true), model.uiState.value.pixIdCheck)
+    }
+
+    @Test
+    fun checkPixId_taken_isNotAvailable() = runTest {
+        model.checkPixId("test1")
+        runCurrent()
+
+        assertEquals(PixIdCheck("test1", available = false), model.uiState.value.pixIdCheck)
+    }
+
+    @Test
+    fun checkPixId_failed_keepsTheReason() = runTest {
+        auth.failures["check"] = AccountException(AccountError.OFFLINE)
+
+        model.checkPixId("test5")
+        runCurrent()
+
+        val check = model.uiState.value.pixIdCheck!!
+        assertEquals(AccountError.OFFLINE, check.error?.error)
+        assertNull(check.available)
+        assertFalse(check.checking)
+    }
+
+    @Test
+    fun checkPixId_runsBesideASignUp() = runTest {
+        auth.checkGate = CompletableDeferred()
+        model.checkPixId("test5")
+        model.signUp("test5", "Test Account 5", "testpassword5")
+        runCurrent()
+
+        assertTrue("signUp:test5" in auth.calls)
+        assertTrue(model.uiState.value.pixIdCheck!!.checking)
+    }
+
+    @Test
+    fun checkPixId_aNewerCheck_replacesOneStillWaiting() = runTest {
+        auth.checkGate = CompletableDeferred()
+        model.checkPixId("test5")
+        runCurrent()
+
+        model.checkPixId("test1")
+        auth.checkGate!!.complete(Unit)
+        runCurrent()
+
+        assertEquals(PixIdCheck("test1", available = false), model.uiState.value.pixIdCheck)
+    }
+
+    @Test
+    fun startForm_forgetsTheCheckAndTheError() = runTest {
+        auth.failure = AccountException(AccountError.OFFLINE)
+        model.logIn("test1", "sunset2026")
+        model.checkPixId("test5")
+        runCurrent()
+
+        model.startForm()
+
+        assertNull(model.uiState.value.pixIdCheck)
+        assertNull(model.uiState.value.error)
     }
 }

@@ -22,6 +22,7 @@
 | 1.9 | 2026-10-18 | Subject view's video fitted to the frame (Iter2-A4, #86). The subject's `SurfaceViewRenderer` wraps its content and is centered, so it measures itself to the video's shape and covers the rectangle the grid and the guide fit. At `match_parent` the renderer cropped every frame to the view's shape despite aspect-fit scaling, so the guide lay on another part of the scene than on the photographer's phone: about 6 % off at 4:3, 26 % at 16:9, and 41 % at 1:1. A pinch anywhere in the video area, the margins around the video included, zooms (2.6.4). *Still open* gains whether Subject view also shows the reference thumbnail. |
 | 1.10 | 2026-10-21 | Pose descriptions and suggested poses (Iter2-P12, #53). Every candidate is generated with one prompt, whose pose is the user's description or, without one, one of four poses that a vision model suggests for the scene through the new `POST /pose-suggestions`; the template prompt is gone, and the four predefined poses stay as the default poses when the suggestion model fails and for apps from before Iteration 2, which still call `GET /pose-templates` (2.5.3, 2.6.3). The prompt lets the model frame the person closer or from a slightly different height, never wider than the scene photo (2.6.3). The suggestion model, Gemini 3.1 Flash Lite, was chosen from ten on 2026-10-21 with `compare_suggestion_models.py` (2.6.3). `POST /poses` takes a `description` of 1–100 characters after trimming, answers it with `"templateId": null`, and answers `422 REJECTED` when the service refuses it, with the same message as for a template, because the service does not say whether it refused the photo or the text; the app names its four requests `pose-1` … `pose-4`, and the `candidateId` the server was to echo is dropped (2.3, 2.5.3). The app: *Generate poses* between *Use this photo* and Generating poses, with idea chips from string resources (`GET /pose-ideas` and `PoseGenerator.ideas()` are dropped), `PoseGenerator.generate(scene, request, seed)` reporting the poses before the candidates, and, when the service rejected every pose of a description, *Couldn't create poses* asking for a different description or another photo, with *Edit description*, which goes back to *Generate poses* with the text kept, as *Try other poses* on *Pick a pose* now does too (2.1–2.3, 2.6.3). With a description, the same vision model writes three variations of it for the scene (`POST /pose-suggestions` with a `description`), so the four candidates differ instead of repeating one pose; the description's own request goes out at once (2.1, 2.5.3, 2.6.3). The prompts and the default poses are data in `server/src/pix_server/poses/prompts.toml`, which the server checks when it starts and both comparison scripts read (2.6.3). Suggestion requests have rate limits of their own (2.8). A run, and each call to the image API, may now take 60 s instead of 30 s (2.6.3, 2.8). 2.6.3 keeps the decisions and their reasons, without the test logs. The pose ideas leave *Still open*. |
 | 1.11 | 2026-10-21 | Sign-in, Pix ID, and Friends screens as built (Iter2-P13, #54). The four *Still open* rows of Iter2-P13 are decided (Decided): *Shoot together* opens *Friends*, which, signed out, offers *Sign in to add friends* and *Use a room code instead*; one *Sign in* screen with *Continue with Google* and *Sign up*; an *Account* sheet from the account button on *Friends*; the team's Google Cloud project with the web client ID in the app's build script; the tokens in DataStore without Keystore encryption and out of backups and device transfers. The contracts follow the server (2.1, 2.3, 2.5.3): `PixAuthApi` holds the sign-in endpoints and `PixAccountApi` those with a token, each on its own HTTP client, so a refresh never waits behind the calls that wait for it; `AuthRepository.state` is an `AuthState`, and the tokens stay in `AuthTokens`; `setDisplayName` and `freshAccessToken` are added; `Friend.inSession`, `PixUser`, `RequestOutcome`, and one `AccountError` with `AccountException` replace `PixIdError` and `PasswordError`. Presence: the app holds one signed-in signaling socket while Pix is in front (2.5.2). Without push (Iter2-P15), *Friends* refreshes its lists every 10 s while it is shown (2.8). |
+| 1.12 | 2026-10-22 | *Check* and *Sent requests* (Iter2-P13, #54; R&S FR-5.15, FR-5.16). New endpoint `POST /auth/check-pix-id`, without a token: whether a sign-up could take a Pix ID now, with the Pix ID in the body and `400 PIX_ID_INVALID` as at sign-up; sign-up and `PUT /me` still answer `409 PIX_ID_TAKEN` for a Pix ID taken in the meantime (2.5.3). Contracts (2.1, 2.3): `AuthRepository.isPixIdAvailable`, on `PixAuthApi`; `FriendsRepository.sentRequests` with the new `SentRequest`, from the `outgoing` list that `GET /friend-requests` already answered, and `cancel` takes a withdrawn request off it, also when the server answers `404`. *Sent requests* is a screen of its own from *Friends* that refreshes like it. |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.7). Testing plans will be in the Testing Documentation.
 
@@ -403,6 +404,7 @@ interface AuthRepository {                               // It 2 (FR-5.1–5.3, 
     val state: StateFlow<AuthState>                      // Loading, SignedOut, or SignedIn(account); everything but friends works signed out
     val expired: SharedFlow<Unit>                        // the server refused the refresh token: ask to sign in again
     suspend fun signUp(pixId: String, password: String, displayName: String): Result<Account>  // PIX_ID_TAKEN, PIX_ID_INVALID, PASSWORD_INVALID
+    suspend fun isPixIdAvailable(pixId: String): Result<Boolean>   // Check on Sign up and Pix ID setup, without a sign-in; PIX_ID_INVALID
     suspend fun logIn(pixId: String, password: String): Result<Account>   // INVALID_CREDENTIALS
     suspend fun signInWithGoogle(idToken: String): Result<GoogleSignIn>   // NotRegistered: ask about an existing Pix account
     suspend fun signUpWithGoogle(idToken: String): Result<Account>   // a new account; the Pix ID comes next
@@ -417,11 +419,12 @@ interface AuthRepository {                               // It 2 (FR-5.1–5.3, 
 interface FriendsRepository {                            // It 2 (FR-5.4–5.10); failures are AccountException
     val friends: StateFlow<List<Friend>>
     val requests: StateFlow<List<FriendRequest>>         // received, pending
-    suspend fun refresh(): Result<Unit>                  // both lists; Friends calls it every 10 s while shown
+    val sentRequests: StateFlow<List<SentRequest>>       // sent, not answered yet (FR-5.16)
+    suspend fun refresh(): Result<Unit>                  // the three lists; Friends and Sent requests call it every 10 s while shown
     suspend fun search(pixId: String): Result<UserLookup> // exact match only
     suspend fun request(userId: String): Result<RequestOutcome>   // Sent, or BecameFriends when they had asked
     suspend fun accept(requestId: String): Result<Friend>
-    suspend fun cancel(requestId: String): Result<Unit>  // withdraws a request the user sent
+    suspend fun cancel(requestId: String): Result<Unit>  // withdraws a request the user sent; it leaves sentRequests, on NOT_FOUND too
     suspend fun decline(requestId: String): Result<Unit>
     suspend fun remove(userId: String): Result<Unit>
 }
@@ -656,6 +659,7 @@ classDiagram
     +continueWithGoogle(activity)
     +answerExistingAccount(hasAccount)
     +signUp(pixId, displayName, password)
+    +checkPixId(pixId)
     +savePixId(pixId)
     +saveDisplayName(name)
     +addGoogle(activity)
@@ -672,6 +676,7 @@ classDiagram
     +withdrawFound()
     +accept(request)
     +decline(request)
+    +withdraw(sent)
     +remove(friend)
   }
   class InvitationViewModel {
@@ -686,6 +691,7 @@ classDiagram
     <<interface>>
     +state StateFlow~AuthState~
     +signUp(pixId, password, displayName)
+    +isPixIdAvailable(pixId)
     +logIn(pixId, password)
     +signInWithGoogle(idToken)
     +signUpWithGoogle(idToken)
@@ -699,6 +705,7 @@ classDiagram
     <<interface>>
     +friends StateFlow
     +requests StateFlow
+    +sentRequests StateFlow
     +refresh()
     +search(pixId)
     +request(userId)
@@ -844,6 +851,7 @@ sealed interface GoogleSignIn {
 data class PixUser(val userId: String, val pixId: String, val displayName: String)   // a lookup result or a request's sender
 data class Friend(val userId: String, val pixId: String, val displayName: String, val online: Boolean, val inSession: Boolean)
 data class FriendRequest(val id: String, val from: PixUser, val createdAt: Long)
+data class SentRequest(val id: String, val to: PixUser, val createdAt: Long)   // a request the user sent, not answered yet (FR-5.16)
 sealed interface UserLookup {
     data class Found(val user: PixUser, val relation: Relation, val requestId: String?) : UserLookup   // relation decides the button (FR-5.8); requestId for REQUESTED and INCOMING
     data object NotFound : UserLookup
@@ -1296,6 +1304,7 @@ Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11; Iteratio
 | `POST /pose-suggestions` (It 2) | Four poses for the scene, chosen by a vision model, or, with a `description`, the description and three variations of it; the app asks once per set | `400 INVALID_IMAGE`, `400 INVALID_REQUEST`, `413`, `429 RATE_LIMITED`, `503 UNAVAILABLE` |
 | `POST /poses` | One pose candidate for a description, the user's or a suggested pose (It 2), or for a template id from an app before Iteration 2; the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `400 INVALID_REQUEST`, `413`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `503 UNAVAILABLE` (the session store, which counts the rate limit, does not answer), `504 UPSTREAM_TIMEOUT` |
 | `POST /auth/signup` (It 2) | Create an account with a Pix ID, a display name, and a password; return its tokens (FR-5.2, FR-5.11) | `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` |
+| `POST /auth/check-pix-id` (It 2) | Whether a sign-up could take a Pix ID now, for *Check* on Sign up and Pix ID setup (FR-5.15) | `400 PIX_ID_INVALID` |
 | `POST /auth/login` (It 2) | Sign in with a Pix ID and a password; return an access and a refresh token | `401 INVALID_CREDENTIALS` |
 | `POST /auth/refresh` (It 2) | Exchange a refresh token for a new access token and a new refresh token | `401 INVALID_REFRESH_TOKEN` |
 | `POST /auth/google` (It 2) | Verify a Google ID token and sign in the account that uses it; return an access and a refresh token | `401 INVALID_TOKEN`, `404 NOT_REGISTERED`, `503 UNAVAILABLE` |
@@ -1403,6 +1412,8 @@ The server checks the photo and does not repair it: one that is not a readable J
 ```
 
 The Pix ID is the login name; `POST /auth/login` ignores capitals and spaces around it. A password has 8–64 characters, at least one letter and one digit, and is not the Pix ID (FR-5.11); `PASSWORD_INVALID` names the broken rule, as `PIX_ID_INVALID` does. A display name has 1–30 characters after trimming, otherwise `400 INVALID_REQUEST`. The server keeps only an argon2id hash of the password (2.8, Accounts). An unknown Pix ID and a wrong password get the same answer, and the server checks a stand-in hash for an unknown Pix ID, so both take as long. Login attempts are not limited for now (decided 2026-10-15). Each sign-in issues a new token for that phone, valid for 30 days.
+
+**Checking a Pix ID (FR-5.15, added 2026-10-22).** `POST /auth/check-pix-id` `{ "pixId": "test5" }` answers `200 { "available": true }`, or `false` when an account has that Pix ID, and `400 PIX_ID_INVALID`, naming the rule, for one that breaks the rules as at sign-up (no capitals or spaces are taken off). It needs no token, so *Check* on Sign up and on the Pix ID setup of a Google account use it alike; it tells no more than a sign-up with that Pix ID would, and, like log-in, it is not limited for now. The answer can change before the form is sent, so sign-up and `PUT /me` still answer `409 PIX_ID_TAKEN`. The Pix ID travels in the body, as in the lookup, so no log prints it.
 
 **Session tokens.** A sign-in starts a session for that phone and answers with two tokens.
 
@@ -1517,7 +1528,7 @@ Exact match only; no partial search or listing (FR-5.5, NFR-15). Capitals and sp
 // DELETE /friend-requests/fr_77       → 204   (the sender withdraws it)
 ```
 
-The receiver gets an FCM push `friend.request` and sees it under received requests (FR-5.7); **TODO** Iter2-P15: the push is sent once the server has its FCM sender. A declined or withdrawn request is deleted and can be sent again later (US-8). Only the receiver can accept or decline, and only the sender can withdraw; anyone else, and a request already answered, get `404 NOT_FOUND`. Each of these, and a request that accepts the other user's, takes the request with one `DELETE … RETURNING`, so of two at the same moment only one succeeds: an accept and a withdrawal at once never leave the two as friends after the request was withdrawn. Sending and accepting between the same two users also lock both user rows (`SELECT … FOR UPDATE`) and run one after the other, so a request sent while the reverse one is accepted finds the friendship instead of being saved next to it. An accept reads the new friend's presence before it commits, so if the session store fails it answers `503 UNAVAILABLE` and saves nothing, and the same call can be repeated. Sending a request to oneself is `400 INVALID_REQUEST`. `createdAt` is in milliseconds since the epoch.
+The receiver gets an FCM push `friend.request` and sees it under received requests (FR-5.7), and the sender sees it on *Sent requests* until it is answered or withdrawn (FR-5.16, added 2026-10-22); **TODO** Iter2-P15: the push is sent once the server has its FCM sender. A declined or withdrawn request is deleted and can be sent again later (US-8). Only the receiver can accept or decline, and only the sender can withdraw; anyone else, and a request already answered, get `404 NOT_FOUND`. Each of these, and a request that accepts the other user's, takes the request with one `DELETE … RETURNING`, so of two at the same moment only one succeeds: an accept and a withdrawal at once never leave the two as friends after the request was withdrawn. Sending and accepting between the same two users also lock both user rows (`SELECT … FOR UPDATE`) and run one after the other, so a request sent while the reverse one is accepted finds the friendship instead of being saved next to it. An accept reads the new friend's presence before it commits, so if the session store fails it answers `503 UNAVAILABLE` and saves nothing, and the same call can be repeated. Sending a request to oneself is `400 INVALID_REQUEST`. `createdAt` is in milliseconds since the epoch.
 
 </details>
 

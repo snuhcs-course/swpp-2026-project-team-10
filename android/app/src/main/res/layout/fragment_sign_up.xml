@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, US-6). Each rule shows under its
-     field, in the danger color once it is broken, and Sign up waits until all hold. -->
+<!-- Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, FR-5.15, US-6). Each rule shows
+     under its field, in the danger color once it is broken, and Sign up waits until all hold. Check tells whether the
+     Pix ID is free, under the field too. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -53,17 +54,33 @@
             android:textAppearance="@style/TextAppearance.Pix.Action.Small"
             android:textColor="@color/pix_text" />
 
-        <EditText
-            android:id="@+id/pixIdInput"
-            style="@style/Widget.Pix.TextField"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:autofillHints="newUsername"
-            android:imeOptions="actionNext"
-            android:inputType="textNoSuggestions|textVisiblePassword"
-            android:maxLength="40"
-            tools:text="test1" />
+            android:layout_marginTop="8dp">
+
+            <EditText
+                android:id="@+id/pixIdInput"
+                style="@style/Widget.Pix.TextField"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:autofillHints="newUsername"
+                android:imeOptions="actionNext"
+                android:inputType="textNoSuggestions|textVisiblePassword"
+                android:maxLength="40"
+                tools:text="test5" />
+
+            <Button
+                android:id="@+id/checkButton"
+                style="@style/Widget.Pix.Button.Secondary.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:contentDescription="@string/check_pix_id_description"
+                android:enabled="false"
+                android:text="@string/check" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/pixIdRule"

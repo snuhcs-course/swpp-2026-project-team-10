@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +15,10 @@ interface FriendsRepository {
     /** Received and pending, newest first. */
     val requests: StateFlow<List<FriendRequest>>
 
-    /** Loads both lists again. */
+    /** Sent and not answered yet, newest first (FR-5.16). */
+    val sentRequests: StateFlow<List<SentRequest>>
+
+    /** Loads the three lists again. */
     suspend fun refresh(): Result<Unit>
 
     /** Exact match only (FR-5.5); NotFound for an unknown Pix ID. */
@@ -27,7 +30,7 @@ interface FriendsRepository {
 
     suspend fun decline(requestId: String): Result<Unit>
 
-    /** Withdraws a request the user sent. */
+    /** Withdraws a request the user sent. It leaves [sentRequests] even on NOT_FOUND: it was answered already. */
     suspend fun cancel(requestId: String): Result<Unit>
 
     suspend fun remove(userId: String): Result<Unit>

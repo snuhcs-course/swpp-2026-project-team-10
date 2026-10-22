@@ -24,10 +24,13 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 
 /*
- * Partitions for the account forms on their real layouts (US-6, US-7; FR-5.2, FR-5.3, FR-5.5, FR-5.8, FR-5.11).
- * Sign up: empty (rules faint, button off), "Test User!" (the Pix ID rule in red, US-6), a password without a digit, the
- * password equal to the Pix ID, all valid (button on), PIX_ID_TAKEN from the server (at the field; editing clears it),
- * busy. Pix ID setup: invalid and valid input, TAKEN with the input kept. Sign in: both fields needed, a refused
+ * Partitions for the account forms on their real layouts (US-6, US-7; FR-5.2, FR-5.3, FR-5.5, FR-5.8, FR-5.11,
+ * FR-5.15). Sign up: empty (rules faint, button off), "Test User!" (the Pix ID rule in red, US-6), a password without a
+ * digit, the password equal to the Pix ID, all valid (button on), PIX_ID_TAKEN from the server (at the field; editing
+ * clears it; it wins over a Check that said free), busy. Check on Sign up: an empty or broken Pix ID (off), a valid one
+ * (asks for it), checking (off, "Checking…"), free (in green), taken (in red), failed (the reason in red), an answer for
+ * another Pix ID than the field's (the rule instead). Pix ID setup: invalid and valid input, TAKEN with the input kept,
+ * Check. Sign in: both fields needed, a refused
  * password, the Google account waiting to be added (only the Pix ID and password are offered). Add a friend: typed
  * capitals and symbols (kept out), each relation's button or label, No user found (Search again, field in red), an
  * edit after a search (the result is dropped).
@@ -39,13 +42,20 @@ class AccountFormsTest {
     private val calls = mutableListOf<String>()
     private val red = ContextCompat.getColor(activity, R.color.pix_danger_text)
     private val faint = ContextCompat.getColor(activity, R.color.pix_text_faint)
+    private val green = ContextCompat.getColor(activity, R.color.pix_live)
 
     private val View.shown get() = visibility == View.VISIBLE
 
     private fun signUp(): Pair<FragmentSignUpBinding, SignUpForm> {
         val binding = FragmentSignUpBinding.inflate(inflater)
         activity.setContentView(binding.root)
-        return binding to SignUpForm(binding, { id, name, _ -> calls += "signUp:$id:$name" }, { calls += "edited" })
+        val form = SignUpForm(
+            binding,
+            onCheck = { calls += "check:$it" },
+            onSignUp = { id, name, _ -> calls += "signUp:$id:$name" },
+            onEdited = { calls += "edited" },
+        )
+        return binding to form
     }
 
     @Test
@@ -112,6 +122,72 @@ class AccountFormsTest {
     }
 
     @Test
+    fun signUp_check_waitsForAValidPixIdAndAsksForIt() {
+        val (binding, _) = signUp()
+        assertFalse(binding.checkButton.isEnabled)
+
+        binding.pixIdInput.setText("Test User!")
+        assertFalse(binding.checkButton.isEnabled)
+
+        binding.pixIdInput.setText("test5")
+        assertTrue(binding.checkButton.isEnabled)
+        binding.checkButton.performClick()
+        assertEquals(listOf("check:test5"), calls)
+    }
+
+    @Test
+    fun signUp_check_showsCheckingThenTheAnswerForThatPixIdOnly() {
+        val (binding, form) = signUp()
+        binding.pixIdInput.setText("test5")
+
+        form.render(AccountUiState(pixIdCheck = PixIdCheck("test5")))
+        assertEquals("Checking…", binding.pixIdRule.text.toString())
+        assertFalse(binding.checkButton.isEnabled)
+
+        form.render(AccountUiState(pixIdCheck = PixIdCheck("test5", available = true)))
+        assertEquals("test5 is available", binding.pixIdRule.text.toString())
+        assertEquals(green, binding.pixIdRule.currentTextColor)
+        assertTrue(binding.checkButton.isEnabled)
+
+        binding.pixIdInput.setText("test6")
+        assertEquals("4–20 characters: a–z, 0–9, \".\", \"_\"", binding.pixIdRule.text.toString())
+        assertEquals(faint, binding.pixIdRule.currentTextColor)
+
+        form.render(AccountUiState(pixIdCheck = PixIdCheck("test6", available = false)))
+        assertEquals("This Pix ID is taken", binding.pixIdRule.text.toString())
+        assertEquals(red, binding.pixIdRule.currentTextColor)
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test
+    fun signUp_check_failed_saysWhyAtTheField() {
+        val (binding, form) = signUp()
+        binding.pixIdInput.setText("test5")
+
+        form.render(AccountUiState(pixIdCheck = PixIdCheck("test5", error = AccountException(AccountError.OFFLINE))))
+
+        assertEquals("Couldn't reach Pix. Check your connection and try again.", binding.pixIdRule.text.toString())
+        assertEquals(red, binding.pixIdRule.currentTextColor)
+        assertTrue(binding.checkButton.isEnabled)
+    }
+
+    @Test
+    fun signUp_takenAtSignUp_winsOverACheckThatSaidFree() {
+        val (binding, form) = signUp()
+        binding.pixIdInput.setText("test5")
+
+        form.render(
+            AccountUiState(
+                error = AccountException(AccountError.PIX_ID_TAKEN),
+                pixIdCheck = PixIdCheck("test5", available = true),
+            ),
+        )
+
+        assertEquals("This Pix ID is taken", binding.pixIdRule.text.toString())
+        assertEquals(red, binding.pixIdRule.currentTextColor)
+    }
+
+    @Test
     fun signUp_busy_waits() {
         val (binding, form) = signUp()
         binding.pixIdInput.setText("test1")
@@ -127,10 +203,11 @@ class AccountFormsTest {
     fun pixIdSetup_savesOnlyAValidPixId_andKeepsATakenOne() {
         val binding = FragmentPixIdSetupBinding.inflate(inflater)
         activity.setContentView(binding.root)
-        val form = PixIdForm(binding, { calls += "save:$it" }, { calls += "edited" })
+        val form = PixIdForm(binding, { calls += "check:$it" }, { calls += "save:$it" }, { calls += "edited" })
 
         binding.pixIdInput.setText("Test User!")
         assertFalse(binding.saveButton.isEnabled)
+        assertFalse(binding.checkButton.isEnabled)
 
         binding.pixIdInput.setText("test2")
         binding.saveButton.performClick()
@@ -139,6 +216,21 @@ class AccountFormsTest {
         assertEquals(listOf("save:test2"), calls)
         assertEquals("This Pix ID is taken", binding.pixIdRule.text.toString())
         assertEquals("test2", binding.pixIdInput.text.toString())
+    }
+
+    @Test
+    fun pixIdSetup_check_asksAndShowsTheAnswer() {
+        val binding = FragmentPixIdSetupBinding.inflate(inflater)
+        activity.setContentView(binding.root)
+        val form = PixIdForm(binding, { calls += "check:$it" }, { calls += "save:$it" }, { calls += "edited" })
+        binding.pixIdInput.setText("test5")
+
+        binding.checkButton.performClick()
+        form.render(AccountUiState(pixIdCheck = PixIdCheck("test5", available = true)))
+
+        assertEquals(listOf("check:test5"), calls)
+        assertEquals("test5 is available", binding.pixIdRule.text.toString())
+        assertEquals(green, binding.pixIdRule.currentTextColor)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.core.network
 
 import kotlinx.serialization.Serializable
@@ -31,6 +31,13 @@ data class SignUpBody(val pixId: String, val password: String, val displayName: 
 
 @Serializable
 data class LogInBody(val pixId: String, val password: String)
+
+@Serializable
+data class PixIdCheckBody(val pixId: String)
+
+/** `POST /auth/check-pix-id`. */
+@Serializable
+data class PixIdCheckDto(val available: Boolean)
 
 @Serializable
 data class RefreshBody(val refreshToken: String)

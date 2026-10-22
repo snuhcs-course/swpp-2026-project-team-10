@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.FriendRequestBody
@@ -18,7 +18,7 @@ import retrofit2.HttpException
 
 /**
  * [FriendsRepository] on the Pix server (Design 2.5.3). Each answer also updates the lists, so a screen shows an
- * accepted friend or a declined request at once, before the next refresh. The lists empty whenever the signed-in user
+ * accepted friend, a declined request, or a sent or withdrawn one at once, before the next refresh. The lists empty whenever the signed-in user
  * changes, so one account never shows another's friends. Owner: Accounts (#54).
  */
 class RemoteFriendsRepository(private val api: PixAccountApi, auth: StateFlow<AuthState>, scope: CoroutineScope) :
@@ -30,11 +30,15 @@ class RemoteFriendsRepository(private val api: PixAccountApi, auth: StateFlow<Au
     private val _requests = MutableStateFlow<List<FriendRequest>>(emptyList())
     override val requests: StateFlow<List<FriendRequest>> = _requests.asStateFlow()
 
+    private val _sentRequests = MutableStateFlow<List<SentRequest>>(emptyList())
+    override val sentRequests: StateFlow<List<SentRequest>> = _sentRequests.asStateFlow()
+
     init {
         scope.launch {
             auth.map { (it as? AuthState.SignedIn)?.account?.userId }.distinctUntilChanged().collect {
                 _friends.value = emptyList()
                 _requests.value = emptyList()
+                _sentRequests.value = emptyList()
             }
         }
     }
@@ -44,7 +48,9 @@ class RemoteFriendsRepository(private val api: PixAccountApi, auth: StateFlow<Au
             val friends = async { api.friends() }
             val requests = async { api.friendRequests() }
             _friends.value = friends.await().friends.map { it.toFriend() }
-            _requests.value = requests.await().incoming.map { it.toFriendRequest() }
+            val pending = requests.await()
+            _requests.value = pending.incoming.map { it.toFriendRequest() }
+            _sentRequests.value = pending.outgoing.map { it.toSentRequest() }
         }
     }
 
@@ -65,22 +71,30 @@ class RemoteFriendsRepository(private val api: PixAccountApi, auth: StateFlow<Au
             add(friend)
             RequestOutcome.BecameFriends(friend)
         } else {
-            RequestOutcome.Sent(sent.id ?: throw AccountException(AccountError.UNKNOWN, "No request id"))
+            val requestId = sent.id ?: throw AccountException(AccountError.UNKNOWN, "No request id")
+            // Newest first, as the server lists them; without the user, the next refresh brings it.
+            sent.to?.let { to ->
+                val request = SentRequest(requestId, to.toPixUser(), sent.createdAt ?: 0)
+                _sentRequests.update { requests -> listOf(request) + requests.filterNot { it.id == requestId } }
+            }
+            RequestOutcome.Sent(requestId)
         }
     }
 
     override suspend fun accept(requestId: String): Result<Friend> = accountCall {
-        val friend = answer(requestId) { api.acceptFriendRequest(requestId).friend.toFriend() }
+        val friend = settle({ removeRequest(requestId) }) { api.acceptFriendRequest(requestId).friend.toFriend() }
         add(friend)
         friend
     }
 
     override suspend fun decline(requestId: String): Result<Unit> = accountCall {
-        answer(requestId) { api.declineFriendRequest(requestId) }
+        settle({ removeRequest(requestId) }) { api.declineFriendRequest(requestId) }
     }
 
     override suspend fun cancel(requestId: String): Result<Unit> = accountCall {
-        api.withdrawFriendRequest(requestId)
+        settle({ _sentRequests.update { requests -> requests.filterNot { it.id == requestId } } }) {
+            api.withdrawFriendRequest(requestId)
+        }
     }
 
     override suspend fun remove(userId: String): Result<Unit> = accountCall {
@@ -88,15 +102,18 @@ class RemoteFriendsRepository(private val api: PixAccountApi, auth: StateFlow<Au
         _friends.update { friends -> friends.filterNot { it.userId == userId } }
     }
 
-    /** Answers a received request. It leaves the list either way: a `404` means it was withdrawn or answered already. */
-    private suspend fun <T> answer(requestId: String, call: suspend () -> T): T {
+    /**
+     * Answers or withdraws a request, which then [leaves] its list. It leaves on a `404` too, which means the request
+     * was answered or withdrawn already.
+     */
+    private suspend fun <T> settle(leaves: () -> Unit, call: suspend () -> T): T {
         val result = try {
             call()
         } catch (error: HttpException) {
-            if (error.code() == NOT_FOUND) removeRequest(requestId)
+            if (error.code() == NOT_FOUND) leaves()
             throw error
         }
-        removeRequest(requestId)
+        leaves()
         return result
     }
 

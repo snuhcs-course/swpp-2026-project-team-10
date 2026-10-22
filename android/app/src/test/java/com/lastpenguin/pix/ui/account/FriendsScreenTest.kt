@@ -13,6 +13,7 @@ import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.Friend
 import com.lastpenguin.pix.account.FriendRequest
 import com.lastpenguin.pix.account.PixUser
+import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.databinding.FragmentFriendsBinding
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,11 +23,12 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 
 /*
- * Partitions for the Friends screen (R&S 6.4; FR-5.4, FR-5.7, FR-5.9, FR-5.10, FR-8.1), on the real layout. The
- * account: loading, signed out (Sign in and the room code instead of the list), signed in without a Pix ID (Choose a
- * Pix ID), with one. The lists: no friends (the empty card), friends online, offline, and in a session; received
- * requests, one being answered (its buttons wait). The last refresh failed. Taps: the room code, My Pix ID (copied),
- * Accept and Decline, a long press on a friend (Remove).
+ * Partitions for the Friends screen (R&S 6.4; FR-5.4, FR-5.7, FR-5.9, FR-5.10, FR-5.16, FR-8.1), on the real layout.
+ * The account: loading, signed out (Sign in and the room code instead of the list), signed in without a Pix ID (Choose
+ * a Pix ID), with one. The lists: no friends (the empty card), friends online, offline, and in a session; received
+ * requests, one being answered (its buttons wait); sent requests (none: no button; some: their count; signed out: no
+ * button). The last refresh failed. Taps: the room code, My Pix ID (copied), Accept and Decline, Sent requests, a long
+ * press on a friend (Remove).
  */
 @RunWith(AndroidJUnit4::class)
 class FriendsScreenTest {
@@ -50,6 +52,10 @@ class FriendsScreenTest {
 
             override fun addFriend() {
                 taps += "addFriend"
+            }
+
+            override fun openSentRequests() {
+                taps += "sentRequests"
             }
 
             override fun openAccount() {
@@ -181,6 +187,27 @@ class FriendsScreenTest {
         val waiting = binding.requestsList.getChildAt(0)
         assertFalse(waiting.findViewById<Button>(R.id.acceptButton).isEnabled)
         assertFalse(waiting.findViewById<Button>(R.id.declineButton).isEnabled)
+    }
+
+    @Test
+    fun sentRequests_showTheirCountAndOpenTheirScreen() {
+        val (binding, screen) = screen()
+        val sent = listOf(
+            SentRequest("fr_77", PixUser("u_4", "test4", "Test Account 4"), 900),
+            SentRequest("fr_76", PixUser("u_5", "test5", "Test Account 5"), 800),
+        )
+
+        screen.render(FriendsUiState(AuthState.SignedIn(account), sent = sent))
+
+        assertTrue(binding.sentRequestsButton.shown)
+        assertEquals("Sent requests · 2", binding.sentRequestsButton.text.toString())
+        binding.sentRequestsButton.performClick()
+        assertEquals(listOf("sentRequests"), taps)
+
+        screen.render(FriendsUiState(AuthState.SignedIn(account)))
+        assertFalse(binding.sentRequestsButton.shown)
+        screen.render(FriendsUiState(AuthState.SignedOut, sent = sent))
+        assertFalse(binding.sentRequestsButton.shown)
     }
 
     @Test

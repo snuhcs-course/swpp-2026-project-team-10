@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.content.ClipData
@@ -35,9 +35,9 @@ import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.launch
 
 /**
- * Friends, the screen *Shoot together* opens (R&S 6.4; FR-5.4–5.10, FR-8.1). Signed out it offers *Sign in to add
- * friends* and *Use a room code instead*, and an account made with Google first chooses its Pix ID; room codes never
- * need a sign-in (FR-5.1). Owner: Accounts (#54).
+ * Friends, the screen *Shoot together* opens (R&S 6.4; FR-5.4–5.10, FR-5.16, FR-8.1). Signed out it offers *Sign in to
+ * add friends* and *Use a room code instead*, and an account made with Google first chooses its Pix ID; room codes
+ * never need a sign-in (FR-5.1). Requests the user sent open on Sent requests. Owner: Accounts (#54).
  */
 class FriendsFragment : Fragment(R.layout.fragment_friends) {
 
@@ -54,6 +54,8 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
                 override fun choosePixId() = navigate(R.id.action_friends_to_pixIdSetup)
 
                 override fun addFriend() = navigate(R.id.action_friends_to_addFriend)
+
+                override fun openSentRequests() = navigate(R.id.action_friends_to_sentRequests)
 
                 override fun openAccount() = navigate(R.id.action_friends_to_account)
 
@@ -126,6 +128,7 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
         fun signIn()
         fun choosePixId()
         fun addFriend()
+        fun openSentRequests()
         fun openAccount()
         fun useRoomCode()
         fun copyPixId(pixId: String)
@@ -143,6 +146,7 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
         binding.signInButton.setOnClickListener { actions.signIn() }
         binding.choosePixIdButton.setOnClickListener { actions.choosePixId() }
         binding.addFriendButton.setOnClickListener { actions.addFriend() }
+        binding.sentRequestsButton.setOnClickListener { actions.openSentRequests() }
         binding.accountButton.setOnClickListener { actions.openAccount() }
         binding.roomCodeButton.setOnClickListener { actions.useRoomCode() }
         binding.roomCodeInsteadButton.setOnClickListener { actions.useRoomCode() }
@@ -184,6 +188,9 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
 
         val requests = if (pixId != null) state.requests else emptyList()
         val friends = if (pixId != null) state.friends else emptyList()
+        val sent = if (pixId != null) state.sent else emptyList()
+        binding.sentRequestsButton.isVisible = sent.isNotEmpty()
+        binding.sentRequestsButton.text = context.getString(R.string.sent_requests_count, sent.size)
         renderRequests(requests, state.answering)
         renderFriends(friends)
         binding.emptyCard.isVisible = pixId != null && friends.isEmpty()

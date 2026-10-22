@@ -16,11 +16,14 @@ import com.lastpenguin.pix.core.network.LookupDto
 import com.lastpenguin.pix.core.network.PasswordBody
 import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixAuthApi
+import com.lastpenguin.pix.core.network.PixIdCheckBody
+import com.lastpenguin.pix.core.network.PixIdCheckDto
 import com.lastpenguin.pix.core.network.RefreshBody
 import com.lastpenguin.pix.core.network.SentRequestDto
 import com.lastpenguin.pix.core.network.SignUpBody
 import com.lastpenguin.pix.core.network.TokensDto
 import com.lastpenguin.pix.core.network.UpdateMeBody
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -73,6 +76,7 @@ class FakeAuthApi : PixAuthApi {
     val calls = mutableListOf<Any>()
     var signUp: suspend (SignUpBody) -> AuthDto = { authDto(accountDto(pixId = it.pixId)) }
     var logIn: suspend (LogInBody) -> AuthDto = { authDto(accountDto(pixId = it.pixId)) }
+    var checkPixId: suspend (PixIdCheckBody) -> PixIdCheckDto = { PixIdCheckDto(available = it.pixId != "test1") }
     var refresh: suspend (
         RefreshBody,
     ) -> TokensDto = { TokensDto("access-${calls.size + 1}", "refresh-${calls.size + 1}", 900) }
@@ -81,6 +85,8 @@ class FakeAuthApi : PixAuthApi {
         { authDto(accountDto(pixId = null, hasPassword = false, hasGoogle = true)) }
 
     override suspend fun signUp(body: SignUpBody): AuthDto = signUp.invoke(body.also { calls += it })
+
+    override suspend fun checkPixId(body: PixIdCheckBody): PixIdCheckDto = checkPixId.invoke(body.also { calls += it })
 
     override suspend fun logIn(body: LogInBody): AuthDto = logIn.invoke(body.also { calls += it })
 
@@ -172,6 +178,10 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
     var googleResult: GoogleSignIn? = null
     var token: String? = "access-1"
 
+    /** Pix IDs that *Check* finds taken; [checkGate], when set, holds every check until it completes. */
+    val takenPixIds = mutableSetOf("test1")
+    var checkGate: CompletableDeferred<Unit>? = null
+
     fun signInAs(account: Account) {
         this.account = account
         _state.value = AuthState.SignedIn(account)
@@ -191,6 +201,13 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
 
     override suspend fun signUp(pixId: String, password: String, displayName: String) =
         answer("signUp:$pixId") { it.copy(pixId = pixId, displayName = displayName) }
+
+    override suspend fun isPixIdAvailable(pixId: String): Result<Boolean> {
+        calls += "check:$pixId"
+        checkGate?.await()
+        (failures["check"] ?: failure)?.let { return Result.failure(it) }
+        return Result.success(pixId !in takenPixIds)
+    }
 
     override suspend fun logIn(pixId: String, password: String) = answer("logIn:$pixId")
 
@@ -241,6 +258,9 @@ class FakeFriendsRepository : FriendsRepository {
 
     val requestsFlow = MutableStateFlow<List<FriendRequest>>(emptyList())
     override val requests: StateFlow<List<FriendRequest>> = requestsFlow.asStateFlow()
+
+    val sentFlow = MutableStateFlow<List<SentRequest>>(emptyList())
+    override val sentRequests: StateFlow<List<SentRequest>> = sentFlow.asStateFlow()
 
     val calls = mutableListOf<String>()
     var failure: AccountException? = null

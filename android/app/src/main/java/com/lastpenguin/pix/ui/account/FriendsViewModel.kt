@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import androidx.lifecycle.ViewModel
@@ -12,6 +12,7 @@ import com.lastpenguin.pix.account.FriendRequest
 import com.lastpenguin.pix.account.FriendsRepository
 import com.lastpenguin.pix.account.Relation
 import com.lastpenguin.pix.account.RequestOutcome
+import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.account.UserLookup
 import com.lastpenguin.pix.account.normalizePixId
 import kotlinx.coroutines.delay
@@ -35,9 +36,11 @@ data class FriendsUiState(
     val friends: List<Friend> = emptyList(),
     /** Received and pending (FR-5.7). */
     val requests: List<FriendRequest> = emptyList(),
+    /** Sent and not answered yet (FR-5.16). */
+    val sent: List<SentRequest> = emptyList(),
     /** The last refresh failed, so the lists may be out of date. */
     val offline: Boolean = false,
-    /** Requests being answered; their buttons wait. */
+    /** Requests being answered or withdrawn; their buttons wait. */
     val answering: Set<String> = emptySet(),
 )
 
@@ -63,9 +66,9 @@ sealed interface FriendsEvent {
 }
 
 /**
- * Friends and Add a friend (R&S 6.4; FR-5.4–5.10, US-7, US-8), shared by both (activity scope). Without push, which
- * comes with invitations (Iter2-P15), the Friends screen keeps the lists fresh with [keepRefreshing] while it is shown.
- * Owner: Accounts (#54).
+ * Friends, Add a friend, and Sent requests (R&S 6.4; FR-5.4–5.10, FR-5.16, US-7, US-8), shared by all three (activity
+ * scope). Without push, which comes with invitations (Iter2-P15), Friends and Sent requests keep the lists fresh with
+ * [keepRefreshing] while they are shown. Owner: Accounts (#54).
  */
 class FriendsViewModel(private val auth: AuthRepository, private val repository: FriendsRepository) : ViewModel() {
 
@@ -75,11 +78,11 @@ class FriendsViewModel(private val auth: AuthRepository, private val repository:
     val uiState: StateFlow<FriendsUiState> = combine(
         auth.state,
         repository.friends,
-        repository.requests,
+        combine(repository.requests, repository.sentRequests, ::Pair),
         offline,
         answering,
-    ) { auth, friends, requests, offline, answering ->
-        FriendsUiState(auth, friends, requests, offline, answering)
+    ) { auth, friends, (requests, sent), offline, answering ->
+        FriendsUiState(auth, friends, requests, sent, offline, answering)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, FriendsUiState(auth.state.value))
 
     private val _search = MutableStateFlow(SearchUiState())
@@ -94,7 +97,7 @@ class FriendsViewModel(private val auth: AuthRepository, private val repository:
 
     /**
      * Refreshes the lists every [REFRESH_INTERVAL_MS] while the user is signed in with a Pix ID, the only users who
-     * have friends. Runs until cancelled; the Friends screen runs it while started.
+     * have friends. Runs until cancelled; Friends and Sent requests run it while started.
      */
     suspend fun keepRefreshing() {
         auth.state
@@ -113,6 +116,9 @@ class FriendsViewModel(private val auth: AuthRepository, private val repository:
     fun accept(request: FriendRequest) = answer(request.id) { repository.accept(request.id) }
 
     fun decline(request: FriendRequest) = answer(request.id) { repository.decline(request.id) }
+
+    /** *Withdraw* on Sent requests (FR-5.16); the request leaves the list. */
+    fun withdraw(request: SentRequest) = answer(request.id) { repository.cancel(request.id) }
 
     fun remove(friend: Friend) {
         viewModelScope.launch { repository.remove(friend.userId).exceptionOrNull()?.let { fail(it) } }

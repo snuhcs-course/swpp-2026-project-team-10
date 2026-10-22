@@ -122,7 +122,7 @@
             app:popUpToInclusive="true" />
     </fragment>
 
-    <!-- Flow 3: Friends, Add a friend; Sign in, Sign up, Pix ID setup, Account (R&S 6.4, 6.8) -->
+    <!-- Flow 3: Friends, Add a friend, Sent requests; Sign in, Sign up, Pix ID setup, Account (R&S 6.4, 6.8) -->
     <fragment
         android:id="@+id/friendsFragment"
         android:name="com.lastpenguin.pix.ui.account.FriendsFragment"
@@ -137,6 +137,9 @@
             android:id="@+id/action_friends_to_addFriend"
             app:destination="@id/addFriendFragment" />
         <action
+            android:id="@+id/action_friends_to_sentRequests"
+            app:destination="@id/sentRequestsFragment" />
+        <action
             android:id="@+id/action_friends_to_account"
             app:destination="@id/accountSheet" />
         <action
@@ -148,6 +151,11 @@
         android:id="@+id/addFriendFragment"
         android:name="com.lastpenguin.pix.ui.account.AddFriendFragment"
         android:label="Add a friend" />
+
+    <fragment
+        android:id="@+id/sentRequestsFragment"
+        android:name="com.lastpenguin.pix.ui.account.SentRequestsFragment"
+        android:label="Sent requests" />
 
     <!-- A signed-in screen returns to Friends by popping back to it. -->
     <fragment

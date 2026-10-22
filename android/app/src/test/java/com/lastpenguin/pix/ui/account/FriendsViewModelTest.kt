@@ -13,6 +13,7 @@ import com.lastpenguin.pix.account.FriendsRepository
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.Relation
 import com.lastpenguin.pix.account.RequestOutcome
+import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.account.UserLookup
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -35,12 +36,13 @@ import org.junit.Before
 import org.junit.Test
 
 /*
- * Partitions for Friends and Add a friend (FR-5.4–5.10, US-7, US-8). Refreshing: signed out, signed in without a Pix
+ * Partitions for Friends, Add a friend, and Sent requests (FR-5.4–5.10, FR-5.16, US-7, US-8). Refreshing: signed out, signed in without a Pix
  * ID (never), with one (at once, then every 10 s), a failed refresh (offline shown) and a later good one, signing out
  * (stops). Search: found, not found, failed, blank input, capitals and spaces. On the result: Add (Requested with its
  * id, or Friends when they had asked), Accept for INCOMING, Withdraw for REQUESTED, a button that does not match the
  * relation (ignored), a failure (the result stays, an event). Requests: accept and decline (disabled while answered),
- * a failure (event). Remove. The server ending the sign-in (event).
+ * a failure (event). Sent requests: in the state; Withdraw (disabled while it runs, a second tap ignored), a failure
+ * (event). Remove. The server ending the sign-in (event).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class FriendsViewModelTest {
@@ -53,6 +55,7 @@ class FriendsViewModelTest {
 
     private val testAccount3 = PixUser("u_3", "test3", "Test Account 3")
     private val request = FriendRequest("fr_80", testAccount3, 1_000)
+    private val sent = SentRequest("fr_77", PixUser("u_4", "test4", "Test Account 4"), 900)
 
     @Before
     fun setup() {
@@ -129,10 +132,12 @@ class FriendsViewModelTest {
     fun uiState_followsTheAccountAndTheLists() = runTest {
         auth.signInAs(auth.account)
         repository.requestsFlow.value = listOf(request)
+        repository.sentFlow.value = listOf(sent)
         runCurrent()
 
         assertEquals(AuthState.SignedIn(auth.account), model.uiState.value.auth)
         assertEquals(listOf(request), model.uiState.value.requests)
+        assertEquals(listOf(sent), model.uiState.value.sent)
     }
 
     @Test
@@ -271,6 +276,39 @@ class FriendsViewModelTest {
 
         assertEquals(emptySet<String>(), model.uiState.value.answering)
         assertEquals(listOf("accept:fr_80"), repository.calls)
+    }
+
+    @Test
+    fun withdrawingASentRequest_disablesItUntilDone() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val slow = object : FriendsRepository by repository {
+            override suspend fun cancel(requestId: String): Result<Unit> {
+                gate.await()
+                return repository.cancel(requestId)
+            }
+        }
+        val model = FriendsViewModel(auth, slow).also { store.put("slow", it) }
+
+        model.withdraw(sent)
+        runCurrent()
+        assertEquals(setOf("fr_77"), model.uiState.value.answering)
+        model.withdraw(sent)
+        gate.complete(Unit)
+        runCurrent()
+
+        assertEquals(emptySet<String>(), model.uiState.value.answering)
+        assertEquals(listOf("cancel:fr_77"), repository.calls)
+    }
+
+    @Test
+    fun withdraw_failed_tellsWhy() = runTest {
+        collectEvents()
+        repository.failure = AccountException(AccountError.NOT_FOUND)
+
+        model.withdraw(sent)
+        runCurrent()
+
+        assertEquals(listOf<FriendsEvent>(FriendsEvent.Failed(AccountError.NOT_FOUND)), events)
     }
 
     @Test

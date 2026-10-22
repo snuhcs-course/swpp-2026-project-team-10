@@ -1,9 +1,11 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 """Sign-up, sign-in, the caller's account, and device tokens through the REST API (Design 2.5.3, R&S F5).
 
 Partitions:
 - sign-up with a password: valid (a JWT for the user; only a hash of the password stored); Pix ID invalid (each rule)
   or taken; password invalid (each rule); display name missing, blank, 30 and 31 characters; malformed body
+- checking a Pix ID before sign-up: free; taken by a password account, or by a Google account that chose it; free
+  again after that account changed it; breaking a rule (each rule, as sign-up names it); with no token or a bad one
 - log-in: right password; capitals and spaces around the Pix ID; wrong password; unknown Pix ID; an account that
   has no password
 - Google: unknown account (NOT_REGISTERED); sign-up with a name, without one, with a long one; sign-up twice;
@@ -190,6 +192,45 @@ def test_sign_up_accepts_a_display_name_of_thirty_characters(client, sign_up):
 def test_malformed_sign_up_body_is_invalid(client):
     response = client.post("/api/v1/auth/signup", content=b"{", headers={"Content-Type": "application/json"})
     assert_error(response, 400, "INVALID_REQUEST")
+
+
+# --- checking a Pix ID before sign-up --------------------------------------------------------------------------------
+
+
+def check_pix_id(client, pix_id, headers=None):
+    return client.post("/api/v1/auth/check-pix-id", headers=headers or {}, json={"pixId": pix_id})
+
+
+def test_pix_id_check_answers_whether_sign_up_could_take_it(client, sign_up):
+    sign_up("test1")
+    assert check_pix_id(client, "test5").json() == {"available": True}
+    assert check_pix_id(client, "test1").json() == {"available": False}
+    # The answer is the sign-up's own.
+    response = client.post("/api/v1/auth/signup", json={"pixId": "test5", "password": PASSWORD, "displayName": "T"})
+    assert response.status_code == 201
+    assert check_pix_id(client, "test5").json() == {"available": False}
+
+
+def test_pix_id_check_follows_the_pix_id_a_google_account_chooses_or_changes(client):
+    headers, _ = google_sign_up(client)
+    client.put("/api/v1/me", headers=headers, json={"pixId": "test2"})
+    assert check_pix_id(client, "test2").json() == {"available": False}
+    client.put("/api/v1/me", headers=headers, json={"pixId": "test3"})
+    assert check_pix_id(client, "test2").json() == {"available": True}
+    assert check_pix_id(client, "test3").json() == {"available": False}
+
+
+@pytest.mark.parametrize(
+    "pix_id, rule",
+    [("abc", "at least 4"), ("a" * 21, "at most 20"), ("Test1", "lowercase"), ("test 1", "lowercase")],
+)
+def test_pix_id_check_of_an_invalid_pix_id_names_the_rule_as_sign_up_does(client, pix_id, rule):
+    assert rule in assert_error(check_pix_id(client, pix_id), 400, "PIX_ID_INVALID")
+
+
+@pytest.mark.parametrize("headers", [{}, bearer("not-a-jwt")])
+def test_pix_id_check_needs_no_sign_in(client, headers):
+    assert check_pix_id(client, "test5", headers).json() == {"available": True}
 
 
 # --- log-in ----------------------------------------------------------------------------------------------------------

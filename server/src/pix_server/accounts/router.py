@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
 """Sign-up, sign-in, the caller's own account, and device tokens (Design Documentation 2.5.3, R&S F5).
 
 A user signs up with a Pix ID and a password, or with Google; either kind of account can add the other way to sign
@@ -37,6 +37,14 @@ class SignUpRequest(BaseModel):
 class LogInRequest(BaseModel):
     pixId: str
     password: str
+
+
+class PixIdCheckRequest(BaseModel):
+    pixId: str
+
+
+class PixIdCheck(BaseModel):
+    available: bool
 
 
 class GoogleRequest(BaseModel):
@@ -156,6 +164,18 @@ async def sign_up(body: SignUpRequest, request: Request, db: Database) -> AuthOu
     return await signed_in(request, db, user)
 
 
+@router.post("/auth/check-pix-id")
+async def check_pix_id_available(body: PixIdCheckRequest, db: Database) -> PixIdCheck:
+    """Whether a sign-up, or a Google account's Pix ID setup, could take this Pix ID now: *Check* on those screens
+    (FR-5.15). It needs no sign-in, as sign-up does. Whether a Pix ID exists is not secret: the lookup tells any
+    signed-in user, by exact match only (NFR-15; Design 2.8, Accounts). The answer can change before the form is sent,
+    so sign-up and `PUT /me` still refuse a taken one. The Pix ID travels in the body, as in `POST /users/lookup`, so no
+    log prints it."""
+    check_pix_id(body.pixId)
+    taken = await db.scalar(select(User.id).where(User.pix_id == body.pixId))
+    return PixIdCheck(available=taken is None)
+
+
 @router.post("/auth/login")
 async def log_in(body: LogInRequest, request: Request, db: Database) -> AuthOut:
     user = await db.scalar(select(User).where(User.pix_id == normalize_pix_id(body.pixId)))
@@ -164,7 +184,8 @@ async def log_in(body: LogInRequest, request: Request, db: Database) -> AuthOut:
     # hold the pool's connections, or SQLite's write lock, while it waits.
     await db.commit()
     passwords: Passwords = request.app.state.passwords
-    # One answer for an unknown Pix ID and a wrong password, so the answer does not tell which Pix IDs exist.
+    # One answer for an unknown Pix ID and a wrong password. Whether a Pix ID exists is not secret (the lookup and
+    # `check-pix-id` tell it), but a failed log-in does not say which of the two was wrong.
     if not await passwords.verify(stored, body.password):
         raise ApiError(401, "INVALID_CREDENTIALS", "The Pix ID or the password is wrong")
     return await signed_in(request, db, user)

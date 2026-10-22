@@ -1,13 +1,23 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.camera
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.net.Uri
+import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import android.util.Rational
 import android.util.Size
+import android.view.Choreographer
 import android.view.Surface
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState as CameraXState
@@ -87,9 +97,25 @@ class CameraXController(
     // request separately, so that the reset is still published without replacing the user's framing.
     private var retainedZoom = 1f
     private var pendingZoom: Float? = null
+
+    // Whether pendingZoom is the last value of a pinch; until it is, the bound lens is held (CameraZoomPlan.lensFor).
+    private var pendingFinal = true
+
+    // Touch events come faster than the display, and each setZoomRatio replaces the camera's repeating request:
+    // the newest pending value is applied once per display frame.
+    private var drainScheduled = false
+    private val drainOnFrame = Choreographer.FrameCallback {
+        drainScheduled = false
+        binding?.let(::drainZoom)
+    }
     private var zoomPlan: CameraZoomPlan? = null
     private var primarySelector = CameraSelector.DEFAULT_BACK_CAMERA
     private var ultrawideSelector: CameraSelector? = null
+
+    // Until when every camera frame is logged as `zoom.frame` (NFR-19): shortly after each zoom request, lens switch,
+    // or shutter press, so `android/scripts/zoom_timings.py` sees those frames without logging the whole session.
+    @Volatile
+    private var traceUntil = 0L
 
     override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
         mainExecutor.execute {
@@ -108,7 +134,8 @@ class CameraXController(
         }
     }
 
-    private fun startBinding(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
+    /** [lens] is where a lens switch is heading; without it, the lens follows the zoom to restore. */
+    private fun startBinding(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider, lens: ZoomLens? = null) {
         val current = Binding(owner, surfaceProvider)
         binding = current
         current.lifecycleObserver = LifecycleEventObserver { _, event ->
@@ -123,6 +150,7 @@ class CameraXController(
                     current.exposureRestored = false
                     current.restoringExposure = false
                     pendingZoom = null
+                    pendingFinal = true
                     current.frames.clear()
                     refreshStatus(current)
                 }
@@ -152,7 +180,8 @@ class CameraXController(
                     if (controls == null) discoverControls(cameraProvider)
                     if (zoomPlan == null) discoverZoomPlan(cameraProvider)
                     val plan = checkNotNull(zoomPlan)
-                    current.lens = plan.lensFor(plan.clamp(pendingZoom ?: retainedZoom)!!)
+                    current.lens = lens?.takeIf { it == ZoomLens.PRIMARY || plan.ultrawide != null }
+                        ?: plan.lensFor(plan.clamp(pendingZoom ?: retainedZoom)!!)
                     current.range = plan.rangeFor(current.lens)
                     bindUseCases(cameraProvider, current, current.surfaceProvider)
                 } catch (error: Exception) {
@@ -206,6 +235,7 @@ class CameraXController(
         val preview = Preview.Builder()
             .setTargetRotation(rotation)
             .setResolutionSelector(ResolutionSelector.Builder().setAspectRatioStrategy(aspect).build())
+            .traceFrames(current.lens)
             .build()
         val capture = ImageCapture.Builder()
             .setTargetRotation(rotation)
@@ -292,14 +322,20 @@ class CameraXController(
         camera.cameraInfo.cameraState.observe(current.owner, current.stateObserver!!)
     }
 
-    override fun setZoom(ratio: Float) {
+    override fun setZoom(ratio: Float, final: Boolean) {
         mainExecutor.execute {
             val current = binding ?: return@execute
             val requested = zoomPlan?.clamp(ratio) ?: return@execute
             if (!current.active || current.failed) return@execute
+            extendTrace()
+            Timings.mark("zoom.request", "$requested${if (final) " final" else ""}")
             // Keep the latest gesture delta while a lens opens or a photo finishes saving.
             pendingZoom = requested
-            drainZoom(current)
+            pendingFinal = final
+            if (!drainScheduled) {
+                drainScheduled = true
+                Choreographer.getInstance().postFrameCallback(drainOnFrame)
+            }
         }
     }
 
@@ -307,19 +343,22 @@ class CameraXController(
         if (binding !== current || _status.value != CameraStatus.READY || current.capturesInFlight > 0) return
         val requested = pendingZoom ?: return
         val plan = zoomPlan ?: return
-        if (plan.lensFor(requested) != current.lens) {
-            switchLens(current)
+        val lens = plan.lensFor(requested, current.lens, pendingFinal)
+        if (lens != current.lens) {
+            switchLens(current, lens)
         } else {
             pendingZoom = null
             applyZoom(current, requested)
         }
     }
 
-    private fun switchLens(current: Binding) {
+    private fun switchLens(current: Binding, lens: ZoomLens? = null) {
         if (binding !== current) return
+        extendTrace()
+        Timings.mark("zoom.lens", "from=${current.lens}")
         // Invalidate old callbacks, but retain the combined range and the latest pinch target.
         releaseBinding(preserveZoomPlan = true)
-        startBinding(current.owner, current.surfaceProvider)
+        startBinding(current.owner, current.surfaceProvider, lens)
     }
 
     private fun restoreZoomIfNeeded(current: Binding) {
@@ -329,10 +368,13 @@ class CameraXController(
         val plan = zoomPlan ?: return
         val requested = plan.clamp(pendingZoom ?: retainedZoom)!!
         current.restoreZoomOnOpen = false
-        if (plan.lensFor(requested) != current.lens) {
+        // A pinch still in progress keeps the lens it switched to; a settled zoom gets its own lens.
+        val settled = pendingZoom == null || pendingFinal
+        if (plan.lensFor(requested, current.lens, settled) != current.lens) {
             // A reversal or lifecycle stop can leave the new binding on the wrong lens. Queue
             // the correct one without overwriting retained framing with a temporary clamped ratio.
             pendingZoom = requested
+            pendingFinal = settled
             return
         }
         pendingZoom = null
@@ -350,8 +392,10 @@ class CameraXController(
         val range = current.range ?: return
         val requestId = ++current.zoomRequestId
         val restoring = current.restoringZoom
+        val native = range.nativeZoom(requested)
+        Timings.mark("zoom.apply", "$requested native=$native lens=${current.lens}")
         val future = try {
-            camera.cameraControl.setZoomRatio(range.nativeZoom(requested))
+            camera.cameraControl.setZoomRatio(native)
         } catch (error: Exception) {
             current.restoringZoom = false
             if (restoring) current.failed = true
@@ -364,8 +408,9 @@ class CameraXController(
             if (binding !== current || current.zoomRequestId != requestId) return@addListener
             try {
                 future.get()
-                // Ratios remain relative to the primary camera across lens changes and lifecycle resets.
-                retainedZoom = requested
+                // Ratios remain relative to the primary camera across lens changes and lifecycle resets. Keep what
+                // the lens shows: a held lens can show less than the pinch asked for (CameraZoomPlan.lensFor).
+                retainedZoom = range.appZoom(native)
                 if (restoring) current.frames.clear()
             } catch (_: CancellationException) {
                 // A newer gesture or unbind supersedes the previous request.
@@ -399,6 +444,7 @@ class CameraXController(
                 applyAspectRatio(current)
             }
             try {
+                extendTrace()
                 Timings.mark("camera.capture.start")
                 capture.takePicture(
                     photoSaver.outputOptions(),
@@ -636,14 +682,49 @@ class CameraXController(
 
     private fun refreshStatus(current: Binding) {
         if (binding !== current) return
-        _status.value = when {
-            !current.owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) -> CameraStatus.IDLE
-            current.failed -> CameraStatus.UNAVAILABLE
-            current.restoringZoom || current.restoreZoomOnOpen || current.restoringExposure -> CameraStatus.STARTING
-            current.open && current.frames.hasFrame() -> CameraStatus.READY
-            else -> CameraStatus.STARTING
-        }
+        publishStatus(
+            when {
+                !current.owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) -> CameraStatus.IDLE
+                current.failed -> CameraStatus.UNAVAILABLE
+                current.restoringZoom || current.restoreZoomOnOpen || current.restoringExposure -> CameraStatus.STARTING
+                current.open && current.frames.hasFrame() -> CameraStatus.READY
+                else -> CameraStatus.STARTING
+            },
+        )
         drainZoom(current)
+    }
+
+    private fun publishStatus(next: CameraStatus) {
+        if (_status.value != next) Timings.mark("camera.status", next.name)
+        _status.value = next
+    }
+
+    private fun extendTrace() {
+        traceUntil = SystemClock.elapsedRealtime() + TRACE_MS
+    }
+
+    /** Logs each completed frame's sensor time and applied zoom while [traceUntil] lasts (NFR-19). */
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun Preview.Builder.traceFrames(lens: ZoomLens): Preview.Builder = apply {
+        Camera2Interop.Extender(this).setSessionCaptureCallback(
+            object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureCompleted(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    result: TotalCaptureResult,
+                ) {
+                    if (SystemClock.elapsedRealtime() > traceUntil) return
+                    val sensor = result.get(CaptureResult.SENSOR_TIMESTAMP) ?: return
+                    val zoom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        result.get(CaptureResult.CONTROL_ZOOM_RATIO)
+                    } else {
+                        null
+                    }
+                    val crop = result.get(CaptureResult.SCALER_CROP_REGION)?.width()
+                    Timings.mark("zoom.frame", "us=${sensor / 1_000} z=$zoom crop=$crop lens=$lens")
+                }
+            },
+        )
     }
 
     private fun failBinding(current: Binding, error: Exception) {
@@ -651,7 +732,7 @@ class CameraXController(
         Log.e(TAG, "Could not bind rear camera", error)
         if (recoverPrimary(current)) return
         releaseBinding()
-        _status.value = CameraStatus.UNAVAILABLE
+        publishStatus(CameraStatus.UNAVAILABLE)
     }
 
     private fun recoverPrimary(current: Binding): Boolean {
@@ -671,12 +752,13 @@ class CameraXController(
         val current = binding ?: return
         binding = null
         current.active = false
-        _status.value = if (preserveZoomPlan) CameraStatus.STARTING else CameraStatus.IDLE
+        publishStatus(if (preserveZoomPlan) CameraStatus.STARTING else CameraStatus.IDLE)
         if (!preserveZoomPlan) {
             _capabilities.value = null
             zoomPlan = null
             ultrawideSelector = null
             pendingZoom = null
+            pendingFinal = true
         }
         current.lifecycleObserver?.let { current.owner.lifecycle.removeObserver(it) }
         current.zoomObserver?.let { current.camera?.cameraInfo?.zoomState?.removeObserver(it) }
@@ -739,6 +821,9 @@ class CameraXController(
 
     private companion object {
         const val TAG = "PixCamera"
+
+        // How long frames are logged after the last zoom request, lens switch, or shutter press.
+        const val TRACE_MS = 1_500L
 
         /**
          * The analysis buffer, which the viewport then crops: 960×720 for 4:3 and 720×720 for 1:1, and 1280×960

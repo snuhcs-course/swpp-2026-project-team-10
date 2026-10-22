@@ -186,12 +186,13 @@ class CameraViewModel(
         }
     }
 
-    fun onZoomChanged(ratio: Float) {
+    /** [final] is false for the steps of a pinch, so the camera holds its lens until the pinch ends (NFR-19). */
+    fun onZoomChanged(ratio: Float, final: Boolean = true) {
         val status = camera.status.value
         if ((status == CameraStatus.READY || status == CameraStatus.STARTING) &&
             camera.capabilities.value != null && ratio.isFinite()
         ) {
-            camera.setZoom(ratio)
+            camera.setZoom(ratio, final)
         }
     }
 

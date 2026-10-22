@@ -642,7 +642,7 @@ class GenerationViewModelTest {
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
 
-        override fun setZoom(ratio: Float) = Unit
+        override fun setZoom(ratio: Float, final: Boolean) = Unit
 
         override fun setFocusPoint(x: Float, y: Float) = Unit
 

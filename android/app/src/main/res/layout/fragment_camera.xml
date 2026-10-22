@@ -142,7 +142,7 @@
             android:layout_height="match_parent"
             android:background="@color/pix_ground" />
 
-        <!-- The last frame of the old ratio, held while the camera rebinds for a new one (Design 2.6.2). -->
+        <!-- The last frame, held while the camera rebinds for a new ratio or lens (PreviewHold, Design 2.6.2, 2.6.5). -->
         <ImageView
             android:id="@+id/aspectStill"
             android:layout_width="match_parent"

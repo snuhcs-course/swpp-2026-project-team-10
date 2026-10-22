@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
@@ -139,9 +139,11 @@ class RemoteControlHandler(
         timeoutJob?.cancel()
         timeoutJob = null
         if (request.final && abs(camera.zoom.value - ratio) < ZOOM_MATCH) {
-            // The pinch's last step already landed, so the camera will not emit again: confirm it now.
+            // The pinch's last step already landed, so the camera will not emit again: confirm it now. The camera
+            // still learns that the pinch ended, so a lens it held can settle (Design 2.6.5).
             pending = null
             finalJob?.cancel()
+            camera.setZoom(ratio, final = true)
             confirm(RemoteAction.Zoom(ratio), "zoom.applied", "$ratio")
             send(ratio, Role.SUBJECT, final = true)
             return
@@ -151,7 +153,8 @@ class RemoteControlHandler(
         // A final echo still due for the previous step would send a stale zoom after the subject's pinch ended.
         // The newer request brings its own echoes: when applied, or from the timeout answer.
         finalJob?.cancel()
-        camera.setZoom(ratio)
+        // The subject's pinch holds the lens like a local one until its last value (Design 2.6.5).
+        camera.setZoom(ratio, request.final)
         if (!request.final) return
         timeoutJob = scope?.launch {
             answerIfStalled(

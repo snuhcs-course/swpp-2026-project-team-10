@@ -243,7 +243,7 @@ class CameraGuideGestureTest {
         val zoomRequests = mutableListOf<Float>()
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
-        override fun setZoom(ratio: Float) {
+        override fun setZoom(ratio: Float, final: Boolean) {
             zoomRequests += ratio
         }
 

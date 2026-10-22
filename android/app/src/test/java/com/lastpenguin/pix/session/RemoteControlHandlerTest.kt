@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
@@ -139,6 +139,8 @@ class RemoteControlHandlerTest {
         handler.handle(SessionMessage.ZoomSet(1.8f))
         runCurrent()
         assertEquals(listOf(1.5f, 1.8f), camera.requests)
+        // The steps are not final, so the camera holds its lens through the subject's pinch (Design 2.6.5).
+        assertEquals(listOf(false, false), camera.requestFinals)
         assertEquals(SessionMessage.CameraStateUpdate(1.8f, Role.SUBJECT, final = false), echoes().last())
         assertTrue(actions.isEmpty())
 
@@ -147,11 +149,13 @@ class RemoteControlHandlerTest {
         assertTrue(actions.isEmpty())
         assertEquals(SessionMessage.CameraStateUpdate(1.8f, Role.SUBJECT, final = true), lastFinal())
 
-        // The pinch ends on the value the camera already shows: no new request, one notice, one final echo.
+        // The pinch ends on the value the camera already shows: the camera only learns that the pinch ended, and
+        // there is one notice and one final echo.
         session.sent.clear()
         handler.handle(SessionMessage.ZoomSet(1.8f, final = true))
         runCurrent()
-        assertEquals(listOf(1.5f, 1.8f), camera.requests)
+        assertEquals(listOf(1.5f, 1.8f, 1.8f), camera.requests)
+        assertEquals(listOf(false, false, true), camera.requestFinals)
         assertEquals(listOf<RemoteAction>(RemoteAction.Zoom(1.8f)), actions)
         assertEquals(listOf(SessionMessage.CameraStateUpdate(1.8f, Role.SUBJECT, final = true)), echoes())
         handler.stop()

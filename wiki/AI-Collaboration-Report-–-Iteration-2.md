@@ -16,7 +16,7 @@
 
 ## 2. Prompt History
 
-Full input prompt logs, one page per task, with the prompts as they were sent and none of the agents' responses: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server and deployment|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[User CRUD and Friends|Iteration-2-–-Prompt-Log-–-User-CRUD-and-Friends]] [[Pose Generation|Iteration-2-–-Prompt-Log-–-Pose-Generation]] · [[Android camera and guide|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · Accounts, friends, and invitations (TBD) · [[Real-time and remote control|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Code reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]]
+Full input prompt logs, one page per task, with the prompts as they were sent and none of the agents' responses: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server and deployment|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[User CRUD and Friends|Iteration-2-–-Prompt-Log-–-User-CRUD-and-Friends]] · [[Pose Generation|Iteration-2-–-Prompt-Log-–-Pose-Generation]] · [[Android camera and guide|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · [[Real-time and remote control|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Code reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]]
 
 ## 3. What AI Did Well
 

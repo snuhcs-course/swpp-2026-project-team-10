@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.DialogInterface
@@ -20,8 +20,8 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Room code, photographer (R&S 6.7), opened from Friends. When the subject joins, the sheet and Friends close and the
- * Camera screen shows the live badge. Closing the sheet any other way while waiting cancels the code (FR-8.4).
+ * Room code, photographer (R&S 6.7). When the subject joins, the sheet closes and the Camera
+ * screen shows the live badge. Closing the sheet any other way while waiting cancels the code (FR-8.4).
  * Owner: Real-time (#8).
  */
 class RoomCodeSheet : BottomSheetDialogFragment() {
@@ -72,10 +72,9 @@ class RoomCodeSheet : BottomSheetDialogFragment() {
 
             is SessionState.Connecting -> binding.statusText.setText(R.string.friend_joined_connecting)
 
-            // Back to the camera with its live badge, also when the sheet was opened from Friends.
             is SessionState.Connected -> {
                 dismissedForConnection = true
-                findNavController().popBackStack(R.id.cameraFragment, false)
+                dismiss()
             }
 
             is SessionState.Ended -> {

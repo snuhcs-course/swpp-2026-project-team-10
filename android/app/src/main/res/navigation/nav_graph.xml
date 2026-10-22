@@ -142,9 +142,12 @@
         <action
             android:id="@+id/action_friends_to_account"
             app:destination="@id/accountSheet" />
+        <!-- The room code floats over Camera, as from Iteration 1, so the camera is already on when the subject
+             joins; Cancel goes back to Camera. -->
         <action
             android:id="@+id/action_friends_to_roomCode"
-            app:destination="@id/roomCodeSheet" />
+            app:destination="@id/roomCodeSheet"
+            app:popUpTo="@id/cameraFragment" />
     </fragment>
 
     <fragment

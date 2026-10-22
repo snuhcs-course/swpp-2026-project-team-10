@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-05, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.camera
 
 /** CameraX ratios are relative to each lens; the app's ratios are relative to the primary lens. */
@@ -53,9 +53,36 @@ internal class CameraZoomPlan(
     fun lensFor(ratio: Float): ZoomLens =
         if (ultrawide != null && ratio < primary.minZoom) ZoomLens.ULTRAWIDE else ZoomLens.PRIMARY
 
+    /**
+     * The lens for [ratio] while [current] is bound. Each switch rebinds the camera, so during a pinch ([final] false)
+     * the lens stays until the ratio is [HOLD_BAND] past the primary's minimum: a pinch that wavers around 1× keeps
+     * one lens, the primary showing its minimum and the ultrawide cropping up to the band. The last value of a pinch
+     * settles on [lensFor].
+     */
+    fun lensFor(ratio: Float, current: ZoomLens, final: Boolean): ZoomLens {
+        val ultrawide = ultrawide
+        if (final || ultrawide == null) return lensFor(ratio)
+        return when (current) {
+            ZoomLens.PRIMARY ->
+                if (ratio < primary.minZoom * (1f - HOLD_BAND)) ZoomLens.ULTRAWIDE else ZoomLens.PRIMARY
+
+            ZoomLens.ULTRAWIDE ->
+                if (ratio > primary.minZoom * (1f + HOLD_BAND) || ratio > ultrawide.maxZoom) {
+                    ZoomLens.PRIMARY
+                } else {
+                    ZoomLens.ULTRAWIDE
+                }
+        }
+    }
+
     fun rangeFor(lens: ZoomLens): LensZoomRange =
         when (lens) {
             ZoomLens.PRIMARY -> primary
             ZoomLens.ULTRAWIDE -> requireNotNull(ultrawide) { "No usable ultrawide camera" }
         }
+
+    companion object {
+        /** How far past the primary's minimum, as a share of it, a pinch goes before the lens changes. */
+        const val HOLD_BAND = 0.05f
+    }
 }

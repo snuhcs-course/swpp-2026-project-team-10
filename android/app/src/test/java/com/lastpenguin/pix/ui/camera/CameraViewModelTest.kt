@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-13, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -153,6 +153,8 @@ class CameraViewModelTest {
         runCurrent()
         model.onZoomChanged(1.73f)
         assertEquals(listOf(1.73f), camera.zoomRequests)
+        // A single change, like a Zoom in / Zoom out action, is final.
+        assertEquals(listOf(true), camera.zoomFinals)
         // A request is not yet the applied value; the camera remains authoritative.
         assertEquals(1f, model.uiState.value.zoom)
         camera.zoom.value = 1.8f
@@ -180,13 +182,15 @@ class CameraViewModelTest {
     fun pinchRequestsContinueAcrossLensTransitionAndReadoutWaitsForAppliedZoom() = runTest {
         camera.capabilities.value = CameraCapabilities(0.5f, 4f, listOf(0.5f, 0.6f, 1f, 2f, 3f))
         runCurrent()
-        model.onZoomChanged(0.9f)
+        model.onZoomChanged(0.9f, final = false)
         camera.status.value = CameraStatus.STARTING
-        model.onZoomChanged(0.7f)
-        model.onZoomChanged(0.5f)
+        model.onZoomChanged(0.7f, final = false)
+        model.onZoomChanged(0.5f, final = true)
         runCurrent()
 
         assertEquals(listOf(0.9f, 0.7f, 0.5f), camera.zoomRequests)
+        // The camera holds its lens until the pinch's last value (Design 2.6.5).
+        assertEquals(listOf(false, false, true), camera.zoomFinals)
         assertEquals(1f, model.uiState.value.zoom)
         assertEquals(0.5f, model.uiState.value.minZoom)
         assertEquals(CameraStatus.STARTING, model.uiState.value.cameraStatus)
@@ -267,10 +271,12 @@ class CameraViewModelTest {
         var captureCount = 0
         var throwOnCapture = false
         val zoomRequests = mutableListOf<Float>()
+        val zoomFinals = mutableListOf<Boolean>()
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
-        override fun setZoom(ratio: Float) {
+        override fun setZoom(ratio: Float, final: Boolean) {
             zoomRequests.add(ratio)
+            zoomFinals.add(final)
         }
         override fun setFocusPoint(x: Float, y: Float) = Unit
         override fun setExposure(index: Int) = Unit

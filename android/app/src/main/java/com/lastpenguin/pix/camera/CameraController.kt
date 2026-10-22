@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -72,8 +72,12 @@ interface CameraController {
     /** Binds Preview, ImageCapture, and ImageAnalysis with one viewport of the chosen aspect ratio (AD-10). */
     fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider)
 
-    /** Primary-relative ratio, clamped to [CameraCapabilities.minZoom, CameraCapabilities.maxZoom]. */
-    fun setZoom(ratio: Float)
+    /**
+     * Primary-relative ratio, clamped to [CameraCapabilities.minZoom, CameraCapabilities.maxZoom]; only the newest
+     * value is applied, once per display frame. [final] is false for the steps of a pinch and true for its last value
+     * or a single change: during a pinch the lens changes only well past 1× (Design 2.6.5, NFR-19).
+     */
+    fun setZoom(ratio: Float, final: Boolean = true)
 
     /** Focuses and meters at a point of the frame, 0..1 from its top-left corner (FR-1.4). */
     fun setFocusPoint(x: Float, y: Float)

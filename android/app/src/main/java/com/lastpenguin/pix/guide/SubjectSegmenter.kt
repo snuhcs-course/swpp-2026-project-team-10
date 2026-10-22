@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-14, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -31,10 +31,11 @@ class Segmentation(
 )
 
 /**
- * ML Kit subject segmentation (Design 2.6.1, steps 2–3).
+ * ML Kit subject segmentation (Design 2.6.1, steps 2–3). Open so that a test can stand in for the model with a
+ * confidence field of its own (MlKitReferenceGuideMakerTest); the client is created on first use only.
  * Owner: PM (#5).
  */
-class SubjectSegmenter(private val context: Context) {
+open class SubjectSegmenter(private val context: Context) {
 
     private val client: MlKitSegmenter by lazy {
         SubjectSegmentation.getClient(
@@ -46,7 +47,7 @@ class SubjectSegmenter(private val context: Context) {
     }
 
     /** Fails with [NoPersonFoundException] if fewer than 2% of the pixels have confidence ≥ 0.5. */
-    suspend fun segment(bitmap: Bitmap): Result<Segmentation> = try {
+    open suspend fun segment(bitmap: Bitmap): Result<Segmentation> = try {
         ensureModule()
         val result = client.process(InputImage.fromBitmap(bitmap, 0)).await()
         val width = bitmap.width

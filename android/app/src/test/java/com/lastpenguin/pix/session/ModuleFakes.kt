@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.EglBase
+import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
 
 /** A session that records what is sent and lets a test deliver incoming messages. */
@@ -220,6 +221,35 @@ class FakeRemoteVideo : RemoteVideo {
 
     override fun detach(sink: VideoSink) {
         sinks -= sink
+    }
+
+    /** Delivers one frame to every attached sink, as the photographer's video would. */
+    fun deliverFrame() {
+        val frame = VideoFrame(FakeFrameBuffer, 0, 0L)
+        sinks.toList().forEach { it.onFrame(frame) }
+        frame.release()
+    }
+
+    /** A 4×4 buffer that never touches native memory, so a frame can exist on the JVM. */
+    private object FakeFrameBuffer : VideoFrame.Buffer {
+        override fun getWidth(): Int = 4
+
+        override fun getHeight(): Int = 4
+
+        override fun toI420(): VideoFrame.I420Buffer? = null
+
+        override fun retain() = Unit
+
+        override fun release() = Unit
+
+        override fun cropAndScale(
+            cropX: Int,
+            cropY: Int,
+            cropWidth: Int,
+            cropHeight: Int,
+            scaleWidth: Int,
+            scaleHeight: Int,
+        ): VideoFrame.Buffer = this
     }
 }
 

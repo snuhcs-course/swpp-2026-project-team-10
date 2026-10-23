@@ -53,6 +53,7 @@ class TestAppContainer(
     val saved = SavedGuideStore.InMemory()
     val generator = ScriptedPoseGenerator()
     val auth = FakeAuthRepository()
+    val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
     private val syncer = GuideSyncer(session, guides, mirror, FakeGuideImageCodec())
 
@@ -69,7 +70,7 @@ class TestAppContainer(
         friendsRepository = friends,
         googleIdTokens = FakeGoogleIdTokens(),
         sessionManager = session,
-        remoteVideo = FakeRemoteVideo(),
+        remoteVideo = video,
         guideSyncer = syncer,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
     )

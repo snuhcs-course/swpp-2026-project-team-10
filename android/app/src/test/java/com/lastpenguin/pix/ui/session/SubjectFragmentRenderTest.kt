@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -38,7 +38,8 @@ import org.robolectric.shadows.ShadowToast
 
 /*
  * Subject view's render paths (R&S 6.6, Testing Documentation 2.1.6), on the real Fragment under FragmentScenario
- * with a container of fakes. Partitions: not connected / connected; the photographer's capabilities with and
+ * with a container of fakes. Partitions: not connected / connected before the first frame / streaming / frames
+ * stopped for 2 s ("camera paused") / streaming again; the photographer's capabilities with and
  * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
  * toggle, a hidden guide; the brightness panel and a flash tap; Leave, the back button's question, and the session
  * ending by a lost connection or the photographer.
@@ -75,8 +76,10 @@ class SubjectFragmentRenderTest {
         name: String = "Dongje",
         exposureRange: IntRange = 0..0,
         hasFlash: Boolean = false,
+        firstFrame: Boolean = true,
     ) {
         modules.session.setState(SessionState.Connected("s1", PeerInfo(name), Role.SUBJECT))
+        if (firstFrame) modules.video.deliverFrame()
         modules.session.deliver(
             SessionMessage.Capabilities(
                 CameraCapabilities(0.6f, 10f, listOf(1f, 2f), exposureRange, 0.5f, hasFlash),
@@ -100,6 +103,33 @@ class SubjectFragmentRenderTest {
             assertEquals(View.GONE, binding.flashButton.visibility)
             assertEquals(View.GONE, binding.brightnessButton.visibility)
         }
+    }
+
+    @Test
+    fun connecting_staysUntilTheFirstFrame_andPausedOnlyWhenFramesStop() {
+        val modules = launch()
+
+        connect(modules, firstFrame = false)
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.connectingText.visibility)
+            assertEquals(string(R.string.connecting), binding.connectingText.text.toString())
+        }
+
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.connectingText.visibility) }
+
+        // No frame for longer than the 2 s stall limit: the camera is paused.
+        Thread.sleep(2_100)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.connectingText.visibility)
+            assertEquals(string(R.string.camera_paused), binding.connectingText.text.toString())
+        }
+
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.connectingText.visibility) }
     }
 
     @Test

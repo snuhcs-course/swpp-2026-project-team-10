@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The sign-in never leaves the phone (Design 2.8, Accounts): a copied refresh token would be spent twice, which
-     ends the session on both phones. Cloud backups are off (allowBackup="false"); from Android 12 that does not stop a
-     transfer to a new phone, which these rules govern. -->
+     ends the session on both phones. Saved guides never leave it either (FR-3.8, NFR-13). Cloud backups are off
+     (allowBackup="false"); from Android 12 that does not stop a transfer to a new phone, which these rules govern. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/account.preferences_pb" />
+        <exclude domain="file" path="guides/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/account.preferences_pb" />
+        <exclude domain="file" path="guides/" />
     </device-transfer>
 </data-extraction-rules>

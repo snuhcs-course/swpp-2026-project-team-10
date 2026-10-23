@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -184,6 +184,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         controls.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
+        controls.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupReference(controls)
         controls.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
@@ -245,6 +246,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             )
                         }
                         showNotice(controls, text)
+                    }
+                }
+                launch {
+                    viewModel.guideSaveNotices.collect { notice ->
+                        val text = when (notice) {
+                            GuideSaveNotice.SAVED -> R.string.guide_saved_notice
+                            GuideSaveNotice.SAVED_OLDEST_REMOVED -> R.string.guide_saved_oldest_removed_notice
+                            GuideSaveNotice.ALREADY_SAVED -> R.string.guide_already_saved_notice
+                            GuideSaveNotice.FAILED -> R.string.guide_save_failed_notice
+                        }
+                        showNotice(controls, getString(text))
                     }
                 }
                 launch {
@@ -494,6 +506,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.hideGuideButton.contentDescription =
             getString(if (hidden) R.string.show_guide else R.string.hide_guide)
         controls.hideGuideButton.isEnabled = guideEditable
+        // Save guide (FR-3.8): filled once saved; a tap then says where the saved guide is.
+        controls.saveGuideButton.setIconResource(
+            if (state.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+        )
+        controls.saveGuideButton.contentDescription =
+            getString(if (state.guideSaved) R.string.guide_saved else R.string.save_guide)
+        controls.saveGuideButton.isEnabled = guideEditable && !state.savingGuide
         // Guide-edit mode (AD-17): the overlay owns the preview's touches while on; the pinch zooms while off.
         // Its toggle sits beside the zoom readout, so it stays when the guide's panel changes (Iter2-P11).
         controls.editGuideButton.isVisible = state.guide != null

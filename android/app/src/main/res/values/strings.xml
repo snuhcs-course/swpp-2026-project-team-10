@@ -45,6 +45,13 @@
     <string name="hide_guide">Hide guide</string>
     <string name="show_guide">Show guide</string>
     <string name="hint_guide_hidden">Guide hidden</string>
+    <!-- Saved guides (FR-3.8): the button on the guide's panel and its notices. -->
+    <string name="save_guide">Save guide</string>
+    <string name="guide_saved">Guide saved</string>
+    <string name="guide_saved_notice">Guide saved. Use it again from Guide.</string>
+    <string name="guide_saved_oldest_removed_notice">Guide saved. The oldest saved guide was removed to keep 20.</string>
+    <string name="guide_already_saved_notice">This guide is already saved. Find it under Guide.</string>
+    <string name="guide_save_failed_notice">Couldn\'t save the guide. Check the phone\'s storage.</string>
     <string name="reference_photo">Reference photo</string>
     <string name="enlarge_reference">Enlarge</string>
     <string name="shrink_reference">Make smaller</string>

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -31,11 +31,13 @@ import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseGenerator
+import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.MlKitReferenceGuideMaker
 import com.lastpenguin.pix.guide.OutlineExtractor
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
+import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.guide.SubjectSegmenter
 import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.GuideSyncer
@@ -50,6 +52,7 @@ import com.lastpenguin.pix.session.WebpGuideImageCodec
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.signalingUrl
+import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -91,8 +94,11 @@ class AppContainer(context: Context) {
     val referenceGuideMaker: ReferenceGuideMaker =
         MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
 
-    /** Work that outlives every screen: loading the sign-in, presence. */
+    /** Work that outlives every screen: loading the sign-in, presence, reading the saved guides. */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** Guides kept to use again, in the app's private files only (FR-3.8, AD-16, NFR-13). */
+    val savedGuideStore: SavedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope)
 
     private val json = Json { ignoreUnknownKeys = true }
 

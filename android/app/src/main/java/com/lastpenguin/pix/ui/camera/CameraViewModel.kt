@@ -19,17 +19,17 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -116,10 +116,10 @@ class CameraViewModel(
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
     private var savedNoticeJob: Job? = null
 
-    private val _guideSaveNotices = MutableSharedFlow<GuideSaveNotice>(extraBufferCapacity = 1)
+    private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
 
-    /** One notice per *Save guide* tap, shown like the other short notices. */
-    val guideSaveNotices: SharedFlow<GuideSaveNotice> = _guideSaveNotices.asSharedFlow()
+    /** One notice per *Save guide* tap, shown like the other short notices; kept until the screen reads it. */
+    val guideSaveNotices: Flow<GuideSaveNotice> = _guideSaveNotices.receiveAsFlow()
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
@@ -321,19 +321,28 @@ class CameraViewModel(
         val state = _uiState.value
         val guide = state.guide ?: return
         if (state.savingGuide) return
-        if (state.guideSaved) {
-            _guideSaveNotices.tryEmit(GuideSaveNotice.ALREADY_SAVED)
+        // The store's own list, not only guideSaved, which follows it a moment later.
+        val before = savedGuides.saved.value
+        if (state.guideSaved || before.any { it.id == guide.id }) {
+            _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
             return
         }
-        val full = savedGuides.saved.value.size >= SavedGuideStore.MAX_SAVED
+        val full = before.size >= SavedGuideStore.MAX_SAVED
         _uiState.update { it.copy(savingGuide = true) }
         viewModelScope.launch {
-            val notice = savedGuides.save(guide, guides.state.value).fold(
-                onSuccess = { if (full) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
-                onFailure = { GuideSaveNotice.FAILED },
-            )
-            _uiState.update { it.copy(savingGuide = false) }
-            _guideSaveNotices.emit(notice)
+            val notice = try {
+                savedGuides.save(guide, guides.state.value).fold(
+                    onSuccess = { if (full) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
+                    onFailure = { GuideSaveNotice.FAILED },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                GuideSaveNotice.FAILED
+            } finally {
+                _uiState.update { it.copy(savingGuide = false) }
+            }
+            _guideSaveNotices.send(notice)
         }
     }
 

@@ -25,13 +25,16 @@ import org.robolectric.annotation.GraphicsMode
 
 /*
  * Partitions for saved guides on the phone (FR-3.8, Design 2.8), with real files and real WebP encoding.
- * save: a new guide (listed first, its own folder of three files), the same guide again (one copy), a guide without
- * a reference photo (the cutout makes the thumbnail), an id that cannot name a folder, storage that cannot be written.
- * Boundary of MAX_SAVED: the 20th is kept with the others; the 21st deletes the oldest from the list and the storage.
+ * save: a new guide (listed first with a 3:4 thumbnail, its own folder of three files), the same guide again (one
+ * copy), a guide without a reference photo (the cutout makes the thumbnail), an id that cannot name a folder, storage
+ * that cannot be written, a bitmap that cannot be encoded (a failure, not a crash), and a clock set back between two
+ * saves (the last one saved stays first).
+ * Boundary of MAX_SAVED: the 20th is kept with the others; the 21st deletes the oldest from the list and the storage;
+ * 21 folders found at a start keep the newest 20.
  * load: a saved guide (cutout at most 720 px tall, outline rebuilt, anchor, aspect, source, state, and reference as
  * saved), an unknown id, an unreadable cutout.
- * Restart (a new store on the same folder): the saved guides, newest first, and they load; unfinished or broken
- * folders are not listed.
+ * Restart (a new store on the same folder): the saved guides, newest first, and they load; unfinished, broken, and
+ * unusable folders (an aspect of 0) are not listed and are deleted.
  * delete: a saved guide (gone from the list, the storage, and the next start), an unknown id.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -49,6 +52,7 @@ class FileSavedGuideStoreTest {
             directory,
             this,
             io = StandardTestDispatcher(testScheduler),
+            compute = StandardTestDispatcher(testScheduler),
             clock = { now++ },
         )
 
@@ -61,8 +65,10 @@ class FileSavedGuideStoreTest {
 
         assertEquals(listOf("g2", "g1"), store.saved.value.map { it.id })
         assertEquals(saved, store.saved.value.first())
+        // The 512 × 384 reference, cut to the list item's 3:4.
         val thumbnail = store.saved.value.first().thumbnail
-        assertEquals(256, maxOf(thumbnail.width, thumbnail.height))
+        assertEquals(252, thumbnail.width)
+        assertEquals(336, thumbnail.height)
     }
 
     @Test
@@ -93,7 +99,7 @@ class FileSavedGuideStoreTest {
 
         store.save(guide("g1", reference = null), GuideState()).getOrThrow()
 
-        assertEquals(256, store.saved.value.single().thumbnail.height)
+        assertEquals(336, store.saved.value.single().thumbnail.height)
         assertNull(store.load("g1").getOrThrow().first.reference)
     }
 
@@ -118,6 +124,35 @@ class FileSavedGuideStoreTest {
 
         assertTrue(result.isFailure)
         assertTrue(store.saved.value.isEmpty())
+    }
+
+    @Test
+    fun save_bitmapThatCannotBeEncoded_failsAndListsNothing() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        val broken = guide("g1").also { it.cutout.recycle() }
+
+        val result = store.save(broken, GuideState())
+
+        assertTrue(result.isFailure)
+        assertTrue(store.saved.value.isEmpty())
+        assertTrue(directory.list().isNullOrEmpty())
+    }
+
+    @Test
+    fun save_clockSetBackBetweenTwoSaves_keepsTheLastSavedFirst() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        now = 5_000L
+        store.save(guide("g1"), GuideState()).getOrThrow()
+        now = 1_000L
+
+        store.save(guide("g2"), GuideState()).getOrThrow()
+
+        assertEquals(listOf("g2", "g1"), store.saved.value.map { it.id })
+        val after = store(directory)
+        advanceUntilIdle()
+        assertEquals(listOf("g2", "g1"), after.saved.value.map { it.id })
     }
 
     @Test
@@ -216,6 +251,40 @@ class FileSavedGuideStoreTest {
 
         assertEquals(listOf("g1"), after.saved.value.map { it.id })
         assertFalse(File(directory, ".g2").exists())
+        assertFalse(File(directory, "g3").exists())
+        assertFalse(File(directory, "g4").exists())
+    }
+
+    @Test
+    fun restart_metaWithAnAspectThatCannotPlaceAGuide_isLeftOutAndDeleted() = runTest {
+        val directory = File(folder.root, "guides")
+        store(directory).save(guide("g1"), GuideState()).getOrThrow()
+        val meta = File(directory, "g1/meta.json")
+        meta.writeText(meta.readText().replace(Regex("\"aspect\":[^,]+"), "\"aspect\":0.0"))
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertTrue(after.saved.value.isEmpty())
+        assertFalse(File(directory, "g1").exists())
+    }
+
+    @Test
+    fun restart_twentyOneFolders_keepsTheNewestTwentyAndDeletesTheOldest() = runTest {
+        val directory = File(folder.root, "guides")
+        val before = store(directory)
+        repeat(SavedGuideStore.MAX_SAVED) { before.save(smallGuide("g$it"), GuideState()).getOrThrow() }
+        // A 21st folder from before, as when an earlier delete stopped halfway: older than every other.
+        File(directory, "g0").copyRecursively(File(directory, "old"))
+        val oldMeta = File(directory, "old/meta.json")
+        oldMeta.writeText(oldMeta.readText().replace(Regex("\"order\":\\d+"), "\"order\":0"))
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals(SavedGuideStore.MAX_SAVED, after.saved.value.size)
+        assertFalse("old" in after.saved.value.map { it.id })
+        assertFalse(File(directory, "old").exists())
     }
 
     @Test

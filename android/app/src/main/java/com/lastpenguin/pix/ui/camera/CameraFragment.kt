@@ -39,6 +39,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
@@ -48,6 +49,7 @@ import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
@@ -251,12 +253,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 launch {
                     viewModel.guideSaveNotices.collect { notice ->
                         val text = when (notice) {
-                            GuideSaveNotice.SAVED -> R.string.guide_saved_notice
-                            GuideSaveNotice.SAVED_OLDEST_REMOVED -> R.string.guide_saved_oldest_removed_notice
-                            GuideSaveNotice.ALREADY_SAVED -> R.string.guide_already_saved_notice
-                            GuideSaveNotice.FAILED -> R.string.guide_save_failed_notice
+                            GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
+
+                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
+                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
+
+                            GuideSaveNotice.ALREADY_SAVED -> getString(R.string.guide_already_saved_notice)
+
+                            GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
-                        showNotice(controls, getString(text))
+                        showNotice(controls, text)
                     }
                 }
                 launch {
@@ -502,12 +508,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             getString(R.string.guide_opacity_percent, (state.guideState.opacity * 100f).roundToInt())
         controls.removeGuideButton.isEnabled = guideEditable
         val hidden = !state.guideState.visible
-        controls.hideGuideButton.setIconResource(if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off)
+        setIconOnce(controls.hideGuideButton, if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off)
         controls.hideGuideButton.contentDescription =
             getString(if (hidden) R.string.show_guide else R.string.hide_guide)
         controls.hideGuideButton.isEnabled = guideEditable
         // Save guide (FR-3.8): filled once saved; a tap then says where the saved guide is.
-        controls.saveGuideButton.setIconResource(
+        setIconOnce(
+            controls.saveGuideButton,
             if (state.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
         )
         controls.saveGuideButton.contentDescription =
@@ -837,6 +844,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             chip,
             if (look == StatusLook.ERROR) ColorStateList.valueOf(context.getColor(R.color.pix_danger_text)) else null,
         )
+    }
+
+    /**
+     * Sets [icon] on [button] only when it differs from the one set last: each call inflates a new drawable and lays
+     * the button out again, and the screen renders on every zoom step of a pinch.
+     */
+    private fun setIconOnce(button: MaterialButton, @DrawableRes icon: Int) {
+        if (button.getTag(R.id.icon_resource) == icon) return
+        button.setIconResource(icon)
+        button.setTag(R.id.icon_resource, icon)
     }
 
     private fun showNotice(controls: FragmentCameraBinding, text: String) {

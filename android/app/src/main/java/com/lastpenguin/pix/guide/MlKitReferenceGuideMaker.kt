@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -7,7 +7,6 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Log
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.scale
 import com.lastpenguin.pix.core.Timings
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -111,15 +110,6 @@ class MlKitReferenceGuideMaker(
             else -> bitmap.copy(Bitmap.Config.ARGB_8888, false)
         }
         return shrink(software, MAX_REFERENCE_LONG_SIDE)
-    }
-
-    private fun shrink(bitmap: Bitmap, maxLongSide: Int): Bitmap {
-        val size = fitLongSide(bitmap.width, bitmap.height, maxLongSide)
-        return if (size.width == bitmap.width && size.height == bitmap.height) {
-            bitmap
-        } else {
-            bitmap.scale(size.width, size.height)
-        }
     }
 
     private companion object {

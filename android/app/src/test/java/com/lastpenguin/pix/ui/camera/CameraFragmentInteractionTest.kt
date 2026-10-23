@@ -46,6 +46,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,7 +61,7 @@ import org.robolectric.annotation.GraphicsMode
  * without an app to open the photo; each capture failure's message; the subject's zoom, brightness, flash, and guide
  * moves as notices, and a lost connection; the zoom accessibility actions; the reference thumbnail's tap, drag,
  * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button; the preview's stream state;
- * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap.
+ * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap; its icon kept while other state changes.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -428,6 +429,22 @@ class CameraFragmentInteractionTest {
         assertEquals(1, modules.saved.saved.value.size)
         onScreen { controls, _ ->
             assertEquals(string(R.string.guide_already_saved_notice), controls.noticeText.text.toString())
+        }
+    }
+
+    @Test
+    fun guideButtonIcons_otherStateChanges_keepTheSameDrawable() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+        val (save, hide) = onScreen { controls, _ -> controls.saveGuideButton.icon to controls.hideGuideButton.icon }
+
+        modules.guides.update(final = true) { it.copy(opacity = 0.7f) }
+        idle()
+
+        onScreen { controls, _ ->
+            assertSame(save, controls.saveGuideButton.icon)
+            assertSame(hide, controls.hideGuideButton.icon)
         }
     }
 

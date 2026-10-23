@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.graphics.scale
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -25,17 +26,20 @@ import kotlinx.serialization.json.Json
 
 /**
  * [SavedGuideStore] in the app's private files (Design 2.8, *Guide store*): one folder per guide under [directory]
- * (`filesDir/guides/<id>/`) with `cutout.webp`, `reference.webp`, and `meta.json`. Design 2.8 names a `mask.png`;
- * until only the mask travels to the subject (Design 2.6.1, step 6), a guide still holds its cutout, whose alpha is
- * that smoothed mask, so the cutout is kept, encoded as the subject receives it (WebP with alpha, at most 720 px
- * tall), and a loaded guide draws the outline the subject draws. A guide is written to a hidden folder and renamed
- * into place, so a half-written one is never listed. Nothing goes to MediaStore.
+ * (`filesDir/guides/<id>/`) with `cutout.webp`, `reference.webp`, and `meta.json`. Until only the mask travels to the
+ * subject (Design 2.6.1, step 6), a guide still holds its cutout, whose alpha is that smoothed mask, so the cutout is
+ * kept, encoded as the subject receives it (WebP with alpha, at most 720 px tall), and a loaded guide draws the
+ * outline the subject draws. The encoding is the store's own, so a later change to what travels does not change the
+ * guides already saved. A guide is written to a hidden folder and renamed into place, so a half-written one is never
+ * listed; a folder that cannot be read back is deleted. The list is ordered by an increasing number kept in
+ * `meta.json`, not by the clock. Nothing goes to MediaStore.
  * Owner: Guide controls (#58).
  */
 class FileSavedGuideStore(
     private val directory: File,
     scope: CoroutineScope,
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val compute: CoroutineDispatcher = Dispatchers.Default,
     private val outlines: OutlineExtractor = OutlineExtractor(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) : SavedGuideStore {
@@ -49,40 +53,48 @@ class FileSavedGuideStore(
     private var entries: List<Entry>? = null
 
     init {
-        // Read the folder now, so Add a pose guide lists the saved guides as soon as it opens.
+        // Read the folder now: the Camera screen shows at once whether its guide is saved, and Add a pose guide
+        // lists the saved guides as soon as it opens.
         scope.launch { locked { } }
     }
 
     override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> = locked { entries ->
         entries.firstOrNull { it.saved.id == guide.id }?.let { return@locked Result.success(it.saved) }
         try {
-            val entry = write(guide, state)
+            val entry = write(guide, state, order = (entries.maxOfOrNull { it.meta.order } ?: 0L) + 1)
             val kept = listOf(entry) + entries
             kept.drop(SavedGuideStore.MAX_SAVED).forEach { remove(it.saved.id) }
             publish(kept.take(SavedGuideStore.MAX_SAVED))
             Result.success(entry.saved)
-        } catch (error: IOException) {
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            // Any failure, not only a full disk: a bitmap that cannot be encoded must not end the app.
             Log.w(TAG, "Could not save guide ${guide.id}", error)
             Result.failure(error)
         }
     }
 
-    override suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>> = locked { entries ->
-        val meta = entries.firstOrNull { it.saved.id == id }?.meta
-            ?: return@locked Result.failure(NoSuchElementException("No saved guide $id"))
-        val folder = File(directory, id)
-        val cutout = decode(File(folder, CUTOUT))
-            ?: return@locked Result.failure(IOException("The cutout of saved guide $id cannot be read"))
+    override suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>> {
+        val read = locked { entries ->
+            val meta = entries.firstOrNull { it.saved.id == id }?.meta ?: return@locked null
+            val folder = File(directory, id)
+            Triple(meta, decode(File(folder, CUTOUT)), decode(File(folder, REFERENCE)))
+        } ?: return Result.failure(NoSuchElementException("No saved guide $id"))
+        val (meta, cutout, reference) = read
+        if (cutout == null) return Result.failure(IOException("The cutout of saved guide $id cannot be read"))
+        // Tracing is work for the CPU, done outside the lock so that saves and deletes do not wait for it.
+        val outline = withContext(compute) { outlines.extract(cutout, outlineStrokePx(cutout.height)) }
         val guide = ReferenceGuide(
             id = id,
             cutout = cutout,
-            outline = outlines.extract(cutout, outlineStrokePx(cutout.height)),
+            outline = outline,
             aspect = meta.aspect,
             source = meta.source,
             anchor = meta.anchor?.let { NormalizedRect(it.left, it.top, it.right, it.bottom) },
-            reference = decode(File(folder, REFERENCE)),
+            reference = reference,
         )
-        Result.success(guide to meta.state)
+        return Result.success(guide to meta.state)
     }
 
     override suspend fun delete(id: String) {
@@ -103,13 +115,14 @@ class FileSavedGuideStore(
         _saved.value = next.map { it.saved }
     }
 
-    private fun write(guide: ReferenceGuide, state: GuideState): Entry {
+    private fun write(guide: ReferenceGuide, state: GuideState, order: Long): Entry {
         if (!ID.matches(guide.id)) throw IOException("Guide id ${guide.id} cannot name a folder")
         val folder = File(directory, guide.id)
         val unfinished = File(directory, ".${guide.id}")
         unfinished.deleteRecursively()
         if (!unfinished.mkdirs()) throw IOException("Could not create $unfinished")
         val meta = Meta(
+            order = order,
             savedAt = clock(),
             aspect = guide.aspect,
             source = guide.source,
@@ -122,42 +135,51 @@ class FileSavedGuideStore(
             File(unfinished, META).writeText(json.encodeToString(Meta.serializer(), meta))
             folder.deleteRecursively()
             if (!unfinished.renameTo(folder)) throw IOException("Could not move $unfinished to $folder")
-        } catch (error: IOException) {
+        } catch (error: Exception) {
             unfinished.deleteRecursively()
             throw error
         }
-        val thumbnail = shrink(guide.reference ?: guide.cutout, THUMBNAIL_LONG_SIDE)
-        return Entry(SavedGuide(guide.id, meta.savedAt, thumbnail), meta)
+        return Entry(SavedGuide(guide.id, meta.savedAt, thumbnail(guide.reference ?: guide.cutout)), meta)
     }
 
-    /** Every finished folder, newest first. A folder left by a save that did not finish is deleted. */
+    /**
+     * Every finished folder, newest first, and at most [SavedGuideStore.MAX_SAVED] of them. A folder left by a save
+     * that did not finish, one that cannot be read back, and the oldest beyond the limit are deleted, so the folder
+     * and the list stay the same after a delete that stopped halfway.
+     */
     private fun readAll(): List<Entry> {
         val folders = directory.listFiles() ?: return emptyList()
-        return folders
+        val read = folders
             .mapNotNull { folder ->
                 when {
                     folder.name.startsWith(".") -> null.also { folder.deleteRecursively() }
-                    ID.matches(folder.name) -> read(folder)
-                    else -> null
+                    !ID.matches(folder.name) -> null
+                    else -> read(folder) ?: null.also { folder.deleteRecursively() }
                 }
             }
-            .sortedByDescending { it.saved.savedAt }
+            .sortedWith(compareByDescending<Entry> { it.meta.order }.thenByDescending { it.meta.savedAt })
+        read.drop(SavedGuideStore.MAX_SAVED).forEach { remove(it.saved.id) }
+        return read.take(SavedGuideStore.MAX_SAVED)
     }
 
+    /** The folder's guide, or null when its `meta.json` or images cannot be used. */
     private fun read(folder: File): Entry? {
         val meta = try {
             json.decodeFromString(Meta.serializer(), File(folder, META).readText())
         } catch (error: IOException) {
-            Log.w(TAG, "Skipped saved guide ${folder.name}", error)
+            Log.w(TAG, "Saved guide ${folder.name} has no meta.json", error)
             return null
         } catch (error: SerializationException) {
-            Log.w(TAG, "Skipped saved guide ${folder.name}", error)
+            Log.w(TAG, "Saved guide ${folder.name} has a damaged meta.json", error)
+            return null
+        }
+        if (!meta.isUsable()) {
+            Log.w(TAG, "Saved guide ${folder.name} has values that cannot place a guide")
             return null
         }
         val reference = File(folder, REFERENCE)
-        val thumbnail = decode(if (reference.isFile) reference else File(folder, CUTOUT), THUMBNAIL_LONG_SIDE)
-            ?: return null
-        return Entry(SavedGuide(folder.name, meta.savedAt, thumbnail), meta)
+        val source = decode(if (reference.isFile) reference else File(folder, CUTOUT)) ?: return null
+        return Entry(SavedGuide(folder.name, meta.savedAt, thumbnail(source)), meta)
     }
 
     private fun writeWebp(file: File, bitmap: Bitmap) {
@@ -166,18 +188,11 @@ class FileSavedGuideStore(
         }
     }
 
-    /** [file] as ARGB_8888, its long side shrunk to at most [maxLongSide]; null when it is missing or unreadable. */
-    private fun decode(file: File, maxLongSide: Int? = null): Bitmap? {
+    /** [file] as ARGB_8888; null when it is missing or unreadable. */
+    private fun decode(file: File): Bitmap? {
         if (!file.isFile) return null
         val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
-        if (maxLongSide != null) {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(file.path, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-            options.inSampleSize = decodeSampleSize(bounds.outWidth, bounds.outHeight, maxLongSide)
-        }
-        val bitmap = BitmapFactory.decodeFile(file.path, options) ?: return null
-        return if (maxLongSide == null) bitmap else shrink(bitmap, maxLongSide)
+        return BitmapFactory.decodeFile(file.path, options)
     }
 
     private fun remove(id: String) {
@@ -186,18 +201,25 @@ class FileSavedGuideStore(
 
     private class Entry(val saved: SavedGuide, val meta: Meta)
 
-    /** `meta.json`: what places the guide again, and when it was saved (Design 2.8). */
+    /** `meta.json`: what places the guide again, its place in the list, and when it was saved (Design 2.8). */
     @Serializable
     private data class Meta(
+        /** Increases with every save; orders the list, so a clock set back cannot reorder it. */
+        val order: Long = 0,
         val savedAt: Long,
         val aspect: Float,
         val source: GuideSource,
         val anchor: Box? = null,
         val state: GuideState,
-    )
+    ) {
+        /** What `GuideGeometry` needs to place the guide: a positive aspect and a real box. */
+        fun isUsable(): Boolean = aspect.isFinite() && aspect > 0f && (anchor == null || anchor.isUsable())
+    }
 
     @Serializable
-    private data class Box(val left: Float, val top: Float, val right: Float, val bottom: Float)
+    private data class Box(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+        fun isUsable(): Boolean = listOf(left, top, right, bottom).all { it.isFinite() } && left < right && top < bottom
+    }
 
     private companion object {
         const val TAG = "PixSavedGuides"
@@ -209,8 +231,12 @@ class FileSavedGuideStore(
         const val MAX_CUTOUT_HEIGHT = 720
         const val QUALITY = 90
 
-        /** The thumbnails on Add a pose guide; twenty of them stay under 4 MB in memory. */
-        const val THUMBNAIL_LONG_SIDE = 256
+        /**
+         * The thumbnails on Add a pose guide: the item's 3:4 at its size on a 3x screen (84 × 112 dp), so a photo of
+         * any shape stays sharp; twenty of them take under 7 MB in memory.
+         */
+        const val THUMBNAIL_WIDTH = 252
+        const val THUMBNAIL_HEIGHT = 336
 
         /** The UUIDs that `MlKitReferenceGuideMaker` gives, which also name the folders. */
         val ID = Regex("[A-Za-z0-9-]{1,64}")
@@ -223,13 +249,21 @@ class FileSavedGuideStore(
             return bitmap.scale(width, maxHeight)
         }
 
-        fun shrink(bitmap: Bitmap, maxLongSide: Int): Bitmap {
-            val size = fitLongSide(bitmap.width, bitmap.height, maxLongSide)
-            return if (size.width == bitmap.width && size.height == bitmap.height) {
-                bitmap
+        /** The middle of [source] cut to 3:4, at most [THUMBNAIL_WIDTH] × [THUMBNAIL_HEIGHT]. */
+        fun thumbnail(source: Bitmap): Bitmap {
+            val (width, height) = if (source.width * 4 > source.height * 3) {
+                maxOf(1, source.height * 3 / 4) to source.height
             } else {
-                bitmap.scale(size.width, size.height)
+                source.width to maxOf(1, source.width * 4 / 3)
             }
+            val cropped = Bitmap.createBitmap(
+                source,
+                (source.width - width) / 2,
+                (source.height - height) / 2,
+                width,
+                height,
+            )
+            return if (height <= THUMBNAIL_HEIGHT) cropped else cropped.scale(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
         }
 
         @Suppress("DEPRECATION")

@@ -35,7 +35,8 @@ import org.junit.Test
  * savedGuides: the store's list, newest first.
  * onUseSaved: a saved guide with no guide on the camera (on the camera, at its reference's place and not where it
  * was saved; USED), one replacing the guide on the camera, an id the store cannot load (FAILED, the camera's guide
- * kept), a second tap while the first is opening (one load).
+ * kept), a guide whose values cannot place it (FAILED, no crash), a second tap while the first is opening (one load),
+ * the sheet closing before it arrives (the camera's guide kept). A result that comes while no sheet collects waits.
  * onDeleteSaved: a saved guide (gone from the list) that is also on the camera (it stays there).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -142,6 +143,50 @@ class SavedGuidesViewModelTest {
         runCurrent()
 
         assertEquals(1, slow.loads)
+        assertEquals(listOf(SavedGuideResult.USED), results)
+    }
+
+    @Test
+    fun onUseSaved_guideThatCannotBePlaced_failsInsteadOfCrashing() = runTest(dispatcher) {
+        saved.save(ReferenceGuide("g1", fakeBitmap(), fakeBitmap(), 0f, GuideSource.GALLERY), GuideState())
+        guides.setGuide(fakeGuide("current"))
+        val model = model()
+        val results = results(model)
+
+        model.onUseSaved("g1")
+        runCurrent()
+
+        assertEquals("current", guides.guide.value?.id)
+        assertEquals(listOf(SavedGuideResult.FAILED), results)
+    }
+
+    @Test
+    fun onUseSaved_sheetClosesBeforeItArrives_keepsTheCamerasGuide() = runTest(dispatcher) {
+        saved.save(anchored("g1"), GuideState())
+        guides.setGuide(fakeGuide("current"))
+        val slow = SlowLoads(saved)
+        val model = model(slow)
+        val results = results(model)
+
+        model.onUseSaved("g1")
+        runCurrent()
+        model.cancelOpening()
+        slow.release.complete(Unit)
+        runCurrent()
+
+        assertEquals("current", guides.guide.value?.id)
+        assertEquals(emptyList<SavedGuideResult>(), results)
+    }
+
+    @Test
+    fun result_whileNoSheetCollects_waitsForTheSheet() = runTest(dispatcher) {
+        saved.save(anchored("g1"), GuideState())
+        val model = model()
+
+        model.onUseSaved("g1")
+        runCurrent()
+        val results = results(model)
+
         assertEquals(listOf(SavedGuideResult.USED), results)
     }
 

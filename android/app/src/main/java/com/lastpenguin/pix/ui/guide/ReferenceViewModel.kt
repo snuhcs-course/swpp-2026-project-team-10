@@ -12,13 +12,14 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -59,10 +60,13 @@ class ReferenceViewModel(
     /** Newest first, for Add a pose guide. */
     val savedGuides: StateFlow<List<SavedGuide>> = savedGuideStore.saved
 
-    private val _savedGuideResults = MutableSharedFlow<SavedGuideResult>(extraBufferCapacity = 1)
+    private val _savedGuideResults = Channel<SavedGuideResult>(Channel.BUFFERED)
 
-    /** One result per tap on a saved guide: the sheet closes when it is used. */
-    val savedGuideResults: SharedFlow<SavedGuideResult> = _savedGuideResults.asSharedFlow()
+    /**
+     * One result per tap on a saved guide: the sheet closes when it is used. Kept until the sheet reads it, so a
+     * result that comes while the screen is stopped is not lost.
+     */
+    val savedGuideResults: Flow<SavedGuideResult> = _savedGuideResults.receiveAsFlow()
 
     private var opening: Job? = null
 
@@ -90,20 +94,28 @@ class ReferenceViewModel(
     /**
      * *Use* on a saved guide: it becomes the guide on the camera, in place of any other (FR-3.6). It starts where
      * the person stands in its reference, as when it was first made (FR-3.1), not where it was when it was saved.
-     * A second tap while one is opening does nothing.
+     * A second tap while one is opening does nothing, and [cancelOpening] stops one that has not arrived.
      */
     fun onUseSaved(id: String) {
         if (opening?.isActive == true) return
         opening = viewModelScope.launch {
-            val result = savedGuideStore.load(id).fold(
-                onSuccess = { (guide, _) ->
-                    guides.setGuide(guide)
-                    SavedGuideResult.USED
-                },
-                onFailure = { SavedGuideResult.FAILED },
-            )
-            _savedGuideResults.emit(result)
+            val result = try {
+                val (guide, _) = savedGuideStore.load(id).getOrThrow()
+                guides.setGuide(guide)
+                SavedGuideResult.USED
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // Unreadable files, or values the guide cannot be placed with: a message, not a crash.
+                SavedGuideResult.FAILED
+            }
+            _savedGuideResults.send(result)
         }
+    }
+
+    /** The sheet closed: a saved guide still opening must not replace the guide the user chose to keep. */
+    fun cancelOpening() {
+        opening?.cancel()
     }
 
     /** *Delete* on a saved guide, after the sheet asked; a guide on the camera stays there. */

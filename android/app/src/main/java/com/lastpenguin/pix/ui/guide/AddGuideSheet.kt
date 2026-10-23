@@ -1,6 +1,7 @@
 // AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
+import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -78,6 +79,12 @@ class AddGuideSheet : BottomSheetDialogFragment() {
                 }
             }
         }
+    }
+
+    /** However the sheet closes, a saved guide still opening must not replace the guide on the camera. */
+    override fun onDismiss(dialog: DialogInterface) {
+        referenceViewModel.cancelOpening()
+        super.onDismiss(dialog)
     }
 
     /** A saved guide is deleted only after asking (FR-3.8); the guide on the camera, if it is that one, stays. */

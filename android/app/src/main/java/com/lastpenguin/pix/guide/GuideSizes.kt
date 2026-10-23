@@ -1,6 +1,8 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
+import android.graphics.Bitmap
+import androidx.core.graphics.scale
 import kotlin.math.roundToInt
 
 /** The reference is segmented at this long side at most (Design 2.6.1, step 1). */
@@ -39,6 +41,16 @@ internal fun fitLongSide(width: Int, height: Int, maxLongSide: Int = MAX_REFEREN
     if (longSide <= maxLongSide) return PixelSize(width, height)
     val scale = maxLongSide.toFloat() / longSide
     return PixelSize(maxOf(1, (width * scale).roundToInt()), maxOf(1, (height * scale).roundToInt()))
+}
+
+/** [bitmap] scaled down so its long side is at most [maxLongSide]; the same bitmap when it already fits. */
+internal fun shrink(bitmap: Bitmap, maxLongSide: Int): Bitmap {
+    val size = fitLongSide(bitmap.width, bitmap.height, maxLongSide)
+    return if (size.width == bitmap.width && size.height == bitmap.height) {
+        bitmap
+    } else {
+        bitmap.scale(size.width, size.height)
+    }
 }
 
 /**

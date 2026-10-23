@@ -31,7 +31,8 @@ import org.junit.Test
  * Partitions for *Save guide* on the Camera screen (FR-3.8), state-based, with the in-memory store.
  * onSaveGuide: a guide not saved yet (stored with its state, shown as saved, SAVED), a guide already saved
  * (ALREADY_SAVED, stored once), no guide (nothing), a full store (SAVED_OLDEST_REMOVED), a store that cannot write
- * (FAILED, not shown as saved, the button free again), a second tap while the first is writing (one save).
+ * (FAILED, not shown as saved, the button free again), a store that throws (the same, no crash), a second tap while
+ * the first is writing (one save). A notice that comes while no screen collects waits for the screen.
  * guideSaved: a new guide (not saved), another guide replacing a saved one, a saved guide deleted from the store,
  * a saved guide put on the camera again with its id (saved).
  */
@@ -88,14 +89,14 @@ class SaveGuideViewModelTest {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
         runCurrent()
-        model.onSaveGuide()
-        runCurrent()
         val notices = notices(model)
+        model.onSaveGuide()
+        runCurrent()
 
         model.onSaveGuide()
         runCurrent()
 
-        assertEquals(listOf(GuideSaveNotice.ALREADY_SAVED), notices)
+        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.ALREADY_SAVED), notices)
         assertEquals(1, saved.saved.value.size)
     }
 
@@ -141,6 +142,33 @@ class SaveGuideViewModelTest {
         assertEquals(listOf(GuideSaveNotice.FAILED), notices)
         assertFalse(model.uiState.value.guideSaved)
         assertFalse(model.uiState.value.savingGuide)
+    }
+
+    @Test
+    fun onSaveGuide_storeThrows_saysItFailedAndFreesTheButton() = runTest(dispatcher) {
+        val model = model(ThrowingStore(saved))
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+        val notices = notices(model)
+
+        model.onSaveGuide()
+        runCurrent()
+
+        assertEquals(listOf(GuideSaveNotice.FAILED), notices)
+        assertFalse(model.uiState.value.savingGuide)
+    }
+
+    @Test
+    fun notice_whileNoScreenCollects_waitsForTheScreen() = runTest(dispatcher) {
+        val model = model()
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+
+        model.onSaveGuide()
+        runCurrent()
+        val notices = notices(model)
+
+        assertEquals(listOf(GuideSaveNotice.SAVED), notices)
     }
 
     @Test
@@ -205,6 +233,12 @@ class SaveGuideViewModelTest {
     private class FailingStore(private val inner: SavedGuideStore) : SavedGuideStore by inner {
         override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> =
             Result.failure(IOException("No space left"))
+    }
+
+    /** A store whose writes throw instead of failing, as with a bitmap that was recycled. */
+    private class ThrowingStore(private val inner: SavedGuideStore) : SavedGuideStore by inner {
+        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> =
+            throw IllegalStateException("Can't compress a recycled bitmap")
     }
 
     /** A store whose writes wait for [release], so a second tap arrives while the first is writing. */

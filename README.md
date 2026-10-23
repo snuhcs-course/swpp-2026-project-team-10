@@ -20,38 +20,16 @@ This branch is the **Iteration 2 build**: the Pix server runs on the course's pu
 
 ## Demo videos
 
-Recorded on a Galaxy S23 Ultra (photographer) and a Galaxy S25 Ultra (subject) with the Iteration 2 build on `dev`, against the course server (#98). The files are in [`wiki/images/`](wiki/images/), compressed to 0.5–3.8 MB each; they are also the evidence of the integration run in [Testing Documentation 2.2.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#222-iteration-2--integration-tests-215).
+Recorded on a Galaxy S23 Ultra (photographer) and a Galaxy S25 Ultra (subject) with the Iteration 2 build on `dev`, against the course server (#98). They are also the evidence of the integration run in [Testing Documentation 2.2.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#222-iteration-2--integration-tests-215); the full-size files are in the team's shared folder.
 
-| Video | What it shows |
-|---|---|
-| [Camera basics](wiki/images/testing_it2_demo_camera_basic.mp4) (47 s) | The aspect ratio 4:3 → 16:9 → 1:1 with a photo saved in each, the brightness slider, the flash button, zoom, and the last-photo thumbnail |
-| [Guide from a photo](wiki/images/testing_it2_demo_reference_image.mp4) (37 s) | *Add a pose guide* with saved guides, a reference photo turned into an outline guide, drag and pinch, opacity, hide, *Save guide*, and *Replace the pose guide?* |
-| [Sign-in and account](wiki/images/testing_it2_demo_login.mp4) (42 s) | *Friends* signed out, *Continue with Google*, the account sheet with *Edit name*, *Add a password*, and *Sign out* |
-| [Shoot together](wiki/images/testing_it2_demo_streaming.mp4) (81 s, both phones) | A room-code session: the live view, a guide from a reference on both phones, the photographer's moves followed on the subject's phone, a ratio change, the scene photo with a typed description and *Generating poses*, and the subject's brightness applied on the photographer's phone |
-| [Midterm demo: guide](wiki/images/testing_it2_demo_midterm_guide.mp4) (43 s, both phones) | Shown at the midterm presentation on 10/21, recorded on 10/15: a room-code session and a guide from a reference synced to the subject |
-| [Midterm demo: pose generation](wiki/images/testing_it2_demo_midterm_generation.mp4) (44 s, both phones) | The same session with *Generate poses here*, "3 of 4 ready", and the chosen pose as the guide on both phones |
-
-<!-- Players: drag each file into this section on GitHub's web editor to get a user-attachments link, as the Iteration 1 README has. -->
-
-
-https://github.com/user-attachments/assets/42a0c887-c326-4025-810d-a0bbcffeb2ee
-
-
-
-
-https://github.com/user-attachments/assets/88f5413d-0cb8-4226-9d46-2cf4788362fc
-
-
-
-
-https://github.com/user-attachments/assets/8e64ef8c-8fef-4398-ba66-bbedf2b953d0
-
-
-
-https://github.com/user-attachments/assets/724a8990-4207-4f40-8cce-ba2a923e4c07
-
-
-
+| Video | What it shows | Player |
+|---|---|---|
+| **Camera basics** (47 s) | The aspect ratio 4:3 → 16:9 → 1:1 with a photo saved in each, the brightness slider, the flash button, zoom, and the last-photo thumbnail | <video src="https://github.com/user-attachments/assets/42a0c887-c326-4025-810d-a0bbcffeb2ee" controls width="220"></video> |
+| **Guide from a photo** (37 s) | *Add a pose guide* with saved guides, a reference photo turned into an outline guide, drag and pinch, opacity, hide, *Save guide*, and *Replace the pose guide?* | <video src="https://github.com/user-attachments/assets/8e64ef8c-8fef-4398-ba66-bbedf2b953d0" controls width="220"></video> |
+| **Sign-in and account** (42 s) | *Friends* signed out, *Continue with Google*, the account sheet with *Edit name*, *Add a password*, and *Sign out* | <video src="https://github.com/user-attachments/assets/88f5413d-0cb8-4226-9d46-2cf4788362fc" controls width="220"></video> |
+| **Shoot together** (81 s, both phones) | A room-code session: the live view, a guide from a reference on both phones, the photographer's moves followed on the subject's phone, a ratio change, the scene photo with a typed description and *Generating poses*, and the subject's brightness applied on the photographer's phone | <video src="https://github.com/user-attachments/assets/724a8990-4207-4f40-8cce-ba2a923e4c07" controls width="320"></video> |
+| **Midterm demo: guide** (43 s, both phones) | Shown at the midterm presentation on 10/21, recorded on 10/15: a room-code session and a guide from a reference synced to the subject | — |
+| **Midterm demo: pose generation** (44 s, both phones) | The same session with *Generate poses here*, "3 of 4 ready", and the chosen pose as the guide on both phones | — |
 
 ## What Iteration 2 does
 
@@ -195,7 +173,7 @@ At the close of Iteration 2: 756 app tests and 431 server tests, app line covera
 |---|---|
 | `android/` | The Android app (open this folder in Android Studio) |
 | `server/` | The Pix server, its tests, the deploy files for the course servers, and tools for testing with one phone |
-| `wiki/` | The source of the GitHub wiki, published on every push to `dev`; the demo recordings are in `wiki/images/` |
+| `wiki/` | The source of the GitHub wiki, published on every push to `dev` |
 | `.github/` | CI workflows and the pull request template |
 
 Branches: `main` holds the stable version and `dev` is the integration branch. Each task is a branch from `dev` that returns through a reviewed, squash-merged pull request. `iteration-N-demo` holds the code shown in that iteration's demo, and at the end of an iteration `dev` is merged into `main`.

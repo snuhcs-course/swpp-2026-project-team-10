@@ -25,5 +25,6 @@
   <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Camera-and-Guide">Camera and Guide</a></li>
   <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control">Real-time and Remote Control</a></li>
   <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Code-Reviews">Code Reviews</a></li>
+  <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-2-–-Prompt-Log-–-Testing">Testing</a></li>
   </ul></details></li>
   </ul>

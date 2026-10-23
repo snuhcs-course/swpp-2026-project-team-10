@@ -57,8 +57,6 @@ Known limitations of the Iteration 2 build:
 - The guide image sent to the subject is still the cutout as a WebP with alpha; the mask-only transfer decided on 2026-10-16 is not built (Design 2.5.1).
 - The zoom fix (Iter2-P5) is measured on the S23 Ultra, which zooms to 0.6× natively; the S21, the test phone with a separate ultrawide lens, is still to be measured (Testing Documentation IT-10).
 - The timing targets (live-view delay, control round trip) were not measured in Iteration 2; the integration run was recorded on video without a `Timings` log.
-- Google sign-in needs the phone's debug key registered in the team's Google Cloud project; sign-up with a Pix ID and a password works on every build.
-- The first segmentation downloads the model through Google Play services, which can take a minute; the first pose set takes 15–60 s.
 
 ### Next: Iteration 3
 

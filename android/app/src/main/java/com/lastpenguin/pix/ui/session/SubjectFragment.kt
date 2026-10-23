@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -119,12 +119,15 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     }
                 }
                 launch {
-                    // "Connecting…" until the session is up, then "camera paused" whenever frames stop (Design 2.8).
+                    // "Connecting…" until the session is up and its first frame has arrived; "camera paused" only when
+                    // frames stop after that (Design 2.8). A session is Connected before WebRTC delivers the first
+                    // frame, so counting the stall from the watchdog's creation showed "paused" before any video.
                     while (true) {
                         val connected = sessionViewModel.state.value is SessionState.Connected
-                        val stalled = connected && frames.nanosSinceLastFrame() > STALL_NANOS
-                        binding.connectingText.isVisible = !connected || stalled
-                        binding.connectingText.setText(if (connected) R.string.camera_paused else R.string.connecting)
+                        val streaming = connected && frames.hasFrame()
+                        val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
+                        binding.connectingText.isVisible = !streaming || stalled
+                        binding.connectingText.setText(if (stalled) R.string.camera_paused else R.string.connecting)
                         delay(STALL_CHECK_MS)
                     }
                 }
@@ -253,8 +256,6 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     /** Passes frames to the renderer and remembers when the last one came, to detect a paused camera. */
     private class FrameWatchdog(private val renderer: VideoSink) : VideoSink {
-        private val createdNanos = System.nanoTime()
-
         @Volatile
         private var lastFrameNanos = 0L
 
@@ -263,8 +264,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             renderer.onFrame(frame)
         }
 
-        /** Since the last frame, or since the watchdog was created if none came yet. */
-        fun nanosSinceLastFrame(): Long = System.nanoTime() - maxOf(lastFrameNanos, createdNanos)
+        /** Whether any frame has arrived since the screen opened. */
+        fun hasFrame(): Boolean = lastFrameNanos != 0L
+
+        /** Since the last frame; meaningful only once [hasFrame]. */
+        fun nanosSinceLastFrame(): Long = System.nanoTime() - lastFrameNanos
     }
 
     private companion object {

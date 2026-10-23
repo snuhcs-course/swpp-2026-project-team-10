@@ -33,6 +33,26 @@ Recorded on a Galaxy S23 Ultra (photographer) and a Galaxy S25 Ultra (subject) w
 
 <!-- Players: drag each file into this section on GitHub's web editor to get a user-attachments link, as the Iteration 1 README has. -->
 
+
+https://github.com/user-attachments/assets/42a0c887-c326-4025-810d-a0bbcffeb2ee
+
+
+
+
+https://github.com/user-attachments/assets/88f5413d-0cb8-4226-9d46-2cf4788362fc
+
+
+
+
+https://github.com/user-attachments/assets/8e64ef8c-8fef-4398-ba66-bbedf2b953d0
+
+
+
+https://github.com/user-attachments/assets/724a8990-4207-4f40-8cce-ba2a923e4c07
+
+
+
+
 ## What Iteration 2 does
 
 | Feature | What you can do |

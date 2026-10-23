@@ -2,7 +2,7 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 
 Prompts were given in Korean to Claude Code (Claude Fable 5.1) and are translated here.
 
-## Pinch zoom with the guide-edit mode (#48, PR #74)
+## Pinch zoom with the guide-edit mode ([#48], PR [#74])
 
 **Plan and build (10/13)**
 
@@ -26,9 +26,9 @@ Prompts were given in Korean to Claude Code (Claude Fable 5.1) and are translate
 - [Sungmin, 10-14] "Go ahead."
 - [Sungmin, 10-14] "Like PR #77, add my section to the Iteration 2 AI collaboration report and an English prompt log for this PR."
 
-## Sessions across networks (#56, planning only)
+## Sessions across networks ([#56], planning only)
 
-Questions asked while #74 was in review; no code was changed.
+Questions asked while [#74] was in review; no code was changed.
 
 - [Sungmin, 10-14] "`dev` now has the public server, so we no longer run the server on a laptop. We have to make streaming work across different networks, not only the same Wi-Fi. Look at the code on `dev` and think about whether that is possible and how. Don't implement anything and don't change code."
 - [Sungmin, 10-14] "But doesn't this only work on the school Wi-Fi so far?"
@@ -37,7 +37,7 @@ Questions asked while #74 was in review; no code was changed.
 - [Sungmin, 10-14] "So does streaming across networks work or not?"
 - [Sungmin, 10-14] "So if the server is reachable only from inside the school, is it impossible?"
 
-## Join with code keeps the previous room's code (#81)
+## Join with code keeps the previous room's code ([#81])
 
 **Issue and fix (10/15)**
 
@@ -48,7 +48,7 @@ Questions asked while #74 was in review; no code was changed.
 - [Sungmin, 10-15] "Write the PR body."
 - [Sungmin, 10-15] "Add the prompt log and the AI collaboration report entries too, and push."
 
-## Remote brightness, flash, and guide moves (#57, PR #85)
+## Remote brightness, flash, and guide moves ([#57], PR [#85])
 
 **Plan and build (10/16)**
 
@@ -68,3 +68,10 @@ Questions asked while #74 was in review; no code was changed.
 - [Sungmin, 10-16] "(pasted two Codex comments: supersede queued settings before confirming the current value; bind guide moves to the guide being edited) Do these need fixes?"
 - [Sungmin, 10-16] "OK, fix them, commit, and push."
 - [Sungmin, 10-16] "Now update the AI collaboration report and the prompt log, commit, and push."
+
+[#48]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/48
+[#56]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/56
+[#57]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/57
+[#74]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/74
+[#81]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/81
+[#85]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/85

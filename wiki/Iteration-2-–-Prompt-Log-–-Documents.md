@@ -2,7 +2,7 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 
 One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11–10/23. Each prompt is quoted as it was sent; attachments are named in a note. Prompts are given in the order they were sent; follow-ups that only confirmed a result are left out. The session was told, through `CLAUDE.md`, to commit or push only when asked, so each "commit" below is an explicit instruction.
 
-## AI rules in CLAUDE.md and the PR template (#44, [#62])
+## AI rules in CLAUDE.md and the PR template ([#44], [#62])
 
 - [Joonhyung, 10-11] "Add the AI-generated marker rule to CLAUDE.md and an AI usage section to the PR template 이 부분에 대해서 현재 작성된 파일을 바탕으로 추가해 줘."
 - [Joonhyung, 10-11] "https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/44 이 내용이 모두 포함된 것이 맞지?" (The agent compared the diff with the issue, found two missing items, and added them: one marker line per file and source files only; the 'what we had to fix' and 'prompts' lines.)
@@ -32,7 +32,7 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 - [Joonhyung, 10-13] "앞으로 바뀌는 번호는 1.0, 1.1, 1.2, … 1.10, 1.11 이런 식인데 맞나?" (The agent had written "continue as 1.10, 1.11"; it corrected both pages, found that [#66] and [#67] had been merged meanwhile, and opened [#68] from `dev` for the fix.)
 - [Joonhyung, 10-13] "지금 PR을 그냥 머지했다. 지금 각 브랜치에 대해서 push한 거 취소해 줘." (The two feature branches were reset to the commits their merged PRs used, with `--force-with-lease`.)
 
-## Testing Documentation v1.0 (#69, [#70])
+## Testing Documentation v1.0 ([#69], [#70])
 
 - [Joonhyung, 10-13] "이제 Issue에 [Iter2-A1]에서 Testing Documentation을 위키에 새로 만드는 것을 추가하려고 한다. Create a new Testing Documentation page on your team's GitHub repository Wiki. Document how your team tested your implementation and the results of your testing. Please follow the Testing Documentation Guidelines for detailed requirements. 그리고 해당 guideline을 기반으로 format을 만들어 줘. 그리고 이것의 기본 format 버전을 1.0부터 시작할 예정이다. 우선 issue 제목과 본문부터 작성해 줘."
 - [Joonhyung, 10-13] "wiki/Testing-Documentation.md 포맷을 작성해 줘."
@@ -72,7 +72,7 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 - [Joonhyung, 10-21] "각 Documentation에서의 변화들로 영어 요약을 작성해 줘."
 - [Joonhyung, 10-21] "Briefly introduce your progress in feature testing. Show which features you have tested so far and how you tested them. Share any key findings, failures, or issues identified through testing. Explain how the testing results have affected, or will affect, your implementation. Briefly describe what you plan to test next. 이 부분을 작성해야 하는데, 지금까지의 git을 바탕으로 레이턴시 테스트, CI Test(android/server), Image Test(첨부 폴더), unit test 등을 포함해서 설명해 줘. 그리고 간단히 영어로 요약해서 작성해 줘." (The speed-target image and the `20261021-cc0-arcade-test` folder were attached.)
 
-## Testing Documentation 1.10–1.13: coverage tools, screen and adapter tests, results, and targets (#69, [#94])
+## Testing Documentation 1.10–1.13: coverage tools, screen and adapter tests, results, and targets ([#69], [#94])
 
 - [Joonhyung, 10-22] "이 이슈 https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/69 를 진행하려 한다. 지금 현재 Task 상황에 대해서 정리해 줘."
 - [Joonhyung, 10-22] "chore/a1-coverage 브랜치로 JaCoCo랑 pytest-cov 추가해 줘." (Testing Documentation 1.10: the two TODO lines of 2.1.1 and 2.1.4 became the configuration.)
@@ -94,13 +94,24 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 - [Joonhyung, 10-23] "그러면 지금 이 상태로 목표를 순서대로 (App) 90 / 90 / 90 / 30 (Server) 90 / 90 / 90으로 Testing 문서를 기준으로 바꿔 주고, Adapter 부분에 대해서 커버리지가 낮은 이유와 추후 이터레이션에서 보완할 방안들에 대해서 제안하는 식으로 작성해 줘." (2.1.2: the targets set with the proposals kept, and the adapter layer's reasons and the measures of Iterations 3 and 4.)
 - [Joonhyung, 10-23] "지금까지의 내용을 바탕으로 AI Collaboration Report에서 Document 부분의 Prompt 로그를 작성해 줘."
 
+## Syncing the Design Documentation, R&S, and wireframes with the app as built ([#97])
+
+- [Jaewan, 10-23] "Now can you check for anything we've changed and is implemented in our code that is NOT consistent with the design document and R&S. And fix the docs accordingly. If the system architecture graphic should be fixed update the html, and if the wireframe images should be fixed update https://claude.ai/artifact/GRLQMzirhDrBui9WWTQ1vm directly. Create a new branch and do this."
+- [Jaewan, 10-23] "1. what happens if an image not 3:4 is sent to the server currently? 2. thanks. joining from another network is not implemented yet, so we'll fix that later. 3. what are the outdated comments?"
+- [Jaewan, 10-23] "fix the stale comments in this branch. we'll do the server ratio in the next iteration."
+- [Jaewan, 10-23] "also for all wiki documents, can you add any missing paths for issue/PR shorthands?"
+- [Jaewan, 10-23] "not for shorthands that are in the prompt logs' prompt messages"
+
+[#44]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/44
 [#62]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/62
 [#66]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/66
 [#67]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/67
 [#68]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/68
+[#69]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/69
 [#70]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/70
 [#76]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/76
 [#87]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/87
 [#91]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/91
 [#94]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/94
 [#95]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/95
+[#97]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/97

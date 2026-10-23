@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
 
-## WebRTC streaming with room codes (#8)
+## WebRTC streaming with room codes ([#8])
 
 - [Sungmin, 10-03] "My part of Iteration 1 is streaming one phone's camera to the other phone over the same Wi-Fi with a room code. Read the documents and think through how to build it. Don't implement yet; explain the approach in detail."
 - [Sungmin, 10-03] "Is this Android work or server work? Who generates the room code, who checks it, and how do the two phones actually connect? Keep Iteration 2's login and friend list in mind, and tell me which screens this touches."
@@ -11,7 +11,7 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 - [Sungmin, 10-04] "Build the APK for the current Wi-Fi so that I can test on real phones."
 - [Sungmin, 10-04] "Can this later work when the phones are not on the same Wi-Fi, and how much delay would that add?"
 
-## Remote zoom (#10)
+## Remote zoom ([#10])
 
 - [Sungmin, 10-04] "I'll implement remote zoom (#10) on a new branch. Make a detailed plan first."
 - [Sungmin, 10-04] "The test harness you propose is for your own verification, right? Where does it live, and it never appears in the app?"
@@ -24,7 +24,7 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 - [Sungmin, 10-05] "Fix those two, commit, and push."
 - [Sungmin, 10-05] "The video on the subject's phone looks lower quality than the original. Is that normal?"
 
-## Guide sync (#9)
+## Guide sync ([#9])
 
 - [Sungmin, 10-06] "Does the current code already share the guide overlay to the other phone, or does that need new work?"
 - [Sungmin, 10-06] "Here is issue #9. The overlay on the photographer's phone should appear on the subject's phone and follow every adjustment. Plan first, don't implement. You don't have to follow the issue literally; plan the best approach."
@@ -35,3 +35,7 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 - [Sungmin, 10-06] "The photographer's preview looks too small. Should *End session* take the place of *Shoot together* at the top? Why is *Shoot together* still shown while connected? Don't change anything yet; give me your view."
 - [Sungmin, 10-06] "Hide *Shoot together* while connected and put *End session* in its place."
 - [Sungmin, 10-06] "Add placeholders for the two screenshots (subject and photographer) in the PR description."
+
+[#8]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/8
+[#9]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/9
+[#10]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/10

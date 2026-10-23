@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-20, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park
 """One pose candidate per call through OpenRouter's Image API."""
 
 import asyncio
@@ -75,7 +75,7 @@ class PoseGenerator:
                     "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(scene).decode()},
                 }
             ],
-            "aspect_ratio": "3:4",  # the app's fixed frame (AD-10)
+            "aspect_ratio": "3:4",  # every scene, whatever its ratio; the scene's own ratio comes later (Design 2.6.3)
             "resolution": "1K",
             "seed": seed % SEED_LIMIT,
         }

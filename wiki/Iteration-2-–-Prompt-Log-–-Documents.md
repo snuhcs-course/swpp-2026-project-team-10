@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]]
 
-One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11–10/23. Each prompt is quoted as it was sent; attachments are named in a note. Prompts are given in the order they were sent; follow-ups that only confirmed a result are left out. The session was told, through `CLAUDE.md`, to commit or push only when asked, so each "commit" below is an explicit instruction.
+One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11–10/23; the prompts of the same session for the tests, the coverage, and the integration are on [[Testing|Iteration-2-–-Prompt-Log-–-Testing]]. Each prompt is quoted as it was sent; attachments are named in a note. Prompts are given in the order they were sent; follow-ups that only confirmed a result are left out. The session was told, through `CLAUDE.md`, to commit or push only when asked, so each "commit" below is an explicit instruction.
 
 ## AI rules in CLAUDE.md and the PR template ([#44], [#62])
 
@@ -72,28 +72,6 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 - [Joonhyung, 10-21] "각 Documentation에서의 변화들로 영어 요약을 작성해 줘."
 - [Joonhyung, 10-21] "Briefly introduce your progress in feature testing. Show which features you have tested so far and how you tested them. Share any key findings, failures, or issues identified through testing. Explain how the testing results have affected, or will affect, your implementation. Briefly describe what you plan to test next. 이 부분을 작성해야 하는데, 지금까지의 git을 바탕으로 레이턴시 테스트, CI Test(android/server), Image Test(첨부 폴더), unit test 등을 포함해서 설명해 줘. 그리고 간단히 영어로 요약해서 작성해 줘." (The speed-target image and the `20261021-cc0-arcade-test` folder were attached.)
 
-## Testing Documentation 1.10–1.13: coverage tools, screen and adapter tests, results, and targets ([#69], [#94])
-
-- [Joonhyung, 10-22] "이 이슈 https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/69 를 진행하려 한다. 지금 현재 Task 상황에 대해서 정리해 줘."
-- [Joonhyung, 10-22] "chore/a1-coverage 브랜치로 JaCoCo랑 pytest-cov 추가해 줘." (Testing Documentation 1.10: the two TODO lines of 2.1.1 and 2.1.4 became the configuration.)
-- [Joonhyung, 10-22] "푸시하고 PR 작성해 줘."
-- [Joonhyung, 10-22] "테스팅 문서에 우리 커버리지 목표 값을 지금 제안된 값을 한 번 다시 검토하고, 어느 정도 수치가 적절한지 설명해 줘."
-- [Joonhyung, 10-22] "View와 Adapter 부분의 커버리지를 올릴 수 있는 부분이 있는가?"
-- [Joonhyung, 10-22] "CameraFragment render 테스트부터 FragmentScenario로 추가해 줘." (Revision 1.11.)
-- [Joonhyung, 10-22] "일단 이 부분만 push하고, draft로 놔둬 줘. 그리고 View 커버리지를 보고해 줘."
-- [Joonhyung, 10-22] "SubjectFragment, JoinCodeFragment, ConnectionLostFragment도 같은 방식으로 추가해 줘. 그리고 지금 다른 브랜치로 했는데, 그렇게 하면 안 되고, chore/a1-coverage 브랜치를 기준으로 지금 #95를 여기에 머지해서 PR을 유지해 줘." (Revision 1.12; [#95] was merged into the branch and closed.)
-- [Joonhyung, 10-22] "RoomCodeSheet랑 guide, generation 화면도 같은 방식으로 추가해 줘." (Revision 1.13.)
-- [Joonhyung, 10-22] "Testing Documentation 2.2에 지금 수치 기록해 줘." (Revision 1.14: the first results of 2.2.1 with the four report screenshots and the Test Log's first row.)
-- [Joonhyung, 10-22] "App에서 platform adapters의 커버리지를 늘릴 방안에 대해서 생각해 줘."
-- [Joonhyung, 10-22] "1번의 세 가지를 지금 chore/a1-coverage에 추가해 줘." (Revision 1.15; 2.2.1 re-recorded on the new commit.)
-- [Joonhyung, 10-23] "PR #94 본문 다시 확인해 줘. 그리고 Platform adapters의 커버리지는 어떻게 향상시킬 수 있는지 검토해 줘." (The agent found and fixed four stale parts of the PR body and gave four ways to raise the layer, with the expected coverage of each.)
-- [Joonhyung, 10-23] "1번 네 가지를 chore/a1-coverage에 추가해 줘. 그리고 Test document에서 이번 변경 사항들을 버전 업을 각각 하는 게 아니라, 하나로 통합해서 작성해 줘. 그리고 가능하면 지금 dev 브랜치와 컨플릭트 나는 부분에 대해서 resolve해 줘." (`dev` was merged into the branch with a merge commit; the six revision rows 1.10–1.15 became one row, 1.13, after dev's 1.10–1.12.)
-- [Joonhyung, 10-23] "계정 Fragment 4개도 FragmentScenario 테스트 추가해 줘."
-- [Joonhyung, 10-23] "CameraFragment 남은 경로도 커버해 줘."
-- [Joonhyung, 10-23] "일단 지금까지 커버리지가 된 부분을 정리해서 보여 줘."
-- [Joonhyung, 10-23] "그러면 지금 이 상태로 목표를 순서대로 (App) 90 / 90 / 90 / 30 (Server) 90 / 90 / 90으로 Testing 문서를 기준으로 바꿔 주고, Adapter 부분에 대해서 커버리지가 낮은 이유와 추후 이터레이션에서 보완할 방안들에 대해서 제안하는 식으로 작성해 줘." (2.1.2: the targets set with the proposals kept, and the adapter layer's reasons and the measures of Iterations 3 and 4.)
-- [Joonhyung, 10-23] "지금까지의 내용을 바탕으로 AI Collaboration Report에서 Document 부분의 Prompt 로그를 작성해 줘."
-
 ## Syncing the Design Documentation, R&S, and wireframes with the app as built ([#97])
 
 - [Jaewan, 10-23] "Now can you check for anything we've changed and is implemented in our code that is NOT consistent with the design document and R&S. And fix the docs accordingly. If the system architecture graphic should be fixed update the html, and if the wireframe images should be fixed update https://claude.ai/artifact/GRLQMzirhDrBui9WWTQ1vm directly. Create a new branch and do this."
@@ -101,6 +79,21 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 - [Jaewan, 10-23] "fix the stale comments in this branch. we'll do the server ratio in the next iteration."
 - [Jaewan, 10-23] "also for all wiki documents, can you add any missing paths for issue/PR shorthands?"
 - [Jaewan, 10-23] "not for shorthands that are in the prompt logs' prompt messages"
+
+## Closing Iteration 2 in the documents ([#97])
+
+- [Joonhyung, 10-23] "docs/align-design-and-rs 원격 브랜치를 기준으로 다음을 작성하려 한다. 각각을 하나의 커밋으로 진행해서 푸시할 예정인데, 일단 커밋 푸시하지 말고, 수정본을 작성해 줘. 1. Daily Standup Meeting 최신화. 한준형은 월요일 데모 영상 및 중간 발표 자료 준비 및 발표 준비, 화 수 목에는 각각 테스팅 관련 업데이트 진행했고, PM으로 팀원 피처 일정 관리 등을 진행했다고 작성해 줘. 그리고 나머지 팀원은 아래 첨부했다. 2. 그리고 iter1 때 남아 있는 것들 중에 iter2 내용으로 안 덮어씌워진 것들이 있는데, 이를 수정하고, 최신화해 줘. 예를 들어, design documentation에 iter 1 때 아키텍처 그래픽이 남아 있는데, 이를 없애 줘." (The notes of 박동제, 조성민, and 박재완 for 10/19–10/22 were pasted after the prompt.)
+- [Joonhyung, 10-23] "일단 각각 커밋하고 푸시해 줘."
+- [Joonhyung, 10-23] "그리고 디자인, R&S, 테스팅 문서에서 지금 이터에서 반영되어야 할 부분, 수정해야 할 부분이 있으면 찾아서 알려 줘." (The agent listed four passages already wrong, the placeholders due by 10/25, and the long-standing leftovers.)
+- [Joonhyung, 10-23] "1, 2, 4 문구 수정본부터 작성해 줘. 참고로 이번 이터 때는 P15(Invitations: push notification with a link fallback), P16(Sessions across networks: TURN relay, invitations, and reconnection)은 구현되지 않았다. 이는 다음 이터레이션 때 추가해서 구현할 예정이다."
+- [Joonhyung, 10-23] "추가적으로 Could 부분도 Iter3 이후로 넘길 예정이다. 그리고 가능하면, revision 버전이 날짜마다 너무 계속 번잡하게 바뀌는 것 같아서, 가능하면 간략하게 버전을 합쳐 줘." (The branch's revision rows became one row per page; rows already on `dev` stayed.)
+- [Joonhyung, 10-23] "이 수정본 하나의 커밋으로 묶어서 푸시해 줘."
+- [Joonhyung, 10-23] "테스팅 문서에서도 #94 브랜치의 내용들을 반영해서 갱신해 줘. 그리고 PR #97 본문도 이 커밋들 반영해서 갱신해 줘." (The Testing page already carried [#94]; the results were re-run on `dev` after [#96] and recorded.)
+
+## Demo README and the AI Collaboration Report at the close ([#61])
+
+- [Joonhyung, 10-23] "https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/61 이 이슈를 진행하려 한다. README 초안을 작성해 줘."
+- [Joonhyung, 10-23] "그리고 AI Collaboration Report를 최신화하고자 한다. Written by: 한준형, ChatGPT Codex, GitHub Copilot code review의 TBD는 지워 줘. 그리고 Testing에서 나와의 대화 내용도 마찬가지로 Prompt log로 작성해 줘."
 
 [#44]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/44
 [#62]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/62
@@ -115,3 +108,4 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 [#94]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/94
 [#95]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/95
 [#97]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/97
+[#61]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/61

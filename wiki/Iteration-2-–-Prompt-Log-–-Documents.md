@@ -81,12 +81,12 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 - [Joonhyung, 10-22] "View와 Adapter 부분의 커버리지를 올릴 수 있는 부분이 있는가?"
 - [Joonhyung, 10-22] "CameraFragment render 테스트부터 FragmentScenario로 추가해 줘." (Revision 1.11.)
 - [Joonhyung, 10-22] "일단 이 부분만 push하고, draft로 놔둬 줘. 그리고 View 커버리지를 보고해 줘."
-- [Joonhyung, 10-22] "SubjectFragment, JoinCodeFragment, ConnectionLostFragment도 같은 방식으로 추가해 줘. 그리고 지금 다른 브랜치로 했는데, 그렇게 하면 안 되고, chore/a1-coverage 브랜치를 기준으로 지금 [#95]를 여기에 머지해서 PR을 유지해 줘." (Revision 1.12; [#95] was merged into the branch and closed.)
+- [Joonhyung, 10-22] "SubjectFragment, JoinCodeFragment, ConnectionLostFragment도 같은 방식으로 추가해 줘. 그리고 지금 다른 브랜치로 했는데, 그렇게 하면 안 되고, chore/a1-coverage 브랜치를 기준으로 지금 #95를 여기에 머지해서 PR을 유지해 줘." (Revision 1.12; [#95] was merged into the branch and closed.)
 - [Joonhyung, 10-22] "RoomCodeSheet랑 guide, generation 화면도 같은 방식으로 추가해 줘." (Revision 1.13.)
 - [Joonhyung, 10-22] "Testing Documentation 2.2에 지금 수치 기록해 줘." (Revision 1.14: the first results of 2.2.1 with the four report screenshots and the Test Log's first row.)
 - [Joonhyung, 10-22] "App에서 platform adapters의 커버리지를 늘릴 방안에 대해서 생각해 줘."
 - [Joonhyung, 10-22] "1번의 세 가지를 지금 chore/a1-coverage에 추가해 줘." (Revision 1.15; 2.2.1 re-recorded on the new commit.)
-- [Joonhyung, 10-23] "PR [#94] 본문 다시 확인해 줘. 그리고 Platform adapters의 커버리지는 어떻게 향상시킬 수 있는지 검토해 줘." (The agent found and fixed four stale parts of the PR body and gave four ways to raise the layer, with the expected coverage of each.)
+- [Joonhyung, 10-23] "PR #94 본문 다시 확인해 줘. 그리고 Platform adapters의 커버리지는 어떻게 향상시킬 수 있는지 검토해 줘." (The agent found and fixed four stale parts of the PR body and gave four ways to raise the layer, with the expected coverage of each.)
 - [Joonhyung, 10-23] "1번 네 가지를 chore/a1-coverage에 추가해 줘. 그리고 Test document에서 이번 변경 사항들을 버전 업을 각각 하는 게 아니라, 하나로 통합해서 작성해 줘. 그리고 가능하면 지금 dev 브랜치와 컨플릭트 나는 부분에 대해서 resolve해 줘." (`dev` was merged into the branch with a merge commit; the six revision rows 1.10–1.15 became one row, 1.13, after dev's 1.10–1.12.)
 - [Joonhyung, 10-23] "계정 Fragment 4개도 FragmentScenario 테스트 추가해 줘."
 - [Joonhyung, 10-23] "CameraFragment 남은 경로도 커버해 줘."

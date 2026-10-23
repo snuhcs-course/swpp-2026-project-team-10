@@ -73,7 +73,7 @@ Use FastAPI for the server framework. We would have to use sqlalchemy and alembi
 
 ## Pose generation flow ([#7])
 
-- [Jaewan, 10-05] "Now implement the client-side pose generation flow (issue [#7]). Since we changed the design principle (ex. preprocess image at client side before sending to server), make sure to follow these according to the new design document."
+- [Jaewan, 10-05] "Now implement the client-side pose generation flow (issue #7). Since we changed the design principle (ex. preprocess image at client side before sending to server), make sure to follow these according to the new design document."
 - [Jaewan, 10-05] "Tell me how I should test this on android studio & android device"
 - [Jaewan, 10-05] "when clicking 'Guide -> Generate poses here', the app immediately captures the camera screen there and then automatically sends to the server API. we need steps in between here. After we click generate poses here, there should be some step where we show the camera screen to the user and make them press the shutter to shoot the scene image. Also after the image is taken, we should have something like "Use this image" -> yes (use it and generate) / no (shoot again)."
 - [Jaewan, 10-05] "What do you recommend for the camera screen? spawn a new one and add zoom to this or build this into the camera screen?"
@@ -94,10 +94,9 @@ Use FastAPI for the server framework. We would have to use sqlalchemy and alembi
 - [Jaewan, 10-06] "can you summarize how flow 2 wireframe should be fixed? and what the missing 'Camera, taking the scene photo' wireframe should illustrate?"
 - [Jaewan, 10-06] "make this concise. I will write this into the PR comment"
 - [Jaewan, 10-06] "can you draw the new flow part as mermaid"
-- [Jaewan, 10-06] "PR [#31] was just merged to dev, can you update this branch with content in the new dev (don't rebase, just merge) and solve conflicts?"
+- [Jaewan, 10-06] "PR #31 was just merged to dev, can you update this branch with content in the new dev (don't rebase, just merge) and solve conflicts?"
 - [Jaewan, 10-06] "commit and push this"
 
 [#4]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/4
 [#7]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/7
 [#18]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/18
-[#31]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/31

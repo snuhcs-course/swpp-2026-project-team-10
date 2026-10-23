@@ -115,6 +115,23 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-18] "Shut down the emulator. And add one later task to the documents: the subject's phone shows the guide's photo the same way. Whether we do it in this iteration is not decided." (A *Still open* row in the Design Documentation; it needs the reference sent to the subject, which AD-6 and AD-15 now rule out.)
 - [Dongje, 10-18] "Commit it to #89 as well and push it."
 
+## Saved guides (#58, [#96])
+
+**Plan (10/21–10/23)**
+
+- [Dongje, 10-21] "Let's start issue #58. Is there anything I should consider or discuss with the team?" (The agent listed what the Design already fixes and the open points: the new contracts, the stored format against the mask-only transfer, saving on the subject's phone, the schedule, and eight screen choices with a recommendation each.)
+- [Dongje, 10-23] "Some PRs were merged. Update the local branch, review #58 again, and tell me." (#94 gives `AppContainer` a constructor and tests the same sheet and Camera screen; #92's device-transfer rules would copy saved guides to a new phone.)
+- [Dongje, 10-23] "Is it bad to keep the cutout as it is?"
+- [Dongje, 10-23] "No, don't change the Design; for this task we keep it as it is. And why did #94 touch the AppContainer? Should I develop from the start expecting to merge after it?"
+- [Dongje, 10-23] "No need to review it; let's go on with ours, from step 1. Follow the recommendations, but wouldn't it be better for a loaded guide to start where the person stands in the reference?" (IT-9's expected result changed with it.)
+
+**Store, Save guide, and the list (10/23)**
+
+- [Dongje, 10-23] "Yes, commit it and go on. We'll fix things after #94 is merged, but build it expecting #94 to be merged." (*Save guide* came with an in-memory store that #94's test container can take.)
+- [Dongje, 10-23] "Yes, commit it and go on." (The saved guides on *Add a pose guide*, with emulator screenshots.)
+- [Dongje, 10-23] "Yes, commit it and go on." (IT-9 after a force-stop on the emulator, then the documents.)
+- [Dongje, 10-23] "Yes, commit it and open the PR now."
+
 ## Daily standup rows (10/14)
 
 - [Dongje, 10-14] "Write my rows of the daily standup log from Tuesday on. For Tuesday and Wednesday, split the task we merged into two parts. Over Thursday, Friday, and Saturday I will work on #52 (Iter2-P11) and #51 (Iter2-P10): split them into tasks per day, very briefly."
@@ -125,3 +142,4 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#80]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/80
 [#83]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/83
 [#89]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/89
+[#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96

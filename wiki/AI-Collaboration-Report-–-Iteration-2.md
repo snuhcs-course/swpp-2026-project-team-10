@@ -8,8 +8,8 @@
 
 - **Documents:** the AI rules ([#62]), the Iteration 2 R&S and design ([#66], [#67]), the issue renumbering, the Testing Documentation ([#70]), and the CLAUDE.md rules and history ([#76]): Claude Code.
 - **Server:** deployment on the course servers with Docker and nginx ([#71]), sessions and room codes in Redis ([#75]), accounts and friends ([#78]), pose descriptions and suggested poses ([#90]), invitations (TBD): TBD which tool wrote which part.
-- **Android:** smooth outlines ([#72]), pinch zoom and the guide-edit mode ([#74]), the Join code fix ([#81]), camera controls ([#80]), guide controls and the thumbnail ([#83]), remote brightness, flash, and guide moves ([#85]), Subject view's video fit ([#89]): Claude Code wrote the code, the tests (154 in all), and the documents; humans reviewed on phones and decided. Zoom stutter, saved guides, sign-in and friends screens: TBD.
-- **Code review:** Claude Code wrote 박동제's reviews of [#74], [#75], and [#78] ([[log|Iteration-2-–-Prompt-Log-–-Code-Reviews]]); the Codex reviewer commented on seven feature PRs, and the author judged each finding before fixing or declining it (section 4).
+- **Android:** smooth outlines ([#72]), pinch zoom and the guide-edit mode ([#74]), the Join code fix ([#81]), camera controls ([#80]), guide controls and the thumbnail ([#83]), remote brightness, flash, and guide moves ([#85]), Subject view's video fit ([#89]), saved guides ([#96]): Claude Code wrote the code, the tests (190 in all), and the documents; humans reviewed on phones and decided. Zoom stutter, sign-in and friends screens: TBD.
+- **Code review:** Claude Code wrote 박동제's reviews of [#74], [#75], [#78], and [#92] ([[log|Iteration-2-–-Prompt-Log-–-Code-Reviews]]); the Codex reviewer commented on seven feature PRs, and the author judged each finding before fixing or declining it (section 4).
 - **CLAUDE.md:** updated by the feature PRs with the code; Iteration 2 adds the marker, Testing Documentation, and no-force-push rules ([[history|Iteration-2-–-CLAUDE-md-History]]).
 - **Markers in the code:** every AI-written source file starts with `AI-generated with <tool>, <date>, reviewed by <name>` ([all markers](https://github.com/search?q=repo%3Asnuhcs-course%2Fswpp-2026-project-team-10+%22AI-generated+with%22&type=code)), more than guidelines v1.1 require. The `manually fixed by <name>, <date>` note it asks for next to hand-edited code has not been needed: no merged PR edited code by hand (TBD if that changes).
 - **Not used:** the kickoff and product decisions (what the guide shows, where controls sit, what is Could), tests on real phones, and the final review verdicts; AI wrote text and code against them. TBD for the remaining tasks.
@@ -35,6 +35,7 @@ Full input prompt logs, one page per task, with the prompts as they were sent an
 - **Guide controls ([#83]):** before writing code, the agent listed what P11 changes in the shared contracts and which parts belong to other owners, so the mask-only transfer was left to 조성민 and nothing in the sync code changed. Each of the four UI steps came with emulator screenshots of the real app, which is where 박동제 changed two of them (no *Replace* button, no close button on the thumbnail). The starting position was checked with two references, one taller and one wider than the frame, in all three ratios. From the plan to the PR in about 1.5 hours of one session (planned 3 h).
 - **Remote brightness, flash, and guide moves ([#85]):** from the plan to a build that passed every item of the two-phone check in about 1.5 hours of agent time (planned 4 h; about 1 h of mine for the plan, the two-phone check, and four review rounds). The plan started from what [#80] had already laid down (`camera.state` with exposure, flash, and aspect; `setExposure` and `setFlash`) instead of re-doing it, reused the zoom path's step-then-final and echo-held rules for the two new controls through one small class, and sent guide moves through the existing repository so the photographer's limits held without new clamping code. Each of the four Codex findings was assessed first and then fixed with a test in about ten minutes.
 - **Subject view's video ([#89]):** with the course servers closed off campus, the agent ran the server on the laptop and joined the emulator and the S22 over the same Wi-Fi, which found a bug that #80's unit tests could not: the subject's video was cropped while the grid and the guide fit the frame. It measured the offset in each ratio, traced it to WebRTC's renderer cropping a `match_parent` view, tried the fix on the S22 before committing, and wrote a test that fails on the old layout.
+- **Saved guides ([#96]):** before writing code, the agent listed what the Design already fixed and what needed the team. Asked to look again after #92 and #93 were merged, it found that #94 gives `AppContainer` a constructor and adds tests for the same sheet and Camera screen, and that #92's device-transfer rules would copy saved guides to a new phone; the work was built to follow #94, with an in-memory store its test container can take. Each new test class was checked by breaking the code on purpose (ten deliberate bugs, each caught), each UI step came with emulator screenshots, and IT-9 ran after a force-stop.
 - TBD (one bullet per remaining feature PR, from its *AI usage* section).
 
 </details>
@@ -117,6 +118,10 @@ Full input prompt logs, one page per task, with the prompts as they were sent an
   - Before: "the subject's view doesn't follow the photographer's ratio change, why?"
   - After: "...is this in this issue's scope? Just tell me whether it is or not."
   - Why: the answer named the owning task ([#80]) in two sentences, and the finding became a separate bug issue (Iter2-A4) instead of growing this PR.
+- **Looking again after merges ([#96])**
+  - Before: "Let's start issue #58. Is there anything I should consider or discuss with the team?"
+  - After, two days later: "Some PRs were merged. Update the local branch, review #58 again, and tell me."
+  - Why: the second look found what the first could not: an open PR (#94) rebuilding `AppContainer` and testing the same screens, and new transfer rules (#92) that would have copied saved guides to a new phone.
 - TBD
 
 </details>
@@ -135,6 +140,7 @@ Full input prompt logs, one page per task, with the prompts as they were sent an
 - **Guide controls ([#83]):** decisions by 박동제: the mask-only transfer is 조성민's; the four open points as the agent proposed (a new guide keeps the height and center of the person's box, *Reference confirm* on a neutral single color, a replacement starts at its own reference's place, the thumbnail in the top-left corner); no *Replace* button, *Guide* asks to replace instead; a tap, not a close button, makes the thumbnail small again, and a drag moves it only between the four corners; the size limits stay fixed for every start (FR-3.3 revised).
 - **Join with code ([#81]):** that the code is offered only from *Session not found*, and selected so that typing replaces it, was the agent's proposal in the issue text, accepted when the issue was posted.
 - **Remote controls ([#85]):** decisions taken at the plan: the brightness panel copied into Subject view's layout instead of a shared include, so the Camera layout stays 박동제's; `by` on `guide.state` through the syncer's attribution instead of a repository change; the Could items (remote focus, the permission switch) left as protocol messages only, with a Design TODO.
+- **Saved guides ([#96]):** decisions by 박동제: keep the cutout as stored without changing Design 2.8, which names the mask; a used saved guide starts where the person stands in its reference, not where it was saved, so IT-9's expected result changed; build to merge after #94; the agent's proposals for the screens (a bookmark in the guide's panel, the list under *Generate poses here*, an ✕ that asks before deleting).
 - TBD
 
 </details>
@@ -165,3 +171,5 @@ Full input prompt logs, one page per task, with the prompts as they were sent an
 [#85]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/85
 [#89]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/89
 [#90]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/90
+[#92]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/92
+[#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96

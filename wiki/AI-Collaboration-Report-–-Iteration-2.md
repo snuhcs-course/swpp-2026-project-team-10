@@ -2,7 +2,7 @@
 
 **Tools used:** Claude Code (Claude Fable 5.1; Claude Opus 5.5 for the camera and guide tasks), ChatGPT Codex (reviewer on the feature PRs), GitHub Copilot code review.
 
-**How this report was prepared.** From each PR's *AI usage* section, written when the PR was opened, and the prompt logs; the per-PR evidence is on [[Evidence by PR|Iteration-2-–-AI-Collaboration-Report-–-Evidence]].
+**How this report was prepared.** From each PR's *AI usage* section and the prompt logs; the per-PR evidence is on [[Evidence by PR|Iteration-2-–-AI-Collaboration-Report-–-Evidence]].
 
 ## 1. Where AI Was Used
 
@@ -17,32 +17,32 @@ Prompts as sent, no responses, one page per task: [[Documents|Iteration-2-–-Pr
 
 ## 3. What AI Did Well
 
-- **Fast from plan to device:** 15 minutes to 1.5 hours of agent time per feature PR against 1–4 planned hours, first test runs mostly passing ([#74], [#80], [#83], [#85]).
+- **Fast from plan to device:** 15 minutes to 1.5 hours of agent time per feature PR against 1–4 planned hours ([#74], [#80], [#83], [#85]).
 - **It checked before it wrote** (overlaps listed, smoothing prototyped in Python; [#72], [#80]) **and found on devices what tests could not:** the cropped subject video, `PreviewView` drawing outside the crop ([#80], [#89]).
-- **Screen tests on a container of fakes** took the Views layer from 29 % to 91 % in two days and found a real bug (a hidden guide left the edit toggle drawn as on) ([#94]).
-- **It read the recordings as a tester:** matched six demo videos to the scripts, wrote down what each does not show, and named the observation that became [#99] ([#98]).
+- **Screen tests on a container of fakes** took the Views layer from 29 % to 91 % and found a real bug (a hidden guide left the edit toggle drawn as on) ([#94]).
+- **It read the recordings as a tester:** matched six demo videos to the scripts, noted what each does not show, and named the observation that became [#99] ([#98]).
 
 ## 4. Hallucinations / Errors
 
-- **Platform behaviour asserted, not checked:** `PreviewView` assumed to clip; the subject's renderer said to "fit the stream" when it cropped every frame. Caught on devices, not by the unit tests; one cost a fix PR ([#80], [#89]).
-- **Asynchronous and cross-device states missed:** READY before the exposure was restored, four remote-control edge cases, the edit mode surviving a hidden guide. Caught by the Codex reviewer, each fixed with a test in ten minutes ([#74], [#80], [#85]).
-- **Stale context and weak tests:** a revision number from a replaced scheme, a screenshot from an older build, a PR body left at its first numbers; a password rule tested with a Pix ID the length rule refuses first ([#74], [#83], [#94]).
+- **Platform behaviour asserted, not checked:** `PreviewView` assumed to clip; the subject's renderer said to "fit the stream" when it cropped every frame. Caught on devices; one cost a fix PR ([#80], [#89]).
+- **Asynchronous and cross-device states missed:** READY before the exposure was restored, four remote-control edge cases, the edit mode surviving a hidden guide. Caught by the Codex reviewer, each fixed with a test ([#74], [#80], [#85]).
+- **Stale context and weak tests:** a revision number from a replaced scheme, an old screenshot, a PR body left at its first numbers; a password rule tested with a Pix ID the length rule refuses first ([#74], [#83], [#94]).
 - **Decisions it should have left open:** a guide style and a *Replace* button the team removed ([#67], [#83]).
 
 ## 5. Prompt Revisions
 
-- **Name what is about to change** ([#74]): "that row goes away later; put the toggle on the camera screen" put the control where it lasted.
-- **Give experiments an exit condition** ([#72]): "if lines cannot read as arms, I will not implement it" turned three tries into a decision.
+- **Name what is about to change** ([#74]): "that row goes away later; put the toggle on the camera screen."
+- **Give experiments an exit condition** ([#72]): "if lines cannot read as arms, I will not implement it."
 - **Ask before "fix it"** ([#85]): "does this need a fix?" first; no wrong fix went in.
 - **Give the facts it cannot see** ([#98]): the phones, the tester, and why cellular pairs could not run came from the team.
 
 ## 6. Manual Fixes and Why
 
-No merged PR edited code or a document by hand, so the `manually fixed by <name>, <date>` note was never needed. When the agent was wrong, we said what was wrong and it fixed it with a test or a new commit, because that was faster than editing and left a commit a reader can find. The two document slips of 10/13 went the same way: the agent wrote the version sequence as "continue as 1.10, 1.11" on the R&S and Design pages, and applied the R&S renumbering to `dev` instead of [#66]'s branch because a worktree held that branch; the PM caught both in review, and the agent redid them in [#66]'s commit `932a915` and in [#68] (`7ee4b9c`). What humans did by hand was decide: the guide-edit toggle and its defaults, outline only, the controls' places, no *Replace* button, the coverage targets, what the recordings prove, and the Iteration 3 scope; and 한준형 wrote [#98]'s body himself.
+No merged PR edited code or a document by hand, so the `manually fixed by <name>, <date>` note was never needed: when the agent was wrong, we said so and it fixed it with a test or a new commit, which is faster than editing and leaves a commit a reader can find. The two 10/13 slips went that way: the version sequence written as "continue as 1.10, 1.11" on the R&S and Design pages, and the R&S renumbering applied to `dev` instead of [#66]'s branch (a worktree held it); the PM caught both in review and the agent redid them in [#66] (`932a915`) and [#68] (`7ee4b9c`). Humans decided instead: the guide-edit toggle and its defaults, outline only, the controls' places, no *Replace* button, the coverage targets, what the recordings prove, the Iteration 3 scope; 한준형 wrote [#98]'s body himself.
 
 ## 7. Takeaway for Iteration 3
 
-- Check camera and video code on a device at each step, and run the two-phone check before merging anything the subject sees.
+- Check camera and video code on a device at each step; run the two-phone check before merging anything the subject sees.
 - Keep the Codex reviewer on camera and session code; paste its findings as questions first.
 - Ask for overlaps before coding; after merging `dev`, have the agent re-read the documents.
 - Run the integration scripts with the `Timings` log on, and give the agent the test matrix before it writes the record.

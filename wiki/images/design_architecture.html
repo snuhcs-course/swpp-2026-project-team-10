@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Pix · Design architecture figures</title>
+<title>Pix · Design architecture figure</title>
 <style>
   body { max-width: 900px; margin: 24px auto; padding: 0 16px; background: #fff; color: #1c2433; font-family: "Helvetica Neue", Arial, sans-serif; }
   h1 { font-size: 16px; margin: 0 0 4px; }
@@ -13,79 +13,17 @@
 </head>
 <body>
 <!--
-  Source of the two architecture figures in the Design Documentation (wiki/Design-Documentation.md).
+  Source of the architecture figure in the Design Documentation (wiki/Design-Documentation.md).
   The captions and all other text are in that page; this file holds only the drawings.
 
-  To change a figure: edit its <svg> here, save that element alone as an .svg file, and render it at twice
+  To change the figure: edit its <svg> here, save that element alone as an .svg file, and render it at twice
   its size over the image the wiki page uses:
     rsvg-convert -w 1800 -b white figure.svg -o wiki/images/<name>.png
 -->
-<h1>Pix · Design architecture figures</h1>
-<p>Open this file in a browser to see the drawings. The published images are <code>design_architecture.png</code> and <code>design_target_architecture.png</code>.</p>
+<h1>Pix · Design architecture figure</h1>
+<p>Open this file in a browser to see the drawing. The published image is <code>design_target_architecture.png</code>.</p>
 
-<h2>Figure 1 · <code>design_architecture.png</code> · Iteration 1</h2>
-<svg viewBox="0 0 900 366" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica Neue, Arial, sans-serif" fill="#1c2433" style="width:100%;height:auto">
-<defs>
-  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5d6677"/></marker>
-  <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f5bd3"/></marker>
-</defs>
-<!-- same Wi-Fi network -->
-<rect x="6" y="64" width="888" height="294" rx="12" fill="none" stroke="#9aa3b2" stroke-dasharray="6 5"/>
-<text x="20" y="349" font-size="10" fill="#5d6677">Same Wi-Fi network · Iteration 1 test setup</text>
-<!-- external service -->
-<rect x="385" y="10" width="130" height="40" rx="8" fill="#fff" stroke="#9aa3b2"/>
-<text x="450" y="27" text-anchor="middle" font-size="10.5" font-weight="700">Image-editing API</text>
-<text x="450" y="42" text-anchor="middle" font-size="9.5" fill="#5d6677">external vendor</text>
-<!-- server -->
-<rect x="300" y="76" width="300" height="130" rx="10" fill="#eef2fb" stroke="#9aa3b2"/>
-<text x="314" y="96" font-size="12.5" font-weight="700">Pix server</text>
-<text x="586" y="96" text-anchor="end" font-size="10" fill="#5d6677">laptop · FastAPI</text>
-<rect x="314" y="104" width="272" height="44" rx="6" fill="#fff" stroke="#c9cfd9"/>
-<text x="450" y="121" text-anchor="middle" font-size="11" font-weight="700">REST API · pose proxy</text>
-<text x="450" y="138" text-anchor="middle" font-size="9.5" fill="#5d6677">GET /pose-templates · POST /poses</text>
-<rect x="314" y="156" width="272" height="38" rx="6" fill="#fff" stroke="#c9cfd9"/>
-<text x="450" y="172" text-anchor="middle" font-size="11" font-weight="700">Signaling hub · WebSocket</text>
-<text x="450" y="187" text-anchor="middle" font-size="9.5" fill="#5d6677">room codes and sessions in memory</text>
-<!-- phones -->
-<rect x="16" y="76" width="250" height="250" rx="10" fill="#f7f9fc" stroke="#9aa3b2"/>
-<text x="30" y="97" font-size="12.5" font-weight="700">Photographer phone</text>
-<text x="30" y="113" font-size="10" fill="#5d6677">Pix app · photographer role</text>
-<rect x="30" y="124" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="142.5" text-anchor="middle" font-size="10.5">UI · Fragments (XML Views)</text>
-<rect x="30" y="158" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="176.5" text-anchor="middle" font-size="10.5">ViewModels · StateFlow</text>
-<rect x="30" y="192" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="210.5" text-anchor="middle" font-size="10.5">Camera (CameraX) · Guide overlay</text>
-<rect x="30" y="226" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="244.5" text-anchor="middle" font-size="10.5">Reference (ML Kit) · Pose generation</text>
-<rect x="30" y="260" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="278.5" text-anchor="middle" font-size="10.5">Session (WebRTC) · Remote control</text>
-<rect x="634" y="76" width="250" height="250" rx="10" fill="#f7f9fc" stroke="#9aa3b2"/>
-<text x="648" y="97" font-size="12.5" font-weight="700">Subject phone</text>
-<text x="648" y="113" font-size="10" fill="#5d6677">Pix app · subject role</text>
-<rect x="648" y="124" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="142.5" text-anchor="middle" font-size="10.5">UI · Subject view</text>
-<rect x="648" y="158" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="176.5" text-anchor="middle" font-size="10.5">ViewModels · StateFlow</text>
-<rect x="648" y="192" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="210.5" text-anchor="middle" font-size="10.5">Session (WebRTC)</text>
-<rect x="648" y="226" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="244.5" text-anchor="middle" font-size="10.5">Guide renderer (local copy)</text>
-<rect x="648" y="260" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="278.5" text-anchor="middle" font-size="10.5">Remote control (zoom)</text>
-<!-- control plane edges -->
-<g stroke="#5d6677" stroke-width="1.4" fill="none">
-  <line x1="450" y1="104" x2="450" y2="53" marker-end="url(#ah)"/>
-  <line x1="266" y1="126" x2="311" y2="126" marker-end="url(#ah)"/>
-  <line x1="634" y1="126" x2="589" y2="126" marker-end="url(#ah)"/>
-  <line x1="269" y1="175" x2="311" y2="175" marker-start="url(#ah)" marker-end="url(#ah)"/>
-  <line x1="631" y1="175" x2="589" y2="175" marker-start="url(#ah)" marker-end="url(#ah)"/>
-</g>
-<g font-size="9.5" fill="#5d6677">
-  <text x="457" y="61">HTTPS</text>
-  <text x="283" y="120" text-anchor="middle">HTTP</text>
-  <text x="617" y="120" text-anchor="middle">HTTP</text>
-  <text x="283" y="169" text-anchor="middle">WS</text>
-  <text x="617" y="169" text-anchor="middle">WS</text>
-</g>
-<!-- media plane -->
-<path d="M266,300 H630" stroke="#2f5bd3" stroke-width="3" fill="none" marker-end="url(#ahb)"/>
-<text x="450" y="293" text-anchor="middle" font-size="10" font-weight="700" fill="#2f5bd3">live video · WebRTC, peer-to-peer, encrypted</text>
-<path d="M270,318 H630" stroke="#2f5bd3" stroke-width="1.6" stroke-dasharray="6 4" fill="none" marker-start="url(#ahb)" marker-end="url(#ahb)"/>
-<text x="450" y="334" text-anchor="middle" font-size="10" fill="#2f5bd3">data channels · guide sync and zoom</text>
-</svg>
-
-<h2>Figure 4 · <code>design_target_architecture.png</code> · target from Iteration 2</h2>
+<h2>Figure 1 · <code>design_target_architecture.png</code> · architecture as built</h2>
 <svg viewBox="0 0 900 432" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica Neue, Arial, sans-serif" fill="#1c2433" style="width:100%;height:auto">
 <defs>
   <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5d6677"/></marker>

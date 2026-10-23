@@ -2,8 +2,6 @@
 
 **Tools used:** Claude Code (Claude Fable 5.1; Claude Opus 5.5 for the camera and guide tasks), ChatGPT Codex (reviewer on the feature PRs), GitHub Copilot code review.
 
-**How this report was prepared.** From each PR's *AI usage* section, written when the PR was opened, and the prompt logs; the per-PR evidence is on [[Evidence by PR|Iteration-2-–-AI-Collaboration-Report-–-Evidence]].
-
 ## 1. Where AI Was Used
 
 - **Documents** (the R&S, design, testing, and CLAUDE.md pages; [#62]–[#76], [#97]) and **every feature PR** ([#71]–[#96]): Claude Code wrote the text, the code, the tests, and the document updates; humans reviewed on phones and decided. Zoom stutter ([#93]) also used ChatGPT Codex.
@@ -13,7 +11,7 @@
 
 ## 2. Prompt History
 
-Prompts as sent, no responses, one page per task: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[Friends|Iteration-2-–-Prompt-Log-–-User-CRUD-and-Friends]] · [[Poses|Iteration-2-–-Prompt-Log-–-Pose-Generation]] · [[Camera|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · [[Real-time|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]] · [[Testing|Iteration-2-–-Prompt-Log-–-Testing]]
+One page per task: [[Documents|Iteration-2-–-Prompt-Log-–-Documents]] · [[Server|Iteration-2-–-Prompt-Log-–-Server-and-Deployment]] · [[Friends|Iteration-2-–-Prompt-Log-–-User-CRUD-and-Friends]] · [[Poses|Iteration-2-–-Prompt-Log-–-Pose-Generation]] · [[Camera|Iteration-2-–-Prompt-Log-–-Camera-and-Guide]] · [[Real-time|Iteration-2-–-Prompt-Log-–-Real-time-and-Remote-Control]] · [[Reviews|Iteration-2-–-Prompt-Log-–-Code-Reviews]] · [[Testing|Iteration-2-–-Prompt-Log-–-Testing]]
 
 ## 3. What AI Did Well
 
@@ -31,14 +29,25 @@ Prompts as sent, no responses, one page per task: [[Documents|Iteration-2-–-Pr
 
 ## 5. Prompt Revisions
 
-- **Name what is about to change** ([#74]): "that row goes away later; put the toggle on the camera screen" put the control where it lasted.
-- **Give experiments an exit condition** ([#72]): "if lines cannot read as arms, I will not implement it" turned three tries into a decision.
-- **Ask before "fix it"** ([#85]): "does this need a fix?" first; no wrong fix went in.
-- **Give the facts it cannot see** ([#98]): the phones, the tester, and why cellular pairs could not run came from the team.
+- **Guide-edit toggle ([#74])**
+  - Before: "Implement the toggle as an icon button." The agent put it in the guide's Cutout / Outline row.
+  - After: "The toggle sits above the Cutout / Outline row, which will go away later anyway. I'd rather have it on the camera screen itself, at the top or the bottom."
+  - Why: it named what another task (Iter2-P11) was about to remove, so the agent chose a place that lasts, beside the zoom readout.
+- **Arm and leg lines ([#72])**
+  - Before: "Do the smooth outline first, then the arms and legs." The first lines traced the upper arms and loose shorts.
+  - After: "With lines alone you cannot tell they are arms. Can you make them more concrete? If this is the limit, I will not implement this part."
+  - Why: an exit condition turned open-ended retries into a decision; the agent showed three versions side by side, and the lines were dropped at one look.
 
 ## 6. Manual Fixes and Why
 
-No merged PR edited code by hand: when the agent was wrong, we said so and it fixed it with a test. Humans decided instead: the guide-edit toggle and its defaults, outline only, the controls' places, no *Replace* button, the coverage targets, what the recordings prove, and the Iteration 3 scope. Two document edits were redone by hand on 10/13.
+No code was edited by hand. What the team decided over the agent's proposals, and why:
+
+- **Deployment ([#71]):** the agent planned a new `deploy` user and an in-place container swap with a few seconds' gap; we kept one member's account and a blue-green switch. Why: we may not add users on the course servers, and even a short gap ends the rooms still waiting for the subject.
+- **Outline only ([#72]):** we dropped the agent's arm and leg lines and kept the smoothed 3 dp outline with no fill. Why: the guide only has to be good enough to refer to while shooting, and lines that do not read as arms mislead more than they guide.
+- **No *Replace* button ([#83]):** the agent built one, as R&S 6.2 listed it; with a guide on the camera, *Guide* now asks to replace it. Why: both buttons opened the same sheet, so the second one only added a choice.
+- **Pose variations ([#90]):** a description goes out as itself and three variations, and *Try other poses* returns to *Generate poses*; we reverted the agent's follow-up that kept the old set. Why: the same text four times gave four nearly identical images, and keeping the old set made *back* move forward in the flow.
+- **Saved guides ([#96]):** a used guide starts where the person stands in its reference, not where it was saved, as the agent recommended. Why: every guide, saved or new, then starts by one rule (FR-3.1); IT-9's expected result changed with it.
+- **Coverage targets ([#94]):** 90 % for the app's managers, ViewModels, and Views and every server module, 30 % for the platform adapters, with no exclusion list. Why: the adapters' remaining lines call CameraX, libwebrtc, ML Kit, or Credential Manager, which need a device; reporting the layer instead of excluding it keeps that gap visible for Iterations 3 and 4.
 
 ## 7. Takeaway for Iteration 3
 
@@ -59,6 +68,8 @@ No merged PR edited code by hand: when the agent was wrong, we said so and it fi
 [#83]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/83
 [#85]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/85
 [#89]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/89
+[#90]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/90
+[#92]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/92
 [#93]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/93
 [#94]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/94
 [#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96

@@ -191,6 +191,54 @@ The kickoff on 2026-10-09 replaced that day's standup ([[Team Meetings|Team-Meet
 
 </details>
 
+<details>
+<summary><b>2026-10-19 (Mon)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter2-A4 ([#86]): checked Subject view against the photographer's aspect ratio on two phones and fixed it ([#89]) | Keep checking the fix in each ratio | – |
+| 박재완 | Prepared the server, deployment, and accounts parts of the midterm presentation, and checked the demo flow against Server B | Pose description on the server ([#53]), which was due 10/18: an optional description in `POST /poses` and its prompt, tried on the example photos. Then the Sign-in, Pix ID, and Friends screens ([#54]) | – |
+| 조성민 | Checked the remote brightness, flash, and guide moves from [#85] (merged 10/18) on the S25 Ultra and S23 Ultra over Server B, together with [#89]'s aspect-ratio fit on Subject view. Read through the camera changes of [#80] and [#83] (the rebind on a ratio change, the exposure restored after a rebind, the last frame held during a ratio change) to plan the zoom fix ([#47]) on top of them | Zoom stutter ([#47]), overdue since 10/15: measure first. `Timings` marks for zoom requests, lens switches, and camera status, and a per-frame trace of the applied zoom | – |
+| 한준형 | Finished the Iteration 2 demo video and the midterm presentation materials; rehearsed the presentation with the demo flow on two phones | Give the midterm presentation (10/21); as PM, go through each member's remaining Iteration 2 issues and their due dates ([#47], [#53], [#54] overdue) and settle the order of the rest | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-20 (Tue)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter2-A4 ([#86]): kept checking and fixing [#89] in 4:3, 16:9, and 1:1 | Review the pose description PR ([#90]); plan Iter2-P18 ([#58]) | – |
+| 박재완 | Pose description on the server ([#53]): an optional `description` in `POST /poses` with its own prompt, the prompts moved into `prompts.toml`, and descriptions tried through OpenRouter on the eight example photos. Decided that the idea chips are string resources in the app (no `GET /pose-ideas`) and that a response to a description has `templateId: null`. Opened [#90], and Codex found no major issues. Added the pose description part to the midterm presentation | Midterm presentation. The Generate poses screen in the app ([#53]). Address the reviews on [#90] and merge it | – |
+| 조성민 | Zoom measurement for [#47]: `zoom.request`, `zoom.apply`, `zoom.lens`, and `camera.status` marks, and a Camera2Interop capture callback that logs each frame's sensor time and applied zoom. A script (`zoom_timings.py`) turns the log into frame intervals, dropped and frozen frames, request-to-frame latency, and the time of each lens switch | The fix for [#47]: zoom requests applied once per display frame, the lens held during a pinch, and the last frame kept on screen through a lens switch | – |
+| 한준형 | Testing: went through the AI Collaboration Report guidelines v1.1 against the Iteration 2 report and listed what to add (the prompt logs become pages of their own, linked from the report's Prompt History); checked the test state of the merged features against the Testing Documentation for the presentation's testing section. PM: checked the schedule with each owner; [#47], [#53], and [#54] are being finished this week, with [#90] in review | Revise the AI Collaboration Report for v1.1 ([#91]); write the testing progress for the midterm presentation (latency, CI, image tests, unit tests) | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-21 (Wed)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Reviewed and approved pose descriptions ([#90]); suggested prompt wording for camera position and framing; summarized the arm and leg approaches tried in Iterations 1 and 2; planned Iter2-P18 ([#58]) | Iter2-P18 ([#58]): saved guides | – |
+| 박재완 | Midterm presentation. Reworked pose generation ([#53]) after the 10/20 results. Every candidate now uses one prompt. Without a description, a vision model suggests four poses for the scene. With one, three candidates follow variations of it, because four requests with the same text gave nearly the same image. A run may take 60 s, because single requests took up to 46 s. Added the Generate poses screen, with "Skip, suggest poses for me" and with "Try other poses" going back to it. Updated Design 1.10, R&S 1.6, the Testing Documentation 1.9 (IT-7), and the Flow 2 wireframe. Fixed the Codex finding on refusal messages and merged [#90] | Sign-in, Pix ID, and Friends screens ([#54]), overdue since 10/18. First settle the four "Still open" rows for Iter2-P13 in the Design, then build Sign in, Sign up, Continue with Google, Pix ID setup, and Friends, and open the PR. Run IT-7 on a phone ([#59]) | – |
+| 조성민 | [#47]: `CameraZoomPlan.lensFor(ratio, current, final)`, which keeps the bound lens until the pinch is 5 % past 1×, with its tests at the band's edges. Built the demo APK from the latest dev ([#85], [#89], [#90]) on Server B and installed it on the S25 Ultra and S23 Ultra | Finish [#47] on the latest dev (`setZoom(ratio, final)`, the last frame through a switch), measure before and after on a phone, and open the PR | – |
+| 한준형 | Midterm presentation. Testing: wrote the testing progress section from the repository's history (the latency measurements, the `android-test` and `server-test` CI runs, the image-API comparison tests, and the unit tests) and the feature status of [#54] and [#47]; revised the AI Collaboration Report for guidelines v1.1 with the prompt logs as separate pages and merged [#91]. PM: confirmed with each owner what lands before 10/25 ([#47], [#54], [#58]) and what moves to Iteration 3 | Iter2-A1 ([#69]): the coverage tools (JaCoCo, pytest-cov) and the first measured run against the proposed targets | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-22 (Thu)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Reviewed sign-in and friends ([#92]); Iter2-P18 ([#58]): saved guide store, Save guide button, and the saved list on Add a pose guide; opened [#96] | Address the review on [#96] after [#94] is merged | – |
+| 박재완 | Sign-in, Pix ID, and Friends screens ([#54]), with the PR opened. Two phones signed in with different accounts and added each other on Server B | Address the reviews on [#54] and merge it. Integration tests for pose generation and friends on Wi-Fi and cellular with the S21, S22, and S23 Ultra ([#59]). Help with the integration on the test phones ([#60]) and the latency and connection-rate measurement per network pair. Fix what the integration finds | – |
+| 조성민 | Zoom stutter fix ([#47]): rebuilt on the latest dev, with `setZoom(ratio, final)`, the lens held during local and remote pinches, and `PreviewHold`, which keeps the last frame through a lens switch, shared with [#80]'s ratio change. Measured before and after on the S23 Ultra: no stutter either way, 30 fps (the most it offers apps), and no lens switch, because it zooms to 0.6× natively. Opened PR [#93] and resolved its conflicts with [#92]. Tested [#92]'s sign-in and friends screens on a phone against a local server | Address the review on [#93]. Measure [#47] on the S21, the only test phone with a separate ultrawide. Integration tests for the room-code session with the guide and remote control ([#59]) | – |
+| 한준형 | Iter2-A1 ([#69], [#94]): JaCoCo and pytest-cov in the repository; screen tests on every Fragment and bottom sheet with `FragmentScenario` on a container of fakes (Views 29 → 86 %); JVM tests for the adapters that can run without a device (23 → 35 %); the first measured results in Testing Documentation 2.2.1 with the report screenshots. PM: reviewed the schedule for the last three days of the iteration ([#93], [#94], [#96] in review; [#59] and [#60] from 10/23) | Merge dev into [#94] and fold its Testing Documentation changes into one revision; the account screens' tests; set the coverage targets from the measured run | – |
+
+</details>
+
 [#5]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/5
 [#6]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/6
 [#11]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/11
@@ -246,3 +294,15 @@ The kickoff on 2026-10-09 replaced that day's standup ([[Team Meetings|Team-Meet
 [#77]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/77
 [#78]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/78
 [#80]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/80
+[#58]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/58
+[#60]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/60
+[#83]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/83
+[#85]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/85
+[#86]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/86
+[#89]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/89
+[#90]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/90
+[#91]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/91
+[#92]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/92
+[#93]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/93
+[#94]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/94
+[#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96

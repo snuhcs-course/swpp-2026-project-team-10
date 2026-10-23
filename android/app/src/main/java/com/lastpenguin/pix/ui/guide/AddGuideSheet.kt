@@ -1,22 +1,28 @@
-// AI-generated with Claude Code, 2026-10-18, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
+import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import kotlinx.coroutines.launch
 
 /**
- * Add a pose guide, or Replace the pose guide with one on the camera (R&S 6.2).
- * Owner: PM (#5); *Generate poses here* starts #7.
+ * Add a pose guide, or Replace the pose guide with one on the camera (R&S 6.2), with the saved guides (FR-3.8).
+ * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58.
  */
 class AddGuideSheet : BottomSheetDialogFragment() {
 
@@ -50,6 +56,38 @@ class AddGuideSheet : BottomSheetDialogFragment() {
             if (generationViewModel.needsConsent) showConsentNotice() else takeScenePhoto()
         }
         binding.cancelButton.setOnClickListener { dismiss() }
+
+        val savedGuides =
+            SavedGuideList(binding, onUse = { referenceViewModel.onUseSaved(it.id) }, onDelete = ::confirmDelete)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { referenceViewModel.savedGuides.collect(savedGuides::render) }
+                launch {
+                    referenceViewModel.savedGuideResults.collect { result ->
+                        when (result) {
+                            SavedGuideResult.USED -> dismiss()
+
+                            SavedGuideResult.FAILED ->
+                                Toast.makeText(
+                                    requireContext(),
+                                    R.string.saved_guide_open_failed,
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** A saved guide is deleted only after asking (FR-3.8); the guide on the camera, if it is that one, stays. */
+    private fun confirmDelete(guide: SavedGuide) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.delete_saved_guide_title)
+            .setMessage(R.string.delete_saved_guide_message)
+            .setPositiveButton(R.string.delete) { _, _ -> referenceViewModel.onDeleteSaved(guide.id) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /** Asked before the first request only (FR-4.2). *Not now* sends nothing and leaves this sheet open. */

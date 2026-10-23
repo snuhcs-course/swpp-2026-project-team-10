@@ -31,7 +31,9 @@ object PixViewModels {
                 container.savedGuideStore,
             )
         }
-        initializer { ReferenceViewModel(container.referenceGuideMaker, container.guideRepository) }
+        initializer {
+            ReferenceViewModel(container.referenceGuideMaker, container.guideRepository, container.savedGuideStore)
+        }
         initializer {
             GenerationViewModel(container.poseGenerator, container.cameraController, container.generationConsent)
         }

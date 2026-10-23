@@ -132,6 +132,13 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-23] "Yes, commit it and go on." (IT-9 after a force-stop on the emulator, then the documents.)
 - [Dongje, 10-23] "Yes, commit it and open the PR now."
 
+**Review (10/23)**
+
+- [Dongje, 10-23] "I merged #94." (`dev` merged into the branch: `AppContainer`'s constructor and `create()`, `TestAppContainer`'s in-memory store, and saved-guide cases in #94's sheet and Camera screen tests.)
+- [Dongje, 10-23] "Yes, commit it and push it."
+- [Dongje, 10-23] "Check the reviews on the PR." (Jaewan's review had fifteen comments; each was checked against the code, and the agent recommended fixing twelve, part of one, and keeping two with their reasons.)
+- [Dongje, 10-23] "Go ahead as recommended." (A load cancelled when the sheet closes, results kept while a screen is stopped, any failure while saving or placing a guide turned into a message, unusable or extra folders deleted at a start, the list ordered by a counter instead of the clock, icons set only when they change, 3:4 thumbnails, the outline traced outside the store's lock, and a line in Design 2.8 for `cutout.webp`; the store keeps its own encoding.)
+
 ## Daily standup rows (10/14)
 
 - [Dongje, 10-14] "Write my rows of the daily standup log from Tuesday on. For Tuesday and Wednesday, split the task we merged into two parts. Over Thursday, Friday, and Saturday I will work on #52 (Iter2-P11) and #51 (Iter2-P10): split them into tasks per day, very briefly."

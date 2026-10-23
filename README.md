@@ -24,12 +24,10 @@ Recorded on a Galaxy S23 Ultra (photographer) and a Galaxy S25 Ultra (subject) w
 
 | Video | What it shows | Player |
 |---|---|---|
-| **Camera basics** (47 s) | The aspect ratio 4:3 → 16:9 → 1:1 with a photo saved in each, the brightness slider, the flash button, zoom, and the last-photo thumbnail | <video src="https://github.com/user-attachments/assets/42a0c887-c326-4025-810d-a0bbcffeb2ee" controls width="220"></video> |
-| **Guide from a photo** (37 s) | *Add a pose guide* with saved guides, a reference photo turned into an outline guide, drag and pinch, opacity, hide, *Save guide*, and *Replace the pose guide?* | <video src="https://github.com/user-attachments/assets/8e64ef8c-8fef-4398-ba66-bbedf2b953d0" controls width="220"></video> |
-| **Sign-in and account** (42 s) | *Friends* signed out, *Continue with Google*, the account sheet with *Edit name*, *Add a password*, and *Sign out* | <video src="https://github.com/user-attachments/assets/88f5413d-0cb8-4226-9d46-2cf4788362fc" controls width="220"></video> |
-| **Shoot together** (81 s, both phones) | A room-code session: the live view, a guide from a reference on both phones, the photographer's moves followed on the subject's phone, a ratio change, the scene photo with a typed description and *Generating poses*, and the subject's brightness applied on the photographer's phone | <video src="https://github.com/user-attachments/assets/724a8990-4207-4f40-8cce-ba2a923e4c07" controls width="320"></video> |
-| **Midterm demo: guide** (43 s, both phones) | Shown at the midterm presentation on 10/21, recorded on 10/15: a room-code session and a guide from a reference synced to the subject | — |
-| **Midterm demo: pose generation** (44 s, both phones) | The same session with *Generate poses here*, "3 of 4 ready", and the chosen pose as the guide on both phones | — |
+| **Camera basics** | The aspect ratio 4:3 → 16:9 → 1:1 with a photo saved in each, the brightness slider, the flash button, zoom, and the last-photo thumbnail | <video src="https://github.com/user-attachments/assets/42a0c887-c326-4025-810d-a0bbcffeb2ee" controls width="220"></video> |
+| **Guide from a photo** | *Add a pose guide* with saved guides, a reference photo turned into an outline guide, drag and pinch, opacity, hide, and *Save guide* | <video src="https://github.com/user-attachments/assets/8e64ef8c-8fef-4398-ba66-bbedf2b953d0" controls width="220"></video> |
+| **Sign-in and account** | *Friends* signed out, *Continue with Google*, the account sheet with *Edit name*, *Add a password*, and *Sign out* | <video src="https://github.com/user-attachments/assets/88f5413d-0cb8-4226-9d46-2cf4788362fc" controls width="220"></video> |
+| **Shoot together** (both phones) | A room-code session: the live view, a guide from a reference on both phones, the photographer's moves followed on the subject's phone, a ratio change, the scene photo with a typed description and *Generating poses*, and the subject's brightness applied on the photographer's phone | <video src="https://github.com/user-attachments/assets/724a8990-4207-4f40-8cce-ba2a923e4c07" controls width="320"></video> |
 
 ## What Iteration 2 does
 

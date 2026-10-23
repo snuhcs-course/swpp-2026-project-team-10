@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -7,7 +7,9 @@ import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.databinding.ItemSavedGuideBinding
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
+import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
@@ -15,6 +17,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,7 +32,8 @@ import org.robolectric.shadows.ShadowDialog
  * Add a pose guide (R&S 6.2, FR-3.6, FR-4.2), on the real bottom sheet. Partitions: no guide on the camera (Add)
  * or a guide (Replace, with Keep the current guide); Generate poses here with consent already given (the scene
  * photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts it);
- * Cancel.
+ * Cancel. Saved guides (FR-3.8): none (the section is hidden); one, which a tap puts on the camera, closing the
+ * sheet; its ✕, which asks first (Cancel keeps it, Delete removes it).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -121,6 +125,56 @@ class AddGuideSheetTest {
         assertTrue(modules.consent.given)
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
         assertFalse(sheet.isAdded)
+    }
+
+    @Test
+    fun savedGuides_noneSaved_hidesTheSection() {
+        launch()
+
+        onSheet { binding ->
+            assertFalse(binding.savedGuidesTitle.isShown)
+            assertFalse(binding.savedGuidesScroll.isShown)
+        }
+    }
+
+    @Test
+    fun savedGuide_tap_putsItOnTheCameraAndCloses() {
+        val modules = TestAppContainer()
+        runBlocking { modules.saved.save(guide(), GuideState()) }
+        launch(modules)
+
+        onSheet { binding ->
+            assertTrue(binding.savedGuidesTitle.isShown)
+            assertEquals(1, binding.savedGuidesList.childCount)
+            ItemSavedGuideBinding.bind(binding.savedGuidesList.getChildAt(0)).thumbnail.performClick()
+        }
+        idle()
+
+        assertEquals("guide-1", modules.guides.guide.value?.id)
+        assertFalse(sheet.isAdded)
+    }
+
+    @Test
+    fun savedGuide_delete_asksFirst_cancelKeepsIt_deleteRemovesIt() {
+        val modules = TestAppContainer()
+        runBlocking { modules.saved.save(guide(), GuideState()) }
+        launch(modules)
+        val delete = { onSheet { binding -> ItemSavedGuideBinding.bind(binding.savedGuidesList.getChildAt(0)) } }
+
+        delete().deleteButton.performClick()
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+        assertEquals(1, modules.saved.saved.value.size)
+
+        delete().deleteButton.performClick()
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertTrue(modules.saved.saved.value.isEmpty())
+        onSheet { binding -> assertFalse(binding.savedGuidesTitle.isShown) }
+        assertTrue(sheet.isAdded)
     }
 
     @Test

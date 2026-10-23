@@ -9,7 +9,7 @@
 - **Documents** (the R&S, design, testing, and CLAUDE.md pages; [#62]–[#76], [#97]) and **every feature PR** ([#71]–[#96]): Claude Code wrote the text, the code, the tests, and the document updates; humans reviewed on phones and decided. Zoom stutter ([#93]) also used ChatGPT Codex.
 - **Testing and integration** ([#94], [#98], [#99]): coverage tools, screen tests on every Fragment, JVM tests of the adapters, the integration record from the demo recordings, and the one fix it found. 756 app and 431 server tests at the close.
 - **Code review:** Claude Code wrote 박동제's reviews; Codex reviewed seven feature PRs, each finding judged by the author.
-- **Markers:** every AI-written source file starts with `AI-generated with <tool>, <date>, reviewed by <name>`. **Not used:** product decisions, phone tests, final review verdicts, and the Iteration 3 scope decision.
+- **Markers:** every AI-written source file starts with `AI-generated with <tool>, <date>, reviewed by <name>`. **Not used:** product decisions, phone tests, final review verdicts, the Iteration 3 scope decision.
 
 ## 2. Prompt History
 
@@ -38,7 +38,7 @@ Prompts as sent, no responses, one page per task: [[Documents|Iteration-2-–-Pr
 
 ## 6. Manual Fixes and Why
 
-No merged PR edited code by hand: when the agent was wrong, we said so and it fixed it with a test. Humans decided instead: the guide-edit toggle and its defaults, outline only, the controls' places, no *Replace* button, the coverage targets, what the recordings prove, and the Iteration 3 scope. Two document edits were redone by hand on 10/13.
+No merged PR edited code or a document by hand, so the `manually fixed by <name>, <date>` note was never needed. When the agent was wrong, we said what was wrong and it fixed it with a test or a new commit, because that was faster than editing and left a commit a reader can find. The two document slips of 10/13 went the same way: the agent wrote the version sequence as "continue as 1.10, 1.11" on the R&S and Design pages, and applied the R&S renumbering to `dev` instead of [#66]'s branch because a worktree held that branch; the PM caught both in review, and the agent redid them in [#66]'s commit `932a915` and in [#68] (`7ee4b9c`). What humans did by hand was decide: the guide-edit toggle and its defaults, outline only, the controls' places, no *Replace* button, the coverage targets, what the recordings prove, and the Iteration 3 scope; and 한준형 wrote [#98]'s body himself.
 
 ## 7. Takeaway for Iteration 3
 
@@ -50,6 +50,7 @@ No merged PR edited code by hand: when the agent was wrong, we said so and it fi
 [#62]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/62
 [#66]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/66
 [#67]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/67
+[#68]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/68
 [#70]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/70
 [#71]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/71
 [#72]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/72

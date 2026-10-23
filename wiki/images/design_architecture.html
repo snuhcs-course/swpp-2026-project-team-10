@@ -86,46 +86,51 @@
 </svg>
 
 <h2>Figure 4 · <code>design_target_architecture.png</code> · target from Iteration 2</h2>
-<svg viewBox="0 0 900 422" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica Neue, Arial, sans-serif" fill="#1c2433" style="width:100%;height:auto">
+<svg viewBox="0 0 900 432" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica Neue, Arial, sans-serif" fill="#1c2433" style="width:100%;height:auto">
 <defs>
   <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5d6677"/></marker>
   <marker id="ahb2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f5bd3"/></marker>
 </defs>
 <!-- external services -->
+<rect x="140" y="14" width="130" height="40" rx="8" fill="#fff" stroke="#9aa3b2"/>
+<text x="205" y="31" text-anchor="middle" font-size="10.5" font-weight="700">Google sign-in</text>
+<text x="205" y="46" text-anchor="middle" font-size="9.5" fill="#5d6677">ID tokens · public keys</text>
 <rect x="316" y="14" width="130" height="40" rx="8" fill="#fff" stroke="#9aa3b2"/>
-<text x="381" y="31" text-anchor="middle" font-size="10.5" font-weight="700">Image-editing API</text>
-<text x="381" y="46" text-anchor="middle" font-size="9.5" fill="#5d6677">external vendor</text>
+<text x="381" y="31" text-anchor="middle" font-size="10.5" font-weight="700">OpenRouter</text>
+<text x="381" y="46" text-anchor="middle" font-size="9.5" fill="#5d6677">image and vision models</text>
 <rect x="454" y="14" width="130" height="40" rx="8" fill="#fff" stroke="#9aa3b2" stroke-dasharray="5 4"/>
 <text x="519" y="31" text-anchor="middle" font-size="10.5" font-weight="700">Firebase Cloud</text>
 <text x="519" y="46" text-anchor="middle" font-size="10.5" font-weight="700">Messaging</text>
 <!-- server -->
-<rect x="300" y="76" width="300" height="194" rx="10" fill="#eef2fb" stroke="#9aa3b2"/>
+<rect x="300" y="76" width="300" height="204" rx="10" fill="#eef2fb" stroke="#9aa3b2"/>
 <text x="314" y="96" font-size="12.5" font-weight="700">Pix server</text>
 <text x="586" y="96" text-anchor="end" font-size="10" fill="#5d6677">course server</text>
 <rect x="314" y="104" width="272" height="44" rx="6" fill="#fff" stroke="#c9cfd9"/>
 <text x="450" y="121" text-anchor="middle" font-size="11" font-weight="700">REST API</text>
-<text x="450" y="138" text-anchor="middle" font-size="9.5" fill="#5d6677">pose proxy · accounts, friends, invitations</text>
+<text x="450" y="138" text-anchor="middle" font-size="9.5" fill="#5d6677">pose proxy · accounts · friends · invitations (planned)</text>
 <rect x="314" y="156" width="272" height="38" rx="6" fill="#fff" stroke="#c9cfd9"/>
 <text x="450" y="172" text-anchor="middle" font-size="11" font-weight="700">Signaling hub · WebSocket</text>
-<text x="450" y="187" text-anchor="middle" font-size="9.5" fill="#5d6677">connects the two phones for session setup</text>
-<rect x="314" y="202" width="132" height="56" rx="6" fill="#fff" stroke="#9aa3b2" stroke-dasharray="5 4"/>
-<text x="380" y="219" text-anchor="middle" font-size="11" font-weight="700">Database</text>
-<text x="380" y="234" text-anchor="middle" font-size="9.5" fill="#5d6677">users · devices</text>
-<text x="380" y="247" text-anchor="middle" font-size="9.5" fill="#5d6677">friendships · invitations</text>
-<rect x="454" y="202" width="132" height="56" rx="6" fill="#fff" stroke="#9aa3b2" stroke-dasharray="5 4"/>
+<text x="450" y="187" text-anchor="middle" font-size="9.5" fill="#5d6677">session setup · presence of signed-in phones</text>
+<rect x="314" y="202" width="132" height="56" rx="6" fill="#fff" stroke="#9aa3b2"/>
+<text x="380" y="219" text-anchor="middle" font-size="11" font-weight="700">Database · PostgreSQL</text>
+<text x="380" y="234" text-anchor="middle" font-size="9.5" fill="#5d6677">users · sign-ins · devices</text>
+<text x="380" y="247" text-anchor="middle" font-size="9.5" fill="#5d6677">friend requests · friendships</text>
+<rect x="454" y="202" width="132" height="56" rx="6" fill="#fff" stroke="#9aa3b2"/>
 <text x="520" y="219" text-anchor="middle" font-size="11" font-weight="700">Session store · Redis</text>
 <text x="520" y="234" text-anchor="middle" font-size="9.5" fill="#5d6677">sessions · room codes</text>
-<text x="520" y="247" text-anchor="middle" font-size="9.5" fill="#5d6677">presence · rate limit</text>
+<text x="520" y="247" text-anchor="middle" font-size="9.5" fill="#5d6677">presence · rate limits</text>
+<text x="450" y="272" text-anchor="middle" font-size="9" fill="#5d6677">behind nginx on port 80 · blue and green copies of the app</text>
 <!-- phones -->
-<rect x="16" y="76" width="250" height="250" rx="10" fill="#f7f9fc" stroke="#9aa3b2"/>
+<rect x="16" y="76" width="250" height="260" rx="10" fill="#f7f9fc" stroke="#9aa3b2"/>
 <text x="30" y="97" font-size="12.5" font-weight="700">Photographer phone</text>
 <text x="30" y="113" font-size="10" fill="#5d6677">Pix app · photographer role</text>
 <rect x="30" y="124" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="142.5" text-anchor="middle" font-size="10.5">UI · Fragments (XML Views)</text>
 <rect x="30" y="158" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="176.5" text-anchor="middle" font-size="10.5">ViewModels · StateFlow</text>
 <rect x="30" y="192" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="210.5" text-anchor="middle" font-size="10.5">Camera (CameraX) · Guide overlay</text>
-<rect x="30" y="226" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="244.5" text-anchor="middle" font-size="10.5">Reference (ML Kit) · Pose generation</text>
-<rect x="30" y="260" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="278.5" text-anchor="middle" font-size="10.5">Session (WebRTC) · Remote control</text>
-<rect x="634" y="76" width="250" height="250" rx="10" fill="#f7f9fc" stroke="#9aa3b2"/>
+<rect x="30" y="226" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="244.5" text-anchor="middle" font-size="10.5">Reference (ML Kit) · Saved guides</text>
+<rect x="30" y="260" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="278.5" text-anchor="middle" font-size="10.5">Pose generation · Accounts, friends</text>
+<rect x="30" y="294" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="141" y="312.5" text-anchor="middle" font-size="10.5">Session (WebRTC) · Remote control</text>
+<rect x="634" y="76" width="250" height="260" rx="10" fill="#f7f9fc" stroke="#9aa3b2"/>
 <text x="648" y="97" font-size="12.5" font-weight="700">Subject phone</text>
 <text x="648" y="113" font-size="10" fill="#5d6677">Pix app · subject role</text>
 <rect x="648" y="124" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="142.5" text-anchor="middle" font-size="10.5">UI · Subject view</text>
@@ -133,11 +138,14 @@
 <rect x="648" y="192" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="210.5" text-anchor="middle" font-size="10.5">Session (WebRTC)</text>
 <rect x="648" y="226" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="244.5" text-anchor="middle" font-size="10.5">Guide renderer (local copy)</text>
 <rect x="648" y="260" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="278.5" text-anchor="middle" font-size="10.5">Remote controls</text>
+<rect x="648" y="294" width="222" height="28" rx="5" fill="#fff" stroke="#c9cfd9"/><text x="759" y="312.5" text-anchor="middle" font-size="10.5">Accounts, friends</text>
 <!-- control plane edges -->
 <g stroke="#5d6677" stroke-width="1.4" fill="none">
   <line x1="381" y1="104" x2="381" y2="57" marker-end="url(#ah2)"/>
   <line x1="519" y1="104" x2="519" y2="57" marker-end="url(#ah2)" stroke-dasharray="5 4"/>
   <path d="M584,34 H759 V73" marker-end="url(#ah2)" stroke-dasharray="5 4"/>
+  <line x1="205" y1="76" x2="205" y2="57" marker-end="url(#ah2)"/>
+  <path d="M306,76 V34 H273" marker-end="url(#ah2)"/>
   <line x1="266" y1="126" x2="311" y2="126" marker-end="url(#ah2)"/>
   <line x1="634" y1="126" x2="589" y2="126" marker-end="url(#ah2)"/>
   <line x1="269" y1="175" x2="311" y2="175" marker-start="url(#ah2)" marker-end="url(#ah2)"/>
@@ -146,6 +154,8 @@
 <g font-size="9.5" fill="#5d6677">
   <text x="387" y="72">HTTPS</text>
   <text x="525" y="72">push</text>
+  <text x="211" y="70">sign-in</text>
+  <text x="311" y="68">keys</text>
   <text x="672" y="27" text-anchor="middle">invitation notification</text>
   <text x="283" y="120" text-anchor="middle">HTTP</text>
   <text x="617" y="120" text-anchor="middle">HTTP</text>
@@ -159,13 +169,13 @@
 <text x="450" y="334" text-anchor="middle" font-size="10" fill="#2f5bd3">data channels · guide sync and camera commands</text>
 <!-- TURN -->
 <g stroke="#9aa3b2" stroke-width="1.4" stroke-dasharray="5 4" fill="none">
-  <path d="M141,326 V377 H375"/>
-  <path d="M759,326 V377 H525"/>
+  <path d="M141,336 V387 H375"/>
+  <path d="M759,336 V387 H525"/>
 </g>
-<rect x="375" y="356" width="150" height="42" rx="8" fill="#fff" stroke="#9aa3b2" stroke-dasharray="5 4"/>
-<text x="450" y="374" text-anchor="middle" font-size="10.5" font-weight="700">TURN relay</text>
-<text x="450" y="389" text-anchor="middle" font-size="9.5" fill="#5d6677">Cloudflare, managed service</text>
-<text x="450" y="414" text-anchor="middle" font-size="9.5" fill="#5d6677">relays the encrypted media only when no direct path exists · the Pix server hands the phones short-lived credentials</text>
+<rect x="375" y="366" width="150" height="42" rx="8" fill="#fff" stroke="#9aa3b2" stroke-dasharray="5 4"/>
+<text x="450" y="384" text-anchor="middle" font-size="10.5" font-weight="700">TURN relay</text>
+<text x="450" y="399" text-anchor="middle" font-size="9.5" fill="#5d6677">Cloudflare, managed service</text>
+<text x="450" y="424" text-anchor="middle" font-size="9.5" fill="#5d6677">relays the encrypted media only when no direct path exists · the Pix server hands the phones short-lived credentials</text>
 </svg>
 </body>
 </html>

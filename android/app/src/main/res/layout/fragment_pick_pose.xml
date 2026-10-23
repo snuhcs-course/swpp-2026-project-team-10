@@ -43,17 +43,28 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- The candidate images; the selected one is outlined in the accent and checked. -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/candidateGrid"
+    <!--
+        The candidates one at a time, as large as the screen allows; a swipe shows the next. The pose on screen is the
+        selected one, and its neighbors show at the sides. Reaches the screen's edges, past this layout's padding.
+    -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/candidatePager"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginHorizontal="-6dp"
+        android:layout_marginHorizontal="-20dp"
         android:layout_marginTop="10dp"
         android:layout_weight="1"
-        app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-        app:spanCount="2"
-        tools:listitem="@layout/item_pose_candidate" />
+        tools:listitem="@layout/item_pose_page" />
+
+    <TextView
+        android:id="@+id/pageCounter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
+        android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+        android:textColor="@color/pix_text_faint"
+        tools:text="1 / 4" />
 
     <Button
         android:id="@+id/usePoseButton"

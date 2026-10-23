@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park
 package com.lastpenguin.pix.guide
 
 import kotlinx.coroutines.flow.SharedFlow
@@ -18,7 +18,7 @@ interface GuideRepository {
     /** Every applied change, for guide sync. */
     val changes: SharedFlow<GuideChange>
 
-    /** null removes the guide. A new guide starts at the default position. */
+    /** null removes the guide. A new guide starts at its `anchor`, where the person is in the reference (FR-3.1). */
     fun setGuide(guide: ReferenceGuide?)
 
     fun update(final: Boolean, change: (GuideState) -> GuideState)

@@ -94,6 +94,14 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 - [Joonhyung, 10-23] "그러면 지금 이 상태로 목표를 순서대로 (App) 90 / 90 / 90 / 30 (Server) 90 / 90 / 90으로 Testing 문서를 기준으로 바꿔 주고, Adapter 부분에 대해서 커버리지가 낮은 이유와 추후 이터레이션에서 보완할 방안들에 대해서 제안하는 식으로 작성해 줘." (2.1.2: the targets set with the proposals kept, and the adapter layer's reasons and the measures of Iterations 3 and 4.)
 - [Joonhyung, 10-23] "지금까지의 내용을 바탕으로 AI Collaboration Report에서 Document 부분의 Prompt 로그를 작성해 줘."
 
+## Syncing the Design Documentation, R&S, and wireframes with the app as built ([#97])
+
+- [Jaewan, 10-23] "Now can you check for anything we've changed and is implemented in our code that is NOT consistent with the design document and R&S. And fix the docs accordingly. If the system architecture graphic should be fixed update the html, and if the wireframe images should be fixed update https://claude.ai/artifact/GRLQMzirhDrBui9WWTQ1vm directly. Create a new branch and do this."
+- [Jaewan, 10-23] "1. what happens if an image not 3:4 is sent to the server currently? 2. thanks. joining from another network is not implemented yet, so we'll fix that later. 3. what are the outdated comments?"
+- [Jaewan, 10-23] "fix the stale comments in this branch. we'll do the server ratio in the next iteration."
+- [Jaewan, 10-23] "also for all wiki documents, can you add any missing paths for issue/PR shorthands?"
+- [Jaewan, 10-23] "not for shorthands that are in the prompt logs' prompt messages"
+
 [#44]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/44
 [#62]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/62
 [#66]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/66
@@ -106,3 +114,4 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11�
 [#91]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/91
 [#94]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/94
 [#95]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/95
+[#97]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/97

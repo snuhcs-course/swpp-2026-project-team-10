@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]]
 
-## Server APIs (#50)
+## Server APIs ([#50])
 
 - [Jaewan, 10-15] "Now we are going to implement the server APIs for user CRUD/friends. What APIs do we have in plan?"
 - [Jaewan, 10-15] "I think we need just normal signup/login not only google auth"
@@ -12,11 +12,11 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-15] "is it okay to not pretect the non-auth apis? like pose generation?"
 - [Jaewan, 10-15] "first commit and push the current fixes, then add the global pose cap and the failed-join limit"
 - [Jaewan, 10-15] "commit and push this. also, for env variables we've added PIX_GOOGLE_CLIENT_ID but the deploy doesn't automatically add this while it should be set. On each deploy, can we make it compare the .env.example and the real .env in the server and find the missing (uncommented) keys, add them if they have default values, and tell the user to add one if it doesn't have a default value? but i'm not sure if this is a good way because the variable orders can be like mixed up and the .env file can become messy"
-- [Jaewan, 10-15] "can i just set PIX_GOOGLE_CLIENT_ID as a dummy value and get the read id when implementing #54?
+- [Jaewan, 10-15] "can i just set PIX_GOOGLE_CLIENT_ID as a dummy value and get the read id when implementing [#54]?
 
-## Android-side (#54)
+## Android-side ([#54])
 
-- [Jaewan, 10-21] "Now let's implement #54. Give me your plan and anything i need to decide"
+- [Jaewan, 10-21] "Now let's implement [#54]. Give me your plan and anything i need to decide"
 - [Jaewan, 10-21] "[…] Good?"
   > 1. When signed out, let's keep the room code feature and use it. But go to the friends tab first with both "Sign in to add friends" and "Use a room code instead"
   > 2. Do as recommended. But I think we may have to fix or add flows in R&S.
@@ -36,3 +36,6 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-22] "commit and push this"
 - [Jaewan, 10-22] "There are reviews from pkdje's Claude. tell me if we should fix them"
 - [Jaewan, 10-22] "I fixed 4 and pushed it. Make the fixes 1-3"
+
+[#50]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/50
+[#54]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/54

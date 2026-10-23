@@ -1,8 +1,8 @@
 Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]]
 
-## Pose Generation with Custom Prompts (#46)
+## Pose Generation with Custom Prompts ([#46])
 
-- [Jaewan, 10-20] "Now let's implement the server part of #53. Give me your plan, and tell me anything we need to decide"
+- [Jaewan, 10-20] "Now let's implement the server part of [#53]. Give me your plan, and tell me anything we need to decide"
 - [Jaewan, 10-20] "yes you can run the experiment with the openrouter key. and i'll follow your recommendations, but for the prompt, for now create a separate description prompt template on your own, and tell me where to fix to change it. I'll test them later."
 - [Jaewan, 10-20] "can we defer all prompts to a separate file? json or yaml or txt or md, ..."
 - [Jaewan, 10-20] "can you run more tests for the prompt? only use images `examples/example1-8.jpg`. and try more input cases not only those with '벽에 기대서'. and show the results in a single html file"
@@ -34,3 +34,6 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-21] "can you find a copyright free image i can use to run tests and report on publicly?"
 - [Jaewan, 10-21] "can you find more? i don't like these"
 - [Jaewan, 10-21] "I'll choose image 1. re-test and write the full report using this (and of course only do one round for the wo description part). for the with description part, use "벽에 기대서 카메라 보며 살짝 웃기", "손으로 하트 만들기", "상반신만", "뒤돌아서 고개만 돌리기", "멋있게", "앉아서 쉬는 모습", "카메라 향해서 걷기""
+
+[#46]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/46
+[#53]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/53

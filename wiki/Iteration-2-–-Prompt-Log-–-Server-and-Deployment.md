@@ -1,8 +1,8 @@
 Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-Iteration-2]]
 
-## Server deployment plan (#46)
+## Server deployment plan ([#46])
 
-- [Jaewan, 10-13] "I need to deploy our server on the course's provided servers (one for main, one for dev) (issue #46). I have a rough plan as below, can you see if this good, and tell me how I should do this? The servers are reachable in this mac by `ssh swpp-a` and `ssh swpp-b` but don't go into there on your own and make any changes there (install code run, etc.). […]"
+- [Jaewan, 10-13] "I need to deploy our server on the course's provided servers (one for main, one for dev) (issue [#46]). I have a rough plan as below, can you see if this good, and tell me how I should do this? The servers are reachable in this mac by `ssh swpp-a` and `ssh swpp-b` but don't go into there on your own and make any changes there (install code run, etc.). […]"
   > Goal: continuous, zero-downtime deployment of our FastAPI server to the SWPP course servers using Docker + nginx + GitHub Actions.
   >
   > - Servers: Server A and Server B, both Ubuntu 24.04. Only port 80 is reachable from outside; no HTTPS, no IPv6. We SSH in through a relay with personal keys, which must NOT go into GitHub, so GitHub can't SSH in to deploy.
@@ -43,10 +43,10 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-14] "what do you mean about the invite link? we need to fix the design if we can't use HTTPS?"
 - [Jaewan, 10-14] "how would the 'custom scheme' look like?"
 
-## Redis setup (#73)
+## Redis setup ([#73])
 
 - [Jaewan, 10-14] "okay now add the redis container settings and implement the relevant code changes in this branch"
-- [Jaewan, 10-14] "so what is the current behavior when switching servers? and what is to be changed on #56?"
+- [Jaewan, 10-14] "so what is the current behavior when switching servers? and what is to be changed on [#56]?"
 - [Jaewan, 10-14] "commit and push this fix"
 - [Jaewan, 10-14] "just remove the rejoin part from the issue"
 - [Jaewan, 10-14] "the image build workflow failed"
@@ -68,3 +68,7 @@ Back to [[AI Collaboration Report – Iteration 2|AI-Collaboration-Report-–-It
 - [Jaewan, 10-14] "fix both of those in this branch"
 - [Jaewan, 10-14] "commit and push"
 - [Jaewan, 10-16] "when i ssh into the server, i get the error `-bash: /opt/pix/state/env-check: Permission denied pix: /opt/pix/.env needs attention (). Run pix env, then pix restart.`. what's wrong?"
+
+[#46]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/46
+[#56]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/56
+[#73]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/73

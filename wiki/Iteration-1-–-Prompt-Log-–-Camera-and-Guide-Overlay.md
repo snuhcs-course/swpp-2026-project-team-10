@@ -4,8 +4,8 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 
 - [Joonhyung] (Attached the Design Documentation, R&S, and wireframe PDFs and the project schedule) "Based on the `dev` branch on GitHub, explain in detail what is implemented so far and what I need to implement, following the Project Schedule."
 - [Joonhyung] "Then start implementing the P7 camera first."
-- [Joonhyung] "Write the camera feature PR, referring to PR #17."
-- [Joonhyung] "Does the current implementation meet every task that issue #3 asks for?"
+- [Joonhyung] "Write the camera feature PR, referring to PR [#17]."
+- [Joonhyung] "Does the current implementation meet every task that issue [#3] asks for?"
 
 ## Camera zoom and composition guides (A2, [#26]): ChatGPT Codex (GPT-6 Astra)
 
@@ -14,22 +14,22 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 - [Joonhyung] "I checked the existing implementation on a real phone. As `fix: low magnification pinch zoom`, support zooming out to 0.5× where possible."
 - [Joonhyung] "Write the PR for what is implemented so far, in our format. I finished the real-device tests except for zooming below 1×."
 
-## Guide overlay groundwork (#6): ChatGPT Codex (GPT-6 Astra)
+## Guide overlay groundwork ([#6]): ChatGPT Codex (GPT-6 Astra)
 
-- [Joonhyung] "Explain in detail what is implemented so far (`dev` branch), and explain issue #6, the scope I need to implement."
+- [Joonhyung] "Explain in detail what is implemented so far (`dev` branch), and explain issue [#6], the scope I need to implement."
 - [Joonhyung] "Then first complete the geometry."
 - [Joonhyung] "Next, do the 'complete the store' step."
 - [Joonhyung] "Next, implement static rendering."
 - [Joonhyung] "Next, implement the gestures."
 - [Joonhyung] "Everything works through the guide. But resizing the guide seems to conflict with camera zoom for the user, so make zoom a slider instead."
 
-## Guide editing (#6): Claude Code (Claude Opus 5.5)
+## Guide editing ([#6]): Claude Code (Claude Opus 5.5)
 
-- [Joonhyung, 10-06] (Attached the Design Documentation, R&S, and wireframe PDFs) "Look at issue #6, check how much is implemented on the current branch, and explain what to implement next."
+- [Joonhyung, 10-06] (Attached the Design Documentation, R&S, and wireframe PDFs) "Look at issue [#6], check how much is implemented on the current branch, and explain what to implement next."
 - [Joonhyung, 10-06] "Then implement showing the guide edit control bar first."
 - [Joonhyung, 10-06] "Now implement the opacity slider and the style toggle too."
 - [Joonhyung, 10-06] "There's already a test directory, and I don't see a reason to keep androidTest separate. Merge it into the existing test directory." (Chose "Move to Robolectric".)
-- [Joonhyung, 10-06] "So which of the issue #6 tasks does what's built so far cover, and what is left?"
+- [Joonhyung, 10-06] "So which of the issue [#6] tasks does what's built so far cover, and what is left?"
 - [Joonhyung, 10-06] "Don't create the PR yourself; just return the PR text here."
 - [Joonhyung, 10-06] "The PR example is https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/30. Write it like this."
 - [Joonhyung, 10-06] "Explain everything implemented so far in detail."
@@ -40,7 +40,7 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 - [Joonhyung, 10-06] "So I need a Python virtual environment, and then I install the dependencies from pyproject.toml in it?"
 - [Joonhyung, 10-06] "Running `uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 65536` gives `ModuleNotFoundError: No module named 'starlette.middleware.body_limit'`."
 
-## Integration (#11)
+## Integration ([#11])
 
 - [Joonhyung, 10-06] "https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/11 I'm going to work on this issue now; explain in detail what I need to do."
 - [Joonhyung, 10-06] "First implement task 4, the Timings improvement."
@@ -53,4 +53,7 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 - [Joonhyung, 10-07] "Now I think only the documents' revision history is left. Add it."
 
 [#3]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/3
+[#6]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/6
+[#11]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/11
+[#17]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/17
 [#26]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/26

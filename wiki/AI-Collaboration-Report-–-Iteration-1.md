@@ -4,7 +4,7 @@
 
 ## 1. Where AI Was Used
 
-- **Documents:** the task breakdown, requirements and design drafts (from the course guidelines, other teams' wikis, and our meeting minutes), issues #1–#12, meeting minutes, and the updates after each feature ([#25], [#33]): Claude Code.
+- **Documents:** the task breakdown, requirements and design drafts (from the course guidelines, other teams' wikis, and our meeting minutes), issues [#1]–[#12], meeting minutes, and the updates after each feature ([#25], [#33]): Claude Code.
 - **Server:** signaling ([#17]), pose generation API and model comparison script ([#22]), wiki workflow ([#24]): Claude Code.
 - **Android:** camera, zoom, and guide gestures ([#21], [#26], [#31]): ChatGPT Codex. Shared contracts and app shell ([#13], [#16]), reference guide ([#28]), streaming ([#23]), remote zoom ([#27]), pose generation ([#30]), guide sync ([#32]), integration and UI ([#34]): Claude Code.
 - **Code review:** the Codex reviewer checked 10 PRs ([#13], [#17], [#21], [#22], [#27], [#28], [#30], [#31], [#32], [#34]) and Copilot 2 ([#13], [#16]), with 15 inline findings. Claude helped us judge each finding before we fixed or declined it, and drafted the human reviews on [#23] and [#34].
@@ -37,7 +37,7 @@ Full prompt logs, one page per task: [[Documents|Iteration-1-–-Prompt-Log-–-
 ## 5. Prompt Revisions
 
 - **Scene photo step**
-  - Before: "Now implement the client-side pose generation flow (issue #7)." The photo was sent on the tap.
+  - Before: "Now implement the client-side pose generation flow (issue [#7])." The photo was sent on the tap.
   - After: "After we click generate poses here, there should be some step where we show the camera screen to the user and make them press the shutter to shoot the scene image."
   - Why: it described the flow as the user sees it.
 - **Subject's zoom**
@@ -60,6 +60,9 @@ Full prompt logs, one page per task: [[Documents|Iteration-1-–-Prompt-Log-–-
 - Tell Claude to ask before departing from the design document or R&S.
 - Add AI-generated markers in the same PR as the code.
 
+[#1]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/1
+[#7]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/7
+[#12]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/12
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13
 [#16]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/16
 [#17]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/17

@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
 
-## Signaling server (#4), with review and network questions
+## Signaling server ([#4]), with review and network questions
 
 - [Jaewan, 10-01] "Read AGENTS.md for the project's context and instructions. For convenience, I have downloaded the design documentation and requirements and specifications to the ./wiki directory. You can refer to them for detailed information on the project specifications and design considerations. I need you to create a server app at ./server that meets the requirements outlined in the documentation. Only implement requirements for iteration 1; but don't create the APIs for image generation yet and only implement the signaling hub part. Use uv for package management with pyproject.toml and uv.lock files. Also use ruff for linting and formatting. I have a preferred ruff.toml configuration file at the repo root. Put this configuration file in the ./server directory as well.
 Use FastAPI for the server framework. We would have to use sqlalchemy and alembic for database management in the next iterations, but since we don't need database management for iteration 1, you can skip that for now."
@@ -22,7 +22,7 @@ Use FastAPI for the server framework. We would have to use sqlalchemy and alembi
 - [Jaewan, 10-07] "what if with no internet (the QR version) where the two phones connect through one's localonlyhotspot"
 - [Jaewan, 10-07] "then should we always use this?"
 
-## Pose generation server (#18)
+## Pose generation server ([#18])
 
 - [Jaewan, 10-03] "I have to choose which image edit API to use for this project. Can you recommend which to use? Also, write a script that I can use to test these APIs (independent to the current codebase) in `server/scripts/`. Use openrouter. I have $OPENROUTER_API_KEY configurated in this shell env."
 - [Jaewan, 10-03] "are there any python packages needed to be downloaded to run this script?"
@@ -71,9 +71,9 @@ Use FastAPI for the server framework. We would have to use sqlalchemy and alembi
 - [Jaewan, 10-06] "Can you also add the pose generation consent as implemented to the wireframe, and fix that row in 6.8?"
 - [Jaewan, 10-06] "commit and push this"
 
-## Pose generation flow (#7)
+## Pose generation flow ([#7])
 
-- [Jaewan, 10-05] "Now implement the client-side pose generation flow (issue #7). Since we changed the design principle (ex. preprocess image at client side before sending to server), make sure to follow these according to the new design document."
+- [Jaewan, 10-05] "Now implement the client-side pose generation flow (issue [#7]). Since we changed the design principle (ex. preprocess image at client side before sending to server), make sure to follow these according to the new design document."
 - [Jaewan, 10-05] "Tell me how I should test this on android studio & android device"
 - [Jaewan, 10-05] "when clicking 'Guide -> Generate poses here', the app immediately captures the camera screen there and then automatically sends to the server API. we need steps in between here. After we click generate poses here, there should be some step where we show the camera screen to the user and make them press the shutter to shoot the scene image. Also after the image is taken, we should have something like "Use this image" -> yes (use it and generate) / no (shoot again)."
 - [Jaewan, 10-05] "What do you recommend for the camera screen? spawn a new one and add zoom to this or build this into the camera screen?"
@@ -94,5 +94,10 @@ Use FastAPI for the server framework. We would have to use sqlalchemy and alembi
 - [Jaewan, 10-06] "can you summarize how flow 2 wireframe should be fixed? and what the missing 'Camera, taking the scene photo' wireframe should illustrate?"
 - [Jaewan, 10-06] "make this concise. I will write this into the PR comment"
 - [Jaewan, 10-06] "can you draw the new flow part as mermaid"
-- [Jaewan, 10-06] "PR #31 was just merged to dev, can you update this branch with content in the new dev (don't rebase, just merge) and solve conflicts?"
+- [Jaewan, 10-06] "PR [#31] was just merged to dev, can you update this branch with content in the new dev (don't rebase, just merge) and solve conflicts?"
 - [Jaewan, 10-06] "commit and push this"
+
+[#4]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/4
+[#7]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/7
+[#18]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/18
+[#31]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/31

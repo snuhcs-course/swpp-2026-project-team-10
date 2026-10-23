@@ -19,6 +19,9 @@ Back to [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-It
 
 - [Dongje, 09-30] "Set up the Android project and write the shared contracts from the design document (module interfaces, data models, messages, and the REST API), so that each owner can build their module against them."
 - [Dongje, 09-30] "Keep only the Gradle project and the shared contracts. Remove the screens, implementations, fakes, and server, because they belong to my teammates' tasks."
-- [Dongje, 09-30] "Limit the contracts in #13 to Iteration 1."
-- [Dongje, 10-01] "Address the bot review comments on #13."
-- [Dongje, 10-01] "Make the app shell for #2: the navigation graph and every Iteration 1 screen with a basic layout, with each module's functions declared and a `TODO` for its owner."
+- [Dongje, 09-30] "Limit the contracts in [#13] to Iteration 1."
+- [Dongje, 10-01] "Address the bot review comments on [#13]."
+- [Dongje, 10-01] "Make the app shell for [#2]: the navigation graph and every Iteration 1 screen with a basic layout, with each module's functions declared and a `TODO` for its owner."
+
+[#2]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/2
+[#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13

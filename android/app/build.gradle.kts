@@ -1,10 +1,11 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
+    jacoco
 }
 
 // The Pix server (Design 2.8, Hosting and Configuration). Release builds use Server A, which runs main.
@@ -69,11 +70,54 @@ android {
             it.testLogging.exceptionFormat = TestExceptionFormat.FULL
             // Robolectric reads FileDescriptor internals, which Java 17+ modules hide by default.
             it.jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
+            // Coverage (Testing Documentation 2.1.4): Robolectric loads classes without a source location,
+            // and the JDK's internals must stay out of the agent, or the report is empty or the run fails.
+            it.extensions.configure<JacocoTaskExtension> {
+                isIncludeNoLocationClasses = true
+                excludes = listOf("jdk.internal.*")
+            }
         }
     }
     lint {
         // Pix runs on phones only. This check wants the camera marked optional for ChromeOS, but Pix needs it.
         disable += "PermissionImpliesUnsupportedChromeOsHardware"
+    }
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
+}
+
+// Line and branch coverage of the JVM and Robolectric tests (Testing Documentation 2.1.2–2.1.4):
+// `./gradlew :app:jacocoTestReport`, then app/build/reports/jacoco/jacocoTestReport/html/index.html.
+// Excluded (2.1.3): generated code (BuildConfig, R, ViewBinding), and the hand-written fakes that stand in for the
+// module interfaces in tests. The debug source set is not compiled into the debug app classes used here.
+val coverageExclusions = listOf(
+    "**/BuildConfig.*",
+    "**/R.class",
+    "**/R$*.class",
+    "**/databinding/**",
+    "**/*Binding.class",
+    "**/*Binding$*.class",
+    "**/*Fake*.*",
+)
+tasks.register<JacocoReport>("jacocoTestReport") {
+    group = "verification"
+    description = "Line and branch coverage of the debug unit tests."
+    dependsOn("testDebugUnitTest")
+    val buildDir = layout.buildDirectory
+    classDirectories.setFrom(
+        files(
+            buildDir.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+            buildDir.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes"),
+        ).map { dir -> fileTree(dir) { exclude(coverageExclusions) } },
+    )
+    sourceDirectories.setFrom(files("src/main/java"))
+    executionData.setFrom(buildDir.file("jacoco/testDebugUnitTest.exec"))
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
     }
 }
 
@@ -123,6 +167,11 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.ext.junit)
-    // A real HTTP server on the JVM for the token refresh path, which lives in OkHttp's interceptor and authenticator.
+    // Screen tests: FragmentScenario launches a Fragment in a debug-only activity under Robolectric.
+    testImplementation(libs.androidx.fragment.testing)
+    testImplementation(libs.androidx.navigation.testing)
+    debugImplementation(libs.androidx.fragment.testing.manifest)
+    // A real HTTP server on the JVM for the token refresh path, which lives in OkHttp's interceptor and
+    // authenticator, and for the signaling socket's client.
     testImplementation(libs.okhttp.mockwebserver)
 }

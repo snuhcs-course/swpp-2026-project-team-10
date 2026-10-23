@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -58,7 +58,12 @@ class FakeSessionManager : SessionManager {
 
     override fun videoSink(): FrameSink = frameSink
 
-    override suspend fun leave(reason: EndReason) = Unit
+    /** Every `leave`, with its reason, so a screen test can see a cancelled room or a left session. */
+    val leaves = mutableListOf<EndReason>()
+
+    override suspend fun leave(reason: EndReason) {
+        leaves += reason
+    }
 
     fun setState(state: SessionState) {
         _state.value = state
@@ -87,6 +92,7 @@ class FakeCameraController(
     maxZoom: Float = 10f,
     exposureRange: IntRange = 0..0,
     hasFlash: Boolean = false,
+    supportsFocusPoint: Boolean = false,
 ) : CameraController {
     private val _status = MutableStateFlow(CameraStatus.READY)
     override val status: StateFlow<CameraStatus> = _status.asStateFlow()
@@ -99,6 +105,7 @@ class FakeCameraController(
             exposureRange = exposureRange,
             exposureStep = if (exposureRange.first < exposureRange.last) 0.5f else 0f,
             hasFlash = hasFlash,
+            supportsFocusPoint = supportsFocusPoint,
         ),
     )
     override val capabilities: StateFlow<CameraCapabilities?> = _capabilities.asStateFlow()
@@ -133,7 +140,12 @@ class FakeCameraController(
         _status.value = status
     }
 
-    override fun setFocusPoint(x: Float, y: Float) = Unit
+    /** Every focus point asked for, in frame fractions. */
+    val focusPoints = mutableListOf<Pair<Float, Float>>()
+
+    override fun setFocusPoint(x: Float, y: Float) {
+        focusPoints += x to y
+    }
 
     val exposureRequests = mutableListOf<Int>()
     val flashRequests = mutableListOf<FlashMode>()
@@ -151,9 +163,22 @@ class FakeCameraController(
 
     override fun setAspectRatio(ratio: AspectRatio) = Unit
 
-    override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())
+    /** When set, [takePhoto] saves to it; otherwise saving fails, as it does without a camera. */
+    var photo: Uri? = null
 
-    override suspend fun grabFrame(): Result<Bitmap> = Result.failure(UnsupportedOperationException())
+    /** When set, [grabFrame] returns it, so the scene photo step can be driven in a screen test. */
+    var frame: Bitmap? = null
+
+    /** When set, [takePhoto] fails with it, so a screen test can see each failure's message. */
+    var photoFailure: Throwable? = null
+
+    override suspend fun takePhoto(): Result<Uri> {
+        photoFailure?.let { return Result.failure(it) }
+        return photo?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    }
+
+    override suspend fun grabFrame(): Result<Bitmap> =
+        frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
 
     override fun setFrameSink(sink: FrameSink?) {
         this.sink = sink

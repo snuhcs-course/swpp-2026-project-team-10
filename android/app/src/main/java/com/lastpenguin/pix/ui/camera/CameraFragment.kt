@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -39,6 +39,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
@@ -48,6 +49,7 @@ import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
@@ -184,6 +186,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         controls.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
+        controls.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupReference(controls)
         controls.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
@@ -243,6 +246,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                                 },
                                 notice.name,
                             )
+                        }
+                        showNotice(controls, text)
+                    }
+                }
+                launch {
+                    viewModel.guideSaveNotices.collect { notice ->
+                        val text = when (notice) {
+                            GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
+
+                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
+                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
+
+                            GuideSaveNotice.ALREADY_SAVED -> getString(R.string.guide_already_saved_notice)
+
+                            GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
                         showNotice(controls, text)
                     }
@@ -490,10 +508,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             getString(R.string.guide_opacity_percent, (state.guideState.opacity * 100f).roundToInt())
         controls.removeGuideButton.isEnabled = guideEditable
         val hidden = !state.guideState.visible
-        controls.hideGuideButton.setIconResource(if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off)
+        setIconOnce(controls.hideGuideButton, if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off)
         controls.hideGuideButton.contentDescription =
             getString(if (hidden) R.string.show_guide else R.string.hide_guide)
         controls.hideGuideButton.isEnabled = guideEditable
+        // Save guide (FR-3.8): filled once saved; a tap then says where the saved guide is.
+        setIconOnce(
+            controls.saveGuideButton,
+            if (state.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+        )
+        controls.saveGuideButton.contentDescription =
+            getString(if (state.guideSaved) R.string.guide_saved else R.string.save_guide)
+        controls.saveGuideButton.isEnabled = guideEditable && !state.savingGuide
         // Guide-edit mode (AD-17): the overlay owns the preview's touches while on; the pinch zooms while off.
         // Its toggle sits beside the zoom readout, so it stays when the guide's panel changes (Iter2-P11).
         controls.editGuideButton.isVisible = state.guide != null
@@ -818,6 +844,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             chip,
             if (look == StatusLook.ERROR) ColorStateList.valueOf(context.getColor(R.color.pix_danger_text)) else null,
         )
+    }
+
+    /**
+     * Sets [icon] on [button] only when it differs from the one set last: each call inflates a new drawable and lays
+     * the button out again, and the screen renders on every zoom step of a pinch.
+     */
+    private fun setIconOnce(button: MaterialButton, @DrawableRes icon: Int) {
+        if (button.getTag(R.id.icon_resource) == icon) return
+        button.setIconResource(icon)
+        button.setTag(R.id.icon_resource, icon)
     }
 
     private fun showNotice(controls: FragmentCameraBinding, text: String) {

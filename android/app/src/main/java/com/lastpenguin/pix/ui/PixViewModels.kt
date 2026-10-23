@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -23,8 +23,17 @@ import com.lastpenguin.pix.ui.session.SubjectViewModel
 object PixViewModels {
 
     val Factory: ViewModelProvider.Factory = viewModelFactory {
-        initializer { CameraViewModel(container.cameraController, container.guideRepository, container.cameraSettings) }
-        initializer { ReferenceViewModel(container.referenceGuideMaker, container.guideRepository) }
+        initializer {
+            CameraViewModel(
+                container.cameraController,
+                container.guideRepository,
+                container.cameraSettings,
+                container.savedGuideStore,
+            )
+        }
+        initializer {
+            ReferenceViewModel(container.referenceGuideMaker, container.guideRepository, container.savedGuideStore)
+        }
         initializer {
             GenerationViewModel(container.poseGenerator, container.cameraController, container.generationConsent)
         }

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -16,19 +16,34 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuideStore
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class CaptureNotice { SAVED, SAVE_FAILED, STORAGE_FAILED, CAMERA_UNAVAILABLE, PERMISSION_REQUIRED }
+
+/** What *Save guide* did (FR-3.8), shown as a short notice. */
+enum class GuideSaveNotice {
+    SAVED,
+
+    /** Saved, and the oldest saved guide was deleted to keep [SavedGuideStore.MAX_SAVED]. */
+    SAVED_OLDEST_REMOVED,
+    ALREADY_SAVED,
+    FAILED,
+}
 
 internal fun captureFailureNotice(error: Throwable): CaptureNotice = when {
     error is SecurityException -> CaptureNotice.PERMISSION_REQUIRED
@@ -76,6 +91,10 @@ data class CameraUiState(
     val referenceExpanded: Boolean = false,
     /** The preview corner the reference thumbnail sits in, kept from one guide to the next. */
     val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
+    /** The guide on the camera is one of the saved guides (FR-3.8), so *Save guide* shows it as saved. */
+    val guideSaved: Boolean = false,
+    /** *Save guide* is writing the guide; the button waits. */
+    val savingGuide: Boolean = false,
     /** The last saved photo, for the thumbnail and "Saved without the guide". */
     val lastPhoto: Uri? = null,
     /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
@@ -90,11 +109,17 @@ class CameraViewModel(
     private val camera: CameraController,
     private val guides: GuideRepository,
     private val settings: CameraSettings = CameraSettings.InMemory(),
+    private val savedGuides: SavedGuideStore = SavedGuideStore.InMemory(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
     private var savedNoticeJob: Job? = null
+
+    private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
+
+    /** One notice per *Save guide* tap, shown like the other short notices; kept until the screen reads it. */
+    val guideSaveNotices: Flow<GuideSaveNotice> = _guideSaveNotices.receiveAsFlow()
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
@@ -147,6 +172,13 @@ class CameraViewModel(
             guides.state.collect { state ->
                 _uiState.update { it.copy(guideState = state, guideEditing = it.guideEditing && state.visible) }
             }
+        }
+        viewModelScope.launch {
+            // A guide keeps its id when it is saved and loaded again, so the id tells whether it is saved.
+            combine(guides.guide, savedGuides.saved) { guide, saved ->
+                guide != null && saved.any { it.id == guide.id }
+            }
+                .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
         }
     }
 
@@ -279,6 +311,39 @@ class CameraViewModel(
     /** A drag drops the reference thumbnail into one of the preview's corners, and nowhere else (FR-3.9). */
     fun setReferenceCorner(corner: ReferenceCorner) {
         _uiState.update { it.copy(referenceCorner = corner) }
+    }
+
+    /**
+     * *Save guide* (FR-3.8): keeps the guide on the camera, to use again from *Add a pose guide*. A saved guide is
+     * not saved twice; when [SavedGuideStore.MAX_SAVED] are saved, the store deletes the oldest and the notice says so.
+     */
+    fun onSaveGuide() {
+        val state = _uiState.value
+        val guide = state.guide ?: return
+        if (state.savingGuide) return
+        // The store's own list, not only guideSaved, which follows it a moment later.
+        val before = savedGuides.saved.value
+        if (state.guideSaved || before.any { it.id == guide.id }) {
+            _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
+            return
+        }
+        val full = before.size >= SavedGuideStore.MAX_SAVED
+        _uiState.update { it.copy(savingGuide = true) }
+        viewModelScope.launch {
+            val notice = try {
+                savedGuides.save(guide, guides.state.value).fold(
+                    onSuccess = { if (full) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
+                    onFailure = { GuideSaveNotice.FAILED },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                GuideSaveNotice.FAILED
+            } finally {
+                _uiState.update { it.copy(savingGuide = false) }
+            }
+            _guideSaveNotices.send(notice)
+        }
     }
 
     /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */

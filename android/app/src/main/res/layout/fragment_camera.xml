@@ -352,6 +352,15 @@
                     android:textColor="@color/slider_value_text"
                     tools:text="50%" />
 
+                <!-- Save guide (FR-3.8): filled once the guide on the camera is saved. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/saveGuideButton"
+                    style="@style/Widget.Pix.Button.Icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/save_guide"
+                    app:icon="@drawable/ic_bookmark" />
+
                 <Button
                     android:id="@+id/removeGuideButton"
                     style="@style/Widget.Pix.Button.Icon"

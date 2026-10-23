@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -21,6 +21,7 @@ import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
+import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeRemoteVideo
@@ -49,6 +50,7 @@ class TestAppContainer(
     val settings = CameraSettings.InMemory()
     val consent = IdleConsent()
     val maker = ScriptedGuideMaker()
+    val saved = SavedGuideStore.InMemory()
     val generator = ScriptedPoseGenerator()
     val auth = FakeAuthRepository()
     val friends = FakeFriendsRepository()
@@ -60,6 +62,7 @@ class TestAppContainer(
         guideRepository = guides,
         mirrorGuideRepository = mirror,
         referenceGuideMaker = maker,
+        savedGuideStore = saved,
         poseGenerator = generator,
         generationConsent = consent,
         authRepository = auth,

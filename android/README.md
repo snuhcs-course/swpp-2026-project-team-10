@@ -47,6 +47,7 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 | `camera/CameraController.kt` | Camera interface, `CameraCapabilities`, `CameraState`, `AspectRatio`, `FlashMode`, `FrameSink` | 2.1, 2.3 |
 | `guide/GuideModels.kt` | `ReferenceGuide`, `GuideState`, `NormalizedRect`, `GuideSource` | 2.3 |
 | `guide/GuideRepository.kt`, `guide/ReferenceGuideMaker.kt` | Guide store and reference-to-guide interfaces | 2.1 |
+| `guide/SavedGuideStore.kt` | Saved guides on the phone: `SavedGuideStore`, `SavedGuide`, and `SavedGuideStore.InMemory` for tests | 2.1, 2.3 |
 | `generation/GenerationModels.kt`, `generation/PoseGenerator.kt` | Pose requests, planned poses, generation and candidate events, generator interface | 2.1, 2.3 |
 | `session/SessionModels.kt`, `session/SessionManager.kt` | Roles, entries, session states, session interface | 2.1, 2.3, 2.4 |
 | `session/protocol/SessionMessage.kt` | Data channel messages between the two phones | 2.5.1 |
@@ -61,7 +62,7 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Screen (R&S 6) | Class in `ui/` | ViewModel | Issue |
 |---|---|---|---|
 | Camera, Camera + guide, Photo saved, live badge, Scene photo, Scene photo · Review | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel` | #3, #6, #7, #8 |
-| Add a pose guide (bottom sheet), Consent notice | `guide/AddGuideSheet` | `ReferenceViewModel`, `GenerationViewModel` | #5, #7 |
+| Add a pose guide (bottom sheet) with the saved guides, Consent notice | `guide/AddGuideSheet` | `ReferenceViewModel`, `GenerationViewModel` | #5, #7, #58 |
 | Reference confirm, No person found | `guide/ReferenceConfirmFragment`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` | #5 |
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` | #7 |
 | Friends, Friends (signed out) | `account/FriendsFragment` | `FriendsViewModel`, `SessionViewModel` | #54 |

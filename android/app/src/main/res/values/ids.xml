@@ -5,4 +5,6 @@
     <item name="move_reference_top_right" type="id" />
     <item name="move_reference_bottom_left" type="id" />
     <item name="move_reference_bottom_right" type="id" />
+    <!-- The icon a guide button shows, so the Camera screen sets it only when it changes. -->
+    <item name="icon_resource" type="id" />
 </resources>

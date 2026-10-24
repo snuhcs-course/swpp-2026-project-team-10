@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Add a friend and No user found (R&S 6.4; FR-5.5, FR-5.6, FR-5.8, US-7). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="56dp">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            style="@style/Widget.Pix.Header.Back"
+            android:contentDescription="@string/back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:accessibilityHeading="true"
+            android:text="@string/add_a_friend"
+            android:textAppearance="@style/TextAppearance.Pix.Header" />
+    </LinearLayout>
+
+    <!-- Lowercase a–z, 0–9, "." and "_" only (FR-5.5); the hint is the field's accessibility label. -->
+    <EditText
+        android:id="@+id/pixIdInput"
+        style="@style/Widget.Pix.TextField"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:drawablePadding="10dp"
+        android:hint="@string/add_friend_hint"
+        android:imeOptions="actionSearch"
+        android:importantForAutofill="no"
+        android:inputType="textNoSuggestions|textVisiblePassword"
+        android:maxLength="20"
+        app:drawableStartCompat="@drawable/ic_search_small"
+        app:drawableTint="@color/pix_text_muted" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:accessibilityLiveRegion="polite"
+        android:textAppearance="@style/TextAppearance.Pix.Body"
+        android:visibility="gone"
+        tools:text="@string/searching"
+        tools:visibility="visible" />
+
+    <!-- FOUND: the user and the button their relation gives (FR-5.8). -->
+    <LinearLayout
+        android:id="@+id/resultSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/result_label"
+            android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_list_card"
+            android:gravity="center_vertical"
+            android:minHeight="72dp"
+            android:paddingVertical="12dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="12dp">
+
+            <TextView
+                android:id="@+id/avatarText"
+                style="@style/Widget.Pix.Avatar"
+                tools:text="T" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/nameText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+                    android:textColor="@color/pix_text"
+                    tools:text="Test Account 2" />
+
+                <TextView
+                    android:id="@+id/pixIdText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                    tools:text="\@test2" />
+            </LinearLayout>
+
+            <!-- Add (NONE) or Accept (INCOMING). -->
+            <Button
+                android:id="@+id/resultButton"
+                style="@style/Widget.Pix.Button.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                tools:text="@string/add" />
+
+            <!-- "Requested", "Friends", or "This is you" in place of a button. -->
+            <TextView
+                android:id="@+id/relationText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_chip_surface"
+                android:backgroundTint="@color/pix_surface_3"
+                android:gravity="center"
+                android:minHeight="36dp"
+                android:paddingHorizontal="14dp"
+                android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                android:visibility="gone"
+                tools:text="@string/requested" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/noteText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:lineSpacingMultiplier="1.2"
+            android:textAppearance="@style/TextAppearance.Pix.Body"
+            tools:text="Test Account 2 gets a friend request and accepts it in Pix." />
+
+        <Button
+            android:id="@+id/withdrawButton"
+            style="@style/Widget.Pix.Button.Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="-20dp"
+            android:layout_marginTop="4dp"
+            android:text="@string/withdraw_request"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- No user found (US-7). -->
+    <LinearLayout
+        android:id="@+id/notFoundSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/notFoundTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/no_user_found"
+            android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:lineSpacingMultiplier="1.2"
+            android:text="@string/no_user_found_message"
+            android:textAppearance="@style/TextAppearance.Pix.Body" />
+    </LinearLayout>
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Search, or Search again after No user found; disabled while the field is empty. -->
+    <Button
+        android:id="@+id/searchButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:enabled="false"
+        android:text="@string/search" />
+</LinearLayout>

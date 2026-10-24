@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-04, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park
 """One pose candidate per call through OpenRouter's Image API."""
 
 import asyncio
@@ -12,7 +12,6 @@ from PIL import Image
 
 from pix_server.config import Settings
 from pix_server.errors import ApiError
-from pix_server.poses.templates import PROMPT, PoseTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ class PoseGenerator:
         self._settings = settings
         self._http = http
 
-    async def generate(self, scene: bytes, template: PoseTemplate, seed: int) -> bytes:
+    async def generate(self, scene: bytes, prompt: str, seed: int) -> bytes:
         """Return the candidate as JPEG bytes, or raise the ApiError the endpoint should answer with."""
         key = self._settings.openrouter_api_key
         if key is None or not key.get_secret_value():
@@ -69,14 +68,14 @@ class PoseGenerator:
         # OpenRouter ignores a field the chosen model does not support, so the same payload fits every model.
         payload = {
             "model": model,
-            "prompt": PROMPT.format(pose=template.description),
+            "prompt": prompt,
             "input_references": [
                 {
                     "type": "image_url",
                     "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(scene).decode()},
                 }
             ],
-            "aspect_ratio": "3:4",  # the app's fixed frame (AD-10)
+            "aspect_ratio": "3:4",  # every scene, whatever its ratio; the scene's own ratio comes later (Design 2.6.3)
             "resolution": "1K",
             "seed": seed % SEED_LIMIT,
         }

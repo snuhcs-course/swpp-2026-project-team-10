@@ -1,0 +1,12 @@
+# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# Installed to /etc/systemd/system by setup.sh. Enable with: sudo systemctl enable --now pix-deploy.timer
+[Unit]
+Description=Check every minute for a new commit of the Pix server
+
+[Timer]
+OnBootSec=1min
+# One minute after the last run ended, so two runs never overlap.
+OnUnitInactiveSec=1min
+
+[Install]
+WantedBy=timers.target

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 name: server-test
 
 on:
@@ -26,6 +26,30 @@ jobs:
     name: server-test
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      # The same image as server/deploy/docker-compose.yml.
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: pix
+          POSTGRES_PASSWORD: pix
+          POSTGRES_DB: pix
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pix -d pix"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,5 +70,15 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --locked --dev
 
+      # The session store is an in-process Redis and the account database a SQLite file here, which is also what
+      # the image build's test stage uses.
       - name: Run pytest
         run: uv run --locked pytest
+
+      # The same tests again on a real Redis and PostgreSQL, which is what runs the store's Lua scripts and the
+      # account queries on the servers.
+      - name: Run pytest against Redis and PostgreSQL
+        run: uv run --locked pytest
+        env:
+          PIX_TEST_REDIS_URL: redis://localhost:6379/0
+          PIX_TEST_DATABASE_URL: postgresql+asyncpg://pix:pix@localhost:5432/pix

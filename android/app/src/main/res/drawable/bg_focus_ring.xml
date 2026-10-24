@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Where a tap on the preview focuses (FR-1.4), in the accent like the applied zoom. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <stroke
+        android:width="1.5dp"
+        android:color="@color/pix_accent" />
+</shape>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.core.AppContainer
+import com.lastpenguin.pix.ui.account.AccountViewModel
+import com.lastpenguin.pix.ui.account.FriendsViewModel
 import com.lastpenguin.pix.ui.camera.CameraViewModel
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
@@ -21,8 +23,17 @@ import com.lastpenguin.pix.ui.session.SubjectViewModel
 object PixViewModels {
 
     val Factory: ViewModelProvider.Factory = viewModelFactory {
-        initializer { CameraViewModel(container.cameraController, container.guideRepository) }
-        initializer { ReferenceViewModel(container.referenceGuideMaker, container.guideRepository) }
+        initializer {
+            CameraViewModel(
+                container.cameraController,
+                container.guideRepository,
+                container.cameraSettings,
+                container.savedGuideStore,
+            )
+        }
+        initializer {
+            ReferenceViewModel(container.referenceGuideMaker, container.guideRepository, container.savedGuideStore)
+        }
         initializer {
             GenerationViewModel(container.poseGenerator, container.cameraController, container.generationConsent)
         }
@@ -37,6 +48,8 @@ object PixViewModels {
         initializer {
             SubjectViewModel(container.sessionManager, container.mirrorGuideRepository, container.remoteVideo)
         }
+        initializer { AccountViewModel(container.authRepository, container.googleIdTokens) }
+        initializer { FriendsViewModel(container.authRepository, container.friendsRepository) }
     }
 
     private val CreationExtras.container: AppContainer

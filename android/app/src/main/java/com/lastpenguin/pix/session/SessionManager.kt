@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.flow.Flow
@@ -20,8 +21,8 @@ interface SessionManager {
     /** Subject: the photographer's `camera.capabilities`, kept so a screen that opens late still gets it. */
     val peerCapabilities: StateFlow<CameraCapabilities?>
 
-    /** Subject: the zoom from the last `camera.state`, for the same reason; null until one arrives. */
-    val peerZoom: StateFlow<Float?>
+    /** Subject: the applied camera values from the last `camera.state`, for the same reason; null until one arrives. */
+    val peerCamera: StateFlow<CameraState?>
 
     suspend fun start(entry: SessionEntry, role: Role)
 

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-02, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
 import json
 import re
 from contextlib import ExitStack
@@ -43,6 +43,68 @@ def ice_signal(tag="test"):
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
+
+
+def test_health_fails_while_the_session_store_is_down(client, outage):
+    outage(True)
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable"}
+    outage(False)
+    assert client.get("/health").status_code == 200
+
+
+def test_socket_is_asked_to_try_again_while_the_session_store_is_down(client, outage):
+    outage(True)
+    with client.websocket_connect("/ws") as socket:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            socket.receive_json()
+        assert exc.value.code == 1013
+    outage(False)
+    with client.websocket_connect("/ws") as socket:
+        create_room(socket)
+
+
+def test_store_outage_in_the_middle_of_a_session_closes_the_socket(client, outage):
+    with client.websocket_connect("/ws") as photographer:
+        create_room(photographer)
+        outage(True)
+        photographer.send_json(ice_signal())
+        with pytest.raises(WebSocketDisconnect) as exc:
+            photographer.receive_json()
+        assert exc.value.code == 1013
+    outage(False)
+    with client.websocket_connect("/ws") as socket:
+        create_room(socket)
+
+
+def test_waiting_room_is_closed_when_the_session_store_fails(client, outage):
+    # The photographer sends nothing while it waits, so only the server's own check can notice the outage.
+    with client.websocket_connect("/ws") as photographer:
+        create_room(photographer)
+        outage(True)
+        with pytest.raises(WebSocketDisconnect) as exc:
+            photographer.receive_json()
+        assert exc.value.code == 1013
+    outage(False)
+
+
+def test_waiting_room_is_closed_when_redis_restarts_empty(client, restart_store):
+    with client.websocket_connect("/ws") as photographer:
+        create_room(photographer)
+        restart_store()
+        with pytest.raises(WebSocketDisconnect) as exc:
+            photographer.receive_json()
+        assert exc.value.code == 1013
+
+
+def test_internal_stats_count_open_rooms_and_sockets(client):
+    assert client.get("/internal/stats").json() == {"sessions": 0, "connections": 0}
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        assert client.get("/internal/stats").json()["sessions"] == 1
+        join_room(photographer, subject, room)
+        assert client.get("/internal/stats").json() == {"sessions": 1, "connections": 2}
 
 
 def test_codes_preserve_leading_zeroes_and_retry_collisions(client, monkeypatch):
@@ -301,3 +363,47 @@ def test_fifty_rooms_can_coexist_without_code_collisions(client):
         for photographer, subject, code in pairs:
             subject.send_json(ice_signal(code))
             assert photographer.receive_json() == ice_signal(code)
+
+
+def try_code(socket, code):
+    socket.send_json({"type": "room.join", "code": code})
+    return socket.receive_json()
+
+
+def wrong_code(room):
+    return f"{(int(room['code']) + 1) % 1_000_000:06d}"
+
+
+def test_wrong_codes_from_one_address_are_limited_until_the_window_passes(client, settings, clock):
+    settings.join_failure_limit = 3
+    # Shorter than the room's own 10 minutes, so the room is still waiting when the window has passed.
+    settings.join_failure_window_seconds = 60
+    with client.websocket_connect("/ws") as photographer:
+        room = create_room(photographer)
+        with client.websocket_connect("/ws") as guesser:
+            for _ in range(3):
+                assert try_code(guesser, wrong_code(room))["code"] == "NOT_FOUND"
+            # The right code is refused too while the window is full, so a guess cannot be confirmed.
+            assert try_code(guesser, room["code"])["code"] == "RATE_LIMITED"
+        # The count belongs to the address, so a new socket does not start over.
+        with client.websocket_connect("/ws") as again:
+            assert try_code(again, room["code"])["code"] == "RATE_LIMITED"
+            clock.advance(settings.join_failure_window_seconds - 1)
+            assert try_code(again, room["code"])["code"] == "RATE_LIMITED"
+            clock.advance(1)
+            join_room(photographer, again, room)
+
+
+def test_an_expired_code_counts_as_wrong_and_a_full_room_does_not(client, settings, clock):
+    settings.join_failure_limit = 1
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        join_room(photographer, subject, room)
+        with client.websocket_connect("/ws") as late:
+            assert try_code(late, room["code"])["code"] == "FULL"
+            with client.websocket_connect("/ws") as other:
+                waiting = create_room(other)
+                clock.advance(settings.room_ttl_seconds)
+                assert try_code(late, waiting["code"])["code"] == "EXPIRED"
+                assert assert_error(other, "EXPIRED")
+                assert try_code(late, room["code"])["code"] == "RATE_LIMITED"

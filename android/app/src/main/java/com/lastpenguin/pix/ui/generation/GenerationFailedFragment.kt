@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -12,7 +12,7 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
 import com.lastpenguin.pix.ui.PixViewModels
 
-/** Couldn't create poses (R&S 6.3, FR-4.7). Owner: Server/AI/Sync (#7). */
+/** Couldn't create poses (R&S 6.3, FR-4.7, US-5). Owner: Server/AI/Sync (#7). */
 class GenerationFailedFragment : Fragment(R.layout.fragment_failure) {
 
     private val viewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
@@ -20,21 +20,32 @@ class GenerationFailedFragment : Fragment(R.layout.fragment_failure) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentFailureBinding.bind(view)
         // The scene photo is kept for Try again (FR-4.7).
-        val scene = viewModel.uiState.value.scene
+        val state = viewModel.uiState.value
+        val scene = state.scene
         if (scene == null) {
             // Nothing failed here: the app process was restarted on this screen and the photo is gone.
             view.post { if (isAdded) backToCamera() }
             return
         }
         binding.failureTitle.setText(R.string.generation_failed_title)
-        binding.failureMessage.setText(R.string.generation_failed_message)
         binding.failurePhoto.isVisible = true
         binding.failurePhotoImage.setImageBitmap(scene)
 
-        binding.primaryButton.setText(R.string.try_again)
-        binding.primaryButton.setOnClickListener {
-            viewModel.retry()
-            findNavController().navigate(R.id.action_generationFailed_to_generating)
+        if (state.descriptionRejected) {
+            // The service refused the description: the same one again would be refused too (US-5).
+            binding.failureMessage.text = getString(R.string.description_rejected_message, state.description.trim())
+            binding.primaryButton.setText(R.string.edit_description)
+            binding.primaryButton.setOnClickListener {
+                viewModel.describeAgain()
+                findNavController().navigate(R.id.action_generationFailed_to_describePose)
+            }
+        } else {
+            binding.failureMessage.setText(R.string.generation_failed_message)
+            binding.primaryButton.setText(R.string.try_again)
+            binding.primaryButton.setOnClickListener {
+                viewModel.retry()
+                findNavController().navigate(R.id.action_generationFailed_to_generating)
+            }
         }
         binding.secondaryButton.setText(R.string.back_to_camera)
         binding.secondaryButton.setOnClickListener { backToCamera() }

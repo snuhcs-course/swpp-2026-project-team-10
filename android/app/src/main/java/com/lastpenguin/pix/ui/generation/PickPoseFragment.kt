@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -39,8 +39,9 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         binding.tryOtherButton.setOnClickListener {
-            viewModel.retry()
-            findNavController().navigate(R.id.action_pickPose_to_generating)
+            // Generate poses again, with the photo and the description kept, so the user can change what to ask for.
+            viewModel.describeAgain()
+            findNavController().navigate(R.id.action_pickPose_to_describePose)
         }
         // Leaving this screen with system back discards the candidates.
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToCamera() }

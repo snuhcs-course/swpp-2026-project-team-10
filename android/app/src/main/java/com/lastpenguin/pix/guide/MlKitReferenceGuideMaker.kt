@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Log
-import androidx.core.graphics.scale
+import androidx.core.graphics.createBitmap
 import com.lastpenguin.pix.core.Timings
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * [ReferenceGuideMaker] on the device: load, segment, crop, outline (Design 2.6.1).
+ * [ReferenceGuideMaker] on the device: load, segment, smooth, crop, outline (Design 2.6.1).
  * Owner: PM (#5).
  */
 class MlKitReferenceGuideMaker(
@@ -60,20 +60,46 @@ class MlKitReferenceGuideMaker(
             decoder.setTargetSampleSize(decodeSampleSize(info.size.width, info.size.height))
         }
 
-    /** Steps 2–5 on an upright image: segment, crop to the person plus 2%, and outline. */
+    /**
+     * Steps 2–5 on an upright image: segment, smooth the mask, crop to the person plus 2% and keep where that crop
+     * lies as the anchor (FR-3.1), and outline; a small copy of the photo is kept for the thumbnail (FR-3.9). The
+     * cutout's alpha is the smoothed mask, so the subject, which rebuilds the outline from it, draws the same line
+     * (FR-2.9).
+     */
     private suspend fun build(input: Bitmap, source: GuideSource): ReferenceGuide {
         val bitmap = prepare(input)
         val segmentation = segmenter.segment(bitmap).getOrThrow()
-        val box = segmentation.bounds
-        val crop = cropWithMargin(PixelRect(box.left, box.top, box.right, box.bottom), bitmap.width, bitmap.height)
-        val cutout = Bitmap.createBitmap(segmentation.foreground, crop.left, crop.top, crop.width, crop.height)
-        val mask = Bitmap.createBitmap(segmentation.mask, crop.left, crop.top, crop.width, crop.height)
+        val width = segmentation.width
+        val height = segmentation.height
+        Timings.mark("smooth.start")
+        val radius = smoothRadius(subjectHeight(segmentation.confidence, width, height))
+        val field = smoothMask(segmentation.confidence, width, height, radius)
+        // Smoothing drops specks, so a photo with nothing but specks has no person after all.
+        val area = foregroundBounds(field, width, height) ?: throw NoPersonFoundException()
+        val crop = cropWithMargin(PixelRect(area.left, area.top, area.right, area.bottom), width, height)
+        val colors = IntArray(crop.width * crop.height)
+        bitmap.getPixels(colors, 0, crop.width, crop.left, crop.top, crop.width, crop.height)
+        val alpha = IntArray(colors.size)
+        for (y in 0 until crop.height) {
+            for (x in 0 until crop.width) {
+                val k = y * crop.width + x
+                alpha[k] = smoothedAlpha(field[(crop.top + y) * width + crop.left + x], radius)
+                colors[k] = (colors[k] and 0x00FFFFFF) or (alpha[k] shl 24)
+            }
+        }
+        val cutout = createBitmap(crop.width, crop.height).apply {
+            setPixels(colors, 0, crop.width, 0, 0, crop.width, crop.height)
+        }
+        val outline = outlineExtractor.extract(alpha, crop.width, crop.height, outlineStrokePx(crop.height))
+        Timings.mark("smooth.end", "r=$radius")
         return ReferenceGuide(
             id = UUID.randomUUID().toString(),
             cutout = cutout,
-            outline = outlineExtractor.extract(mask, outlineStrokePx(crop.height)),
+            outline = outline,
             aspect = crop.width.toFloat() / crop.height,
             source = source,
+            anchor = crop.relativeTo(width, height),
+            reference = shrink(bitmap, REFERENCE_THUMBNAIL_LONG_SIDE),
         )
     }
 
@@ -83,12 +109,7 @@ class MlKitReferenceGuideMaker(
             Bitmap.Config.ARGB_8888 -> bitmap
             else -> bitmap.copy(Bitmap.Config.ARGB_8888, false)
         }
-        val size = fitLongSide(software.width, software.height)
-        return if (size.width == software.width && size.height == software.height) {
-            software
-        } else {
-            software.scale(size.width, size.height)
-        }
+        return shrink(software, MAX_REFERENCE_LONG_SIDE)
     }
 
     private companion object {

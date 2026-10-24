@@ -1,22 +1,30 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
+    jacoco
 }
 
-// Iteration 1: the Pix server runs on a laptop on the test Wi-Fi (Design 2.8). Set its address as
-// `pix.serverUrl=http://192.168.0.10:8000/` in local.properties (never committed) or pass -Ppix.serverUrl=...
-// The default, 10.0.2.2, is the host machine as seen from the emulator.
+// The Pix server (Design 2.8, Hosting and Configuration). Release builds use Server A, which runs main.
+// Debug builds use `pix.serverUrl` from local.properties (never committed) or -Ppix.serverUrl=...: Server B, which
+// runs dev (`http://swpp26t10.147-46-242-174.sslip.io/`), or a laptop on the test Wi-Fi
+// (`http://192.168.0.10:8000/`). Their default, 10.0.2.2, is the host machine as seen from the emulator.
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
-val serverUrl: String = providers.gradleProperty("pix.serverUrl").orNull
+val debugServerUrl: String = providers.gradleProperty("pix.serverUrl").orNull
     ?: localProperties.getProperty("pix.serverUrl")
     ?: "http://10.0.2.2:8000/"
+val releaseServerUrl = "http://swpp26t10.147-46-242-169.sslip.io/"
+
+// The web OAuth client of the team's Google Cloud project "Pix" (Design 2.8, Configuration). The app asks Google for
+// ID tokens addressed to it, and both servers check them against the same ID in `PIX_GOOGLE_CLIENT_ID`. It is not a
+// secret: every APK contains it.
+val googleServerClientId = "572788944856-cr72pqlradqibnep626t672driie7537.apps.googleusercontent.com"
 
 android {
     namespace = "com.lastpenguin.pix"
@@ -30,12 +38,15 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-
-        buildConfigField("String", "SERVER_URL", "\"$serverUrl\"")
+        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "SERVER_URL", "\"$debugServerUrl\"")
+        }
         release {
+            buildConfigField("String", "SERVER_URL", "\"$releaseServerUrl\"")
             optimization {
                 enable = false
             }
@@ -59,11 +70,54 @@ android {
             it.testLogging.exceptionFormat = TestExceptionFormat.FULL
             // Robolectric reads FileDescriptor internals, which Java 17+ modules hide by default.
             it.jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
+            // Coverage (Testing Documentation 2.1.4): Robolectric loads classes without a source location,
+            // and the JDK's internals must stay out of the agent, or the report is empty or the run fails.
+            it.extensions.configure<JacocoTaskExtension> {
+                isIncludeNoLocationClasses = true
+                excludes = listOf("jdk.internal.*")
+            }
         }
     }
     lint {
         // Pix runs on phones only. This check wants the camera marked optional for ChromeOS, but Pix needs it.
         disable += "PermissionImpliesUnsupportedChromeOsHardware"
+    }
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
+}
+
+// Line and branch coverage of the JVM and Robolectric tests (Testing Documentation 2.1.2–2.1.4):
+// `./gradlew :app:jacocoTestReport`, then app/build/reports/jacoco/jacocoTestReport/html/index.html.
+// Excluded (2.1.3): generated code (BuildConfig, R, ViewBinding), and the hand-written fakes that stand in for the
+// module interfaces in tests. The debug source set is not compiled into the debug app classes used here.
+val coverageExclusions = listOf(
+    "**/BuildConfig.*",
+    "**/R.class",
+    "**/R$*.class",
+    "**/databinding/**",
+    "**/*Binding.class",
+    "**/*Binding$*.class",
+    "**/*Fake*.*",
+)
+tasks.register<JacocoReport>("jacocoTestReport") {
+    group = "verification"
+    description = "Line and branch coverage of the debug unit tests."
+    dependsOn("testDebugUnitTest")
+    val buildDir = layout.buildDirectory
+    classDirectories.setFrom(
+        files(
+            buildDir.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+            buildDir.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes"),
+        ).map { dir -> fileTree(dir) { exclude(coverageExclusions) } },
+    )
+    sourceDirectories.setFrom(files("src/main/java"))
+    executionData.setFrom(buildDir.file("jacoco/testDebugUnitTest.exec"))
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
     }
 }
 
@@ -101,6 +155,11 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.constraintlayout)
 
+    // Accounts and friends (#54): Google sign-in through Credential Manager; the sign-in is kept in DataStore.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.
 
@@ -108,4 +167,11 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.ext.junit)
+    // Screen tests: FragmentScenario launches a Fragment in a debug-only activity under Robolectric.
+    testImplementation(libs.androidx.fragment.testing)
+    testImplementation(libs.androidx.navigation.testing)
+    debugImplementation(libs.androidx.fragment.testing.manifest)
+    // A real HTTP server on the JVM for the token refresh path, which lives in OkHttp's interceptor and
+    // authenticator, and for the signaling socket's client.
+    testImplementation(libs.okhttp.mockwebserver)
 }

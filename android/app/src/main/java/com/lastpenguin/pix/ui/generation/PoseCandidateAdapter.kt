@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -10,14 +10,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.ItemPoseCandidateBinding
 import com.lastpenguin.pix.generation.CandidateEvent
-import com.lastpenguin.pix.generation.PoseTemplate
+import com.lastpenguin.pix.generation.PlannedPose
 
-/** One cell of the candidate grid: a template and what has arrived for it; null while it is being created. */
-data class PoseSlot(val template: PoseTemplate, val event: CandidateEvent?, val selected: Boolean = false)
+/** One cell of the candidate grid: a pose and what has arrived for it; null while it is being created. */
+data class PoseSlot(val pose: PlannedPose, val event: CandidateEvent?, val selected: Boolean = false)
 
-/** A slot per template, in the server's order. */
+/** A slot per pose, in the set's order. */
 fun GenerationUiState.slots(): List<PoseSlot> =
-    templates.map { PoseSlot(it, candidates[it.id], selected = it.id == selectedTemplateId) }
+    poses.map { PoseSlot(it, candidates[it.id], selected = it.id == selectedPoseId) }
 
 /**
  * The 2×2 candidate grid of Generating poses and Pick a pose (R&S 6.3). Cells can be picked only when [onPick] is
@@ -25,7 +25,7 @@ fun GenerationUiState.slots(): List<PoseSlot> =
  * Owner: Server/AI/Sync (#7).
  */
 class PoseCandidateAdapter(
-    private val onPick: ((PoseTemplate) -> Unit)? = null,
+    private val onPick: ((PlannedPose) -> Unit)? = null,
 ) : ListAdapter<PoseSlot, PoseCandidateAdapter.Holder>(Diff) {
 
     class Holder(val binding: ItemPoseCandidateBinding) : RecyclerView.ViewHolder(binding.root)
@@ -44,15 +44,15 @@ class PoseCandidateAdapter(
         binding.poseStatus.setText(if (slot.event == null) R.string.creating_pose else R.string.pose_failed)
 
         val card = binding.root
-        // The pose name is not shown; a screen reader still says which pose the image is.
-        card.contentDescription = slot.template.label
+        // The pose is not written on the card (FR-4.6); a screen reader still says which pose the image is.
+        card.contentDescription = slot.pose.text
         card.isChecked = slot.selected
         binding.poseCheck.isVisible = slot.selected
         card.strokeWidth = card.resources.getDimensionPixelSize(
             if (slot.selected) R.dimen.pose_card_stroke_selected else R.dimen.pose_card_stroke,
         )
         if (onPick != null && image != null) {
-            card.setOnClickListener { onPick.invoke(slot.template) }
+            card.setOnClickListener { onPick.invoke(slot.pose) }
         } else {
             card.setOnClickListener(null)
             card.isClickable = false
@@ -60,7 +60,7 @@ class PoseCandidateAdapter(
     }
 
     private object Diff : DiffUtil.ItemCallback<PoseSlot>() {
-        override fun areItemsTheSame(oldItem: PoseSlot, newItem: PoseSlot) = oldItem.template.id == newItem.template.id
+        override fun areItemsTheSame(oldItem: PoseSlot, newItem: PoseSlot) = oldItem.pose.id == newItem.pose.id
 
         override fun areContentsTheSame(oldItem: PoseSlot, newItem: PoseSlot) = oldItem == newItem
     }

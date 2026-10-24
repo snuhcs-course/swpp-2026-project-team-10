@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 /**
@@ -19,6 +19,8 @@ class ChannelRouter {
         is SessionMessage.GuideStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.CameraStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.ZoomSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+        is SessionMessage.GuideMove -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+        is SessionMessage.ExposureSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.Ping, is SessionMessage.Pong -> Channel.REALTIME
         else -> Channel.RELIABLE
     }
@@ -28,7 +30,10 @@ class ChannelRouter {
      * the last one applied for that type, whichever channel it came on (Design 2.5.1).
      */
     fun latestOnly(message: SessionMessage): Boolean = when (message) {
-        is SessionMessage.GuideStateUpdate, is SessionMessage.CameraStateUpdate, is SessionMessage.ZoomSet -> true
+        is SessionMessage.GuideStateUpdate, is SessionMessage.CameraStateUpdate, is SessionMessage.ZoomSet,
+        is SessionMessage.GuideMove, is SessionMessage.ExposureSet,
+        -> true
+
         else -> false
     }
 }

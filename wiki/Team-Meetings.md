@@ -138,7 +138,107 @@ Each note lists the attendees, the agenda, the decisions for each agenda item, a
 | 조성민 | Choose the WebRTC build for Android | 10/2 |
 
 [↑ Back to the list](#iteration-1)
+ 
+## Iteration 2
+ 
+| Date | Meeting | Topics |
+|---|---|---|
+| [2026-10-09 (Fri)](#2026-10-09-fri-iteration-2-kickoff) | Iteration 2 kickoff | Iteration 1 results, scope and priorities, camera and guide changes, server and friends, roles, AI records |
+ 
+### 2026-10-09 (Fri): Iteration 2 kickoff
+ 
+**Attendees:** 박동제, 박재완, 조성민, 한준형
+ 
+**Agenda**
+1. What Iteration 1 built
+2. Iteration 2 scope and priorities
+3. Camera and remote controls
+4. The guide
+5. Server, friends, and invitations
+6. Pose description
+7. Roles
+8. AI records, documents, and the schedule
 
+**1. What Iteration 1 built**
+- Camera: zoom slider, composition grid, and horizon bar.
+- Guide: cutout and outline with drag, pinch, and opacity, and removing the guide.
+- Server: WebSocket signaling and the pose generation APIs (`POST /poses`, `GET /pose-templates`), with GPT Image 2.5 Flare at low quality through OpenRouter.
+- Live view: the photographer's camera on the subject's phone, the same guide on both phones, and remote zoom from either phone.
+- The demo flow works from start to end, which is enough for the midterm presentation.
+
+**2. Iteration 2 scope and priorities**
+- Already planned in the R&S: friends and invitations, sessions across networks, more camera and remote controls, hiding and replacing the guide, saved guides, and describing a pose in words.
+- Added at this meeting: smoother guide outlines, a fix for the zoom stutter, pinch zoom, aspect ratios, no shutter sound, and a reference thumbnail.
+- Must: smoother outlines and the zoom stutter. ML Kit finds the arms and legs, but the edges are jagged and the limbs come out too thick or too long. The preview stutters on every zoom, and on the S21 it pauses to load when the zoom goes below 1×.
+- If possible: pinch zoom instead of the slider, and the short pause when the shutter is pressed.
+- The rest is picked up one by one when there is time. Iteration 2 overlaps with midterms, so one or two items may move to Iteration 3.
+- Iteration 3: selfie mode, and a settings screen with the guide color and a frame delay indicator for remote sessions.
+- Later or dropped: video comes later, because it gets complicated with remote sessions. A guide that keeps the reference's background is not worth it. Choosing the image model in the app is dropped, because it would show our costs.
+- The UI stays in English. Korean comes at the end, with a language setting, if there is time.
+- Small UI fixes, such as long device names cut off in the live view, are made as they come up, without a task.
+
+**3. Camera and remote controls**
+- Brightness and flash on the photographer's camera and from the subject's phone. Focus too, if possible.
+- Aspect ratios 4:3, 16:9, and 1:1 only. 16:9 fits Instagram stories without cropping. This replaces the fixed 3:4 frame (AD-10).
+- No shutter sound.
+- Pinch zoom comes back if possible, with a button that switches between zooming the camera and editing the guide, so the two pinch gestures do not clash.
+- Apart from brightness and flash, the remote controls need fewer additions than we expected.
+
+**4. The guide**
+- The guide no longer shows the reference photo's pixels. A small thumbnail of the reference sits in a corner of the Camera screen instead, as in Ulike.
+- The guide starts where the person stands in the reference photo, not at the center, and the user adjusts it from there. Framing the person in the photo matters more than the background.
+- Both people can move and resize the guide, so the subject can fix a guide that the photographer placed badly.
+- The guide can be hidden for a moment and replaced. Removing it already works.
+- Saved guides stay in the app on the phone, not in the gallery and not on the server.
+- If there is time: a guide color that contrasts with the background (black or white by default), which the user can switch.
+
+**5. Server, friends, and invitations**
+- The course-provided server first, AWS otherwise, with Docker and nginx. GitHub hosting serves only static pages.
+- Sessions on different networks need the deployed server for signaling. Streaming across networks is still its own task after the server is up.
+- Sign-in with Google. The team makes choices like this one; AI designs details such as the database schema.
+- Invitations arrive as push notifications. If a push does not arrive, the photographer copies an invite link and sends it to the friend. Sending invitations only through KakaoTalk would need KakaoTalk on every test phone.
+- The friends feature needs both the server (박재완) and the connection code (조성민), so the two agree on the order of the work.
+
+**6. Pose description**
+- Idea chips are the default, and the user can also type a description.
+- The *Generate poses* screen design was accepted: a thumbnail of the scene, a 100-character field in Korean or English, idea chips, *Generate 4 poses*, and *Skip, use the preset poses*.
+- The default prompt must keep good framing. The owner decides the details.
+- We still need to collect preset images.
+
+**7. Roles**
+ 
+| Member | Iteration 2 tasks |
+|---|---|
+| 한준형 | PM: schedule and issues; the Iteration 2 design in the R&S and Design; the AI rules in `CLAUDE.md` and the PR template |
+| 박재완 | Server deployment; accounts and friends; invitations; pose description; pinch zoom |
+| 조성민 | Sessions across networks; remote brightness, flash, and guide moves; the zoom stutter |
+| 박동제 | Smoother outlines; camera controls; guide controls, the reference thumbnail, and the starting position; saved guides |
+ 
+- After the meeting, the Iteration 2 schedule (10/11) moved pinch zoom and invitations to 조성민.
+
+**8. AI records, documents, and the schedule**
+- We write the AI collaboration notes as we go: each PR says what AI did well and what we had to fix. In Iteration 1 the report was written at the end.
+- The `AI-generated with …` line stays in source files only, one line per file, not per function. When a file changes, the line names the latest tool, date, and reviewer; `git blame` shows the history. The rule goes into `CLAUDE.md`.
+- The Iteration 2 design is written with AI before feature work, and the team reviews it. Decisions that come up during the work are made in the team chat.
+- The wiki documents stay one page each and get new versions, not a page per iteration.
+- Team meeting notes go up on the day of the meeting. The standup log is filled through 10/7, with a short entry for 10/8 (demo recording, tests, and presentation prep). Weekend standups are flexible.
+
+**Action items**
+ 
+| Owner | Item | Due |
+|---|---|---|
+| 한준형 | Post these notes | 10/9 |
+| 한준형 | Fill the standup log through 10/8 | – |
+| 한준형 | Iteration 2 schedule and GitHub issues, as in Iteration 1 | 10/11 |
+| 한준형 | Iteration 2 design in the R&S and Design | Before feature work |
+| 한준형 | AI marker rule in `CLAUDE.md` and an AI section in the PR template | – |
+| 박재완 | Check the course-provided server; otherwise use AWS | – |
+| 박동제 | Smooth the guide outline (top priority) | – |
+| 조성민 | Fix the zoom stutter (top priority) | – |
+| All | Note AI use in every PR | – |
+ 
+[↑ Back to the list](#iteration-2)
+ 
 [#1]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/1
 [#12]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/12
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13

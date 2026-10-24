@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.Role
 import kotlinx.serialization.json.Json
@@ -27,12 +26,12 @@ class MessageCodecTest {
         val text = codec.encode(SessionMessage.Hello(appVersion = "0.1.0", role = Role.PHOTOGRAPHER, name = "Dongje"))
 
         val envelope = Json.parseToJsonElement(text).jsonObject
-        assertEquals(1, envelope.getValue("v").jsonPrimitive.int)
+        assertEquals(2, envelope.getValue("v").jsonPrimitive.int)
         assertEquals("hello", envelope.getValue("t").jsonPrimitive.content)
         assertEquals(1, envelope.getValue("seq").jsonPrimitive.int)
         assertEquals(1_759_212_345_678L, envelope.getValue("ts").jsonPrimitive.long)
         val body = envelope.getValue("b").jsonObject
-        assertEquals(1, body.getValue("protocol").jsonPrimitive.int)
+        assertEquals(2, body.getValue("protocol").jsonPrimitive.int)
         assertEquals("0.1.0", body.getValue("appVersion").jsonPrimitive.content)
         assertEquals("PHOTOGRAPHER", body.getValue("role").jsonPrimitive.content)
         assertEquals("Dongje", body.getValue("name").jsonPrimitive.content)
@@ -48,7 +47,7 @@ class MessageCodecTest {
             SessionMessage.GuideImageBegin("g1", "webp", 540, 720, 48213, 5),
             SessionMessage.GuideImageChunk("g1", 0, "UklGRl68AABXRUJQ"),
             SessionMessage.GuideImageEnd("g1", 3735928559L),
-            SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, GuideStyle.CUTOUT, true), false),
+            SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, false), false),
             SessionMessage.GuideClear,
             SessionMessage.ZoomSet(2f),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
@@ -87,7 +86,7 @@ class MessageCodecTest {
     @Test
     fun `decodes the guide state example from the design`() {
         val text = """
-            {"v": 1, "t": "guide.state", "seq": 412, "ts": 1759212349120,
+            {"v": 2, "t": "guide.state", "seq": 412, "ts": 1759212349120,
              "b": {"state": {"guideId": "5f0c2b9e", "cx": 0.32, "cy": 0.55, "height": 0.7,
                              "opacity": 0.5, "style": "OUTLINE", "visible": true}, "final": false}}
         """.trimIndent()
@@ -98,13 +97,15 @@ class MessageCodecTest {
         val update = envelope.message as SessionMessage.GuideStateUpdate
         assertEquals("5f0c2b9e", update.state.guideId)
         assertEquals(0.32f, update.state.cx, 0f)
-        assertEquals(GuideStyle.OUTLINE, update.state.style)
+        // The style an Iteration 1 phone still sends is ignored: the guide is an outline only (FR-2.2).
+        assertEquals(true, update.state.visible)
         assertFalse(update.final)
     }
 
     @Test
     fun `unknown types, unknown fields, and garbage are tolerated`() {
-        assertNull(codec.decode("""{"v":1,"t":"camera.flash.set","seq":1,"ts":0,"b":{"mode":"ON"}}"""))
+        // A type a later protocol may add; camera.flash.set, the earlier example here, exists since #57.
+        assertNull(codec.decode("""{"v":1,"t":"camera.timer.set","seq":1,"ts":0,"b":{"seconds":3}}"""))
         assertNull(codec.decode("not json"))
         assertNull(codec.decode("""{"v":1}"""))
         val withExtra = codec.decode("""{"v":1,"t":"ping","seq":1,"ts":0,"b":{"ts":5,"extra":true}}""")

@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Friends, from Shoot together (R&S 6.4; FR-5.4, FR-5.7, FR-5.9, FR-5.16, FR-8.1). Signed out, it offers Sign in and
+     the room code instead of the list; a Google account without a Pix ID is asked to choose one first. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="56dp">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            style="@style/Widget.Pix.Header.Back"
+            android:contentDescription="@string/back_to_camera" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/friends_overline"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:accessibilityHeading="true"
+                android:text="@string/shoot_together"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/friends_subtitle"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+        </LinearLayout>
+
+        <!-- The Account sheet (decided in Iter2-P13): name, Add Google or Add a password, Sign out. -->
+        <ImageButton
+            android:id="@+id/accountButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="-12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/account"
+            android:src="@drawable/ic_account"
+            android:visibility="gone"
+            app:tint="@color/pix_text"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="12dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- The last refresh failed; the lists are what was loaded before. -->
+            <TextView
+                android:id="@+id/offlineText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:accessibilityLiveRegion="polite"
+                android:text="@string/friends_offline"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                android:textColor="@color/pix_danger_text"
+                android:visibility="gone" />
+
+            <!-- Signed out, or no Pix ID yet: one card in place of the list. -->
+            <LinearLayout
+                android:id="@+id/promptCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_info_card"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="28dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_icon_tile"
+                    android:importantForAccessibility="no"
+                    android:padding="14dp"
+                    android:src="@drawable/ic_people"
+                    app:tint="@color/pix_text_muted" />
+
+                <TextView
+                    android:id="@+id/promptTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:textAppearance="@style/TextAppearance.Pix.Action"
+                    android:textColor="@color/pix_text"
+                    tools:text="@string/signed_out_title" />
+
+                <TextView
+                    android:id="@+id/promptBody"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.2"
+                    android:textAppearance="@style/TextAppearance.Pix.Body"
+                    tools:text="@string/signed_out_body" />
+            </LinearLayout>
+
+            <!-- Received requests with Accept and Decline (FR-5.7). -->
+            <TextView
+                android:id="@+id/requestsLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:text="@string/friend_requests"
+                android:textAppearance="@style/TextAppearance.Pix.Overline"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <LinearLayout
+                android:id="@+id/requestsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <!-- Requests the user sent and nobody answered yet, which Sent requests lists with Withdraw (FR-5.16). -->
+            <Button
+                android:id="@+id/sentRequestsButton"
+                style="@style/Widget.Pix.Button.Text.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginEnd="-12dp"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone"
+                app:icon="@drawable/ic_chevron_right"
+                app:iconGravity="end"
+                app:iconPadding="2dp"
+                app:iconSize="18dp"
+                app:iconTint="@color/button_text_text"
+                tools:text="Sent requests · 2"
+                tools:visibility="visible" />
+
+            <!-- No friends yet. -->
+            <LinearLayout
+                android:id="@+id/emptyCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_info_card"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="36dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_people"
+                    app:tint="@color/pix_text_faint" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/no_friends_title"
+                    android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+                    android:textColor="@color/pix_text" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/no_friends_body"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+            </LinearLayout>
+
+            <!-- Friends with name, online status, and Invite (FR-5.9); long-press to remove (FR-5.10). -->
+            <LinearLayout
+                android:id="@+id/friendsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/signInButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/sign_in_to_add_friends"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <Button
+        android:id="@+id/choosePixIdButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/choose_pix_id"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/addFriendButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/add_a_friend"
+        android:visibility="gone" />
+
+    <!-- Room codes work without signing in (FR-5.1, FR-8.1). -->
+    <Button
+        android:id="@+id/roomCodeInsteadButton"
+        style="@style/Widget.Pix.Button.Secondary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/use_room_code_instead"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <Button
+        android:id="@+id/roomCodeButton"
+        style="@style/Widget.Pix.Button.Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/use_room_code"
+        android:visibility="gone" />
+
+    <!-- Tap to copy (FR-5.4). -->
+    <TextView
+        android:id="@+id/myPixIdText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:background="?attr/selectableItemBackground"
+        android:gravity="center"
+        android:minHeight="44dp"
+        android:paddingHorizontal="12dp"
+        android:textAppearance="@style/TextAppearance.Pix.Label"
+        android:textColor="@color/pix_text_muted"
+        android:visibility="gone"
+        tools:text="My Pix ID: test1" />
+</LinearLayout>

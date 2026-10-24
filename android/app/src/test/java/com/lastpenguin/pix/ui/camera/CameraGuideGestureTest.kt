@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -6,14 +6,16 @@ import android.net.Uri
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.GuideStyle
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlinx.coroutines.Dispatchers
@@ -161,7 +163,7 @@ class CameraGuideGestureTest {
     fun guideGesturesPreserveOtherPropertiesAndDoNotZoomTheCamera() {
         val guide = guide()
         guides.setGuide(guide)
-        guides.update(final = true) { it.copy(opacity = 0.8f, style = GuideStyle.CUTOUT, visible = false) }
+        guides.update(final = true) { it.copy(opacity = 0.8f, visible = false) }
         val before = guides.state.value
 
         model.onGuideGesture(0.1f, -0.1f, 2f, final = true)
@@ -208,31 +210,12 @@ class CameraGuideGestureTest {
     }
 
     @Test
-    fun styleToggleSwitchesBothWaysAndKeepsPositionSizeAndOpacity() = runTest {
-        guides.setGuide(guide())
-        guides.update(final = true) { it.copy(cx = 0.3f, cy = 0.6f, height = 1.2f, opacity = 0.8f) }
-        val placed = guides.state.value
-        val changes = mutableListOf<GuideChange>()
-        backgroundScope.launch { guides.changes.collect { changes += it } }
-        runCurrent()
-
-        model.onStyleToggle()
-        assertEquals(placed.copy(style = GuideStyle.CUTOUT), guides.state.value)
-        model.onStyleToggle()
-        runCurrent()
-
-        assertEquals(placed, guides.state.value)
-        assertEquals(listOf(true, true), changes.map { it.final })
-    }
-
-    @Test
-    fun opacityAndStyleWithoutAGuideDoNothing() = runTest {
+    fun opacityWithoutAGuideDoesNothing() = runTest {
         val changes = mutableListOf<GuideChange>()
         backgroundScope.launch { guides.changes.collect { changes += it } }
         runCurrent()
 
         model.onOpacityChange(0.3f, final = true)
-        model.onStyleToggle()
         runCurrent()
 
         assertEquals(GuideState(), guides.state.value)
@@ -256,12 +239,21 @@ class CameraGuideGestureTest {
             CameraCapabilities(1f, 4f, listOf(1f, 2f, 3f)),
         )
         override val zoom = MutableStateFlow(1f)
+        override val state = MutableStateFlow(CameraState(zoom = 1f))
         val zoomRequests = mutableListOf<Float>()
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
-        override fun setZoom(ratio: Float) {
+        override fun setZoom(ratio: Float, final: Boolean) {
             zoomRequests += ratio
         }
+
+        override fun setFocusPoint(x: Float, y: Float) = Unit
+
+        override fun setExposure(index: Int) = Unit
+
+        override fun setFlash(mode: FlashMode) = Unit
+
+        override fun setAspectRatio(ratio: AspectRatio) = Unit
         override suspend fun takePhoto(): Result<Uri> = error("Guide gestures must not capture photos")
         override suspend fun grabFrame(): Result<Bitmap> = error("Guide gestures must not capture frames")
         override fun setFrameSink(sink: FrameSink?) = Unit

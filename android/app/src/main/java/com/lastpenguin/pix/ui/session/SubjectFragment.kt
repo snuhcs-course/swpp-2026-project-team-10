@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -17,10 +17,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.camera.ExposureScale
+import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import java.text.DecimalFormat
 import kotlinx.coroutines.delay
@@ -31,23 +35,26 @@ import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
 
 /**
- * Subject view (R&S 6.6): the photographer's live video, fitted to the 3:4 frame, with their name and *Leave*.
- * The zoom slider controls the photographer's camera, with the Camera screen's readout (FR-7.1). System back asks
- * first (R&S 6.9). Owner: Real-time (#8, #10), with the guide from #9.
+ * Subject view (R&S 6.6): the photographer's live video, fitted to their frame, with their name and *Leave*.
+ * A pinch on the video zooms the photographer's camera while guide-edit mode is off, with the Camera screen's
+ * readout (FR-7.1, AD-17); with the mode on, drags and pinches move the photographer's guide (FR-7.2). The
+ * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3). System back asks
+ * first (R&S 6.9). Owner: Real-time (#8, #10, #57), with the guide from #9.
  */
 class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     private val viewModel: SubjectViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val zoomFormat = DecimalFormat("0.0")
-    private val zoomLimitFormat = DecimalFormat("0.#")
-    private var zoomSlider: TrackedSliderController? = null
+    private var pinchZoom: PinchZoomController? = null
+    private var brightnessSlider: TrackedSliderController? = null
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
         binding.guideOverlay.editable = false
+        binding.guideOverlay.onGesture = viewModel::onGuideGesture
         view.keepScreenOn = true
 
         val live = binding.liveView
@@ -58,8 +65,26 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
-        zoomSlider = TrackedSliderController.zoom(binding.zoomControls.zoomSlider, viewModel::onZoomGesture)
-        setupZoomAccessibility(binding.zoomControls.zoomRatio)
+        // The whole area takes the pinch, the margins beside a video of another shape too.
+        pinchZoom = PinchZoomController(
+            binding.videoContainer,
+            range = { viewModel.uiState.value.let { if (it.canZoom) it.minZoom..it.maxZoom else null } },
+            current = { viewModel.uiState.value.zoom },
+            onZoom = viewModel::onZoomGesture,
+        )
+        setupZoomAccessibility(binding.zoomReadout)
+        binding.editGuideButton.setOnClickListener {
+            viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
+        }
+        // The photographer's brightness and flash from this phone (FR-7.3), on the Camera screen's scale.
+        brightnessSlider = TrackedSliderController(
+            binding.brightnessSlider,
+            { ExposureScale.formatEv(sliderIndex(it), viewModel.uiState.value.exposureStep) },
+        ) { value, final -> viewModel.onExposureGesture(sliderIndex(value), final) }
+        binding.brightnessButton.setOnClickListener {
+            viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
+        }
+        binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
 
         binding.leaveButton.setOnClickListener { leaveNow() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
@@ -71,25 +96,38 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.photographerName.text = ui.photographerName
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
+                        // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
+                        binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
+                        binding.guideOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.render(ui.guide, ui.guideState)
                         binding.compositionOverlay.isVisible = ui.connected
+                        // Guide-edit mode (AD-17): the overlay owns the video's touches while on; the pinch zooms while off.
+                        binding.guideOverlay.editable = ui.guideEditing
+                        pinchZoom?.enabled = !ui.guideEditing
+                        // The toggle sits beside the readout while a guide is on the video; a hidden guide cannot be edited.
+                        binding.editGuideButton.isVisible = ui.guide != null
+                        // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
+                        // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
+                        binding.editGuideButton.isChecked = ui.guideEditing
+                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
+                        renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
-                        val zoomControls = binding.zoomControls
-                        zoomControls.zoomRatio.text = getString(R.string.zoom_ratio, ratio)
-                        zoomControls.zoomRatio.contentDescription = getString(R.string.camera_zoom_description, ratio)
-                        zoomControls.zoomRatio.isEnabled = ui.canZoom
-                        zoomControls.minZoom.text = getString(R.string.zoom_ratio, zoomLimitFormat.format(ui.minZoom))
-                        zoomControls.maxZoom.text = getString(R.string.zoom_ratio, zoomLimitFormat.format(ui.maxZoom))
-                        zoomSlider?.render(ui.minZoom, ui.maxZoom, ui.zoom, ui.canZoom)
+                        binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
+                        binding.zoomReadout.contentDescription = getString(R.string.camera_zoom_description, ratio)
+                        binding.zoomReadout.isEnabled = ui.canZoom
+                        if (!ui.canZoom) pinchZoom?.finishInteraction()
                     }
                 }
                 launch {
-                    // "Connecting…" until the session is up, then "camera paused" whenever frames stop (Design 2.8).
+                    // "Connecting…" until the session is up and its first frame has arrived; "camera paused" only when
+                    // frames stop after that (Design 2.8). A session is Connected before WebRTC delivers the first
+                    // frame, so counting the stall from the watchdog's creation showed "paused" before any video.
                     while (true) {
                         val connected = sessionViewModel.state.value is SessionState.Connected
-                        val stalled = connected && frames.nanosSinceLastFrame() > STALL_NANOS
-                        binding.connectingText.isVisible = !connected || stalled
-                        binding.connectingText.setText(if (connected) R.string.camera_paused else R.string.connecting)
+                        val streaming = connected && frames.hasFrame()
+                        val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
+                        binding.connectingText.isVisible = !streaming || stalled
+                        binding.connectingText.setText(if (stalled) R.string.camera_paused else R.string.connecting)
                         delay(STALL_CHECK_MS)
                     }
                 }
@@ -101,18 +139,56 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onPause() {
-        zoomSlider?.finishInteraction()
+        pinchZoom?.finishInteraction()
+        brightnessSlider?.finishInteraction()
         super.onPause()
     }
 
     override fun onDestroyView() {
-        zoomSlider = null
+        pinchZoom?.finishInteraction()
+        pinchZoom = null
+        brightnessSlider?.finishInteraction()
+        brightnessSlider = null
         watchdog?.let(viewModel.video::detach)
         watchdog = null
         renderer?.release()
         renderer = null
         super.onDestroyView()
     }
+
+    /** Brightness and flash, hidden when the photographer's phone has no range or no flash (FR-7.3). */
+    private fun renderCameraControls(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.brightnessButton.isVisible = ui.hasBrightness
+        binding.brightnessButton.isChecked = ui.brightnessOpen
+        binding.brightnessButton.isEnabled = ui.connected
+        binding.brightnessPanel.isVisible = ui.brightnessOpen
+        brightnessSlider?.render(
+            1f,
+            ExposureScale.sliderMax(ui.exposureRange),
+            ExposureScale.sliderValue(ui.exposure, ui.exposureRange),
+            enabled = ui.connected && ui.hasBrightness,
+        )
+        binding.brightnessValue.text = ExposureScale.formatEv(ui.exposure, ui.exposureStep)
+        binding.flashButton.isVisible = ui.hasFlash
+        binding.flashButton.isEnabled = ui.connected
+        binding.flashButton.setIconResource(
+            when (ui.flash) {
+                FlashMode.OFF -> R.drawable.ic_flash_off
+                FlashMode.AUTO -> R.drawable.ic_flash_auto
+                FlashMode.ON -> R.drawable.ic_flash_on
+            },
+        )
+        binding.flashButton.contentDescription = getString(
+            when (ui.flash) {
+                FlashMode.OFF -> R.string.flash_off
+                FlashMode.AUTO -> R.string.flash_auto
+                FlashMode.ON -> R.string.flash_on
+            },
+        )
+    }
+
+    /** The exposure index for a brightness slider position (ExposureScale, shared with the Camera screen). */
+    private fun sliderIndex(value: Float): Int = ExposureScale.index(value, viewModel.uiState.value.exposureRange)
 
     private fun setupZoomAccessibility(readout: View) {
         fun adjust(factor: Float): Boolean {
@@ -168,7 +244,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     private fun leaveNow() {
-        zoomSlider?.finishInteraction()
+        pinchZoom?.finishInteraction()
+        brightnessSlider?.finishInteraction()
         sessionViewModel.leave()
         backToCamera()
     }
@@ -179,8 +256,6 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     /** Passes frames to the renderer and remembers when the last one came, to detect a paused camera. */
     private class FrameWatchdog(private val renderer: VideoSink) : VideoSink {
-        private val createdNanos = System.nanoTime()
-
         @Volatile
         private var lastFrameNanos = 0L
 
@@ -189,8 +264,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             renderer.onFrame(frame)
         }
 
-        /** Since the last frame, or since the watchdog was created if none came yet. */
-        fun nanosSinceLastFrame(): Long = System.nanoTime() - maxOf(lastFrameNanos, createdNanos)
+        /** Whether any frame has arrived since the screen opened. */
+        fun hasFrame(): Boolean = lastFrameNanos != 0L
+
+        /** Since the last frame; meaningful only once [hasFrame]. */
+        fun nanosSinceLastFrame(): Long = System.nanoTime() - lastFrameNanos
     }
 
     private companion object {

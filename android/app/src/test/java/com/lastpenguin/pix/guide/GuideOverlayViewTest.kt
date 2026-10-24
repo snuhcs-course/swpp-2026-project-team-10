@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -49,28 +49,25 @@ class GuideOverlayViewTest {
     }
 
     @Test
-    fun switchingStyleChangesTheBitmapWithoutMovingOrResizingIt() = onMain {
+    fun render_guideWithACutout_drawsTheOutlineAndNeverTheReferencesPixels() = onMain {
+        // The cutout holds the reference's pixels (red); the guide is the outline only (blue, FR-2.2, AD-15).
         val guide = guide()
         val view = view(300, 400)
-        val state = GuideState(guideId = guide.id, cx = 0.35f, cy = 0.6f, height = 0.5f)
-        view.render(guide, state)
-        val outline = snapshot(view)
+        view.render(guide, GuideState(guideId = guide.id, cx = 0.35f, cy = 0.6f, height = 0.5f))
 
-        view.render(guide, state.copy(style = GuideStyle.CUTOUT))
-        val cutout = snapshot(view)
+        val rendered = snapshot(view)
 
-        assertPixel(outline, 105, 240, Color.argb(128, 0, 0, 255))
-        assertPixel(cutout, 105, 240, Color.argb(128, 255, 0, 0))
-        assertArrayEquals(pixels(outline).map(Color::alpha).toIntArray(), pixels(cutout).map(Color::alpha).toIntArray())
+        assertPixel(rendered, 105, 240, Color.argb(128, 0, 0, 255))
+        assertTrue(pixels(rendered).none { Color.red(it) > 0 })
     }
 
     @Test
     fun opacityMultipliesSourceAlphaWithoutChangingEitherSourceBitmap() = onMain {
-        val guide = guide(cutout = solid(Color.argb(128, 255, 0, 0)))
+        val guide = guide(outline = solid(Color.argb(128, 255, 0, 0)))
         val originalCutout = pixels(guide.cutout)
         val originalOutline = pixels(guide.outline)
         val view = view(300, 400)
-        view.render(guide, GuideState(guideId = guide.id, opacity = 0.5f, style = GuideStyle.CUTOUT))
+        view.render(guide, GuideState(guideId = guide.id, opacity = 0.5f))
 
         val transparentBackground = snapshot(view)
         val blueBackground = snapshot(view, Color.BLUE)
@@ -85,9 +82,9 @@ class GuideOverlayViewTest {
 
     @Test
     fun aWideViewClipsAtTheFrameAndRestoresTheCanvasForLaterDrawing() = onMain {
-        val guide = guide()
+        val guide = guide(outline = solid(Color.RED))
         val view = view(500, 400)
-        view.render(guide, GuideState(guideId = guide.id, height = 2.1f, opacity = 0.9f, style = GuideStyle.CUTOUT))
+        view.render(guide, GuideState(guideId = guide.id, height = 2.1f, opacity = 0.9f))
         val rendered = bitmap(500, 400)
         val canvas = Canvas(rendered)
         val originalClip = canvas.clipBounds
@@ -109,9 +106,9 @@ class GuideOverlayViewTest {
 
     @Test
     fun aTallViewKeepsTheTopAndBottomLetterboxesClear() = onMain {
-        val guide = guide()
+        val guide = guide(outline = solid(Color.RED))
         val view = view(300, 600)
-        view.render(guide, GuideState(guideId = guide.id, height = 2.1f, opacity = 0.9f, style = GuideStyle.CUTOUT))
+        view.render(guide, GuideState(guideId = guide.id, height = 2.1f, opacity = 0.9f))
 
         val rendered = snapshot(view)
 
@@ -124,13 +121,13 @@ class GuideOverlayViewTest {
 
     @Test
     fun clippingAnOffFrameGuideDoesNotSqueezeItsHiddenHalfIntoTheVisibleArea() = onMain {
-        val cutout = solid(Color.RED)
-        Canvas(cutout).drawRect(10f, 0f, 20f, 40f, Paint().apply { color = Color.GREEN })
-        val guide = guide(cutout = cutout)
+        val outline = solid(Color.RED)
+        Canvas(outline).drawRect(10f, 0f, 20f, 40f, Paint().apply { color = Color.GREEN })
+        val guide = guide(outline = outline)
         val view = view(500, 400)
         view.render(
             guide,
-            GuideState(guideId = guide.id, cx = 0f, height = 1f, opacity = 0.9f, style = GuideStyle.CUTOUT),
+            GuideState(guideId = guide.id, cx = 0f, height = 1f, opacity = 0.9f),
         )
 
         val rendered = snapshot(view)

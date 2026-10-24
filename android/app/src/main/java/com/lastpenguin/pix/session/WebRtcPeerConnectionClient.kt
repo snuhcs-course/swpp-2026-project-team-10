@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -22,8 +22,6 @@ import org.webrtc.MediaStream
 import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
-import org.webrtc.RTCStats
-import org.webrtc.RTCStatsReport
 import org.webrtc.RtpParameters
 import org.webrtc.RtpSender
 import org.webrtc.RtpTransceiver
@@ -54,8 +52,7 @@ class WebRtcPeerConnectionClient(
     private var remoteTrack: VideoTrack? = null
     private var videoSource: VideoSource? = null
     private var closed = false
-    private var lastBytes: Long? = null
-    private var lastStatsTimestampUs = 0.0
+    private val statsParser = LinkStatsParser()
 
     private val observer = object : PeerConnection.Observer {
         override fun onIceCandidate(candidate: RtcIceCandidate) {
@@ -122,8 +119,15 @@ class WebRtcPeerConnectionClient(
             ?: error("Could not create a peer connection")
         if (config.role == Role.PHOTOGRAPHER) {
             val source = factory.createVideoSource(false)
-            // Crops to 4:3 and scales down to 960×720 if the camera gives more (Design 2.6.4).
-            source.adaptOutputFormat(STREAM_LONG_SIDE, STREAM_SHORT_SIDE, STREAM_FPS)
+            // Frames arrive already cut to the chosen aspect ratio: keep that shape, and scale down only past
+            // 1280×720 pixels, so 960×720, 1280×720, and 720×720 go as they are (Design 2.6.4, AD-10).
+            source.adaptOutputFormat(
+                VideoSource.AspectRatio.UNDEFINED,
+                STREAM_MAX_PIXELS,
+                VideoSource.AspectRatio.UNDEFINED,
+                STREAM_MAX_PIXELS,
+                STREAM_FPS,
+            )
             videoSource = source
             frameSource.observer = source.capturerObserver
             source.capturerObserver.onCapturerStarted(true)
@@ -196,42 +200,8 @@ class WebRtcPeerConnectionClient(
         val report = suspendCancellableCoroutine { continuation ->
             peerConnection.getStats { report -> continuation.resume(report) }
         }
-        return parse(report)
+        return statsParser.parse(report)
     }
-
-    /** Reads the video RTP stream, its codec, and the nominated candidate pair; bitrate comes from byte deltas. */
-    private fun parse(report: RTCStatsReport): LinkStats? {
-        val all = report.statsMap.values
-        // A transceiver reports both directions; the one carrying bytes is the live video stream.
-        val rtp =
-            all.filter { (it.type == "outbound-rtp" || it.type == "inbound-rtp") && it.members["kind"] == "video" }
-                .maxByOrNull { it.bytes() ?: -1L } ?: return null
-        val members = rtp.members
-        val bytes = rtp.bytes()
-        val codec = (members["codecId"] as? String)?.let { report.statsMap[it]?.members?.get("mimeType") as? String }
-        val pair = all.firstOrNull { it.type == "candidate-pair" && it.members["nominated"] == true }
-            ?: all.firstOrNull { it.type == "candidate-pair" && it.members["state"] == "succeeded" }
-        val roundTripMs = (pair?.members?.get("currentRoundTripTime") as? Number)?.toDouble()?.times(1000)
-        val now: Double = rtp.timestampUs
-        val previousBytes = lastBytes
-        val bitrateKbps = if (bytes != null && previousBytes != null && now > lastStatsTimestampUs) {
-            (bytes - previousBytes) * 8.0 / ((now - lastStatsTimestampUs) / 1_000_000.0) / 1000.0
-        } else {
-            null
-        }
-        lastBytes = bytes
-        lastStatsTimestampUs = now
-        return LinkStats(
-            codec = codec,
-            width = (members["frameWidth"] as? Number)?.toInt(),
-            height = (members["frameHeight"] as? Number)?.toInt(),
-            framesPerSecond = (members["framesPerSecond"] as? Number)?.toDouble(),
-            bitrateKbps = bitrateKbps,
-            roundTripMs = roundTripMs,
-        )
-    }
-
-    private fun RTCStats.bytes(): Long? = ((members["bytesSent"] ?: members["bytesReceived"]) as? Number)?.toLong()
 
     override fun addVideoSink(sink: VideoSink) {
         synchronized(lock) {
@@ -357,8 +327,7 @@ class WebRtcPeerConnectionClient(
         const val RELIABLE_LABEL = "reliable"
         const val VIDEO_TRACK_ID = "pix-video"
         const val STREAM_ID = "pix"
-        const val STREAM_LONG_SIDE = 960
-        const val STREAM_SHORT_SIDE = 720
+        const val STREAM_MAX_PIXELS = 1280 * 720
         const val STREAM_FPS = 30
         const val MAX_BITRATE_BPS = 2_500_000
     }

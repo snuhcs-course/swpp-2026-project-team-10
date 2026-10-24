@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-05, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.camera
 
 import org.junit.Assert.assertEquals
@@ -150,6 +150,57 @@ class CameraZoomPlanTest {
         assertEquals(0.5f, plan.minZoom)
         assertEquals(1f, plan.maxZoom)
         assertEquals(1f, primary.nativeZoom(3f))
+    }
+
+    @Test
+    fun aPinchKeepsThePrimaryUntilWellBelowItsMinimum() {
+        val plan = CameraZoomPlan(range(1f, 1f, 10f), range(0.5f, 1f, 8f))
+
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(2f, ZoomLens.PRIMARY, final = false))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(0.97f, ZoomLens.PRIMARY, final = false))
+        // The band's edge still holds; just past it the ultrawide takes over.
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(0.95f, ZoomLens.PRIMARY, final = false))
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(0.94f, ZoomLens.PRIMARY, final = false))
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(0.5f, ZoomLens.PRIMARY, final = false))
+    }
+
+    @Test
+    fun aPinchKeepsTheUltrawideUntilWellAboveThePrimaryMinimum() {
+        val plan = CameraZoomPlan(range(1f, 1f, 10f), range(0.5f, 1f, 8f))
+
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(0.7f, ZoomLens.ULTRAWIDE, final = false))
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(1f, ZoomLens.ULTRAWIDE, final = false))
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(1.05f, ZoomLens.ULTRAWIDE, final = false))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(1.06f, ZoomLens.PRIMARY, final = false))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(1.06f, ZoomLens.ULTRAWIDE, final = false))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(3f, ZoomLens.ULTRAWIDE, final = false))
+    }
+
+    @Test
+    fun aPinchLeavesAnUltrawideThatCannotReachTheBand() {
+        // 0.5 × 2.04 = 1.02: the ultrawide cannot crop as far as 1.05.
+        val plan = CameraZoomPlan(range(1f, 1f, 10f), range(0.5f, 1f, 2.04f))
+
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(1.01f, ZoomLens.ULTRAWIDE, final = false))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(1.03f, ZoomLens.ULTRAWIDE, final = false))
+    }
+
+    @Test
+    fun thePinchsLastValueSettlesOnItsOwnLens() {
+        val plan = CameraZoomPlan(range(1f, 1f, 10f), range(0.5f, 1f, 8f))
+
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(0.97f, ZoomLens.PRIMARY, final = true))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(1.03f, ZoomLens.ULTRAWIDE, final = true))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(1f, ZoomLens.ULTRAWIDE, final = true))
+        assertEquals(ZoomLens.ULTRAWIDE, plan.lensFor(0.6f, ZoomLens.ULTRAWIDE, final = true))
+    }
+
+    @Test
+    fun withoutAnUltrawideEveryPinchStaysOnThePrimary() {
+        val plan = CameraZoomPlan(range(1f, 0.5f, 8f))
+
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(0.5f, ZoomLens.PRIMARY, final = false))
+        assertEquals(ZoomLens.PRIMARY, plan.lensFor(0.5f, ZoomLens.PRIMARY, final = true))
     }
 
     private fun range(intrinsic: Float, min: Float, max: Float): LensZoomRange =

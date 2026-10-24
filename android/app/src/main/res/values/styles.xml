@@ -120,6 +120,16 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
+    <!-- A small button inside a row, such as Invite and Accept on Friends. -->
+    <style name="Widget.Pix.Button.Small">
+        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
     <style name="Widget.Pix.Button.Secondary" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:minHeight">52dp</item>
         <item name="android:insetTop">0dp</item>
@@ -137,6 +147,16 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
+    <!-- An outlined button inside a row, such as Invite on Friends while invitations are not built (Iter2-P15). -->
+    <style name="Widget.Pix.Button.Secondary.Small">
+        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
     <style name="Widget.Pix.Button.Text" parent="Widget.Material3.Button.TextButton">
         <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
@@ -148,6 +168,21 @@
     </style>
 
     <!-- A pill over the preview: 44 dp of glass inside a 48 dp touch target. -->
+    <style name="Widget.Pix.Button.Text.Small">
+        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+    </style>
+
+    <!-- A friend's initial in a circle. -->
+    <style name="Widget.Pix.Avatar" parent="">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:background">@drawable/bg_avatar</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Header</item>
+    </style>
+
     <style name="Widget.Pix.Button.Glass" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">2dp</item>
@@ -170,6 +205,15 @@
         <item name="strokeColor">@color/pix_danger_stroke</item>
         <item name="android:textColor">@color/button_danger_text</item>
         <item name="iconTint">@color/button_danger_text</item>
+    </style>
+
+    <!-- A glass button with only an icon, such as Flash in the top bar. -->
+    <style name="Widget.Pix.Button.Glass.Icon">
+        <item name="android:minWidth">48dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconGravity">textStart</item>
     </style>
 
     <!-- An icon-only round button, such as Remove guide. -->
@@ -204,8 +248,8 @@
         <item name="thumbTrackGapSize">0dp</item>
         <item name="trackStopIndicatorSize">0dp</item>
         <item name="trackInsideCornerSize">2dp</item>
-        <item name="thumbColor">@color/pix_text</item>
-        <item name="trackColorActive">@color/pix_accent</item>
+        <item name="thumbColor">@color/slider_thumb</item>
+        <item name="trackColorActive">@color/slider_track_active</item>
         <item name="trackColorInactive">#33FFFFFF</item>
         <item name="haloColor">#33F2C14E</item>
         <item name="haloRadius">18dp</item>
@@ -215,7 +259,7 @@
 
     <!-- The guide's own controls use the guide color. -->
     <style name="Widget.Pix.Slider.Guide">
-        <item name="trackColorActive">@color/pix_guide</item>
+        <item name="trackColorActive">@color/slider_guide_track_active</item>
         <item name="haloColor">#335EEAD4</item>
     </style>
 
@@ -272,6 +316,31 @@
     </style>
 
     <!-- A Generating poses / Pick a pose candidate. -->
+    <!-- A text field, such as the pose description on Generate poses (FR-4.8). -->
+    <style name="Widget.Pix.TextField" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/bg_text_field</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.BodyLarge</item>
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:textColorHint">@color/pix_text_faint</item>
+        <item name="android:textCursorDrawable">@null</item>
+    </style>
+
+    <!-- An idea chip on Generate poses (FR-4.8): a short pose that fills the description field when tapped. -->
+    <style name="Widget.Pix.IdeaChip" parent="Widget.Material3.Chip.Suggestion">
+        <item name="chipBackgroundColor">@color/pix_surface_2</item>
+        <item name="chipStrokeColor">@color/pix_outline</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
+        <item name="android:textColor">@color/pix_text_soft</item>
+        <item name="rippleColor">#14FFFFFF</item>
+    </style>
+
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">
         <item name="cardBackgroundColor">@color/pix_surface</item>
         <item name="cardCornerRadius">18dp</item>

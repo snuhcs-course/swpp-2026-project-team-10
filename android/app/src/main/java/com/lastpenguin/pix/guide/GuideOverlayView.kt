@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -16,7 +16,9 @@ import kotlin.math.roundToInt
 
 /**
  * Draws the guide over the camera preview or the subject's live view (Design 2.6.2, 2.6.4).
- * Owner: Camera/Overlay (#6). The subject's phone uses it with [editable] = false (#9).
+ * Owner: Camera/Overlay (#6). [editable] is the screen's guide-edit mode (AD-17, #48): while it is on, every touch
+ * that starts inside the camera image edits the guide, so the camera never zooms by mistake; while it is off, every
+ * touch passes through to the preview or live video below.
  */
 class GuideOverlayView @JvmOverloads constructor(
     context: Context,
@@ -33,16 +35,27 @@ class GuideOverlayView @JvmOverloads constructor(
     private var gesture: TouchGesture? = null
 
     init {
-        // Only a touch starting on an editable guide is consumed; the video below owns other gestures.
+        // Only a touch starting inside the camera image while editable is consumed; the video below owns the rest.
         isClickable = false
         isFocusable = false
     }
 
-    /** Drag and pinch are handled only when true: on the photographer's camera. */
+    /** Guide-edit mode: drag and pinch are handled only while true, and then anywhere inside the camera image. */
     var editable: Boolean = true
         set(value) {
             field = value
             if (!value) finishGesture()
+        }
+
+    /** The frame's width / height (AD-10): 3:4 by default, 9:16, or 1:1. The guide is placed in that image. */
+    var frameAspect: Float = 3f / 4f
+        set(value) {
+            if (field == value || !value.isFinite() || value <= 0f) return
+            field = value
+            // A drag measured against the old image would land elsewhere in the new one.
+            finishGesture()
+            updateDrawing()
+            postInvalidateOnAnimation()
         }
 
     /**
@@ -92,9 +105,8 @@ class GuideOverlayView @JvmOverloads constructor(
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             finishGesture()
             releaseTouch()
-            if (!canEdit() || !frameBounds.contains(event.x, event.y) || !guideBounds.contains(event.x, event.y)) {
-                return false
-            }
+            // In edit mode the whole image belongs to the guide, so it is easy to grab even by its transparent parts.
+            if (!canEdit() || !frameBounds.contains(event.x, event.y)) return false
             ownsTouch = true
             gesture = TouchGesture(event.getPointerId(0), position = TouchPosition(event.x, event.y, 0f))
             parent?.requestDisallowInterceptTouchEvent(true)
@@ -214,7 +226,7 @@ class GuideOverlayView @JvmOverloads constructor(
             return
         }
 
-        val frame = GuideFrameTransform.fit(3f, 4f, width.toFloat(), height.toFloat())
+        val frame = GuideFrameTransform.fit(frameAspect, 1f, width.toFloat(), height.toFloat())
         val center = frame.frameToView(state.cx, state.cy)
         val guideHeight = state.height * frame.height
         val guideWidth = guideHeight * guide.aspect
@@ -227,10 +239,8 @@ class GuideOverlayView @JvmOverloads constructor(
         frameBounds.set(frame.left, frame.top, frame.left + frame.width, frame.top + frame.height)
         guideBounds.set(left, top, right, bottom)
         paint.alpha = (state.opacity.coerceIn(0f, 1f) * 255f).roundToInt()
-        bitmap = when (state.style) {
-            GuideStyle.CUTOUT -> guide.cutout
-            GuideStyle.OUTLINE -> guide.outline
-        }
+        // The guide is an outline only; the reference's pixels are never drawn (FR-2.2, AD-15).
+        bitmap = guide.outline
     }
 
     override fun onDraw(canvas: Canvas) {

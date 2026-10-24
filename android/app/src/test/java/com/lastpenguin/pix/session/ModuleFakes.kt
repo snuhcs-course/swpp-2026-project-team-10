@@ -1,13 +1,16 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.EglBase
+import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
 
 /** A session that records what is sent and lets a test deliver incoming messages. */
@@ -36,13 +40,18 @@ class FakeSessionManager : SessionManager {
     private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
     override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
 
-    private val _peerZoom = MutableStateFlow<Float?>(null)
-    override val peerZoom: StateFlow<Float?> = _peerZoom.asStateFlow()
+    private val _peerCamera = MutableStateFlow<CameraState?>(null)
+    override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
 
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
 
-    override suspend fun start(entry: SessionEntry, role: Role) = Unit
+    /** Every `start`, so a test can see what was joined or opened, and as which role. */
+    val starts = mutableListOf<Pair<SessionEntry, Role>>()
+
+    override suspend fun start(entry: SessionEntry, role: Role) {
+        starts += entry to role
+    }
 
     override fun send(message: SessionMessage) {
         sent += message
@@ -50,43 +59,76 @@ class FakeSessionManager : SessionManager {
 
     override fun videoSink(): FrameSink = frameSink
 
-    override suspend fun leave(reason: EndReason) = Unit
+    /** Every `leave`, with its reason, so a screen test can see a cancelled room or a left session. */
+    val leaves = mutableListOf<EndReason>()
+
+    override suspend fun leave(reason: EndReason) {
+        leaves += reason
+    }
 
     fun setState(state: SessionState) {
         _state.value = state
     }
 
+    /** The session kept a `camera.state` whose `incoming` emission this screen did not see. */
+    fun setPeerCamera(state: CameraState?) {
+        _peerCamera.value = state
+    }
+
     fun deliver(message: SessionMessage) {
         if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
-        if (message is SessionMessage.CameraStateUpdate) _peerZoom.value = message.zoom
+        if (message is SessionMessage.CameraStateUpdate) {
+            _peerCamera.value = CameraState(message.zoom, message.exposure, message.flash, message.aspect)
+        }
         check(_incoming.tryEmit(message))
     }
 }
 
-/** A camera whose zoom applies at once (or not at all when [applies] is false). */
+/**
+ * A camera whose zoom, exposure, and flash apply at once (or not at all when [applies] is false), within the
+ * capabilities it was given: no exposure range and no flash unless a test asks for them.
+ */
 class FakeCameraController(
     minZoom: Float = 0.6f,
     maxZoom: Float = 10f,
+    exposureRange: IntRange = 0..0,
+    hasFlash: Boolean = false,
+    supportsFocusPoint: Boolean = false,
 ) : CameraController {
     private val _status = MutableStateFlow(CameraStatus.READY)
     override val status: StateFlow<CameraStatus> = _status.asStateFlow()
 
     private val _capabilities = MutableStateFlow<CameraCapabilities?>(
-        CameraCapabilities(minZoom, maxZoom, listOf(0.6f, 1f, 2f, 3f).filter { it in minZoom..maxZoom }),
+        CameraCapabilities(
+            minZoom,
+            maxZoom,
+            listOf(0.6f, 1f, 2f, 3f).filter { it in minZoom..maxZoom },
+            exposureRange = exposureRange,
+            exposureStep = if (exposureRange.first < exposureRange.last) 0.5f else 0f,
+            hasFlash = hasFlash,
+            supportsFocusPoint = supportsFocusPoint,
+        ),
     )
     override val capabilities: StateFlow<CameraCapabilities?> = _capabilities.asStateFlow()
 
     private val _zoom = MutableStateFlow(1f)
     override val zoom: StateFlow<Float> = _zoom.asStateFlow()
 
+    /** Set by a test to stand for the photographer changing exposure, flash, or the aspect ratio. */
+    override val state = MutableStateFlow(CameraState(zoom = 1f))
+
     val requests = mutableListOf<Float>()
+
+    /** The `final` flag of each of [requests]. */
+    val requestFinals = mutableListOf<Boolean>()
     var applies = true
     var sink: FrameSink? = null
 
     override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
 
-    override fun setZoom(ratio: Float) {
+    override fun setZoom(ratio: Float, final: Boolean) {
         requests += ratio
+        requestFinals += final
         if (applies) _zoom.value = ratio
     }
 
@@ -99,9 +141,45 @@ class FakeCameraController(
         _status.value = status
     }
 
-    override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())
+    /** Every focus point asked for, in frame fractions. */
+    val focusPoints = mutableListOf<Pair<Float, Float>>()
 
-    override suspend fun grabFrame(): Result<Bitmap> = Result.failure(UnsupportedOperationException())
+    override fun setFocusPoint(x: Float, y: Float) {
+        focusPoints += x to y
+    }
+
+    val exposureRequests = mutableListOf<Int>()
+    val flashRequests = mutableListOf<FlashMode>()
+
+    override fun setExposure(index: Int) {
+        exposureRequests += index
+        val range = _capabilities.value?.exposureRange ?: 0..0
+        if (applies) state.value = state.value.copy(exposure = index.coerceIn(range))
+    }
+
+    override fun setFlash(mode: FlashMode) {
+        flashRequests += mode
+        if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(flash = mode)
+    }
+
+    override fun setAspectRatio(ratio: AspectRatio) = Unit
+
+    /** When set, [takePhoto] saves to it; otherwise saving fails, as it does without a camera. */
+    var photo: Uri? = null
+
+    /** When set, [grabFrame] returns it, so the scene photo step can be driven in a screen test. */
+    var frame: Bitmap? = null
+
+    /** When set, [takePhoto] fails with it, so a screen test can see each failure's message. */
+    var photoFailure: Throwable? = null
+
+    override suspend fun takePhoto(): Result<Uri> {
+        photoFailure?.let { return Result.failure(it) }
+        return photo?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    }
+
+    override suspend fun grabFrame(): Result<Bitmap> =
+        frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
 
     override fun setFrameSink(sink: FrameSink?) {
         this.sink = sink
@@ -143,6 +221,35 @@ class FakeRemoteVideo : RemoteVideo {
 
     override fun detach(sink: VideoSink) {
         sinks -= sink
+    }
+
+    /** Delivers one frame to every attached sink, as the photographer's video would. */
+    fun deliverFrame() {
+        val frame = VideoFrame(FakeFrameBuffer, 0, 0L)
+        sinks.toList().forEach { it.onFrame(frame) }
+        frame.release()
+    }
+
+    /** A 4×4 buffer that never touches native memory, so a frame can exist on the JVM. */
+    private object FakeFrameBuffer : VideoFrame.Buffer {
+        override fun getWidth(): Int = 4
+
+        override fun getHeight(): Int = 4
+
+        override fun toI420(): VideoFrame.I420Buffer? = null
+
+        override fun retain() = Unit
+
+        override fun release() = Unit
+
+        override fun cropAndScale(
+            cropX: Int,
+            cropY: Int,
+            cropWidth: Int,
+            cropHeight: Int,
+            scaleWidth: Int,
+            scaleHeight: Int,
+        ): VideoFrame.Buffer = this
     }
 }
 

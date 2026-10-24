@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-06, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -60,7 +60,7 @@ class InMemoryGuideRepositoryTest {
 
         for (next in listOf(first, second)) {
             repository.update(final = true) {
-                it.copy(cx = 0.2f, cy = 0.8f, height = 1.2f, opacity = 0.8f, style = GuideStyle.CUTOUT, visible = false)
+                it.copy(cx = 0.2f, cy = 0.8f, height = 1.2f, opacity = 0.8f, visible = false)
             }
             repository.setGuide(next)
 
@@ -70,9 +70,33 @@ class InMemoryGuideRepositoryTest {
     }
 
     @Test
+    fun setGuide_guidesWithAnchors_eachStartsWhereItsPersonIsInTheCurrentFrame() = runTest {
+        var frameAspect = 3f / 4f
+        val repository = InMemoryGuideRepository { frameAspect }
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { repository.changes.collect { changes += it } }
+        runCurrent()
+
+        repository.setGuide(guide("left").copy(anchor = NormalizedRect(0.1f, 0.2f, 0.3f, 0.9f)))
+        repository.update(final = true) { it.copy(cx = 0.8f, height = 1.4f) }
+        // A replacement starts at its own reference's place, not where the previous guide was moved (FR-3.1).
+        frameAspect = 9f / 16f
+        repository.setGuide(guide("right", aspect = 0.4f).copy(anchor = NormalizedRect(0.5f, 0.3f, 0.9f, 0.8f)))
+        runCurrent()
+
+        assertEquals(GuideState(guideId = "left", cx = 0.2f, cy = 0.55f, height = 0.7f), changes.first().state)
+        val started = repository.state.value
+        assertEquals("right", started.guideId)
+        assertEquals(0.7f, started.cx, EPSILON)
+        assertEquals(0.55f, started.cy, EPSILON)
+        assertEquals(0.5f, started.height, EPSILON)
+        assertEquals(GuideChange(started, final = true), changes.last())
+    }
+
+    @Test
     fun clearingDropsTheImageAndEmitsAFinalResetEvenWhenAlreadyEmpty() = runTest {
         repository.setGuide(guide("first"))
-        repository.update(final = true) { it.copy(style = GuideStyle.CUTOUT, opacity = 0.9f) }
+        repository.update(final = true) { it.copy(opacity = 0.9f) }
         val changes = mutableListOf<GuideChange>()
         backgroundScope.launch { repository.changes.collect { changes += it } }
         runCurrent()
@@ -107,16 +131,37 @@ class InMemoryGuideRepositoryTest {
     }
 
     @Test
+    fun finalUpdateAfterTheFrameChanges_clampsToTheNewFrameAndPublishesAFinalChange() = runTest {
+        var frameAspect = 3f / 4f
+        val repository = InMemoryGuideRepository { frameAspect }
+        repository.setGuide(guide("tall", aspect = 0.5f))
+        repository.update(final = true) { it.copy(cx = -10f) }
+        // Height .7 at aspect .5 is .467 of a 3:4 frame's width: the leftmost center keeps 20 % of it inside.
+        assertEquals(-0.14f, repository.state.value.cx, EPSILON)
+        val changes = mutableListOf<GuideChange>()
+        backgroundScope.launch { repository.changes.collect { changes += it } }
+        runCurrent()
+
+        frameAspect = 1f
+        repository.update(final = true) { it }
+        runCurrent()
+
+        // In a 1:1 frame the same guide is .35 of the width, so it may go further left.
+        assertEquals(-0.105f, repository.state.value.cx, EPSILON)
+        assertEquals(0.7f, repository.state.value.height, EPSILON)
+        assertEquals(listOf(GuideChange(repository.state.value, final = true)), changes)
+    }
+
+    @Test
     fun successiveEditsUseTheLatestStateAndKeepTheSameBitmap() {
         val guide = guide("first")
         repository.setGuide(guide)
         repository.update(final = false) { it.copy(cx = it.cx + 0.1f, height = it.height * 2f) }
-        repository.update(final = true) { it.copy(cx = it.cx + 0.2f, style = GuideStyle.CUTOUT, visible = false) }
+        repository.update(final = true) { it.copy(cx = it.cx + 0.2f, visible = false) }
 
         assertSame(guide, repository.guide.value)
         assertEquals(0.8f, repository.state.value.cx, EPSILON)
         assertEquals(1.4f, repository.state.value.height, EPSILON)
-        assertEquals(GuideStyle.CUTOUT, repository.state.value.style)
         assertFalse(repository.state.value.visible)
     }
 
@@ -190,7 +235,7 @@ class InMemoryGuideRepositoryTest {
         assertEquals("first", repository.guide.value?.id)
         assertEquals(0.8f, repository.state.value.opacity, EPSILON)
 
-        repository.update(final = true) { it.copy(style = GuideStyle.CUTOUT) }
+        repository.update(final = true) { it.copy(visible = false) }
         runCurrent()
         assertEquals(listOf(GuideChange(repository.state.value, true)), first)
         assertEquals(first, second)
@@ -200,7 +245,7 @@ class InMemoryGuideRepositoryTest {
     fun invalidReplacementAndFailedEditLeaveTheExistingGuideAndEventsUnchanged() = runTest {
         val original = guide("first")
         repository.setGuide(original)
-        repository.update(final = true) { it.copy(cx = 0.8f, style = GuideStyle.CUTOUT) }
+        repository.update(final = true) { it.copy(cx = 0.8f) }
         val previous = repository.state.value
         val changes = mutableListOf<GuideChange>()
         backgroundScope.launch { repository.changes.collect { changes += it } }

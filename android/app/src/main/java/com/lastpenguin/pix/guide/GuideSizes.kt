@@ -1,10 +1,15 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
+import android.graphics.Bitmap
+import androidx.core.graphics.scale
 import kotlin.math.roundToInt
 
 /** The reference is segmented at this long side at most (Design 2.6.1, step 1). */
 internal const val MAX_REFERENCE_LONG_SIDE = 1280
+
+/** The reference kept for the Camera screen's thumbnail, enlarged to at most half a phone's width (FR-3.9). */
+internal const val REFERENCE_THUMBNAIL_LONG_SIDE = 512
 
 /**
  * The outline's stroke where the guide first appears: about 8 px on screen, 3 dp on a typical phone (Design 2.6.1,
@@ -38,6 +43,16 @@ internal fun fitLongSide(width: Int, height: Int, maxLongSide: Int = MAX_REFEREN
     return PixelSize(maxOf(1, (width * scale).roundToInt()), maxOf(1, (height * scale).roundToInt()))
 }
 
+/** [bitmap] scaled down so its long side is at most [maxLongSide]; the same bitmap when it already fits. */
+internal fun shrink(bitmap: Bitmap, maxLongSide: Int): Bitmap {
+    val size = fitLongSide(bitmap.width, bitmap.height, maxLongSide)
+    return if (size.width == bitmap.width && size.height == bitmap.height) {
+        bitmap
+    } else {
+        bitmap.scale(size.width, size.height)
+    }
+}
+
 /**
  * The person's bounding box grown by [fraction] of its longer side on every side, clamped to the image
  * (Design 2.6.1, step 4).
@@ -51,6 +66,14 @@ internal fun cropWithMargin(bounds: PixelRect, width: Int, height: Int, fraction
         bottom = minOf(height, bounds.bottom + margin),
     )
 }
+
+/** This rectangle as fractions of a [width]×[height] image: where the cutout lies in the reference (FR-3.1). */
+internal fun PixelRect.relativeTo(width: Int, height: Int): NormalizedRect = NormalizedRect(
+    left = left.toFloat() / width,
+    top = top.toFloat() / height,
+    right = right.toFloat() / width,
+    bottom = bottom.toFloat() / height,
+)
 
 /**
  * The outline stroke in cutout pixels, scaled so it is about [STROKE_ON_SCREEN_PX] when the guide first appears

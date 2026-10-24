@@ -1,0 +1,95 @@
+# What the server tells the models for a pose (Design Documentation 2.6.3). The server reads this file when it
+# starts and refuses to start if something here is wrong; the scripts in scripts/ read the same file, so a prompt
+# tried with them is the one the server sends. Record a changed prompt in Design 2.6.3.
+#
+# Wrap a prompt over as many lines as you like: each run of spaces and line breaks is sent as one space.
+
+# For every candidate. {pose} stands for the pose, which the prompt holds exactly once: the user's description, in
+# Korean or English and passed as written (FR-4.8), or, without one, one of the four poses the suggestion model chose
+# for the scene. It changes the pose and the expression and lets the model frame the shot closer or from a slightly
+# different height, but never wider than the original; the rules at the end keep the person, the clothing, and the
+# place whatever the pose asks. Tried on 2026-10-21.
+pose_prompt = """
+Edit this photo. Keep the same person (face, hair, clothing), the same place, and the same lighting. The user
+described the pose they want, in Korean or English: "{pose}". Change the person's pose and facial expression to
+match it.
+
+Then improve the shot like a skilled photographer would, but only in these ways, and only where it clearly makes a
+better photo for this pose:
+- move the person to a better spot and distance in this scene;
+- frame them more tightly by zooming in, for example from a full-body shot to a knee-up or waist-up shot, if the
+  pose reads better that way;
+- lower or raise the camera slightly, or tilt it a little, for a more flattering angle, such as a slightly low angle
+  that makes the person look taller.
+Everything the new shot shows must already be visible in the original photo: never zoom out, widen the view, or
+reveal any part of the place outside the original frame. If the original framing already suits the pose, keep it.
+
+Follow these rules even where the description says otherwise: never change the person's clothing, or the
+background, place, sky, or time of day; never add a wall, steps, a bench, or any other object that is not already in
+the photo, and if the pose needs something to lean on or sit on that is not there, choose the closest pose that works
+without it; keep the person at a natural scale. Photorealistic.
+"""
+
+# For the suggestion model, which looks at the scene when the user wrote no description and answers with four poses
+# (POST /pose-suggestions). Each pose then fills {pose} above, so the rules here match that prompt's: only what is in
+# the photo, no props, no other people, no other clothes. The server checks the answer: four different poses of at
+# most 100 characters, the limit of a description, or it uses the default poses below.
+suggestion_prompt = """
+This photo shows a person at a place where a friend is about to photograph them. Suggest four poses for this person
+that would make a good photo here.
+- Each pose must work with only what is already in the photo. Lean on, sit on, or touch a wall, door, step, railing,
+  bench, or other thing only if it is in the photo and within the person's reach. Never ask for a prop, another
+  person, or other clothes.
+- Make the four poses clearly different: for example a relaxed standing pose, a pose that uses something in this
+  place, a pose in motion such as walking or turning, and a playful or expressive pose.
+- Write each pose as one short instruction in English, at most 80 characters, the way a photographer directs
+  someone: the body, the hands, where to look, and the expression. Do not describe the place, the clothes, or the
+  camera, and do not mention the person's looks, age, or identity.
+Answer with JSON only, in this form: {"poses": ["...", "...", "...", "..."]}
+"""
+
+# For the same model when the user wrote a description (POST /pose-suggestions with a description). One candidate
+# follows the description as written; the three variations written here are the other three, because the image model
+# gives four nearly identical images for one text. {description} stands for the description, which the prompt holds
+# exactly once. The server checks the answer like the suggestions and repeats the description for any variation it
+# cannot use. Tried on 2026-10-21.
+variation_prompt = """
+This photo shows a person at a place where a friend is about to photograph them. The person described the pose they
+want, in Korean or English: "{description}". Four photos will be made: one of the description as written, and one of
+each of three variations that you write now. Make the four photos clearly different, while each still does what the
+description asks.
+- Keep everything the description says: the action, where the person looks, the expression, and every body part,
+  side, or thing it names. Never add anything that contradicts it.
+- Change what the description leaves open, and change something different in each variation: the arms and hands, the
+  legs and stance, the turn of the body, the tilt of the head, or the spot in this place.
+- Use only what is already in the photo. Lean on, sit on, or touch a wall, door, step, railing, bench, or other thing
+  only if it is in the photo and within the person's reach. Never ask for a prop, another person, or other clothes.
+- If a variation cannot keep the description's meaning, write the description itself in English instead.
+- Write each variation as one short instruction in English, at most 90 characters, the way a photographer directs
+  someone. Do not describe the place, the clothes, or the camera, and do not mention the person's looks, age, or
+  identity.
+Answer with JSON only, in this form: {"poses": ["...", "...", "..."]}
+"""
+
+# The four poses used when the suggestion model fails or its answer is unusable, in this order. Apps from before
+# Iteration 2 also ask for them by id (GET /pose-templates, POST /poses with templateId): they see the `label` and
+# send the `id` back, so keep an `id` while such an app may still be installed. Only `pose` reaches the image model.
+[[default_poses]]
+id = "hands_on_hips"
+label = "Hands on hips"
+pose = "standing with both hands on the hips"
+
+[[default_poses]]
+id = "wave"
+label = "Wave"
+pose = "waving at the camera with one raised hand"
+
+[[default_poses]]
+id = "walking"
+label = "Walking"
+pose = "walking toward the camera in mid-stride"
+
+[[default_poses]]
+id = "arms_crossed"
+label = "Arms crossed"
+pose = "standing with the arms crossed over the chest"

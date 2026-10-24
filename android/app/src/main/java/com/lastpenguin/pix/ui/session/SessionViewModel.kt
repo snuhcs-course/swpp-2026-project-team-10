@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -7,6 +7,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.RemoteAction
@@ -33,6 +34,15 @@ sealed interface SessionNotice {
 
     /** The subject changed the zoom: "Junhyeong set zoom to 2×" (FR-7.4). */
     data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
+
+    /** The subject moved or resized the guide: "Junhyeong moved the guide" (FR-7.2, FR-7.4). */
+    data class RemoteGuideMove(val name: String) : SessionNotice
+
+    /** The subject set the brightness: "Junhyeong set brightness to +1"; [index] is the applied exposure index. */
+    data class RemoteBrightness(val name: String, val index: Int) : SessionNotice
+
+    /** The subject changed the flash: "Junhyeong turned the flash on". */
+    data class RemoteFlash(val name: String, val mode: FlashMode) : SessionNotice
 }
 
 /**
@@ -62,9 +72,16 @@ class SessionViewModel(
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
 
-    /** The code the subject entered last. Session not found keeps it, and Reconnect reuses it (FR-8.3, FR-6.11). */
+    /**
+     * The code the subject entered last, kept only where it is reused: *Session not found* offers it for editing
+     * (FR-8.3), and *Reconnect* on *Connection lost* joins it again (FR-6.11). *Leave*, the photographer's *End
+     * session*, a room gone while reconnecting, and starting a room clear it, so *Join with code* opens empty (#81).
+     */
     var lastCode: String? = null
         private set
+
+    /** Whether the current join is a *Reconnect*; decides what an `Ended` does with [lastCode]. */
+    private var reconnecting = false
 
     private var role: Role? = null
     private var peerName: String? = null
@@ -100,6 +117,7 @@ class SessionViewModel(
         ) {
             return
         }
+        lastCode = null // This phone is the photographer now; a code it joined earlier is stale.
         role = Role.PHOTOGRAPHER
         viewModelScope.launch { session.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER) }
     }
@@ -110,24 +128,29 @@ class SessionViewModel(
     }
 
     /** Subject: *Join* with 6 digits. */
-    fun joinRoom(code: String) {
-        lastCode = code
-        role = Role.SUBJECT
-        viewModelScope.launch { session.start(SessionEntry.RoomCode(code), Role.SUBJECT) }
-    }
+    fun joinRoom(code: String) = join(code, reconnecting = false)
 
-    /** *End session* (photographer) or *Leave* (subject). */
+    /** *End session* (photographer) or *Leave* (subject). The subject leaves the room for good, so its code goes too. */
     fun leave() {
+        lastCode = null
         viewModelScope.launch { session.leave(EndReason.LEFT) }
     }
 
     /** *Reconnect* on Connection lost: joins the same code again (FR-6.11). */
     fun reconnect() {
-        lastCode?.let { joinRoom(it) }
+        lastCode?.let { join(it, reconnecting = true) }
+    }
+
+    private fun join(code: String, reconnecting: Boolean) {
+        lastCode = code
+        this.reconnecting = reconnecting
+        role = Role.SUBJECT
+        viewModelScope.launch { session.start(SessionEntry.RoomCode(code), Role.SUBJECT) }
     }
 
     private fun onState(state: SessionState) {
         _transitions.tryEmit(state)
+        if (state is SessionState.Ended) onEnded(state.reason)
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
 
@@ -162,6 +185,13 @@ class SessionViewModel(
                             val name = peerName ?: return@collect
                             when (action) {
                                 is RemoteAction.Zoom -> _notices.tryEmit(SessionNotice.RemoteZoom(name, action.ratio))
+
+                                is RemoteAction.GuideMove -> _notices.tryEmit(SessionNotice.RemoteGuideMove(name))
+
+                                is RemoteAction.Brightness ->
+                                    _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))
+
+                                is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
                             }
                         }
                     }
@@ -188,6 +218,23 @@ class SessionViewModel(
             delay(BACKGROUND_LIMIT_MS)
             if (state.value is SessionState.Connected) session.leave(EndReason.LEFT)
         }
+    }
+
+    /**
+     * What an end does with the kept code (#81): *Connection lost* keeps it for *Reconnect*; an unknown or expired
+     * code keeps it for editing on *Session not found*, unless a reconnect found the room gone; a reconnect that
+     * failed otherwise keeps it for another try; every other end, such as *Leave* or the photographer's *End
+     * session*, forgets it, so the next *Join with code* starts empty.
+     */
+    private fun onEnded(reason: EndReason) {
+        val keep = when (reason) {
+            EndReason.CONNECTION_LOST -> true
+            EndReason.NOT_FOUND, EndReason.EXPIRED -> !reconnecting
+            EndReason.LEFT, EndReason.PEER_LEFT, EndReason.CANCELLED -> false
+            else -> reconnecting
+        }
+        if (!keep) lastCode = null
+        reconnecting = false
     }
 
     private fun onMessage(message: SessionMessage) {

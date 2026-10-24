@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-04, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -9,12 +9,16 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import java.io.IOException
@@ -149,6 +153,8 @@ class CameraViewModelTest {
         runCurrent()
         model.onZoomChanged(1.73f)
         assertEquals(listOf(1.73f), camera.zoomRequests)
+        // A single change, like a Zoom in / Zoom out action, is final.
+        assertEquals(listOf(true), camera.zoomFinals)
         // A request is not yet the applied value; the camera remains authoritative.
         assertEquals(1f, model.uiState.value.zoom)
         camera.zoom.value = 1.8f
@@ -176,13 +182,15 @@ class CameraViewModelTest {
     fun pinchRequestsContinueAcrossLensTransitionAndReadoutWaitsForAppliedZoom() = runTest {
         camera.capabilities.value = CameraCapabilities(0.5f, 4f, listOf(0.5f, 0.6f, 1f, 2f, 3f))
         runCurrent()
-        model.onZoomChanged(0.9f)
+        model.onZoomChanged(0.9f, final = false)
         camera.status.value = CameraStatus.STARTING
-        model.onZoomChanged(0.7f)
-        model.onZoomChanged(0.5f)
+        model.onZoomChanged(0.7f, final = false)
+        model.onZoomChanged(0.5f, final = true)
         runCurrent()
 
         assertEquals(listOf(0.9f, 0.7f, 0.5f), camera.zoomRequests)
+        // The camera holds its lens until the pinch's last value (Design 2.6.5).
+        assertEquals(listOf(false, false, true), camera.zoomFinals)
         assertEquals(1f, model.uiState.value.zoom)
         assertEquals(0.5f, model.uiState.value.minZoom)
         assertEquals(CameraStatus.STARTING, model.uiState.value.cameraStatus)
@@ -258,15 +266,22 @@ class CameraViewModelTest {
             CameraCapabilities(1f, 4f, listOf(1f, 2f, 3f)),
         )
         override val zoom = MutableStateFlow(1f)
+        override val state = MutableStateFlow(CameraState(zoom = 1f))
         var capture = CompletableDeferred<Result<Uri>>()
         var captureCount = 0
         var throwOnCapture = false
         val zoomRequests = mutableListOf<Float>()
+        val zoomFinals = mutableListOf<Boolean>()
 
         override fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) = Unit
-        override fun setZoom(ratio: Float) {
+        override fun setZoom(ratio: Float, final: Boolean) {
             zoomRequests.add(ratio)
+            zoomFinals.add(final)
         }
+        override fun setFocusPoint(x: Float, y: Float) = Unit
+        override fun setExposure(index: Int) = Unit
+        override fun setFlash(mode: FlashMode) = Unit
+        override fun setAspectRatio(ratio: AspectRatio) = Unit
         override suspend fun takePhoto(): Result<Uri> {
             captureCount++
             if (throwOnCapture) throw IllegalStateException("Camera closed")
@@ -285,6 +300,52 @@ class CameraViewModelTest {
 
         assertEquals(listOf<ReferenceGuide?>(null), guides.set)
         assertNull(model.uiState.value.guide)
+    }
+
+    @Test
+    fun `a new guide starts edit mode, and the shutter, hiding, or removing the guide ends it`() = runTest(dispatcher) {
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertFalse(model.uiState.value.guideEditing)
+
+        guides.setGuide(guide("g1"))
+        runCurrent()
+        assertTrue(model.uiState.value.guideEditing)
+        model.setGuideEditing(false)
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertTrue(model.uiState.value.guideEditing)
+
+        model.onShutter()
+        assertFalse(model.uiState.value.guideEditing)
+        camera.capture.complete(Result.success(Uri.parse("content://media/1")))
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+
+        guides.setGuide(guide("g2"))
+        runCurrent()
+        assertTrue(model.uiState.value.guideEditing)
+        guides.state.value = guides.state.value.copy(visible = false)
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertFalse(model.uiState.value.guideEditing)
+        guides.state.value = guides.state.value.copy(visible = true)
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+        model.setGuideEditing(true)
+        assertTrue(model.uiState.value.guideEditing)
+
+        model.setGuideEditing(true)
+        guides.setGuide(null)
+        runCurrent()
+        assertFalse(model.uiState.value.guideEditing)
+    }
+
+    private fun guide(id: String): ReferenceGuide {
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        return ReferenceGuide(id, bitmap, bitmap, 0.5f, GuideSource.GALLERY)
     }
 
     private class FakeGuides : GuideRepository {

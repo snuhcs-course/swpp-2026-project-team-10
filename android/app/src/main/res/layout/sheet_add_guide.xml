@@ -13,7 +13,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal" />
 
+    <!-- With a guide on the camera, the sheet asks to replace it (FR-3.6); its Cancel keeps the current guide. -->
     <TextView
+        android:id="@+id/titleText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="4dp"
@@ -22,6 +24,7 @@
         android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
 
     <TextView
+        android:id="@+id/bodyText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="4dp"
@@ -143,6 +146,33 @@
             android:src="@drawable/ic_chevron_right"
             app:tint="@color/pix_text_faint" />
     </LinearLayout>
+
+    <!-- Saved guides (FR-3.8), newest first, hidden while there are none: a tap uses one, its ✕ deletes it. -->
+    <TextView
+        android:id="@+id/savedGuidesTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="20dp"
+        android:accessibilityHeading="true"
+        android:text="@string/saved_guides_title"
+        android:textAppearance="@style/TextAppearance.Pix.Header"
+        android:visibility="gone" />
+
+    <HorizontalScrollView
+        android:id="@+id/savedGuidesScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/savedGuidesList"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
 
     <Button
         android:id="@+id/cancelButton"

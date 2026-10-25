@@ -526,7 +526,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 
 ### 6.1 Wireframe overview
 
-The low-fidelity wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur.
+The low-fidelity wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below.
 
 - **Arrows**: user input or system event, labeled
 - **Dashed coral frame**: failure case

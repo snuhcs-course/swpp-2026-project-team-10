@@ -294,10 +294,9 @@ Each note lists the attendees, the agenda, the decisions for each agenda item, a
   - Pose suggestions: check whether the current prompt works for selfies; it probably needs its own.
 - **Composition and background: four candidates that differ**
   - With a description, the server writes three variations today. The idea is to prepare four prompt templates with the same `{pose}` instead.
-  - The default template is to be improved. Open: how to handle a request such as "two photos saluting and two with hands up".
-  - The prompt says that `{pose}` is the user's request and should be read sensibly, and it keeps rules such as: do not change the face or the clothes, and do not put several poses in one photo.
+  - The default template is improved for requests such as "two photos saluting and two with hands up": the prompt says that `{pose}` is the user's request and should be read sensibly, and it keeps rules such as: do not change the face or the clothes, and do not put several poses in one photo.
 - **Settings screen**
-  - The overlay's color and thickness. Still open: a latency indicator and a how-to-use help.
+  - The overlay's color and thickness, a latency indicator, and a how-to-use help.
   - A tutorial runs on first use only, and can be turned on again from the settings screen.
 
 **3. Testing**

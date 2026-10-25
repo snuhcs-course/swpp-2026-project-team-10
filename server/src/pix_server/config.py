@@ -1,5 +1,7 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 """Environment configuration for the Pix server."""
+
+from typing import Literal
 
 from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -52,6 +54,17 @@ class Settings(BaseSettings):
     # Suggestion requests, counted apart from pose requests in windows of the same lengths.
     suggestion_rate_limit: PositiveInt = 10
     suggestion_global_limit: PositiveInt = 500
+    # An OpenRouter model that takes images and answers in text; it says how to hold the phone for the chosen candidate
+    # (Design Documentation 2.6.3).
+    tip_model: str = "google/gemini-3.1-flash-lite"
+    # A little thinking caught more of the prompt's rules on 2026-10-25 for 0.4 s more; "medium" was slower and less
+    # consistent.
+    tip_reasoning: Literal["minimal", "low", "medium", "high"] = "low"
+    # The app asks when the user takes a candidate and shows the tip on Camera; it took 2-3.5 s on 2026-10-25.
+    tip_timeout_seconds: PositiveFloat = 10
+    # Tip requests, counted apart from poses and suggestions in windows of the same lengths.
+    tip_rate_limit: PositiveInt = 20
+    tip_global_limit: PositiveInt = 1000
 
     # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
     # leaves the window, so codes cannot be guessed. High, because phones on one Wi-Fi or carrier address share it,

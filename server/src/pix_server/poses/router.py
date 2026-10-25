@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -14,6 +14,7 @@ from pix_server.poses.generator import PoseGenerator, check_scene
 from pix_server.poses.limiter import Kind, PoseLimiter
 from pix_server.poses.prompts import DEFAULT_POSES, checked_pose, pose_prompt
 from pix_server.poses.suggester import PoseSuggester
+from pix_server.poses.tips import Angle, Framing, Height, Level, PoseTipper
 
 router = APIRouter(prefix="/api/v1")
 
@@ -33,6 +34,14 @@ class PoseResponse(BaseModel):
     templateId: str | None  # None for a description; the app tells its four requests apart by itself
     image: str
     elapsedMs: int
+
+
+class PoseTipResponse(BaseModel):
+    text: str  # the sentence the app shows
+    framing: Framing
+    hold: Level  # where to hold the phone, by the photographer's posture
+    height: Height  # compared with where the phone was for the scene
+    angle: Angle
 
 
 async def count(request: Request, kind: Kind) -> None:
@@ -115,3 +124,26 @@ async def create_pose(
         image=base64.b64encode(candidate).decode(),
         elapsedMs=round((time.perf_counter() - started) * 1000),
     )
+
+
+@router.post("/pose-tips")
+async def pose_tip(
+    request: Request,
+    scene: UploadFile,
+    candidate: UploadFile,
+    pose: Annotated[str, Form()],
+    # How much bigger the person is in the candidate, as the app measured it from the outlines; left out when it could
+    # not, and the model judges it instead.
+    framing: Annotated[Framing | None, Form()] = None,
+) -> PoseTipResponse:
+    """How to hold the phone for the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate,
+    and the pose it was made with (Design Documentation 2.6.3)."""
+    pose = checked_pose(pose, "pose")
+    scene_bytes = await scene.read()
+    check_scene(scene_bytes)
+    candidate_bytes = await candidate.read()
+    check_scene(candidate_bytes)
+    await count(request, "tips")
+    tipper: PoseTipper = request.app.state.pose_tipper
+    tip = await tipper.tip(scene_bytes, candidate_bytes, pose, framing)
+    return PoseTipResponse(text=tip.text, framing=tip.framing, hold=tip.hold, height=tip.height, angle=tip.angle)

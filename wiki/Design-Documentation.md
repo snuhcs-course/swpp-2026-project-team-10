@@ -39,13 +39,14 @@ Audience: the development team. This page describes the design of Iterations 1 a
 | Zoom stutter: what is left | Built in Iter2-P5 (2.6.5) and measured on the S23 Ultra on 2026-10-22: no stutter before or after, 30 fps (the most it offers apps), and no lens switch, because it zooms to 0.6× natively. Open on the S21, the only test phone with a separate ultrawide, where the lens switch and the held frame can be seen: its before and after numbers (Testing Documentation IT-10, NFR-19), and `PreviewView` in `PERFORMANCE` mode (`SurfaceView`) only if its preview still stutters. The shutter freeze stays Could. | 조성민 (Iter2-P5) | With IT-10 (Iteration 3) |
 | Invite link format | A verified Android App Link needs HTTPS, which the course servers do not have (AD-11). Proposal: `http://<host>/i/<invitationId>` opens a small page from nginx that hands over to Pix through a custom scheme (`pix://i/<invitationId>`) and otherwise says to install Pix (2.6.6). | 조성민 (Iter2-P15) | 10/30 |
 | Wrong-code message on *Join* | The server answers `room.join` with `RATE_LIMITED` after 100 wrong codes from one address in 10 minutes (2.5.2); the app shows "Couldn't connect…" for any code it does not know. The count is per network address, so phones on one Wi-Fi or behind one carrier address share it. Proposal: "Too many wrong codes from this network. Try again in a few minutes." on *Join with code*. | 조성민 (Iter2-P16) | 10/30 |
-| Reference thumbnail on Subject view | Whether the subject's phone also shows the guide's reference photo in a corner, the same as the photographer's thumbnail (FR-3.9), so the subject sees the pose to copy. It needs the photo on the subject's phone, which AD-6 and AD-15 rule out (only the smoothed mask travels, 2.5.1), so it starts with that decision. Proposal: send a copy with its long side at most 512 px once per guide, used only for the thumbnail. | 박동제 with 조성민 (guide sync) | 10/30, with the shared steps |
+| Reference thumbnail on Subject view | Whether the subject's phone also shows the guide's reference photo in a corner, the same as the photographer's thumbnail (FR-3.9), so the subject sees the pose to copy. It needs the photo on the subject's phone, which AD-6 and AD-15 rule out (only the smoothed mask travels, 2.5.1), so it starts with that decision. Proposal: send a copy with its long side at most 512 px once per guide, used only for the thumbnail. | 박재완 with 한준형 (mask transfer, shared steps) | 10/30, with the shared steps |
 | Pose tips (FR-4.10) | A vision model compares the scene photo with each candidate and answers with a short tip: step forward or back, zoom in or out, hold the camera higher or lower, tilt it down or up. Proposal: Gemini through OpenRouter's chat completions with the server's key, like the suggestion model (2.6.3), with its own rate limit (2.8, Privacy); the tip stays with its candidate and then with the guide for the Camera screen's panel. Open: whether the app asks for each tip as its candidate arrives or the server asks right after it generates one, the endpoint, and the answer's format. No tip for a guide from an uploaded reference. | 박동제 | 10/30 |
 | Shared steps on both phones (FR-6.14–6.16) | The subject's phone can open *Add a pose guide* and *Generate poses here*; both phones show the same step without streaming what is typed or selected, and the first phone to go on moves both. Open: which phone calls the Pix server; how the scene photo, the candidates, and the chosen guide reach the other phone (data-channel chunks like the guide image, 2.5.1); the step messages and the protocol version (3); how this fits AD-7, under which the photographer's phone owns the camera and guide state; and sending each photo to the subject (FR-6.14). | 한준형 | 10/30 |
 | Selfie prompt (FR-1.14) | Whether the pose prompt and the suggestion prompt (2.6.3) work for a selfie as the scene photo, or selfie mode needs prompts of its own. | 박동제 | 10/30 |
-| Four prompt templates (FR-4.8) | With a description, four templates around the same `{pose}` take the place of the three variations (2.6.3), and the default template is to be improved: `{pose}` is the user's request, read sensibly, with rules such as keeping the face and the clothes and one pose per photo. Open: the four templates, and how a request such as "two photos saluting and two with hands up" is handled. | TBD | Week of 11/2 |
-| Prompt history (FR-4.11) | Proposal: kept on the phone, because the server never stores descriptions (NFR-13). Open: how a partner is identified for the history with this person (the Pix ID when both are signed in; a room-code session has no account) and what the subject's phone records. | TBD | Week of 11/2 |
-| Offline QR connection (F9) | The plan of 1.4.2: a local-only hotspot, signaling on the photographer's phone, one connection per QR code, and *Resume* on both phones. Open: the detailed design (the QR payload, the local signaling, the hotspot API's limits). | TBD | Week of 11/2 |
+| Four prompt templates (FR-4.8) | With a description, four templates around the same `{pose}` take the place of the three variations (2.6.3), and the default template is to be improved: `{pose}` is the user's request, read sensibly, with rules such as keeping the face and the clothes and one pose per photo. Open: the four templates, and how a request such as "two photos saluting and two with hands up" is handled. | 박재완 | Week of 11/2 |
+| Prompt history (FR-4.11) | Proposal: kept on the phone, because the server never stores descriptions (NFR-13). Open: how a partner is identified for the history with this person (the Pix ID when both are signed in; a room-code session has no account) and what the subject's phone records. | 박동제 | Week of 11/2 |
+| Offline QR connection (F9) | The plan of 1.4.2: a local-only hotspot, signaling on the photographer's phone, one connection per QR code, and *Resume* on both phones. Open: the detailed design (the QR payload, the local signaling, the hotspot API's limits). | 조성민 | Week of 11/2 |
+| Mask-only transfer with the shared steps | Once the subject can choose a guide on their phone (FR-6.15), the guide is made there and has to reach the photographer's phone, which owns the guide state (AD-7), so the mask travels in either direction, not only P→S (2.5.1). The photographer's reference thumbnail (FR-3.9) is the reference photo, which a mask-only transfer does not carry, so it is left out for a guide from the subject's phone or a 512 px copy is sent (see *Reference thumbnail on Subject view*). A guide the subject saves (FR-6.16) holds only the mask, so its thumbnail comes from the outline (2.8, *Guide store*). The new mask format and the step messages share one protocol bump, to version 3. | 박재완 with 한준형 | 10/28 |
 
 **Contents**
 
@@ -1856,7 +1857,7 @@ erDiagram
 | **Pose generation** | 박재완 | API choice, `POST /poses`, the default poses, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, one prompt, suggested poses (Iter2-P12, [#53]) | Reference guide |
 | **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | `ws://` to the course server. Iteration 3: TURN through Cloudflare, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter2-P16, [#56]); invitations with push and link (Iter2-P15, [#55]) | Guide sync, remote control |
 | **Remote control** | 조성민 | `RemoteControlHandler` (zoom) | Brightness, flash, guide moves, and notices (Iter2-P17, [#57]); pinch zoom and the guide-edit mode toggle on Subject view (Iter2-P6, [#48]); zoom without stutter (Iter2-P5, [#47]; measured on the S23 Ultra, the S21 numbers with IT-10). Iteration 3: remote focus and the permission switch (Iter2-P17, Could) | UI |
-| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; no `anchor` is sent (2.5.1). Not built yet: the mask-only transfer in `GuideImageCodec` and the syncer | UI |
+| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; no `anchor` is sent (2.5.1). Iteration 3: the mask-only transfer in `GuideImageCodec` and the syncer, in either direction (박재완) | UI |
 
 Invitations need both the accounts server (박재완) and the session entry point (조성민), and the two owners agree the order of the invitation work.
 
@@ -1874,14 +1875,20 @@ Invitations need both the accounts server (박재완) and the session entry poin
 | 박재완 | The documents (PM) | 10/26 | — |
 | 박재완 | The Korean translation | 10/26 | 1.4.2 |
 | 박재완 | Candidates in the scene photo's ratio | 10/30 | 2.6.3 |
+| 박재완 | The mask-only guide transfer, in either direction | 10/30 | 2.5.1, 2.6.1, *Still open* |
 | 박동제 | *Pick a pose* one candidate at a time ([#108]) | 10/30 | 2.6.3 |
 | 박동제 | Pose tips | 10/30 | *Still open* |
 | 박동제 | Selfie mode, and whether the prompts suit it | 10/30 | 1.4.2, *Still open* |
 | 조성민 | Sessions on different networks ([#56]) | 10/30 | 2.6.7 |
 | 조성민 | Reconnection after a short drop ([#56]) | 10/30 | 2.6.7 |
 | 조성민 | Invitations and friend requests with push notifications ([#55]) | 10/30 | 2.6.6 |
-| 한준형 | Personalization: the shared steps and photos on both phones | 10/30 | *Still open* |
-| TBD | The QR connection, the prompt history, the settings screen and tutorial, and the four prompt templates | Week of 11/2 | 1.4.2, *Still open* |
+| 한준형 | Shared steps: the subject's phone opens guide selection and pose generation, both phones show the same step, and guides can be saved on either phone | 10/30 | *Still open* |
+| 한준형 | Photos taken in a session saved on both phones | 10/30 | *Still open* |
+| 조성민 | The offline QR connection | 11/5 | 1.4.2, *Still open* |
+| 한준형 | The settings screen and the first-use tutorial | 11/5 | 1.4.2 |
+| 박동제 | Prompt history on *Generate poses* | 11/5 | *Still open* |
+| 박재완 | Four prompt templates and an improved default prompt | 11/5 | *Still open* |
+| 박재완 | Integrate the Iteration 3 features | 11/5 | — |
 
 **Iteration 2 build order** (follows the schedule of 2026-10-11; dates are the issues' due dates):
 

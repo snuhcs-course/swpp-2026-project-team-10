@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -30,7 +30,9 @@ import com.lastpenguin.pix.core.network.PixAuthApi
 import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.RemotePoseGenerator
+import com.lastpenguin.pix.generation.RemotePoseTipper
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -89,6 +91,8 @@ class AppContainer(
     val savedGuideStore: SavedGuideStore,
     // ---- Pose generation (#7) ---------------------------------------------------
     val poseGenerator: PoseGenerator,
+    /** How to hold the phone for a generated pose (FR-4.10). */
+    val poseTipper: PoseTipper,
     val generationConsent: GenerationConsent,
     // ---- Accounts and friends (#54) ---------------------------------------------
     val authRepository: AuthRepository,
@@ -181,6 +185,7 @@ class AppContainer(
                     MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor()),
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
+                poseTipper = RemotePoseTipper(pixApi),
                 generationConsent = DataStoreGenerationConsent(appContext),
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -9,6 +9,9 @@ import java.io.ByteArrayOutputStream
 
 /** The server rejects a scene photo whose long side is above this (Design 2.5.3). */
 internal const val MAX_SCENE_LONG_SIDE = 1024
+
+/** A candidate goes to `POST /pose-tips` at this size: enough for the tip model, and half the upload. */
+internal const val TIP_CANDIDATE_LONG_SIDE = 768
 
 private const val SCENE_JPEG_QUALITY = 85
 
@@ -23,20 +26,27 @@ interface PoseImageCodec {
      */
     fun encodeScene(scene: Bitmap): ByteArray
 
+    /** The candidate the user took, as `POST /pose-tips` gets it: long side at most 768 px, JPEG as for the scene. */
+    fun encodeTipCandidate(candidate: Bitmap): ByteArray
+
     /** A candidate from the server, or null when the bytes are not an image. */
     fun decodeCandidate(image: ByteArray): Bitmap?
 }
 
 object AndroidPoseImageCodec : PoseImageCodec {
 
-    override fun encodeScene(scene: Bitmap): ByteArray {
-        val size = fitLongSide(scene.width, scene.height, MAX_SCENE_LONG_SIDE)
-        val fits = size.width == scene.width && size.height == scene.height
-        val scaled = if (fits) scene else scene.scale(size.width, size.height)
+    override fun encodeScene(scene: Bitmap): ByteArray = encode(scene, MAX_SCENE_LONG_SIDE)
+
+    override fun encodeTipCandidate(candidate: Bitmap): ByteArray = encode(candidate, TIP_CANDIDATE_LONG_SIDE)
+
+    private fun encode(image: Bitmap, longSide: Int): ByteArray {
+        val size = fitLongSide(image.width, image.height, longSide)
+        val fits = size.width == image.width && size.height == image.height
+        val scaled = if (fits) image else image.scale(size.width, size.height)
         val jpeg = ByteArrayOutputStream()
         // Bitmap.compress writes a plain JPEG without EXIF, so the location never leaves the phone (NFR-13).
         scaled.compress(Bitmap.CompressFormat.JPEG, SCENE_JPEG_QUALITY, jpeg)
-        if (scaled !== scene) scaled.recycle()
+        if (scaled !== image) scaled.recycle()
         return jpeg.toByteArray()
     }
 

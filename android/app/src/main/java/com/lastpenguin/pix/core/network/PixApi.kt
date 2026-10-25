@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -34,6 +34,20 @@ interface PixApi {
         @Part("description") description: RequestBody,
         @Part("seed") seed: RequestBody,
     ): PoseResponseDto
+
+    /**
+     * How to hold the phone for the candidate the user took (FR-4.10): `scene` as sent to [createPose], `candidate`,
+     * the pose it was made with, and `framing` (`closer`, `back`, or `keep`) when the phone measured it; a null part
+     * is left out. `502 UPSTREAM_ERROR` also when the server could not use its model's answer.
+     */
+    @Multipart
+    @POST("api/v1/pose-tips")
+    suspend fun poseTip(
+        @Part scene: MultipartBody.Part,
+        @Part candidate: MultipartBody.Part,
+        @Part("pose") pose: RequestBody,
+        @Part("framing") framing: RequestBody?,
+    ): PoseTipDto
 }
 
 /**

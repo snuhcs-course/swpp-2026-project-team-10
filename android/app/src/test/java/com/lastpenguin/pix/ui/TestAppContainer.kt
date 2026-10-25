@@ -18,6 +18,7 @@ import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
+import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.TipFraming
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -34,6 +35,9 @@ import com.lastpenguin.pix.session.RemoteControlHandler
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -57,6 +61,10 @@ class TestAppContainer(
     val saved = SavedGuideStore.InMemory()
     val generator = ScriptedPoseGenerator()
     val tipper = ScriptedPoseTipper()
+
+    /** No person is measured in a scene, so a tip is asked for without a framing. */
+    val tips =
+        PoseTips(tipper, guides.guide, measure = { null }, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
     val auth = FakeAuthRepository()
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
@@ -71,6 +79,7 @@ class TestAppContainer(
         savedGuideStore = saved,
         poseGenerator = generator,
         poseTipper = tipper,
+        poseTips = tips,
         generationConsent = consent,
         authRepository = auth,
         friendsRepository = friends,

@@ -31,10 +31,12 @@ import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseTipper
+import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseTipper
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.MlKitReferenceGuideMaker
 import com.lastpenguin.pix.guide.OutlineExtractor
@@ -93,6 +95,8 @@ class AppContainer(
     val poseGenerator: PoseGenerator,
     /** How to hold the phone for a generated pose (FR-4.10). */
     val poseTipper: PoseTipper,
+    /** The tip of the guide on Camera, asked for with [poseTipper]. */
+    val poseTips: PoseTips,
     val generationConsent: GenerationConsent,
     // ---- Accounts and friends (#54) ---------------------------------------------
     val authRepository: AuthRepository,
@@ -176,16 +180,25 @@ class AppContainer(
             )
             val guideSyncer =
                 GuideSyncer(rtcSessionManager, guideRepository, mirrorGuideRepository, WebpGuideImageCodec())
+            val referenceGuideMaker: ReferenceGuideMaker =
+                MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
+            val poseTipper: PoseTipper = RemotePoseTipper(pixApi)
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,
-                referenceGuideMaker =
-                    MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor()),
+                referenceGuideMaker = referenceGuideMaker,
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
-                poseTipper = RemotePoseTipper(pixApi),
+                poseTipper = poseTipper,
+                // The person in the scene is found as for a guide; only the box is used.
+                poseTips = PoseTips(
+                    poseTipper,
+                    guideRepository.guide,
+                    measure = { referenceGuideMaker.make(it, GuideSource.GENERATED).getOrNull()?.anchor },
+                    scope = appScope,
+                ),
                 generationConsent = DataStoreGenerationConsent(appContext),
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),

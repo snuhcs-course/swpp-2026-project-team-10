@@ -1,9 +1,14 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.generation.PoseTip
+import com.lastpenguin.pix.generation.PoseTipper
+import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.TipFraming
+import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -21,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -163,6 +169,64 @@ class ReferenceViewModelTest {
         maker.finish(Result.success(second))
         runCurrent()
         assertEquals(ReferenceUiState.Ready(second), model.uiState.value)
+    }
+
+    @Test
+    fun onCandidatePicked_withItsSceneAndPose_asksForItsTipOnceThePersonIsFound() = runTest {
+        val tipper = RecordingTipper()
+        val model = withTips(tipper)
+        val candidate = bitmap()
+        val scene = bitmap()
+        val guide = guide()
+
+        model.onCandidatePicked(candidate, TipSource(scene, "Walk past the railing"))
+        runCurrent()
+        assertEquals(emptyList<String>(), tipper.poses)
+        maker.finish(Result.success(guide))
+        runCurrent()
+
+        assertEquals(ReferenceUiState.Ready(guide), model.uiState.value)
+        assertEquals(listOf("Walk past the railing"), tipper.poses)
+        assertSame(scene, tipper.scenes.single())
+        assertSame(candidate, tipper.candidates.single())
+    }
+
+    @Test
+    fun onCandidatePicked_withoutItsSource_orWithoutAPerson_asksForNoTip() = runTest {
+        val tipper = RecordingTipper()
+        val model = withTips(tipper)
+
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+        maker.finish(Result.failure(NoPersonFoundException()))
+        runCurrent()
+
+        assertEquals(ReferenceUiState.NoPersonFound, model.uiState.value)
+        assertEquals(emptyList<String>(), tipper.poses)
+    }
+
+    private fun TestScope.withTips(tipper: PoseTipper) =
+        ReferenceViewModel(maker, guides, tips = PoseTips(tipper, guides.guide, { null }, backgroundScope))
+
+    private class RecordingTipper : PoseTipper {
+        val scenes = mutableListOf<Bitmap>()
+        val candidates = mutableListOf<Bitmap>()
+        val poses = mutableListOf<String>()
+
+        override suspend fun tip(
+            scene: Bitmap,
+            candidate: Bitmap,
+            pose: String,
+            framing: TipFraming?,
+        ): Result<PoseTip> {
+            scenes += scene
+            candidates += candidate
+            poses += pose
+            return Result.success(PoseTip("Hold the phone at your chest and keep it level."))
+        }
     }
 
     private fun guide() = ReferenceGuide(

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -531,6 +531,23 @@ class GenerationViewModelTest {
         assertEquals("pose-2", state.selectedPoseId)
         assertSame(second.image, state.selectedImage)
         assertEquals(listOf(false, true, false, false), state.slots().map { it.selected })
+    }
+
+    @Test
+    fun theSelectedCandidatesTipIsAskedFromTheSceneAndItsPose() = runTest {
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        run.plan()
+        run.send(ready("pose-1"), ready("pose-2"))
+        run.finish()
+        runCurrent()
+        assertNull(state.tipSource)
+
+        model.select("pose-2")
+
+        val source = state.tipSource!!
+        assertSame(state.scene, source.scene)
+        assertEquals(SUGGESTED[1], source.pose)
     }
 
     @Test

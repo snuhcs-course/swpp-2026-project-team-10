@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -31,7 +31,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         binding.usePoseButton.setOnClickListener {
             val image = viewModel.uiState.value.selectedImage ?: return@setOnClickListener
             // The same step as an uploaded photo: the person is separated on the phone (FR-4.6).
-            referenceViewModel.onCandidatePicked(image)
+            referenceViewModel.onCandidatePicked(image, viewModel.uiState.value.tipSource)
             findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
             // Reference confirm has the image now. The scene and the other candidates cannot be reached again, so
             // they are let go; after navigating, so that this screen does not take the empty state for a restart.

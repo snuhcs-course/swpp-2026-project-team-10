@@ -1,10 +1,12 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.NoPersonFoundException
@@ -43,13 +45,15 @@ enum class SavedGuideResult { USED, FAILED }
 
 /**
  * Add a pose guide → Reference confirm, and the saved guides on Add a pose guide (FR-3.8). Shared by AddGuideSheet,
- * ReferenceConfirmFragment, NoPersonFoundFragment, and PickPoseFragment (activity scope).
- * Owner: PM (#5); saved guides #58.
+ * ReferenceConfirmFragment, NoPersonFoundFragment, and PickPoseFragment (activity scope). The guide of a generated
+ * pose also gets its tip asked for here, once its person is found (FR-4.10).
+ * Owner: PM (#5); saved guides #58; pose tips.
  */
 class ReferenceViewModel(
     private val maker: ReferenceGuideMaker,
     private val guides: GuideRepository,
     private val savedGuideStore: SavedGuideStore = SavedGuideStore.InMemory(),
+    private val tips: PoseTips? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReferenceUiState>(ReferenceUiState.Idle)
@@ -79,9 +83,14 @@ class ReferenceViewModel(
         make { maker.make(uri) }
     }
 
-    /** The pose chosen on Pick a pose. */
-    fun onCandidatePicked(image: Bitmap) {
-        make { maker.make(image, GuideSource.GENERATED) }
+    /**
+     * The pose chosen on Pick a pose. With [tipFrom], the scene and the pose it was made from, its tip is asked for
+     * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10).
+     */
+    fun onCandidatePicked(image: Bitmap, tipFrom: TipSource? = null) {
+        make(onReady = { guide -> if (tipFrom != null) tips?.prepare(guide, image, tipFrom) }) {
+            maker.make(image, GuideSource.GENERATED)
+        }
     }
 
     /** *Use this guide*. */
@@ -124,12 +133,15 @@ class ReferenceViewModel(
     }
 
     /** Separates the person; a newer photo (*Choose another photo*) replaces one still in progress. */
-    private fun make(block: suspend () -> Result<ReferenceGuide>) {
+    private fun make(onReady: (ReferenceGuide) -> Unit = {}, block: suspend () -> Result<ReferenceGuide>) {
         making?.cancel()
         _uiState.value = ReferenceUiState.Working
         making = viewModelScope.launch {
             _uiState.value = block().fold(
-                onSuccess = { ReferenceUiState.Ready(it) },
+                onSuccess = {
+                    onReady(it)
+                    ReferenceUiState.Ready(it)
+                },
                 onFailure = {
                     if (it is NoPersonFoundException) ReferenceUiState.NoPersonFound else ReferenceUiState.Failed
                 },

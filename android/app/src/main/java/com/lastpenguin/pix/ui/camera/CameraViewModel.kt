@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
@@ -43,6 +44,31 @@ enum class GuideSaveNotice {
     SAVED_OLDEST_REMOVED,
     ALREADY_SAVED,
     FAILED,
+}
+
+/**
+ * The pose tip of the guide on the camera (FR-4.10), as the screen shows it: a banner over the bottom of the preview
+ * that opens once when the guide comes, and the tip button in the top bar.
+ */
+data class TipBanner(
+    /** The guide the tip is for; a new guide opens the banner again. */
+    val guideId: String,
+    val state: TipState,
+    /** The banner is open; a touch anywhere closes it, and the tip button opens it again. */
+    val open: Boolean,
+    /** The tip arrived while the banner was closed: the tip button shows a dot until it is opened. */
+    val unseen: Boolean = false,
+)
+
+/**
+ * The tip after a change of the guide on the camera ([guideId]) or of its tip ([state]): a new guide's tip opens,
+ * and a tip that arrives while closed is marked unseen; none without a guide or a tip.
+ */
+internal fun nextTip(previous: TipBanner?, guideId: String?, state: TipState?): TipBanner? {
+    if (guideId == null || state == null) return null
+    if (previous == null || previous.guideId != guideId) return TipBanner(guideId, state, open = true)
+    val arrivedClosed = state is TipState.Ready && previous.state !is TipState.Ready && !previous.open
+    return previous.copy(state = state, unseen = previous.unseen || arrivedClosed)
 }
 
 internal fun captureFailureNotice(error: Throwable): CaptureNotice = when {
@@ -99,6 +125,8 @@ data class CameraUiState(
     val lastPhoto: Uri? = null,
     /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
+    /** The pose tip of the guide on the camera (FR-4.10), or null when it has none. */
+    val tip: TipBanner? = null,
 )
 
 /**
@@ -110,11 +138,14 @@ class CameraViewModel(
     private val guides: GuideRepository,
     private val settings: CameraSettings = CameraSettings.InMemory(),
     private val savedGuides: SavedGuideStore = SavedGuideStore.InMemory(),
+    /** The tip of the guide on the camera (`PoseTips.onCamera`, FR-4.10). */
+    private val tips: StateFlow<TipState?> = MutableStateFlow(null),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
     private var savedNoticeJob: Job? = null
+    private var failedTipJob: Job? = null
 
     private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
 
@@ -179,6 +210,41 @@ class CameraViewModel(
                 guide != null && saved.any { it.id == guide.id }
             }
                 .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
+        }
+        viewModelScope.launch {
+            combine(guides.guide.map { it?.id }.distinctUntilChanged(), tips) { id, tip -> id to tip }
+                .collect { (id, tip) ->
+                    _uiState.update { it.copy(tip = nextTip(it.tip, id, tip)) }
+                    if (tip == TipState.Failed) closeFailedTip()
+                }
+        }
+    }
+
+    /** A touch anywhere on the screen ended: an open tip closes (FR-4.10). */
+    fun onAnyTouch() {
+        _uiState.update { state ->
+            state.tip?.takeIf { it.open }?.let { state.copy(tip = it.copy(open = false)) }
+                ?: state
+        }
+    }
+
+    /** The tip button: the tip opens again, and is no longer unseen. A tip that could not be had has no button. */
+    fun onTipButton() {
+        _uiState.update { state ->
+            val tip = state.tip?.takeIf { it.state != TipState.Failed } ?: return@update state
+            state.copy(tip = tip.copy(open = true, unseen = false))
+        }
+    }
+
+    /** "Couldn't get a tip" stays for [NOTICE_MS] if the banner is open, then the banner closes for good. */
+    private fun closeFailedTip() {
+        failedTipJob?.cancel()
+        failedTipJob = viewModelScope.launch {
+            delay(NOTICE_MS)
+            _uiState.update { state ->
+                val tip = state.tip?.takeIf { it.state == TipState.Failed } ?: return@update state
+                state.copy(tip = tip.copy(open = false))
+            }
         }
     }
 

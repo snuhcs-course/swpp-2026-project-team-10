@@ -29,6 +29,7 @@ object PixViewModels {
                 container.guideRepository,
                 container.cameraSettings,
                 container.savedGuideStore,
+                container.poseTips.onCamera,
             )
         }
         initializer {

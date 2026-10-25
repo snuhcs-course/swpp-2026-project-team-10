@@ -28,7 +28,7 @@
 | 1.15 | 2026-10-23 | Synced with the code on `dev` after [#96], with no decision changes: every section from 1.1 to 2.10 now describes what is built; Figure 4 redrawn and the Iteration 1 architecture figure removed; the S23 Ultra zoom measurement recorded (2.6.5); invitations, cross-network sessions, and the Could items move to Iteration 3 (1.4, 2.9). |
 | 1.16 | 2026-10-23 | Integration of the Iteration 2 features (Iter2-P22, [#60], [#99]): when Subject view shows "Connecting…" and when "camera paused" (2.8). No other design change. |
 | 1.17 | 2026-10-23 | The *Decided* paragraphs at the top are removed; each decision is in its own section. No design change. |
-| 2.0 | 2026-10-25 | First version for Iteration 3 (versions count 2.0, 2.1, …). The page records only the current design: revision notes, Iteration 1 behavior, and the reasons for changed decisions are removed, and what Iteration 2 did not build (invitations, push, the relay, reconnection, the Could items) is marked Iteration 3 (1.1–1.4, 2.1–2.9). The revision history is shortened. No design change. |
+| 2.0 | 2026-10-25 | First version for Iteration 3: the page records only the current design, and what Iteration 2 did not build is marked Iteration 3; the revision history is shortened. No design change. |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v2.0). Testing plans will be in the Testing Documentation.
 

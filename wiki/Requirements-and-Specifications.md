@@ -20,7 +20,7 @@
 | 1.7 | 2026-10-21 | Sign-in, Pix ID, and Friends screens as built (Iter2-P13, [#54]): *Shoot together* opens *Friends*, usable signed out (FR-5.2 revised); the account screens (6.4) and Figure 3b. |
 | 1.8 | 2026-10-22 | *Check* for a free Pix ID (FR-5.15) and *Sent requests* with *Withdraw* (FR-5.16) (Iter2-P13, [#54]; US-6, US-7, 6.4). |
 | 1.9 | 2026-10-23 | Synced with the app on `dev` after [#96], with original texts kept: FR-8.1, FR-8.5, and US-13 revised; section 6 follows the built screens, and Figures 1–6 and 3b are redrawn; invitations, reconnection, and the Could items move to Iteration 3 (4.1). |
-| 2.0 | 2026-10-25 | First version for Iteration 3 (versions count 2.0, 2.1, …). The page records only the current requirements: original texts, revision notes, and Iteration 1 behavior are removed, with the Iteration 1 slider cases of US-1 and US-12, and what Iteration 2 did not build targets Iteration 3 (4.1, F3–F7, NFR-5, NFR-9–NFR-11). The revision history is shortened. No requirement is added or dropped. |
+| 2.0 | 2026-10-25 | First version for Iteration 3: the page records only the current requirements, without original texts or Iteration 1 cases, and what Iteration 2 did not build targets Iteration 3; the revision history is shortened. No requirement added or dropped. |
 
 Items marked **TBD** need a team decision.
 

@@ -21,7 +21,7 @@
 | 1.16 | 2026-10-23 | The Iteration 2 integration run (Iter2-P21, [#59]): the script results from the demo recordings, the user stories and each acceptance case mapped to their tests (2.2.2), and the NFRs not measured (2.2.3). |
 | 1.17 | 2026-10-23 | Integration fix (Iter2-P22, [#60], [#99]): Subject view shows "Connecting…" until the first frame, with its tests (2.1.6); the `Timings` marks checked against 2.1.4 and 2.1.5. |
 | 1.18 | 2026-10-23 | The integration recordings moved from `images/` to the README and the team's shared folder (2.2.2). |
-| 2.0 | 2026-10-25 | First version for Iteration 3: the plan records only the current tests and scripts, with changed goals keeping their originals; 2.2.2's mapping follows R&S 2.0 (94 cases); the revision history is shortened. No goal, script, or result changed. |
+| 2.0 | 2026-10-26 | First version for Iteration 3: the plan records only the current tests and scripts, with changed goals keeping their originals, and 2.2.2's mapping follows R&S 2.0 (94 cases); from the kickoff of 2026-10-25, the Iteration 3 test owners and focus (1), an LLM judge for the AI module tests (3), and the user test (4.3); the revision history is shortened. |
 
 Audience: the development team and the course staff. This page makes our testing explicit and reproducible: anyone on the team can run the same commands, get the same numbers, and compare them with the goals set here in advance. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications) page, and section numbers in the form "Design 2.x" to the [Design Documentation](Design-Documentation). **TBD** marks a value the team still has to set; **TODO** marks a part that is filled in when its iteration comes.
 
@@ -38,9 +38,9 @@ Audience: the development team and the course staff. This page makes our testing
 | Iteration | Newly required | Kept up to date |
 |---|---|---|
 | 2 | 1 Test Responsibility & Schedule; 2 Unit & Integration Testing (plan and first results) | — |
-| 3 | 3 AI Module Testing (evaluation set, thresholds, first results); 4 Acceptance Testing (plan) | 2 |
-| 4 | 4 Acceptance Testing (results) | 2, 3 |
-| 5 | 5 Alpha & Beta Testing (plan, execution, results) | 2, 3, 4 |
+| 3 | 3 AI Module Testing (evaluation set, thresholds, first results); 4 Acceptance Testing (plan); the user test (4.3) | 2 |
+| 4 | 4 Acceptance Testing (the UAT on 11/16 and 11/18, results) | 2, 3 |
+| 5 | 5 Alpha & Beta Testing (in-class testing 11/30, real user test 12/2; plan, execution, results) | 2, 3, 4 |
 
 **What each part of this page gives evidence of.** Testing answers two questions (Week 6, *Verification vs. Validation*). Sections 1–3 are **verification**, are we building the software right: unit and integration tests, the AI evaluation set, static checks (Spotless, Android Lint, Ruff), and code review check the implementation against the R&S and the Design Documentation. Sections 4 and 5 are **validation**, are we building the right software: the UAT, the heuristic evaluation, and alpha and beta testing check it against what users need. Each test type of the course's list has a home here:
 
@@ -48,7 +48,7 @@ Audience: the development team and the course staff. This page makes our testing
 |---|---|---|
 | Functional | Does Pix do what the R&S says? | 2 (unit, integration), 4 (UAT) |
 | Performance | Is it fast enough, and does the live view hold up? | 2.2.3 (NFR measurements: NFR-1 to NFR-12, NFR-19) |
-| Usability | Can two people get the photo without help? | NFR-16 hallway test, the heuristic evaluation, 4, 5 |
+| Usability | Can two people get the photo without help? | NFR-16 hallway test, the user test (4.3), the heuristic evaluation, 4, 5 |
 | Acceptance | Does it satisfy the agreed stories? | 4 |
 | Security and access control | Can it be misused? | NFR-14 and NFR-15 checks in 2 (server tests for non-friend and blocked cases) |
 | Compatibility | Does it work on every supported phone? | NFR-17 device pass in 2.2.2, the pairwise device and network table in 2.1.6 |
@@ -72,7 +72,7 @@ Each component has one member responsible for writing and maintaining its tests.
 
 | Component | Layer (Design 1.1.5, 2.1) | Where the tests live | Responsible |
 |---|---|---|---|
-| Camera (`camera/`) | Managers and platform: `CameraController`, `CameraXController`, zoom plan, photo saving, camera controls (focus point, exposure, flash, aspect ratio) and their setting | `android/app/src/test/.../camera/` | 박동제 |
+| Camera (`camera/`) | Managers and platform: `CameraController`, `CameraXController`, zoom plan, photo saving, camera controls (focus point, exposure, flash, aspect ratio) and their setting, selfie mode (Iteration 3) | `android/app/src/test/.../camera/` | 박동제 |
 | Reference guide and overlay (`guide/`) | Managers and Views: segmentation, mask smoothing, outline, `GuideGeometry` (with the starting position), `GuideRepository`, `GuideOverlayView`, saved guides (`SavedGuideStore`) | `android/app/src/test/.../guide/` | 박동제 |
 | Pose generation, app side (`generation/`) | Managers: `RemotePoseGenerator`, image codec | `android/app/src/test/.../generation/` | 박재완 |
 | Account, friends, invitations, app side (`account/`, `ui/account/`) | ViewModels and repositories | `android/app/src/test/.../account/`, `.../ui/` | 박재완 |
@@ -82,8 +82,12 @@ Each component has one member responsible for writing and maintaining its tests.
 | Server: session store (`store/`) | Server module: the Redis scripts for room transitions, delivery between workers, heartbeats, the rate limit | `server/tests/test_registry.py` (several registries as workers), `test_signaling.py`, `test_poses.py` | 박재완 |
 | Server: accounts, friends, invitations, TURN credentials (`accounts/`, `invitations/`, `turn/`, `db/`) | Server modules and database | `server/tests/test_accounts.py`, `test_friends.py`, `test_account_rules.py`, `test_passwords.py`, `test_google.py`, `test_database.py`, presence in `test_registry.py`; `test_invitations.py` (to be added with invitations, Iteration 3) | 박재완 |
 | Server: poses (`poses/`) | Server module | `server/tests/test_poses.py`, `test_pose_suggestions.py`, `test_prompts.py` (the prompts file) | 박재완 |
+| Pose tips, app and server (Iteration 3) | Managers and server module: the tip request and answer, and the tip on *Pick a pose* and the Camera screen | `android/app/src/test/.../generation/`, `.../ui/`, `server/tests/` | 박동제 |
+| Shared steps on both phones (Iteration 3) | Managers and ViewModels: the step messages, the first phone to go on, the candidates and the guide sent to the other phone, photos saved on both phones | `android/app/src/test/.../session/`, `.../ui/` | 한준형 |
+| Language, settings, and tutorial (Iteration 3) | Views and resources: the Korean strings, the settings screen, the tutorial | `android/app/src/test/.../ui/` | 박재완 (the Korean strings); the settings screen and the tutorial **TBD** |
 | Integration tests for the Iteration 2 flows | Across components, on two phones and the public server | Design 2.9 (Iter2-P21) | 한준형 |
-| This page, CI, and coverage reports | — | `wiki/Testing-Documentation.md`, `.github/workflows/` | 한준형 |
+| Integration tests for the Iteration 3 flows | As above, and the user test (4.3) | Design 2.9 | **TBD** |
+| This page, CI, and coverage reports | — | `wiki/Testing-Documentation.md`, `.github/workflows/` | 한준형 (Iteration 2), 박재완 (Iteration 3) |
 
 **Policy for new code.** The author of a feature writes its tests and submits them in the same pull request as the code; a PR without tests for new logic is not merged (PR template, *Checklist*). Tests are written with the code, in short test–code cycles, and test-first for logic whose expected result is clear in advance (boundaries, protocol messages, state transitions): write the failing test, watch it fail for the right reason (an assertion, not a compile error), make it pass, then refactor with the suite green (Week 7, TDD). **Every fixed bug becomes a test**: the PR that fixes a bug first adds a test that reproduces it and fails, then the fix, and the test stays in CI (Week 6, regression). Shared contracts (Design 2.9) change only with the tests of every affected owner updated in the same PR. AI-generated tests follow the same marker and review rule as other source files (`CLAUDE.md`), and a reviewer checks that their oracle is independent of the code they test, because a test that restates the implementation passes on any bug (Week 6, *The Test Oracle*; Week 7 Part III for AI-written tests).
 
@@ -98,6 +102,8 @@ The stages follow the course's rule of fast feedback early and high fidelity bef
 | `dev` after a merge | Every push to `dev` | The same four checks; the wiki sync | A red `dev` is fixed or reverted before anyone builds on it |
 | End of iteration, before `dev` → `main` (hours) | Once per iteration | The four checks, the coverage reports (2.1.4), the integration tests on two phones and the public server (2.1.5), the NFR measurements of R&S 5 that the iteration's features touch, with `Timings` logs (Design 2.8), and the mutation run on the critical modules once it exists (2.1.7) | Yes; results are recorded in 2.2, and a miss is explained there |
 | Nightly | None | The suites run on the JVM and in one Python process in a few minutes, so everything automated runs on every push. Emulator-based UI tests (Espresso), if added in Iteration 3 or later, run on `dev` or nightly, not on every PR (**TBD**, 2.1.6) | — |
+
+**Iteration 3 focus** (kickoff of 2026-10-25). Testing is a focus of this iteration, on three areas: taking photos with the camera, pose suggestions and the guide, and live sharing. Where latency is tested, and with which limits, is decided later (**TBD**).
 
 Tests that need a phone or an emulator (camera permission, real CameraX capture, MediaStore, two-phone sessions, push delivery) are not in CI; they are run by hand before merging to `dev` and at the end of the iteration, and their results go in 2.2.2 and 2.2.3.
 
@@ -569,15 +575,15 @@ To be completed in Iteration 3.
 
 ## 3. AI Module Testing (from Iteration 3)
 
-To be completed in Iteration 3. The AI module under test is pose generation (Design 2.6.3): the prompt pipeline and the image-editing model behind `POST /poses`, with a description as input, and the suggestion model behind `POST /pose-suggestions`, which suggests four poses for a scene photo when there is no description. With a description, three of the four candidates follow variations of it written by the same model; the variation test of Design 2.6.3 had a second vision model judge each set for how many different poses it holds and whether each candidate follows the description, which the evaluation can reuse.
+To be completed in Iteration 3. The AI module under test is pose generation (Design 2.6.3): the prompt pipeline and the image-editing model behind `POST /poses`, with a description as input, and the suggestion model behind `POST /pose-suggestions`, which suggests four poses for a scene photo when there is no description. The kickoff of 2026-10-25 chose the method: an LLM (VLM) judge checks each candidate against rules that every generated pose must keep, consistent with the prompt, and the result is a failure rate, with Claude through the Claude API as the judge. Whether the pose tips (R&S FR-4.10) are judged as well is **TBD**.
 
 ### 3.1 Plan
 
 - **Frozen evaluation set.** A file committed to the repository with at least 30 cases: a scene photo, a description or none (suggested poses), and the expected behavior (the same person and place, the described pose, the whole person in the frame). Path: **TODO** (proposal `server/eval/pose_cases.json` with the photos under `server/eval/scenes/`). Once submitted, cases may be added but not removed or edited; additions are listed here.
-- **Ground truth and evaluation design.** A good pose image has no single correct answer, so the cases are judged by human rating on a fixed scale by at least two team members, with the rubric below, plus automatic checks where they apply. The plan is discussed with the TA before the first run. **TODO**: how the ratings are collected and who rates.
-- **Assertion method per case.** The oracle problem is the hard part here: there is no reference image to compare against, so the verdict combines automatic properties and human judgement (Week 6, *The Test Oracle*; Week 7, metamorphic relations). Automatic: schema validity of the response (a decodable JPEG of the expected size), latency within 30 s, a pose or person detector that confirms one person in the frame (**TBD**), and metamorphic checks (the same scene with two seeds gives two different poses; a description and its Korean translation give the same pose class). Human: a 1–5 rating on identity kept, place kept, pose followed, and framing kept, with 4 or more counting as a pass, by two raters with the disagreement rate reported. Exact image matching is not used.
-- **Thresholds declared in advance.** **TODO** (declared and committed before the first run; proposal: schema validity = 100 %, latency ≤ 30 s for ≥ 95 % of cases, human pass rate ≥ 80 % overall and ≥ 75 % for described poses).
-- **Test settings and command.** Model and version (`PIX_POSE_MODEL`), quality, seed handling, prompt version (Design 2.6.3), and the command that runs the set and prints the metrics: **TODO** (proposal `uv run scripts/eval_poses.py --cases eval/pose_cases.json`).
+- **Ground truth and evaluation design.** A good pose image has no single correct answer, so each candidate is checked against a fixed list of rules that every generated pose must keep, written to match the pose prompt (Design 2.6.3): for example the same person, face, and clothing, the same place, the requested pose, and one pose in the photo (**TODO**: the list). The judge is Claude through the Claude API (**TODO**: the model and its prompt); the kickoff chose it in place of the human rating proposed before (two raters, a 1–5 scale). How the judge itself is checked, for example by a team member reviewing a sample of its verdicts, is **TBD**. The plan is discussed with the TA before the first run.
+- **Assertion method per case.** The oracle problem is the hard part here: there is no reference image to compare against, so the verdict combines automatic properties and human judgement (Week 6, *The Test Oracle*; Week 7, metamorphic relations). Automatic: schema validity of the response (a decodable JPEG of the expected size), latency within 30 s, a pose or person detector that confirms one person in the frame (**TBD**), and metamorphic checks (the same scene with two seeds gives two different poses; a description and its Korean translation give the same pose class). Judge: for each rule, pass or fail with a reason; a case fails if any rule fails, and the failure rate is reported per rule and over all cases. Exact image matching is not used.
+- **Thresholds declared in advance.** **TODO** (declared and committed before the first run; proposal: schema validity = 100 %, latency ≤ 30 s for ≥ 95 % of cases, failure rate ≤ 20 % overall and ≤ 25 % for described poses).
+- **Test settings and command.** Model and version (`PIX_POSE_MODEL`), quality, seed handling, prompt version (Design 2.6.3), the judge's model and prompt, and the command that runs the set and prints the metrics: **TODO** (proposal `uv run scripts/eval_poses.py --cases eval/pose_cases.json`).
 
 ### 3.2 Results
 
@@ -589,7 +595,7 @@ To be completed in Iteration 3: each declared metric with its value and pass/fai
 
 ### 4.1 Plan (Iteration 3)
 
-To be completed in Iteration 3. The UAT is validation (are we building the right software?), so its stories are black-box: written from the R&S, run by a tester who follows the procedure without knowing the code, and judged on what the user sees. At least five user stories from R&S 4.4 are chosen for the UAT and not changed afterwards; the current candidates are US-2, US-4, US-9, US-10, US-11, and US-12 (marked "UAT candidate" in the R&S). For each story: the acceptance criteria (the observable conditions under which it passes, from its Given–When–Then table) and the procedure a tester follows, step by step, with the devices and the network.
+To be completed in Iteration 3; the UAT runs on 11/16 and 11/18, in Iteration 4. The UAT is validation (are we building the right software?), so its stories are black-box: written from the R&S, run by a tester who follows the procedure without knowing the code, and judged on what the user sees. At least five user stories from R&S 4.4 are chosen for the UAT and not changed afterwards; the current candidates are US-2, US-4, US-9, US-10, US-11, and US-12 (marked "UAT candidate" in the R&S). For each story: the acceptance criteria (the observable conditions under which it passes, from its Given–When–Then table) and the procedure a tester follows, step by step, with the devices and the network.
 
 | Story | Acceptance criteria | Procedure | Devices |
 |---|---|---|---|
@@ -603,11 +609,20 @@ To be completed in Iteration 4: for each story, pass/fail, the test date, the te
 |---|---|---|---|---|
 | US-? | | | | |
 
+### 4.3 User test (Iteration 3)
+
+A test with users before the heuristic evaluation and the UAT, separate from the UAT (decided 2026-10-25).
+
+- **When and what.** The weekend of 10/31–11/1, on the build with the tasks due 10/30 (Design 2.9), against the temporary server on AWS.
+- **Participants.** Five people that 박동제 knows, outside the team.
+- **Method.** A questionnaire (Google Forms), or asking each participant in person and recording the answers (**TBD** which). The tasks and questions: **TODO**.
+- **Results.** Summarized here: what each participant did and said, and the problems found, with the fixes that follow in Iteration 4.
+
 ---
 
 ## 5. Alpha & Beta Testing (Iteration 5)
 
-To be completed in Iteration 5. Alpha testing is done by people in the course but outside the team (another team or the TAs) in a setting where we observe them; beta testing by external users on their own phones without us present. Alpha runs first, serious issues are fixed, then the beta build is released.
+To be completed in Iteration 5, with in-class testing on 11/30 (alpha) and the real user test on 12/2 (beta). Alpha testing is done by people in the course but outside the team (another team or the TAs) in a setting where we observe them; beta testing by external users on their own phones without us present. Alpha runs first, serious issues are fixed, then the beta build is released.
 
 ### 5.1 Plan
 

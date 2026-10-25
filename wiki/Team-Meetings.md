@@ -256,6 +256,7 @@ Each note lists the attendees, the agenda, the decisions for each agenda item, a
 4. Tasks
 
 **1. Iteration 3 features**
+- Iteration 3 runs 10/26–11/6. A user test is held on the weekend of 10/31–11/1, before the heuristic evaluation (11/4) and the UAT (11/16 and 11/18, in Iteration 4).
 - UI and UX:
   - A Korean translation. English or Korean is chosen in the settings screen, and the default follows the phone's language.
   - *Pick a pose* shows the candidates one at a time, with a swipe ([#108]).
@@ -294,7 +295,7 @@ Each note lists the attendees, the agenda, the decisions for each agenda item, a
   - Pose suggestions: check whether the current prompt works for selfies; it probably needs its own.
 - **Composition and background: four candidates that differ**
   - With a description, the server writes three variations today. The idea is to prepare four prompt templates with the same `{pose}` instead.
-  - The default template is improved for requests such as "two photos saluting and two with hands up": the prompt says that `{pose}` is the user's request and should be read sensibly, and it keeps rules such as: do not change the face or the clothes, and do not put several poses in one photo.
+  - The default template is to be improved for requests such as "two photos saluting and two with hands up": the prompt will say that `{pose}` is the user's request and should be read sensibly, and keep rules such as: do not change the face or the clothes, and do not put several poses in one photo.
 - **Settings screen**
   - The overlay's color and thickness, a latency indicator, and a how-to-use help.
   - A tutorial runs on first use only, and can be turned on again from the settings screen.
@@ -324,7 +325,7 @@ Each note lists the attendees, the agenda, the decisions for each agenda item, a
 | 박동제 | Selfie mode, and check whether the pose prompt works for it | 10/30 (Fri) |
 | 한준형 | Personalization | 10/30 (Fri) |
 
-The rest continues next week, TBD.
+The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues next week, TBD.
 
 [↑ Back to the list](#iteration-3)
 

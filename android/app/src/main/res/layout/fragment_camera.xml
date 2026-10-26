@@ -14,9 +14,11 @@
         android:id="@+id/topBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:minHeight="44dp"
+        android:minHeight="48dp"
+        android:outlineProvider="none"
         android:paddingHorizontal="10dp"
         android:paddingVertical="0dp"
+        android:translationZ="1dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -125,13 +127,15 @@
             android:layout_height="match_parent"
             android:background="@color/pix_ground" />
 
-        <!-- The last frame, held while the camera rebinds for a new ratio or lens (PreviewHold, Design 2.6.2, 2.6.5). -->
+        <!-- The last frame, held while the camera rebinds for a new ratio or lens (PreviewHold, Design 2.6.2, 2.6.5). It is
+             drawn at its own size from the top left, not fitted: a new ratio resizes this area at once, but its top and
+             width stay, so the old frame keeps its place until the new one streams. -->
         <ImageView
             android:id="@+id/aspectStill"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:importantForAccessibility="no"
-            android:scaleType="fitCenter"
+            android:scaleType="matrix"
             android:visibility="gone" />
 
         <com.lastpenguin.pix.guide.GuideOverlayView
@@ -468,7 +472,7 @@
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
-        android:layout_height="44dp"
+        android:layout_height="48dp"
         android:outlineProvider="none"
         android:paddingHorizontal="12dp"
         android:translationZ="1dp"
@@ -502,7 +506,7 @@
             android:importantForAccessibility="yes"
             android:minWidth="48dp"
             android:paddingHorizontal="12dp"
-            android:paddingVertical="8dp"
+            android:paddingVertical="10dp"
             android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
             android:textColor="@color/zoom_readout_text"
             android:textSize="11sp"
@@ -643,27 +647,40 @@
                     android:contentDescription="@string/shutter" />
             </FrameLayout>
 
+            <!-- A third of the row, as for Guide and the shutter, with the gallery button in its middle. -->
             <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1">
+                android:layout_weight="1"
+                tools:ignore="UselessParent">
 
-                <com.google.android.material.imageview.ShapeableImageView
+                <!-- The last photo: a 36 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps; the
+                     thumbnail shows its pressed state. -->
+                <FrameLayout
                     android:id="@+id/galleryButton"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:layout_gravity="center"
-                    android:background="@color/pix_glass"
                     android:clickable="true"
                     android:contentDescription="@string/open_last_photo"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:padding="1dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/gallery_placeholder"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
-                    app:strokeColor="#80FFFFFF"
-                    app:strokeWidth="1.5dp" />
+                    android:focusable="true">
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/galleryThumbnail"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        android:background="@color/pix_glass"
+                        android:duplicateParentState="true"
+                        android:foreground="?attr/selectableItemBackground"
+                        android:importantForAccessibility="no"
+                        android:padding="1dp"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/gallery_placeholder"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
+                        app:strokeColor="#80FFFFFF"
+                        app:strokeWidth="1.5dp" />
+                </FrameLayout>
             </FrameLayout>
         </LinearLayout>
 

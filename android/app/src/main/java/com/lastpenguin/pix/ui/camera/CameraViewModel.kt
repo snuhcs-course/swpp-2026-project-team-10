@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
 import com.lastpenguin.pix.generation.GuideTip
@@ -148,6 +149,10 @@ class CameraViewModel(
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
     private var savedNoticeJob: Job? = null
+
+    // The quick step a tap asked for until the camera applies it, so that another tap goes on from it (FR-1.3); the
+    // readout still shows the applied zoom.
+    private var pendingZoomStep: Float? = null
     private var failedTipJob: Job? = null
 
     private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
@@ -190,7 +195,10 @@ class CameraViewModel(
             }
         }
         viewModelScope.launch {
-            camera.zoom.collect { zoom -> _uiState.update { it.copy(zoom = zoom) } }
+            camera.zoom.collect { zoom ->
+                if (pendingZoomStep?.let { isAtZoomStep(zoom, it) } == true) pendingZoomStep = null
+                _uiState.update { it.copy(zoom = zoom) }
+            }
         }
         viewModelScope.launch {
             guides.guide.collect { guide ->
@@ -293,18 +301,30 @@ class CameraViewModel(
 
     /** [final] is false for the steps of a pinch, so the camera holds its lens until the pinch ends (NFR-19). */
     fun onZoomChanged(ratio: Float, final: Boolean = true) {
-        val status = camera.status.value
-        if ((status == CameraStatus.READY || status == CameraStatus.STARTING) &&
-            camera.capabilities.value != null && ratio.isFinite()
-        ) {
-            camera.setZoom(ratio, final)
-        }
+        pendingZoomStep = null
+        requestZoom(ratio, final)
     }
 
-    /** A tap on the zoom readout (FR-1.3): the next quick step, such as 0.6×, 1×, and 2×, the last back to the first. */
+    /**
+     * A tap on the zoom readout (FR-1.3): the next quick step, such as 0.6×, 1×, and 2×, the last back to the first,
+     * from the step an earlier tap asked for while the camera has not applied it yet.
+     */
     fun onZoomTap() {
         val state = _uiState.value
-        nextZoomStep(quickZoomSteps(state.minZoom, state.maxZoom), state.zoom)?.let { onZoomChanged(it) }
+        val step = nextZoomStep(quickZoomSteps(state.minZoom, state.maxZoom), pendingZoomStep ?: state.zoom) ?: return
+        if (requestZoom(step, final = true)) pendingZoomStep = step
+    }
+
+    /** Asks the camera for [ratio] while it can zoom; false when it cannot. */
+    private fun requestZoom(ratio: Float, final: Boolean): Boolean {
+        val status = camera.status.value
+        if ((status != CameraStatus.READY && status != CameraStatus.STARTING) ||
+            camera.capabilities.value == null || !ratio.isFinite()
+        ) {
+            return false
+        }
+        camera.setZoom(ratio, final)
+        return true
     }
 
     /** A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4); the camera focuses and meters there. */

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.view.View
@@ -34,6 +34,18 @@ internal fun fitViewfinderFrame(viewWidth: Float, viewHeight: Float, frameAspect
  * the controls below ([underControls]).
  */
 internal data class PreviewArea(val top: Float, val bottom: Float, val underControls: Float)
+
+/**
+ * How far the top bar's 48 dp touch areas reach below what it draws (NFR-16): the bar draws in its top 44 dp, and the
+ * image starts there, under the last 4 dp of its buttons, which are transparent.
+ */
+internal const val TOP_BAR_OVERHANG_DP = 4f
+
+/**
+ * Between the zoom row and the image's bottom edge or the panels: the row's controls are drawn 8 dp above it, and the
+ * row's 48 dp touch height (NFR-16) takes 2 dp of that.
+ */
+internal const val ZOOM_ROW_MARGIN_DP = 6f
 
 /**
  * The image takes the screen's [width] at [areaAspect] (width / height) right below the top bar ([topBar] tall). One

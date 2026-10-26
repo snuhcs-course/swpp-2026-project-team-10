@@ -4,12 +4,14 @@ package com.lastpenguin.pix.ui.camera
 import android.Manifest
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
@@ -52,8 +54,8 @@ import org.robolectric.annotation.GraphicsMode
  * Ratios: 4:3, 16:9, and 1:1, each with the preview right below the top bar, the shutter's row in one place, and the
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
  * the top bar: no guide, a guide with a pose tip, and a session, at font scale 1 and 1.3, none overlapping. A guide's
- * panel in the space below a 4:3 image. The zoom readout's tap area, the row's height. Subject view's video placed
- * the same way.
+ * panel in the space below a 4:3 image. The frame held while the ratio changes, in its place. The zoom readout's tap
+ * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -138,7 +140,8 @@ class CameraLayoutTest {
         for ((aspect, height) in listOf(AspectRatio.R4_3 to 480, AspectRatio.R16_9 to 640, AspectRatio.R1_1 to 480)) {
             screen.ratio(aspect)
             val preview = screen.controls.previewContainer.box()
-            assertEquals("$aspect", screen.controls.topBar.box().bottom, preview.top)
+            // The bar's 48 dp touch height reaches 4 dp over the image, which starts below what the bar draws.
+            assertEquals("$aspect", screen.controls.topBar.box().bottom - TOP_BAR_OVERHANG_DP.toInt(), preview.top)
             assertEquals("$aspect", 360, preview.width())
             assertEquals("$aspect", height, preview.height())
             shutters += screen.controls.shutterButton.box()
@@ -170,7 +173,7 @@ class CameraLayoutTest {
     @Test
     fun theZoomRow_sitsAtTheBottomOfTheImage_inEachRatio() {
         val screen = camera()
-        val margin = 8
+        val margin = ZOOM_ROW_MARGIN_DP.toInt()
         screen.ratio(AspectRatio.R4_3)
         assertEquals(524 - margin, screen.controls.zoomRow.box().bottom)
 
@@ -196,6 +199,29 @@ class CameraLayoutTest {
         assertTrue(panel.bottom <= screen.controls.bottomPanel.box().top)
         assertTrue(screen.controls.zoomRow.box().bottom <= image.bottom)
         assertTrue(screen.controls.tipButtonFrame.isShown)
+    }
+
+    @Test
+    fun aHeldFrame_keepsItsPlace_whileANewRatioResizesThePreview() {
+        val screen = camera()
+        val still = screen.controls.aspectStill
+        val area = screen.controls.previewContainer
+        // The 4:3 preview's last frame, as PreviewHold puts it over the preview.
+        val frame = Bitmap.createBitmap(area.width, area.height, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.RED)
+        }
+        still.setImageBitmap(heldFrame(frame, AspectRatio.R4_3))
+        still.visibility = View.VISIBLE
+
+        screen.ratio(AspectRatio.R16_9)
+        assertTrue(still.height > frame.height)
+        val drawn = Bitmap.createBitmap(still.width, still.height, Bitmap.Config.ARGB_8888)
+        still.draw(Canvas(drawn))
+
+        // Where it was: from the top of the taller area down to the old bottom, and nothing below.
+        assertEquals(Color.RED, drawn.getPixel(still.width / 2, 0))
+        assertEquals(Color.RED, drawn.getPixel(still.width / 2, frame.height - 1))
+        assertEquals(Color.TRANSPARENT, drawn.getPixel(still.width / 2, frame.height + 1))
     }
 
     // ---- The top bar ------------------------------------------------------------------------
@@ -256,7 +282,7 @@ class CameraLayoutTest {
         val screen = camera()
         assertReadoutTapArea(screen.controls.zoomReadout, screen.controls.zoomRow)
 
-        // 4 dp below the readout's top: above the pill, which starts 8 dp down.
+        // 4 dp below the readout's top: above the pill, which starts 10 dp down.
         val readout = IntArray(2).also { screen.controls.zoomReadout.getLocationInWindow(it) }
         val root = IntArray(2).also { screen.controls.root.getLocationInWindow(it) }
         val density = screen.controls.root.resources.displayMetrics.density
@@ -269,6 +295,42 @@ class CameraLayoutTest {
 
         assertEquals(listOf(2f), (screen.modules.camera as FakeCameraController).requests)
     }
+
+    // ---- Touch targets (NFR-16) -------------------------------------------------------------
+
+    /** Every control shown in [root] takes taps on at least 48 x 48 dp, whatever it draws. */
+    private fun assertEveryControlAtLeast48(root: View, state: String) {
+        val small = mutableListOf<String>()
+        var controls = 0
+        fun walk(view: View) {
+            if (!view.isShown) return
+            if (view.isClickable && view.id != View.NO_ID) {
+                controls++
+                val box = view.box()
+                if (box.width() < 48 || box.height() < 48) {
+                    small += "${view.resources.getResourceEntryName(view.id)} ${box.width()} x ${box.height()}"
+                }
+            }
+            if (view is ViewGroup) for (i in 0 until view.childCount) walk(view.getChildAt(i))
+        }
+        walk(root)
+        assertTrue("$state: $controls controls", controls >= 5)
+        assertTrue("$state: $small", small.isEmpty())
+    }
+
+    private fun Camera.assertEveryControlAtLeast48(font: String) {
+        assertEveryControlAtLeast48(controls.root, "no guide, $font")
+        guideWithTip()
+        session()
+        assertEveryControlAtLeast48(controls.root, "a guide with a tip and a session, $font")
+    }
+
+    @Test
+    fun everyControl_takesTapsOnAtLeast48dp() = camera().assertEveryControlAtLeast48("font scale 1")
+
+    @Test
+    fun everyControl_takesTapsOnAtLeast48dp_atFontScale1_3() =
+        camera(fontScale = 1.3f).assertEveryControlAtLeast48("font scale 1.3")
 
     // ---- Subject view -----------------------------------------------------------------------
 
@@ -298,10 +360,16 @@ class CameraLayoutTest {
         val binding = FragmentSubjectBinding.bind(fragment.requireView())
 
         val video = binding.videoContainer.box()
-        assertEquals(binding.topBar.box().bottom, video.top)
+        assertEquals(binding.topBar.box().bottom - TOP_BAR_OVERHANG_DP.toInt(), video.top)
         assertEquals(640, video.height())
         assertTrue(binding.zoomRow.box().bottom <= binding.bottomPanel.box().top)
         assertTrue(binding.liveDot.isShown)
         assertReadoutTapArea(binding.zoomReadout, binding.zoomRow)
+
+        binding.editGuideButton.visibility = View.VISIBLE
+        binding.brightnessButton.visibility = View.VISIBLE
+        binding.brightnessPanel.visibility = View.VISIBLE
+        idle()
+        assertEveryControlAtLeast48(binding.root, "Subject view")
     }
 }

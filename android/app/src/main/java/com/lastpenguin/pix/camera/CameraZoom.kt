@@ -1,6 +1,8 @@
 // AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.camera
 
+import kotlin.math.abs
+
 /** Advertise only ratios this camera can actually apply; never imply an unavailable physical lens. */
 internal fun cameraZoomStops(minZoom: Float, maxZoom: Float): List<Float> =
     listOf(0.5f, 0.6f, 1f, 2f, 3f).filter { it in minZoom..maxZoom }
@@ -22,6 +24,9 @@ internal fun quickZoomSteps(minZoom: Float, maxZoom: Float): List<Float> =
  */
 internal fun nextZoomStep(steps: List<Float>, zoom: Float): Float? =
     steps.firstOrNull { it > zoom * (1f + STEP_TOLERANCE) } ?: steps.firstOrNull()
+
+/** Whether [zoom] counts as [step], within [STEP_TOLERANCE]. */
+internal fun isAtZoomStep(zoom: Float, step: Float): Boolean = abs(zoom - step) <= step * STEP_TOLERANCE
 
 private const val STEP_TOLERANCE = 0.02f
 

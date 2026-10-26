@@ -297,9 +297,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             }
                         }
                         if (thumbnail == null) {
-                            controls.galleryButton.setImageResource(R.drawable.gallery_placeholder)
+                            controls.galleryThumbnail.setImageResource(R.drawable.gallery_placeholder)
                         } else {
-                            controls.galleryButton.setImageBitmap(thumbnail)
+                            controls.galleryThumbnail.setImageBitmap(thumbnail)
                         }
                     }
                 }
@@ -475,7 +475,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val area = previewArea(
             root.width.toFloat(),
             root.height.toFloat(),
-            controls.topBar.height.toFloat(),
+            controls.topBar.height - TOP_BAR_OVERHANG_DP * resources.displayMetrics.density,
             controls.bottomPanel.height.toFloat(),
             aspect.previewAspect,
         )
@@ -1027,7 +1027,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_HOLD_MS = 700L
         private const val FOCUS_RING_FADE_MS = 200L
         private const val CHIP_ICON_DP = 14f
-        private const val ZOOM_ROW_MARGIN_DP = 8f
 
         /** The reference thumbnail's long side while small, and its margin in the preview's corners (FR-3.9). */
         private const val REFERENCE_SMALL_DP = 72f

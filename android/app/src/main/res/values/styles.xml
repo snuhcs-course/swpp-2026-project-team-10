@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, though
-     the camera's buttons draw a 40 dp shape inside that; radius 999 for chips and pills, 16 for buttons and cards, 28
-     for sheets. -->
+<!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, and the
+     camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that; radius 999 for chips and pills,
+     16 for buttons and cards, 28 for sheets. -->
 <resources>
 
     <!-- Type: Manrope for the UI, DM Mono for the room code. -->
@@ -184,11 +184,12 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Header</item>
     </style>
 
-    <!-- A pill in the camera screens' top bar, such as Shoot together: 32 dp of glass inside a 44 dp touch height. -->
+    <!-- A pill in the camera screens' top bar, such as Shoot together: 32 dp of glass in the middle of the bar's 44 dp,
+         with a 48 dp touch height whose last 4 dp reach over the image's top edge. -->
     <style name="Widget.Pix.Button.Glass" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="android:minHeight">44dp</item>
+        <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">6dp</item>
-        <item name="android:insetBottom">6dp</item>
+        <item name="android:insetBottom">10dp</item>
         <item name="android:paddingStart">10dp</item>
         <item name="android:paddingEnd">11dp</item>
         <item name="cornerRadius">16dp</item>
@@ -210,12 +211,15 @@
         <item name="iconTint">@color/button_danger_text</item>
     </style>
 
-    <!-- An icon-only round button, such as Remove guide. -->
+    <!-- An icon-only round button, such as Remove guide: a 40 dp shape in a 48 x 48 dp touch area. -->
     <style name="Widget.Pix.Button.Icon" parent="Widget.Material3.Button.IconButton">
-        <item name="android:minWidth">40dp</item>
-        <item name="android:minHeight">44dp</item>
-        <item name="android:insetTop">2dp</item>
-        <item name="android:insetBottom">2dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">4dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <!-- 2 dp less than Material's, as the insets grew: at a large font a button stays as tall as before. -->
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
         <item name="android:paddingStart">11dp</item>
         <item name="android:paddingEnd">11dp</item>
         <item name="iconPadding">0dp</item>
@@ -224,23 +228,27 @@
         <item name="rippleColor">#1FFFFFFF</item>
     </style>
 
-    <!-- The top bar's flash: an icon without a shape, like the brightness button, in a 40 x 44 dp touch area. -->
+    <!-- The top bar's flash: an icon without a shape, like the brightness button, in the middle of the bar's 44 dp,
+         with a 48 x 48 dp touch area whose last 4 dp reach over the image's top edge. -->
     <style name="Widget.Pix.Button.Icon.TopBar">
-        <item name="android:minWidth">40dp</item>
-        <item name="android:minHeight">44dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
-        <item name="android:insetBottom">0dp</item>
+        <item name="android:insetBottom">4dp</item>
         <item name="android:paddingStart">13dp</item>
         <item name="android:paddingEnd">13dp</item>
         <item name="iconSize">14dp</item>
     </style>
 
-    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text. -->
+    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text, in a 48 x 48 dp
+         touch area that adds 8 dp after the label and 4 dp below the bar, so the label stays where it was. -->
     <style name="Widget.Pix.Button.Text.TopBar">
-        <item name="android:minWidth">40dp</item>
-        <item name="android:minHeight">44dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
         <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">10dp</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="rippleColor">#1FFFFFFF</item>
         <item name="android:textSize">11sp</item>

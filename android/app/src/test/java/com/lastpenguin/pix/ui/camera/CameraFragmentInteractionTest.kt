@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -342,6 +342,34 @@ class CameraFragmentInteractionTest {
 
         assertEquals(listOf(2f, 0.6f, 1f), camera.requests)
         assertEquals(listOf(true, true, true), camera.requestFinals)
+    }
+
+    @Test
+    fun quickTapsBeforeTheCameraAppliesAStep_goOnFromThatStep_andAPinchStartsAgainFromTheAppliedZoom() {
+        val camera = FakeCameraController(minZoom = 0.6f, maxZoom = 10f).apply { applies = false }
+        launch(camera)
+
+        // Two taps at 1× before the camera applies the first: 2×, then the widest, not 2× twice.
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        assertEquals(listOf(2f, 0.6f), camera.requests)
+
+        // The first step applied late does not stop the third tap going on from the second.
+        camera.applyLocally(2f)
+        idle()
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        assertEquals(listOf(2f, 0.6f, 1f), camera.requests)
+
+        // Another zoom request (here TalkBack's Zoom in) forgets the pending step: the next tap goes on from the
+        // applied zoom, 2×, to the widest, not from the pending 1× to 2×.
+        val zoomIn = AccessibilityActionCompat.ACTION_SCROLL_FORWARD.id
+        onScreen { controls, _ -> ViewCompat.performAccessibilityAction(controls.zoomReadout, zoomIn, null) }
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        assertEquals(5, camera.requests.size)
+        assertEquals(0.6f, camera.requests.last())
     }
 
     @Test

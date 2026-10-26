@@ -139,13 +139,17 @@ internal fun dimOutsideFrame(canvas: Canvas, width: Float, height: Float, frame:
 /**
  * The preview's last [bitmap] as the Camera screen holds it while the camera rebinds: of a 1:1 [aspect], the 4:3 area
  * with the outside dimmed as the live view showed it, because the overlay that dims it goes with the old ratio; of
- * the others, as it is (the still is clipped to their frame).
+ * the others, as it is (the still is clipped to their frame). It is drawn pixel for pixel where the preview was, so it
+ * has no density, which would scale it when the display's size setting differs from the one the bitmap was made for.
  */
 internal fun heldFrame(bitmap: Bitmap, aspect: AspectRatio): Bitmap {
-    if (aspect.previewAspect == aspect.frameAspect) return bitmap
-    val held = if (bitmap.isMutable) bitmap else bitmap.copy(Bitmap.Config.ARGB_8888, true)
-    val width = held.width.toFloat()
-    val height = held.height.toFloat()
-    dimOutsideFrame(Canvas(held), width, height, fitViewfinderFrame(width, height, aspect.frameAspect))
+    val dim = aspect.previewAspect != aspect.frameAspect
+    val held = if (!dim || bitmap.isMutable) bitmap else bitmap.copy(Bitmap.Config.ARGB_8888, true)
+    if (dim) {
+        val width = held.width.toFloat()
+        val height = held.height.toFloat()
+        dimOutsideFrame(Canvas(held), width, height, fitViewfinderFrame(width, height, aspect.frameAspect))
+    }
+    held.density = Bitmap.DENSITY_NONE
     return held
 }

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -28,7 +28,9 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
+import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
+import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
@@ -184,7 +186,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val area = previewArea(
             root.width.toFloat(),
             root.height.toFloat(),
-            binding.topBar.height.toFloat(),
+            binding.topBar.height - TOP_BAR_OVERHANG_DP * resources.displayMetrics.density,
             binding.bottomPanel.height.toFloat(),
             aspect.previewAspect,
         )
@@ -356,6 +358,5 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private companion object {
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
-        const val ZOOM_ROW_MARGIN_DP = 8f
     }
 }

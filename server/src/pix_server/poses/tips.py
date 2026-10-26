@@ -15,7 +15,7 @@ import httpx2
 from pix_server.config import Settings
 from pix_server.errors import ApiError
 from pix_server.poses.generator import status_phrase
-from pix_server.poses.prompts import tip_prompt
+from pix_server.poses.prompts import PROMPTS
 
 logger = logging.getLogger(__name__)
 
@@ -60,25 +60,25 @@ class PoseTip:
     angle: Angle
 
 
-def usable_tip(answer: str, framing: Framing | None) -> PoseTip | None:
+def usable_tip(answer: str) -> PoseTip | None:
     """The tip in the model's answer, or None when it cannot be shown. The height move compares where the phone was
-    for the scene with where it should be; a framing the app measured replaces the model's."""
+    for the scene with where it should be."""
     match = re.search(r"\{.*\}", answer, re.DOTALL)  # some models wrap the JSON in a code fence
     try:
         fields = json.loads(match.group(0) if match else answer)
         text = " ".join(fields["text"].split())
-        now, best, angle, judged = fields["camera_now"], fields["camera_best"], fields["angle"], fields["framing"]
+        now, best, angle, framing = fields["camera_now"], fields["camera_best"], fields["angle"], fields["framing"]
     except (ValueError, TypeError, KeyError, AttributeError):
         return None
     if now not in LEVELS or best not in LEVELS or angle not in ("up", "level", "down"):
         return None
-    if judged not in ("closer", "back", "keep"):
+    if framing not in ("closer", "back", "keep"):
         return None
     if not 0 < len(text) <= TEXT_MAX_LENGTH or MEASURE.search(text):
         return None
     step = LEVELS.index(best) - LEVELS.index(now)
     height: Height = "raise" if step > 0 else "lower" if step < 0 else "keep"
-    return PoseTip(text, framing or judged, best, height, angle)
+    return PoseTip(text, framing, best, height, angle)
 
 
 class PoseTipper:
@@ -86,9 +86,8 @@ class PoseTipper:
         self._settings = settings
         self._http = http
 
-    async def tip(self, scene: bytes, candidate: bytes, pose: str, framing: Framing | None) -> PoseTip:
-        """The tip for taking `candidate`, made with `pose` from `scene`, or the ApiError the endpoint answers with.
-        `framing` is what the app measured, when it could."""
+    async def tip(self, scene: bytes, candidate: bytes, pose: str) -> PoseTip:
+        """The tip for taking `candidate`, made with `pose` from `scene`, or the ApiError the endpoint answers with."""
         key = self._settings.openrouter_api_key
         if key is None or not key.get_secret_value():
             logger.error("OPENROUTER_API_KEY is not set, so tips cannot be made")
@@ -99,7 +98,7 @@ class PoseTipper:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": tip_prompt(framing)},
+                        {"type": "text", "text": PROMPTS.tip},
                         {"type": "text", "text": "Photo 1, the scene:"},
                         {"type": "image_url", "image_url": {"url": data_url(scene)}},
                         {"type": "text", "text": f'Photo 2, the photo they want, with the pose "{pose}":'},
@@ -135,7 +134,7 @@ class PoseTipper:
                 status = response.status_code
                 logger.warning("OpenRouter answered %s (%s) to a tip request", status, status_phrase(status))
                 raise ApiError(502, "UPSTREAM_ERROR", "The tip model failed")
-            tip = usable_tip(body["choices"][0]["message"]["content"] or "", framing)
+            tip = usable_tip(body["choices"][0]["message"]["content"] or "")
         except (ValueError, LookupError, TypeError, AttributeError) as exc:
             logger.warning("OpenRouter answered %s with an unreadable body to a tip request", response.status_code)
             raise ApiError(502, "UPSTREAM_ERROR", "The tip model returned an unreadable answer") from exc

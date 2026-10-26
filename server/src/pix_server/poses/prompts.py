@@ -11,7 +11,6 @@ from pix_server.errors import ApiError
 PROMPTS_FILE = Path(__file__).with_name("prompts.toml")
 PLACEHOLDER = "{pose}"
 DESCRIPTION_PLACEHOLDER = "{description}"  # in the variation prompt
-FRAMING_PLACEHOLDER = "{framing}"  # in the tip framing note
 DESCRIPTION_MAX_LENGTH = 100  # the app's field stops at the same length (FR-4.8)
 POSE_COUNT = 4  # candidates per set, so poses per suggestion (FR-4.3)
 
@@ -30,7 +29,6 @@ class Prompts:
     suggestion: str
     variation: str
     tip: str
-    tip_framing_note: str
     default_poses: dict[str, DefaultPose]
 
 
@@ -50,8 +48,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
 
     with path.open("rb") as file:
         data = tomllib.load(file)
-    keys = {"pose_prompt", "suggestion_prompt", "variation_prompt", "tip_prompt", "tip_framing_note", "default_poses"}
-    unknown = set(data) - keys
+    unknown = set(data) - {"pose_prompt", "suggestion_prompt", "variation_prompt", "tip_prompt", "default_poses"}
     if unknown:
         raise ValueError(f"{path.name}: unknown keys {', '.join(sorted(unknown))}")
     pose = text(data, "pose_prompt", "")
@@ -62,9 +59,6 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
     if variation.count(DESCRIPTION_PLACEHOLDER) != 1:
         raise ValueError(f"{path.name}: variation_prompt must hold {DESCRIPTION_PLACEHOLDER} exactly once")
     tip = text(data, "tip_prompt", "")
-    tip_framing_note = text(data, "tip_framing_note", "")
-    if tip_framing_note.count(FRAMING_PLACEHOLDER) != 1:
-        raise ValueError(f"{path.name}: tip_framing_note must hold {FRAMING_PLACEHOLDER} exactly once")
     entries = data.get("default_poses")
     if not isinstance(entries, list) or len(entries) != POSE_COUNT:
         raise ValueError(f"{path.name}: exactly {POSE_COUNT} [[default_poses]] are needed")
@@ -82,7 +76,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         if len(default.pose) > DESCRIPTION_MAX_LENGTH:
             raise ValueError(f"{path.name}: {where}pose must be at most {DESCRIPTION_MAX_LENGTH} characters")
         poses[default.id] = default
-    return Prompts(pose, suggestion, variation, tip, tip_framing_note, poses)
+    return Prompts(pose, suggestion, variation, tip, poses)
 
 
 PROMPTS = load_prompts()
@@ -109,10 +103,3 @@ def pose_prompt(pose: str) -> str:
 def variation_prompt(description: str) -> str:
     """The suggestion model's prompt for three variations of a description (checked_pose)."""
     return PROMPTS.variation.replace(DESCRIPTION_PLACEHOLDER, checked_pose(description))
-
-
-def tip_prompt(framing: str | None) -> str:
-    """The tip model's prompt, with the framing the app measured when it sent one."""
-    if framing is None:
-        return PROMPTS.tip
-    return PROMPTS.tip + " " + PROMPTS.tip_framing_note.replace(FRAMING_PLACEHOLDER, framing)

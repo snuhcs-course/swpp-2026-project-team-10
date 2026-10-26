@@ -37,8 +37,7 @@ interface PixApi {
 
     /**
      * How to hold the phone for the candidate the user took (FR-4.10): `scene` as sent to [createPose], `candidate`,
-     * the pose it was made with, and `framing` (`closer`, `back`, or `keep`) when the phone measured it; a null part
-     * is left out. `502 UPSTREAM_ERROR` also when the server could not use its model's answer.
+     * and the pose it was made with. `502 UPSTREAM_ERROR` also when the server could not use its model's answer.
      */
     @Multipart
     @POST("api/v1/pose-tips")
@@ -46,7 +45,6 @@ interface PixApi {
         @Part scene: MultipartBody.Part,
         @Part candidate: MultipartBody.Part,
         @Part("pose") pose: RequestBody,
-        @Part("framing") framing: RequestBody?,
     ): PoseTipDto
 }
 

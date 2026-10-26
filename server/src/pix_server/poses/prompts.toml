@@ -113,13 +113,6 @@ because the app already shows the pose. Fill in, in this order:
 Answer with JSON only.
 """
 
-# Added to the tip prompt when the app measured how much bigger the person is in the candidate than in the scene, from
-# the outlines it cuts on the phone; the model then takes that framing instead of judging it. {framing} stands for
-# "closer", "back", or "keep", exactly once.
-tip_framing_note = """
-The app measured the person in both photos: use framing "{framing}", and write the text to match it.
-"""
-
 # The four poses used when the suggestion model fails or its answer is unusable, in this order. Apps from before
 # Iteration 2 also ask for them by id (GET /pose-templates, POST /poses with templateId): they see the `label` and
 # send the `id` back, so keep an `id` while such an app may still be installed. Only `pose` reaches the image model.

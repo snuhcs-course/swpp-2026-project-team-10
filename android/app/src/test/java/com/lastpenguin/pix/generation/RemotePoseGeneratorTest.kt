@@ -356,7 +356,6 @@ class RemotePoseGeneratorTest {
             scene: MultipartBody.Part,
             candidate: MultipartBody.Part,
             pose: RequestBody,
-            framing: RequestBody?,
         ): PoseTipDto = error("Pose generation never asks for a tip")
 
         private fun RequestBody.text(): String = Buffer().also(::writeTo).readUtf8()

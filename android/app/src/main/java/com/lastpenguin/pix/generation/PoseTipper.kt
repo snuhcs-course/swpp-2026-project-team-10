@@ -3,12 +3,6 @@ package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
 
-/**
- * How much bigger the person is in the candidate than in the scene, which the phone measures from the two outlines
- * it cuts (Design 2.6.3, Pose tips).
- */
-enum class TipFraming { CLOSER, BACK, KEEP }
-
 /** How to hold the phone for a generated pose, in plain words: the sentence Camera shows (FR-4.10). */
 data class PoseTip(val text: String)
 
@@ -19,6 +13,5 @@ data class PoseTip(val text: String)
  * Owner: Pose tips.
  */
 interface PoseTipper {
-    /** [framing] is what the phone measured, or null when it could not; the server's model then judges it. */
-    suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String, framing: TipFraming?): Result<PoseTip>
+    suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip>
 }

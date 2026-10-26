@@ -132,9 +132,6 @@ async def pose_tip(
     scene: UploadFile,
     candidate: UploadFile,
     pose: Annotated[str, Form()],
-    # How much bigger the person is in the candidate, as the app measured it from the outlines; left out when it could
-    # not, and the model judges it instead.
-    framing: Annotated[Framing | None, Form()] = None,
 ) -> PoseTipResponse:
     """How to hold the phone for the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate,
     and the pose it was made with (Design Documentation 2.6.3)."""
@@ -145,5 +142,5 @@ async def pose_tip(
     check_scene(candidate_bytes)
     await count(request, "tips")
     tipper: PoseTipper = request.app.state.pose_tipper
-    tip = await tipper.tip(scene_bytes, candidate_bytes, pose, framing)
+    tip = await tipper.tip(scene_bytes, candidate_bytes, pose)
     return PoseTipResponse(text=tip.text, framing=tip.framing, hold=tip.hold, height=tip.height, angle=tip.angle)

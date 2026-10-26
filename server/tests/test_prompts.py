@@ -1,11 +1,10 @@
 # AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 # prompts.toml partitions (Testing Documentation 2.1.6). The file as shipped; a prompt wrapped over several lines; a
 # pose prompt without {pose}, with it twice, missing, or empty; a suggestion prompt missing or empty; a variation
-# prompt without {description}, with it twice, missing, or empty; a tip prompt missing or empty; a tip framing note
-# without {framing}, with it twice, or missing; an unknown key at the top or in a default pose; a default pose without
-# a field, with an empty one, longer than a description, or not a table; three or five default poses; an id used
-# twice; a file that is not TOML. A pose or description with braces of its own. The tip prompt with and without a
-# measured framing.
+# prompt without {description}, with it twice, missing, or empty; a tip prompt missing or empty; an unknown key at the
+# top or in a default pose; a default pose without a field, with an empty one, longer than a description, or not a
+# table; three or five default poses; an id used twice; a file that is not TOML. A pose or description with braces of
+# its own.
 import tomllib
 
 import pytest
@@ -16,7 +15,6 @@ from pix_server.poses.prompts import (
     PROMPTS_FILE,
     load_prompts,
     pose_prompt,
-    tip_prompt,
     variation_prompt,
 )
 
@@ -24,9 +22,7 @@ POSE_PROMPT = 'pose_prompt = "Same person and place. Pose: {pose}."\n'
 SUGGESTION_PROMPT = 'suggestion_prompt = "Suggest four poses as JSON."\n'
 VARIATION_PROMPT = 'variation_prompt = "Three variations of {description} as JSON."\n'
 TIP_PROMPT = 'tip_prompt = "How to hold the phone, as JSON."\n'
-FRAMING_NOTE = 'tip_framing_note = "Use framing {framing}."\n'
-TIP_PROMPTS = TIP_PROMPT + FRAMING_NOTE
-MODEL_PROMPTS = SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPTS
+MODEL_PROMPTS = SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT
 
 
 def default_pose(pose_id: str, pose: str = "waving") -> str:
@@ -51,8 +47,7 @@ def test_shipped_file_has_the_prompts_and_four_default_poses_in_order():
     assert list(prompts.default_poses) == ["hands_on_hips", "wave", "walking", "arms_crossed"]
     assert prompts.pose.count("{pose}") == 1
     assert prompts.variation.count("{description}") == 1
-    assert prompts.tip_framing_note.count("{framing}") == 1
-    for prompt in (prompts.pose, prompts.suggestion, prompts.variation, prompts.tip, prompts.tip_framing_note):
+    for prompt in (prompts.pose, prompts.suggestion, prompts.variation, prompts.tip):
         assert "\n" not in prompt and "  " not in prompt
     assert '{"poses": [' in prompts.suggestion and '{"poses": [' in prompts.variation
     assert prompts.default_poses == DEFAULT_POSES
@@ -73,36 +68,22 @@ def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
         ('pose_prompt = "  "\n' + MODEL_PROMPTS + FOUR, "pose_prompt"),
         (POSE_PROMPT + VARIATION_PROMPT + FOUR, "suggestion_prompt"),
         (POSE_PROMPT + 'suggestion_prompt = ""\n' + VARIATION_PROMPT + FOUR, "suggestion_prompt"),
-        (POSE_PROMPT + SUGGESTION_PROMPT + TIP_PROMPTS + FOUR, "variation_prompt"),
-        (POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = " "\n' + TIP_PROMPTS + FOUR, "variation_prompt"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + TIP_PROMPT + FOUR, "variation_prompt"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = " "\n' + TIP_PROMPT + FOUR, "variation_prompt"),
         (
-            POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = "Three variations."\n' + TIP_PROMPTS + FOUR,
+            POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = "Three variations."\n' + TIP_PROMPT + FOUR,
             "variation_prompt",
         ),
         (
             POSE_PROMPT
             + SUGGESTION_PROMPT
             + 'variation_prompt = "{description} or {description}"\n'
-            + TIP_PROMPTS
+            + TIP_PROMPT
             + FOUR,
             "variation_prompt",
         ),
-        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + FRAMING_NOTE + FOUR, "tip_prompt"),
-        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + 'tip_prompt = ""\n' + FRAMING_NOTE + FOUR, "tip_prompt"),
-        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT + FOUR, "tip_framing_note"),
-        (
-            POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT + 'tip_framing_note = "Use it."\n' + FOUR,
-            "tip_framing_note",
-        ),
-        (
-            POSE_PROMPT
-            + SUGGESTION_PROMPT
-            + VARIATION_PROMPT
-            + TIP_PROMPT
-            + 'tip_framing_note = "{framing}, {framing}"\n'
-            + FOUR,
-            "tip_framing_note",
-        ),
+        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + FOUR, "tip_prompt"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + 'tip_prompt = ""\n' + FOUR, "tip_prompt"),
         (POSE_PROMPT + MODEL_PROMPTS + 'template_prompt = "{pose}"\n' + FOUR, "template_prompt"),
     ],
     ids=[
@@ -118,9 +99,6 @@ def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
         "variation placeholder twice",
         "no tip",
         "empty tip",
-        "no framing note",
-        "framing note without placeholder",
-        "framing note placeholder twice",
         "unknown key",
     ],
 )
@@ -164,11 +142,3 @@ def test_braces_in_a_pose_are_sent_as_written():
     assert "{pose} {0} {name}" in pose_prompt("{pose} {0} {name}")
     assert '"{description} {pose}"' in variation_prompt("{description} {pose}")
     assert all(default.pose in pose_prompt(default.pose) for default in DEFAULT_POSES.values())
-
-
-def test_tip_prompt_takes_the_measured_framing_only_when_there_is_one():
-    shipped = load_prompts(PROMPTS_FILE)
-    assert tip_prompt(None) == shipped.tip
-    with_framing = tip_prompt("closer")
-    assert with_framing.startswith(shipped.tip + " ")
-    assert with_framing.endswith(shipped.tip_framing_note.replace("{framing}", "closer"))

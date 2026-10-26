@@ -17,7 +17,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * [PoseTipper] through the Pix server's `POST /pose-tips` (Design 2.5.3, 2.6.3): the scene as `POST /poses` got it,
- * the candidate at a long side of 768 px, the pose, and the framing when the phone measured one.
+ * the candidate at a long side of 768 px, and the pose.
  * Owner: Pose tips.
  */
 class RemotePoseTipper(
@@ -28,7 +28,7 @@ class RemotePoseTipper(
     private val imageDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : PoseTipper {
 
-    override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String, framing: TipFraming?): Result<PoseTip> =
+    override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> =
         try {
             val (scenePhoto, candidatePhoto) = withContext(imageDispatcher) {
                 images.encodeScene(scene) to images.encodeTipCandidate(candidate)
@@ -38,7 +38,6 @@ class RemotePoseTipper(
                     MultipartBody.Part.createFormData("scene", "scene.jpg", scenePhoto.toRequestBody(JPEG)),
                     MultipartBody.Part.createFormData("candidate", "candidate.jpg", candidatePhoto.toRequestBody(JPEG)),
                     pose.toRequestBody(TEXT),
-                    framing?.name?.lowercase()?.toRequestBody(TEXT),
                 )
             } ?: throw SocketTimeoutException("The server gave no tip within $timeoutMs ms")
             if (answer.text.isBlank()) throw IOException("The server gave an empty tip")

@@ -19,7 +19,6 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
-import com.lastpenguin.pix.generation.TipFraming
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -62,9 +61,7 @@ class TestAppContainer(
     val generator = ScriptedPoseGenerator()
     val tipper = ScriptedPoseTipper()
 
-    /** No person is measured in a scene, so a tip is asked for without a framing. */
-    val tips =
-        PoseTips(tipper, guides.guide, measure = { null }, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
+    val tips = PoseTips(tipper, guides.guide, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
     val auth = FakeAuthRepository()
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
@@ -155,14 +152,10 @@ class TestAppContainer(
     class ScriptedPoseTipper : PoseTipper {
         val requests = mutableListOf<Request>()
 
-        override suspend fun tip(
-            scene: Bitmap,
-            candidate: Bitmap,
-            pose: String,
-            framing: TipFraming?,
-        ): Result<PoseTip> = Request(scene, candidate, pose, framing).also(requests::add).answer.await()
+        override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> =
+            Request(scene, candidate, pose).also(requests::add).answer.await()
 
-        class Request(val scene: Bitmap, val candidate: Bitmap, val pose: String, val framing: TipFraming?) {
+        class Request(val scene: Bitmap, val candidate: Bitmap, val pose: String) {
             val answer = CompletableDeferred<Result<PoseTip>>()
 
             fun tip(text: String) = check(answer.complete(Result.success(PoseTip(text))))

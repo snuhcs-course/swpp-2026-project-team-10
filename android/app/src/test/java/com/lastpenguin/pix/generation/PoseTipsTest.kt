@@ -3,7 +3,6 @@ package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
 import com.lastpenguin.pix.guide.GuideSource
-import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.guide.ReferenceGuide
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -21,18 +20,16 @@ import org.junit.Test
 
 // Partitions (Testing Documentation 2.1.6). When the tip arrives: before or after its guide goes on Camera. Its
 // result: a tip, or a failure. The guide on Camera: the prepared one, another (from the gallery or saved), none, and
-// the same id again after it was removed. Framing: the person clearly bigger, clearly smaller, about the same, at the
-// threshold; no person in the scene, a scene that cannot be measured, a candidate without a box. Asking again: a newer
-// guide prepared while the one on Camera keeps its tip, and while an older one is still being asked for.
+// the same id again after it was removed. Asking again: a newer guide prepared while the one on Camera keeps its tip,
+// and while an older one is still being asked for.
 @OptIn(ExperimentalCoroutinesApi::class)
 class PoseTipsTest {
     private val tipper = RecordingTipper()
     private val onCamera = MutableStateFlow<ReferenceGuide?>(null)
     private val scene = testBitmap()
     private val candidate = testBitmap()
-    private var sceneBox: suspend (Bitmap) -> NormalizedRect? = { null }
 
-    private fun TestScope.tips() = PoseTips(tipper, onCamera, { sceneBox(it) }, backgroundScope)
+    private fun TestScope.tips() = PoseTips(tipper, onCamera, backgroundScope)
 
     @Test
     fun aPreparedGuideBringsItsTipToCamera_preparingUntilItArrives() = runTest {
@@ -161,57 +158,14 @@ class PoseTipsTest {
         assertNull(tips.onCamera.value)
     }
 
-    @Test
-    fun theFramingComparesThePersonsHeightInBothPhotos() = runTest {
-        suspend fun framingFor(inCandidate: Float?, inScene: Float?): TipFraming? {
-            sceneBox = { inScene?.let(::box) }
-            val tips = tips()
-            tips.prepare(guide("g", anchorHeight = inCandidate), candidate, TipSource(scene, POSE))
-            runCurrent()
-            return tipper.requests.removeLast().framing
-        }
-
-        assertEquals(TipFraming.CLOSER, framingFor(inCandidate = 0.9f, inScene = 0.4f))
-        assertEquals(TipFraming.CLOSER, framingFor(inCandidate = 0.6f, inScene = 0.5f))
-        assertEquals(TipFraming.KEEP, framingFor(inCandidate = 0.55f, inScene = 0.5f))
-        assertEquals(TipFraming.BACK, framingFor(inCandidate = 0.3f, inScene = 0.6f))
-        assertNull(framingFor(inCandidate = 0.9f, inScene = null))
-        assertNull(framingFor(inCandidate = null, inScene = 0.4f))
-    }
-
-    @Test
-    fun aSceneThatCannotBeMeasuredStillGetsATip_withoutAFraming() = runTest {
-        sceneBox = { throw IOException("Segmentation model not available") }
-        val tips = tips()
-
-        tips.prepare(guide("g1"), candidate, TipSource(scene, POSE))
-        runCurrent()
-
-        assertNull(tipper.requests.single().framing)
-    }
-
-    private fun guide(id: String, anchorHeight: Float? = 0.8f, source: GuideSource = GuideSource.GENERATED) =
-        ReferenceGuide(
-            id = id,
-            cutout = testBitmap(),
-            outline = testBitmap(),
-            aspect = 0.5f,
-            source = source,
-            anchor = anchorHeight?.let(::box),
-        )
-
-    private fun box(height: Float) = NormalizedRect(0.3f, 0f, 0.7f, height)
+    private fun guide(id: String, source: GuideSource = GuideSource.GENERATED) =
+        ReferenceGuide(id = id, cutout = testBitmap(), outline = testBitmap(), aspect = 0.5f, source = source)
 
     private class RecordingTipper : PoseTipper {
         val requests = mutableListOf<Request>()
 
-        override suspend fun tip(
-            scene: Bitmap,
-            candidate: Bitmap,
-            pose: String,
-            framing: TipFraming?,
-        ): Result<PoseTip> {
-            val request = Request(scene, candidate, pose, framing).also(requests::add)
+        override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> {
+            val request = Request(scene, candidate, pose).also(requests::add)
             try {
                 return request.result.await()
             } catch (error: CancellationException) {
@@ -220,7 +174,7 @@ class PoseTipsTest {
             }
         }
 
-        class Request(val scene: Bitmap, val candidate: Bitmap, val pose: String, val framing: TipFraming?) {
+        class Request(val scene: Bitmap, val candidate: Bitmap, val pose: String) {
             val result = CompletableDeferred<Result<PoseTip>>()
             var cancelled = false
 

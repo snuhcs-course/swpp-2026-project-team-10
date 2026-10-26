@@ -2,9 +2,7 @@
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
-import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.guide.ReferenceGuide
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,8 +39,6 @@ class PoseTips(
     private val tipper: PoseTipper,
     /** The guide on Camera (`GuideRepository.guide`). */
     guideOnCamera: StateFlow<ReferenceGuide?>,
-    /** The person's box in a photo, or null when none is found: ML Kit's, as for a guide. */
-    private val measure: suspend (Bitmap) -> NormalizedRect?,
     private val scope: CoroutineScope,
 ) {
     /** The tips kept: the one of the guide on Camera and the one being prepared, by guide id. */
@@ -74,40 +70,12 @@ class PoseTips(
         asking?.cancel()
         tips.update { it.copy(pending = guide.id, states = it.states + (guide.id to TipState.Preparing)).kept() }
         asking = scope.launch {
-            val framing = framing(source.scene, guide.anchor)
-            val state = tipper.tip(source.scene, candidate, source.pose, framing).fold(
+            val state = tipper.tip(source.scene, candidate, source.pose).fold(
                 onSuccess = { TipState.Ready(it) },
                 onFailure = { TipState.Failed },
             )
             // A guide that left in the meantime, unused or replaced, keeps no tip.
             tips.update { if (guide.id in it.states) it.copy(states = it.states + (guide.id to state)) else it }
         }
-    }
-
-    /**
-     * How much bigger the person is in the candidate than in the scene, from the heights of their boxes as shares of
-     * each photo's height, which is how the guide is sized on Camera; null when either photo has no person.
-     */
-    private suspend fun framing(scene: Bitmap, inCandidate: NormalizedRect?): TipFraming? {
-        val candidateHeight = inCandidate?.height ?: return null
-        val sceneHeight = try {
-            measure(scene)?.height
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            null
-        }
-        if (sceneHeight == null || sceneHeight <= 0f) return null
-        val ratio = candidateHeight / sceneHeight
-        return when {
-            ratio >= CLOSER_RATIO -> TipFraming.CLOSER
-            ratio <= 1f / CLOSER_RATIO -> TipFraming.BACK
-            else -> TipFraming.KEEP
-        }
-    }
-
-    companion object {
-        /** The person must look this much bigger, or smaller, before the tip says to get closer, or back. */
-        const val CLOSER_RATIO = 1.2f
     }
 }

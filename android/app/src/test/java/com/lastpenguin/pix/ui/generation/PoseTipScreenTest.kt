@@ -93,8 +93,6 @@ class PoseTipScreenTest {
         val request = modules.tipper.requests.single()
         assertEquals("Walk toward the camera", request.pose)
         assertSame(scene, request.scene)
-        // The test modules find no person in a scene, so the server's model judges the framing.
-        assertNull(request.framing)
         request.tip(TIP)
         idle()
         assertNull(modules.tips.onCamera.value)

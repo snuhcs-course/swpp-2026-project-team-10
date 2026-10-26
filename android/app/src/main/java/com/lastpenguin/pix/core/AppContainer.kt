@@ -36,7 +36,6 @@ import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseTipper
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
-import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.MlKitReferenceGuideMaker
 import com.lastpenguin.pix.guide.OutlineExtractor
@@ -192,13 +191,7 @@ class AppContainer(
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
                 poseTipper = poseTipper,
-                // The person in the scene is found as for a guide; only the box is used.
-                poseTips = PoseTips(
-                    poseTipper,
-                    guideRepository.guide,
-                    measure = { referenceGuideMaker.make(it, GuideSource.GENERATED).getOrNull()?.anchor },
-                    scope = appScope,
-                ),
+                poseTips = PoseTips(poseTipper, guideRepository.guide, appScope),
                 generationConsent = DataStoreGenerationConsent(appContext),
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),

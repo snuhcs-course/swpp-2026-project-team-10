@@ -1,9 +1,8 @@
 # AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
 # POST /pose-tips partitions (Testing Documentation 2.1.6). Photos: a scene and a candidate within the contract, and
 # either one not a JPEG, too large, carrying EXIF, or missing. Pose: one in Korean with extra whitespace, of 100
-# characters and of 101, blank, or missing. Framing from the app: left out or empty (the model judges), each of the
-# three values (it replaces the model's and goes into the prompt), or another value. The model's answer: usable; JSON
-# in a code fence; a sentence over lines; unusable (not JSON, a field missing, a value outside the schema, an empty
+# characters and of 101, blank, or missing. The model's answer: usable, with each framing it may judge; JSON in a code
+# fence; a sentence over lines; unusable (not JSON, a field missing, a value outside the schema, an empty
 # sentence, one over 160 characters, one with a number, a unit, or a degree, an empty message). The height move: the
 # phone lower, higher, or where it was. Upstream: a refusal (403), a failing status, an unreadable body, no answer in
 # time, no connection, no key. Limits: each window full, counted apart from poses and suggestions; refused input not
@@ -17,7 +16,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from pix_server.main import create_app
-from pix_server.poses.prompts import DESCRIPTION_MAX_LENGTH, tip_prompt
+from pix_server.poses.prompts import DESCRIPTION_MAX_LENGTH, PROMPTS
 
 POSE = "Wave at the camera with one hand"
 ANSWER = {
@@ -42,11 +41,9 @@ def photos(make_image):
     return make_image(size=(576, 1024)), make_image(size=(768, 1024))
 
 
-def ask(client, photos, pose=POSE, framing=None, files=None):
+def ask(client, photos, pose=POSE, files=None):
     scene, candidate = photos
     data = {"pose": pose} if pose is not None else {}
-    if framing is not None:
-        data["framing"] = framing
     if files is None:
         files = {"scene": ("scene.jpg", scene, "image/jpeg"), "candidate": ("candidate.jpg", candidate, "image/jpeg")}
     return client.post("/api/v1/pose-tips", files=files, data=data)
@@ -87,7 +84,7 @@ def test_tip_comes_from_the_model_for_the_scene_and_the_candidate(client, image_
     scene, candidate = photos
     # The scene first and the candidate second, as the prompt names them.
     assert message["content"] == [
-        {"type": "text", "text": tip_prompt(None)},
+        {"type": "text", "text": PROMPTS.tip},
         {"type": "text", "text": "Photo 1, the scene:"},
         image_url(scene),
         {"type": "text", "text": f'Photo 2, the photo they want, with the pose "{POSE}":'},
@@ -96,22 +93,9 @@ def test_tip_comes_from_the_model_for_the_scene_and_the_candidate(client, image_
 
 
 @pytest.mark.parametrize("framing", ["closer", "back", "keep"])
-def test_measured_framing_replaces_the_models_and_goes_into_the_prompt(client, image_api, photos, framing):
-    response = ask(client, photos, framing=framing)
-
-    assert response.json()["framing"] == framing
-    [payload] = image_api.tip_payloads
-    assert payload["messages"][0]["content"][0]["text"] == tip_prompt(framing)
-
-
-def test_empty_framing_lets_the_model_judge(client, image_api, photos):
-    assert ask(client, photos, framing="").json()["framing"] == "closer"
-    assert image_api.tip_payloads[0]["messages"][0]["content"][0]["text"] == tip_prompt(None)
-
-
-def test_other_framing_is_refused_before_a_call(client, image_api, photos):
-    assert_error(ask(client, photos, framing="far"), 400, "INVALID_REQUEST")
-    assert image_api.tip_requests == []
+def test_framing_is_the_models(client, image_api, photos, framing):
+    image_api.tips(ANSWER | {"framing": framing})
+    assert ask(client, photos).json()["framing"] == framing
 
 
 @pytest.mark.parametrize(

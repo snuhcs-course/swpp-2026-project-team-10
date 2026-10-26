@@ -25,15 +25,13 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
 
-// Partitions (Testing Documentation 2.1.6). Framing: each of the three, and none (the part is left out). Answer: a
-// tip, one with spaces around it, a blank one, a failing status, no connection, no answer in time. The caller
-// cancelled.
+// Partitions (Testing Documentation 2.1.6). Answer: a tip, one with spaces around it, a blank one, a failing status,
+// no connection, no answer in time. The caller cancelled.
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemotePoseTipperTest {
     private val api = FakeApi()
@@ -50,7 +48,7 @@ class RemotePoseTipperTest {
 
     @Test
     fun theSceneTheCandidateAndThePoseGoOut_andTheSentenceComesBack() = runTest {
-        val tip = tipper().tip(scene, candidate, POSE, null)
+        val tip = tipper().tip(scene, candidate, POSE)
 
         assertEquals(Result.success(PoseTip(TEXT)), tip)
         assertEquals(listOf(scene), images.scenes)
@@ -62,29 +60,20 @@ class RemotePoseTipperTest {
         assertArrayEquals(CANDIDATE_JPEG, request.candidate)
         assertEquals("form-data; name=\"candidate\"; filename=\"candidate.jpg\"", request.candidateDisposition)
         assertEquals(POSE, request.pose)
-        assertNull(request.framing)
-    }
-
-    @Test
-    fun aMeasuredFramingGoesOutInTheServersWords() = runTest {
-        val tipper = tipper()
-        for (framing in TipFraming.entries) tipper.tip(scene, candidate, POSE, framing)
-
-        assertEquals(listOf("closer", "back", "keep"), api.requests.map { it.framing })
     }
 
     @Test
     fun spacesAroundTheSentenceAreLeftOut() = runTest {
         api.answer = { tipDto("  $TEXT \n") }
 
-        assertEquals(PoseTip(TEXT), tipper().tip(scene, candidate, POSE, null).getOrThrow())
+        assertEquals(PoseTip(TEXT), tipper().tip(scene, candidate, POSE).getOrThrow())
     }
 
     @Test
     fun noUsableAnswerIsAFailure() = runTest {
         suspend fun failsWith(expected: Class<out Exception>, answer: suspend () -> PoseTipDto) {
             api.answer = answer
-            val error = tipper().tip(scene, candidate, POSE, null).exceptionOrNull()
+            val error = tipper().tip(scene, candidate, POSE).exceptionOrNull()
             assertTrue("$error", expected.isInstance(error))
         }
 
@@ -98,7 +87,7 @@ class RemotePoseTipperTest {
     fun noAnswerInTimeIsAFailureAtTheLimit() = runTest {
         api.answer = { awaitCancellation() }
 
-        val error = tipper().tip(scene, candidate, POSE, null).exceptionOrNull()
+        val error = tipper().tip(scene, candidate, POSE).exceptionOrNull()
 
         assertTrue("$error", error is SocketTimeoutException)
         assertEquals(RemotePoseTipper.TIMEOUT_MS, currentTime)
@@ -107,7 +96,7 @@ class RemotePoseTipperTest {
     @Test
     fun cancellingTheCallerCancelsTheRequest() = runTest {
         api.answer = { awaitCancellation() }
-        val call = async { tipper().tip(scene, candidate, POSE, null) }
+        val call = async { tipper().tip(scene, candidate, POSE) }
         runCurrent() // not advanceUntilIdle, which would also run the clock to the time limit
 
         call.cancel()
@@ -124,7 +113,6 @@ class RemotePoseTipperTest {
         val candidate: ByteArray,
         val candidateDisposition: String?,
         val pose: String,
-        val framing: String?,
     )
 
     private class FakeApi : PixApi {
@@ -135,7 +123,6 @@ class RemotePoseTipperTest {
             scene: MultipartBody.Part,
             candidate: MultipartBody.Part,
             pose: RequestBody,
-            framing: RequestBody?,
         ): PoseTipDto {
             requests += Request(
                 scene = scene.bytes(),
@@ -144,7 +131,6 @@ class RemotePoseTipperTest {
                 candidate = candidate.bytes(),
                 candidateDisposition = candidate.headers?.get("Content-Disposition"),
                 pose = pose.text(),
-                framing = framing?.text(),
             )
             return answer()
         }

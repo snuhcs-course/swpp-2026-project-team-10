@@ -49,7 +49,7 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 | `guide/GuideRepository.kt`, `guide/ReferenceGuideMaker.kt` | Guide store and reference-to-guide interfaces | 2.1 |
 | `guide/SavedGuideStore.kt` | Saved guides on the phone: `SavedGuideStore`, `SavedGuide`, and `SavedGuideStore.InMemory` for tests | 2.1, 2.3 |
 | `generation/GenerationModels.kt`, `generation/PoseGenerator.kt` | Pose requests, planned poses, generation and candidate events, generator interface | 2.1, 2.3 |
-| `generation/PoseTipper.kt` | How to hold the phone for a generated pose: `PoseTipper`, `PoseTip`, `TipFraming` | 2.1, 2.6.3 |
+| `generation/PoseTipper.kt` | How to hold the phone for a generated pose: `PoseTipper`, `PoseTip` | 2.1, 2.6.3 |
 | `session/SessionModels.kt`, `session/SessionManager.kt` | Roles, entries, session states, session interface | 2.1, 2.3, 2.4 |
 | `session/protocol/SessionMessage.kt` | Data channel messages between the two phones | 2.5.1 |
 | `session/signaling/SignalMessage.kt` | WebSocket signaling messages | 2.5.2 |

@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModelStore
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
-import com.lastpenguin.pix.generation.TipFraming
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
@@ -209,19 +208,14 @@ class ReferenceViewModelTest {
     }
 
     private fun TestScope.withTips(tipper: PoseTipper) =
-        ReferenceViewModel(maker, guides, tips = PoseTips(tipper, guides.guide, { null }, backgroundScope))
+        ReferenceViewModel(maker, guides, tips = PoseTips(tipper, guides.guide, backgroundScope))
 
     private class RecordingTipper : PoseTipper {
         val scenes = mutableListOf<Bitmap>()
         val candidates = mutableListOf<Bitmap>()
         val poses = mutableListOf<String>()
 
-        override suspend fun tip(
-            scene: Bitmap,
-            candidate: Bitmap,
-            pose: String,
-            framing: TipFraming?,
-        ): Result<PoseTip> {
+        override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> {
             scenes += scene
             candidates += candidate
             poses += pose

@@ -24,6 +24,7 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-25] "The model applies the rules and writes the sentence; raise the reasoning effort. Why icons for the blue text, can't it just be text?" (`low` reasoning; the banner shows the sentence only.)
 - [Dongje, 10-26] "So only closer, keep, and back use the model on the phone?" (Yes: the phone measures the framing with ML Kit and sends it.)
 - [Dongje, 10-26] "Proceed so it merges without conflicts with #108." / "Cancel the emulator check and open the PR; I'll check on the S22 later." / "Remake the review image with openly licensed photos; that was my face."
+- [Dongje, 10-26] "Drop ML Kit, and let the model judge everything." (The phone no longer measures how much closer to get; the model judges it with the height and the angle.)
 - [Dongje, 10-26] "Document the tips as built, as compactly as possible." (The plan had a tip for each candidate on *Pick a pose*; the documents now follow the build.)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108

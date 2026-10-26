@@ -21,7 +21,7 @@
 | 1.16 | 2026-10-23 | The Iteration 2 integration run (Iter2-P21, [#59]): the script results from the demo recordings, the user stories and each acceptance case mapped to their tests (2.2.2), and the NFRs not measured (2.2.3). |
 | 1.17 | 2026-10-23 | Integration fix (Iter2-P22, [#60], [#99]): Subject view shows "Connecting…" until the first frame, with its tests (2.1.6); the `Timings` marks checked against 2.1.4 and 2.1.5. |
 | 1.18 | 2026-10-23 | The integration recordings moved from `images/` to the README and the team's shared folder (2.2.2). |
-| 2.0 | 2026-10-26 | First version for Iteration 3: the plan records only the current tests and scripts, with changed goals next to their originals, and 2.2.2's mapping follows R&S 2.0 (94 cases); from the kickoff of 2026-10-25, the Iteration 3 test owners and focus (1), an LLM judge for the AI module tests (3), and the user test (4.3); the coverage, mutation, and property-testing items move to Iteration 4; the revision history is shortened. |
+| 2.0 | 2026-10-26 | Iteration 3 plan from the kickoff (1, 3, 4.3); coverage, mutation, and property testing move to Iteration 4. |
 
 Audience: the development team and the course staff. This page makes our testing explicit and reproducible: anyone on the team can run the same commands, get the same numbers, and compare them with the goals set here in advance. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications) page, and section numbers in the form "Design 2.x" to the [Design Documentation](Design-Documentation). **TBD** marks a value the team still has to set; **TODO** marks a part that is filled in when its iteration comes.
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -399,15 +399,15 @@ class CameraFragmentRenderTest {
     // ---- A session on the photographer's phone -----------------------------------------
 
     @Test
-    fun connectedSession_showsTheLiveBadgeAndEndSession_andAPeerLeavingShowsANotice() {
+    fun connectedSession_showsTheLiveLightAndEndSession_andAPeerLeavingShowsANotice() {
         val modules = launch()
 
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.liveBadge.visibility)
-            assertEquals(string(R.string.live_badge, "Junhyeong"), controls.liveBadge.text.toString())
+            assertEquals(View.VISIBLE, controls.liveDot.visibility)
+            assertEquals(string(R.string.live_badge, "Junhyeong"), controls.liveDot.contentDescription.toString())
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
             assertEquals(View.GONE, controls.shootTogetherButton.visibility)
         }

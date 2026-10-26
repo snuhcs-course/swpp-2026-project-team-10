@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1–7.3). No shutter: only the photographer takes photos. A pinch on
      the video zooms the photographer's camera while guide-edit mode is off (AD-17); with it on, drags and pinches
-     move the photographer's guide. The brightness slider and the flash button are the photographer's controls. -->
+     move the photographer's guide. The brightness slider and the flash button are the photographer's controls. The
+     video is placed as on the Camera screen (previewArea, in code), and the bars lie above it. -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -12,9 +13,11 @@
         android:id="@+id/topBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:minHeight="64dp"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp"
+        android:minHeight="44dp"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -22,10 +25,9 @@
         <!-- The photographer's flash, cycled from here (FR-7.3); hidden when their phone has none. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/flashButton"
-            style="@style/Widget.Pix.Button.Glass.Icon"
+            style="@style/Widget.Pix.Button.Icon.TopBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
             android:contentDescription="@string/flash_off"
             android:visibility="gone"
             app:icon="@drawable/ic_flash_off"
@@ -33,21 +35,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:visibility="visible" />
-
-        <!-- "<name>'s camera" with the name from hello (FR-6.6). -->
-        <TextView
-            android:id="@+id/photographerName"
-            style="@style/Widget.Pix.Chip.Live"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
-            android:text="@string/subject_title_placeholder"
-            app:layout_constrainedWidth="true"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/leaveButton"
-            app:layout_constraintHorizontal_bias="0"
-            app:layout_constraintStart_toEndOf="@id/flashButton"
-            app:layout_constraintTop_toTopOf="parent" />
 
         <Button
             android:id="@+id/leaveButton"
@@ -64,11 +51,13 @@
         android:id="@+id/videoContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:layout_marginTop="44dp"
+        android:layout_marginBottom="104dp"
         android:background="@color/pix_ground"
-        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topBar">
+        app:layout_constraintTop_toTopOf="parent">
 
         <!-- The photographer's live video, the whole frame in the ratio they chose (Design 2.6.4, AD-10). It wraps
              its content so that it measures itself to the video's shape and is centered, the same rectangle the
@@ -92,7 +81,7 @@
         <!-- "Connecting…" until the peer connection is up, or "camera paused" when frames stop. -->
         <TextView
             android:id="@+id/connectingText"
-            style="@style/Widget.Pix.Chip"
+            style="@style/Widget.Pix.Chip.Small"
             android:layout_gravity="center"
             android:accessibilityLiveRegion="polite"
             android:text="@string/connecting" />
@@ -102,6 +91,19 @@
             android:id="@+id/guideOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <!-- The photographer's camera is streaming (FR-6.6, FR-6.8): the light at the video's top right, placed in code;
+             its description names the photographer. -->
+        <com.lastpenguin.pix.ui.camera.LiveDotView
+            android:id="@+id/liveDot"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="top|left"
+            android:accessibilityLiveRegion="polite"
+            android:importantForAccessibility="yes"
+            android:visibility="gone"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible" />
     </FrameLayout>
 
     <LinearLayout
@@ -109,9 +111,11 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
         android:paddingHorizontal="16dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -142,8 +146,8 @@
             tools:visibility="visible">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_brightness"
                 app:tint="@color/pix_text_soft" />
@@ -175,8 +179,8 @@
         <!-- The Camera screen's row: brightness button, zoom readout (FR-7.1), and the guide-edit mode toggle. -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="12dp">
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp">
 
             <!-- Opens the brightness slider above (FR-7.3); checked while it is open. -->
             <com.google.android.material.button.MaterialButton
@@ -196,14 +200,14 @@
             <TextView
                 android:id="@+id/zoomReadout"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="32dp"
                 android:layout_gravity="center"
                 android:background="@drawable/bg_zoom_readout"
                 android:focusable="true"
                 android:gravity="center"
                 android:importantForAccessibility="yes"
-                android:minWidth="56dp"
-                android:paddingHorizontal="12dp"
+                android:minWidth="48dp"
+                android:paddingHorizontal="10dp"
                 android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
                 android:textColor="@color/zoom_readout_text"
                 android:textSize="14sp"

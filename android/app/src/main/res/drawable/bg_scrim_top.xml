@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind the top bar while it lies over the camera's image (R&S 6.2), so its icons and text stay readable. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="270"
+        android:endColor="#000C0C0E"
+        android:startColor="#990C0C0E" />
+</shape>

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall;
-     radius 999 for chips and pills, 16 for buttons and cards, 28 for sheets. -->
+<!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, though
+     the camera's buttons draw a 40 dp shape inside that; radius 999 for chips and pills, 16 for buttons and cards, 28
+     for sheets. -->
 <resources>
 
     <!-- Type: Manrope for the UI, DM Mono for the room code. -->
@@ -183,22 +184,24 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Header</item>
     </style>
 
+    <!-- A pill in the camera screens' top bar, such as Shoot together: 32 dp of glass inside a 44 dp touch height. -->
     <style name="Widget.Pix.Button.Glass" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="android:minHeight">48dp</item>
-        <item name="android:insetTop">2dp</item>
-        <item name="android:insetBottom">2dp</item>
-        <item name="android:paddingStart">14dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="cornerRadius">22dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:insetTop">6dp</item>
+        <item name="android:insetBottom">6dp</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">11dp</item>
+        <item name="cornerRadius">16dp</item>
         <item name="backgroundTint">@color/pix_glass</item>
         <item name="strokeColor">@color/pix_glass_stroke</item>
         <item name="strokeWidth">1dp</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="iconTint">@color/button_secondary_text</item>
-        <item name="iconSize">20dp</item>
-        <item name="iconPadding">8dp</item>
+        <item name="iconSize">14dp</item>
+        <item name="iconPadding">5dp</item>
         <item name="rippleColor">#1FFFFFFF</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+        <item name="android:textSize">11sp</item>
     </style>
 
     <style name="Widget.Pix.Button.Glass.Danger">
@@ -207,22 +210,40 @@
         <item name="iconTint">@color/button_danger_text</item>
     </style>
 
-    <!-- A glass button with only an icon, such as Flash in the top bar. -->
-    <style name="Widget.Pix.Button.Glass.Icon">
-        <item name="android:minWidth">48dp</item>
-        <item name="android:paddingStart">14dp</item>
-        <item name="android:paddingEnd">14dp</item>
-        <item name="iconPadding">0dp</item>
-        <item name="iconGravity">textStart</item>
-    </style>
-
     <!-- An icon-only round button, such as Remove guide. -->
     <style name="Widget.Pix.Button.Icon" parent="Widget.Material3.Button.IconButton">
-        <item name="android:minWidth">48dp</item>
-        <item name="android:minHeight">48dp</item>
-        <item name="iconSize">20dp</item>
+        <item name="android:minWidth">40dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:insetTop">2dp</item>
+        <item name="android:insetBottom">2dp</item>
+        <item name="android:paddingStart">11dp</item>
+        <item name="android:paddingEnd">11dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconSize">18dp</item>
         <item name="iconTint">@color/button_secondary_text</item>
         <item name="rippleColor">#1FFFFFFF</item>
+    </style>
+
+    <!-- The top bar's flash: an icon without a shape, like the brightness button, in a 40 x 44 dp touch area. -->
+    <style name="Widget.Pix.Button.Icon.TopBar">
+        <item name="android:minWidth">40dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">13dp</item>
+        <item name="android:paddingEnd">13dp</item>
+        <item name="iconSize">14dp</item>
+    </style>
+
+    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text. -->
+    <style name="Widget.Pix.Button.Text.TopBar">
+        <item name="android:minWidth">40dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:textColor">@color/button_secondary_text</item>
+        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="android:textSize">11sp</item>
     </style>
 
     <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->
@@ -284,16 +305,14 @@
     </style>
 
     <!-- "Live · <name> connected" (FR-6.8) and "<name>'s camera". -->
-    <style name="Widget.Pix.Chip.Live">
-        <item name="android:minHeight">44dp</item>
-        <item name="android:background">@drawable/bg_chip_live</item>
-        <item name="android:paddingStart">12dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="drawableStartCompat">@drawable/ic_live_dot</item>
-        <item name="android:maxLines">1</item>
-        <item name="android:ellipsize">end</item>
-        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
-        <item name="android:textColor">@color/pix_text</item>
+    <!-- A chip over the camera's image, the size of the top bar's pills: hints, notices, and what just happened. -->
+    <style name="Widget.Pix.Chip.Small">
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">11dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+        <item name="android:drawablePadding">5dp</item>
+        <item name="android:textSize">11sp</item>
     </style>
 
     <style name="Widget.Pix.Header.Back" parent="">

@@ -1,13 +1,15 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
+import androidx.core.view.marginTop
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -25,8 +27,11 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.PinchZoomController
+import com.lastpenguin.pix.ui.camera.PreviewArea
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
+import com.lastpenguin.pix.ui.camera.previewArea
 import java.text.DecimalFormat
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
@@ -51,6 +56,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
 
+    // Where the video is, and how much of it the top bar and the controls cover (previewArea).
+    private var videoArea = PreviewArea(0f, 0f, 0f, 0f)
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
         binding.guideOverlay.editable = false
@@ -65,6 +73,24 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
+        binding.videoContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            binding.liveDot.placeIn(
+                binding.videoContainer,
+                viewModel.uiState.value.aspect.frameAspect,
+                videoArea.underTopBar,
+            )
+        }
+        // The video's place follows the screen's height and the bars' (R&S 6.2, 6.6), known only after layout.
+        val placeVideo = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top != oldBottom - oldTop) {
+                view.post {
+                    if (view.isAttachedToWindow) layoutVideo(binding, viewModel.uiState.value.aspect.frameAspect)
+                }
+            }
+        }
+        binding.root.addOnLayoutChangeListener(placeVideo)
+        binding.topBar.addOnLayoutChangeListener(placeVideo)
+        binding.bottomPanel.addOnLayoutChangeListener(placeVideo)
         // The whole area takes the pinch, the margins beside a video of another shape too.
         pinchZoom = PinchZoomController(
             binding.videoContainer,
@@ -93,9 +119,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.uiState.collect { ui ->
-                        binding.photographerName.text = ui.photographerName
+                        binding.liveDot.contentDescription = ui.photographerName
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
+                        layoutVideo(binding, ui.aspect.frameAspect)
+                        binding.liveDot.placeIn(binding.videoContainer, ui.aspect.frameAspect, videoArea.underTopBar)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.frameAspect = ui.aspect.frameAspect
@@ -127,6 +155,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         val streaming = connected && frames.hasFrame()
                         val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
                         binding.connectingText.isVisible = !streaming || stalled
+                        binding.liveDot.isVisible = streaming && !stalled
                         binding.connectingText.setText(if (stalled) R.string.camera_paused else R.string.connecting)
                         delay(STALL_CHECK_MS)
                     }
@@ -142,6 +171,37 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         pinchZoom?.finishInteraction()
         brightnessSlider?.finishInteraction()
         super.onPause()
+    }
+
+    /**
+     * Puts the video where previewArea says for [frameAspect], as on the Camera screen (R&S 6.2, 6.6). The brightness
+     * slider does not count among the controls: it opens over the video instead of moving it. Each bar gets a dark
+     * gradient while it lies over the video.
+     */
+    private fun layoutVideo(binding: FragmentSubjectBinding, frameAspect: Float) {
+        val root = binding.root
+        if (root.width == 0 || root.height == 0) return
+        val slider = binding.brightnessPanel
+        val sliderHeight = if (slider.isVisible) slider.height + slider.marginTop else 0
+        val area = previewArea(
+            root.width.toFloat(),
+            root.height.toFloat(),
+            binding.topBar.height.toFloat(),
+            (binding.bottomPanel.height - sliderHeight).toFloat(),
+            frameAspect,
+        )
+        videoArea = area
+        val container = binding.videoContainer
+        val params = container.layoutParams as ViewGroup.MarginLayoutParams
+        val top = area.top.roundToInt()
+        val bottom = (root.height - area.bottom).roundToInt()
+        if (params.topMargin != top || params.bottomMargin != bottom) {
+            params.topMargin = top
+            params.bottomMargin = bottom
+            container.layoutParams = params
+        }
+        binding.topBar.setBackgroundResource(if (area.underTopBar > 0f) R.drawable.bg_scrim_top else 0)
+        binding.bottomPanel.setBackgroundResource(if (area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
     }
 
     override fun onDestroyView() {

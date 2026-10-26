@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -29,10 +29,16 @@ object PixViewModels {
                 container.guideRepository,
                 container.cameraSettings,
                 container.savedGuideStore,
+                container.poseTips.onCamera,
             )
         }
         initializer {
-            ReferenceViewModel(container.referenceGuideMaker, container.guideRepository, container.savedGuideStore)
+            ReferenceViewModel(
+                container.referenceGuideMaker,
+                container.guideRepository,
+                container.savedGuideStore,
+                container.poseTips,
+            )
         }
         initializer {
             GenerationViewModel(container.poseGenerator, container.cameraController, container.generationConsent)

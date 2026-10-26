@@ -1,10 +1,11 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
 import com.lastpenguin.pix.core.network.PixApi
 import com.lastpenguin.pix.core.network.PoseResponseDto
 import com.lastpenguin.pix.core.network.PoseSuggestionsDto
+import com.lastpenguin.pix.core.network.PoseTipDto
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -351,6 +352,12 @@ class RemotePoseGeneratorTest {
             }
         }
 
+        override suspend fun poseTip(
+            scene: MultipartBody.Part,
+            candidate: MultipartBody.Part,
+            pose: RequestBody,
+        ): PoseTipDto = error("Pose generation never asks for a tip")
+
         private fun RequestBody.text(): String = Buffer().also(::writeTo).readUtf8()
     }
 
@@ -362,6 +369,8 @@ class RemotePoseGeneratorTest {
             encoded += scene
             return SCENE_JPEG
         }
+
+        override fun encodeTipCandidate(candidate: Bitmap): ByteArray = error("Pose generation sends no candidate")
 
         override fun decodeCandidate(image: ByteArray): Bitmap? {
             val text = String(image)

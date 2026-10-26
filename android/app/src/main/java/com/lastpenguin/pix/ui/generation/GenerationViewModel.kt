@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.RemotePoseGenerator
+import com.lastpenguin.pix.generation.TipSource
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
@@ -56,6 +57,13 @@ data class GenerationUiState(
     /** The image *Use this pose* sends to Reference confirm. */
     val selectedImage: Bitmap?
         get() = (candidates[selectedPoseId] as? CandidateEvent.Ready)?.image
+
+    /** What the selected candidate's tip is asked from: the scene and the pose it was made with (FR-4.10). */
+    val tipSource: TipSource?
+        get() {
+            val pose = poses.firstOrNull { it.id == selectedPoseId } ?: return null
+            return scene?.let { TipSource(it, pose.text) }
+        }
 }
 
 /**

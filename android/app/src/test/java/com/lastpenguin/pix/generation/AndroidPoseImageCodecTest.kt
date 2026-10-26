@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -16,7 +16,8 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The scene photo as the server requires it (Design 2.6.3, step 1): a photo within 1024 px on its long side goes at
  * its size; a wider or a taller one is scaled so its long side is 1024 px, and the caller's bitmap is left alone;
- * the bytes are a JPEG. A candidate's bytes decode to a bitmap; bytes that are no image give null.
+ * the bytes are a JPEG. A candidate sent for a tip is scaled the same way to 768 px, and one within that goes at its
+ * size. A candidate's bytes decode to a bitmap; bytes that are no image give null.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -54,6 +55,20 @@ class AndroidPoseImageCodecTest {
 
         assertEquals(512, image.width)
         assertEquals(1024, image.height)
+    }
+
+    @Test
+    fun aCandidateForATip_isScaledTo768_andOneWithinItKeepsItsSize() {
+        val original = scene(1152, 1536)
+
+        val image = decoded(AndroidPoseImageCodec.encodeTipCandidate(original))
+
+        assertEquals(576, image.width)
+        assertEquals(768, image.height)
+        assertFalse(original.isRecycled)
+        val small = decoded(AndroidPoseImageCodec.encodeTipCandidate(scene(480, 640)))
+        assertEquals(480, small.width)
+        assertEquals(640, small.height)
     }
 
     @Test

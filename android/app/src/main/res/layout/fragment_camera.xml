@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Camera, Camera + guide, Photo saved, the scene photo for poses, and the photographer's side of a session
      (R&S 6.2, 6.3, 6.5). The preview, in the chosen aspect ratio, sits between the top bar and the controls, so
-     only the transient chips and the guide's and brightness panels ever cover the photo. -->
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     only the transient chips and the guide's and brightness panels ever cover the photo. The root tells the screen
+     when a touch anywhere ends, which closes the pose tip (FR-4.10). -->
+<com.lastpenguin.pix.ui.camera.TouchWatchingLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -49,6 +50,38 @@
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:text="@string/aspect_4_3" />
+
+            <!-- Opens the pose tip again while the guide on the camera has one (FR-4.10); the dot says a tip came
+                 while the banner was closed. -->
+            <FrameLayout
+                android:id="@+id/tipButtonFrame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/tipButton"
+                    style="@style/Widget.Pix.Button.Glass.Icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/show_tip"
+                    app:icon="@drawable/ic_lightbulb" />
+
+                <ImageView
+                    android:id="@+id/tipDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_status_dot"
+                    android:visibility="gone"
+                    app:tint="@color/pix_accent"
+                    tools:visibility="visible" />
+            </FrameLayout>
         </LinearLayout>
 
         <!-- Shown while a subject is connected (FR-6.8). -->
@@ -304,6 +337,42 @@
                     android:minWidth="40dp"
                     android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
                     tools:text="+0.7" />
+            </LinearLayout>
+
+            <!-- How to hold the phone for a generated pose (FR-4.10): open once when its guide comes, "Preparing a
+                 tip…" until the tip arrives; a touch anywhere closes it, and the tip button in the top bar opens it
+                 again. Translucent, so the preview shows through. -->
+            <LinearLayout
+                android:id="@+id/tipBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:accessibilityLiveRegion="polite"
+                android:background="@drawable/bg_glass_panel"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="48dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_lightbulb"
+                    app:tint="@color/pix_accent" />
+
+                <TextView
+                    android:id="@+id/tipText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:textAppearance="@style/TextAppearance.Pix.Body"
+                    tools:text="Zoom in or take a step closer, hold the phone at your chest and keep it level - the body keeps its proportions." />
             </LinearLayout>
 
             <!-- Shown while a guide is on the camera (R&S 6.2, Camera + guide). -->
@@ -608,4 +677,4 @@
                 android:text="@string/use_this_photo" />
         </LinearLayout>
     </LinearLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+</com.lastpenguin.pix.ui.camera.TouchWatchingLayout>

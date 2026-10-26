@@ -238,7 +238,100 @@ Each note lists the attendees, the agenda, the decisions for each agenda item, a
 | All | Note AI use in every PR | – |
  
 [↑ Back to the list](#iteration-2)
- 
+
+## Iteration 3
+
+| Date | Meeting | Topics |
+|---|---|---|
+| [2026-10-25 (Sun)](#2026-10-25-sun-iteration-3-kickoff) | Iteration 3 kickoff | Features, open questions, testing, tasks |
+
+### 2026-10-25 (Sun): Iteration 3 kickoff
+
+**Attendees:** 박동제, 박재완, 조성민, 한준형
+
+**Agenda**
+1. Iteration 3 features
+2. Open questions
+3. Testing
+4. Tasks
+
+**1. Iteration 3 features**
+- Iteration 3 runs 10/26–11/6. A user test is held on the weekend of 10/31–11/1, before the heuristic evaluation (11/4) and the UAT (11/16 and 11/18, in Iteration 4).
+- UI and UX:
+  - A Korean translation. English or Korean is chosen in the settings screen, and the default follows the phone's language.
+  - *Pick a pose* shows the candidates one at a time, with a swipe ([#108]).
+- New features:
+  - Pose tips. After the poses are generated, a short tip on how to take the shot sits in the space at the bottom of each screen. It covers four things:
+    - the photographer moving forward or back from where they stand;
+    - zooming in or out;
+    - holding the camera higher or lower;
+    - tilting the camera down or up.
+  - How tips are made:
+    - A tip is text. The server sends the original scene photo and the generated pose to Gemini through its API and gets the tip back.
+    - Four poses are generated. Each one shows as soon as it arrives, and its tip request goes out at the same time, so the tips are likely ready while the user is choosing.
+    - The tip then shows on the Camera screen, in a panel that opens and closes.
+    - A guide made from an uploaded reference photo has no tip.
+  - Live preview:
+    - sessions on different networks (planned for Iteration 2, [#56]);
+    - an offline connection with a QR code and a hotspot;
+    - reconnecting after a drop of a few seconds.
+- Other (small bugs and features not finished):
+  - Friend invitations and friend requests, with push notifications (planned for Iteration 2, [#55]).
+  - Generated poses are no longer fixed at 3:4; they follow the ratio of the photo that is sent.
+
+**2. Open questions and our decisions**
+- **Personalization: what each phone offers, the subject's and the photographer's.**
+  - The subject's phone can also open guide selection or pose generation.
+  - Pose generation and selection run on the Camera screen today. While the scene photo is taken, both phones show the same screen, the camera.
+  - On *Generate poses* and *Pick a pose*, both phones also show the same screen. Changes inside it are not streamed: whichever phone decides first moves both to the next screen.
+  - Saving a pose or guide: both phones get the button. To use a guide saved on the subject's phone, start from the subject's phone.
+  - Photos that are taken are saved on both phones by default.
+- **Prompt history**
+  - Shows the descriptions used before. The user chooses between the whole history and the history of one photographer and subject pair.
+  - In the whole history, the photographer sees the photos they took, and the subject the photos they were in.
+  - UI: a toggle between all and with this person, and an ✕ that deletes an entry.
+- **Selfie mode**
+  - Only when there is no live preview.
+  - Pose suggestions: check whether the current prompt works for selfies; it probably needs its own.
+- **Composition and background: four candidates that differ**
+  - With a description, the server writes three variations today. The idea is to prepare four prompt templates with the same `{pose}` instead.
+  - The default template is to be improved for requests such as "two photos saluting and two with hands up": the prompt will say that `{pose}` is the user's request and should be read sensibly, and keep rules such as: do not change the face or the clothes, and do not put several poses in one photo.
+- **Settings screen**
+  - The overlay's color and thickness, a latency indicator, and a how-to-use help.
+  - A tutorial runs on first use only, and can be turned on again from the settings screen.
+
+**3. Testing**
+- Testing is a focus of this iteration.
+- Features to test: taking photos with the camera, pose suggestions and the guide, and live sharing.
+- An LLM (VLM) judge test. We set rules that every generated pose must keep, consistent with the prompt, and measure the failure rate, with the Claude API as the judge.
+- A user test, not settled yet:
+  - five people 박동제 knows;
+  - a questionnaire (Google Forms), or asking them in person and recording the answers, summarized in the Testing Documentation.
+- Latency tests: where they apply and their limits are decided later.
+
+**4. Tasks**
+
+| Owner | Item | Due |
+|---|---|---|
+| 박재완 | Deploy the server on AWS (temporary, for the user test) | 10/26 (Mon) |
+| 박재완 | PM work: add to and revise the documents | 10/26 (Mon) |
+| 박재완 | Korean translation | 10/26 (Mon) |
+| 박동제 | *Pick a pose* one candidate at a time, with a swipe | 10/30 (Fri) |
+| 박동제 | Pose tips after generation | 10/30 (Fri) |
+| 조성민 | Sessions on different networks | 10/30 (Fri) |
+| 조성민 | Reconnecting after a short drop | 10/30 (Fri) |
+| 조성민 | Friend invitations and friend requests, with push notifications | 10/30 (Fri) |
+| 박재완 | Generated poses in the ratio of the photo that is sent, not fixed at 3:4 | 10/30 (Fri) |
+| 박동제 | Selfie mode, and check whether the pose prompt works for it | 10/30 (Fri) |
+| 한준형 | Personalization | 10/30 (Fri) |
+
+The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues next week, TBD.
+
+[↑ Back to the list](#iteration-3)
+
 [#1]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/1
 [#12]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/12
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13
+[#55]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/55
+[#56]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/56
+[#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108

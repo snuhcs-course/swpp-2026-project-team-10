@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -20,13 +20,11 @@ fun GenerationUiState.slots(): List<PoseSlot> =
     poses.map { PoseSlot(it, candidates[it.id], selected = it.id == selectedPoseId) }
 
 /**
- * The 2×2 candidate grid of Generating poses and Pick a pose (R&S 6.3). Cells can be picked only when [onPick] is
- * given, and only once their image is there.
+ * The 2×2 candidate grid of Generating poses (R&S 6.3), filling in as candidates arrive; Pick a pose shows them one
+ * at a time instead ([PosePageAdapter]).
  * Owner: Server/AI/Sync (#7).
  */
-class PoseCandidateAdapter(
-    private val onPick: ((PlannedPose) -> Unit)? = null,
-) : ListAdapter<PoseSlot, PoseCandidateAdapter.Holder>(Diff) {
+class PoseCandidateAdapter : ListAdapter<PoseSlot, PoseCandidateAdapter.Holder>(Diff) {
 
     class Holder(val binding: ItemPoseCandidateBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -43,20 +41,8 @@ class PoseCandidateAdapter(
         binding.poseStatus.isVisible = image == null
         binding.poseStatus.setText(if (slot.event == null) R.string.creating_pose else R.string.pose_failed)
 
-        val card = binding.root
         // The pose is not written on the card (FR-4.6); a screen reader still says which pose the image is.
-        card.contentDescription = slot.pose.text
-        card.isChecked = slot.selected
-        binding.poseCheck.isVisible = slot.selected
-        card.strokeWidth = card.resources.getDimensionPixelSize(
-            if (slot.selected) R.dimen.pose_card_stroke_selected else R.dimen.pose_card_stroke,
-        )
-        if (onPick != null && image != null) {
-            card.setOnClickListener { onPick.invoke(slot.pose) }
-        } else {
-            card.setOnClickListener(null)
-            card.isClickable = false
-        }
+        binding.root.contentDescription = slot.pose.text
     }
 
     private object Diff : DiffUtil.ItemCallback<PoseSlot>() {

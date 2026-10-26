@@ -20,7 +20,8 @@
 | 1.7 | 2026-10-21 | Sign-in, Pix ID, and Friends screens as built (Iter2-P13, [#54]): *Shoot together* opens *Friends*, usable signed out (FR-5.2 revised); the account screens (6.4) and Figure 3b. |
 | 1.8 | 2026-10-22 | *Check* for a free Pix ID (FR-5.15) and *Sent requests* with *Withdraw* (FR-5.16) (Iter2-P13, [#54]; US-6, US-7, 6.4). |
 | 1.9 | 2026-10-23 | Synced with the app on `dev` after [#96], with original texts kept: FR-8.1, FR-8.5, and US-13 revised; section 6 follows the built screens, and Figures 1–6 and 3b are redrawn; invitations, reconnection, and the Could items move to Iteration 3 (4.1). |
-| 2.0 | 2026-10-25 | First version for Iteration 3: the page records only the current requirements, without original texts or Iteration 1 cases, and what Iteration 2 did not build targets Iteration 3; the revision history is shortened. No requirement added or dropped. |
+| 2.0 | 2026-10-26 | Iteration 3 scope from the kickoff (4.1, F1–F10, US-14–US-16); current requirements only. |
+| 2.1 | 2026-10-26 | *Pick a pose* one candidate at a time as built (Iter3-P10, [#114], [#108]): FR-4.6, the screen (6.3), Figure 2, and 6.8. |
 
 Items marked **TBD** need a team decision.
 
@@ -102,7 +103,7 @@ Every "shoot together" session has two people with two phones. Roles are decided
 
 - **A shared view, not only a remote.** Remote-viewfinder products show the framing but not the goal. Pix shows the framing and the same pose guide on both phones, so the subject can match the pose without verbal instructions.
 - **A guide from what the user actually wants.** The guide comes from the user's own reference photo or from poses generated for their current scene, not from a fixed library.
-- **Friends anywhere, no extra device.** After adding each other once, two friends connect with one invitation over Wi-Fi or cellular data (Iteration 3 and later). Without an account, a room code works on the same Wi-Fi, and a QR code works even without internet (Iteration 3–4).
+- **Friends anywhere, no extra device.** After adding each other once, two friends connect with one invitation over Wi-Fi or cellular data (Iteration 3 and later). Without an account, a room code works on the same Wi-Fi, and a QR code works even without internet (Iteration 3).
 - **The photographer stays in control.** Remote control is allowed only with the photographer's permission, and only the photographer takes the photo.
 
 ---
@@ -115,8 +116,9 @@ Every "shoot together" session has two people with two phones. Roles are decided
 |---|---|
 | **Iteration 1**<br>9/27 – 10/9 · prototype | Open the camera and take photos; add a guide from a gallery photo or from four generated poses (predefined pose templates); adjust the guide; connect a second phone **with a room code on the same Wi-Fi**; see the live view and guide on the second phone; change the zoom from the second phone. |
 | **Iteration 2**<br>10/11 – 10/25 · midterm 10/21 | Sign up and sign in with a Pix ID and a password or with Google; add friends by Pix ID, with friend requests and online status. Camera: tap to focus, brightness, flash, aspect ratios 4:3, 16:9, and 1:1, pinch zoom with a guide-edit mode toggle on both phones, and zooming without stutter. Guide: smooth outlines with limbs that keep their shape, a guide that starts where the person stands in the reference, a reference thumbnail, hide and replace, and saved guides. From the subject's phone: move and resize the guide, adjust the brightness, and switch the flash. Pose generation from suggested poses, idea chips, or a typed description. Room codes stay for use without signing in. |
-| **Iterations 3–4**<br>tentative · heuristic evaluation 11/2, UAT 11/6 | Invite a friend **over Wi-Fi or cellular data** by push notification, or by an invite link if the push does not arrive; accept or decline invitations; automatic reconnection (Iteration 3). Connect two phones without internet by scanning a QR code; selfie mode; a settings screen with the guide color and a frame-delay indicator for remote sessions; a Korean language setting; send photos to the subject; fixes from the heuristic evaluation. If time allows (Could): the remote-control switch, remote focus, and a guide color that contrasts with the background. Key stories for the user acceptance test (UAT) are fixed by the end of Iteration 3. |
-| **Iteration 5**<br>tentative | Polish, stability, and performance against the non-functional requirements, based on UAT feedback. |
+| **Iteration 3**<br>10/26 – 11/6 · user test 10/31–11/1, heuristic evaluation 11/4 | Invite a friend **over Wi-Fi or cellular data** by push notification, or by an invite link if the push does not arrive; accept or decline invitations; get friend requests as push notifications; reconnect automatically after a short drop. Connect two phones without internet by scanning a QR code. Pose generation: candidates in the scene photo's aspect ratio, shown one at a time with a swipe, each with a tip on how to take it; four candidates from four prompt templates; a history of past descriptions. In a session, the subject's phone can also choose the guide and generate poses, both phones show the same step, and photos are saved on both phones. Selfie mode while no session runs. A settings screen with the language (English or Korean, the phone's by default), the guide's color and thickness, a latency indicator, and help; a tutorial on first use. If time allows (Could): the remote-control switch and remote focus. Key stories for the user acceptance test (UAT) are fixed by the end of Iteration 3. |
+| **Iteration 4**<br>tentative · UAT 11/16 and 11/18 | Fixes from the user test and the heuristic evaluation; the UAT and its fixes. |
+| **Iteration 5**<br>tentative · in-class testing 11/30, real user test 12/2 | Polish, stability, and performance against the non-functional requirements, based on UAT feedback; in-class testing and a test with real users. |
 
 ### 4.2 Feature list
 
@@ -124,15 +126,16 @@ Priority: **Must** = required for the product to make sense · **Should** = impo
 
 | ID | Feature | What it covers | Priority | Target |
 |---|---|---|---|---|
-| F1 | **Camera** | Opens straight to the live preview; shutter, pinch zoom with a guide-edit mode, tap to focus, brightness, flash, aspect ratio; saves full-quality photos to the gallery. | Must / Should | It 1 / It 2 |
+| F1 | **Camera** | Opens straight to the live preview; shutter, pinch zoom with a guide-edit mode, tap to focus, brightness, flash, aspect ratio; selfie mode with the front camera; saves full-quality photos to the gallery. | Must / Should | It 1 – 3 |
 | F2 | **Guide from a reference photo** | Pick a gallery photo; separate the person from the background on the device; preview as an outline that never shows the reference's pixels. Smooth edges with arms and legs that keep their shape. | Must | It 1 / It 2 |
-| F3 | **Guide overlay** | Show the guide over the preview, starting where the person stands in the reference; move, resize, fade, hide, replace, remove; a reference thumbnail; never saved in photos. Save guides to reuse them. A guide color that contrasts with the background if time allows. | Must / Should / Could | It 1 – 3 |
-| F4 | **AI pose generation** | Four pose candidates of the same person in the same place, generated through the Pix server; pick one as the guide. Poses suggested for the scene, or a pose chosen from idea chips or described in words. | Must / Should | It 1 / It 2 |
+| F3 | **Guide overlay** | Show the guide over the preview, starting where the person stands in the reference; move, resize, fade, hide, replace, remove; a reference thumbnail; never saved in photos. Save guides to reuse them. The guide's color and thickness in the settings. | Must / Should | It 1 – 3 |
+| F4 | **AI pose generation** | Four pose candidates of the same person in the same place, in the scene photo's aspect ratio, generated through the Pix server; pick one as the guide. Poses suggested for the scene, or a pose chosen from idea chips or past descriptions or described in words. A tip on how to take each candidate. | Must / Should | It 1 – 3 |
 | F5 | **Pix account and friends** | An optional account, needed only for friends, with a Pix ID and a password or with Google (either kind can add the other way to sign in); Pix ID, search by exact Pix ID, friend requests, friend list with online status. | Must | It 2 |
-| F6 | **Shoot-together session** | Invitation by push notification with an invite link as the fallback, live view on the subject's phone, guide sync, leaving and reconnecting, over Wi-Fi or cellular data through the public Pix server and a relay. | Must | It 1 – 3 |
+| F6 | **Shoot-together session** | Invitation by push notification with an invite link as the fallback, live view on the subject's phone, guide sync, leaving and reconnecting, over Wi-Fi or cellular data through the public Pix server and a relay. The subject's phone can also choose the guide and generate poses, and photos are saved on both phones. | Must | It 1 – 3 |
 | F7 | **Remote control** | From their own phone, the subject changes the zoom, the guide's position and size, the brightness, and the flash. The photographer sees each action and always takes the photo. The switch that blocks remote control and remote focus are Could items. | Must / Should / Could | It 1 – 3 |
 | F8 | **Room-code session** | 6-digit code on the same Wi-Fi, with no sign-in, for people without an account. | Must | It 1 |
-| F9 | **Offline connection (QR)** | The photographer's phone creates a local hotspot and shows a QR code; the subject scans it and connects without internet. One phone only, and both people confirm before the session starts. | Should | It 3–4 |
+| F9 | **Offline connection (QR)** | The photographer's phone creates a local hotspot and shows a QR code; the subject scans it and connects without internet. One phone only, and both people confirm before the session starts. | Should | It 3 |
+| F10 | **Settings and help** | A settings screen with the language (English or Korean), the guide's color and thickness, a latency indicator for sessions, and how-to-use help; a tutorial on first use. | Must / Should | It 3 |
 
 ### 4.3 Detailed requirements
 
@@ -156,6 +159,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-1.11 | The camera screen has a brightness slider that sets exposure compensation within the range the phone's camera supports. The applied value shows on the slider. | Should | It 2 |
 | FR-1.12 | The camera screen has a flash button with off, auto, and on. On a phone without a flash the button is hidden. | Should | It 2 |
 | FR-1.13 | The user chooses the aspect ratio 4:3, 16:9, or 1:1. The preview, the composition grid, the guide frame, the saved photo, and the live view all use the same frame, so 16:9 photos fit Instagram stories without cropping. Each ratio is cut from the middle of the camera's 4:3 image: 16:9 keeps its full height, and 1:1 its full width. | Should | It 2 |
+| FR-1.14 | While no session runs, the Camera screen can switch to the front camera (selfie mode). Pose generation works with a selfie as the scene photo (Design Documentation 2.6.3). | Must | It 3 |
 
 #### F2 · Guide from a reference photo
 *Turn any photo of a person into a guide.*
@@ -186,7 +190,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-3.7 | The guide's position and size are kept relative to the camera image rather than the screen, so the guide lands on the same part of the scene on a phone with a different screen size. | Must | It 1 |
 | FR-3.8 | *Save guide* stores the current guide on the phone. *Add a pose guide* lists saved guides so the user can reuse or delete them. Saved guides live in the app's private storage, not in the gallery and not on the server, and survive an app restart. At most 20 are kept; saving one more removes the oldest, and the notice says so. | Should | It 2 |
 | FR-3.9 | While a guide is set, a small thumbnail of the reference photo sits in a corner of the Camera screen, so the photographer still sees the original pose. Tapping it enlarges it to about half the preview's width, and tapping it again makes it small. Dragging it moves it to the nearest of the preview's four corners, never elsewhere; the bottom corners stay above the guide's controls. The thumbnail is not streamed to the subject and does not appear in photos. | Should | It 2 |
-| FR-3.10 | The guide color contrasts with the background: black or white by default, and the user can switch it. | Could | It 3 |
+| FR-3.10 | The settings screen sets the guide's color and line thickness (FR-10.1). By default the guide is the white line of FR-2.2. | Should | It 3 |
 
 #### F4 · AI pose generation
 *Pose ideas made for this person in this place.*
@@ -195,13 +199,15 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 |---|---|---|---|
 | FR-4.1 | *Generate poses here* returns to the Camera screen to take the scene photo. The user frames the subject, with zoom as usual, and presses the shutter, then confirms the photo with *Use this photo* or takes another with *Shoot again*. Nothing is sent before the photo is confirmed, and the scene photo is not saved to the gallery. | Must | It 1 |
 | FR-4.2 | Before the first request, Pix says that the scene photo will be sent to an external AI service and asks for consent. Without consent, nothing is sent. | Should | It 1 |
-| FR-4.3 | Pix requests four candidates that keep the same person and background, through the Pix server. The server generates them with an image-editing model on OpenRouter; the model is a server setting (Design Documentation 2.6.3). | Must | It 1 |
+| FR-4.3 | Pix requests four candidates that keep the same person and background, through the Pix server. The server generates them with an image-editing model on OpenRouter; the model is a server setting (Design Documentation 2.6.3). Each candidate has the aspect ratio of the scene photo (FR-1.13). | Must | It 1 / It 3 |
 | FR-4.4 | Without a description, the Pix server suggests four poses that suit the scene photo, and Pix requests one candidate for each; *Skip, suggest poses for me*, or *Generate 4 poses* with an empty field, requests them. When the server cannot suggest poses, it uses the predefined poses: hands on hips, wave, walking, and arms crossed. | Must | It 1 / It 2 |
 | FR-4.5 | *Generating poses* shows the scene photo, each candidate as soon as it is ready, progress ("2 of 4 ready"), how long it may take ("up to 60 s"), and *Cancel*. | Must | It 1 |
-| FR-4.6 | *Pick a pose* shows the candidate images, without pose names. *Use this pose* sends the selected image to *Reference confirm* (F2). *Try other poses* goes back to *Generate poses* with the scene photo and the description kept, so the user can keep the description, change it, or skip before a new set is requested. | Must | It 1 |
+| FR-4.6 | *Pick a pose* shows the candidate images one at a time, without pose names, and a swipe moves to the next ([#108]); the candidate on screen is the selected one. *Use this pose* sends it to *Reference confirm* (F2). *Try other poses* goes back to *Generate poses* with the scene photo and the description kept, so the user can keep the description, change it, or skip before a new set is requested. | Must | It 1 / It 3 |
 | FR-4.7 | If no candidate arrives within 60 s or every request fails, Pix shows *Couldn't create poses* with *Try again* and *Back to camera*, and keeps the scene photo; when the service refused every pose of a description, *Edit description* takes the place of *Try again* (US-5). If only some candidates fail, the others are still shown. | Must | It 1 |
-| FR-4.8 | After the scene photo is confirmed, *Generate poses* shows a thumbnail of the scene, idea chips, and a text field for a pose description in Korean or English (up to 100 characters, with a counter). Idea chips are the default: tapping a chip fills the field, and the user can edit or type their own text. *Generate 4 poses* requests candidates that follow the description: one as written and three of variations that the Pix server writes for the scene, so that the four differ; *Skip, suggest poses for me* requests poses suggested for the scene (FR-4.4). The server's prompt keeps the person, the clothing, and the place whatever the description says, and may frame the person closer than the scene photo, never wider (Design Documentation 2.6.3). | Should | It 2 |
+| FR-4.8 | After the scene photo is confirmed, *Generate poses* shows a thumbnail of the scene, idea chips, and a text field for a pose description in Korean or English (up to 100 characters, with a counter). Idea chips are the default: tapping a chip fills the field, and the user can edit or type their own text. *Generate 4 poses* requests four candidates that follow the description through four different prompt templates, so that the four differ; *Skip, suggest poses for me* requests poses suggested for the scene (FR-4.4). The server's prompt reads the description as the user's request, keeps the person, the face, the clothing, and the place whatever the description says, puts one pose in each candidate, and may frame the person closer than the scene photo, never wider (Design Documentation 2.6.3). | Should | It 2 / It 3 |
 | FR-4.9 | The Pix server does not keep the scene photo or the generated images after returning them. | Must | It 1 |
+| FR-4.10 | Each generated candidate comes with a short tip on how to take it: whether the photographer steps forward or back, zooms in or out, holds the camera higher or lower, or tilts it down or up. Pix asks for the tip as soon as the candidate arrives, so it is usually ready while the user picks. *Pick a pose* shows each candidate's tip below it, and after *Use this pose* the Camera screen shows the tip in a panel that opens and closes. A guide from an uploaded reference photo has no tip. | Must | It 3 |
+| FR-4.11 | *Generate poses* lists the descriptions used before. A toggle switches between the whole history and the history with the current partner: as the photographer, the whole history holds the descriptions of the photos the user took, and as the subject, those of the photos they were in. ✕ deletes an entry. | Should | It 3 |
 
 #### F5 · Pix account and friends
 *Add a friend once, then connect with one tap.*
@@ -214,7 +220,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-5.4 | The Friends screen shows the user's own Pix ID. Tapping it copies the ID. | Should | It 2 |
 | FR-5.5 | *Add a friend* finds users only by their exact Pix ID. There is no public list or partial-match search. | Must | It 2 |
 | FR-5.6 | *Add* sends a friend request. The two users become friends only after the other user accepts. | Must | It 2 |
-| FR-5.7 | The receiver sees pending requests on *Friends* with *Accept* and *Decline*, and gets a push notification for each request once Pix has push ([#55]). | Must | It 2 / It 3 |
+| FR-5.7 | The receiver sees pending requests on *Friends* with *Accept* and *Decline*, and gets a push notification for each request once Pix has push ([#119]). | Must | It 2 / It 3 |
 | FR-5.8 | Search results mark special cases instead of showing *Add*: the user's own ID ("This is you"), an existing friend ("Friends"), a request the user sent ("Requested", with *Withdraw request*), and a request the other person sent (*Accept*, which makes them friends at once). | Should | It 2 |
 | FR-5.9 | The friend list shows each friend's name, Pix ID, online status (Pix is open on their phone), and an *Invite* button. | Must | It 2 |
 | FR-5.10 | The user can remove a friend. A removed user can no longer send invitations to them. | Should | It 2 |
@@ -243,7 +249,9 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-6.11 | When the connection is lost, the subject sees *Connection lost* with *Reconnect* and *Leave*, and the photographer sees "&lt;name&gt; disconnected". | Must | It 1 |
 | FR-6.12 | Before showing *Connection lost*, both phones try to reconnect automatically for up to 10 s. | Should | It 3 |
 | FR-6.13 | The first time a session runs on cellular data, Pix says that the live view uses mobile data. | Should | It 3 |
-| FR-6.14 | After a photo is taken in a session, the photographer can send it to the subject in full quality with one tap. | Could | It 3 |
+| FR-6.14 | Photos taken in a session are saved on both phones by default: the photographer's phone sends each photo to the subject in full quality. | Must | It 3 |
+| FR-6.15 | During a session, the subject's phone can also open *Add a pose guide* and *Generate poses here*. Both phones then show the same step: the scene photo with the photographer's camera, *Generate poses*, and *Pick a pose*. What one person types or selects is not streamed to the other phone; the first phone to go on moves both to the next step. | Must | It 3 |
+| FR-6.16 | *Save guide* is on both phones and saves on the phone where it is tapped. A guide saved on the subject's phone is used by opening *Add a pose guide* from the subject's phone. | Must | It 3 |
 
 #### F7 · Remote control
 *The subject fine-tunes the shot from their phone; the photographer takes the photo.*
@@ -274,11 +282,21 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-9.1 | *Shoot together* offers *Show QR*. The photographer's phone creates a local hotspot, which has no internet, and shows a QR code with its connection details. | Should | It 3–4 |
-| FR-9.2 | *Scan QR* on the subject's phone reads the code, joins the hotspot, and connects to the photographer's phone without the Pix server. No sign-in is needed. | Should | It 3–4 |
-| FR-9.3 | For security, the photographer's phone accepts only one phone per QR code. Later attempts are refused. | Should | It 3–4 |
-| FR-9.4 | When a phone connects, both phones show "Connected" with the other phone's name. The live view and remote control start only after both people tap *Resume*, so a stranger who connected first cannot join unnoticed. *Cancel* ends the connection and shows a new QR code. | Should | It 3–4 |
-| FR-9.5 | The session works over the hotspot alone. Pose generation still needs the photographer's phone to have its own internet connection. | Should | It 3–4 |
+| FR-9.1 | *Shoot together* offers *Show QR*. The photographer's phone creates a local hotspot, which has no internet, and shows a QR code with its connection details. | Should | It 3 |
+| FR-9.2 | *Scan QR* on the subject's phone reads the code, joins the hotspot, and connects to the photographer's phone without the Pix server. No sign-in is needed. | Should | It 3 |
+| FR-9.3 | For security, the photographer's phone accepts only one phone per QR code. Later attempts are refused. | Should | It 3 |
+| FR-9.4 | When a phone connects, both phones show "Connected" with the other phone's name. The live view and remote control start only after both people tap *Resume*, so a stranger who connected first cannot join unnoticed. *Cancel* ends the connection and shows a new QR code. | Should | It 3 |
+| FR-9.5 | The session works over the hotspot alone. Pose generation still needs the photographer's phone to have its own internet connection. | Should | It 3 |
+
+#### F10 · Settings and help
+*Make Pix fit the user, and show how it works.*
+
+| ID | Requirement | Priority | Target |
+|---|---|---|---|
+| FR-10.1 | A settings screen holds the language, the guide's color and thickness (FR-3.10), a latency indicator for sessions, and how-to-use help. | Must | It 3 |
+| FR-10.2 | The UI is available in English and Korean. It follows the phone's language by default, and the settings screen can switch it. | Must | It 3 |
+| FR-10.3 | A setting shows a latency indicator on both phones during a session, with the live view's current delay. | Should | It 3 |
+| FR-10.4 | A short tutorial runs the first time Pix opens. The settings screen can start it again and has a how-to-use help. | Should | It 3 |
 
 ### 4.4 User stories and acceptance criteria
 
@@ -483,14 +501,39 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Failure** | The phones are on different networks | I tap *Join* with a valid code | *Subject view* opens with "Connecting…", and *Connection lost* follows if the phones cannot connect within 15 s. "Couldn't connect. Make sure both phones are on the same Wi-Fi." appears only when the session cannot be reached. |
 
 #### US-14 · Get the photos on my phone
-<sub>F6 · FR-6.14 · Iteration 3 · Could</sub>
+<sub>F6 · FR-6.14 · Iteration 3</sub>
 
 > As a subject, I want to receive the photos taken of me during the session, so that I do not have to ask for them afterward.
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | Dongje took a photo during our session | Dongje taps *Send to Junhyeong* | The photo arrives in my "Pix" album at full resolution. |
+| **Normal** | We are in a session | Dongje takes a photo | The photo is also saved to my "Pix" album at full resolution, without the guide. |
 | **Failure** | A photo is being sent | The connection drops | Sending resumes after reconnecting. If the session has ended, Dongje sees "Couldn't send". |
+
+#### US-15 · Know how to take the generated pose
+<sub>F4 · FR-4.10 · Iteration 3</sub>
+
+> As a photographer, I want a short tip for the pose I picked, so that I know how to move the camera to match it.
+
+| Case | Given | When | Then |
+|---|---|---|---|
+| **Normal** | Four candidates are being generated | A candidate appears on *Pick a pose* | Its tip appears below it soon after, such as "Step back a little and hold the camera lower". |
+| **Normal** | I picked a candidate with a tip | I use it as the guide | The Camera screen shows the tip in a panel that I can close and open again. |
+| **Edge** | I made the guide from an uploaded reference photo | The guide is on the Camera screen | No tip is shown. |
+| **Failure** | A tip cannot be made | I look at the candidate | The candidate can still be picked and used as the guide, without a tip. |
+
+#### US-16 · Choose the pose from my phone as the subject
+<sub>F6 · FR-6.15, FR-6.16 · Iteration 3</sub>
+
+> As a subject, I want to choose or generate the pose from my own phone, so that I pick the pose I will make.
+
+| Case | Given | When | Then |
+|---|---|---|---|
+| **Normal** | We are connected | I open *Generate poses here* on *Subject view* | Both phones show the scene photo step with Dongje's camera. |
+| **Normal** | Both phones show *Generate poses* | I tap *Generate 4 poses* first | Both phones go on to *Generating poses* with my description. |
+| **Normal** | Both phones show *Pick a pose* | Dongje uses a candidate first | Both phones go on with Dongje's choice, and the guide appears on both. |
+| **Normal** | A guide is saved on my phone | I open *Add a pose guide* on *Subject view* and tap it | The guide appears on both phones. |
+| **Normal** | A guide is on both phones | I tap *Save guide* on my phone | The guide is saved on my phone. |
 
 ---
 
@@ -512,9 +555,9 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 | NFR-10 | Reliability | At least 90% of sessions connect in each network combination: same Wi-Fi, different Wi-Fi, Wi-Fi with cellular, and cellular with cellular. (It 3) | 10 trials per combination. |
 | NFR-11 | Reliability | A drop shorter than 10 s recovers without a new invitation. Switching from Wi-Fi to cellular during a session does not crash the app. (It 3) | Turn on airplane mode for 5 s during a session; switch Wi-Fi off. |
 | NFR-12 | Resource use | A 10-minute session uses at most 10% of the photographer's battery. The live view uses at most 2.5 Mbps, about 190 MB per 10 minutes. | Battery statistics; bitrate from connection statistics. |
-| NFR-13 | Privacy | Reference photos and saved guides never leave the phone. A scene photo is sent only when the user asks for poses, only to the Pix server, which passes it to the image-editing service to generate the poses (FR-4.2) and keeps no copy once the response is returned. Nothing from the live view is recorded or stored on any server. The server stores only what accounts, friends, and invitations need: the Google account identifier, the Pix ID, the display name, a hash of the password for an account that has one, friendships and requests, the push-notification device token, and a hash of each signed-in phone's refresh token, plus the hashes of the refresh tokens it has already exchanged, for at most one sign-in lifetime (30 days), so a reused one can be detected; access tokens are not stored. Tokens and personal data are never written to logs. | Code review; server log review. |
+| NFR-13 | Privacy | Reference photos and saved guides never leave the phone. A scene photo is sent only when the user asks for poses, only to the Pix server, which passes it to the image-editing service to generate the poses and, with each candidate, to a vision model for its tip (FR-4.2, FR-4.10), and keeps no copy once the response is returned. Nothing from the live view is recorded or stored on any server. The server stores only what accounts, friends, and invitations need: the Google account identifier, the Pix ID, the display name, a hash of the password for an account that has one, friendships and requests, the push-notification device token, and a hash of each signed-in phone's refresh token, plus the hashes of the refresh tokens it has already exchanged, for at most one sign-in lifetime (30 days), so a reused one can be detected; access tokens are not stored. Tokens and personal data are never written to logs. | Code review; server log review. |
 | NFR-14 | Security | API keys exist only on the server. Traffic between the phone and the Pix server uses HTTP and WS, without transport encryption, because the course-provided servers are reachable only over HTTP on port 80; the app allows unencrypted traffic only to those servers, and the server's own calls to outside services use HTTPS. The server verifies Google sign-ins and issues its own session tokens; the Google token itself is never stored. A password crosses the same unencrypted HTTP at sign-up and sign-in, is stored only as an argon2id hash, and login attempts are not limited for now. A sign-in gives a 15-minute access token (a JWT the server signs) and a refresh token that lasts 30 days from its last use and is replaced on every refresh; a refresh token used twice ends the sign-in, and sign-out ends it at once, the access token within 15 minutes. The live view and control messages are encrypted end to end between the phones, and the relay server cannot read them. | Inspect the APK for keys; configuration review. |
-| NFR-15 | Access control | Only accepted friends can invite each other (It 3). Pix IDs are found only by exact match. Remote control works only while the photographer allows it (Could, It 3). One network address may send at most 100 wrong room codes in 10 minutes; after that every join from it is refused for a while, so a code cannot be guessed. A QR connection accepts only one phone and starts only after both people tap *Resume* (It 3–4). | API tests with non-friend and blocked cases; a third phone tries to join a QR session. |
+| NFR-15 | Access control | Only accepted friends can invite each other (It 3). Pix IDs are found only by exact match. Remote control works only while the photographer allows it (Could, It 3). One network address may send at most 100 wrong room codes in 10 minutes; after that every join from it is refused for a while, so a code cannot be guessed. A QR connection accepts only one phone and starts only after both people tap *Resume* (It 3). | API tests with non-friend and blocked cases; a third phone tries to join a QR session. |
 | NFR-16 | Usability | Controls on *Subject view* are at least 48 dp and reachable with one thumb. Every failure screen says what happened and offers both a retry and a way back. A first-time user can add a guide and take a photo without help. | Hallway test with 5 people: at least 4 finish "add a guide and shoot" within 1 minute. |
 | NFR-17 | Compatibility | Pix runs on Android phones in portrait orientation. It is tested on a Galaxy S22, a Galaxy S23 Ultra, and a Galaxy S21. The minimum version is Android 10 (API 29). | Full test pass on every test device each iteration. |
 | NFR-18 | Scalability | The server handles at least 50 sessions at the same time (100 users). This is sized for demos and the UAT, not for a public launch. | Load test script. |
@@ -526,7 +569,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 
 ### 6.1 Wireframe overview
 
-The low-fidelity wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur.
+The low-fidelity wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below.
 
 - **Arrows**: user input or system event, labeled
 - **Dashed coral frame**: failure case
@@ -563,7 +606,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 | **Scene photo · Review** | The same screen with "Use this photo?" and *Cancel*; the photo that was taken, in place of the preview; "Pix sends this photo to create the poses."; *Shoot again* and *Use this photo*. | *Use this photo* → Generate poses · *Shoot again* → Scene photo · *Cancel* → Camera. | No zoom while the photo is shown. Nothing is sent before *Use this photo*. System back is *Shoot again*. |
 | **Generate poses** | *Cancel* as a back arrow; "Describe a pose, or let Pix suggest four for this place"; a thumbnail of the scene photo; idea chips; a description field for Korean or English with a "0/100" counter; after a refused description, "The last set was refused. Try a different description, or another photo." under the field; *Generate 4 poses*; *Skip, suggest poses for me*. | Tap a chip → its text replaces the field's · Type → the counter updates · *Generate 4 poses* → Generating poses with the description · *Skip, suggest poses for me* → Generating poses with poses suggested for the scene · *Cancel* → Camera. | Input stops at 100 characters. An empty field with *Generate 4 poses* asks for suggested poses. Nothing is sent before one of the two buttons. System back is *Cancel*. |
 | **Generating poses** | The scene photo, labeled "Your photo" and "Same person and place · up to 60 s"; four slots that fill in as candidates arrive, "Couldn't create" in a slot that failed; "n of 4 ready" beside the title. "Choosing poses…" (suggested poses) or "Creating…" (a description) and no slots until the server has given the poses: the suggested poses, or the variations of a description. | *Cancel* → Camera · All four done (ready or failed) with at least one ready, or 60 s with at least one ready → Pick a pose. | Candidates cannot be selected until generation ends. No candidate, or an error → Couldn't create poses. |
-| **Pick a pose** | "Pick a pose" with a back arrow and "Tap one to use it as the guide"; 2×2 grid of the candidates that were created, without pose names; the selected one is highlighted. | Tap a candidate → select · Back (or system back) → Camera, and the candidates are discarded · *Use this pose* → Reference confirm (Flow 1) · *Try other poses* → Generate poses with the scene photo and the description kept. | *Use this pose* is disabled until a candidate is selected. |
+| **Pick a pose** | "Pick a pose" with a back arrow and "Swipe to see each pose"; the candidates that were created, one at a time as large as the screen allows, without pose names, with the previous and the next showing at the sides; below, the position ("2 / 4", read by TalkBack as "Pose 2 of 4") unless only one was created. | Swipe → the next or the previous candidate, which becomes the selected one · Back (or system back) → Camera, and the candidates are discarded · *Use this pose* → Reference confirm (Flow 1) with the candidate on screen · *Try other poses* → Generate poses with the scene photo and the description kept. | The candidate on screen is always the selected one, so *Use this pose* works as soon as the screen opens; a candidate selected before the screen opens is the one shown. |
 | **Couldn't create poses** | "The request failed or took longer than 60 seconds. Your photo is kept, so you can try again." and the scene photo. If the service refused every pose of a description: "The AI service would not create poses for “…” with this photo. Try a different description, or go back to the camera and take another photo.". | *Try again* → Generating poses with the same photo · after a refused description, *Edit description* in place of *Try again* → Generate poses with the text kept · *Back to camera* → Camera. | — |
 
 ### 6.4 Flow 3 · Add a friend by Pix ID
@@ -580,10 +623,10 @@ In the tables below, **Input → result** lists what the user can do on the scre
 |---|---|---|---|
 | **Friends (empty)** | A back arrow; "Friends" over "Shoot together · Invite a friend to see your camera live"; the account button; "No friends yet" and "Add a friend with their Pix ID"; *Add a friend*; *Use a room code*; "My Pix ID: dongje.p". | *Add a friend* → Add a friend · *Use a room code* → Room code (Flow 6) · The account button → Account · Tap own Pix ID → copied · Back arrow or system back → Camera. | No account yet → *Friends (signed out)*. |
 | **Add a friend** | A back arrow; search field for a Pix ID ("Their Pix ID"); *Search* at the bottom ("Searching…" while it runs); result card with name, @ID, and *Add*; note "Junhyeong gets a friend request and accepts it in Pix." | Type an ID and *Search* → result or No user found · *Add* → "Requested" with *Withdraw request* · *Withdraw request* → *Add* again · *Accept* (a request they sent) → friends · Back → Friends. | Characters other than a–z, 0–9, ".", "_" are not accepted. Search is disabled while the field is empty. Own ID → "This is you", an existing friend → "Friends", a request the user sent → "Requested" with *Withdraw request*, a request the other person sent → *Accept*, instead of *Add*. A failed search → its reason under the field. |
-| **Friends (list)** | Friend rows with name, "Online · @id" or "Offline · @id", and *Invite*; *Add a friend*; *Use a room code*; "My Pix ID: …"; once invitations are built ([#55]), "Works on Wi-Fi or cellular data". | *Invite* → Invite sent (Flow 4) · *Add a friend* → Add a friend · *Use a room code* → Room code (Flow 6) · Long-press a friend → *Remove friend* → "Remove Junhyeong?" ("You won't see each other in your friend lists. You can add each other again later.") → *Remove friend* or *Cancel*. | Friend already in a session → "&lt;name&gt; is in another session". |
+| **Friends (list)** | Friend rows with name, "Online · @id" or "Offline · @id", and *Invite*; *Add a friend*; *Use a room code*; "My Pix ID: …"; once invitations are built ([#119]), "Works on Wi-Fi or cellular data". | *Invite* → Invite sent (Flow 4) · *Add a friend* → Add a friend · *Use a room code* → Room code (Flow 6) · Long-press a friend → *Remove friend* → "Remove Junhyeong?" ("You won't see each other in your friend lists. You can add each other again later.") → *Remove friend* or *Cancel*. | Friend already in a session → "&lt;name&gt; is in another session". |
 | **No user found** | A state of *Add a friend*: the field in red, "No user found", and "Check the Pix ID with your friend and try again."; *Search* reads *Search again*. | *Search again* → the field, with the text kept · Back → Friends. | — |
 | **Friends (signed out)** | "Shoot together · Invite a friend to see your camera live"; "Shoot with friends: Sign in to add friends by their Pix ID and invite them to shoot together." | *Sign in to add friends* → Sign in · *Use a room code instead* → Room code (Flow 6) · System back → Camera. | An account made with Google without a Pix ID sees "Choose your Pix ID" and *Choose a Pix ID* → Pix ID setup instead. |
-| **Friends (requests)** | Received friend requests above the friend list, each with name, @ID, *Accept*, and *Decline*. Lists refresh every 10 s while the screen is shown; online friends show "Online"; "In a session" shows once a session's own connection is signed in ([#55], [#56]), and until then a friend in a session shows "Online". "Sent requests · 2" above the list while requests the user sent wait for an answer (FR-5.16). | *Accept* → the friend joins the list · *Decline* → the request disappears (US-8) · *Sent requests · 2* → Sent requests. | A request already withdrawn → "This request is no longer there." A failed refresh → "Couldn't update your friends. Check your connection." above the list. A sign-in the server ended → "You were signed out. Sign in again to see your friends." *Invite* stays disabled until invitations are built ([#55]). |
+| **Friends (requests)** | Received friend requests above the friend list, each with name, @ID, *Accept*, and *Decline*. Lists refresh every 10 s while the screen is shown; online friends show "Online"; "In a session" shows once a session's own connection is signed in ([#119]), and until then a friend in a session shows "Online". "Sent requests · 2" above the list while requests the user sent wait for an answer (FR-5.16). | *Accept* → the friend joins the list · *Decline* → the request disappears (US-8) · *Sent requests · 2* → Sent requests. | A request already withdrawn → "This request is no longer there." A failed refresh → "Couldn't update your friends. Check your connection." above the list. A sign-in the server ended → "You were signed out. Sign in again to see your friends." *Invite* stays disabled until invitations are built ([#119]). |
 | **Sign in** | Pix ID and password fields; *Sign in*; *Continue with Google*; "New to Pix? Sign up". | *Sign in* → Friends (or Pix ID setup for an account without one) · *Continue with Google* → Google's account chooser → Friends, or "Do you already have a Pix account?" · *Sign up* → Sign up · *Back* → Friends. | *Sign in* is disabled until both fields are filled. A wrong Pix ID or password → "The Pix ID or the password is wrong." |
 | **"Do you already have a Pix account?"** | A dialog after a Google account that no Pix account uses (FR-5.13). | *Yes, sign in* → Sign in, now saying the Google account is added once the person signs in, without Google and *Sign up* · *No, make one* → a new account → Pix ID setup. | Closing it forgets the Google account. |
 | **Sign up** | Pix ID, name, and password fields, each with its rule under it: "4–20 characters: a–z, 0–9, ".", "_"", "1–30 characters", "8–64 characters with a letter and a digit"; "There is no email, so a forgotten password can't be reset." *Check* beside the Pix ID field (FR-5.15). | *Sign up* → Friends, signed in · *Back* → Sign in · *Check* → "Checking…", then "test5 is available" or "This Pix ID is taken" under the field, until the field changes. | A broken rule turns red and *Sign up* stays disabled (US-6); a password equal to the Pix ID says so; a taken Pix ID → "This Pix ID is taken" under the field, with the input kept. *Check* is disabled until the Pix ID follows the rule; no answer → "Couldn't reach Pix. Check your connection and try again." under the field. |
@@ -637,8 +680,11 @@ These screens follow from the requirements above but are not yet in the wirefram
 | Invitation no longer available | Shown when an expired or cancelled invitation is opened. Iteration 3, with invitations. | FR-6.4 |
 | Invite sent (update) | *Share invite link* and *Copy link*; the remote-control toggle only if it is built. Iteration 3, with invitations. | FR-6.1, FR-6.2, FR-7.5 |
 | Subject view, control blocked | Disabled remote controls with the reason. Could item, Iteration 3. | FR-7.5 |
-| Selfie mode and Settings | Front camera; a settings screen with the guide color, a frame-delay indicator for remote sessions, and the language (It 3–4). | Iteration 3–4 scope (4.1) |
-| Show QR, Scan QR, Connected | The QR code and hotspot status; the scanner; both phones confirm with *Resume*. | FR-9.1–9.4 |
+| Selfie mode, Settings, and the tutorial | The front camera; the settings screen with the language, the guide's color and thickness, the latency indicator, and help; the first-use tutorial. Iteration 3. | FR-1.14, FR-10.1–10.4 |
+| Show QR, Scan QR, Connected | The QR code and hotspot status; the scanner; both phones confirm with *Resume*. Iteration 3. | FR-9.1–9.4 |
+| Pose tips | Each candidate's tip below it on *Pick a pose*; the tip panel on the Camera screen. Iteration 3. | FR-4.10 |
+| Prompt history | Past descriptions on *Generate poses*, the toggle between all and with this person, and ✕ to delete. Iteration 3. | FR-4.11 |
+| Subject view, choosing the pose | *Guide* and *Generate poses here* on *Subject view*, and the same step on both phones. Iteration 3. | FR-6.15, FR-6.16 |
 
 ### 6.9 Rules for every screen
 
@@ -647,7 +693,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 - **Waiting states** always say what the app is waiting for and how long it may take, and offer *Cancel*.
 - **Failure screens** always state what happened in plain words, offer a primary retry, and offer a way back. No screen is a dead end.
 - **The guide** is drawn only inside the camera image, as an outline of the person that never shows the reference's pixels or background, so it is not mistaken for a control or for the scene: a white line about 3 dp wide, with no fill (Design 2.6.1).
-- **Language.** The UI is in English. A Korean translation comes with a language setting at the end, if there is time (Iteration 3–4).
+- **Language.** The UI is in English and Korean, following the phone's language unless the settings screen chooses one (FR-10.2).
 
 ---
 
@@ -656,11 +702,11 @@ These screens follow from the requirements above but are not yet in the wirefram
 **Assumptions**
 - Both people have an Android phone with Pix installed.
 - The photographer's phone has a rear camera. Multiple lenses are optional.
-- Pose generation, friends, and invitations need an internet connection. Friends and invitations also need a Pix account, made with a Pix ID and a password or with Google. The camera and gallery guides work offline, and from Iteration 3–4 two phones can connect offline with a QR code (F9).
+- Pose generation, friends, and invitations need an internet connection. Friends and invitations also need a Pix account, made with a Pix ID and a password or with Google. The camera and gallery guides work offline, and from Iteration 3 two phones can connect offline with a QR code (F9).
 
 **Constraints**
 - The image-editing API has usage costs and rate limits. Pix uses OpenRouter's Image API, which bills each generated image, so the server limits how many poses one network address can request per hour (phones behind one Wi-Fi or carrier address share the limit), and, separately, how many pose suggestions it can ask for. It also limits how many poses all phones together can request in a day, because pose generation needs no account.
-- The Pix server runs on the two course-provided servers with Docker and nginx, one for the stable build and one for development. They are reachable only over HTTP on port 80, so there is no HTTPS or WSS (NFR-14), and they cannot host a TURN relay, so sessions across networks use a managed relay service (Cloudflare). GitHub hosting serves only static pages and cannot run the server.
+- The Pix server runs on the two course-provided servers with Docker and nginx, one for the stable build and one for development. They are reachable only over HTTP on port 80, so there is no HTTPS or WSS (NFR-14), and they cannot host a TURN relay, so sessions across networks use a managed relay service (Cloudflare). Until the course servers can be reached from outside the campus network, a temporary server on AWS with the same setup serves the user test and sessions across networks. GitHub hosting serves only static pages and cannot run the server.
 - Development follows the course schedule: about 10 hours of work per member per iteration.
 
 **Out of scope**
@@ -689,7 +735,9 @@ These screens follow from the requirements above but are not yet in the wirefram
 | **Reference thumbnail** | A small copy of the reference photo in a corner of the Camera screen, so the photographer still sees the original pose. |
 | **Idea chip** | A short preset pose description on *Generate poses* that fills the description field when tapped. |
 | **Suggested pose** | One of four poses that the Pix server chooses for a scene photo when the user wrote no description; each becomes one pose candidate. |
-| **Pose variation** | One of three poses that the Pix server writes from the user's description for a scene photo, keeping what the description says and changing what it leaves open; with the description itself, each becomes one pose candidate. |
+| **Prompt template** | One of four ways the Pix server's prompt asks for the user's description, so that the four pose candidates differ. |
+| **Pose tip** | A short hint for one pose candidate on how to take it: stepping forward or back, zooming, or holding the camera higher, lower, or tilted. |
+| **Prompt history** | The descriptions the user wrote before, shown on *Generate poses* for all sessions or for the current partner. |
 | **Invite link** | A link to an invitation that the photographer shares when the push notification does not arrive; it opens the same *Invitation* screen (Iteration 3). |
 | **Pose candidate** | One of four images generated from the scene photo, showing the same person and place in a different pose. |
 | **Session** | A live connection between one photographer's phone and one subject's phone. |
@@ -698,13 +746,14 @@ These screens follow from the requirements above but are not yet in the wirefram
 | **Pix ID** | A unique user name, such as "junhyeong.h", that friends use to find each other. |
 | **Room code** | A 6-digit code that connects two phones on the same Wi-Fi without an account. |
 | **Relay** | A TURN service (Cloudflare's managed relay) that forwards the encrypted live view when the two phones cannot connect directly, for example on cellular data (Iteration 3). |
-| **QR connection** | Connecting two phones without internet: the photographer's phone creates a local hotspot and shows its details as a QR code, which the subject scans (Iteration 3–4). |
+| **QR connection** | Connecting two phones without internet: the photographer's phone creates a local hotspot and shows its details as a QR code, which the subject scans (Iteration 3). |
 | **Saved guide** | A guide stored on the phone to reuse later. |
 
 [#51]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/51
 [#52]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/52
 [#53]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/53
 [#54]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/54
-[#55]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/55
-[#56]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/56
 [#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96
+[#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
+[#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
+[#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119

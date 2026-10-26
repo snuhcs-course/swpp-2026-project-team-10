@@ -155,7 +155,9 @@
     <string name="ready_count">%1$d of %2$d ready</string>
     <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
-    <string name="pick_pose_body">Tap one to use it as the guide</string>
+    <string name="pick_pose_body">Swipe to see each pose</string>
+    <string name="pose_page_counter">%1$d / %2$d</string>
+    <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-24, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.View
@@ -35,8 +35,9 @@ import org.robolectric.annotation.GraphicsMode
  * with the shared GenerationViewModel put in the right phase before each screen's view is created. Generate poses: opens with the scene and the
  * idea chips, Generate 4 poses and Skip start a run and open Generating poses, Cancel. Generating poses: the set
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
- * Cancel. Pick a pose: only the ready candidates, Use this pose after a pick (to Reference confirm), Try other
- * poses (back to Generate poses), system back. Couldn't create poses: Try again, a rejected description with Edit
+ * Cancel. Pick a pose: only the ready candidates, one per page with a counter; the page on screen is the selected
+ * pose, so Use this pose works at once and takes the pose swiped to (to Reference confirm); a pose selected before
+ * the screen opens is the one shown; Try other poses (back to Generate poses), system back. Couldn't create poses: Try again, a rejected description with Edit
  * description, Back to camera.
  */
 @RunWith(AndroidJUnit4::class)
@@ -216,22 +217,32 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_showsOnlyTheReadyCandidates_andUseThisPoseAfterAPickOpensReferenceConfirm() {
+    fun pick_showsTheReadyCandidatesOneAtATime_andUseThisPoseTakesThePoseOnScreen() {
         val modules = modules()
         val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
         scenario = s
 
         s.onFragment { fragment ->
             val binding = FragmentPickPoseBinding.bind(fragment.requireView())
-            assertEquals(3, binding.candidateGrid.adapter?.itemCount)
-            assertFalse(binding.usePoseButton.isEnabled)
-            fragment.requireActivity().viewModel<GenerationViewModel>().select("pose-2")
+            assertEquals(3, binding.candidatePager.adapter?.itemCount)
+            assertEquals("1 / 3", binding.pageCounter.text.toString())
+            // The pose on screen is selected, so it can be used without a tap.
+            assertEquals(
+                "pose-1",
+                fragment.requireActivity().viewModel<GenerationViewModel>().uiState.value.selectedPoseId,
+            )
+            assertTrue(binding.usePoseButton.isEnabled)
+            binding.candidatePager.setCurrentItem(1, false)
         }
         idle()
 
         s.onFragment { fragment ->
             val binding = FragmentPickPoseBinding.bind(fragment.requireView())
-            assertTrue(binding.usePoseButton.isEnabled)
+            assertEquals(
+                "pose-2",
+                fragment.requireActivity().viewModel<GenerationViewModel>().uiState.value.selectedPoseId,
+            )
+            assertEquals("2 / 3", binding.pageCounter.text.toString())
             binding.usePoseButton.performClick()
         }
         idle()
@@ -243,6 +254,26 @@ class GenerationScreensTest {
             assertEquals(
                 GenerationUiState.Phase.IDLE,
                 it.requireActivity().viewModel<GenerationViewModel>().uiState.value.phase,
+            )
+        }
+    }
+
+    @Test
+    fun pick_poseSelectedBeforeTheScreenOpens_isTheOneShown() {
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) {
+            picking(modules, it)
+            it.viewModel<GenerationViewModel>().select("pose-4")
+        }
+        scenario = s
+
+        s.onFragment { fragment ->
+            val binding = FragmentPickPoseBinding.bind(fragment.requireView())
+            assertEquals(2, binding.candidatePager.currentItem)
+            assertEquals("3 / 3", binding.pageCounter.text.toString())
+            assertEquals(
+                "pose-4",
+                fragment.requireActivity().viewModel<GenerationViewModel>().uiState.value.selectedPoseId,
             )
         }
     }

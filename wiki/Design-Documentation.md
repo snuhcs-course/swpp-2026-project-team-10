@@ -1871,7 +1871,9 @@ swpp-2026-project-team-10/
 ├─ server/         FastAPI app with its Alembic migrations and Dockerfile; .env.example for secrets; scripts/ (model comparisons) and
 │                  tools/ (fake phones for testing); deploy/ with docker-compose, the nginx configuration, the deploy script, and the
 │                  systemd timer that deploys a new image (It 2)
-├─ wiki/           source of the GitHub wiki, with its images in wiki/images/; the wiki-sync workflow mirrors it on every push to dev
+├─ wiki/           source of the GitHub wiki, with its images in wiki/images/ and their drawings in wiki/design/ (the
+│                  architecture figure, the wireframes one file per flow, and render.py, which renders them); the wiki-sync
+│                  workflow mirrors it on every push to dev
 └─ .github/        pull-request template; CI (Android lint and tests, server lint and tests, the server image), the deploy watcher, and
                    the wiki-sync workflow
 ```

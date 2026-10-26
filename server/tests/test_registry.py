@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 """The registry on the session store, without sockets. Each registry stands for one worker process."""
 
 import asyncio
@@ -165,11 +165,12 @@ async def test_room_created_through_one_worker_is_joined_through_another(make_re
     # The subject signals right after joining; the photographer must still hear about the join first.
     await handle(second, subject, type="room.join", code=room["code"])
     await handle(second, subject, **answer)
+    # A registry without a relay gives every phone the STUN server only.
     assert await receive(subject) == {
         "type": "session.joined",
         "sessionId": room["sessionId"],
         "role": "SUBJECT",
-        "iceServers": [],
+        "iceServers": [{"urls": ["stun:stun.cloudflare.com:3478"]}],
     }
     assert await receive(photographer) == {"type": "peer.joined"}
     assert await receive(photographer) == answer

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -42,6 +42,7 @@ from pix_server.poses.suggester import PoseSuggester
 from pix_server.signaling.registry import SessionRegistry
 from pix_server.signaling.router import router as signaling_router
 from pix_server.store import SessionStore, open_redis
+from pix_server.turn import TurnRelay
 
 # Starlette keeps an upload of up to 1 MiB in memory and spools a larger one to a temporary file. Refusing bigger
 # requests before they are parsed means a scene photo never reaches the disk (FR-4.9) and an upload cannot fill it.
@@ -74,6 +75,8 @@ def warn_about_missing_settings(settings: Settings) -> None:
         logger.warning("OPENROUTER_API_KEY is not set: pose requests answer UPSTREAM_ERROR")
     if not settings.google_client_id:
         logger.warning("PIX_GOOGLE_CLIENT_ID is not set: Google sign-in answers UNAVAILABLE")
+    if not settings.turn_key_id or settings.turn_api_token is None or not settings.turn_api_token.get_secret_value():
+        logger.warning("PIX_TURN_KEY_ID or PIX_TURN_API_TOKEN is not set: phones get STUN only, without the relay")
 
 
 def jwt_secret(settings: Settings) -> str:
@@ -88,14 +91,15 @@ def create_app(
     *,
     clock: Callable[[], float] = time.time,
     image_api: httpx2.AsyncBaseTransport | None = None,
+    turn_api: httpx2.AsyncBaseTransport | None = None,
     redis: Callable[[], Redis] | None = None,
     google: GoogleVerifier | None = None,
     password_hasher: PasswordHasher | None = None,
 ) -> FastAPI:
-    """`image_api` replaces the network connection to OpenRouter, for the image and suggestion models, `redis` opens
-    the session store, `google` verifies Google ID tokens, and `password_hasher` sets the cost of argon2id; tests pass
-    fakes or cheaper ones. `clock` is wall-clock time, because every worker compares it with times other workers
-    stored."""
+    """`image_api` replaces the network connection to OpenRouter, for the image and suggestion models, `turn_api` the
+    one to Cloudflare's TURN API, `redis` opens the session store, `google` verifies Google ID tokens, and
+    `password_hasher` sets the cost of argon2id; tests pass fakes or cheaper ones. `clock` is wall-clock time, because
+    every worker compares it with times other workers stored."""
     config = settings if settings is not None else Settings()
 
     @asynccontextmanager
@@ -103,26 +107,27 @@ def create_app(
         database = open_database(config.database_url)
         connection = redis() if redis is not None else open_redis(config)
         store = SessionStore(connection, config, clock)
-        registry = SessionRegistry(config, store)
         warn_about_missing_settings(config)
         app.state.settings = config
         app.state.clock = clock
         app.state.store = store
-        app.state.signaling = registry
         app.state.pose_limiter = PoseLimiter(store, config)
         app.state.passwords = Passwords(password_hasher or PasswordHasher())
         app.state.tokens = Tokens(jwt_secret(config), config.access_token_minutes * 60, clock)
         try:
             await migrate(database)
             app.state.database = async_sessionmaker(database, expire_on_commit=False)
-            # The generator enforces its own total deadline, so the client sets none.
+            # The generator and the relay enforce their own deadlines, so their clients set none.
             async with (
                 httpx2.AsyncClient(transport=image_api, timeout=None) as http,
                 httpx2.AsyncClient() as google_http,
+                httpx2.AsyncClient(transport=turn_api, timeout=None) as turn_http,
             ):
                 app.state.pose_generator = PoseGenerator(config, http)
                 app.state.pose_suggester = PoseSuggester(config, http)
                 app.state.google = google or GoogleTokenVerifier(config.google_client_id, google_http, clock)
+                registry = SessionRegistry(config, store, TurnRelay(config, turn_http).ice_servers)
+                app.state.signaling = registry
                 await registry.start()
                 try:
                     yield

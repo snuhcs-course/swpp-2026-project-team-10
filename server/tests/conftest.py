@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 import asyncio
 import base64
 import io
@@ -107,6 +107,34 @@ class ImageApi:
         return httpx2.Response(self.status, json=self.body)
 
 
+class TurnApi:
+    """Stands in for Cloudflare's TURN API. It records each request in `requests` and answers with `status` and `body`
+    after `delay`; `servers` is what a working API answers, in Cloudflare's shape."""
+
+    def __init__(self) -> None:
+        self.requests: list[httpx2.Request] = []
+        self.delay = 0.0
+        self.servers = [
+            {"urls": ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:443"]},
+            {
+                "urls": [
+                    "turn:turn.cloudflare.com:3478?transport=udp",
+                    "turn:turn.cloudflare.com:80?transport=tcp",
+                    "turns:turn.cloudflare.com:443?transport=tcp",
+                ],
+                "username": "test-turn-username",
+                "credential": "test-turn-credential",
+            },
+        ]
+        self.status = 201
+        self.body: object = {"iceServers": self.servers}
+
+    async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        await asyncio.sleep(self.delay)
+        return httpx2.Response(self.status, json=self.body)
+
+
 class FakeGoogle:
     """Stands in for Google's token check. A token `google:<subject>` or `google:<subject>:<name>` is valid; any
     other is invalid. `available = False` makes every check fail as if Google's keys could not be fetched, and
@@ -153,6 +181,11 @@ def image_api():
 
 
 @pytest.fixture
+def turn_api():
+    return TurnApi()
+
+
+@pytest.fixture
 def database_url(tmp_path):
     """A new SQLite file per test, or, with PIX_TEST_DATABASE_URL set, that PostgreSQL emptied first, which shows
     that the migrations and queries behave the same on the servers' database."""
@@ -191,6 +224,10 @@ def settings(database_url):
         suggestion_global_limit=500,
         join_failure_limit=10,
         join_failure_window_seconds=600,
+        turn_key_id="test-turn-key",
+        turn_api_token="test-turn-token",
+        turn_ttl_seconds=14400,
+        turn_timeout_seconds=3,
     )
 
 
@@ -271,11 +308,12 @@ def google():
 
 
 @pytest.fixture
-def client(settings, clock, image_api, open_store, google):
+def client(settings, clock, image_api, turn_api, open_store, google):
     app = create_app(
         settings,
         clock=clock,
         image_api=httpx2.MockTransport(image_api),
+        turn_api=httpx2.MockTransport(turn_api),
         redis=open_store,
         google=google,
         # Real argon2id at the lowest cost, so a test hashes in microseconds.

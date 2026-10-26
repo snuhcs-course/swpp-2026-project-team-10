@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 """The sockets of one server process, and the room protocol on top of the session store.
 
 Room state lives in Redis (Design Documentation 2.7), so a room created through one worker can be joined
@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from uuid import uuid4
@@ -21,6 +22,7 @@ from redis.exceptions import RedisError
 from pix_server.config import Settings
 from pix_server.signaling.messages import ClientMessage, Leave, ProtocolError, RoomCreate, RoomJoin, Signal
 from pix_server.store import Delivery, SessionStore, Window
+from pix_server.turn import stun_only
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +61,22 @@ def render(delivery: Delivery) -> str:
     raise ValueError(f"Unknown delivery: {delivery.kind} {delivery.detail}")
 
 
+async def stun_servers() -> list[dict]:
+    return stun_only()
+
+
 class SessionRegistry:
-    def __init__(self, settings: Settings, store: SessionStore) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: SessionStore,
+        ice_servers: Callable[[], Awaitable[list[dict]]] = stun_servers,
+    ) -> None:
+        """`ice_servers` gives the `iceServers` for one phone; each phone of a session asks once, when it gets its
+        place (Design 2.5.2, AD-14)."""
         self.settings = settings
         self.store = store
+        self.ice_servers = ice_servers
         self._peers: dict[str, Peer] = {}
         # Connections whose disconnect did not reach Redis; the housekeeping loop tries again.
         self._unreleased: set[str] = set()
@@ -227,7 +241,10 @@ class SessionRegistry:
             status, deliveries = await self.store.create(peer.id, session_id, code)
             await self._deliver(deliveries)
             if status == "OK":
-                self.send(peer, {"type": "room.created", "code": code, "sessionId": session_id, "iceServers": []})
+                ice_servers = await self.ice_servers()
+                self.send(
+                    peer, {"type": "room.created", "code": code, "sessionId": session_id, "iceServers": ice_servers}
+                )
                 return
             if status == "INVALID_STATE":
                 raise ProtocolError(status, JOIN_ERRORS[status])
@@ -243,7 +260,12 @@ class SessionRegistry:
             )
         status, session_id, deliveries = await self.store.join(peer.id, code, failures)
         if status == "OK":
-            self.send(peer, {"type": "session.joined", "sessionId": session_id, "role": "SUBJECT", "iceServers": []})
+            # Asked only once the place is taken, so wrong codes cost no credentials.
+            ice_servers = await self.ice_servers()
+            self.send(
+                peer,
+                {"type": "session.joined", "sessionId": session_id, "role": "SUBJECT", "iceServers": ice_servers},
+            )
         # The photographer's peer.joined is among these, and it must be on its way before this socket's next signal.
         await self._deliver(deliveries)
         if status != "OK":

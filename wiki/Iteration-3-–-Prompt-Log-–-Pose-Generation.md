@@ -8,7 +8,7 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 
 - [Dongje, 10-24] "Generating poses now shows the four photos split on one screen, and they are too small. Can you make it a slide so each photo can be seen large, one at a time, and a swipe shows the next suggested pose? Update dev first." (A `ViewPager2` on *Pick a pose*; *Generating poses* keeps its grid. No candidate could be generated off campus, so the review images were rendered under Robolectric with stand-in photos.)
 - [Dongje, 10-24] "Was *Try other poses* there before?"
-- [Dongje, 10-24] "Can the branch name be changed later? I want to open the PR from a branch named after the feature and rename it just before merging." (A rename on GitHub keeps the open PR.)
+- [Dongje, 10-24] "Can the branch name be changed later? I want to open the PR from a branch named after the feature and rename it just before merging." (The answer was that a rename on GitHub keeps the open PR. It does not: renaming closed #108 and #110, which were opened again as [#133] and [#135].)
 - [Dongje, 10-24] "Commit it and open the PR. This will go into Iteration 3, so keep that in mind for the documents." / "Keep the documents only locally for now, and open the PR for the code only."
 
 **Documents (10/26)**
@@ -26,8 +26,12 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-26] "Proceed so it merges without conflicts with #108." / "Cancel the emulator check and open the PR; I'll check on the S22 later." / "Remake the review image with openly licensed photos; that was my face."
 - [Dongje, 10-26] "Drop ML Kit, and let the model judge everything." (The phone no longer measures how much closer to get; the model judges it with the height and the angle.)
 - [Dongje, 10-26] "Document the tips as built, as compactly as possible." (The plan had a tip for each candidate on *Pick a pose*; the documents now follow the build.)
+- [Dongje, 10-26] "Check the Codex review on the PR, decide what to fix, and let me review the plan." / "Make the button position an A2 issue, with the camera screen's buttons and preview size; fix #2 too." (Fixed: the server cancels a dropped tip request, a tip names its guide, and numbers in words are refused; the request size stays, measured at 604 KB at most; the top bar went to [#136].)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
 [#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
 [#115]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/115
+[#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
+[#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
+[#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

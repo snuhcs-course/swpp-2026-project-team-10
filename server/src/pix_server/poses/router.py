@@ -4,7 +4,8 @@
 import asyncio
 import base64
 import time
-from typing import Annotated
+from collections.abc import Coroutine
+from typing import Annotated, Any, TypeVar
 
 from fastapi import APIRouter, Form, Request, UploadFile
 from pydantic import BaseModel
@@ -19,6 +20,8 @@ from pix_server.poses.tips import Angle, Framing, Height, Level, PoseTipper
 router = APIRouter(prefix="/api/v1")
 
 DISCONNECT_POLL_SECONDS = 0.25
+
+T = TypeVar("T")
 
 
 class PoseTemplateResponse(BaseModel):
@@ -53,6 +56,20 @@ async def count(request: Request, kind: Kind) -> None:
         raise ApiError(429, "RATE_LIMITED", "Too many pose requests from this device; try again later")
     if refused == "global":
         raise ApiError(429, "RATE_LIMITED", "Pix has made as many poses as it can for today; try again later")
+
+
+async def while_connected(request: Request, work: Coroutine[Any, Any, T]) -> T:
+    """Runs `work` while the phone stays connected. A phone that cancels closes its connection (Design Documentation
+    2.6.3); cancelling `work` then closes ours to the model, so no answer is waited for that nobody will read."""
+    call = asyncio.create_task(work)
+    try:
+        while not call.done():
+            if await request.is_disconnected():
+                raise ApiError(499, "CLIENT_CLOSED_REQUEST", "The request was cancelled")
+            await asyncio.wait({call}, timeout=DISCONNECT_POLL_SECONDS)
+        return call.result()
+    finally:
+        call.cancel()
 
 
 @router.get("/pose-templates")
@@ -106,19 +123,10 @@ async def create_pose(
     await count(request, "poses")
 
     generator: PoseGenerator = request.app.state.pose_generator
-    call = asyncio.create_task(generator.generate(scene, prompt, seed))
-    try:
-        while not call.done():
-            # A phone that cancels closes its connection (Design Documentation 2.6.3). Cancelling the call closes
-            # ours to the image API, which does not bill a generation it could not deliver.
-            if await request.is_disconnected():
-                raise ApiError(499, "CLIENT_CLOSED_REQUEST", "The request was cancelled")
-            await asyncio.wait({call}, timeout=DISCONNECT_POLL_SECONDS)
-        # A refusal keeps the generator's own message: the image service does not say whether it refused the photo or
-        # the text, and every pose of the current app, suggested ones included, arrives as a description (US-5).
-        candidate = call.result()
-    finally:
-        call.cancel()
+    # The image API does not bill a generation it could not deliver. A refusal keeps the generator's own message: the
+    # image service does not say whether it refused the photo or the text, and every pose of the current app,
+    # suggested ones included, arrives as a description (US-5).
+    candidate = await while_connected(request, generator.generate(scene, prompt, seed))
     return PoseResponse(
         templateId=template_id,
         image=base64.b64encode(candidate).decode(),
@@ -142,5 +150,6 @@ async def pose_tip(
     check_scene(candidate_bytes)
     await count(request, "tips")
     tipper: PoseTipper = request.app.state.pose_tipper
-    tip = await tipper.tip(scene_bytes, candidate_bytes, pose)
+    # A tip the phone stopped waiting for, because the user took another candidate, is not waited for either.
+    tip = await while_connected(request, tipper.tip(scene_bytes, candidate_bytes, pose))
     return PoseTipResponse(text=tip.text, framing=tip.framing, hold=tip.hold, height=tip.height, angle=tip.angle)

@@ -40,12 +40,12 @@ class PoseTipsTest {
         runCurrent()
         onCamera.value = guide
         runCurrent()
-        assertEquals(TipState.Preparing, tips.onCamera.value)
+        assertEquals(GuideTip("g1", TipState.Preparing), tips.onCamera.value)
 
         tipper.requests.single().answer(TEXT)
         runCurrent()
 
-        assertEquals(TipState.Ready(PoseTip(TEXT)), tips.onCamera.value)
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(TEXT))), tips.onCamera.value)
         val request = tipper.requests.single()
         assertSame(scene, request.scene)
         assertSame(candidate, request.candidate)
@@ -65,7 +65,7 @@ class PoseTipsTest {
         onCamera.value = guide
         runCurrent()
 
-        assertEquals(TipState.Ready(PoseTip(TEXT)), tips.onCamera.value)
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(TEXT))), tips.onCamera.value)
     }
 
     @Test
@@ -79,7 +79,7 @@ class PoseTipsTest {
         tipper.requests.single().fail()
         runCurrent()
 
-        assertEquals(TipState.Failed, tips.onCamera.value)
+        assertEquals(GuideTip("g1", TipState.Failed), tips.onCamera.value)
     }
 
     @Test
@@ -128,15 +128,15 @@ class PoseTipsTest {
         val second = guide("g2")
         tips.prepare(second, candidate, TipSource(scene, "Sit on the step"))
         runCurrent()
-        assertEquals(TipState.Ready(PoseTip(TEXT)), tips.onCamera.value)
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(TEXT))), tips.onCamera.value)
 
         onCamera.value = second
         runCurrent()
-        assertEquals(TipState.Preparing, tips.onCamera.value)
+        assertEquals(GuideTip("g2", TipState.Preparing), tips.onCamera.value)
         tipper.requests[1].answer("Crouch until the phone is at their eye level and keep it level.")
         runCurrent()
         assertEquals(
-            TipState.Ready(PoseTip("Crouch until the phone is at their eye level and keep it level.")),
+            GuideTip("g2", TipState.Ready(PoseTip("Crouch until the phone is at their eye level and keep it level."))),
             tips.onCamera.value,
         )
     }

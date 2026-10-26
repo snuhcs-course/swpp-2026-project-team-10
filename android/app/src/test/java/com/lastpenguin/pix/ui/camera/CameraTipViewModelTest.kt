@@ -2,6 +2,7 @@
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -27,7 +28,7 @@ import org.junit.Test
 /*
  * Partitions for the pose tip on the Camera screen (FR-4.10), state-based. The guide on the camera: none, one with a
  * tip, one without, a newer one with its own tip, removed. The tip: preparing, arriving while the banner is open or
- * closed, failing while it is open or closed. The user: a touch anywhere (with the banner open or closed, or no tip),
+ * closed, failing while it is open or closed, still the older guide's when the newer one comes. The user: a touch anywhere (with the banner open or closed, or no tip),
  * the tip button (with a tip, or after a failure).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -35,7 +36,7 @@ class CameraTipViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val store = ViewModelStore()
     private val guides = InMemoryGuideRepository()
-    private val tips = MutableStateFlow<TipState?>(null)
+    private val tips = MutableStateFlow<GuideTip?>(null)
     private val ready = TipState.Ready(PoseTip("Hold the phone at your chest and keep it level."))
 
     @Before
@@ -57,11 +58,11 @@ class CameraTipViewModelTest {
     fun aGuideWithATipOpensTheBanner_preparingUntilTheTipArrivesInPlace() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
-        tips.value = TipState.Preparing
+        tips.value = GuideTip("g1", TipState.Preparing)
         runCurrent()
         assertEquals(TipBanner("g1", TipState.Preparing, open = true), model.tip)
 
-        tips.value = ready
+        tips.value = GuideTip("g1", ready)
         runCurrent()
 
         assertEquals(TipBanner("g1", ready, open = true), model.tip)
@@ -70,7 +71,7 @@ class CameraTipViewModelTest {
     @Test
     fun noGuide_orAGuideWithoutATip_hasNoBanner() = runTest(dispatcher) {
         val model = model()
-        tips.value = ready
+        tips.value = GuideTip("g1", ready)
         runCurrent()
         assertNull(model.tip)
 
@@ -84,7 +85,7 @@ class CameraTipViewModelTest {
     fun aTouchAnywhereClosesTheBanner_andTheTipButtonOpensItAgain() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
-        tips.value = ready
+        tips.value = GuideTip("g1", ready)
         runCurrent()
 
         model.onAnyTouch()
@@ -100,11 +101,11 @@ class CameraTipViewModelTest {
     fun aTipThatArrivesWhileClosedIsUnseenUntilTheButtonOpensIt() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
-        tips.value = TipState.Preparing
+        tips.value = GuideTip("g1", TipState.Preparing)
         runCurrent()
         model.onAnyTouch()
 
-        tips.value = ready
+        tips.value = GuideTip("g1", ready)
         runCurrent()
         assertEquals(TipBanner("g1", ready, open = false, unseen = true), model.tip)
 
@@ -116,10 +117,10 @@ class CameraTipViewModelTest {
     fun aFailureIsSaidForANoticeWhileOpen_thenTheBannerClosesForGood() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
-        tips.value = TipState.Preparing
+        tips.value = GuideTip("g1", TipState.Preparing)
         runCurrent()
 
-        tips.value = TipState.Failed
+        tips.value = GuideTip("g1", TipState.Failed)
         runCurrent()
         assertEquals(TipBanner("g1", TipState.Failed, open = true), model.tip)
         advanceTimeBy(CameraViewModel.NOTICE_MS + 1)
@@ -133,11 +134,11 @@ class CameraTipViewModelTest {
     fun aFailureWhileClosedStaysClosed() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
-        tips.value = TipState.Preparing
+        tips.value = GuideTip("g1", TipState.Preparing)
         runCurrent()
         model.onAnyTouch()
 
-        tips.value = TipState.Failed
+        tips.value = GuideTip("g1", TipState.Failed)
         runCurrent()
 
         assertEquals(TipBanner("g1", TipState.Failed, open = false), model.tip)
@@ -147,12 +148,12 @@ class CameraTipViewModelTest {
     fun aNewerGuideOpensItsOwnTip_andARemovedGuideTakesItsTipAway() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
-        tips.value = ready
+        tips.value = GuideTip("g1", ready)
         runCurrent()
         model.onAnyTouch()
 
         guides.setGuide(fakeGuide("g2"))
-        tips.value = TipState.Preparing
+        tips.value = GuideTip("g2", TipState.Preparing)
         runCurrent()
         assertEquals(TipBanner("g2", TipState.Preparing, open = true), model.tip)
 
@@ -160,6 +161,23 @@ class CameraTipViewModelTest {
         tips.value = null
         runCurrent()
         assertNull(model.tip)
+    }
+
+    @Test
+    fun anOlderGuidesTipIsNotShownWithTheNewerGuide() = runTest(dispatcher) {
+        val model = model()
+        guides.setGuide(fakeGuide("g1"))
+        tips.value = GuideTip("g1", ready)
+        runCurrent()
+
+        // The guide changes before the tips follow it.
+        guides.setGuide(fakeGuide("g2"))
+        runCurrent()
+        assertNull(model.tip)
+
+        tips.value = GuideTip("g2", TipState.Preparing)
+        runCurrent()
+        assertEquals(TipBanner("g2", TipState.Preparing, open = true), model.tip)
     }
 
     @Test

@@ -100,6 +100,6 @@ class PoseTipScreenTest {
         s.onFragment { it.requireActivity().viewModel<ReferenceViewModel>().onUseGuide() }
         idle()
 
-        assertEquals(TipState.Ready(PoseTip(TIP)), modules.tips.onCamera.value)
+        assertEquals(TipState.Ready(PoseTip(TIP)), modules.tips.onCamera.value?.state)
     }
 }

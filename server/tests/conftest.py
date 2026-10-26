@@ -10,6 +10,7 @@ import fakeredis
 import httpx2
 import pytest
 import redis
+import uvicorn
 from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -65,7 +66,8 @@ class ImageApi:
     """Stands in for OpenRouter. The Image API records each request in `requests` and answers with `status` and
     `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
     `suggestion_status` and `suggestion_body` after `suggestion_delay`, except tip requests (the `tip` schema), which
-    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`."""
+    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. `cancelled` is set when a call is
+    cancelled while it waits for its answer."""
 
     def __init__(self) -> None:
         self.requests: list[httpx2.Request] = []
@@ -127,19 +129,22 @@ class ImageApi:
         schema = json.loads(request.content or b"{}").get("response_format", {}).get("json_schema", {})
         if request.url.path == "/api/v1/chat/completions" and schema.get("name") == "tip":
             self.tip_requests.append(request)
-            await asyncio.sleep(self.tip_delay)
+            await self.wait(self.tip_delay)
             return httpx2.Response(self.tip_status, json=self.tip_body)
         if request.url.path == "/api/v1/chat/completions":
             self.suggestion_requests.append(request)
-            await asyncio.sleep(self.suggestion_delay)
+            await self.wait(self.suggestion_delay)
             return httpx2.Response(self.suggestion_status, json=self.suggestion_body)
         self.requests.append(request)
+        await self.wait(self.delay)
+        return httpx2.Response(self.status, json=self.body)
+
+    async def wait(self, seconds: float) -> None:
         try:
-            await asyncio.sleep(self.delay)
+            await asyncio.sleep(seconds)
         except asyncio.CancelledError:
             self.cancelled.set()
             raise
-        return httpx2.Response(self.status, json=self.body)
 
 
 class FakeGoogle:
@@ -303,6 +308,22 @@ async def make_registry(settings, clock, open_store):
     for registry, connection in started:
         await registry.stop()
         await connection.aclose()
+
+
+@pytest.fixture
+async def live_server(settings, image_api, unused_tcp_port, open_store):
+    """Serves the app on a real socket and gives its address, for a test that closes a connection in the middle of a
+    request, which the test client cannot."""
+    app = create_app(settings, image_api=httpx2.MockTransport(image_api), redis=open_store)
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=unused_tcp_port, log_level="warning"))
+    serving = asyncio.create_task(server.serve())
+    try:
+        while not server.started:
+            await asyncio.sleep(0.01)
+        yield f"http://127.0.0.1:{unused_tcp_port}"
+    finally:
+        server.should_exit = True
+        await serving
 
 
 @pytest.fixture

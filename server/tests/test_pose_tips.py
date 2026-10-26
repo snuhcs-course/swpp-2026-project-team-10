@@ -3,10 +3,13 @@
 # either one not a JPEG, too large, carrying EXIF, or missing. Pose: one in Korean with extra whitespace, of 100
 # characters and of 101, blank, or missing. The model's answer: usable, with each framing it may judge; JSON in a code
 # fence; a sentence over lines; unusable (not JSON, a field missing, a value outside the schema, an empty
-# sentence, one over 160 characters, one with a number, a unit, or a degree, an empty message). The height move: the
-# phone lower, higher, or where it was. Upstream: a refusal (403), a failing status, an unreadable body, no answer in
-# time, no connection, no key. Limits: each window full, counted apart from poses and suggestions; refused input not
-# counted; the session store down. Privacy: neither the pose nor the answer nor the upstream body is logged.
+# sentence, one over 160 characters, one with a number in digits or in words, "one" before a step, a unit, or a
+# degree, an empty message), and a sentence whose words only contain a number ("often", "someone"). The height move:
+# the phone lower, higher, or where it was. Upstream: a refusal (403), a failing status, an unreadable body, no answer
+# in time, no connection, no key. The phone: staying connected, or dropping the request while the model works.
+# Limits: each window full, counted apart from poses and suggestions; refused input not counted; the session store
+# down. Privacy: neither the pose nor the answer nor the upstream body is logged.
+import asyncio
 import base64
 import json
 
@@ -121,8 +124,11 @@ def test_height_move_compares_where_the_phone_was_with_where_it_should_be(client
             ANSWER
             | {"text": "Zoom in or take a step closer,\n  hold the phone at your waist and tilt it up a\nlittle."}
         ),
+        json.dumps(
+            ANSWER | {"text": "Someone this tall often looks best from your waist, with the phone tilted up a little."}
+        ),
     ],
-    ids=["code fence", "sentence over lines"],
+    ids=["code fence", "sentence over lines", "words containing a number"],
 )
 def test_usable_answer_in_another_shape_is_read(client, image_api, photos, content):
     image_api.tip_answers(content)
@@ -142,6 +148,8 @@ def test_usable_answer_in_another_shape_is_read(client, image_api, photos, conte
         json.dumps(ANSWER | {"text": "  "}),
         json.dumps(ANSWER | {"text": "Hold the phone at your waist. " * 6}),
         json.dumps(ANSWER | {"text": "Take 2 steps back and hold the phone at your waist."}),
+        json.dumps(ANSWER | {"text": "Take two steps back and hold the phone at your waist."}),
+        json.dumps(ANSWER | {"text": "Take one step closer and hold the phone at your waist."}),
         json.dumps(ANSWER | {"text": "Step back about a meter and hold the phone at your waist."}),
         json.dumps(ANSWER | {"text": "Tilt the phone up by fifteen degrees."}),
         json.dumps(ANSWER | {"text": "Tilt the phone up 15°."}),
@@ -157,6 +165,8 @@ def test_usable_answer_in_another_shape_is_read(client, image_api, photos, conte
         "empty sentence",
         "too long",
         "number",
+        "number in words",
+        "one step",
         "unit",
         "degrees",
         "degree sign",
@@ -192,6 +202,32 @@ def test_slow_model_times_out(client, image_api, photos, settings):
     response = ask(client, photos)
     assert_error(response, 504, "UPSTREAM_TIMEOUT")
     assert response.elapsed.total_seconds() < 2
+
+
+async def test_dropped_request_cancels_the_model_call(live_server, image_api, photos):
+    # The phone drops the request when the user takes another candidate before the tip arrives.
+    image_api.tip_delay = 30
+    scene, candidate = photos
+    async with httpx2.AsyncClient(base_url=live_server) as phone:
+        with pytest.raises(httpx2.ReadTimeout):
+            await phone.post(
+                "/api/v1/pose-tips",
+                files={
+                    "scene": ("scene.jpg", scene, "image/jpeg"),
+                    "candidate": ("candidate.jpg", candidate, "image/jpeg"),
+                },
+                data={"pose": POSE},
+                timeout=0.2,
+            )
+    assert len(image_api.tip_requests) == 1
+    async with asyncio.timeout(2):
+        await image_api.cancelled.wait()
+
+
+def test_request_that_stays_connected_is_not_cancelled(client, image_api, photos):
+    image_api.tip_delay = 0.6
+    assert ask(client, photos).status_code == 200
+    assert not image_api.cancelled.is_set()
 
 
 def test_unreachable_model_is_an_upstream_error(settings, photos, open_store, clock):

@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
@@ -139,7 +140,7 @@ class CameraViewModel(
     private val settings: CameraSettings = CameraSettings.InMemory(),
     private val savedGuides: SavedGuideStore = SavedGuideStore.InMemory(),
     /** The tip of the guide on the camera (`PoseTips.onCamera`, FR-4.10). */
-    private val tips: StateFlow<TipState?> = MutableStateFlow(null),
+    private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
@@ -212,7 +213,11 @@ class CameraViewModel(
                 .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
         }
         viewModelScope.launch {
-            combine(guides.guide.map { it?.id }.distinctUntilChanged(), tips) { id, tip -> id to tip }
+            // A tip is shown only with its own guide: the guide changes here before the tips follow it, and a tip
+            // still named for the guide before has none.
+            combine(guides.guide.map { it?.id }.distinctUntilChanged(), tips) { id, tip ->
+                id to tip?.takeIf { it.guideId == id }?.state
+            }
                 .collect { (id, tip) ->
                     _uiState.update { it.copy(tip = nextTip(it.tip, id, tip)) }
                     if (tip == TipState.Failed) closeFailedTip()

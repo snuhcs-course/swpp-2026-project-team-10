@@ -28,6 +28,9 @@ sealed interface TipState {
     data object Failed : TipState
 }
 
+/** A guide's tip, with the guide it is for, so a screen never shows it with another guide (FR-4.10). */
+data class GuideTip(val guideId: String, val state: TipState)
+
 /**
  * The tip for the guide on Camera (FR-4.10; Design 2.6.3, Pose tips). [prepare] asks for the tip of a guide made from
  * a candidate while the user looks at it on Reference confirm; when that guide goes on Camera, its tip comes with it,
@@ -53,9 +56,14 @@ class PoseTips(
     private val tips = MutableStateFlow(Tips())
     private var asking: Job? = null
 
-    /** The tip of the guide on Camera, or null when it has none. */
-    val onCamera: StateFlow<TipState?> =
-        tips.map { it.states[it.onCamera] }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
+    /**
+     * The tip of the guide on Camera, or null when it has none. It names its guide: this follows [guideOnCamera] on
+     * [scope], so a screen that watches the guide too can see the new guide while this still holds the old one's tip.
+     */
+    val onCamera: StateFlow<GuideTip?> =
+        tips.map { tips -> tips.onCamera?.let { id -> tips.states[id]?.let { GuideTip(id, it) } } }
+            .distinctUntilChanged()
+            .stateIn(scope, SharingStarted.Eagerly, null)
 
     init {
         scope.launch {

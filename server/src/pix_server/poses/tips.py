@@ -47,8 +47,16 @@ ANSWER_SCHEMA = {
     "required": ["shot", "pose", "camera_now", "camera_best", "angle", "framing", "text"],
     "additionalProperties": False,
 }
-# A number, a unit, or a degree is hard to follow while shooting, so a sentence with one is not shown.
-MEASURE = re.compile(r"\d|°|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b", re.IGNORECASE)
+# A number, a unit, or a degree is hard to follow while shooting, so a sentence with one is not shown: digits, numbers
+# in words ("two steps"), "one" before a step or a unit, units, and degrees.
+NUMBER_WORDS = (
+    "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
+)
+MEASURE = re.compile(
+    rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
+    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)

@@ -59,8 +59,16 @@ CANDIDATE_LONG_SIDE = 768
 JPEG_QUALITY = 85
 CONCURRENCY = 4
 TEXT_MAX_LENGTH = 140
-# A tip says how to hold the camera in words; a number, a unit, or a degree is hard to follow while shooting.
-MEASURE = re.compile(r"\d|\b(meters?|metres?|cm|centimet|inch|inches|feet|foot|degrees?)\b|°", re.IGNORECASE)
+# A tip says how to hold the camera in words; a number, a unit, or a degree is hard to follow while shooting. The same
+# check as the server's `MEASURE` in poses/tips.py.
+NUMBER_WORDS = (
+    "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
+)
+MEASURE = re.compile(
+    rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
+    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b",
+    re.IGNORECASE,
+)
 
 # Where the photographer holds the camera, by their own posture, lowest first. The model places the camera of photo 1
 # and the best one for the pose, in the order of the schema, so it decides the shot and the pose first; the script

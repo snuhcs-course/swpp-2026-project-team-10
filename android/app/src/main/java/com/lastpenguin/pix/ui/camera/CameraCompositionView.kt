@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -32,6 +32,7 @@ class CameraCompositionView @JvmOverloads constructor(
         strokeWidth = density * 4.5f
         strokeCap = Paint.Cap.ROUND
     }
+    private val dim = Paint().apply { color = Color.argb(DIM_ALPHA, 0, 0, 0) }
     private val levelColor = context.getColor(R.color.camera_level_aligned)
     private var frame = ViewfinderFrame(0f, 0f, 0f, 0f)
     private var level: CameraLevel? = null
@@ -42,6 +43,14 @@ class CameraCompositionView @JvmOverloads constructor(
             if (field == value) return
             field = value
             frame = fitViewfinderFrame(width.toFloat(), height.toFloat(), value)
+            invalidate()
+        }
+
+    /** Darkens the camera's image outside the frame, as 1:1 shows inside the 4:3 area (R&S 6.2). */
+    var dimOutside: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
             invalidate()
         }
 
@@ -78,6 +87,12 @@ class CameraCompositionView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (frame.width == 0f || frame.height == 0f) return
+        if (dimOutside) {
+            canvas.drawRect(0f, 0f, width.toFloat(), frame.top, dim)
+            canvas.drawRect(0f, frame.bottom, width.toFloat(), height.toFloat(), dim)
+            canvas.drawRect(0f, frame.top, frame.left, frame.bottom, dim)
+            canvas.drawRect(frame.right, frame.top, width.toFloat(), frame.bottom, dim)
+        }
         val clipped = canvas.save()
         canvas.clipRect(frame.left, frame.top, frame.right, frame.bottom)
         // Two lines in each direction create nine identically sized cells inside the image only.
@@ -110,5 +125,9 @@ class CameraCompositionView @JvmOverloads constructor(
     private fun drawBar(canvas: Canvas, x1: Float, y1: Float, x2: Float, y2: Float) {
         canvas.drawLine(x1, y1, x2, y2, barOutline)
         canvas.drawLine(x1, y1, x2, y2, bar)
+    }
+
+    private companion object {
+        const val DIM_ALPHA = 153
     }
 }

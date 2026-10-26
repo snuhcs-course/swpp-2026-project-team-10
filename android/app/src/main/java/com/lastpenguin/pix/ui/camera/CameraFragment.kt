@@ -31,7 +31,6 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import androidx.core.view.children
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
 import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -99,7 +98,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var stillAspect: AspectRatio? = null
 
     // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
-    private var previewArea = PreviewArea(0f, 0f, 0f, 0f)
+    private var previewArea = PreviewArea(0f, 0f, 0f)
 
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (binding != null) {
@@ -116,24 +115,22 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.previewView.scaleType = PreviewView.ScaleType.FIT_CENTER
         // TextureView composes predictably with guide and permission/error layers above it.
         controls.previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-        // PreviewView fits the viewport's crop but still draws the camera image around it: show only the frame.
+        // PreviewView fits the viewport's crop but still draws the camera image around it: show only the frame, or,
+        // for 1:1, the whole 4:3 area with the rest dimmed.
         controls.previewView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            clipToFrame(controls.previewView, viewModel.uiState.value.aspect.frameAspect)
-            controls.liveDot.placeIn(
-                controls.previewContainer,
-                viewModel.uiState.value.aspect.frameAspect,
-                previewArea.underTopBar,
-            )
+            fitToFrame(controls, viewModel.uiState.value.aspect)
         }
         // The preview's place follows the screen's height and the bars' (R&S 6.2), known only after layout.
         val placePreview = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
             if (bottom - top != oldBottom - oldTop) {
-                view.post { binding?.let { layoutPreview(it, viewModel.uiState.value.aspect.frameAspect) } }
+                view.post { binding?.let { layoutPreview(it, viewModel.uiState.value.aspect) } }
             }
         }
         controls.root.addOnLayoutChangeListener(placePreview)
         controls.topBar.addOnLayoutChangeListener(placePreview)
         controls.bottomPanel.addOnLayoutChangeListener(placePreview)
+        // The zoom row stays above the panels over the shutter as they open and close.
+        controls.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(controls) }
         controls.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
             Timings.mark("preview.stream", state.name)
             if (state == PreviewView.StreamState.STREAMING && !previewLogged) {
@@ -451,29 +448,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.bottomOverlays.addOnLayoutChangeListener(relayout)
     }
 
-    /**
-     * Inside the preview's margins, below the top bar where it covers the preview, and above the first panel at its
-     * bottom (the guide's controls, at least) or the controls below.
-     */
+    /** Inside the preview's margins and above the zoom row, the panels over the shutter, and the controls. */
     private fun referenceArea(controls: FragmentCameraBinding): ReferenceArea {
         val margin = (REFERENCE_MARGIN_DP * resources.displayMetrics.density).roundToInt()
         val container = controls.previewContainer
-        val panels = controls.bottomOverlays
-        val panel = panels.children.firstOrNull { it.isVisible }
-        val bottom = if (panel == null) {
-            container.height - previewArea.underControls.roundToInt() - margin
-        } else {
-            panels.top + panel.top - margin
-        }
-        return ReferenceArea(margin, previewArea.underTopBar.roundToInt() + margin, container.width - margin, bottom)
+        val zoomTop = (controls.zoomRow.top + controls.zoomRow.translationY).roundToInt()
+        val bottom = minOf(zoomTop - container.top, container.height - previewArea.underControls.roundToInt()) - margin
+        return ReferenceArea(margin, margin, container.width - margin, bottom)
     }
 
     /**
-     * Puts the preview where previewArea says for [frameAspect] (R&S 6.2): the chips start below the top bar and the
-     * panels at its bottom end above the controls, and each bar gets a dark gradient while it lies over the preview.
-     * Margins change only when the place does, as the screen renders on every zoom step of a pinch.
+     * Puts the preview where previewArea says for [aspect] (R&S 6.2), and the zoom row at the bottom of its image. The
+     * controls get a dark gradient while they lie over it. Margins change only when the place does, as the screen
+     * renders on every zoom step of a pinch.
      */
-    private fun layoutPreview(controls: FragmentCameraBinding, frameAspect: Float) {
+    private fun layoutPreview(controls: FragmentCameraBinding, aspect: AspectRatio) {
         val root = controls.root
         if (root.width == 0 || root.height == 0) return
         val area = previewArea(
@@ -481,7 +470,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             root.height.toFloat(),
             controls.topBar.height.toFloat(),
             controls.bottomPanel.height.toFloat(),
-            frameAspect,
+            aspect.previewAspect,
         )
         previewArea = area
         val container = controls.previewContainer
@@ -493,11 +482,22 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             params.bottomMargin = bottom
             container.layoutParams = params
         }
-        controls.topChips.translationY = area.underTopBar
-        val padding = (OVERLAY_PADDING_DP * resources.displayMetrics.density).roundToInt()
-        controls.bottomOverlays.updatePadding(bottom = padding + area.underControls.roundToInt())
-        controls.topBar.setBackgroundResource(if (area.underTopBar > 0f) R.drawable.bg_scrim_top else 0)
         controls.bottomPanel.setBackgroundResource(if (area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        placeZoomRow(controls)
+    }
+
+    /** The zoom row at the bottom of the image as it shows (1:1 inside the 4:3 area), above the panels and controls. */
+    private fun placeZoomRow(controls: FragmentCameraBinding) {
+        val area = previewArea
+        if (area.bottom <= area.top) return
+        val frame = fitViewfinderFrame(
+            controls.root.width.toFloat(),
+            area.bottom - area.top,
+            viewModel.uiState.value.aspect.frameAspect,
+        )
+        val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
+        val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
+        placeZoomRow(controls.zoomRow, controls.bottomOverlays, imageBottom, margin)
     }
 
     private fun setupCompositionLevel(overlay: CameraCompositionView) {
@@ -557,9 +557,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The grid and the guide follow the chosen frame (AD-10); a new ratio re-fits both at once.
         controls.compositionOverlay.frameAspect = state.aspect.frameAspect
         controls.guideOverlay.frameAspect = state.aspect.frameAspect
-        layoutPreview(controls, state.aspect.frameAspect)
-        clipToFrame(controls.previewView, state.aspect.frameAspect)
-        controls.liveDot.placeIn(controls.previewContainer, state.aspect.frameAspect, previewArea.underTopBar)
+        layoutPreview(controls, state.aspect)
+        fitToFrame(controls, state.aspect)
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = overlays
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
@@ -618,6 +617,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             else -> showHint(controls.hintText, R.string.hint_pinch_zoom, R.drawable.ic_zoom_small)
         }
         controls.cameraMessagePanel.isVisible = !granted || unavailable
+        // The permission and camera messages fill the preview; nothing over it applies then.
+        controls.zoomRow.isInvisible = controls.cameraMessagePanel.isVisible
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)
         controls.requestPermissionButton.isVisible =
@@ -897,15 +898,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    /** Clips [view] to the fit-centered frame of [frameAspect] (AD-10); nothing is clipped before layout. */
-    private fun clipToFrame(view: View, frameAspect: Float) {
-        val frame = fitViewfinderFrame(view.width.toFloat(), view.height.toFloat(), frameAspect)
-        val clip = if (frame.width > 0f) {
+    /**
+     * Clips the preview to the fit-centered frame of [aspect] (AD-10), except 1:1, which shows the whole 4:3 area with
+     * the rest dimmed (R&S 6.2), and puts the live light in the frame's corner. Nothing is clipped before layout.
+     */
+    private fun fitToFrame(controls: FragmentCameraBinding, aspect: AspectRatio) {
+        val view = controls.previewView
+        val frame = fitViewfinderFrame(view.width.toFloat(), view.height.toFloat(), aspect.frameAspect)
+        val clip = if (frame.width > 0f && aspect.previewAspect == aspect.frameAspect) {
             Rect(frame.left.roundToInt(), frame.top.roundToInt(), frame.right.roundToInt(), frame.bottom.roundToInt())
         } else {
             null
         }
         if (view.clipBounds != clip) view.clipBounds = clip
+        controls.compositionOverlay.dimOutside = aspect.previewAspect != aspect.frameAspect
+        controls.liveDot.placeIn(controls.previewContainer, aspect.frameAspect)
     }
 
     /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */
@@ -1002,7 +1009,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_HOLD_MS = 700L
         private const val FOCUS_RING_FADE_MS = 200L
         private const val CHIP_ICON_DP = 14f
-        private const val OVERLAY_PADDING_DP = 12f
+        private const val ZOOM_ROW_MARGIN_DP = 8f
 
         /** The reference thumbnail's long side while small, and its margin in the preview's corners (FR-3.9). */
         private const val REFERENCE_SMALL_DP = 72f

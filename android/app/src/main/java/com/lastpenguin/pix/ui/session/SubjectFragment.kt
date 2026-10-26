@@ -9,7 +9,6 @@ import androidx.activity.addCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
-import androidx.core.view.marginTop
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -19,6 +18,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -29,7 +29,10 @@ import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
+import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
+import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
+import com.lastpenguin.pix.ui.camera.previewAspect
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -57,7 +60,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var watchdog: FrameWatchdog? = null
 
     // Where the video is, and how much of it the top bar and the controls cover (previewArea).
-    private var videoArea = PreviewArea(0f, 0f, 0f, 0f)
+    private var videoArea = PreviewArea(0f, 0f, 0f)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
@@ -74,20 +77,18 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         renderer = live
         watchdog = frames
         binding.videoContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            binding.liveDot.placeIn(
-                binding.videoContainer,
-                viewModel.uiState.value.aspect.frameAspect,
-                videoArea.underTopBar,
-            )
+            binding.liveDot.placeIn(binding.videoContainer, viewModel.uiState.value.aspect.frameAspect)
         }
         // The video's place follows the screen's height and the bars' (R&S 6.2, 6.6), known only after layout.
         val placeVideo = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
             if (bottom - top != oldBottom - oldTop) {
                 view.post {
-                    if (view.isAttachedToWindow) layoutVideo(binding, viewModel.uiState.value.aspect.frameAspect)
+                    if (view.isAttachedToWindow) layoutVideo(binding, viewModel.uiState.value.aspect)
                 }
             }
         }
+        // The zoom row stays above the brightness slider as it opens and closes.
+        binding.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(binding) }
         binding.root.addOnLayoutChangeListener(placeVideo)
         binding.topBar.addOnLayoutChangeListener(placeVideo)
         binding.bottomPanel.addOnLayoutChangeListener(placeVideo)
@@ -122,8 +123,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.liveDot.contentDescription = ui.photographerName
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
-                        layoutVideo(binding, ui.aspect.frameAspect)
-                        binding.liveDot.placeIn(binding.videoContainer, ui.aspect.frameAspect, videoArea.underTopBar)
+                        layoutVideo(binding, ui.aspect)
+                        binding.liveDot.placeIn(binding.videoContainer, ui.aspect.frameAspect)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.frameAspect = ui.aspect.frameAspect
@@ -174,21 +175,18 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     /**
-     * Puts the video where previewArea says for [frameAspect], as on the Camera screen (R&S 6.2, 6.6). The brightness
-     * slider does not count among the controls: it opens over the video instead of moving it. Each bar gets a dark
-     * gradient while it lies over the video.
+     * Puts the video where previewArea says for [aspect], as on the Camera screen (R&S 6.2, 6.6), and the zoom row at
+     * the bottom of its image. The caption below gets a dark gradient while it lies over the video.
      */
-    private fun layoutVideo(binding: FragmentSubjectBinding, frameAspect: Float) {
+    private fun layoutVideo(binding: FragmentSubjectBinding, aspect: AspectRatio) {
         val root = binding.root
         if (root.width == 0 || root.height == 0) return
-        val slider = binding.brightnessPanel
-        val sliderHeight = if (slider.isVisible) slider.height + slider.marginTop else 0
         val area = previewArea(
             root.width.toFloat(),
             root.height.toFloat(),
             binding.topBar.height.toFloat(),
-            (binding.bottomPanel.height - sliderHeight).toFloat(),
-            frameAspect,
+            binding.bottomPanel.height.toFloat(),
+            aspect.previewAspect,
         )
         videoArea = area
         val container = binding.videoContainer
@@ -200,8 +198,22 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             params.bottomMargin = bottom
             container.layoutParams = params
         }
-        binding.topBar.setBackgroundResource(if (area.underTopBar > 0f) R.drawable.bg_scrim_top else 0)
         binding.bottomPanel.setBackgroundResource(if (area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        placeZoomRow(binding)
+    }
+
+    /** The zoom row at the bottom of the video as it shows (1:1 inside the 4:3 area), above the slider and caption. */
+    private fun placeZoomRow(binding: FragmentSubjectBinding) {
+        val area = videoArea
+        if (area.bottom <= area.top) return
+        val frame = fitViewfinderFrame(
+            binding.root.width.toFloat(),
+            area.bottom - area.top,
+            viewModel.uiState.value.aspect.frameAspect,
+        )
+        val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
+        val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
+        placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin)
     }
 
     override fun onDestroyView() {
@@ -334,5 +346,6 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private companion object {
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
+        const val ZOOM_ROW_MARGIN_DP = 8f
     }
 }

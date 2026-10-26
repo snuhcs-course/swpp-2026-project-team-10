@@ -27,15 +27,12 @@ class LiveDotView @JvmOverloads constructor(context: Context, attrs: AttributeSe
         repeatMode = ValueAnimator.REVERSE
     }
 
-    /**
-     * Puts the dot [MARGIN_DP] inside the top right corner of the image of [frameAspect] fitted in [parent], and below
-     * the top [covered] pixels of it, which the top bar covers.
-     */
-    fun placeIn(parent: View, frameAspect: Float, covered: Float = 0f) {
+    /** Puts the dot [MARGIN_DP] inside the top right corner of the image of [frameAspect] fitted in [parent]. */
+    fun placeIn(parent: View, frameAspect: Float) {
         val frame = fitViewfinderFrame(parent.width.toFloat(), parent.height.toFloat(), frameAspect)
         val margin = MARGIN_DP * resources.displayMetrics.density
         translationX = frame.right - margin - layoutParams.width
-        translationY = maxOf(frame.top, covered) + margin
+        translationY = frame.top + margin
     }
 
     override fun onDraw(canvas: Canvas) {

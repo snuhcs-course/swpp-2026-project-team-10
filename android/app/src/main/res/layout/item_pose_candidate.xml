@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One candidate of the 2×2 grid on Generating poses and Pick a pose (R&S 6.3). -->
+<!-- One candidate of the 2×2 grid on Generating poses (R&S 6.3). -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     style="@style/Widget.Pix.PoseCard"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
-    android:checkable="true"
-    app:checkedIcon="@null">
+    android:layout_margin="6dp">
 
     <!-- The cell keeps the camera frame's 3:4 shape before its image arrives. -->
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -53,20 +51,5 @@
                 tools:text="Creating…" />
         </LinearLayout>
 
-        <!-- The chosen pose (Pick a pose). -->
-        <ImageView
-            android:id="@+id/poseCheck"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_margin="10dp"
-            android:background="@drawable/bg_check_badge"
-            android:importantForAccessibility="no"
-            android:padding="5dp"
-            android:src="@drawable/ic_check"
-            android:visibility="gone"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:tint="@color/pix_on_accent"
-            tools:visibility="visible" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Border of a pose candidate, and of the selected one (R&S 6.3). -->
-    <dimen name="pose_card_stroke">0dp</dimen>
-    <dimen name="pose_card_stroke_selected">3dp</dimen>
+    <!-- Pick a pose: how much of the next and the previous candidate shows at the sides, and the gap between them. -->
+    <dimen name="pose_page_peek">28dp</dimen>
+    <dimen name="pose_page_gap">12dp</dimen>
 </resources>

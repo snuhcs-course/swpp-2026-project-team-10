@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -221,12 +221,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 launch {
                     sessionViewModel.state.collect { state ->
                         val connected = state as? SessionState.Connected
-                        controls.liveDot.isVisible = connected != null
+                        renderLiveDot(controls, connected)
                         controls.endSessionButton.isVisible = connected != null
                         controls.shootTogetherButton.isVisible = connected == null && !isScenePhotoActive()
-                        connected?.let {
-                            controls.liveDot.contentDescription = getString(R.string.live_badge, it.peer.displayName)
-                        }
                         view.keepScreenOn = connected != null
                     }
                 }
@@ -629,6 +626,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         // The permission and camera messages fill the preview; nothing over it applies then.
         controls.zoomRow.isInvisible = controls.cameraMessagePanel.isVisible
+        renderLiveDot(controls, sessionViewModel.state.value as? SessionState.Connected)
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)
         controls.requestPermissionButton.isVisible =
@@ -878,15 +876,25 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    /**
+     * The live light (FR-6.8): on while a session is [connected] and the camera streams to it, so not over a camera
+     * message. A rebind (a lens or a ratio) keeps it, as the held frame stands for a camera about to stream again.
+     */
+    private fun renderLiveDot(controls: FragmentCameraBinding, connected: SessionState.Connected?) {
+        controls.liveDot.isVisible = connected != null && !controls.cameraMessagePanel.isVisible
+        connected?.let { controls.liveDot.contentDescription = getString(R.string.live_badge, it.peer.displayName) }
+    }
+
     /** Puts the preview's last frame over it while the camera rebinds (PreviewHold); false without a frame. */
     private fun showStill(): Boolean {
         val controls = binding ?: return false
         val frame = controls.previewView.bitmap ?: return false
-        controls.aspectStill.setImageBitmap(frame)
+        val aspect = viewModel.uiState.value.aspect
+        controls.aspectStill.setImageBitmap(heldFrame(frame, aspect))
         // The bitmap is the whole camera image; show the old frame only, as the preview did.
         controls.aspectStill.clipBounds = controls.previewView.clipBounds
         controls.aspectStill.isVisible = true
-        stillAspect = viewModel.uiState.value.aspect
+        stillAspect = aspect
         Timings.mark("preview.still", "on")
         stillJob?.cancel()
         // If the stream never reports a restart, the old frame still goes.

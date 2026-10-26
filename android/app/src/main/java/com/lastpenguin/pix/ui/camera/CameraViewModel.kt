@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -92,8 +92,6 @@ data class CameraUiState(
     val cameraStatus: CameraStatus = CameraStatus.IDLE,
     val minZoom: Float = 1f,
     val maxZoom: Float = 1f,
-    /** The camera's zoom stops (`CameraCapabilities.zoomStops`); a tap on the readout steps through some of them. */
-    val zoomStops: List<Float> = emptyList(),
     val zoom: Float = 1f,
     /** Applied exposure-compensation index (FR-1.11), within [exposureRange]; 0..0 hides the brightness control. */
     val exposure: Int = 0,
@@ -170,7 +168,6 @@ class CameraViewModel(
                     it.copy(
                         minZoom = capabilities?.minZoom ?: 1f,
                         maxZoom = capabilities?.maxZoom ?: 1f,
-                        zoomStops = capabilities?.zoomStops.orEmpty(),
                         exposureRange = exposureRange,
                         exposureStep = capabilities?.exposureStep ?: 0f,
                         brightnessOpen = it.brightnessOpen && exposureRange.first < exposureRange.last,
@@ -307,7 +304,7 @@ class CameraViewModel(
     /** A tap on the zoom readout (FR-1.3): the next quick step, such as 0.6×, 1×, and 2×, the last back to the first. */
     fun onZoomTap() {
         val state = _uiState.value
-        nextZoomStep(quickZoomSteps(state.zoomStops), state.zoom)?.let { onZoomChanged(it) }
+        nextZoomStep(quickZoomSteps(state.minZoom, state.maxZoom), state.zoom)?.let { onZoomChanged(it) }
     }
 
     /** A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4); the camera focuses and meters there. */

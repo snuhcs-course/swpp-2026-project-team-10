@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The applied zoom over the bottom of the camera's image: translucent glass, like the chips over it. -->
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="999dp" />
-            <solid android:color="@color/pix_glass" />
-            <stroke android:width="1dp" android:color="@color/pix_glass_stroke" />
-        </shape>
-    </item>
-</selector>
+<!-- The applied zoom over the bottom of the camera's image: translucent glass, like the chips over it. The pill is
+     inset in the readout, so the readout takes taps across the zoom row's height while the pill stays 28 dp tall. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="4dp"
+    android:insetTop="8dp"
+    android:insetRight="4dp"
+    android:insetBottom="8dp">
+    <shape android:shape="rectangle">
+        <corners android:radius="999dp" />
+        <solid android:color="@color/pix_glass" />
+        <stroke android:width="1dp" android:color="@color/pix_glass_stroke" />
+    </shape>
+</inset>

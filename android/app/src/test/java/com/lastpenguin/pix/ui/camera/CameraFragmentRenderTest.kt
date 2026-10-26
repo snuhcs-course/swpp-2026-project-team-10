@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Looper
 import android.view.View
@@ -423,6 +424,51 @@ class CameraFragmentRenderTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
 
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun theLiveLight_goesOutWhileTheCameraCannotStream_andComesBack() {
+        val camera = FakeCameraController()
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+
+        camera.setStatus(CameraStatus.UNAVAILABLE)
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.cameraMessagePanel.visibility)
+            assertEquals(View.GONE, controls.liveDot.visibility)
+        }
+
+        // A rebind, which holds the last frame, keeps it on.
+        camera.setStatus(CameraStatus.STARTING)
+        idle()
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.liveDot.visibility) }
+        camera.setStatus(CameraStatus.READY)
+        idle()
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.liveDot.visibility) }
+    }
+
+    // ---- The frame held while the ratio changes -------------------------------------------
+
+    @Test
+    fun aHeldOneByOneFrame_keepsTheOutsideDimmed_andOtherRatiosStayAsTheyAre() {
+        fun white() = bitmap(30, 40).apply { eraseColor(Color.WHITE) }
+
+        // 30 x 40, the 4:3 area: the square is rows 5 to 35.
+        val square = heldFrame(white(), AspectRatio.R1_1)
+        assertEquals(Color.WHITE, square.getPixel(15, 20))
+        assertEquals(Color.WHITE, square.getPixel(15, 6))
+        val dimmed = square.getPixel(15, 2)
+        assertEquals(Color.red(dimmed), Color.blue(dimmed))
+        assertTrue(Color.red(dimmed) in 95..110)
+        assertEquals(dimmed, square.getPixel(15, 38))
+
+        for (aspect in listOf(AspectRatio.R4_3, AspectRatio.R16_9)) {
+            val frame = white()
+            assertTrue(heldFrame(frame, aspect) === frame)
+            assertEquals(Color.WHITE, frame.getPixel(15, 2))
+        }
     }
 
     /** The screen's shared GenerationViewModel, the activity-scoped one it uses for the scene photo step. */

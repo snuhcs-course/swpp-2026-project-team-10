@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -52,7 +52,8 @@ import org.robolectric.annotation.GraphicsMode
  * Ratios: 4:3, 16:9, and 1:1, each with the preview right below the top bar, the shutter's row in one place, and the
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
  * the top bar: no guide, a guide with a pose tip, and a session, at font scale 1 and 1.3, none overlapping. A guide's
- * panel in the space below a 4:3 image. Subject view's video placed the same way.
+ * panel in the space below a 4:3 image. The zoom readout's tap area, the row's height. Subject view's video placed
+ * the same way.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -238,6 +239,37 @@ class CameraLayoutTest {
         screen.assertTopBarFits("a session, font 1.3")
     }
 
+    // ---- The zoom readout -------------------------------------------------------------------
+
+    /** The readout takes a tap across the zoom row's height and at least 48 dp wide; its pill stays 28 dp tall. */
+    private fun assertReadoutTapArea(readout: View, row: View) {
+        val box = readout.box()
+        assertEquals(row.box().height(), box.height())
+        assertTrue("${box.width()} dp wide", box.width() >= 48)
+        val inset = Rect().also { readout.background.getPadding(it) }
+        val density = readout.resources.displayMetrics.density
+        assertEquals(28, ((readout.height - inset.top - inset.bottom) / density).roundToInt())
+    }
+
+    @Test
+    fun theZoomReadout_takesATapAcrossTheRowsHeight_aboveItsPill() {
+        val screen = camera()
+        assertReadoutTapArea(screen.controls.zoomReadout, screen.controls.zoomRow)
+
+        // 4 dp below the readout's top: above the pill, which starts 8 dp down.
+        val readout = IntArray(2).also { screen.controls.zoomReadout.getLocationInWindow(it) }
+        val root = IntArray(2).also { screen.controls.root.getLocationInWindow(it) }
+        val density = screen.controls.root.resources.displayMetrics.density
+        val x = readout[0] - root[0] + screen.controls.zoomReadout.width / 2f
+        val y = readout[1] - root[1] + 4 * density
+        val now = SystemClock.uptimeMillis()
+        screen.controls.root.dispatchTouchEvent(MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0))
+        screen.controls.root.dispatchTouchEvent(MotionEvent.obtain(now, now + 50, MotionEvent.ACTION_UP, x, y, 0))
+        idle()
+
+        assertEquals(listOf(2f), (screen.modules.camera as FakeCameraController).requests)
+    }
+
     // ---- Subject view -----------------------------------------------------------------------
 
     @Test
@@ -270,5 +302,6 @@ class CameraLayoutTest {
         assertEquals(640, video.height())
         assertTrue(binding.zoomRow.box().bottom <= binding.bottomPanel.box().top)
         assertTrue(binding.liveDot.isShown)
+        assertReadoutTapArea(binding.zoomReadout, binding.zoomRow)
     }
 }

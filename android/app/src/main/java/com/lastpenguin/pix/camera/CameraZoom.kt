@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.camera
 
 /** Advertise only ratios this camera can actually apply; never imply an unavailable physical lens. */
@@ -6,11 +6,15 @@ internal fun cameraZoomStops(minZoom: Float, maxZoom: Float): List<Float> =
     listOf(0.5f, 0.6f, 1f, 2f, 3f).filter { it in minZoom..maxZoom }
 
 /**
- * The ratios a tap on the zoom readout steps through (FR-1.3): the widest of [stops] below 1×, then 1× and 2×, each
- * only where the camera has it.
+ * The ratios a tap on the zoom readout steps through (FR-1.3): the camera's widest, [minZoom] itself, when it is below
+ * 1× (no stop names a minimum such as 0.55× or 0.7×), then 1× and 2×, each only where the camera has it.
  */
-internal fun quickZoomSteps(stops: List<Float>): List<Float> =
-    listOfNotNull(stops.filter { it < 1f }.minOrNull(), 1f.takeIf { it in stops }, 2f.takeIf { it in stops })
+internal fun quickZoomSteps(minZoom: Float, maxZoom: Float): List<Float> =
+    listOfNotNull(
+        minZoom.takeIf { it > 0f && it * (1f + STEP_TOLERANCE) < 1f },
+        1f.takeIf { it in minZoom..maxZoom },
+        2f.takeIf { it in minZoom..maxZoom },
+    )
 
 /**
  * The step a tap moves [zoom] to: the first of [steps] above it, or the first again from the last one or beyond.

@@ -13,5 +13,6 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-26] "In 16:9 keep the top bar and let the image go straight down; check where the shutter and Guide end up." / "Center the top bar's icons vertically." (They were centered within 1 dp; the gap under the bar made them look low.)
 - [Dongje, 10-26] "Make Guide and the album translucent over the image, and raise the buttons so that in 16:9 the text and the buttons sit above its bottom edge."
 - [Dongje, 10-26] "Commit, and add the quick zoom steps: a tap on the zoom readout goes to 0.6×, 1×, and 2×." / "Commit and go on to step 3." (Tests, the R&S wireframes of Flows 1, 2, 4, and 5, and the documents.)
+- [Dongje, 10-27] "Check the Codex review on the PR and bring it to me for review." / "Go ahead as recommended. Nothing we see changes with item 4, right?" (Four findings, all valid: the quick steps from the camera's real minimum zoom, the 1:1 frame held during a ratio change dimmed as before, the photographer's light out while a camera message shows, and the readout's tap area the row's height. Renders before and after the last were identical pixel for pixel.)
 
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

@@ -11,12 +11,14 @@ Each drawing has one image in wiki/images/, named after it:
   which come from the Claude design canvas format. The two arrows between the phones start in Flow 4 and end in Flow 5,
   so both files have them.
 
-The Korean image takes its texts from the app: a text that is one of the English strings of
-`android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in, becomes that string's
-Korean from `values-ko`. The rest (the screen names over the screens, the arrows' labels, the headings, and screens
-the app does not have yet) is in `wireframes/ko.json` under the flow's name, which also keeps the names and Pix IDs of
-the flow's people as they are. A text with a Latin letter that neither gives, or an entry the flow no longer uses,
-stops the render, so ko.json changes with the drawing; render the flows again after a Korean string changes.
+The Korean image changes only the text on the screens, the cards that clip their content. The label in a card's top
+left corner, a box on a card that `wireframes/ko.json` lists under `notes`, and everything outside the cards (the
+arrows, the headings, the boxes where a flow starts and ends) stay in English. A screen's text that is one of the
+English strings of `android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in,
+becomes that string's Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in
+ko.json under the flow's name, which also keeps the names and Pix IDs of the flow's people as they are. A screen's
+text with a Latin letter that neither gives, or an entry the flow no longer uses, stops the render, so ko.json
+changes with the drawing; render the flows again after a Korean string changes.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -55,6 +57,7 @@ VIEWBOX = re.compile(r'viewBox="[\d.]+ [\d.]+ ([\d.]+) [\d.]+"')
 # A flow's markup split into tags (a style block counts as one) and the texts between them.
 MARKUP = re.compile(r"(<style\b.*?</style>|<[^>]+>)", re.DOTALL)
 LATIN = re.compile(r"[A-Za-z]")
+VOID = {"br", "hr", "img", "input", "link", "meta", "wbr"}
 ARGUMENT = re.compile(r"%(\d+)\$([sd])")
 CHROME_PATHS = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -105,6 +108,8 @@ class Korean:
         entries = json.loads(KOREAN.read_text(encoding="utf-8")).get(flow, {})
         self.entries = {clean(text).casefold(): korean for text, korean in entries.get("texts", {}).items()}
         self.entries |= {clean(text).casefold(): text for text in entries.get("keep", [])}
+        self.notes = {clean(text).casefold() for text in entries.get("notes", [])}
+        self.written = {clean(text).casefold(): text for group in entries.values() for text in group}
         self.used: set[str] = set()
         english, english_arrays = android_strings("values")
         korean, korean_arrays = android_strings("values-ko")
@@ -150,17 +155,46 @@ class Korean:
         return None
 
 
+def screen_texts(parts: list[str], notes: set[str]) -> tuple[list[int], set[str]]:
+    """The indexes of the texts on the screens in [parts], a flow's markup split by MARKUP, and the [notes] found. A
+    screen is a top-level element that clips its content; its label at its top left, and a box on it that holds one of
+    [notes], are not screen text."""
+    stack: list[tuple[int, str]] = []  # the open elements: where each starts in parts, and its tag
+    boxes: dict[int, int] = {}  # a text on a screen, and the box of the screen it is in
+    labels, noted, found = set(), set(), set()
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # a tag
+            name = re.match(r"</?([a-zA-Z][\w-]*)", part)
+            if part.startswith("</"):
+                stack.pop()
+            elif name and name.group(1).lower() not in VOID | {"style"} and not part.endswith("/>"):
+                stack.append((i, part))  # a style block is one part, so it does not stay open
+            continue
+        # stack[0] is the page's root, so stack[1] is a top-level element and stack[2] a box on it
+        if len(stack) < 2 or "overflow: hidden" not in stack[1][1]:
+            continue
+        box = stack[2] if len(stack) > 2 else stack[1]
+        boxes[i] = box[0]
+        if len(stack) > 2 and "left: 12px; top: 10px" in box[1]:
+            labels.add(box[0])
+        if (key := clean(html.unescape(part)).casefold()) in notes:
+            noted.add(box[0])
+            found.add(key)
+    return [i for i, box in boxes.items() if box not in labels | noted], found
+
+
 def korean_page(source: Path) -> str:
-    """The flow's page in Korean, with IBM Plex Sans KR for the Hangul. Stops on a text without Korean, or an entry of
-    ko.json the flow does not use."""
+    """The flow's page with its screens in Korean, and IBM Plex Sans KR for the Hangul. Stops on a screen's text
+    without Korean, or an entry of ko.json the flow does not use."""
     flow = source.name.removesuffix(".dc.html")
     korean = Korean(flow)
     page = source.read_text(encoding="utf-8")
     head, rest = page.split("<x-dc>", 1)
     body, tail = rest.split("</x-dc>", 1)
     parts = MARKUP.split(body)
+    screens, notes = screen_texts(parts, korean.notes)
     missing = []
-    for i in range(0, len(parts), 2):  # the texts; the tags are in between
+    for i in screens:
         text = html.unescape(parts[i])
         if not LATIN.search(text):
             continue
@@ -170,7 +204,7 @@ def korean_page(source: Path) -> str:
         elif translated != text.strip():
             lead, trail = text[: len(text) - len(text.lstrip())], text[len(text.rstrip()) :]
             parts[i] = lead + html.escape(translated, quote=False) + trail
-    unused = sorted(set(korean.entries) - korean.used)
+    unused = sorted(korean.written[key] for key in (set(korean.entries) - korean.used) | (korean.notes - notes))
     if missing or unused:
         sys.exit(
             f"{source.name}: add to {KOREAN.name} under {flow!r}: {json.dumps(missing, ensure_ascii=False)}; "

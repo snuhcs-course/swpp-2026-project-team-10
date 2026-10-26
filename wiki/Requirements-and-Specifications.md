@@ -23,7 +23,7 @@
 | 2.0 | 2026-10-26 | Iteration 3 scope from the kickoff (4.1, F1–F10, US-14–US-16); current requirements only. |
 | 2.1 | 2026-10-26 | *Pick a pose* one candidate at a time as built (Iter3-P10, [#114], [#108]): FR-4.6, the screen (6.3), Figure 2, and 6.8. |
 | 2.2 | 2026-10-26 | Pose tips as built (Iter3-P11, [#115], [#110]): one tip for the pose the user takes, on the Camera screen (4.1, F4, FR-4.10, US-15, NFR-13, 6.2, Figure 1, 6.8, glossary). |
-| 2.4 | 2026-10-27 | Every wireframe figure also in Korean, with the app's Korean text (Iter3-P7, [#111]; 6.1–6.7). |
+| 2.4 | 2026-10-27 | Every wireframe figure also with its screens in Korean (Iter3-P7, [#111]; 6.1–6.7). |
 
 Items marked **TBD** need a team decision.
 
@@ -571,7 +571,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 
 ### 6.1 Wireframe overview
 
-The low-fidelity wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below. Under each figure, *한국어* opens the same flow with the app's Korean text (FR-10.2).
+The low-fidelity wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below. Under each figure, *한국어* opens the same flow with its screens in Korean, as the app shows them (FR-10.2); the labels and notes stay in English.
 
 - **Arrows**: user input or system event, labeled
 - **Dashed coral frame**: failure case

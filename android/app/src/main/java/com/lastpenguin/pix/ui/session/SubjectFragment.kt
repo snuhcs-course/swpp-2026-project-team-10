@@ -281,6 +281,16 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             AccessibilityActionCompat.ACTION_SCROLL_BACKWARD,
             getString(R.string.zoom_out),
         ) { _, _ -> adjust(1f / 1.1f) }
+        // A tap steps through the quick zoom steps, such as 0.6×, 1×, and 2× (FR-1.3).
+        readout.setOnClickListener { viewModel.onZoomTap() }
+        ViewCompat.replaceAccessibilityAction(
+            readout,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.zoom_next_step),
+        ) { _, _ ->
+            viewModel.onZoomTap()
+            true
+        }
     }
 
     private fun onTransition(state: SessionState) {

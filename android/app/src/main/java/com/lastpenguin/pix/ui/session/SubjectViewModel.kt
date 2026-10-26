@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModel
@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.camera.nextZoomStep
+import com.lastpenguin.pix.camera.quickZoomSteps
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.guide.GuideGeometry
 import com.lastpenguin.pix.guide.GuideRepository
@@ -31,6 +33,8 @@ data class SubjectUiState(
     /** The photographer's zoom range, from `camera.capabilities`; equal until it arrives. */
     val minZoom: Float = 1f,
     val maxZoom: Float = 1f,
+    /** The photographer's zoom stops, from `camera.capabilities`; a tap on the readout steps through some of them. */
+    val zoomStops: List<Float> = emptyList(),
     /** The zoom to show: the pinch's value during the gesture, until the photographer echoes applied zoom in `camera.state`. */
     val zoom: Float = 1f,
     /** The photographer's frame (AD-10), from `camera.state`: the video, the grid, and the guide fit to it. */
@@ -133,6 +137,7 @@ class SubjectViewModel(
                     it.copy(
                         minZoom = caps?.minZoom ?: 1f,
                         maxZoom = caps?.maxZoom ?: 1f,
+                        zoomStops = caps?.zoomStops.orEmpty(),
                         exposureRange = range,
                         exposureStep = caps?.exposureStep ?: 0f,
                         brightnessOpen = it.brightnessOpen && range.first < range.last,
@@ -234,6 +239,12 @@ class SubjectViewModel(
         val clamped = ratio.coerceIn(ui.minZoom, ui.maxZoom)
         _uiState.update { it.copy(zoom = clamped) }
         if (final) zoomSender.finish(clamped) else zoomSender.step(clamped)
+    }
+
+    /** A tap on the zoom readout (FR-7.1): the next quick step of the photographer's camera, sent as a final value. */
+    fun onZoomTap() {
+        val ui = _uiState.value
+        nextZoomStep(quickZoomSteps(ui.zoomStops), ui.zoom)?.let { onZoomGesture(it, final = true) }
     }
 
     /** From the brightness slider (FR-7.3): an exposure index, shown at once and sent like a zoom step. */

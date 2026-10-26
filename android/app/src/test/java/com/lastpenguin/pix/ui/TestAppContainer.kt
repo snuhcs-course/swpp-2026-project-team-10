@@ -152,11 +152,19 @@ class TestAppContainer(
     class ScriptedPoseTipper : PoseTipper {
         val requests = mutableListOf<Request>()
 
-        override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> =
-            Request(scene, candidate, pose).also(requests::add).answer.await()
+        override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> {
+            val request = Request(scene, candidate, pose).also(requests::add)
+            try {
+                return request.answer.await()
+            } catch (error: CancellationException) {
+                request.cancelled = true
+                throw error
+            }
+        }
 
         class Request(val scene: Bitmap, val candidate: Bitmap, val pose: String) {
             val answer = CompletableDeferred<Result<PoseTip>>()
+            var cancelled = false
 
             fun tip(text: String) = check(answer.complete(Result.success(PoseTip(text))))
 

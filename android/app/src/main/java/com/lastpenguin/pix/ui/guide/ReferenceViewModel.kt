@@ -61,6 +61,9 @@ class ReferenceViewModel(
 
     private var making: Job? = null
 
+    /** The guide whose tip was asked for and that has not gone on the camera yet. */
+    private var tipFor: String? = null
+
     /** Newest first, for Add a pose guide. */
     val savedGuides: StateFlow<List<SavedGuide>> = savedGuideStore.saved
 
@@ -88,16 +91,40 @@ class ReferenceViewModel(
      * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10).
      */
     fun onCandidatePicked(image: Bitmap, tipFrom: TipSource? = null) {
-        make(onReady = { guide -> if (tipFrom != null) tips?.prepare(guide, image, tipFrom) }) {
-            maker.make(image, GuideSource.GENERATED)
-        }
+        make(
+            onReady = { guide ->
+                if (tipFrom != null && tips != null) {
+                    tips.prepare(guide, image, tipFrom)
+                    tipFor = guide.id
+                }
+            },
+        ) { maker.make(image, GuideSource.GENERATED) }
     }
 
     /** *Use this guide*. */
     fun onUseGuide() {
         val ready = _uiState.value as? ReferenceUiState.Ready ?: return
+        // Its tip goes with it to the camera; leaving the screen now must not drop it.
+        if (ready.guide.id == tipFor) tipFor = null
         guides.setGuide(ready.guide)
         _uiState.value = ReferenceUiState.Idle
+    }
+
+    /**
+     * Back on Reference confirm, which leaves without *Use this guide*: a person still being found is not, and the tip
+     * asked for its guide is dropped, so nothing is sent for a guide that will not be used (FR-4.10).
+     */
+    fun onConfirmLeft() {
+        if (making?.isActive == true) {
+            making?.cancel()
+            _uiState.value = ReferenceUiState.Idle
+        }
+        discardTip()
+    }
+
+    private fun discardTip() {
+        tipFor?.let { tips?.discard(it) }
+        tipFor = null
     }
 
     /**
@@ -135,6 +162,8 @@ class ReferenceViewModel(
     /** Separates the person; a newer photo (*Choose another photo*) replaces one still in progress. */
     private fun make(onReady: (ReferenceGuide) -> Unit = {}, block: suspend () -> Result<ReferenceGuide>) {
         making?.cancel()
+        // The guide it replaces will not be used, so its tip is not needed.
+        discardTip()
         _uiState.value = ReferenceUiState.Working
         making = viewModelScope.launch {
             _uiState.value = block().fold(

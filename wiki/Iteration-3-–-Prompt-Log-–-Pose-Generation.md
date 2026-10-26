@@ -26,7 +26,6 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-26] "Proceed so it merges without conflicts with #108." / "Cancel the emulator check and open the PR; I'll check on the S22 later." / "Remake the review image with openly licensed photos; that was my face."
 - [Dongje, 10-26] "Drop ML Kit, and let the model judge everything." (The phone no longer measures how much closer to get; the model judges it with the height and the angle.)
 - [Dongje, 10-26] "Document the tips as built, as compactly as possible." (The plan had a tip for each candidate on *Pick a pose*; the documents now follow the build.)
-- [Dongje, 10-26] "Check the Codex review on the PR, decide what to fix, and let me review the plan." / "Make the button position an A2 issue, with the camera screen's buttons and preview size; fix #2 too." (Fixed: the server cancels a dropped tip request, a tip names its guide, and numbers in words are refused; the request size stays, measured at 604 KB at most; the top bar went to [#136].)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
@@ -34,4 +33,3 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#115]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/115
 [#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
 [#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
-[#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

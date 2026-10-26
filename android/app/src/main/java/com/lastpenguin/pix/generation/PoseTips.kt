@@ -34,8 +34,9 @@ data class GuideTip(val guideId: String, val state: TipState)
 /**
  * The tip for the guide on Camera (FR-4.10; Design 2.6.3, Pose tips). [prepare] asks for the tip of a guide made from
  * a candidate while the user looks at it on Reference confirm; when that guide goes on Camera, its tip comes with it,
- * and when another guide does, or none, there is no tip, so a guide from the gallery or a saved guide never has one.
- * Only the newest guide's tip is asked for. Kept in memory only, like the candidates.
+ * and when another guide does, or none, there is no tip, so a guide from the gallery or a saved guide never has one,
+ * even a saved copy of the guide on Camera, which keeps its id. Only the newest guide's tip is asked for, and
+ * [discard] drops it when that guide is not used. Kept in memory only, like the candidates.
  * Owner: Pose tips.
  */
 class PoseTips(
@@ -67,8 +68,17 @@ class PoseTips(
 
     init {
         scope.launch {
-            guideOnCamera.map { it?.id }.distinctUntilChanged().collect { id ->
-                tips.update { it.copy(onCamera = id, pending = it.pending.takeIf { pending -> pending != id }).kept() }
+            // Each guide put on Camera, not each id: a saved guide keeps the id of the guide it was saved from.
+            guideOnCamera.distinctUntilChanged { old, new -> old === new }.collect { guide ->
+                val id = guide?.id
+                // Only the guide the tip was prepared for brings one; the one on Camera before loses its own.
+                tips.update {
+                    Tips(
+                        onCamera = id,
+                        pending = it.pending.takeIf { pending -> pending != id },
+                        states = it.states.filterKeys { key -> key == it.pending },
+                    )
+                }
             }
         }
     }
@@ -85,5 +95,18 @@ class PoseTips(
             // A guide that left in the meantime, unused or replaced, keeps no tip.
             tips.update { if (guide.id in it.states) it.copy(states = it.states + (guide.id to state)) else it }
         }
+    }
+
+    /**
+     * Drops the tip asked for the guide [guideId] if that guide has not gone on Camera: Reference confirm was left
+     * without it, or another photo took its place. Its request is cancelled, which the server passes on to the model.
+     */
+    fun discard(guideId: String) {
+        var dropped = false
+        tips.update {
+            dropped = it.pending == guideId
+            if (dropped) it.copy(pending = null).kept() else it
+        }
+        if (dropped) asking?.cancel()
     }
 }

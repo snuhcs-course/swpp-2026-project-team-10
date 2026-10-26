@@ -13,15 +13,17 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 // Partitions (Testing Documentation 2.1.6). When the tip arrives: before or after its guide goes on Camera. Its
-// result: a tip, or a failure. The guide on Camera: the prepared one, another (from the gallery or saved), none, and
-// the same id again after it was removed. Asking again: a newer guide prepared while the one on Camera keeps its tip,
-// and while an older one is still being asked for.
+// result: a tip, or a failure. The guide on Camera: the prepared one, another (from the gallery or saved), none, the
+// same id again after it was removed, and a saved copy with the same id in its place. Asking again: a newer guide
+// prepared while the one on Camera keeps its tip, and while an older one is still being asked for. Discarding: the
+// prepared guide before it goes on Camera, the guide already on Camera, and an older guide.
 @OptIn(ExperimentalCoroutinesApi::class)
 class PoseTipsTest {
     private val tipper = RecordingTipper()
@@ -156,6 +158,55 @@ class PoseTipsTest {
         onCamera.value = older
         runCurrent()
         assertNull(tips.onCamera.value)
+    }
+
+    @Test
+    fun aSavedCopyOfTheGuideOnCameraHasNoTip_thoughItKeepsTheId() = runTest {
+        val tips = tips()
+        val generated = guide("g1")
+        tips.prepare(generated, candidate, TipSource(scene, POSE))
+        onCamera.value = generated
+        runCurrent()
+        tipper.requests.single().answer(TEXT)
+        runCurrent()
+
+        // Saved guides on Camera's sheet: the guide is loaded again with its own id (FR-3.8).
+        onCamera.value = guide("g1")
+        runCurrent()
+
+        assertNull(tips.onCamera.value)
+    }
+
+    @Test
+    fun discardingAPreparedGuideStopsItsAsk_andItBringsNoTipToCamera() = runTest {
+        val tips = tips()
+        val guide = guide("g1")
+        tips.prepare(guide, candidate, TipSource(scene, POSE))
+        runCurrent()
+
+        tips.discard("g1")
+        runCurrent()
+
+        assertTrue(tipper.requests.single().cancelled)
+        onCamera.value = guide
+        runCurrent()
+        assertNull(tips.onCamera.value)
+    }
+
+    @Test
+    fun discardingTheGuideOnCamera_orAnOlderOne_changesNothing() = runTest {
+        val tips = tips()
+        val guide = guide("g1")
+        tips.prepare(guide, candidate, TipSource(scene, POSE))
+        onCamera.value = guide
+        runCurrent()
+
+        tips.discard("g1")
+        tips.discard("g0")
+        runCurrent()
+
+        assertFalse(tipper.requests.single().cancelled)
+        assertEquals(GuideTip("g1", TipState.Preparing), tips.onCamera.value)
     }
 
     private fun guide(id: String, source: GuideSource = GuideSource.GENERATED) =

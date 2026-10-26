@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Jaewan Park
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -55,6 +55,11 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+    androidResources {
+        // English and Korean (FR-10.2), from the values folders and res/resources.properties, so the phone's
+        // per-app language setting (Android 13+) offers both.
+        generateLocaleConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

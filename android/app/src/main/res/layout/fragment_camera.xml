@@ -598,11 +598,14 @@
                         android:src="@drawable/ic_guide"
                         app:tint="@color/guide_button_icon" />
 
+                    <!-- Hangul comes from the phone's font, whose taller line does not fit the 16 dp; its letters fit
+                         Manrope's line, so the label keeps that one. -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="16dp"
                         android:layout_marginTop="6dp"
                         android:duplicateParentState="true"
+                        android:fallbackLineSpacing="false"
                         android:gravity="center"
                         android:includeFontPadding="false"
                         android:importantForAccessibility="no"

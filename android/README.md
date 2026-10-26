@@ -78,6 +78,8 @@ The failure screens share `fragment_failure.xml`.
 
 **Look.** Every screen uses the dark-only `Theme.Pix` (`res/values/themes.xml`). The design tokens are in `colors.xml`: the ground and surfaces, glass for controls over the preview, one accent (`#F2C14E`), the live color (`#36D399`), the guide color (`#5EEAD4`), and the danger color. Type and component styles are in `styles.xml`: `TextAppearance.Pix.*`, and `Widget.Pix.*` for primary, secondary, text, glass, icon, and segment buttons, chips, sliders, cards, sheets, and dialogs. Fonts are Manrope and DM Mono in `res/font` (SIL OFL 1.1; licenses in `assets/licenses`). Icons are vector drawables in `res/drawable` (`ic_*`, with 16–20 dp `_small` versions for use beside text), and the app icon is the adaptive icon in `res/mipmap-anydpi`. The team's UI mockups are the visual reference; where they differ from built behavior, the behavior wins, for example pinch zoom with a guide-edit mode toggle instead of zoom chips and the system number keyboard instead of an on-screen keypad.
 
+**Language.** English is in `res/values/strings.xml` and Korean in `res/values-ko/strings.xml`, under the same keys and in the same order (FR-10.2). The phone's language list picks the first of the two it holds; any other language gets English, and on Android 13+ *Settings › Apps › Pix › Language* chooses one for Pix alone. A new string gets its Korean in the same PR, or lint fails. Korean is in 해요체 (사진을 저장했어요); a name in a message takes 님 (`%1$s님이 나갔어요`) and a number takes 에, so no particle depends on how they end. Only strings without words (ratios, counters, `@%1$s`) are `translatable="false"`. Manrope has no Hangul, so Korean is drawn in the phone's own font.
+
 ### Module classes
 
 | Package | Classes | Issue |

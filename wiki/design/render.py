@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 """Render the drawings in wiki/design/ to the images the wiki pages show.
 
 Each drawing has one image in wiki/images/, named after it:
@@ -6,9 +6,17 @@ Each drawing has one image in wiki/images/, named after it:
 - An `<svg data-image="<name>.png">` in an HTML file here, such as the Design's architecture figure in
   `design_architecture.html`, becomes `<name>.png` at twice its viewBox width over white (`rsvg-convert`).
 - Each wireframe flow of R&S section 6, `wireframes/<name>.dc.html`, becomes `<name>.jpg`, rendered in headless Chrome
-  at the size its `$preview` declares. A flow is a fixed-size HTML page whose elements are placed with `left` and `top`
-  in px. Keep the `support.js` line and the script block at its end, which come from the Claude design canvas format.
-  The two arrows between the phones start in Flow 4 and end in Flow 5, so both files have them.
+  at the size its `$preview` declares, and `<name>_ko.jpg`, the same flow in Korean. A flow is a fixed-size HTML page
+  whose elements are placed with `left` and `top` in px. Keep the `support.js` line and the script block at its end,
+  which come from the Claude design canvas format. The two arrows between the phones start in Flow 4 and end in Flow 5,
+  so both files have them.
+
+The Korean image takes its texts from the app: a text that is one of the English strings of
+`android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in, becomes that string's
+Korean from `values-ko`. The rest (the screen names over the screens, the arrows' labels, the headings, and screens
+the app does not have yet) is in `wireframes/ko.json` under the flow's name, which also keeps the names and Pix IDs of
+the flow's people as they are. A text with a Latin letter that neither gives, or an entry the flow no longer uses,
+stops the render, so ko.json changes with the drawing; render the flows again after a Korean string changes.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -21,6 +29,7 @@ same file.
 """
 
 import argparse
+import html
 import json
 import os
 import re
@@ -30,16 +39,23 @@ import sys
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
+from xml.etree import ElementTree
 
 from PIL import Image
 
 DESIGN = Path(__file__).resolve().parent
 IMAGES = DESIGN.parent / "images"
+STRINGS = DESIGN.parent.parent / "android" / "app" / "src" / "main" / "res"
+KOREAN = DESIGN / "wireframes" / "ko.json"
 # The device scale of the wireframe images exported so far, so a re-rendered flow keeps its size in the wiki.
 WIREFRAME_SCALE = 1.4254
 WIREFRAME_JPEG_QUALITY = 92
 SVG = re.compile(r'<svg\b[^>]*\bdata-image="([^"]+)"[^>]*>.*?</svg>', re.DOTALL)
 VIEWBOX = re.compile(r'viewBox="[\d.]+ [\d.]+ ([\d.]+) [\d.]+"')
+# A flow's markup split into tags (a style block counts as one) and the texts between them.
+MARKUP = re.compile(r"(<style\b.*?</style>|<[^>]+>)", re.DOTALL)
+LATIN = re.compile(r"[A-Za-z]")
+ARGUMENT = re.compile(r"%(\d+)\$([sd])")
 CHROME_PATHS = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "google-chrome",
@@ -65,14 +81,121 @@ def render_figure(svg: str, target: Path) -> None:
         subprocess.run([rsvg, "-w", str(round(width)), "-b", "white", str(source), "-o", str(target)], check=True)
 
 
-def render_wireframe(source: Path, target: Path) -> None:
-    match = re.search(r"data-props='([^']*)'", source.read_text(encoding="utf-8"))
+def clean(text: str) -> str:
+    """[text] with its runs of whitespace as one space and a typographic apostrophe as a straight one."""
+    return " ".join(text.replace("\u2019", "'").split())
+
+
+def android_strings(folder: str) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """The strings and the string arrays of one values folder, unescaped."""
+
+    def unescape(text: str | None) -> str:
+        return (text or "").replace("\\'", "'").replace('\\"', '"').replace("\\@", "@").replace("\\n", " ")
+
+    root = ElementTree.parse(STRINGS / folder / "strings.xml").getroot()
+    strings = {e.get("name"): unescape(e.text) for e in root.iter("string")}
+    arrays = {e.get("name"): [unescape(item.text) for item in e.iter("item")] for e in root.iter("string-array")}
+    return strings, arrays
+
+
+class Korean:
+    """The Korean of a flow's texts: its entries in ko.json first, then the app's strings."""
+
+    def __init__(self, flow: str):
+        entries = json.loads(KOREAN.read_text(encoding="utf-8")).get(flow, {})
+        self.entries = {clean(text).casefold(): korean for text, korean in entries.get("texts", {}).items()}
+        self.entries |= {clean(text).casefold(): text for text in entries.get("keep", [])}
+        self.used: set[str] = set()
+        english, english_arrays = android_strings("values")
+        korean, korean_arrays = android_strings("values-ko")
+        self.strings: dict[str, str] = {}
+        formats = []
+        for name, text in english.items():
+            if ARGUMENT.search(text):
+                formats.append((self.pattern(text), korean.get(name), text))
+            elif name in korean:
+                self.strings.setdefault(clean(text).casefold(), korean[name])
+        for name, items in english_arrays.items():
+            for text, translated in zip(items, korean_arrays.get(name, [])):
+                self.strings.setdefault(clean(text).casefold(), translated)
+        # The longest words first, so "%1$s left" does not take a text that a longer string matches.
+        self.formats = sorted(formats, key=lambda f: -len(ARGUMENT.sub("", f[2])))
+
+    @staticmethod
+    def pattern(text: str) -> re.Pattern[str]:
+        parts = ARGUMENT.split(text)  # words, then the number and the type of each argument
+        regex = re.escape(parts[0])
+        for i in range(1, len(parts), 3):
+            argument = r"\d+" if parts[i + 1] == "d" else ".+?"
+            regex += f"(?P<a{parts[i]}>{argument})" + re.escape(parts[i + 2])
+        return re.compile(regex.replace("%%", "%"), re.IGNORECASE)
+
+    def __call__(self, text: str) -> str | None:
+        """The Korean of [text], or None when neither the app nor ko.json has it."""
+        key = clean(text).casefold()
+        if key in self.entries:
+            self.used.add(key)
+            return self.entries[key]
+        if key in self.strings:
+            return self.strings[key]
+        for pattern, korean, english in self.formats:
+            match = pattern.fullmatch(clean(text))
+            if not match:
+                continue
+            arguments = {name: self(value) or value for name, value in match.groupdict().items()}
+            if korean is None and all(arguments[name] == value for name, value in match.groupdict().items()):
+                continue  # a format without words of its own, around arguments that stay English
+            filled = ARGUMENT.sub(lambda m: arguments[f"a{m.group(1)}"], korean or english)
+            return filled.replace("%%", "%")
+        return None
+
+
+def korean_page(source: Path) -> str:
+    """The flow's page in Korean, with IBM Plex Sans KR for the Hangul. Stops on a text without Korean, or an entry of
+    ko.json the flow does not use."""
+    flow = source.name.removesuffix(".dc.html")
+    korean = Korean(flow)
+    page = source.read_text(encoding="utf-8")
+    head, rest = page.split("<x-dc>", 1)
+    body, tail = rest.split("</x-dc>", 1)
+    parts = MARKUP.split(body)
+    missing = []
+    for i in range(0, len(parts), 2):  # the texts; the tags are in between
+        text = html.unescape(parts[i])
+        if not LATIN.search(text):
+            continue
+        translated = korean(text)
+        if translated is None:
+            missing.append(clean(text))
+        elif translated != text.strip():
+            lead, trail = text[: len(text) - len(text.lstrip())], text[len(text.rstrip()) :]
+            parts[i] = lead + html.escape(translated, quote=False) + trail
+    unused = sorted(set(korean.entries) - korean.used)
+    if missing or unused:
+        sys.exit(
+            f"{source.name}: add to {KOREAN.name} under {flow!r}: {json.dumps(missing, ensure_ascii=False)}; "
+            f"remove: {json.dumps(unused, ensure_ascii=False)}"
+        )
+    page = head + "<x-dc>" + "".join(parts) + "</x-dc>" + tail
+    page = page.replace('<html lang="en">', '<html lang="ko">')
+    # Korean breaks lines between words, not inside them.
+    page = page.replace("</helmet>", "<style>*{word-break:keep-all;overflow-wrap:break-word}</style>\n</helmet>")
+    page = page.replace("family=IBM+Plex+Sans:", "family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Sans:")
+    return re.sub(r"'IBM Plex (Sans|Mono)',", r"'IBM Plex \1', 'IBM Plex Sans KR',", page)
+
+
+def render_wireframe(source: Path, target: Path, korean: bool = False) -> None:
+    page = korean_page(source) if korean else source.read_text(encoding="utf-8")
+    match = re.search(r"data-props='([^']*)'", page)
     if not match:
         sys.exit(f"{source.name}: no data-props with $preview")
     preview = json.loads(match.group(1))["$preview"]
     chrome = tool("Chrome (set CHROME to its path)", [os.environ.get("CHROME"), *CHROME_PATHS])
     with tempfile.TemporaryDirectory() as tmp:
         png = Path(tmp) / "flow.png"
+        if korean:
+            source = Path(tmp) / source.name
+            source.write_text(page, encoding="utf-8")
         subprocess.run(
             [
                 chrome,
@@ -91,16 +214,19 @@ def render_wireframe(source: Path, target: Path) -> None:
         Image.open(png).convert("RGB").save(target, "JPEG", quality=WIREFRAME_JPEG_QUALITY)
 
 
-def drawings() -> dict[str, tuple[str, Callable[[Path], None]]]:
-    """Every image the folder makes: its name, its file name, and how to render it to a path."""
-    found: dict[str, tuple[str, Callable[[Path], None]]] = {}
+def drawings() -> dict[str, list[tuple[str, Callable[[Path], None]]]]:
+    """Every drawing in the folder: its name, and the file name of each of its images with how to render it."""
+    found: dict[str, list[tuple[str, Callable[[Path], None]]]] = {}
     for page in sorted(DESIGN.glob("*.html")):
         for match in SVG.finditer(page.read_text(encoding="utf-8")):
             image, svg = match.group(1), match.group(0)
-            found[Path(image).stem] = (image, lambda target, svg=svg: render_figure(svg, target))
+            found[Path(image).stem] = [(image, lambda target, svg=svg: render_figure(svg, target))]
     for flow in sorted((DESIGN / "wireframes").glob("*.dc.html")):
         name = flow.name.removesuffix(".dc.html")
-        found[name] = (f"{name}.jpg", lambda target, flow=flow: render_wireframe(flow, target))
+        found[name] = [
+            (f"{name}.jpg", lambda target, flow=flow: render_wireframe(flow, target)),
+            (f"{name}_ko.jpg", lambda target, flow=flow: render_wireframe(flow, target, korean=True)),
+        ]
     return found
 
 
@@ -115,10 +241,10 @@ def main() -> None:
         sys.exit(f"unknown: {', '.join(unknown)}; known: {', '.join(known)}")
     args.out.mkdir(parents=True, exist_ok=True)
     for name in args.names or known:
-        image, render = known[name]
-        target = args.out / image
-        render(target)
-        print(os.path.relpath(target))
+        for image, render in known[name]:
+            target = args.out / image
+            render(target)
+            print(os.path.relpath(target))
 
 
 if __name__ == "__main__":

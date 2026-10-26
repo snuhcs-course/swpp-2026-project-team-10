@@ -1,0 +1,130 @@
+{
+  "flow1_pose_guide": {
+    "texts": {
+      "1 · Pose guide": "1 · 포즈 가이드",
+      "Arrows are user actions. Dashed coral frames are failure cases. The dashed mint figure is the pose guide; the grey figure is the real person.": "화살표는 사용자의 동작이에요. 산호색 점선 테두리는 실패하는 경우예요. 민트색 점선 인물은 포즈 가이드, 회색 인물은 실제 사람이에요.",
+      "CAMERA": "카메라",
+      "REFERENCE CONFIRM": "참고 사진 확인",
+      "CAMERA + GUIDE": "카메라 + 가이드",
+      "PHOTO SAVED": "사진 저장됨",
+      "FAILURE": "실패",
+      "Hold the phone at your waist and tilt it up a little - the legs look longer.": "휴대폰을 허리 높이에 두고 살짝 위로 기울이세요 - 다리가 길어 보여요.",
+      "tap Guide": "가이드 탭",
+      "tap a saved guide": "저장한 가이드 탭",
+      "upload photo": "사진 올리기",
+      "use guide": "가이드 사용",
+      "shutter": "셔터",
+      "no person": "사람 없음",
+      "choose again": "다시 고르기"
+    }
+  },
+  "flow2_pose_generation": {
+    "texts": {
+      "2 · Pose generation": "2 · 포즈 만들기",
+      "From Add a pose guide": "포즈 가이드 추가에서",
+      "tap Generate poses here": "여기서 포즈 만들기 탭",
+      "To Reference confirm": "참고 사진 확인으로",
+      "same step as an uploaded photo": "올린 사진과 같은 단계",
+      "SCENE PHOTO": "장면 사진",
+      "SCENE PHOTO · REVIEW": "장면 사진 · 확인",
+      "CONSENT NOTICE": "동의 안내",
+      "FAILURE": "실패",
+      "Refused description → “The AI service would not create poses for “…” with this photo. Try a different description, or go back to the camera and take another photo.” and": "거절된 설명 → “AI 서비스가 이 사진으로 “…” 포즈를 만들지 않았어요. 설명을 바꾸거나, 카메라로 돌아가 다른 사진을 찍으세요.” 문구와",
+      "in place of": "버튼. 대신 빠지는 버튼:",
+      "first time": "처음",
+      "later times": "다음부터",
+      "agree": "동의",
+      "shutter": "셔터",
+      "generate or skip": "만들기 또는 건너뛰기",
+      "ready": "완료",
+      "error": "오류",
+      "retry": "재시도"
+    }
+  },
+  "flow3_add_friend": {
+    "texts": {
+      "3 · Add a friend (Pix ID)": "3 · 친구 추가 (Pix ID)",
+      "From Camera": "카메라에서",
+      "tap Shoot together": "함께 찍기 탭",
+      "FAILURE": "실패",
+      "accepted": "수락됨",
+      "not found": "찾지 못함",
+      "retry": "재시도"
+    },
+    "keep": ["Junhyeong", "junhyeong.h", "@junhyeong.h", "junhyeong.hh", "Test Account 2"]
+  },
+  "flow3b_sign_in": {
+    "texts": {
+      "3b · Sign in, Pix ID, and account": "3b · 로그인, Pix ID, 계정",
+      "From Camera, signed out": "로그아웃 상태의 카메라에서",
+      "tap Shoot together": "함께 찍기 탭",
+      "PIX ID SETUP": "Pix ID 설정",
+      "FAILURE": "실패",
+      "Google, new": "Google, 새 계정",
+      "taken": "사용 중",
+      "tap": "탭"
+    },
+    "keep": [
+      "test1",
+      "@test1",
+      "@test3",
+      "@test4",
+      "test5",
+      "Test Account 1",
+      "Test Account 2",
+      "Test Account 3",
+      "Test Account 4",
+      "Test User!"
+    ]
+  },
+  "flow4_photographer": {
+    "texts": {
+      "4 · Shoot together: photographer": "4 · 함께 찍기: 촬영자",
+      "From Friends": "친구에서",
+      "tap Invite next to a friend": "친구 옆의 초대 탭",
+      "INVITE SENT": "초대 보냄",
+      "Waiting for Junhyeong": "Junhyeong님을 기다리는 중",
+      "Junhyeong gets a notification. The live view starts when they accept.": "Junhyeong님에게 알림이 가요. 수락하면 실시간 화면이 시작돼요.",
+      "Let Junhyeong adjust the camera and guide": "Junhyeong님이 카메라와 가이드를 조정하도록 허용",
+      "Cancel invite": "초대 취소",
+      "FRIEND CONNECTED": "친구 연결됨",
+      "FAILURE": "실패",
+      "Invite not accepted": "초대를 수락하지 않았어요",
+      "Junhyeong declined or didn't answer within 30 seconds.": "Junhyeong님이 거절했거나 30초 안에 답하지 않았어요.",
+      "Invite again": "다시 초대",
+      "accepted": "수락됨",
+      "declined": "거절됨",
+      "live view": "실시간 화면",
+      "zoom, guide, brightness, flash": "배율, 가이드, 밝기, 플래시"
+    }
+  },
+  "flow5_friend": {
+    "texts": {
+      "5 · Shoot together: friend": "5 · 함께 찍기: 친구",
+      "On the friend's phone": "친구의 휴대폰에서",
+      "tap the invitation notification": "초대 알림 탭",
+      "INVITATION": "초대",
+      "Dongje invites you to shoot together": "Dongje님이 함께 찍자고 초대했어요",
+      "Dongje wants to show you their camera": "Dongje님이 카메라를 보여 주려고 해요",
+      "You'll see the framing and pose guide live.": "구도와 포즈 가이드를 실시간으로 볼 수 있어요.",
+      "SUBJECT VIEW": "피사체 화면",
+      "FAILURE": "실패",
+      "drops": "끊김"
+    },
+    "keep": ["Pix"]
+  },
+  "flow6_room_code_prototype": {
+    "texts": {
+      "6 · Room code": "6 · 방 코드",
+      "From Friends": "친구에서",
+      "To Subject view": "피사체 화면으로",
+      "same screen as row 5": "5행과 같은 화면",
+      "JOIN WITH CODE": "코드로 참여",
+      "FAILURE": "실패",
+      "join instead": "대신 참여",
+      "valid code": "맞는 코드",
+      "wrong code": "틀린 코드",
+      "retry": "재시도"
+    }
+  }
+}

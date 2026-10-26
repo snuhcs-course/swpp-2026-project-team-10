@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One candidate on Pick a pose (R&S 6.3): as large as the page allows, in the camera frame's 3:4. -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- The pose is not written on the image (FR-4.6); a screen reader still says which pose it is. -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/poseImage"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/pix_surface"
+        android:focusable="true"
+        android:scaleType="centerCrop"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintDimensionRatio="3:4"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.PoseImage" />
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 """The sockets of one server process, and the room protocol on top of the session store.
 
 Room state lives in Redis (Design Documentation 2.7), so a room created through one worker can be joined
@@ -259,17 +259,24 @@ class SessionRegistry:
                 self.settings.join_failure_window_seconds,
             )
         status, session_id, deliveries = await self.store.join(peer.id, code, failures)
-        if status == "OK":
-            # Asked only once the place is taken, so wrong codes cost no credentials.
-            ice_servers = await self.ice_servers()
-            self.send(
-                peer,
-                {"type": "session.joined", "sessionId": session_id, "role": "SUBJECT", "iceServers": ice_servers},
-            )
-        # The photographer's peer.joined is among these, and it must be on its way before this socket's next signal.
-        await self._deliver(deliveries)
         if status != "OK":
+            await self._deliver(deliveries)
             raise ProtocolError(status, JOIN_ERRORS[status])
+        # The photographer's peer.joined waits for this socket's session.joined, which waits for its credentials;
+        # what else the script decided, such as an expired room's notice, goes out now.
+        joined = [delivery for delivery in deliveries if delivery.kind == "peer.joined"]
+        await self._deliver([delivery for delivery in deliveries if delivery.kind != "peer.joined"])
+        # Asked only once the place is taken, so wrong codes cost no credentials.
+        ice_servers = await self.ice_servers()
+        if not await self.store.seated(session_id, peer.id):
+            # The photographer left meanwhile, and this socket has had its peer.left. A photographer that opened
+            # another room on the same socket must not hear of this subject there.
+            return
+        self.send(
+            peer, {"type": "session.joined", "sessionId": session_id, "role": "SUBJECT", "iceServers": ice_servers}
+        )
+        # It must be on its way before this socket's next signal.
+        await self._deliver(joined)
 
     async def _relay(self, peer: Peer, message: Signal, raw_text: str) -> None:
         sdp_type = message.sdp.type if message.sdp is not None else ""

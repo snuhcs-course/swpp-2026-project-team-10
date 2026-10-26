@@ -17,7 +17,7 @@ uv sync --locked
 
 Optional settings are listed in `.env.example`. Copy it to `.env` in `server/` to override defaults, or export `PIX_` environment variables. The default waiting-room TTL is 600 seconds, empty-session TTL is 60 seconds, and cleanup runs every second. Expiry is also checked during message handling. If changing `PIX_MAX_MESSAGE_BYTES`, keep Uvicorn's `--ws-max-size` consistent.
 
-Pose generation needs `OPENROUTER_API_KEY`, an OpenRouter key with credits, in `.env` or the environment. Without it the server still runs, `POST /poses` answers `UPSTREAM_ERROR`, and `POST /pose-suggestions` answers the default poses. Google sign-in needs `PIX_GOOGLE_CLIENT_ID`, the web client ID that the app passes to Google sign-in; without it the Google endpoints answer `503 UNAVAILABLE`, and sign-up with a Pix ID and a password still works.
+Pose generation needs `OPENROUTER_API_KEY`, an OpenRouter key with credits, in `.env` or the environment. Without it the server still runs, `POST /poses` answers `UPSTREAM_ERROR`, and `POST /pose-suggestions` answers the default poses. Google sign-in needs `PIX_GOOGLE_CLIENT_ID`, the web client ID that the app passes to Google sign-in; without it the Google endpoints answer `503 UNAVAILABLE`, and sign-up with a Pix ID and a password still works. Sessions across networks need `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN`, the TURN key of Cloudflare Realtime: with them each phone gets Cloudflare's STUN and TURN servers with credentials of its own, valid for `PIX_TURN_TTL_SECONDS` (4 h); without them, or when Cloudflare fails or takes longer than `PIX_TURN_TIMEOUT_SECONDS` (3 s), each phone gets Cloudflare's STUN server only, which is enough on one Wi-Fi (Design 2.6.7). The server logs only Cloudflare's status, never the token or a credential.
 
 ## Run on the test Wi-Fi
 
@@ -41,8 +41,8 @@ Send JSON **text** frames to `/ws` on a persistent connection. A socket belongs 
 
 | Client message | Result |
 | --- | --- |
-| `{"type":"room.create"}` | Sender gets `{"type":"room.created","code":"482915","sessionId":"s_…","iceServers":[]}`. |
-| `{"type":"room.join","code":"482915"}` | Subject gets `{"type":"session.joined","sessionId":"s_…","role":"SUBJECT","iceServers":[]}`; photographer gets `{"type":"peer.joined"}`. |
+| `{"type":"room.create"}` | Sender gets `{"type":"room.created","code":"482915","sessionId":"s_…","iceServers":[…]}`, its own STUN and TURN entries (Design 2.5.2). |
+| `{"type":"room.join","code":"482915"}` | Subject gets `{"type":"session.joined","sessionId":"s_…","role":"SUBJECT","iceServers":[…]}`, asked for only once the join succeeded; photographer gets `{"type":"peer.joined"}`. |
 | `{"type":"signal","sdp":{"type":"offer","sdp":"v=0\r\n…"}}` | Forwarded unchanged to the subject. Only the photographer sends offers; only the subject sends answers. |
 | `{"type":"signal","candidate":{"sdpMid":"0","sdpMLineIndex":0,"candidate":"candidate:…"}}` | Forwarded unchanged to the other phone. `sdpMid` may be null; an empty candidate marks the end of candidates. |
 | `{"type":"leave"}` | Other phone gets `{"type":"peer.left","reason":"PEER_LEFT"}`. There is no acknowledgment to the sender. |
@@ -236,7 +236,7 @@ sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 
 ### Settings
 
-[`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=` or `PIX_GOOGLE_CLIENT_ID=`, must be set on every server; every other name is commented and shows the default the app already has, or says where it is set. Uncomment a name in `/opt/pix/.env` only to give a server another value, so a default changed in the code still reaches it.
+[`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=`, `PIX_GOOGLE_CLIENT_ID=`, or `PIX_TURN_API_TOKEN=`, must be set on every server; every other name is commented and shows the default the app already has, or says where it is set. Uncomment a name in `/opt/pix/.env` only to give a server another value, so a default changed in the code still reaches it.
 
 Each deploy and `deploy.sh restart` compare `/opt/pix/.env` with the `.env.example` of the commit being started, and never change either file. They warn about a name the example leaves empty that `.env` has no value for, and about a name `.env` sets that the example does not list, which is probably misspelled, because the app ignores names it does not know. `pix status` shows the result, an operator sees it in one line on logging in, and the app logs which features are off at start. Fill in a value with `pix env`, then `pix restart`. A server set up before 2026-10-15 has every default uncommented in `/opt/pix/.env`, copied from the old example; those lines pin today's values, so delete the ones you did not mean to change.
 

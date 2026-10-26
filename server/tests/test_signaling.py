@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 import json
 import re
 from contextlib import ExitStack
@@ -13,20 +13,24 @@ def create_room(photographer):
     assert room["type"] == "room.created"
     assert re.fullmatch(r"[0-9]{6}", room["code"])
     assert room["sessionId"].startswith("s_")
-    assert room["iceServers"] == []
+    assert isinstance(room["iceServers"], list)
     assert set(room) == {"type", "code", "sessionId", "iceServers"}
     return room
 
 
 def join_room(photographer, subject, room):
+    """Returns the subject's `session.joined`."""
     subject.send_json({"type": "room.join", "code": room["code"]})
-    assert subject.receive_json() == {
+    joined = subject.receive_json()
+    assert joined == {
         "type": "session.joined",
         "sessionId": room["sessionId"],
         "role": "SUBJECT",
-        "iceServers": [],
+        "iceServers": joined["iceServers"],
     }
+    assert isinstance(joined["iceServers"], list)
     assert photographer.receive_json() == {"type": "peer.joined"}
+    return joined
 
 
 def assert_error(socket, code):
@@ -105,6 +109,32 @@ def test_internal_stats_count_open_rooms_and_sockets(client):
         assert client.get("/internal/stats").json()["sessions"] == 1
         join_room(photographer, subject, room)
         assert client.get("/internal/stats").json() == {"sessions": 1, "connections": 2}
+
+
+def test_each_phone_gets_its_own_relay_credentials(client, turn_api):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        joined = join_room(photographer, subject, room)
+    assert room["iceServers"] == turn_api.servers
+    assert joined["iceServers"] == turn_api.servers
+    assert len(turn_api.requests) == 2
+
+
+def test_a_wrong_code_asks_for_no_relay_credentials(client, turn_api):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        create_room(photographer)
+        subject.send_json({"type": "room.join", "code": "000000"})
+        assert_error(subject, "NOT_FOUND")
+    assert len(turn_api.requests) == 1
+
+
+def test_a_failing_relay_still_opens_the_room_with_stun_only(client, turn_api):
+    turn_api.status = 500
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        joined = join_room(photographer, subject, room)
+    assert room["iceServers"] == [{"urls": ["stun:stun.cloudflare.com:3478"]}]
+    assert joined["iceServers"] == [{"urls": ["stun:stun.cloudflare.com:3478"]}]
 
 
 def test_codes_preserve_leading_zeroes_and_retry_collisions(client, monkeypatch):

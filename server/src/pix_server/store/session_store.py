@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 """Session state shared by every server process, kept in Redis (Design Documentation 2.7, AD-18).
 
 Each server process is one worker with its own id. The store runs the room transitions as scripts, carries
@@ -151,6 +151,12 @@ class SessionStore:
         limits = [failures.key, str(failures.limit), f"{failures.seconds:.6f}"] if failures else ["", "0", "0"]
         status, session_id, out = await self._run("JOIN", connection, code, *limits, uuid4().hex)
         return status, session_id, _deliveries(out)
+
+    async def seated(self, session_id: str, connection: str) -> bool:
+        """Whether `connection` still holds the subject's place in the session and its photographer is still there.
+        One read of one hash, so it changes nothing and needs no script."""
+        photographer, subject = await self.redis.hmget(f"session:{session_id}", "photographer", "subject")
+        return bool(photographer) and subject == connection
 
     async def route(self, connection: str, sdp_type: str) -> tuple[str, str, str, str, list[Delivery]]:
         """Finds where a signal goes: `(status, expected SDP type, connection, worker, deliveries)`."""

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 """The registry on the session store, without sockets. Each registry stands for one worker process."""
 
 import asyncio
@@ -165,11 +165,12 @@ async def test_room_created_through_one_worker_is_joined_through_another(make_re
     # The subject signals right after joining; the photographer must still hear about the join first.
     await handle(second, subject, type="room.join", code=room["code"])
     await handle(second, subject, **answer)
+    # A registry without a relay gives every phone the STUN server only.
     assert await receive(subject) == {
         "type": "session.joined",
         "sessionId": room["sessionId"],
         "role": "SUBJECT",
-        "iceServers": [],
+        "iceServers": [{"urls": ["stun:stun.cloudflare.com:3478"]}],
     }
     assert await receive(photographer) == {"type": "peer.joined"}
     assert await receive(photographer) == answer
@@ -184,6 +185,70 @@ async def test_room_created_through_one_worker_is_joined_through_another(make_re
         await handle(first, photographer, **offer)
     assert exc.value.code == "PEER_UNAVAILABLE"
     await handle(second, subject, type="room.join", code=room["code"])
+    assert await receive(photographer) == {"type": "peer.joined"}
+
+
+def held_relay(registry):
+    """Makes the registry's relay wait until the returned `release` is set; `asked` is set once a phone has asked."""
+    asked, release = asyncio.Event(), asyncio.Event()
+
+    async def ice_servers() -> list[dict]:
+        asked.set()
+        await release.wait()
+        return [{"urls": ["stun:stun.cloudflare.com:3478"]}]
+
+    registry.ice_servers = ice_servers
+    return asked, release
+
+
+async def test_a_photographer_who_leaves_while_the_subject_waits_for_credentials_hears_nothing_of_it(make_registry):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    asked, release = held_relay(registry)
+    joining = asyncio.create_task(handle(registry, subject, type="room.join", code=room["code"]))
+    await asyncio.wait_for(asked.wait(), timeout=2)
+
+    await handle(registry, photographer, type="leave")
+    assert await receive(subject) == {"type": "peer.left", "reason": "PEER_LEFT"}
+    release.set()
+    await handle(registry, photographer, type="room.create")
+    assert (await receive(photographer))["type"] == "room.created"
+    await asyncio.wait_for(joining, timeout=2)
+
+    # The subject never hears it joined a room that is gone, and the new room hears of no subject.
+    assert subject.outbox.empty()
+    assert photographer.outbox.empty()
+
+
+async def test_a_photographer_who_drops_while_the_subject_waits_for_credentials_is_not_told_of_it(make_registry):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    asked, release = held_relay(registry)
+    joining = asyncio.create_task(handle(registry, subject, type="room.join", code=room["code"]))
+    await asyncio.wait_for(asked.wait(), timeout=2)
+
+    await registry.disconnect(photographer)
+    assert await receive(subject) == LEFT
+    release.set()
+    await asyncio.wait_for(joining, timeout=2)
+
+    assert subject.outbox.empty()
+
+
+async def test_the_photographer_hears_of_the_subject_only_after_its_credentials_arrive(make_registry):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    asked, release = held_relay(registry)
+    joining = asyncio.create_task(handle(registry, subject, type="room.join", code=room["code"]))
+    await asyncio.wait_for(asked.wait(), timeout=2)
+    assert photographer.outbox.empty()
+
+    release.set()
+    await asyncio.wait_for(joining, timeout=2)
+    assert (await receive(subject))["type"] == "session.joined"
     assert await receive(photographer) == {"type": "peer.joined"}
 
 

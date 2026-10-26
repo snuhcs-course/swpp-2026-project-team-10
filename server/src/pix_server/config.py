@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 """Environment configuration for the Pix server."""
 
 from typing import Literal
@@ -71,3 +71,13 @@ class Settings(BaseSettings):
     # and a room can be taken only in the seconds before the friend joins it.
     join_failure_limit: PositiveInt = 100
     join_failure_window_seconds: PositiveFloat = 600
+
+    # Cloudflare Realtime TURN (Design Documentation 2.6.7, AD-14): the TURN key's id and API token from the Cloudflare
+    # dashboard. While either is unset, each phone gets Cloudflare's STUN server only, so sessions across networks
+    # often fail to connect.
+    turn_key_id: str | None = None
+    turn_api_token: SecretStr | None = None
+    # How long a phone's TURN credentials last. The relay stops when they expire, so this is longer than any session.
+    turn_ttl_seconds: PositiveInt = 14400
+    # After this the phone gets STUN only, so a slow TURN API never holds up a room.
+    turn_timeout_seconds: PositiveFloat = 3

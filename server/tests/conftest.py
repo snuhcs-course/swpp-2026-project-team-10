@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 import asyncio
 import base64
 import io
@@ -147,6 +147,34 @@ class ImageApi:
             raise
 
 
+class TurnApi:
+    """Stands in for Cloudflare's TURN API. It records each request in `requests` and answers with `status` and `body`
+    after `delay`; `servers` is what a working API answers, in Cloudflare's shape."""
+
+    def __init__(self) -> None:
+        self.requests: list[httpx2.Request] = []
+        self.delay = 0.0
+        self.servers = [
+            {"urls": ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:443"]},
+            {
+                "urls": [
+                    "turn:turn.cloudflare.com:3478?transport=udp",
+                    "turn:turn.cloudflare.com:80?transport=tcp",
+                    "turns:turn.cloudflare.com:443?transport=tcp",
+                ],
+                "username": "test-turn-username",
+                "credential": "test-turn-credential",
+            },
+        ]
+        self.status = 201
+        self.body: object = {"iceServers": self.servers}
+
+    async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        await asyncio.sleep(self.delay)
+        return httpx2.Response(self.status, json=self.body)
+
+
 class FakeGoogle:
     """Stands in for Google's token check. A token `google:<subject>` or `google:<subject>:<name>` is valid; any
     other is invalid. `available = False` makes every check fail as if Google's keys could not be fetched, and
@@ -193,6 +221,11 @@ def image_api():
 
 
 @pytest.fixture
+def turn_api():
+    return TurnApi()
+
+
+@pytest.fixture
 def database_url(tmp_path):
     """A new SQLite file per test, or, with PIX_TEST_DATABASE_URL set, that PostgreSQL emptied first, which shows
     that the migrations and queries behave the same on the servers' database."""
@@ -236,6 +269,10 @@ def settings(database_url):
         tip_global_limit=1000,
         join_failure_limit=10,
         join_failure_window_seconds=600,
+        turn_key_id="test-turn-key",
+        turn_api_token="test-turn-token",
+        turn_ttl_seconds=14400,
+        turn_timeout_seconds=3,
     )
 
 
@@ -311,10 +348,15 @@ async def make_registry(settings, clock, open_store):
 
 
 @pytest.fixture
-async def live_server(settings, image_api, unused_tcp_port, open_store):
+async def live_server(settings, image_api, turn_api, unused_tcp_port, open_store):
     """Serves the app on a real socket and gives its address, for a test that closes a connection in the middle of a
     request, which the test client cannot."""
-    app = create_app(settings, image_api=httpx2.MockTransport(image_api), redis=open_store)
+    app = create_app(
+        settings,
+        image_api=httpx2.MockTransport(image_api),
+        turn_api=httpx2.MockTransport(turn_api),
+        redis=open_store,
+    )
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=unused_tcp_port, log_level="warning"))
     serving = asyncio.create_task(server.serve())
     try:
@@ -332,11 +374,12 @@ def google():
 
 
 @pytest.fixture
-def client(settings, clock, image_api, open_store, google):
+def client(settings, clock, image_api, turn_api, open_store, google):
     app = create_app(
         settings,
         clock=clock,
         image_api=httpx2.MockTransport(image_api),
+        turn_api=httpx2.MockTransport(turn_api),
         redis=open_store,
         google=google,
         # Real argon2id at the lowest cost, so a test hashes in microseconds.

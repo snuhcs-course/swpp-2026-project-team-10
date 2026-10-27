@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 """Render the drawings in wiki/design/ to the images the wiki pages show.
 
 Each drawing has one image in wiki/images/, named after it:
@@ -9,6 +9,11 @@ Each drawing has one image in wiki/images/, named after it:
   at the size its `$preview` declares. A flow is a fixed-size HTML page whose elements are placed with `left` and `top`
   in px. Keep the `support.js` line and the script block at its end, which come from the Claude design canvas format.
   The two arrows between the phones start in Flow 4 and end in Flow 5, so both files have them.
+- A screen is drawn as the app shows it on a Galaxy S22: a card of 168 x 364 px whose top 18 px hold the screen's name,
+  then the app's 360 x 705 dp at 165/360 px per dp, and below it the navigation bar with its home indicator. It is in
+  Manrope (DM Mono for the room code) with the colors of `android/app/src/main/res/values/colors.xml` and the app's own
+  icons as inline SVG. A camera image or a photo is a lighter grey gradient, so its frame shows against the app; in it,
+  a grey figure is the real person and a white outline the pose guide.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -35,9 +40,12 @@ from PIL import Image
 
 DESIGN = Path(__file__).resolve().parent
 IMAGES = DESIGN.parent / "images"
-# The device scale of the wireframe images exported so far, so a re-rendered flow keeps its size in the wiki.
-WIREFRAME_SCALE = 1.4254
+# Twice the page's size: a screen is drawn at its real proportions, so its smallest text (11 sp, 5 px on a card) needs it.
+WIREFRAME_SCALE = 2
 WIREFRAME_JPEG_QUALITY = 92
+# Headless Chrome now and then hangs on a page; another try then works.
+CHROME_TIMEOUT_S = 120
+CHROME_TRIES = 3
 SVG = re.compile(r'<svg\b[^>]*\bdata-image="([^"]+)"[^>]*>.*?</svg>', re.DOTALL)
 VIEWBOX = re.compile(r'viewBox="[\d.]+ [\d.]+ ([\d.]+) [\d.]+"')
 CHROME_PATHS = [
@@ -73,21 +81,24 @@ def render_wireframe(source: Path, target: Path) -> None:
     chrome = tool("Chrome (set CHROME to its path)", [os.environ.get("CHROME"), *CHROME_PATHS])
     with tempfile.TemporaryDirectory() as tmp:
         png = Path(tmp) / "flow.png"
-        subprocess.run(
-            [
-                chrome,
-                "--headless",
-                "--hide-scrollbars",
-                f"--force-device-scale-factor={WIREFRAME_SCALE}",
-                f"--window-size={preview['width']},{preview['height']}",
-                # Time for the web fonts to load before the screenshot.
-                "--virtual-time-budget=10000",
-                f"--screenshot={png}",
-                source.as_uri(),
-            ],
-            check=True,
-            capture_output=True,
-        )
+        command = [
+            chrome,
+            "--headless",
+            "--hide-scrollbars",
+            f"--force-device-scale-factor={WIREFRAME_SCALE}",
+            f"--window-size={preview['width']},{preview['height']}",
+            # Time for the web fonts to load before the screenshot.
+            "--virtual-time-budget=10000",
+            f"--screenshot={png}",
+            source.as_uri(),
+        ]
+        for attempt in range(1, CHROME_TRIES + 1):
+            try:
+                subprocess.run(command, check=True, capture_output=True, timeout=CHROME_TIMEOUT_S)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == CHROME_TRIES:
+                    sys.exit(f"{source.name}: Chrome did not finish within {CHROME_TIMEOUT_S} s, {CHROME_TRIES} times")
         Image.open(png).convert("RGB").save(target, "JPEG", quality=WIREFRAME_JPEG_QUALITY)
 
 

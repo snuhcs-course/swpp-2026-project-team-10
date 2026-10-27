@@ -12,7 +12,8 @@ Each drawing has one image in wiki/images/, named after it:
 - A screen is drawn as the app shows it on a Galaxy S22: a card of 168 x 364 px whose top 18 px hold the screen's name,
   then the app's 360 x 705 dp at 165/360 px per dp, and below it the navigation bar with its home indicator. It is in
   Manrope (DM Mono for the room code) with the colors of `android/app/src/main/res/values/colors.xml` and the app's own
-  icons as inline SVG. In a camera image, a grey figure is the real person and a white outline the pose guide.
+  icons as inline SVG. A camera image or a photo is a lighter grey gradient, so its frame shows against the app; in it,
+  a grey figure is the real person and a white outline the pose guide.
 
 Change the drawing, never the image alone, and render it in the same PR:
 

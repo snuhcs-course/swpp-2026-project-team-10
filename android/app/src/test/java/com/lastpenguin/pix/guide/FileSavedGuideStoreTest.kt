@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -24,15 +24,17 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 
 /*
- * Partitions for saved guides on the phone (FR-3.8, Design 2.8), with real files and real WebP encoding.
+ * Partitions for saved guides on the phone (FR-3.8, Design 2.8), with real files and real image encoding.
  * save: a new guide (listed first with a 3:4 thumbnail, its own folder of three files), the same guide again (one
- * copy), a guide without a reference photo (the cutout makes the thumbnail), an id that cannot name a folder, storage
+ * copy), a guide without a reference photo (the outline makes the thumbnail), an id that cannot name a folder, storage
  * that cannot be written, a bitmap that cannot be encoded (a failure, not a crash), and a clock set back between two
  * saves (the last one saved stays first).
  * Boundary of MAX_SAVED: the 20th is kept with the others; the 21st deletes the oldest from the list and the storage;
  * 21 folders found at a start keep the newest 20.
- * load: a saved guide (cutout at most 720 px tall, outline rebuilt, anchor, aspect, source, state, and reference as
- * saved), an unknown id, an unreadable cutout.
+ * load: a saved guide (mask at most 720 px tall, outline rebuilt, anchor, aspect, source, state, and reference as
+ * saved), an unknown id, an unreadable mask.
+ * Migration from before the mask-only transfer (#113): a folder with `cutout.webp` and no `mask.png` is listed,
+ * gets `mask.png` from the cutout's alpha, loses the cutout, and loads; one whose cutout cannot be read is deleted.
  * Restart (a new store on the same folder): the saved guides, newest first, and they load; unfinished, broken, and
  * unusable folders (an aspect of 0) are not listed and are deleted.
  * delete: a saved guide (gone from the list, the storage, and the next start), an unknown id.
@@ -72,13 +74,14 @@ class FileSavedGuideStoreTest {
     }
 
     @Test
-    fun save_newGuide_writesCutoutReferenceAndMetaInItsOwnFolder() = runTest {
+    fun save_newGuide_writesMaskReferenceAndMetaInItsOwnFolder() = runTest {
         val directory = File(folder.root, "guides")
         val store = store(directory)
 
         store.save(guide("g1"), GuideState()).getOrThrow()
 
-        assertEquals(setOf("cutout.webp", "reference.webp", "meta.json"), File(directory, "g1").list()?.toSet())
+        assertEquals(setOf("mask.png", "reference.webp", "meta.json"), File(directory, "g1").list()?.toSet())
+        assertNotNull(MaskPng.decode(File(directory, "g1/mask.png").readBytes()))
         assertEquals(listOf("g1"), directory.list()?.toList())
     }
 
@@ -94,7 +97,7 @@ class FileSavedGuideStoreTest {
     }
 
     @Test
-    fun save_guideWithoutReference_makesTheThumbnailFromTheCutout() = runTest {
+    fun save_guideWithoutReference_makesTheThumbnailFromTheOutline() = runTest {
         val store = store()
 
         store.save(guide("g1", reference = null), GuideState()).getOrThrow()
@@ -130,7 +133,7 @@ class FileSavedGuideStoreTest {
     fun save_bitmapThatCannotBeEncoded_failsAndListsNothing() = runTest {
         val directory = File(folder.root, "guides")
         val store = store(directory)
-        val broken = guide("g1").also { it.cutout.recycle() }
+        val broken = guide("g1").also { it.mask.recycle() }
 
         val result = store.save(broken, GuideState())
 
@@ -190,10 +193,11 @@ class FileSavedGuideStoreTest {
 
         assertEquals("g1", loaded.id)
         // At most 720 px tall, as the subject receives it, with the figure still opaque on a clear background.
-        assertEquals(720, loaded.cutout.height)
-        assertEquals(240, loaded.cutout.width)
-        assertEquals(0, Color.alpha(loaded.cutout.getPixel(2, 2)))
-        assertEquals(255, Color.alpha(loaded.cutout.getPixel(120, 360)))
+        assertEquals(Bitmap.Config.ALPHA_8, loaded.mask.config)
+        assertEquals(720, loaded.mask.height)
+        assertEquals(240, loaded.mask.width)
+        assertEquals(0, Color.alpha(loaded.mask.getPixel(2, 2)))
+        assertEquals(255, Color.alpha(loaded.mask.getPixel(120, 360)))
         assertEquals(240, loaded.outline.width)
         assertTrue("the outline is drawn", hasVisiblePixel(loaded.outline))
         assertEquals(300f / 900f, loaded.aspect, 0f)
@@ -212,11 +216,11 @@ class FileSavedGuideStoreTest {
     }
 
     @Test
-    fun load_unreadableCutout_fails() = runTest {
+    fun load_unreadableMask_fails() = runTest {
         val directory = File(folder.root, "guides")
         val store = store(directory)
         store.save(guide("g1"), GuideState()).getOrThrow()
-        File(directory, "g1/cutout.webp").writeText("not an image")
+        File(directory, "g1/mask.png").writeText("not an image")
 
         assertTrue(store.load("g1").isFailure)
     }
@@ -243,7 +247,7 @@ class FileSavedGuideStoreTest {
         File(directory, ".g2").mkdirs()
         File(directory, "g3").mkdirs()
         File(directory, "g4").mkdirs()
-        File(directory, "g1/cutout.webp").copyTo(File(directory, "g4/cutout.webp"))
+        File(directory, "g1/mask.png").copyTo(File(directory, "g4/mask.png"))
         File(directory, "g4/meta.json").writeText("{\"savedAt\":")
 
         val after = store(directory)
@@ -288,6 +292,38 @@ class FileSavedGuideStoreTest {
     }
 
     @Test
+    fun restart_folderWithAnOldCutout_getsAMaskInItsPlaceAndLoads() = runTest {
+        val directory = File(folder.root, "guides")
+        store(directory).save(guide("g1"), GuideState()).getOrThrow()
+        oldCutout(File(directory, "g1"))
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals(listOf("g1"), after.saved.value.map { it.id })
+        assertEquals(setOf("mask.png", "reference.webp", "meta.json"), File(directory, "g1").list()?.toSet())
+        val loaded = after.load("g1").getOrThrow().first
+        assertEquals(240 to 720, loaded.mask.width to loaded.mask.height)
+        assertEquals(0, Color.alpha(loaded.mask.getPixel(2, 2)))
+        assertEquals(255, Color.alpha(loaded.mask.getPixel(120, 360)))
+        assertTrue("the outline is drawn", hasVisiblePixel(loaded.outline))
+    }
+
+    @Test
+    fun restart_folderWithAnUnreadableOldCutout_isLeftOutAndDeleted() = runTest {
+        val directory = File(folder.root, "guides")
+        store(directory).save(guide("g1"), GuideState()).getOrThrow()
+        File(directory, "g1/mask.png").delete()
+        File(directory, "g1/cutout.webp").writeText("not an image")
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertTrue(after.saved.value.isEmpty())
+        assertFalse(File(directory, "g1").exists())
+    }
+
+    @Test
     fun delete_savedGuide_removesItFromTheListTheStorageAndTheNextStart() = runTest {
         val directory = File(folder.root, "guides")
         val store = store(directory)
@@ -314,21 +350,30 @@ class FileSavedGuideStoreTest {
         assertNotNull(store.load("g1").getOrNull())
     }
 
-    /** A cutout 300×900 with an opaque figure on a clear background, and a 512×384 reference photo. */
+    /** [guideFolder] as a guide saved before #113 left it: `cutout.webp`, a colored figure whose alpha is the mask. */
+    private fun oldCutout(guideFolder: File) {
+        File(guideFolder, "mask.png").delete()
+        val cutout = Bitmap.createScaledBitmap(figure(300, 900), 240, 720, true)
+        File(guideFolder, "cutout.webp").outputStream().use {
+            cutout.compress(Bitmap.CompressFormat.WEBP_LOSSY, 90, it)
+        }
+    }
+
+    /** A mask 300×900 with an opaque figure on a clear background, and a 512×384 reference photo. */
     private fun guide(
         id: String,
         reference: Bitmap? = photo(512, 384),
         anchor: NormalizedRect? = NormalizedRect(0.1f, 0.1f, 0.5f, 0.9f),
         source: GuideSource = GuideSource.GALLERY,
     ): ReferenceGuide {
-        val cutout = figure(300, 900)
-        return ReferenceGuide(id, cutout, cutout, 300f / 900f, source, anchor, reference)
+        val mask = figure(300, 900)
+        return ReferenceGuide(id, mask, mask, 300f / 900f, source, anchor, reference)
     }
 
     /** A guide small enough that twenty saves stay fast. */
     private fun smallGuide(id: String): ReferenceGuide {
-        val cutout = figure(30, 90)
-        return ReferenceGuide(id, cutout, cutout, 30f / 90f, GuideSource.GALLERY, reference = null)
+        val mask = figure(30, 90)
+        return ReferenceGuide(id, mask, mask, 30f / 90f, GuideSource.GALLERY, reference = null)
     }
 
     private fun figure(width: Int, height: Int): Bitmap {

@@ -210,7 +210,7 @@ class PoseTipsTest {
     }
 
     private fun guide(id: String, source: GuideSource = GuideSource.GENERATED) =
-        ReferenceGuide(id = id, cutout = testBitmap(), outline = testBitmap(), aspect = 0.5f, source = source)
+        ReferenceGuide(id = id, mask = testBitmap(), outline = testBitmap(), aspect = 0.5f, source = source)
 
     private class RecordingTipper : PoseTipper {
         val requests = mutableListOf<Request>()

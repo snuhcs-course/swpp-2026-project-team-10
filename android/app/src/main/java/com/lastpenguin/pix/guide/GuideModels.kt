@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -8,20 +8,21 @@ enum class GuideSource { GALLERY, GENERATED }
 
 /** The person taken from a reference photo (Design 2.3). */
 data class ReferenceGuide(
-    /** UUID; the subject uses it to tell whether it already has the image. */
+    /** UUID; the subject uses it to tell whether it already has the mask. */
     val id: String,
     /**
-     * ARGB_8888, person only, transparent background, cropped to the person. Never drawn as the guide, which is an
-     * outline only (FR-2.2, AD-15); it is sent to the subject until the mask alone is sent (Design 2.6.1, 2.9).
+     * ALPHA_8, the smoothed mask (Design 2.6.1, step 4), cropped to the person: opaque is the person. It holds none of
+     * the reference's pixels, and it is what the other phone receives (`mask-png`, AD-6, AD-15). Never drawn as the
+     * guide, which is an outline only (FR-2.2).
      */
-    val cutout: Bitmap,
-    /** Same size as [cutout]; light stroke, about 8 px (3 dp) on screen. */
+    val mask: Bitmap,
+    /** Same size as [mask]; light stroke, about 8 px (3 dp) on screen. */
     val outline: Bitmap,
-    /** cutout width / height. */
+    /** mask width / height. */
     val aspect: Float,
     val source: GuideSource,
     /**
-     * The cutout's box in the reference photo, where a new guide starts (FR-3.1). null on the subject, whose guide
+     * The mask's box in the reference photo, where a new guide starts (FR-3.1). null on the subject, whose guide
      * takes its place from the photographer's `guide.state`.
      */
     val anchor: NormalizedRect? = null,

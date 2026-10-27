@@ -306,7 +306,7 @@ class ReferenceViewModelTest {
 
     private fun guide() = ReferenceGuide(
         id = "guide-${guideCount++}",
-        cutout = bitmap(),
+        mask = bitmap(),
         outline = bitmap(),
         aspect = 0.5f,
         source = GuideSource.GENERATED,

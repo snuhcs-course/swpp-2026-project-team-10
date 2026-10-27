@@ -81,7 +81,7 @@ class PoseTipScreenTest {
         assertEquals(0, modules.tipper.requests.size)
         val guide = ReferenceGuide(
             id = "generated",
-            cutout = bitmap(),
+            mask = bitmap(),
             outline = bitmap(),
             aspect = 0.5f,
             source = GuideSource.GENERATED,

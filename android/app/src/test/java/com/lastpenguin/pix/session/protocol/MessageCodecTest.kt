@@ -26,12 +26,12 @@ class MessageCodecTest {
         val text = codec.encode(SessionMessage.Hello(appVersion = "0.1.0", role = Role.PHOTOGRAPHER, name = "Dongje"))
 
         val envelope = Json.parseToJsonElement(text).jsonObject
-        assertEquals(2, envelope.getValue("v").jsonPrimitive.int)
+        assertEquals(3, envelope.getValue("v").jsonPrimitive.int)
         assertEquals("hello", envelope.getValue("t").jsonPrimitive.content)
         assertEquals(1, envelope.getValue("seq").jsonPrimitive.int)
         assertEquals(1_759_212_345_678L, envelope.getValue("ts").jsonPrimitive.long)
         val body = envelope.getValue("b").jsonObject
-        assertEquals(2, body.getValue("protocol").jsonPrimitive.int)
+        assertEquals(3, body.getValue("protocol").jsonPrimitive.int)
         assertEquals("0.1.0", body.getValue("appVersion").jsonPrimitive.content)
         assertEquals("PHOTOGRAPHER", body.getValue("role").jsonPrimitive.content)
         assertEquals("Dongje", body.getValue("name").jsonPrimitive.content)
@@ -44,7 +44,7 @@ class MessageCodecTest {
         val messages = listOf(
             SessionMessage.Hello(appVersion = "0.1.0", role = Role.SUBJECT, name = "Junhyeong", haveGuideId = "g1"),
             SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(0.6f, 1f, 2f, 3f))),
-            SessionMessage.GuideImageBegin("g1", "webp", 540, 720, 48213, 5),
+            SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f),
             SessionMessage.GuideImageChunk("g1", 0, "UklGRl68AABXRUJQ"),
             SessionMessage.GuideImageEnd("g1", 3735928559L),
             SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, false), false),
@@ -86,7 +86,7 @@ class MessageCodecTest {
     @Test
     fun `decodes the guide state example from the design`() {
         val text = """
-            {"v": 2, "t": "guide.state", "seq": 412, "ts": 1759212349120,
+            {"v": 3, "t": "guide.state", "seq": 412, "ts": 1759212349120,
              "b": {"state": {"guideId": "5f0c2b9e", "cx": 0.32, "cy": 0.55, "height": 0.7,
                              "opacity": 0.5, "style": "OUTLINE", "visible": true}, "final": false}}
         """.trimIndent()

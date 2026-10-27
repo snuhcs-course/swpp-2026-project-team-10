@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -13,11 +13,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 
 /**
- * Checked in `hello`: a phone that speaks another version ends the session. 2 since the subject's requests of
- * Iteration 2 (`guide.move`, `camera.exposure.set`, `camera.flash.set`, Iter2-P17), which a version-1 phone would
- * drop without an answer while still advertising the capabilities for them.
+ * Checked in `hello`: a phone that speaks another version ends the session. 3 since the guide image is the smoothed
+ * mask alone (`mask-png`, Iter3-P9), which a version-2 phone, expecting a WebP cutout, could not draw. 2 was the
+ * subject's requests of Iteration 2 (`guide.move`, `camera.exposure.set`, `camera.flash.set`, Iter2-P17).
  */
-const val PROTOCOL_VERSION = 2
+const val PROTOCOL_VERSION = 3
 
 /**
  * Data channel messages between the two phones (Design 2.5.1).
@@ -44,6 +44,7 @@ sealed interface SessionMessage {
     @SerialName("camera.capabilities")
     data class Capabilities(val capabilities: CameraCapabilities) : SessionMessage
 
+    /** [format] is `mask-png` (Design 2.5.1); [aspect] is the mask's width / height. */
     @Serializable
     @SerialName("guide.image.begin")
     data class GuideImageBegin(
@@ -53,6 +54,7 @@ sealed interface SessionMessage {
         val height: Int,
         val bytes: Int,
         val chunks: Int,
+        val aspect: Float? = null,
     ) : SessionMessage
 
     /** [data] is Base64 of at most 12 KiB, so one message stays under 16 KiB. */

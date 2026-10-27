@@ -33,6 +33,7 @@
 | 2.2 | 2026-10-26 | TURN credentials on the server (Iter3-P13, [#117]): each phone gets its own from Cloudflare with `room.created` or `session.joined`, the subject's only after a join that succeeded and with the photographer's `peer.joined` held until then, and Cloudflare's STUN server alone without a key or when Cloudflare fails (2.2, 2.5.2, 2.6.7); the TURN settings (2.8, *Configuration and secrets*). |
 | 2.3 | 2026-10-26 | Pose tips as built (Iter3-P11, [#115], [#110]): `POST /pose-tips` and `PoseTipper` (1.1.2, 2.1, 2.5.3, 2.7), the tip (2.6.3); *Still open* row closed. |
 | 2.4 | 2026-10-26 | Camera and Subject view layout (Iter3-A2, [#136]): `previewArea` places the preview below the top bar, 1:1 in the 4:3 area and 16:9 under the controls; the shutter in one place; the zoom row over the image, with quick steps from the camera's zoom range; `LiveDotView` in place of the Live badge and the name; every control takes taps on 48 dp (NFR-16) while drawing smaller (2.3, 2.5.1, 2.6.2). |
+| 2.6 | 2026-10-27 | The mask-only guide transfer from the photographer (Iter3-P9, [#113], first part): `ReferenceGuide.mask` (2.3), `mask-png` and protocol version 3 (2.5.1), `MaskPng` and the hand-over (2.6.1), saved guides with `mask.png` and the move from `cutout.webp` (2.8); AD-6 as built. The subject's direction follows with the shared steps. |
 | 2.5 | 2026-10-26 | Sessions across networks in the app (Iter3-P13, [#117]): `SessionManager.path` and `IcePath` (2.1, 2.3); the mobile-data notice, the relay-only debug option, and the `ice.pair` line (2.6.7); the wrong-code message decided, with `EndReason.RATE_LIMITED`, and its row leaves *Still open* (2.3, 2.5.2, 1.4.2); debug builds use the AWS server (2.8, *Configuration and secrets*). |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail, and the plan of Iteration 3 (1.4.2, 2.9); the detailed design of each Iteration 3 feature is added in the PR that builds it. **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v2.0). Testing plans will be in the Testing Documentation.
@@ -49,7 +50,7 @@ Audience: the development team. This page describes the design of Iterations 1 a
 | Four prompt templates (FR-4.8) | With a description, four templates around the same `{pose}` take the place of the three variations (2.6.3), and the default template is to be improved: `{pose}` is the user's request, read sensibly, with rules such as keeping the face and the clothes and one pose per photo. Open: the four templates, and how a request such as "two photos saluting and two with hands up" is handled. | 박재완 | Week of 11/2 |
 | Prompt history (FR-4.11) | Proposal: kept on the phone, because the server never stores descriptions (NFR-13). Open: how a partner is identified for the history with this person (the Pix ID when both are signed in; a room-code session has no account) and what the subject's phone records. | 박동제 | Week of 11/2 |
 | Offline QR connection (F9) | The plan of 1.4.2: a local-only hotspot, signaling on the photographer's phone, one connection per QR code, and *Resume* on both phones. Open: the detailed design (the QR payload, the local signaling, the hotspot API's limits). | 조성민 | Week of 11/2 |
-| Mask-only transfer with the shared steps | Once the subject can choose a guide on their phone (FR-6.15), the guide is made there and has to reach the photographer's phone, which owns the guide state (AD-7), so the mask travels in either direction, not only P→S (2.5.1). The photographer's reference thumbnail (FR-3.9) is the reference photo, which a mask-only transfer does not carry, so it is left out for a guide from the subject's phone or a 512 px copy is sent (see *Reference thumbnail on Subject view*). A guide the subject saves (FR-6.16) holds only the mask, so its thumbnail comes from the outline (2.8, *Guide store*). The new mask format and the step messages share one protocol bump, to version 3. | 박재완 with 한준형 | 10/28 |
+| Mask-only transfer with the shared steps | Once the subject can choose a guide on their phone (FR-6.15), the guide is made there and has to reach the photographer's phone, which owns the guide state (AD-7), so the mask travels in either direction, not only P→S (2.5.1). The photographer's reference thumbnail (FR-3.9) is the reference photo, which a mask-only transfer does not carry, so it is left out for a guide from the subject's phone or a 512 px copy is sent (see *Reference thumbnail on Subject view*). A guide the subject saves (FR-6.16) holds only the mask, so its thumbnail comes from the outline (2.8, *Guide store*). The new mask format and the step messages share one protocol bump, to version 3. | 한준형 | 10/28 |
 
 **Contents**
 
@@ -258,7 +259,7 @@ sequenceDiagram
 | AD-3 | **Peer-to-peer media with WebRTC; the server only does signaling** | Lowest latency for the live view, no media-server cost, end-to-end encryption. WebRTC also provides congestion control and adaptive quality (NFR-6). | Media server (SFU); sending JPEG frames over WebSocket |
 | AD-4 | **CameraX is the only camera owner and feeds frames to WebRTC** | Only one client can open the camera. CameraX gives us capture, zoom, focus, and exposure for remote control, and one viewport for preview, capture, and streaming, so all three show the same framing. | WebRTC's built-in camera capturer |
 | AD-5 | **Two data channels: *realtime* (unordered, no retransmission) and *reliable* (ordered)** | Continuous values (guide position, zoom) need only the latest value, and retransmitting stale ones adds lag. Images, commands, and results must arrive exactly once. Both reuse the existing peer connection, so there is no server round trip. | One reliable channel; relaying messages through the server |
-| AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp on the subject's phone. It never enters the video or the saved photo. Updates are a few bytes. The photographer sends the smoothed mask, not the cutout, so both phones draw the same outline and no reference pixels travel. Until that transfer is built (2.9, Guide sync), the cutout travels as WebP, its alpha the smoothed mask. | Burning the overlay into the video stream; mirroring the photographer's screen |
+| AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp on the subject's phone. It never enters the video or the saved photo. Updates are a few bytes. The photographer sends the smoothed mask, not the cutout, so both phones draw the same outline and no reference pixels travel. | Burning the overlay into the video stream; mirroring the photographer's screen |
 | AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | Avoids conflicting edits: subject actions are requests; the photographer applies them in arrival order and echoes the applied value, so the later change wins and both phones agree (FR-7.6). The subject's requests cover zoom, brightness, flash, and guide moves. | Shared editing on both phones |
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | The riskiest part, streaming and sync, works without accounts, and each way into a session is only an entry point: an accepted invitation yields a `sessionId`, just like a room code does, and the signaling, peer connection, and reconnection code is shared. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots. One codebase and one install, with the role chosen per session. | A separate viewer app for the subject |
@@ -376,7 +377,7 @@ fun interface FrameSink { fun onFrame(image: ImageProxy) }   // must copy the im
 interface ReferenceGuideMaker {                         // fails with NoPersonFoundException (FR-2.4)
     suspend fun make(source: Uri): Result<ReferenceGuide>                        // gallery photo
     suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> // pose candidate
-}                                                        // It 2: the result carries the cutout, whose alpha is the smoothed mask, the person's
+}                                                        // It 2: the result carries the smoothed mask (It 3: alone, no cutout), the person's
                                                          // box (anchor), and a reference copy of at most 512 px (2.6.1)
 
 interface GuideRepository {
@@ -818,8 +819,6 @@ data class ReferenceGuide(
     val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (the person and its 2 % margin), where a new guide starts (FR-3.1); null on the subject
     val reference: Bitmap? = null,        // the photo itself, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); never sent, never drawn as the guide; null on the subject
 )
-// Until the mask-only transfer (2.9, Guide sync), the code keeps the `cutout` in place of `mask`:
-// ARGB_8888 with the reference's pixels and the smoothed mask as its alpha. It is only sent; nothing draws it.
 
 data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float)   // fractions of an image's width and height
 
@@ -987,7 +986,7 @@ Each protocol has a summary table, followed by a JSON example for every message 
 
 #### 2.5.1 Data channel protocol (phone ↔ phone)
 
-The photographer opens two channels when it creates the offer: `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). Every message uses one JSON envelope: `v` is the protocol version, 2 (`hello` ends the session with a phone that speaks another version), `t` the type, `seq` a counter per type, `ts` the send time in milliseconds, and `b` the body. In code, `SessionMessage` uses `t` as its class discriminator, so the codec keeps `t` at the top and moves the other fields into `b`. Receivers ignore unknown types and unknown fields, so older builds keep working, and drop a `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, or `guide.move`, on either channel, whose `seq` is not newer than the last one applied for that type; other types are never dropped. Until the mask-only transfer (2.9), the guide image is the cutout (`guide.image.begin`). Both phones update together. Only the photographer takes photos; the subject sends requests.
+The photographer opens two channels when it creates the offer: `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). Every message uses one JSON envelope: `v` is the protocol version, 3 (`hello` ends the session with a phone that speaks another version), `t` the type, `seq` a counter per type, `ts` the send time in milliseconds, and `b` the body. In code, `SessionMessage` uses `t` as its class discriminator, so the codec keeps `t` at the top and moves the other fields into `b`. Receivers ignore unknown types and unknown fields, so older builds keep working, and drop a `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, or `guide.move`, on either channel, whose `seq` is not newer than the last one applied for that type; other types are never dropped. Version 3 (Iteration 3) sends the guide image as the mask alone (`mask-png`), which a version-2 phone cannot draw; both phones update together. Only the photographer takes photos; the subject sends requests.
 
 | Type | Channel | Dir. | Purpose |
 |----|----|----|----|
@@ -1013,10 +1012,10 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
 
 ```json
 {
-  "v": 2, "t": "hello", "seq": 1, "ts": 1759212345678,
+  "v": 3, "t": "hello", "seq": 1, "ts": 1759212345678,
   "b": {
-    "protocol": 2,
-    "appVersion": "0.2.0",
+    "protocol": 3,
+    "appVersion": "0.3.0",
     "role": "PHOTOGRAPHER",
     "name": "Dongje",
     "haveGuideId": null
@@ -1033,7 +1032,7 @@ Sent by both phones as soon as the channels open. A different `protocol` ends th
 
 ```json
 {
-  "v": 2, "t": "camera.capabilities", "seq": 2, "ts": 1759212345690,
+  "v": 3, "t": "camera.capabilities", "seq": 2, "ts": 1759212345690,
   "b": {
     "capabilities": {
       "minZoom": 0.6, "maxZoom": 10.0, "zoomStops": [0.6, 1.0, 2.0, 3.0],
@@ -1053,7 +1052,7 @@ Sent once the session is connected, and again whenever the photographer's capabi
 
 ```json
 {
-  "v": 2, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
+  "v": 3, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
   "b": {
     "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17",
     "format": "mask-png", "width": 540, "height": 720, "bytes": 9120, "chunks": 1, "aspect": 0.75
@@ -1061,7 +1060,7 @@ Sent once the session is connected, and again whenever the photographer's capabi
 }
 ```
 
-Skipped if the subject reported the same `haveGuideId`. The image is the **smoothed mask** only (`mask-png`: 8-bit single-channel PNG, height ≤ 720 px), never the reference's pixels (AD-6, AD-15). There is no `anchor`: the photographer sends `guide.state` after every image, also to a subject that joins late, and the subject places the guide from it (2.6.2). Until the mask-only transfer (2.9), the code sends a `webp` cutout with alpha instead: `{guideId, format: "webp", width, height, bytes, chunks}`, lossy WebP at quality 90 and at most 720 px tall, without `aspect`, which the subject takes from the image.
+Skipped if the subject reported the same `haveGuideId`. The image is the **smoothed mask** only (`mask-png`: 8-bit single-channel PNG, height ≤ 720 px), never the reference's pixels (AD-6, AD-15). There is no `anchor`: the photographer sends `guide.state` after every image, also to a subject that joins late, and the subject places the guide from it (2.6.2). The PNG's gray value is the mask, written and read by `MaskPng` on both phones rather than by `Bitmap.compress`, and lossless, so the subject traces exactly the mask that was sent; a mask is a few KB, one or two chunks. The subject takes the size from the PNG itself and refuses one taller than 720 px. Version 2 sent a `webp` cutout here, whose RGB held the reference's pixels.
 
 </details>
 
@@ -1070,7 +1069,7 @@ Skipped if the subject reported the same `haveGuideId`. The image is the **smoot
 
 ```json
 {
-  "v": 2, "t": "guide.image.chunk", "seq": 4, "ts": 1759212345705,
+  "v": 3, "t": "guide.image.chunk", "seq": 4, "ts": 1759212345705,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "index": 0, "data": "UklGRl68AABXRUJQVlA4WAoAAAAQAAAAHwIAzwIA..." }
 }
 ```
@@ -1084,7 +1083,7 @@ Skipped if the subject reported the same `haveGuideId`. The image is the **smoot
 
 ```json
 {
-  "v": 2, "t": "guide.image.end", "seq": 9, "ts": 1759212345760,
+  "v": 3, "t": "guide.image.end", "seq": 9, "ts": 1759212345760,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "crc32": 3735928559 }
 }
 ```
@@ -1098,7 +1097,7 @@ The subject checks the CRC, decodes the mask, and draws the outline from it with
 
 ```json
 {
-  "v": 2, "t": "guide.state", "seq": 412, "ts": 1759212349120,
+  "v": 3, "t": "guide.state", "seq": 412, "ts": 1759212349120,
   "b": {
     "state": {
       "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17",
@@ -1118,7 +1117,7 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 <summary><code>guide.clear</code> · reliable · P→S</summary>
 
 ```json
-{ "v": 2, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
+{ "v": 3, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
 ```
 
 </details>
@@ -1127,7 +1126,7 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 <summary><code>guide.move</code> · realtime / reliable · S→P · It 2</summary>
 
 ```json
-{ "v": 2, "t": "guide.move", "seq": 21, "ts": 1759212352100,
+{ "v": 3, "t": "guide.move", "seq": 21, "ts": 1759212352100,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }
 ```
 
@@ -1139,7 +1138,7 @@ The subject's drag or pinch on the guide `guideId`, in frame coordinates, at mos
 <summary><code>camera.zoom.set</code> · realtime / reliable · S→P</summary>
 
 ```json
-{ "v": 2, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
+{ "v": 3, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
 Sent on `realtime` at most every 50 ms during a pinch on the live video, then once with `"final": true` on `reliable` when the pinch ends, is cancelled, or the screen pauses. A tap on the readout (a quick step, 2.6.2) and its Zoom in / Zoom out accessibility actions send a single final request.
@@ -1150,7 +1149,7 @@ Sent on `realtime` at most every 50 ms during a pinch on the live video, then on
 <summary><code>camera.state</code> · realtime / reliable · P→S</summary>
 
 ```json
-{ "v": 2, "t": "camera.state", "seq": 58, "ts": 1759212352342,
+{ "v": 3, "t": "camera.state", "seq": 58, "ts": 1759212352342,
   "b": { "zoom": 2.0, "exposure": 3, "flash": "AUTO", "aspect": "R16_9", "by": "SUBJECT", "final": true } }
 ```
 
@@ -1162,7 +1161,7 @@ Sent on every zoom the camera reports applied, as a step at once (the camera app
 <summary><code>camera.exposure.set</code> · realtime / reliable · S→P · It 2</summary>
 
 ```json
-{ "v": 2, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000, "b": { "index": 3, "final": true } }
+{ "v": 3, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000, "b": { "index": 3, "final": true } }
 ```
 
 An exposure-compensation index within `exposureRange`, with the same step-then-final pattern as zoom. The photographer clamps it, calls `setExposure`, and echoes `camera.state`.
@@ -1173,7 +1172,7 @@ An exposure-compensation index within `exposureRange`, with the same step-then-f
 <summary><code>camera.flash.set</code> · reliable · S→P · It 2</summary>
 
 ```json
-{ "v": 2, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }
+{ "v": 3, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }
 ```
 
 Ignored, with an unchanged echo, when `hasFlash` is false.
@@ -1184,7 +1183,7 @@ Ignored, with an unchanged echo, when `hasFlash` is false.
 <summary><code>camera.focus.set</code> · reliable · S→P · Could</summary>
 
 ```json
-{ "v": 2, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
+{ "v": 3, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
 A tap on the live video, in frame coordinates (2.6.2). The photographer calls `setFocusPoint` and shows the focus ring; there is no echo, because focus has no lasting state.
@@ -1195,7 +1194,7 @@ A tap on the live video, in frame coordinates (2.6.2). The photographer calls `s
 <summary><code>control.permission</code> · reliable · P→S · Could</summary>
 
 ```json
-{ "v": 2, "t": "control.permission", "seq": 1, "ts": 1759212340000, "b": { "allowed": false } }
+{ "v": 3, "t": "control.permission", "seq": 1, "ts": 1759212340000, "b": { "allowed": false } }
 ```
 
 Sent after `hello` and whenever the photographer changes the switch (FR-7.5). While `allowed` is false the subject disables its controls and the photographer ignores `camera.*.set` and `guide.move`. Until the switch is built, the subject assumes `true`.
@@ -1207,7 +1206,7 @@ Sent after `hello` and whenever the photographer changes the switch (FR-7.5). Wh
 <summary><code>session.leave</code> · reliable · both</summary>
 
 ```json
-{ "v": 2, "t": "session.leave", "seq": 60, "ts": 1759212399000, "b": { "reason": "LEFT" } }
+{ "v": 3, "t": "session.leave", "seq": 60, "ts": 1759212399000, "b": { "reason": "LEFT" } }
 ```
 
 Sent before closing, so the other phone shows "left" instead of "connection lost".
@@ -1218,8 +1217,8 @@ Sent before closing, so the other phone shows "left" instead of "connection lost
 <summary><code>ping / pong</code> · realtime · both</summary>
 
 ```json
-{ "v": 2, "t": "ping", "seq": 30, "ts": 1759212360000, "b": { "ts": 1759212360000 } }
-{ "v": 2, "t": "pong", "seq": 30, "ts": 1759212360041, "b": { "ts": 1759212360000 } }
+{ "v": 3, "t": "ping", "seq": 30, "ts": 1759212360000, "b": { "ts": 1759212360000 } }
+{ "v": 3, "t": "pong", "seq": 30, "ts": 1759212360041, "b": { "ts": 1759212360000 } }
 ```
 
 Every 2 s, from both phones. `pong` echoes the `ts` of the `ping`. The phone that receives a `ping` logs `ping.received ts=<ts>`, and the phone that sent it logs `rtt <ms> ms ts=<ts>` when the `pong` arrives. `Timings` times start at each phone's boot, so for one `ts` the receiver's clock minus the sender's is `t(ping.received) − t(rtt) + rtt/2`, within ±rtt/2. This offset aligns the two phones' logs for cross-phone latencies such as `guide.sent` → `guide.applied` (NFR-7).
@@ -1635,7 +1634,7 @@ The server sends the FCM push `invitation` with the `id` and the inviter's name 
 3.  **Check for a person.** If fewer than 2% of the pixels have confidence ≥ 0.5, the step fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
 4.  **Smooth the mask (It 2, FR-2.9).** Blur the confidence mask with three box blurs whose radius is 0.8 % of the person's height (close to a Gaussian; 9 px for a person 1100 px tall), so its 0.5 level becomes a smooth curve. The person is the largest region of the mask, so a stray blob far above or below does not stretch the height. Then drop separate regions smaller than 1 % of the foreground, such as a stray blob beside a hand, and fill holes smaller than 0.2 %; the gap between an arm and the body stays, and background that reaches the photo's edge is never a hole. People of similar size, such as a couple, are all kept (FR-2.5); a figure that small, far in the background, is dropped with the specks. Crop the mask to its bounding box plus a 2 % margin, store the aspect ratio, and keep the box's position in the photo as `anchor` (FR-3.1).
 5.  **Outline.** Trace the smoothed mask's 0.5 level with marching squares, placing each crossing between two pixels by interpolation, so the line follows the blurred curve instead of pixel steps; a person cut off by the photo's edge stays open there. Round the line with two passes of corner cutting (Chaikin) and draw it as a white anti-aliased line with round joins, about 3 dp on screen and scaled to the mask size, with no fill. The width assumes the default start of 70 % of the frame height; a guide that starts larger or smaller from its `anchor` gets a proportionally thicker or thinner line, the same on both phones, because the subject has no `anchor` (2.6.2). No pixel of the reference is used (AD-15).
-6.  **Hand over.** Put the `ReferenceGuide` into `GuideRepository`, which places it at `anchor` (2.6.2). The subject receives only the **smoothed mask** (single-channel PNG, height ≤ 720 px) and runs step 5 on it, never step 4, so both phones draw the same shape. Until the mask-only transfer (`mask-png`, 2.5.1; 2.9), the cutout travels with the smoothed mask as its alpha, so the subject already draws the same line. The reference photo itself stays on the photographer's phone, downscaled to 512 px for the corner thumbnail (FR-3.9).
+6.  **Hand over.** Put the `ReferenceGuide` into `GuideRepository`, which places it at `anchor` (2.6.2). The subject receives only the **smoothed mask** (single-channel PNG, height ≤ 720 px) and runs step 5 on it, never step 4, so both phones draw the same shape. `ReferenceGuide.mask` is that mask as an `ALPHA_8` bitmap; the guide keeps none of the photo's pixels, and `MaskGuideImageCodec` sends it as `mask-png` (2.5.1). The reference photo itself stays on the photographer's phone, downscaled to 512 px for the corner thumbnail (FR-3.9).
 
 All steps run on `Dispatchers.Default`. Target: ≤ 2 s from selection to *Reference confirm* including the smoothing (NFR-3); `Timings` marks `smooth.start` and `smooth.end` inside `seg.start`–`seg.end` show how much of it the smoothing takes. On the emulator the whole step took 0.25–0.35 s per photo once the model was loaded.
 
@@ -1848,8 +1847,8 @@ erDiagram
 | **Concurrency** | Segmentation, outline, and image encoding run on `Dispatchers.Default`; network and file work on `Dispatchers.IO`. The saved-guide store encodes and scales its images on `Dispatchers.IO` with its file work, one call at a time, and traces a loaded guide's outline on `Dispatchers.Default`. CameraX analysis uses its own single-thread executor. All WebRTC and WebSocket callbacks hop onto one serial session scope (`limitedParallelism(1)`), so session state changes never race. WebRTC's own threads are never blocked. |
 | **Message rate** | `guide.state` is throttled to 20 Hz during gestures, and the final value goes on the reliable channel (2.5.1). `camera.state` follows the camera: one step for each zoom it reports applied, at most one per display frame, and a final value 100 ms after the last (2.6.5). The subject's requests go at most every 50 ms, with the final value at once. Receivers drop stale `seq`. |
 | **Backpressure** | Reliable messages, image chunks and control messages alike, wait in one ordered queue until `hello` has gone out and while the reliable channel's `bufferedAmount` is 256 KiB or more; realtime messages never wait. A guide image of tens of KB stays well under the limit, so control messages are not held up in practice. |
-| **Caching** | The current guide and the last candidate set are kept in memory for the app process only; no gallery or generated images are written to disk, except a guide the user saves (*Guide store*), whose cutout and 512 px reference copy go to the app's private files. The subject keeps the last received guide image by `guideId`, so a reconnect does not resend it. |
-| **Guide store** | Each phone uses `InMemoryGuideRepository`, with separate instances for the photographer's guide, clamped with the chosen ratio's frame, and the subject's mirror, clamped with the narrowest frame (9:16). `setGuide` resets the display state to the guide's `anchor` (or clears it for null); `update` is ignored without an image, keeps the stored image's ID, and clamps through `GuideGeometry`. Writes are serialized. Every applied operation emits a `GuideChange`, including the hidden flag. **Saved guides (It 2, AD-16)** are written by `FileSavedGuideStore`, the `SavedGuideStore` of the app, under `filesDir/guides/<id>/` as `mask.png`, `reference.webp` (the 512 px thumbnail source), and `meta.json` (`GuideState`, `anchor`, `aspect`, `savedAt`); at most 20, oldest deleted first; nothing is written to MediaStore. Until only the mask travels to the subject (2.6.1, step 6), a guide still holds the cutout, so the store keeps `cutout.webp` in place of `mask.png`, encoded as the subject receives it; its alpha is the mask. `meta.json` also keeps the guide's source and an increasing `order` that sorts the list, so a clock set back does not reorder it. A guide is written to a hidden `.<id>` folder and renamed into place; when the folder is read, a half-written folder, a folder that cannot be read back, and any beyond 20 are deleted. The thumbnail is the middle of the reference (or of the cutout without one), cut to 3:4 and at most 252 × 336 px; a loaded guide's outline is traced again from the stored cutout. `guides/` is left out of cloud backups and device transfers (`data_extraction_rules.xml`, NFR-13). A saved guide that is used starts at its `anchor`, like a new guide (FR-3.1): the `GuideState` in `meta.json` is kept but not applied. |
+| **Caching** | The current guide and the last candidate set are kept in memory for the app process only; no gallery or generated images are written to disk, except a guide the user saves (*Guide store*), whose mask and 512 px reference copy go to the app's private files. The subject keeps the last received guide image by `guideId`, so a reconnect does not resend it. |
+| **Guide store** | Each phone uses `InMemoryGuideRepository`, with separate instances for the photographer's guide, clamped with the chosen ratio's frame, and the subject's mirror, clamped with the narrowest frame (9:16). `setGuide` resets the display state to the guide's `anchor` (or clears it for null); `update` is ignored without an image, keeps the stored image's ID, and clamps through `GuideGeometry`. Writes are serialized. Every applied operation emits a `GuideChange`, including the hidden flag. **Saved guides (It 2, AD-16)** are written by `FileSavedGuideStore`, the `SavedGuideStore` of the app, under `filesDir/guides/<id>/` as `mask.png`, `reference.webp` (the 512 px thumbnail source), and `meta.json` (`GuideState`, `anchor`, `aspect`, `savedAt`); at most 20, oldest deleted first; nothing is written to MediaStore. `mask.png` is encoded as the subject receives it (`mask-png`, 2.5.1). A guide saved before Iteration 3 has `cutout.webp`, whose alpha is the mask: the first read writes `mask.png` from it and deletes the cutout, and a cutout that cannot be read makes the folder unreadable. `meta.json` also keeps the guide's source and an increasing `order` that sorts the list, so a clock set back does not reorder it. A guide is written to a hidden `.<id>` folder and renamed into place; when the folder is read, a half-written folder, a folder that cannot be read back, and any beyond 20 are deleted. The thumbnail is the middle of the reference (or of the outline without one), cut to 3:4 and at most 252 × 336 px; a loaded guide's outline is traced again from the stored mask. `guides/` is left out of cloud backups and device transfers (`data_extraction_rules.xml`, NFR-13). A saved guide that is used starts at its `anchor`, like a new guide (FR-3.1): the `GuideState` in `meta.json` is kept but not applied. |
 | **Lifecycle** | The camera binds to the lifecycle of the camera screen; ViewModels keep UI state across rotation. If the photographer's app goes to the background, the camera is released and the video pauses. The session stays open for 60 s, and the subject sees that the camera is paused: Subject view shows "Connecting…" until the session's first frame arrives and "The photographer's camera is paused" when no frame has come for 2 s after that. No foreground service is used. With reconnection (Iteration 3) a drop moves both phones to `Reconnecting` for up to 10 s before the session ends (2.6.7). The aspect ratio, brightness, and flash are restored when the camera rebinds; the last ratio is kept in DataStore. |
 | **Error handling** | Module interfaces return `Result` with typed errors (`NoPersonFound`, `GenerationError`, `EndReason`). ViewModels map them to the failure screens in the wireframe, and each maps to exactly one screen, with one exception: a reference photo that cannot be read, or a segmentation model that is not ready within 60 s, shows the toast "Couldn't use this photo. Try another one." and returns to Camera. |
 | **Timeouts** | Pose generation: 60 s on the client for a whole run, and 60 s from server to API for each request (2.6.3, *Time limit*). Because the phone's limit starts first, it usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. A link that ICE reports disconnected: 10 s before it counts as lost (2.4). The photographer's app in the background: 60 s before it leaves the session. Remote requests: 500 ms before an unanswered final request is answered, and 5 s in which a late one is still the subject's (2.6.5). Room code: 10 min. Invitation: 30 s on the server (It 3). Reconnection: 10 s (It 3). TURN credentials: the session's lifetime plus 10 min (It 3). |
@@ -1877,7 +1876,7 @@ erDiagram
 | **Pose generation** | 박재완 | API choice, `POST /poses`, the default poses, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, one prompt, suggested poses (Iter2-P12, [#53]) | Reference guide |
 | **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | `ws://` to the course server. Iteration 3: TURN through Cloudflare, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter3-P13, [#117]; Iter3-P14, [#118]); invitations with push and link (Iter3-P15, [#119]) | Guide sync, remote control |
 | **Remote control** | 조성민 | `RemoteControlHandler` (zoom) | Brightness, flash, guide moves, and notices (Iter2-P17, [#57]); pinch zoom and the guide-edit mode toggle on Subject view (Iter2-P6, [#48]); zoom without stutter (Iter2-P5, [#47]; measured on the S23 Ultra, the S21 numbers with IT-10). Iteration 3: remote focus and the permission switch (Iter2-P17, Could) | UI |
-| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; no `anchor` is sent (2.5.1). Iteration 3: the mask-only transfer in `GuideImageCodec` and the syncer, in either direction (박재완; Iter3-P9, [#113]) | UI |
+| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; no `anchor` is sent (2.5.1). Iteration 3: the mask-only transfer in `GuideImageCodec` and the syncer, in either direction (한준형; Iter3-P9, [#113]) | UI |
 
 Invitations need both the accounts server (박재완) and the session entry point (조성민), and the two owners agree the order of the invitation work.
 
@@ -1895,7 +1894,7 @@ Invitations need both the accounts server (박재완) and the session entry poin
 | 박재완 | The documents (PM; Iter3-P3–P5) | 10/26 | — |
 | 박재완 | The Korean translation (Iter3-P7, [#111]) | 10/26 | 1.4.2 |
 | 박재완 | Candidates in the scene photo's ratio (Iter3-P8, [#112]) | 10/30 | 2.6.3 |
-| 박재완 | The mask-only guide transfer, in either direction (Iter3-P9, [#113]) | 10/30 | 2.5.1, 2.6.1, *Still open* |
+| 한준형 | The mask-only guide transfer, in either direction (Iter3-P9, [#113]) | 10/30 | 2.5.1, 2.6.1, *Still open* |
 | 박동제 | *Pick a pose* one candidate at a time (Iter3-P10, [#114]; PR [#108]) | 10/30 | 2.6.3 |
 | 박동제 | Pose tips (Iter3-P11, [#115]; PR [#110]) | 10/30 | 2.6.3 |
 | 박동제 | Selfie mode, and whether the prompts suit it (Iter3-P12, [#116]) | 10/30 | 1.4.2, *Still open* |

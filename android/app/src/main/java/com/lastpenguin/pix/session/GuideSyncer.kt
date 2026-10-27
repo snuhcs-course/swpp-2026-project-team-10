@@ -23,8 +23,8 @@ import kotlinx.coroutines.withContext
  * image first. Gesture steps go on the realtime channel at most every [STEP_INTERVAL_MS] (the newest wins), the
  * final value of a gesture at once on the reliable channel, and a removed guide as `guide.clear`.
  *
- * Subject ([startAsReceiver]): rebuilds the image from its chunks, checks it, derives the outline from the cutout's
- * alpha ([GuideImageCodec]), and writes image and state into [mirror]. A state that arrives before its image is
+ * Subject ([startAsReceiver]): rebuilds the image from its chunks, checks it, derives the outline from the mask
+ * ([GuideImageCodec]), and writes image and state into [mirror]. A state that arrives before its image is
  * kept and applied once the image is there. Stale `seq` is already dropped by the session.
  * Owner: Real-time (#9).
  */

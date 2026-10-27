@@ -45,6 +45,7 @@ import com.lastpenguin.pix.guide.SubjectSegmenter
 import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.MaskGuideImageCodec
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.OkHttpSignalingClient
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -53,7 +54,6 @@ import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.WebRtcRuntime
-import com.lastpenguin.pix.session.WebpGuideImageCodec
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.signalingUrl
@@ -182,7 +182,7 @@ class AppContainer(
                 haveGuideId = { mirrorGuideRepository.guide.value?.id },
             )
             val guideSyncer =
-                GuideSyncer(rtcSessionManager, guideRepository, mirrorGuideRepository, WebpGuideImageCodec())
+                GuideSyncer(rtcSessionManager, guideRepository, mirrorGuideRepository, MaskGuideImageCodec())
             val referenceGuideMaker: ReferenceGuideMaker =
                 MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
             val poseTipper: PoseTipper = RemotePoseTipper(pixApi)

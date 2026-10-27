@@ -13,7 +13,7 @@ import org.junit.Test
 class GuideImageChunksTest {
 
     private val bytes = Random(7).nextBytes(20_000)
-    private val image = EncodedGuideImage("g1", "webp", 540, 720, bytes)
+    private val image = EncodedGuideImage("g1", "mask-png", 540, 720, bytes)
 
     @Test
     fun `an image is split into chunks of at most 12 KiB of Base64`() {

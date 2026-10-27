@@ -103,7 +103,7 @@ class CameraLayoutTest {
     private fun Camera.guideWithTip() {
         val guide = ReferenceGuide(
             id = "g1",
-            cutout = Bitmap.createBitmap(4, 8, Bitmap.Config.ARGB_8888),
+            mask = Bitmap.createBitmap(4, 8, Bitmap.Config.ARGB_8888),
             outline = Bitmap.createBitmap(4, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.TRANSPARENT) },
             aspect = 0.5f,
             source = GuideSource.GENERATED,

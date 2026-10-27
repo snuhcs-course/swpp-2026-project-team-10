@@ -297,12 +297,12 @@ Results are added per iteration and never overwritten; each iteration gets its o
 
 | Component | Frameworks | Target (2.1.2, line) | Actual line | Actual branch | Date | Command / Report |
 |---|---|---|---|---|---|---|
-| App · managers and repositories | JUnit 4, coroutines-test, JaCoCo | 90 % | **93.5 %** (1,475/1,577) | 74.0 % | 10/23 | `./gradlew :app:jacocoTestReport` · [report](images/testing_it2_jacoco.png) |
+| App · managers and repositories | JUnit 4, coroutines-test, JaCoCo | 90 % | **93.5 %** (1,475/1,577) | 74.0 % | 10/23 | `./gradlew :app:jacocoTestReport` · [report](images/testing/it2_jacoco.png) |
 | App · ViewModels | JUnit 4, coroutines-test, JaCoCo | 90 % | **95.4 %** (768/805) | 79.2 % | 10/23 | same |
 | App · Views and Fragments | JUnit 4, Robolectric, FragmentScenario, JaCoCo | 90 % | **91.1 %** (2,307/2,532) | 75.7 % | 10/23 | same |
 | App · platform adapters | JUnit 4, Robolectric (where the JVM can run them); integration tests for the rest | 30 % | **43.2 %** (733/1,696) | 35.9 % | 10/23 | same |
 | App · whole module (JaCoCo total) | | — | 79.6 % (5,230/6,573) | 64.7 % (3,331/5,145) | 10/23 | same |
-| Server · `signaling`, `store`, `accounts` | pytest, pytest-cov | 90 % | **97.4 %** (944/969) | 91.2 % | 10/23 | `uv run pytest --cov=pix_server --cov-branch` · [report](images/testing_it2_pytest_cov.png) |
+| Server · `signaling`, `store`, `accounts` | pytest, pytest-cov | 90 % | **97.4 %** (944/969) | 91.2 % | 10/23 | `uv run pytest --cov=pix_server --cov-branch` · [report](images/testing/it2_pytest_cov.png) |
 | Server · `poses` | pytest, pytest-cov | 90 % | **99.3 %** (304/306) | 98.6 % | 10/23 | same |
 | Server · `main`, `config`, `errors`, `db` | pytest, pytest-cov | 90 % | **98.9 %** (270/273) | 84.6 % | 10/23 | same |
 | Server · whole package (pytest-cov total) | | — | 98.1 % (1,518/1,548) | 92.5 % (272/294) | 10/23 | same |
@@ -313,8 +313,8 @@ Results are added per iteration and never overwritten; each iteration gets its o
 
 | Suite | Tests | Passed | Failed | Skipped | Time | Evidence |
 |---|---|---|---|---|---|---|
-| Android JVM, Robolectric, and screen tests (`:app:testDebugUnitTest`) | 755 | 755 | 0 | 0 | about 3 min (Robolectric's first SDK 36 sandbox included) | [screenshot](images/testing_it2_android_tests.png) |
-| Server (`uv run pytest`, fakeredis and SQLite) | 431 | 431 | 0 | 0 | 1 min 32 s | [screenshot](images/testing_it2_server_tests.png) |
+| Android JVM, Robolectric, and screen tests (`:app:testDebugUnitTest`) | 755 | 755 | 0 | 0 | about 3 min (Robolectric's first SDK 36 sandbox included) | [screenshot](images/testing/it2_android_tests.png) |
+| Server (`uv run pytest`, fakeredis and SQLite) | 431 | 431 | 0 | 0 | 1 min 32 s | [screenshot](images/testing/it2_server_tests.png) |
 
 Iteration 1 ended with 240 Android tests; Iteration 2 adds 515, of which 122 are the screen tests on the real Fragments, 33 the adapter tests on the JVM (2.1.1), 50 the saved-guides tests of Iter2-P18 (revision 1.14), and the rest the module, ViewModel, and layout tests of the features, the accounts of Iter2-P13 among them. The server suite is new since Iteration 1's 97.
 

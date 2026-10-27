@@ -111,18 +111,6 @@
             android:textColor="@android:color/transparent" />
     </FrameLayout>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="18dp"
-        app:drawableStartCompat="@drawable/ic_wifi_small"
-        android:drawablePadding="8dp"
-        app:drawableTint="@color/pix_text_muted"
-        android:gravity="center_vertical"
-        android:text="@string/same_wifi"
-        android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-
     <!-- "Connecting…" while joining, or why the join failed (FR-8.5). -->
     <TextView
         android:id="@+id/statusText"

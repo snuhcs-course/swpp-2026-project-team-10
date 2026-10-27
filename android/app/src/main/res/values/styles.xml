@@ -2,36 +2,41 @@
 <!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, and the
      camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that; radius 999 for chips and pills,
      16 for buttons and cards, 28 for sheets. -->
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Type: Manrope for the UI, DM Mono for the room code. -->
+    <!-- Type: Manrope for the UI (Pretendard on a phone in Korean: the @font/pix_* aliases), DM Mono for the room code. -->
+    <!-- Every text appearance breaks Korean between words (phrase, Android 13+); before 13, Android breaks inside them. -->
     <style name="TextAppearance.Pix.Title" parent="TextAppearance.Material3.HeadlineSmall">
-        <item name="android:fontFamily">@font/manrope_extrabold</item>
-        <item name="fontFamily">@font/manrope_extrabold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_extrabold</item>
+        <item name="fontFamily">@font/pix_extrabold</item>
         <item name="android:textSize">24sp</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <style name="TextAppearance.Pix.SheetTitle" parent="TextAppearance.Material3.TitleLarge">
-        <item name="android:fontFamily">@font/manrope_extrabold</item>
-        <item name="fontFamily">@font/manrope_extrabold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_extrabold</item>
+        <item name="fontFamily">@font/pix_extrabold</item>
         <item name="android:textSize">22sp</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <style name="TextAppearance.Pix.Header" parent="TextAppearance.Material3.TitleMedium">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">18sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <style name="TextAppearance.Pix.Action" parent="TextAppearance.Material3.LabelLarge">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">16sp</item>
         <item name="android:letterSpacing">0</item>
     </style>
@@ -41,16 +46,18 @@
     </style>
 
     <style name="TextAppearance.Pix.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
-        <item name="android:fontFamily">@font/manrope_medium</item>
-        <item name="fontFamily">@font/manrope_medium</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_medium</item>
+        <item name="fontFamily">@font/pix_medium</item>
         <item name="android:textSize">15sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_soft</item>
     </style>
 
     <style name="TextAppearance.Pix.Body" parent="TextAppearance.Material3.BodyMedium">
-        <item name="android:fontFamily">@font/manrope_medium</item>
-        <item name="fontFamily">@font/manrope_medium</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_medium</item>
+        <item name="fontFamily">@font/pix_medium</item>
         <item name="android:textSize">14sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_muted</item>
@@ -61,21 +68,23 @@
     </style>
 
     <style name="TextAppearance.Pix.Label" parent="TextAppearance.Material3.LabelMedium">
-        <item name="android:fontFamily">@font/manrope_semibold</item>
-        <item name="fontFamily">@font/manrope_semibold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_semibold</item>
+        <item name="fontFamily">@font/pix_semibold</item>
         <item name="android:textSize">13sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_soft</item>
     </style>
 
     <style name="TextAppearance.Pix.Label.Bold">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
     </style>
 
     <style name="TextAppearance.Pix.Caption" parent="TextAppearance.Material3.LabelSmall">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">12sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_muted</item>
@@ -430,7 +439,11 @@
         <item name="android:lineSpacingMultiplier">1.2</item>
     </style>
 
+    <!-- Material's 12 dp set again as start and end: the theme's materialButtonStyle gives every button 20 dp there,
+         which would win over the left and right of Material's dialog style. -->
     <style name="Widget.Pix.Button.Dialog" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
         <item name="android:textColor">@color/button_text_text</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
     </style>

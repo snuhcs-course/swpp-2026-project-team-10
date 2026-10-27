@@ -26,6 +26,9 @@
 | 2.3 | 2026-10-26 | Camera and Subject view controls and preview size (Iter3-A2, [#136]): smaller controls, the preview right below the top bar with 1:1 in the 4:3 area and 16:9 down under the controls, the shutter in one place, the zoom over the image with quick steps, and a blinking light in place of the Live badge and the name (FR-1.3, FR-1.13, FR-4.10, FR-6.6, FR-6.8, FR-7.1, 6.2, 6.3, 6.5, 6.6, Figures 1, 2, 4, 5). |
 | 2.4 | 2026-10-26 | Sessions across networks (Iter3-P13, [#117]): the mobile-data notice on *Friend connected* and *Subject view* (FR-6.13), and the wrong-code message on *Join with code* (NFR-15) in section 6. |
 | 2.5 | 2026-10-27 | The wireframe figures redrawn from the app's screens (6.1–6.7). |
+| 2.6 | 2026-10-27 | Every wireframe figure also with its screens in Korean (Iter3-P7, [#111]; 6.1–6.7). |
+| 2.7 | 2026-10-27 | Room codes on any network, as built since [#139] (the overview, F8, FR-8.5, US-13, glossary): *Room code* and *Join with code* no longer say both phones must be on the same Wi-Fi, and the connection messages ask for an internet connection; the join steps on *Room code* sit in a box (6.6, 6.7, Figures 5 and 6). |
+| 2.8 | 2026-10-27 | *Check* answers "This Pix ID is available" without repeating the ID, like "This Pix ID is taken" (US-6, 6.4). |
 
 Items marked **TBD** need a team decision.
 
@@ -43,7 +46,7 @@ Items marked **TBD** need a team decision.
 
 ## 1. Project Abstract
 
-Pix is an Android camera app that helps two people get the portrait one of them has in mind. When friends photograph each other, the person in the photo usually knows the pose and framing they want, but only the photographer sees the screen, which leads to repeated instructions and retakes. Pix gives both people the same view. The photographer adds a pose guide to the camera, either from a gallery photo or from one of four poses that Pix generates for the current scene with an image-editing AI. Pix separates the person from the background and shows them as an outline that can be moved, resized, and faded; the reference's own pixels and background are never drawn on the camera. The photographer then invites a friend added by Pix ID. Once the friend accepts, their phone shows the photographer's live camera view with the same guide, over Wi-Fi or cellular data. With the photographer's permission, the friend can also adjust the shot from their own phone: the zoom, the guide's position and size, the brightness, and the flash. The photographer takes the photo, and it is saved at full quality without the guide. Without an account, two phones on the same Wi-Fi can also connect with a 6-digit room code. Later, a QR code will connect two phones even without internet.
+Pix is an Android camera app that helps two people get the portrait one of them has in mind. When friends photograph each other, the person in the photo usually knows the pose and framing they want, but only the photographer sees the screen, which leads to repeated instructions and retakes. Pix gives both people the same view. The photographer adds a pose guide to the camera, either from a gallery photo or from one of four poses that Pix generates for the current scene with an image-editing AI. Pix separates the person from the background and shows them as an outline that can be moved, resized, and faded; the reference's own pixels and background are never drawn on the camera. The photographer then invites a friend added by Pix ID. Once the friend accepts, their phone shows the photographer's live camera view with the same guide, over Wi-Fi or cellular data. With the photographer's permission, the friend can also adjust the shot from their own phone: the zoom, the guide's position and size, the brightness, and the flash. The photographer takes the photo, and it is saved at full quality without the guide. Without an account, two phones can also connect with a 6-digit room code. Later, a QR code will connect two phones even without internet.
 
 ---
 
@@ -107,7 +110,7 @@ Every "shoot together" session has two people with two phones. Roles are decided
 
 - **A shared view, not only a remote.** Remote-viewfinder products show the framing but not the goal. Pix shows the framing and the same pose guide on both phones, so the subject can match the pose without verbal instructions.
 - **A guide from what the user actually wants.** The guide comes from the user's own reference photo or from poses generated for their current scene, not from a fixed library.
-- **Friends anywhere, no extra device.** After adding each other once, two friends connect with one invitation over Wi-Fi or cellular data (Iteration 3 and later). Without an account, a room code works on the same Wi-Fi, and a QR code works even without internet (Iteration 3).
+- **Friends anywhere, no extra device.** After adding each other once, two friends connect with one invitation over Wi-Fi or cellular data (Iteration 3 and later). Without an account, a room code connects them the same way, and a QR code works even without internet (Iteration 3).
 - **The photographer stays in control.** Remote control is allowed only with the photographer's permission, and only the photographer takes the photo.
 
 ---
@@ -137,7 +140,7 @@ Priority: **Must** = required for the product to make sense · **Should** = impo
 | F5 | **Pix account and friends** | An optional account, needed only for friends, with a Pix ID and a password or with Google (either kind can add the other way to sign in); Pix ID, search by exact Pix ID, friend requests, friend list with online status. | Must | It 2 |
 | F6 | **Shoot-together session** | Invitation by push notification with an invite link as the fallback, live view on the subject's phone, guide sync, leaving and reconnecting, over Wi-Fi or cellular data through the public Pix server and a relay. The subject's phone can also choose the guide and generate poses, and photos are saved on both phones. | Must | It 1 – 3 |
 | F7 | **Remote control** | From their own phone, the subject changes the zoom, the guide's position and size, the brightness, and the flash. The photographer sees each action and always takes the photo. The switch that blocks remote control and remote focus are Could items. | Must / Should / Could | It 1 – 3 |
-| F8 | **Room-code session** | 6-digit code on the same Wi-Fi, with no sign-in, for people without an account. | Must | It 1 |
+| F8 | **Room-code session** | 6-digit code, with no sign-in, for people without an account. | Must | It 1 |
 | F9 | **Offline connection (QR)** | The photographer's phone creates a local hotspot and shows a QR code; the subject scans it and connects without internet. One phone only, and both people confirm before the session starts. | Should | It 3 |
 | F10 | **Settings and help** | A settings screen with the language (English or Korean), the guide's color and thickness, a latency indicator for sessions, and how-to-use help; a tutorial on first use. | Must / Should | It 3 |
 
@@ -271,7 +274,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-7.7 | The subject can also set the focus point remotely, as the photographer does with FR-1.4. | Could | It 3 |
 
 #### F8 · Room-code session
-*Connect on the same Wi-Fi without an account.*
+*Connect without an account.*
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
@@ -279,7 +282,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-8.2 | *Join with code* accepts digits only. *Join* stays disabled until all 6 digits are entered. | Must | It 1 |
 | FR-8.3 | A valid code opens *Subject view*. An unknown or expired code shows *Session not found* and keeps the entered code for editing. | Must | It 1 |
 | FR-8.4 | A code expires when the photographer cancels, or after 10 minutes if nobody joins. | Should | It 1 |
-| FR-8.5 | Both screens state that both phones must be on the same Wi-Fi. A join from another network still reaches the session and opens *Subject view* ("Connecting…"); if the phones cannot connect directly, it shows *Connection lost* after 15 s. When *Join with code* cannot reach the session at all, Pix shows "Couldn't connect. Make sure both phones are on the same Wi-Fi." | Must | It 1 |
+| FR-8.5 | The phones may be on any networks from which both reach the Pix server, as with an invitation (FR-6.5): they connect directly when they can and through the relay otherwise. If they still cannot connect, *Subject view* shows *Connection lost* after 15 s. When *Join with code* cannot reach the session at all, Pix shows "Couldn't connect. Check your internet connection and try again." | Must | It 3 |
 
 #### F9 · Offline connection with a QR code
 *Connect two phones anywhere, even without internet or a shared Wi-Fi.*
@@ -403,7 +406,7 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Normal** | I signed up as "dongje.p" with a password, and no Pix account uses my Google account | I tap *Continue with Google*, answer that I already have a Pix account, and sign in as "dongje.p" | My Google account is added, and from then on Google alone signs me in as "dongje.p". |
 | **Normal** | I signed up with Google and chose the Pix ID "junhyeong.h" | I add a password in my account | On a phone without my Google account, "junhyeong.h" and the password sign me in. |
 | **Failure** | I am signing up | I enter "abcdefgh" as the password | The rule (8–64 characters with a letter and a digit) is shown, and no account is created. |
-| **Normal** | I am signing up and typed the Pix ID "test5" | I tap *Check* | "test5 is available" appears under the field, or "This Pix ID is taken" if someone uses it, before I fill in the rest. |
+| **Normal** | I am signing up and typed the Pix ID "test5" | I tap *Check* | "This Pix ID is available" appears under the field, or "This Pix ID is taken" if someone uses it, before I fill in the rest. |
 
 #### US-7 · Add a friend by Pix ID
 <sub>F5 · FR-5.5–5.9, FR-5.16 · Iteration 2</sub>
@@ -495,14 +498,14 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 #### US-13 · Join with a room code
 <sub>F8 · FR-8.1–8.5 · Iteration 1</sub>
 
-> As a subject without a Pix account, I want to join the photographer's session by entering a 6-digit code, so that we can shoot together on the same Wi-Fi without signing in.
+> As a subject without a Pix account, I want to join the photographer's session by entering a 6-digit code, so that we can shoot together without signing in.
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | Both phones are on the same Wi-Fi and the photographer's phone shows a code | I enter the code and tap *Join* | *Subject view* opens within 10 s. |
+| **Normal** | The photographer's phone shows a code, on my network or another | I enter the code and tap *Join* | *Subject view* opens within 10 s. |
 | **Failure** | I entered a code that does not exist or has expired | I tap *Join* | *Session not found* appears; *Try again* returns to *Join with code* with my code kept for editing. |
 | **Failure** | I am on *Join with code* | I try to type letters, or I have entered fewer than 6 digits | Letters are not accepted, and *Join* stays disabled. |
-| **Failure** | The phones are on different networks | I tap *Join* with a valid code | *Subject view* opens with "Connecting…", and *Connection lost* follows if the phones cannot connect within 15 s. "Couldn't connect. Make sure both phones are on the same Wi-Fi." appears only when the session cannot be reached. |
+| **Failure** | The phones cannot reach each other, directly or through the relay | I tap *Join* with a valid code | *Subject view* opens with "Connecting…", and *Connection lost* follows if the phones cannot connect within 15 s. "Couldn't connect. Check your internet connection and try again." appears only when the session cannot be reached. |
 
 #### US-14 · Get the photos on my phone
 <sub>F6 · FR-6.14 · Iteration 3</sub>
@@ -573,7 +576,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 
 ### 6.1 Wireframe overview
 
-The wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Each screen is drawn as the app shows it on a Galaxy S22, with the screen's name above it; the screens the app does not have yet use its components. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below.
+The wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Each screen is drawn as the app shows it on a Galaxy S22, with the screen's name above it; the screens the app does not have yet use its components. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below. Under each figure, *한국어* opens the same flow with its screens, and the screen text its labels quote, in Korean, as the app shows them (FR-10.2); the labels and notes stay in English.
 
 - **Arrows**: user input or system event, labeled
 - **Dashed coral frame**: failure case
@@ -587,6 +590,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 ![Wireflow 1: pose guide](images/flow1_pose_guide.jpg)
 
 *Figure 1. Camera → Add a pose guide → Reference confirm → Camera + guide → Photo saved, with the "No person found" failure.*
+
+<details><summary>한국어</summary>
+
+![Wireflow 1 in Korean](images/flow1_pose_guide_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -602,6 +611,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 ![Wireflow 2: pose generation](images/flow2_pose_generation.jpg)
 
 *Figure 2. Consent notice (the first time) → Scene photo → Scene photo · Review → Generate poses → Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. *Try other poses* goes back to Generate poses with the photo and the description kept, and so does *Edit description* when the service refused the description.*
+
+<details><summary>한국어</summary>
+
+![Wireflow 2 in Korean](images/flow2_pose_generation_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -619,9 +634,21 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 *Figure 3. Friends (empty) → Add a friend → Friends (list), with the "No user found" failure.*
 
+<details><summary>한국어</summary>
+
+![Wireflow 3 in Korean](images/flow3_add_friend_ko.jpg)
+
+</details>
+
 ![Wireflow 3b: sign in, Pix ID, and account](images/flow3b_sign_in.jpg)
 
 *Figure 3b. Friends (signed out) → Sign in → "Do you already have a Pix account?" → Pix ID setup → Friends with a request; below, Sent requests, Sign up with a broken rule, Sign in to add Google, "This Pix ID is taken", and the Account sheet.*
+
+<details><summary>한국어</summary>
+
+![Wireflow 3b in Korean](images/flow3b_sign_in_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -633,7 +660,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 | **Friends (requests)** | Received friend requests above the friend list, each with name, @ID, *Accept*, and *Decline*. Lists refresh every 10 s while the screen is shown; online friends show "Online"; "In a session" shows once a session's own connection is signed in ([#119]), and until then a friend in a session shows "Online". "Sent requests · 2" above the list while requests the user sent wait for an answer (FR-5.16). | *Accept* → the friend joins the list · *Decline* → the request disappears (US-8) · *Sent requests · 2* → Sent requests. | A request already withdrawn → "This request is no longer there." A failed refresh → "Couldn't update your friends. Check your connection." above the list. A sign-in the server ended → "You were signed out. Sign in again to see your friends." *Invite* stays disabled until invitations are built ([#119]). |
 | **Sign in** | Pix ID and password fields; *Sign in*; *Continue with Google*; "New to Pix? Sign up". | *Sign in* → Friends (or Pix ID setup for an account without one) · *Continue with Google* → Google's account chooser → Friends, or "Do you already have a Pix account?" · *Sign up* → Sign up · *Back* → Friends. | *Sign in* is disabled until both fields are filled. A wrong Pix ID or password → "The Pix ID or the password is wrong." |
 | **"Do you already have a Pix account?"** | A dialog after a Google account that no Pix account uses (FR-5.13). | *Yes, sign in* → Sign in, now saying the Google account is added once the person signs in, without Google and *Sign up* · *No, make one* → a new account → Pix ID setup. | Closing it forgets the Google account. |
-| **Sign up** | Pix ID, name, and password fields, each with its rule under it: "4–20 characters: a–z, 0–9, ".", "_"", "1–30 characters", "8–64 characters with a letter and a digit"; "There is no email, so a forgotten password can't be reset." *Check* beside the Pix ID field (FR-5.15). | *Sign up* → Friends, signed in · *Back* → Sign in · *Check* → "Checking…", then "test5 is available" or "This Pix ID is taken" under the field, until the field changes. | A broken rule turns red and *Sign up* stays disabled (US-6); a password equal to the Pix ID says so; a taken Pix ID → "This Pix ID is taken" under the field, with the input kept. *Check* is disabled until the Pix ID follows the rule; no answer → "Couldn't reach Pix. Check your connection and try again." under the field. |
+| **Sign up** | Pix ID, name, and password fields, each with its rule under it: "4–20 characters: a–z, 0–9, ".", "_"", "1–30 characters", "8–64 characters with a letter and a digit"; "There is no email, so a forgotten password can't be reset." *Check* beside the Pix ID field (FR-5.15). | *Sign up* → Friends, signed in · *Back* → Sign in · *Check* → "Checking…", then "This Pix ID is available" or "This Pix ID is taken" under the field, until the field changes. | A broken rule turns red and *Sign up* stays disabled (US-6); a password equal to the Pix ID says so; a taken Pix ID → "This Pix ID is taken" under the field, with the input kept. *Check* is disabled until the Pix ID follows the rule; no answer → "Couldn't reach Pix. Check your connection and try again." under the field. |
 | **Pix ID setup** | "Choose your Pix ID"; one field with the rule under it, and *Check* beside it. | *Save* → Friends · *Back* → Friends, which asks again · *Check* → as on Sign up. | As on Sign up: the rule in red and *Save* disabled; "This Pix ID is taken" with the input kept (US-6). |
 | **Sent requests** | "Sent requests · They become your friends once they accept"; each request the user sent and nobody answered yet, with name, @ID, and *Withdraw*; "No sent requests" and "Requests you send stay here until they're answered" when there are none. The list refreshes every 10 s while the screen is shown (FR-5.16). | *Withdraw* → the request leaves the list · *Back* → Friends. | A request answered in the meantime → "This request is no longer there.", and it leaves the list. A failed refresh → "Couldn't update your friends. Check your connection." Signed out → Friends. |
 | **Account** (sheet) | The name with *Edit name*, the @ID, how the account signs in, *Add Google* (without Google) or *Add a password* (a Google account with a Pix ID), and *Sign out*. | *Edit name* → a dialog with the name rule · *Add Google* → Google's account chooser · *Add a password* → a dialog with the password rule · *Sign out* → Friends (signed out). | Google already used by another account → "Another Pix account uses this Google account." |
@@ -643,6 +670,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 ![Wireflow 4: photographer](images/flow4_photographer.jpg)
 
 *Figure 4. Invite sent → Friend connected, with the "Invite not accepted" failure. The vertical arrows lead to the subject's phone (Flow 5). Invite sent and Invite not accepted are not built yet (Iteration 3).*
+
+<details><summary>한국어</summary>
+
+![Wireflow 4 in Korean](images/flow4_photographer_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -656,11 +689,17 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 *Figure 5. Invitation → Subject view, with the "Connection lost" failure. Invitation is not built yet (Iteration 3).*
 
+<details><summary>한국어</summary>
+
+![Wireflow 5 in Korean](images/flow5_friend_ko.jpg)
+
+</details>
+
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Invitation** | Opened from the notification "Dongje invites you to shoot together" or from an invite link; "You'll see the framing and pose guide live." | *Accept* → Subject view · *Decline* → closes, and the photographer sees Invite not accepted. | Expired or cancelled → "This invitation is no longer available" (screen to be drawn). |
 | **Subject view** | Photographer's live camera in the photographer's aspect ratio, placed as on the Camera screen, with the 3×3 grid and the synced guide; a red light blinking at its top right while it streams (FR-6.6); *Leave*; "Pinch the video to zoom the photographer's camera" at the bottom; the flash icon at the top left; a row over the bottom of the video with the brightness button, which opens a brightness slider in EV above the caption, the ratio readout, and the guide-edit mode toggle; "Connecting…" until the session is connected, and "The photographer's camera is paused." after 2 s without video; "The live view uses mobile data." as a toast the first time a session runs on this phone's cellular data (FR-6.13). No shutter. | Pinch the live video while guide-edit mode is off, tap the readout (the next quick step), or the readout's Zoom in / Zoom out action → photographer's zoom; during a pinch the local readout follows the request, then settles on the applied echo · With guide-edit mode on, drag or pinch the guide → it moves or resizes on both phones · Brightness slider or flash button → applied to the photographer's camera · (Could, It 3) tap the live video → photographer's focus · *Leave* (or system back, then confirm) → own Camera · The photographer ends the session → "Dongje ended the session" → own Camera. | The guide's opacity, hiding, and replacing cannot be changed here. Remote control blocked (if the switch is built) → controls disabled with a message. Connection lost → Connection lost. |
-| **Connection lost** | "Connection lost"; "Video stopped. Check that both phones are on the same Wi-Fi, then reconnect."; "Connecting…" while it reconnects. | *Reconnect* → Subject view if the session is still open, otherwise "The session has ended." → Camera · *Leave* → Camera. | *Reconnect* is disabled while it reconnects; another failure keeps the screen, with *Reconnect* enabled again. |
+| **Connection lost** | "Connection lost"; "Video stopped. Check both phones' internet connection, then reconnect."; "Connecting…" while it reconnects. | *Reconnect* → Subject view if the session is still open, otherwise "The session has ended." → Camera · *Leave* → Camera. | *Reconnect* is disabled while it reconnects; another failure keeps the screen, with *Reconnect* enabled again. |
 
 ### 6.7 Flow 6 · Room code
 
@@ -668,10 +707,16 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 *Figure 6. Room code → Join with code → Subject view, with the "Session not found" failure. It opens from *Friends*: *Use a room code instead* when signed out, *Use a room code* under the friend list. Subject view is as in Flow 5.*
 
+<details><summary>한국어</summary>
+
+![Wireflow 6 in Korean](images/flow6_room_code_prototype_ko.jpg)
+
+</details>
+
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Room code** | A sheet over Camera: "Your room code"; "Ask your friend to open Pix, tap Shoot together › Use a room code, and join with this code."; 6-digit code ("482 915"); "Both phones on the same Wi-Fi" and "Expires in 10 min"; "Getting a code…", then "Waiting for your friend…", then "Your friend joined · connecting…". | *Cancel* → Camera, and the code expires · *Join with a code instead* → Join with code, and this phone's code is cancelled · Friend joins → Friend connected (Flow 4). | Nobody joins in 10 minutes → "The code expired. Tap Use a room code again for a new one." No server → "Couldn't connect. Make sure both phones are on the same Wi-Fi." |
-| **Join with code** | A back arrow; "Join with a code"; "Enter the 6-digit code shown on your friend's camera."; "Room code" over six digit boxes, with the number keyboard open; "Both phones on the same Wi-Fi"; "Connecting…" while it joins. | Enter 6 digits and *Join* → Subject view (Flow 5) · Back → Camera. | Letters are not accepted. *Join* is disabled until 6 digits are entered. The session cannot be reached → "Couldn't connect…"; from another network the join opens Subject view (FR-8.5). Too many wrong codes from this network → "Too many wrong codes from this network. Try again in a few minutes." (NFR-15). |
+| **Room code** | A sheet over Camera: "Your room code"; 6-digit code ("482 915"); "Ask your friend to open Pix, tap Shoot together › Use a room code, and join with this code." in a box with the people icon; "Expires in 10 min"; "Getting a code…", then "Waiting for your friend…", then "Your friend joined · connecting…". | *Cancel* → Camera, and the code expires · *Join with a code instead* → Join with code, and this phone's code is cancelled · Friend joins → Friend connected (Flow 4). | Nobody joins in 10 minutes → "The code expired. Tap Use a room code again for a new one." No server → "Couldn't connect. Check your internet connection and try again." |
+| **Join with code** | A back arrow; "Join with a code"; "Enter the 6-digit code shown on your friend's camera."; "Room code" over six digit boxes, with the number keyboard open; "Connecting…" while it joins. | Enter 6 digits and *Join* → Subject view (Flow 5) · Back → Camera. | Letters are not accepted. *Join* is disabled until 6 digits are entered. The session cannot be reached → "Couldn't connect. Check your internet connection and try again."; from another network the join connects too (FR-8.5). Too many wrong codes from this network → "Too many wrong codes from this network. Try again in a few minutes." (NFR-15). |
 | **Session not found** | "Session not found"; "Check the code with your friend and try again." | *Try again* → Join with code, with the code kept and selected for editing · *Back* → Camera. | — |
 
 ### 6.8 Screens still to be drawn
@@ -747,7 +792,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 | **Live view** | The photographer's camera image as shown on the subject's phone. |
 | **Remote control** | The subject adjusting the shot from their own phone: the zoom, the guide's position and size, the brightness, and the flash. Either person can move and resize the guide. The photographer always takes the photo. |
 | **Pix ID** | A unique user name, such as "junhyeong.h", that friends use to find each other. |
-| **Room code** | A 6-digit code that connects two phones on the same Wi-Fi without an account. |
+| **Room code** | A 6-digit code that connects two phones without an account. |
 | **Relay** | A TURN service (Cloudflare's managed relay) that forwards the encrypted live view when the two phones cannot connect directly, for example on cellular data (Iteration 3). |
 | **QR connection** | Connecting two phones without internet: the photographer's phone creates a local hotspot and shows its details as a QR code, which the subject scans (Iteration 3). |
 | **Saved guide** | A guide stored on the phone to reuse later. |
@@ -759,6 +804,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 [#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
+[#111]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/111
 [#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
 [#115]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/115
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117

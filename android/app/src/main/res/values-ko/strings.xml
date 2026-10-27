@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Korean (FR-10.2), in 해요체. Keep the keys and the order of values/strings.xml. A name in a message takes 님, so no
+     particle depends on how the name ends (%1$s님이, not %1$s이/가); a number takes 에 for the same reason. -->
+<resources>
+    <!-- Common -->
+    <string name="cancel">취소</string>
+    <string name="back">뒤로</string>
+    <string name="back_to_camera">카메라로 돌아가기</string>
+    <string name="try_again">다시 시도</string>
+    <string name="connecting">연결 중…</string>
+    <string name="couldnt_connect">연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도하세요.</string>
+    <string name="join_rate_limited">이 네트워크에서 틀린 코드를 너무 많이 입력했어요. 몇 분 뒤에 다시 시도하세요.</string>
+    <string name="mobile_data_notice">카메라 공유에 모바일 데이터를 사용해요.</string>
+
+    <!-- Flow 1: Camera -->
+    <string name="shoot_together">카메라 공유</string>
+    <string name="camera_permission_message">뷰파인더를 보여 주고 사진을 촬영하려면 카메라 권한이 필요해요. 설정에서 카메라 접근을 허용하세요.</string>
+    <string name="camera_unavailable">카메라를 사용할 수 없어요. 카메라를 사용하는 다른 앱을 닫고 카메라 권한을 확인한 뒤 다시 시도하세요.</string>
+    <string name="starting_camera">카메라 시작 중</string>
+    <string name="open_settings">설정 열기</string>
+    <string name="allow_camera">카메라 허용</string>
+    <string name="camera_zoom_description">카메라 확대 %1$s배</string>
+    <string name="zoom_in">확대</string>
+    <string name="zoom_out">축소</string>
+    <string name="zoom_next_step">다음 배율</string>
+    <string name="camera_grid_description">격자선</string>
+    <string name="camera_level_aligned">카메라가 수평이에요</string>
+    <string name="camera_level_tilted">가운데 막대가 양옆 표시와 나란해지도록 카메라를 기울이세요</string>
+    <string name="saving_photo">저장 중…</string>
+    <string name="photo_saved">가이드는 빼고 사진만 저장했어요</string>
+    <string name="photo_save_failed">사진을 촬영하거나 저장하지 못했어요. 다시 시도하세요.</string>
+    <string name="photo_storage_failed">사진을 저장하지 못했어요. 남은 저장 공간을 확인하고 다시 시도하세요.</string>
+    <string name="photo_camera_closed">사진을 촬영하기 전에 카메라가 닫혔어요. 카메라로 돌아가 다시 시도하세요.</string>
+    <string name="open_last_photo">마지막으로 저장한 사진을 갤러리에서 열기</string>
+    <string name="gallery_unavailable">이 사진을 열 수 있는 앱이 없어요.</string>
+    <string name="photo_unavailable">이 사진은 더 이상 없어요. 사진을 새로 찍으세요.</string>
+    <string name="hint_add_guide">가이드를 눌러 포즈를 추가하세요</string>
+    <string name="hint_edit_guide">드래그해 옮기기 · 두 손가락으로 크기 조절</string>
+    <string name="guide">가이드</string>
+    <string name="guide_add_description">포즈 가이드 추가</string>
+    <string name="guide_change_description">포즈 가이드 바꾸기</string>
+    <string name="shutter">사진 촬영</string>
+    <string name="guide_opacity">가이드 불투명도</string>
+    <string name="remove_guide">가이드 제거</string>
+    <string name="hide_guide">가이드 숨기기</string>
+    <string name="show_guide">가이드 보기</string>
+    <string name="hint_guide_hidden">가이드 숨김</string>
+    <!-- Saved guides (FR-3.8): the button on the guide's panel and its notices. -->
+    <string name="save_guide">가이드 저장</string>
+    <string name="guide_saved">가이드 저장됨</string>
+    <string name="guide_saved_notice">가이드를 저장했어요. 가이드에서 다시 사용할 수 있어요.</string>
+    <string name="guide_saved_oldest_removed_notice">가이드를 저장했어요. %1$d개까지만 보관해서 가장 오래된 가이드를 지웠어요.</string>
+    <string name="guide_already_saved_notice">이미 저장한 가이드예요. 가이드에서 찾을 수 있어요.</string>
+    <string name="guide_save_failed_notice">가이드를 저장하지 못했어요. 휴대폰 저장 공간을 확인하세요.</string>
+    <string name="saved_guides_title">저장한 가이드</string>
+    <string name="saved_guide_description">%1$s에 저장한 가이드</string>
+    <string name="delete_saved_guide">저장한 가이드 삭제</string>
+    <string name="delete_saved_guide_description">%1$s에 저장한 가이드 삭제</string>
+    <string name="delete_saved_guide_title">저장한 가이드를 삭제할까요?</string>
+    <string name="delete_saved_guide_message">이 휴대폰에서 지워져요. 카메라에 있는 가이드는 그대로 남아요.</string>
+    <string name="delete">삭제</string>
+    <string name="saved_guide_open_failed">저장한 가이드를 열지 못했어요.</string>
+    <string name="reference_photo">참고 사진</string>
+    <string name="enlarge_reference">크게 보기</string>
+    <string name="shrink_reference">작게 보기</string>
+    <string name="move_reference_top_left">왼쪽 위로 옮기기</string>
+    <string name="move_reference_top_right">오른쪽 위로 옮기기</string>
+    <string name="move_reference_bottom_left">왼쪽 아래로 옮기기</string>
+    <string name="move_reference_bottom_right">오른쪽 아래로 옮기기</string>
+    <string name="edit_guide">가이드 편집</string>
+    <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
+    <string name="tip_preparing">팁 준비 중…</string>
+    <string name="tip_failed">이 포즈의 팁을 받지 못했어요</string>
+    <string name="show_tip">팁 보기</string>
+    <string name="close_tip">팁 닫기</string>
+    <string name="hint_pinch_zoom">두 손가락으로 확대·축소</string>
+    <string name="flash_off">플래시 끔</string>
+    <string name="flash_auto">플래시 자동</string>
+    <string name="flash_on">플래시 켬</string>
+    <string name="aspect_ratio_description">화면 비율 %1$s</string>
+    <string name="brightness">밝기</string>
+    <string name="live_badge">실시간 · %1$s님과 연결됨</string>
+    <string name="end_session">공유 종료</string>
+    <string name="peer_left">%1$s님이 나갔어요</string>
+    <string name="peer_disconnected">%1$s님의 연결이 끊겼어요</string>
+    <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
+    <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
+    <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
+    <string name="remote_flash_on_notice">%1$s님이 플래시를 켰어요</string>
+    <string name="remote_flash_off_notice">%1$s님이 플래시를 껐어요</string>
+    <string name="remote_flash_auto_notice">%1$s님이 플래시를 자동으로 바꿨어요</string>
+
+    <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
+    <string name="add_guide_title">포즈 가이드 추가</string>
+    <string name="add_guide_body">사진 속 인물만 따서 카메라 화면에 띄워 줘요. 보면서 같은 포즈로 찍어 보세요.</string>
+    <string name="replace_guide_title">포즈 가이드를 바꿀까요?</string>
+    <string name="replace_guide_body">새 참고 사진을 고르면 그 가이드가 지금 가이드를 대신해요.</string>
+    <string name="keep_current_guide">지금 가이드 유지</string>
+    <string name="upload_reference">참고 사진 올리기</string>
+    <string name="upload_reference_body">갤러리에서 인물 한 명이 나온 사진 선택</string>
+    <string name="generate_poses">AI로 포즈 생성</string>
+    <string name="generate_poses_body">AI가 지금 장소에 어울리는 포즈 4개를 추천해요</string>
+    <string name="reference_title">참고 사진</string>
+    <string name="reference_preview_description">참고 사진 속 인물</string>
+    <string name="finding_person">인물을 인식하는 중…</string>
+    <string name="person_found">인물을 인식했어요</string>
+    <string name="couldnt_use_photo">이 사진은 사용할 수 없어요. 다른 사진을 고르세요.</string>
+    <string name="use_this_guide">이 가이드 사용</string>
+    <string name="choose_another_photo">다른 사진 고르기</string>
+    <string name="no_person_title">인물을 인식하지 못했어요</string>
+    <string name="no_person_message">인물 한 명이 또렷하게 나온 사진을 골라 주세요.</string>
+
+    <!-- Flow 2: Pose generation -->
+    <string name="generating_title">포즈 생성 중</string>
+    <string name="consent_title">이 사진을 AI 서비스로 보낼까요?</string>
+    <string name="consent_message">포즈를 생성하기 위해 이어서 찍을 배경 사진을 Pix 서버를 거쳐 외부 AI 이미지 서비스로 보내요. Pix 서버에는 사진이 저장되지 않아요.</string>
+    <string name="consent_agree">동의하고 계속</string>
+    <string name="not_now">나중에</string>
+    <string name="scene_title">배경 사진 촬영</string>
+    <string name="scene_body">인물과 배경이 함께 나오게 구도를 잡고 셔터를 누르세요.</string>
+    <string name="scene_review_title">이 사진을 사용할까요?</string>
+    <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
+    <string name="use_this_photo">이 사진 사용</string>
+    <string name="shoot_again">다시 촬영</string>
+    <string name="scene_shot_failed">사진을 촬영하지 못했어요. 다시 시도하세요.</string>
+    <string name="your_photo">촬영한 사진</string>
+    <string name="describe_title">포즈 생성</string>
+    <string name="describe_body">원하는 포즈를 적거나, 이 장소에 어울리는 포즈 4개를 추천받으세요</string>
+    <string name="describe_label">원하는 포즈</string>
+    <string name="describe_hint">예: 벽에 기대고 한 손은 주머니에</string>
+    <string name="description_refused">지난 요청이 거절됐어요. 설명이나 사진을 바꿔 다시 시도하세요.</string>
+    <string name="description_rejected_message">AI 서비스가 이 사진으로 “%1$s” 포즈를 생성하지 않았어요. 설명을 바꾸거나, 카메라로 돌아가 다른 사진을 찍으세요.</string>
+    <string name="edit_description">설명 수정</string>
+    <string name="ideas_label">추천 포즈</string>
+    <string name="generate_four_poses">포즈 4개 생성</string>
+    <string name="skip_suggest_poses">건너뛰고 포즈 추천받기</string>
+    <string name="choosing_poses">포즈 선택 중…</string>
+    <!-- Idea chips on Generate poses (FR-4.8). Each fills the description field, so keep them under 100 characters
+         and possible anywhere: the image model adds nothing to lean or sit on that the scene does not have. -->
+    <string-array name="pose_ideas">
+        <item>어깨 너머로 뒤돌아보기</item>
+        <item>웃으면서 카메라 쪽으로 걸어오기</item>
+        <item>주머니에 손 넣고 하늘 보기</item>
+        <item>팔짱 끼고 기대 서기</item>
+        <item>앉아서 무릎 끌어안기</item>
+        <item>두 팔 들고 점프하기</item>
+    </string-array>
+    <string name="scene_photo_description">포즈를 생성할 배경 사진</string>
+    <string name="creating_pose">생성 중…</string>
+    <string name="pose_failed">생성하지 못함</string>
+    <string name="ready_count">%2$d개 중 %1$d개 완료</string>
+    <string name="generating_scene_caption">인물과 배경은 그대로 · 최대 60초</string>
+    <string name="pick_pose_title">포즈 선택</string>
+    <string name="pick_pose_body">옆으로 넘겨 포즈를 하나씩 살펴보세요</string>
+    <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
+    <string name="use_this_pose">이 포즈 사용</string>
+    <string name="try_other_poses">다른 포즈 생성</string>
+    <string name="generation_failed_title">포즈를 생성하지 못했어요</string>
+    <string name="generation_failed_message">문제가 생겼거나 60초 넘게 걸렸어요. 사진은 그대로 있으니 다시 시도해 보세요.</string>
+
+    <!-- Flow 3: Friends, Add a friend (R&S 6.4) -->
+    <string name="friends_overline">친구</string>
+    <string name="friends_subtitle">친구를 초대해 카메라를 실시간으로 공유하세요</string>
+    <string name="account">계정</string>
+    <string name="signed_out_title">친구와 카메라 공유</string>
+    <string name="signed_out_body">로그인하면 Pix ID로 친구를 추가하고 카메라 공유에 초대할 수 있어요.</string>
+    <string name="sign_in_to_add_friends">로그인하고 친구 추가</string>
+    <string name="use_room_code_instead">로그인 없이 참여 코드 사용</string>
+    <string name="use_room_code">참여 코드 사용</string>
+    <string name="choose_pix_id_title">Pix ID 정하기</string>
+    <string name="choose_pix_id_body">친구들이 Pix ID로 나를 찾아요.</string>
+    <string name="choose_pix_id">Pix ID 정하기</string>
+    <string name="no_friends_title">아직 친구가 없어요</string>
+    <string name="no_friends_body">Pix ID로 친구를 추가하세요</string>
+    <string name="add_a_friend">친구 추가</string>
+    <string name="my_pix_id">내 Pix ID: %1$s</string>
+    <string name="copy_pix_id">내 Pix ID 복사</string>
+    <string name="pix_id_copied">Pix ID를 복사했어요</string>
+    <string name="friend_requests">친구 요청</string>
+    <string name="accept">수락</string>
+    <string name="decline">거절</string>
+    <string name="online">온라인</string>
+    <string name="offline">오프라인</string>
+    <string name="in_session">카메라 공유 중</string>
+    <string name="invite">초대</string>
+    <string name="invite_not_yet">%1$s님 초대. 아직 사용할 수 없어요</string>
+    <string name="remove_friend_title">%1$s님을 친구에서 삭제할까요?</string>
+    <string name="remove_friend_message">서로의 친구 목록에서 사라져요. 나중에 다시 추가할 수 있어요.</string>
+    <string name="remove_friend">친구 삭제</string>
+    <string name="friends_offline">친구 목록을 새로 고치지 못했어요. 연결을 확인하세요.</string>
+    <!-- Sent requests, from "Sent requests · 2" on Friends (FR-5.16). -->
+    <string name="sent_requests_count">보낸 요청 · %1$d</string>
+    <string name="sent_requests_title">보낸 요청</string>
+    <string name="sent_requests_subtitle">상대가 수락하면 친구가 돼요</string>
+    <string name="no_sent_requests_title">보낸 요청이 없어요</string>
+    <string name="no_sent_requests_body">보낸 요청은 답을 받을 때까지 여기에 있어요</string>
+    <string name="withdraw">취소</string>
+    <string name="withdraw_request_to">%1$s님에게 보낸 요청 취소</string>
+    <string name="signed_out_expired">로그아웃됐어요. 친구 목록을 보려면 다시 로그인하세요.</string>
+    <string name="request_gone">이 요청은 더 이상 없어요.</string>
+    <string name="add_friend_hint">친구의 Pix ID</string>
+    <string name="search">검색</string>
+    <string name="searching">검색 중…</string>
+    <string name="result_label">검색 결과</string>
+    <string name="add">추가</string>
+    <string name="requested">요청됨</string>
+    <string name="withdraw_request">요청 취소</string>
+    <string name="already_friends">친구</string>
+    <string name="this_is_you">나예요</string>
+    <string name="add_friend_note">%1$s님이 친구 요청을 받고 Pix에서 수락하면 친구가 돼요.</string>
+    <string name="no_user_found">사용자를 찾지 못했어요</string>
+    <string name="no_user_found_message">Pix ID가 맞는지 친구에게 확인해 보세요.</string>
+    <string name="search_again">다시 검색</string>
+
+    <!-- Sign in, Sign up, Pix ID setup, Account (R&S 6.4, 6.8; FR-5.2, FR-5.11–5.14) -->
+    <string name="sign_in_title">로그인</string>
+    <string name="sign_in_body">로그인하고 친구를 추가해 카메라를 공유해요.</string>
+    <string name="link_google_body">Pix 계정에 로그인하면 Google 계정이 연결돼요.</string>
+    <string name="pix_id_label">Pix ID</string>
+    <string name="password_label">비밀번호</string>
+    <string name="sign_in">로그인</string>
+    <string name="or">또는</string>
+    <string name="continue_with_google">Google로 계속하기</string>
+    <string name="new_to_pix">Pix가 처음인가요? 회원가입</string>
+    <string name="sign_up_title">회원가입</string>
+    <string name="sign_up_body">Pix는 현재 가입 시 이메일을 받지 않아요. 비밀번호를 잊으면 재설정할 수 없어요.</string>
+    <string name="name_label">이름</string>
+    <string name="name_rule">1–30자</string>
+    <string name="pix_id_rule">4–20자: a–z, 0–9, \".\", \"_\"</string>
+    <string name="password_rule">8–64자, 영문과 숫자 포함</string>
+    <string name="password_same_as_pix_id">비밀번호는 Pix ID와 같을 수 없어요</string>
+    <string name="pix_id_taken">이미 사용 중인 Pix ID예요</string>
+    <!-- Check, beside the Pix ID field of Sign up and Pix ID setup (FR-5.15). -->
+    <string name="check">확인</string>
+    <string name="check_pix_id_description">이 Pix ID를 사용할 수 있는지 확인</string>
+    <string name="checking_pix_id">확인 중…</string>
+    <string name="pix_id_available">사용할 수 있는 ID예요</string>
+    <string name="sign_up">회원가입</string>
+    <string name="pix_id_setup_title">Pix ID 정하기</string>
+    <string name="pix_id_setup_body">친구가 이 ID로 나를 검색해요. 대문자와 띄어쓰기는 사용할 수 없어요.</string>
+    <string name="save">저장</string>
+    <string name="wrong_credentials">Pix ID나 비밀번호가 틀렸어요.</string>
+    <string name="offline_error">Pix에 연결하지 못했어요. 연결을 확인하고 다시 시도하세요.</string>
+    <string name="unavailable_error">지금은 사용할 수 없어요. 몇 분 뒤에 다시 시도하세요.</string>
+    <string name="account_error">문제가 생겼어요. 다시 시도하세요.</string>
+    <string name="google_failed">Google로 로그인하지 못했어요. 다시 시도하세요.</string>
+    <string name="google_no_account">먼저 휴대폰 설정에서 Google 계정을 추가하세요.</string>
+    <string name="google_in_use">이 Google 계정은 이미 다른 Pix 계정에 연결되어 있어요.</string>
+    <string name="google_already_added">이 계정은 이미 Google 계정에 연결되어 있어요.</string>
+    <string name="google_not_added">로그인했지만 Google 계정을 연결하지 못했어요. %1$s</string>
+    <string name="existing_account_title">이미 Pix 계정이 있나요?</string>
+    <string name="existing_account_message">이 Google 계정과 연결된 Pix 계정이 없어요. Pix 계정이 있다면 로그인해서 연결하고, 없다면 새로 만들 수 있어요.</string>
+    <string name="existing_account_yes">기존 계정으로 로그인</string>
+    <string name="existing_account_no">새 계정 만들기</string>
+    <string name="signs_in_with_google">Google로 로그인</string>
+    <string name="signs_in_with_password">Pix ID와 비밀번호로 로그인</string>
+    <string name="signs_in_with_both">Google 또는 Pix ID와 비밀번호로 로그인</string>
+    <string name="edit_name">이름 수정</string>
+    <string name="add_google">Google 계정 연결</string>
+    <string name="add_google_body">Google로도 로그인할 수 있어요</string>
+    <string name="add_password">비밀번호 추가</string>
+    <string name="add_password_body">Pix ID로도 로그인할 수 있어요</string>
+    <string name="sign_out">로그아웃</string>
+    <string name="name_saved">이름을 저장했어요</string>
+    <string name="google_added">Google 계정을 연결했어요. 이제 Google로도 로그인할 수 있어요.</string>
+    <string name="password_added">비밀번호를 추가했어요. 이제 Pix ID로 로그인할 수 있어요.</string>
+    <string name="signed_out">로그아웃했어요</string>
+
+    <!-- Flow 6: Room code -->
+    <string name="room_code_title">참여 코드</string>
+    <string name="room_code_body">친구가 Pix에서 카메라 공유 › 참여 코드 사용을 누르고 이 코드를 입력하면 돼요.</string>
+    <string name="getting_code">코드 받는 중…</string>
+    <string name="waiting_for_friend">친구를 기다리는 중…</string>
+    <string name="friend_joined_connecting">친구가 들어왔어요 · 연결 중…</string>
+    <string name="code_expired">코드가 만료됐어요. 참여 코드 사용을 다시 눌러 새 코드를 받으세요.</string>
+    <string name="code_expiry">10분 뒤 만료</string>
+    <string name="join_instead">받은 코드로 참여하기</string>
+    <string name="join_title">코드로 참여</string>
+    <string name="join_body">친구 화면에 표시된 6자리 코드를 입력하세요.</string>
+    <string name="room_code_label">참여 코드</string>
+    <string name="join">참여</string>
+    <string name="session_not_found_title">참여할 수 없는 코드예요</string>
+    <string name="session_not_found_message">코드가 맞는지 친구에게 확인해 보세요.</string>
+
+    <!-- Flow 5: Subject view, Connection lost -->
+    <string name="subject_title">%1$s님의 카메라</string>
+    <string name="subject_title_placeholder">상대 카메라</string>
+    <string name="leave">나가기</string>
+    <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
+    <string name="subject_caption">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요</string>
+    <string name="peer_ended_session">%1$s님이 카메라 공유를 끝냈어요</string>
+    <string name="peer_ended_session_unnamed">상대가 카메라 공유를 끝냈어요</string>
+    <string name="camera_paused">상대 카메라가 잠시 중지됐어요.</string>
+    <string name="session_ended">카메라 공유가 끝났어요.</string>
+    <string name="connection_lost_title">연결이 끊겼어요</string>
+    <string name="connection_lost_message">영상이 멈췄어요. 두 휴대폰의 인터넷 연결을 확인하고 다시 연결하세요.</string>
+    <string name="reconnect">다시 연결</string>
+</resources>

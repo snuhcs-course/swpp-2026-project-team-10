@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -30,6 +30,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
@@ -59,7 +60,7 @@ import org.robolectric.annotation.GraphicsMode
  * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
  * together, Use this photo) and system back during the scene photo step; End session; the gallery button with and
  * without an app to open the photo; each capture failure's message; the subject's zoom, brightness, flash, and guide
- * moves as notices, and a lost connection; the zoom accessibility actions; the reference thumbnail's tap, drag,
+ * moves as notices, a lost connection, and the live view on mobile data (FR-6.13); the zoom accessibility actions; the reference thumbnail's tap, drag,
  * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button; the preview's stream state;
  * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap; its icon kept while other state changes.
  */
@@ -220,6 +221,20 @@ class CameraFragmentInteractionTest {
     }
 
     // ---- Session ---------------------------------------------------------------------
+
+    @Test
+    fun liveViewOnMobileData_isANotice() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.setPath(IcePath("srflx", "relay", "cellular", null))
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.mobile_data_notice), controls.noticeText.text.toString())
+        }
+    }
 
     @Test
     fun endSession_leaves_andTheSubjectsActionsAreNotices() {

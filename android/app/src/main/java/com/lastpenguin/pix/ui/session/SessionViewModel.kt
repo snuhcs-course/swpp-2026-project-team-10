@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -10,6 +10,8 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.IcePath
+import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
@@ -27,7 +29,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
-/** Short notices for the photographer's camera screen. */
+/** Short notices for the session's screens: the photographer's camera screen shows them all, Subject view [MobileData]. */
 sealed interface SessionNotice {
     /** The other phone left or dropped: "Junhyeong left" (FR-6.10, FR-6.11). */
     data class PeerGone(val name: String, val reason: EndReason) : SessionNotice
@@ -43,6 +45,9 @@ sealed interface SessionNotice {
 
     /** The subject changed the flash: "Junhyeong turned the flash on". */
     data class RemoteFlash(val name: String, val mode: FlashMode) : SessionNotice
+
+    /** The live view goes over this phone's mobile data, said once on each phone (FR-6.13, Design 2.6.7). */
+    data object MobileData : SessionNotice
 }
 
 /**
@@ -60,6 +65,7 @@ class SessionViewModel(
     private val camera: CameraController,
     private val guideSyncer: GuideSyncer,
     private val remoteControl: RemoteControlHandler,
+    private val mobileDataNotice: MobileDataNotice,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -102,6 +108,7 @@ class SessionViewModel(
     init {
         viewModelScope.launch { session.state.collect { onState(it) } }
         viewModelScope.launch { session.incoming.collect { onMessage(it) } }
+        viewModelScope.launch { session.path.collect { onPath(it) } }
         ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
     }
 
@@ -237,6 +244,17 @@ class SessionViewModel(
         reconnecting = false
     }
 
+    /**
+     * The first time a session's video goes over this phone's cellular network, as its selected candidate pair says,
+     * the screen says so once (FR-6.13). With no screen listening the notice waits for the next change of path.
+     */
+    private suspend fun onPath(path: IcePath?) {
+        if (path?.network != CELLULAR || _notices.subscriptionCount.value == 0) return
+        if (mobileDataNotice.wasShown()) return
+        mobileDataNotice.markShown()
+        _notices.tryEmit(SessionNotice.MobileData)
+    }
+
     private fun onMessage(message: SessionMessage) {
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
@@ -245,5 +263,8 @@ class SessionViewModel(
 
     private companion object {
         const val BACKGROUND_LIMIT_MS = 60_000L
+
+        /** WebRTC's `networkType` of a candidate on a cellular interface. */
+        const val CELLULAR = "cellular"
     }
 }

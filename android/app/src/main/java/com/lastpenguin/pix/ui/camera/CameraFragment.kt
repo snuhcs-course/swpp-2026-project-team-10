@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -246,6 +246,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                                 },
                                 notice.name,
                             )
+
+                            SessionNotice.MobileData -> getString(R.string.mobile_data_notice)
                         }
                         showNotice(controls, text)
                     }

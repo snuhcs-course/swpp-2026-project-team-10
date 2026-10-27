@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -43,6 +43,9 @@ class FakeSessionManager : SessionManager {
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
 
+    private val _path = MutableStateFlow<IcePath?>(null)
+    override val path: StateFlow<IcePath?> = _path.asStateFlow()
+
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
 
@@ -68,6 +71,11 @@ class FakeSessionManager : SessionManager {
 
     fun setState(state: SessionState) {
         _state.value = state
+    }
+
+    /** The link's statistics read a new candidate pair, or none. */
+    fun setPath(path: IcePath?) {
+        _path.value = path
     }
 
     /** The session kept a `camera.state` whose `incoming` emission this screen did not see. */

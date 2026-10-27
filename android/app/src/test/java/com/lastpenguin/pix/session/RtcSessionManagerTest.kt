@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -6,6 +6,7 @@ import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.signaling.IceCandidate
+import com.lastpenguin.pix.session.signaling.IceServer
 import com.lastpenguin.pix.session.signaling.SessionDescription
 import com.lastpenguin.pix.session.signaling.SignalMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,6 +18,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.webrtc.VideoFrame
@@ -88,6 +90,69 @@ class RtcSessionManagerTest {
         assertEquals("ws://10.0.2.2:8000/ws", signalingUrl("http://10.0.2.2:8000/"))
         assertEquals("ws://192.168.0.10:8000/ws", signalingUrl("http://192.168.0.10:8000"))
         assertEquals("wss://pix.example.com/ws", signalingUrl("https://pix.example.com/"))
+    }
+
+    private val relay = listOf(
+        IceServer(listOf("stun:stun.cloudflare.com:3478")),
+        IceServer(listOf("turn:turn.cloudflare.com:3478?transport=udp"), "user", "secret"),
+    )
+
+    @Test
+    fun `photographer's peer connection gets the ice servers of room created`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1", relay))
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+
+        assertEquals(PeerConfig(Role.PHOTOGRAPHER, relay), peers.created.single().config)
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+    }
+
+    @Test
+    fun `too many wrong codes from this network end the subject's join with RATE_LIMITED`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.ServerError("RATE_LIMITED", "Too many wrong codes from this network"))
+        runCurrent()
+
+        assertEquals(SessionState.Ended(EndReason.RATE_LIMITED), manager.state.value)
+        assertTrue(peers.created.isEmpty())
+    }
+
+    @Test
+    fun `path follows the link's statistics and is cleared when the session ends`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        assertNull(manager.path.value)
+
+        val relayed = IcePath("relay", "srflx", "cellular", "udp")
+        peer.stats = LinkStats("video/H264", 960, 720, 30.0, 2000.0, 40.0, relayed)
+        advanceTimeBy(2_100)
+        runCurrent()
+        assertEquals(relayed, manager.path.value)
+
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+        assertNull(manager.path.value)
+    }
+
+    @Test
+    fun `subject's peer connection gets the ice servers of session joined`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT, iceServers = relay))
+        runCurrent()
+
+        assertEquals(PeerConfig(Role.SUBJECT, relay), peers.created.single().config)
+        manager.leave(EndReason.LEFT)
+        runCurrent()
     }
 
     @Test

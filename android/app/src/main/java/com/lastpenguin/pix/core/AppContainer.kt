@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -40,7 +40,9 @@ import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.guide.SubjectSegmenter
 import com.lastpenguin.pix.session.CameraFrameSource
+import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.OkHttpSignalingClient
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.RemoteVideo
@@ -100,6 +102,8 @@ class AppContainer(
     val remoteVideo: RemoteVideo,
     val guideSyncer: GuideSyncer,
     val remoteControlHandler: RemoteControlHandler,
+    /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
+    val mobileDataNotice: MobileDataNotice,
 ) {
     companion object {
         /** Like the session's socket, so the course's proxy never sees it idle. */
@@ -162,7 +166,7 @@ class AppContainer(
             val rtcSessionManager = RtcSessionManager(
                 signaling = OkHttpSignalingClient(),
                 // Loads the native WebRTC library on the first session, not at app start.
-                peers = WebRtcRuntime(appContext, frameSource),
+                peers = WebRtcRuntime(appContext, frameSource, relayOnly = BuildConfig.RELAY_ONLY),
                 frameSource = frameSource,
                 codec = MessageCodec(),
                 router = ChannelRouter(),
@@ -194,6 +198,7 @@ class AppContainer(
                     guideRepository,
                     attributeGuideChanges = guideSyncer::attribute,
                 ),
+                mobileDataNotice = DataStoreMobileDataNotice(appContext),
             )
         }
     }

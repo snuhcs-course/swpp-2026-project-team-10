@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -43,6 +43,7 @@ object PixViewModels {
                 container.cameraController,
                 container.guideSyncer,
                 container.remoteControlHandler,
+                container.mobileDataNotice,
             )
         }
         initializer {

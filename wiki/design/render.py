@@ -24,11 +24,12 @@ strings of `android/app/src/main/res/values/strings.xml`, in any case and with i
 string's Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in ko.json under the
 flow's name, which also keeps the names and Pix IDs of the flow's people as they are. A screen's text with a Latin
 letter that neither gives, or an entry the flow no longer uses, stops the render, so ko.json changes with the drawing;
-render the flows again after a Korean string changes. A chip or a button that wraps its text in the app is drawn as
-one element marked `data-fit` (left, center, or right: the side its row keeps it at), and in Korean it takes its text's
-width from that side. A dialog is one box whose content flows, centered on the screen, with its buttons in a row that
-wraps (`flex-flow: row-reverse wrap`): as in the app, they stand side by side when they fit and stack at the right
-when they do not, so the Korean dialog takes its own height and its own buttons' places.
+render the flows again after a Korean string changes. Anything as wide as its content in the app (a chip, a button, a
+line of text its parent centers, or a row of them) is drawn as one element marked `data-fit` (left, center, or right:
+the side its parent keeps it at), and in Korean it takes its content's width from that side. A dialog is one box
+whose content flows, centered on the screen, with its buttons in a row that wraps (`flex-flow: row-reverse wrap`): as
+in the app, they stand side by side when they fit and stack at the right when they do not, so the Korean dialog takes
+its own height and its own buttons' places.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -201,8 +202,8 @@ SCREEN_WIDTH = 165  # px, a card's screen, inside its border
 
 
 def fit_to_text(match: re.Match[str]) -> str:
-    """A chip or a button that wraps its text in the app, as wide as its Korean text, from the side the app keeps it
-    at (data-fit: left, center, or right), and never wider than the screen's margins."""
+    """An element as wide as its content in the app, as wide as its Korean content, from the side the app keeps it at
+    (data-fit: left, center, or right), and never wider than the screen's margins."""
     side, style = match.group(1), match.group(2)
     left = float(re.search(r"left: ([\d.]+)px", style).group(1))
     width = float(re.search(r"width: ([\d.]+)px", style).group(1))

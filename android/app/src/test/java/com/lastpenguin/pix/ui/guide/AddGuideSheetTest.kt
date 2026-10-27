@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -31,8 +31,8 @@ import org.robolectric.shadows.ShadowDialog
 /*
  * Add a pose guide (R&S 6.2, FR-3.6, FR-4.2), on the real bottom sheet. Partitions: no guide on the camera (Add)
  * or a guide (Replace, with Keep the current guide); Generate poses here with consent already given (the scene
- * photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts it);
- * Cancel. Saved guides (FR-3.8): none (the section is hidden); one, which a tap puts on the camera, closing the
+ * photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts it), and
+ * the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. Saved guides (FR-3.8): none (the section is hidden); one, which a tap puts on the camera, closing the
  * sheet; its ✕, which asks first (Cancel keeps it, Delete removes it).
  */
 @RunWith(AndroidJUnit4::class)
@@ -96,6 +96,22 @@ class AddGuideSheetTest {
 
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
         assertFalse(sheet.isAdded)
+    }
+
+    @Test
+    fun consentNotice_buttonsKeepMaterialsDialogPadding() {
+        launch(TestAppContainer().apply { consent.given = false })
+
+        onSheet { binding -> binding.generateButton.performClick() }
+        idle()
+
+        val notice = ShadowDialog.getLatestDialog() as AlertDialog
+        val density = notice.context.resources.displayMetrics.density
+        for (which in listOf(DialogInterface.BUTTON_POSITIVE, DialogInterface.BUTTON_NEGATIVE)) {
+            val button = notice.getButton(which)
+            assertEquals(12f, button.paddingStart / density, 0.01f)
+            assertEquals(12f, button.paddingEnd / density, 0.01f)
+        }
     }
 
     @Test

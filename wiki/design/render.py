@@ -15,7 +15,7 @@ Each drawing has one image in wiki/images/, named after it:
   Manrope (DM Mono for the room code; Pretendard in the Korean image, as in the app) with the colors of
   `android/app/src/main/res/values/colors.xml` and the app's own icons as inline SVG. A camera image or a photo is a
   lighter grey gradient, so its frame shows against the app; in it, a grey figure is the real person and a white
-  outline the pose guide.
+  outline the pose guide. A spinner, which Robolectric's render leaves out, is a three-quarter ring.
 
 The Korean image changes only the text on the screens, the part of each card that clips its content between the
 screen's name and the navigation bar; the arrows, the headings, the boxes where a flow starts and ends, and a box on a
@@ -26,7 +26,9 @@ flow's name, which also keeps the names and Pix IDs of the flow's people as they
 letter that neither gives, or an entry the flow no longer uses, stops the render, so ko.json changes with the drawing;
 render the flows again after a Korean string changes. A chip or a button that wraps its text in the app is drawn as
 one element marked `data-fit` (left, center, or right: the side its row keeps it at), and in Korean it takes its text's
-width from that side.
+width from that side. A dialog is one box whose content flows, centered on the screen, with its buttons in a row that
+wraps (`flex-flow: row-reverse wrap`): as in the app, they stand side by side when they fit and stack at the right
+when they do not, so the Korean dialog takes its own height and its own buttons' places.
 
 Change the drawing, never the image alone, and render it in the same PR:
 

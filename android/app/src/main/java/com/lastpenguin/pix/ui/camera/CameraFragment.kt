@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
@@ -21,6 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -97,6 +99,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     // The frame's ratio when the held frame was taken: the grid and the guide stay over a held frame of that ratio.
     private var stillAspect: AspectRatio? = null
 
+    // The preview's last frame for PreviewHold; a test stands in for PreviewView, which has no surface on the JVM.
+    @VisibleForTesting
+    internal var previewFrame: () -> Bitmap? = { binding?.previewView?.bitmap }
+
     // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
     private var previewArea = PreviewArea(0f, 0f, 0f)
 
@@ -118,12 +124,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // PreviewView fits the viewport's crop but still draws the camera image around it: show only the frame, or,
         // for 1:1, the whole 4:3 area with the rest dimmed.
         controls.previewView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            fitToFrame(controls, viewModel.uiState.value.aspect)
+            fitToFrame(controls, placedAspect())
         }
         // The preview's place follows the screen's height and the bars' (R&S 6.2), known only after layout.
         val placePreview = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
             if (bottom - top != oldBottom - oldTop) {
-                view.post { binding?.let { layoutPreview(it, viewModel.uiState.value.aspect) } }
+                view.post { binding?.let { layoutPreview(it, placedAspect()) } }
             }
         }
         controls.root.addOnLayoutChangeListener(placePreview)
@@ -507,7 +513,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val frame = fitViewfinderFrame(
             controls.root.width.toFloat(),
             area.bottom - area.top,
-            viewModel.uiState.value.aspect.frameAspect,
+            placedAspect().frameAspect,
         )
         val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
@@ -571,8 +577,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The grid and the guide follow the chosen frame (AD-10); a new ratio re-fits both at once.
         controls.compositionOverlay.frameAspect = state.aspect.frameAspect
         controls.guideOverlay.frameAspect = state.aspect.frameAspect
-        layoutPreview(controls, state.aspect)
-        fitToFrame(controls, state.aspect)
+        // A held frame keeps the old ratio's place until the new one streams, as a shorter area would cut it.
+        layoutPreview(controls, placedAspect())
+        fitToFrame(controls, placedAspect())
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = overlays
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
@@ -892,15 +899,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         connected?.let { controls.liveDot.contentDescription = getString(R.string.live_badge, it.peer.displayName) }
     }
 
+    /** The ratio the preview is placed for: a held frame's while it shows, then the chosen one. */
+    private fun placedAspect(): AspectRatio =
+        stillAspect.takeIf { previewHold?.holding == true } ?: viewModel.uiState.value.aspect
+
     /** Puts the preview's last frame over it while the camera rebinds (PreviewHold); false without a frame. */
     private fun showStill(): Boolean {
         val controls = binding ?: return false
-        val frame = controls.previewView.bitmap ?: return false
+        val frame = previewFrame() ?: return false
         val aspect = viewModel.uiState.value.aspect
         controls.aspectStill.setImageBitmap(heldFrame(frame, aspect))
         // The bitmap is the whole camera image; show the old frame only, as the preview did.
         controls.aspectStill.clipBounds = controls.previewView.clipBounds
         controls.aspectStill.isVisible = true
+        // The grid stays over a held frame of the same ratio; a 1:1 one has its outside dimmed already.
+        controls.compositionOverlay.dimOutside = false
         stillAspect = aspect
         Timings.mark("preview.still", "on")
         stillJob?.cancel()
@@ -936,7 +949,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             null
         }
         if (view.clipBounds != clip) view.clipBounds = clip
-        controls.compositionOverlay.dimOutside = aspect.previewAspect != aspect.frameAspect
+        // A held 1:1 frame has its outside dimmed already (heldFrame), and the grid stays over it during a lens switch.
+        controls.compositionOverlay.dimOutside =
+            aspect.previewAspect != aspect.frameAspect && previewHold?.holding != true
         controls.liveDot.placeIn(controls.previewContainer, aspect.frameAspect)
     }
 

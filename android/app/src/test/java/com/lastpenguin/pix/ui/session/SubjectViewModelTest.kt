@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -109,6 +109,36 @@ class SubjectViewModelTest {
                 requests(),
             )
         }
+
+    @Test
+    fun `a late echo of an earlier quick step neither takes the readout back nor the next tap`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+        fun echo(zoom: Float, by: Role = Role.SUBJECT) {
+            session.deliver(SessionMessage.CameraStateUpdate(zoom, by, final = true))
+            runCurrent()
+        }
+
+        viewModel.onZoomTap()
+        viewModel.onZoomTap()
+        echo(2f)
+        assertEquals(0.6f, viewModel.uiState.value.zoom, 0f)
+
+        // The third tap goes on from 0.6×, not from the late 2×.
+        viewModel.onZoomTap()
+        assertEquals(1f, requests().last().ratio, 0f)
+        echo(0.6f)
+        assertEquals(1f, viewModel.uiState.value.zoom, 0f)
+        echo(1f)
+        assertEquals(1f, viewModel.uiState.value.zoom, 0f)
+
+        // With no step waiting, every echo shows again; while one waits, the photographer's own change shows too.
+        echo(1.5f)
+        assertEquals(1.5f, viewModel.uiState.value.zoom, 0f)
+        viewModel.onZoomTap()
+        echo(3f, by = Role.PHOTOGRAPHER)
+        assertEquals(3f, viewModel.uiState.value.zoom, 0f)
+    }
 
     @Test
     fun `a slider step shows at once and asks the photographer`() = runTest(dispatcher) {

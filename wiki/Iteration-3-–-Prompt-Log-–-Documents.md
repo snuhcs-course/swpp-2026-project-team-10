@@ -118,3 +118,145 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 10-26] "yes, set it up on a new branch from dev"
 - [Jaewan, 10-26] "I think we should put `design/` into `wiki/` and put `design_architecture.html` into it"
 - [Jaewan, 10-26] "update CLAUDE.md and include instructions to update the wireframes too. and maybe we should have a render script for `design_architecture.html` too? or just one universal render script?"
+
+## Wireframes and Korean translation ([#138], [#140])
+
+- [Jaewan, 10-26] "Now we need to do Korean translation (issue #111). How are we going to do this?"
+- [Jaewan, 10-27] "yes, yes, yes. One more question. how is the default language chosen in Android? should the user change language settings in the app or in the phone settings?"
+- [Jaewan, 10-27] "go for it"
+- [Jaewan, 10-27] "can you search for other korean camera apps and see what vocabulary they use often?"
+- [Jaewan, 10-27] "fix them"
+- [Jaewan, 10-27] "can we draw the wireframe images in two versions? both korean and english"
+- [Jaewan, 10-27] "Can you commit and push this, and create a draft PR? make the PR description concise."
+- [Jaewan, 10-27] "what do you mean by 'with 日本語, every screen is in English.'"
+- [Jaewan, 10-27] "in the wireframes, only the phone screen text should be korean. Other description text should be still in english"
+- [Jaewan, 10-27] "oh yeah and fix the PR script and testing document for that part"
+- [Jaewan, 10-27] "later if we have the settings screen and users change language there, then is the normal flow to prioritize app settings and then phone settings? is there no phone-level app settings? (i think i've seen ios work like this)"
+- [Jaewan, 10-27] "#137 is merged into dev, so we need to do this again. But before this Korean thing, I think we should redraw the wireframes. can you draw a new branch from the new dev and redraw the wireframes so that they match the real ui? currently the wireframes are not exactly the same design as the real app. Can we do this first?"
+- [Jaewan, 10-27] "is it still running?"
+- [Jaewan, 10-27] "something new's merged into dev"
+- [Jaewan, 10-27] "commit and push, and create a PR"
+- [Jaewan, 10-27] "some wireframes are cut off at the bottom (flow2, flow3, etc.) i think we need some space below the button at the bottom"
+- [Jaewan, 10-27] "the testing images in the `images` folder is slightly weird. can we move these to a different folder? or move the wireframe images"
+- [Jaewan, 10-27] "Yes add this. Also, let's create an issue for this wireframe fix, with task number Iter3-A2, and link it to the PR"
+- [Jaewan, 10-27] "the camera screen's background color is black, so it's kinda hard to separate that from the surrounding screen. can we draw the camera screen in slightly different color?"
+- [Jaewan, 10-27] "yes"
+- [Jaewan, 10-27] "in flow1, the guide is cut from the original image exactly in its position, and if we press 'use this guide', then it should be placed in the camera screen exactly at its position. can we make this shown?"
+- [Jaewan, 10-27] "no so the guide's position in the 'your reference' screen and the camera screen should be the same"
+- [Jaewan, 10-27] "so in the reference confirm screen the guide is always placed in the center, and when in the camera screen it is placed at its real position in the pose image?"
+- [Jaewan, 10-27] "okay then let's just discard this and come back to this later"
+- [Jaewan, 10-27] "now I merged #140. now let's go back to #138 and apply the changes that were made to dev"
+- [Jaewan, 10-27] "commit and push when the tests pass"
+- [Jaewan, 10-27] "there are some places where the banner width doesn't match the text length (like flow2-ko)"
+- [Jaewan, 10-27] "yes"
+- [Jaewan, 10-27] "what fonts are we using for the app now? and what does the wireframes use?"
+- [Jaewan, 10-27] "can we use Pretendard?"
+- [Jaewan, 10-27] "Commit, push, and update the PR body"
+- [Jaewan, 10-27] ""2 of 4 ready" in flow2 has some blank space at its left. also the positioning of the "Agree and continue" vs "not now" buttons in flow2 is kinda weird. same for their counterparts in flow2-ko. does the real app look like this too? or can you fix the wireframes?"
+- [Jaewan, 10-27] "For the agree and continue / not now, it seems like there is too much space of the right side? we can move it slightly more to the right"
+- [Jaewan, 10-27] "Commit, push, and update the PR body"
+- [Jaewan, 10-27] "I want to fix some korean: […]"
+  > ## 함께 찍기 -> 카메라 공유, 방 코드 -> 참여 코드, 세션 -> 카메라 공유
+  > also fix places that use these vocab other than the below list
+  >
+  > shoot_together: (함께 찍기) -> (카메라 공유)
+  > signed_out_title: (친구와 함께 찍기) -> (친구와 카메라 공유)
+  > signed_out_body: (로그인하면 Pix ID로 친구를 추가하고 함께 찍자고 초대할 수 있어요.) -> (로그인하면 Pix ID로 친구를 추가하고 카메라 공유에 초대할 수 있어요.)
+  > sign_in_body: (로그인하고 친구를 추가해 함께 찍어요.) -> (로그인하고 친구를 추가해 카메라를 공유해요.)
+  > end_session: (세션 종료) -> (공유 종료)
+  > leave_session_title: (세션에서 나갈까요?) -> (카메라 공유에서 나갈까요?)
+  > peer_ended_session: (%1$s님이 세션을 끝냈어요) -> (%1$s님이 카메라 공유를 끝냈어요)
+  > session_ended: (세션이 끝났어요.) -> (카메라 공유가 끝났어요.)
+  > use_room_code: (방 코드 사용) -> (참여 코드 사용)
+  > use_room_code_instead: (대신 방 코드 사용) -> (로그인 없이 참여 코드 사용)
+  > room_code_title: (내 방 코드) -> (참여 코드)
+  > room_code_label: (방 코드) -> (참여 코드)
+  > room_code_body: (친구에게 Pix를 열고 함께 찍기 › 방 코드 사용을 눌러 이 코드로 참여해 달라고 하세요.) -> (친구가 Pix에서 카메라 공유 › 참여 코드 사용을 누르고 이 코드를 입력하면 돼요.)
+  > code_expired: (코드가 만료됐어요. 방 코드 사용을 다시 눌러 새 코드를 받으세요.) -> (코드가 만료됐어요. 참여 코드 사용을 다시 눌러 새 코드를 받으세요.)
+  > join_instead: (대신 코드로 참여) -> (받은 코드로 참여하기)
+  > session_not_found_title: (세션을 찾지 못했어요) -> (참여할 수 없는 코드예요)
+  > session_not_found_message: (친구에게 코드를 확인하고 다시 시도하세요.) -> (코드가 맞는지 친구에게 확인해 보세요.)
+  >
+  > ## 사람 -> 인물
+  > person_found: (사람을 찾았어요) -> (인물을 인식했어요)
+  > finding_person: (사람을 찾는 중…) -> (인물을 인식하는 중…)
+  > no_person_title: (사람을 찾지 못했어요) -> (인물을 인식하지 못했어요)
+  > no_person_message: (한 사람이 또렷하게 나온 사진을 고르세요.) -> (인물 한 명이 또렷하게 나온 사진을 골라 주세요.)
+  > upload_reference_body: (갤러리에서 한 사람이 나온 사진) -> (갤러리에서 인물 한 명이 나온 사진 선택)
+  > reference_preview_description: (참고 사진 속 사람) -> (참고 사진 속 인물)
+  >
+  > ## 장면 -> 배경/장소
+  > scene_title: (장면 사진 찍기) -> (배경 사진 찍기)
+  > scene_photo_description: (포즈를 만들 장면 사진) -> (포즈를 만들 배경 사진)
+  > generate_poses_body: (AI가 이 장면에 맞는 포즈 아이디어 4개를 만들어요) -> (AI가 지금 장소에 어울리는 포즈 4개를 추천해요)
+  > consent_message: (포즈를 만들려고, 다음에 찍는 장면 사진을 Pix 서버를 거쳐 외부 AI 이미지 서비스로 보내요. Pix 서버는 사진을 보관하지 않아요.) -> (포즈를 만들기 위해 이어서 찍을 배경 사진을 Pix 서버를 거쳐 외부 AI 이미지 서비스로 보내요. Pix 서버에는 사진이 저장되지 않아요.)
+  >
+  > ## Google 추가 -> 연결
+  > add_google: (Google 추가) -> (Google 계정 연결)
+  > link_google_body: (Pix 계정에 로그인하면 Google 계정이 추가돼요.) -> (Pix 계정에 로그인하면 Google 계정이 연결돼요.)
+  > google_added: (Google을 추가했어요. 이제 Google로 로그인할 수 있어요.) -> (Google 계정을 연결했어요. 이제 Google로도 로그인할 수 있어요.)
+  > existing_account_message: (이 Google 계정을 쓰는 Pix 계정이 아직 없어요. 계정이 있다면 로그인하세요. Google이 그 계정에 추가돼요. 없다면 Pix가 새 계정을 만들어요.) -> (이 Google 계정과 연결된 Pix 계정이 없어요. Pix 계정이 있다면 로그인해서 연결하고, 없다면 새로 만들 수 있어요.)
+  > existing_account_yes: (네, 로그인) -> (기존 계정으로 로그인)
+  > existing_account_no: (아니요, 새로 만들기) -> (새 계정 만들기)
+  >
+  > ## remove "내 ~"
+  > reference_title: (내 참고 사진) -> (참고 사진)
+  > your_photo: (내 사진) -> (찍은 사진)
+  >
+  > ## misc
+  > add_guide_body: (사진 속 사람을 오려 내 카메라에 보여 줘요. 같은 포즈로 구도를 잡을 수 있어요.) -> (사진 속 인물만 따서 카메라 화면에 띄워 줘요. 보면서 같은 포즈로 찍어 보세요.)
+  > generate_poses: (여기서 포즈 만들기) -> (AI로 포즈 만들기)
+  > photo_saved: (가이드 없이 저장했어요) -> (가이드는 빼고 사진만 저장했어요)
+  > scene_review_body: (이 사진을 보내 포즈를 만들어요.) -> (이 사진으로 포즈를 만들어요.)
+  > describe_body: (원하는 포즈를 설명하거나, 이 장소에 맞는 포즈 4개를 추천받으세요) -> (원하는 포즈를 적거나, 이 장소에 어울리는 포즈 4개를 추천받으세요)
+  > describe_label: (포즈 설명) -> (원하는 포즈)
+  > generating_scene_caption: (같은 사람과 장소 · 최대 60초) -> (인물과 배경은 그대로 · 최대 60초)
+  > ideas_label: (아이디어) -> (추천 포즈)
+  > 포즈 예시 string-array item: (주머니에 손 넣고 위 올려다보기) -> (주머니에 손 넣고 하늘 보기)
+  > 포즈 예시 string-array item: (팔짱 끼고 어딘가에 기대기) -> (팔짱 끼고 기대 서기)
+  > generation_failed_message: (요청이 실패했거나 60초 넘게 걸렸어요. 사진은 그대로 있으니 다시 시도할 수 있어요.) -> (문제가 생겼거나 60초 넘게 걸렸어요. 사진은 그대로 있으니 다시 시도해 보세요.)
+  > pix_id_setup_body: (친구들이 이 ID로 나를 찾아요. 그래서 대문자와 공백은 쓸 수 없어요.) -> (친구가 이 ID로 나를 검색해요. 대문자와 띄어쓰기는 쓸 수 없어요.)
+  > pix_id_taken: (이미 쓰고 있는 Pix ID예요) -> (이미 사용 중인 Pix ID예요)
+  > result_label: (결과) -> (검색 결과)
+  > no_user_found_message: (친구에게 Pix ID를 확인하고 다시 시도하세요.) -> (Pix ID가 맞는지 친구에게 확인해 보세요.)
+  > subject_caption: (영상을 두 손가락으로 벌리거나 오므려 촬영자의 카메라를 확대·축소하세요) -> (화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요)
+  > join_body: (친구의 카메라에 보이는 6자리 코드를 입력하세요.) -> (친구 화면에 표시된 6자리 코드를 입력하세요.)
+  >
+  > ## wiki/design/wireframes/ko.json
+  > flow1_pose_guide: (휴대폰을 허리 높이에 두고 살짝 위로 기울이세요 - 다리가 길어 보여요.) -> (휴대폰을 허리 높이로 내리고 살짝 올려다보듯 찍으면 다리가 길어 보여요.)
+  > flow4_photographer: (Test Account 2님에게 알림이 가요. 수락하면 실시간 화면이 시작돼요.) -> (Test Account 2님에게 알림이 가요. 수락하면 카메라 공유가 시작돼요.)
+  > flow4_photographer: (Test Account 2님이 카메라와 가이드를 조정하도록 허용) -> (Test Account 2님의 카메라·가이드 조절 허용)
+  > flow4_photographer: (초대를 수락하지 않았어요) -> (초대가 수락되지 않았어요)
+  > flow5_friend: (Test Account 1님이 함께 찍자고 초대했어요) -> (Test Account 1님이 카메라 공유에 초대했어요)
+  > flow5_friend: (Test Account 1님이 카메라를 보여 주려고 해요) -> (Test Account 1님이 카메라를 공유하려고 해요)
+- [Jaewan, 10-27] "a few more […] and the "Pix ID로 친구를 추가하세요" text in flow3 is not center-aligned"
+  > 포즈 '만들다'(만들기, 만드는 중, ...) -> '생성'
+  > 포즈 '고르기' -> '선택'
+  > 옆으로 넘겨 포즈를 하나씩' 보세요' -> '살펴보세요'
+  > '이메일을 받지 않아서 비밀번호를 잊으면 재설정할 수 없어요.' -> 'Pix는 현재 가입 시 이메일을 받지 않아요. 비밀번호를 잊으면 재설정할 수 없어요.'
+- [Jaewan, 10-27] "a few more […]"
+  > in_session -> 카메라 공유 중
+  > subject_title_placeholder -> 상대 카메라
+  > camera_paused -> 상대 카메라가 잠시 중지됐어요.
+  > google_in_use -> 이 Google 계정은 이미 다른 Pix 계정에 연결되어 있어요.
+  > google_already_added -> 이 계정은 이미 Google 계정에 연결되어 있어요.
+- [Jaewan, 10-27] "yes, but you don't need to write this to the PR body"
+- [Jaewan, 10-27] "fix the toast fallback when the name is unknown"
+- [Jaewan, 10-27] "Fix these too […]"
+  > - The English "Expires in 10 min" that wraps onto two lines on the room-code sheet.
+  > - Making Android break Korean lines between words instead of in the middle of them (lineBreakWordStyle="phrase").
+- [Jaewan, 10-27] "in the wireframes, text outside the phone screens that mark the exact text in the phone screen should be written in korean. fix these"
+- [Jaewan, 10-27] "commit and push this. then, there are new changes to dev so apply this"
+- [Jaewan, 10-27] "this is merged into dev. can you run the emulator and give me some screenshots of the korean screens?"
+- [Jaewan, 10-27] "in 14_room_code.png, it says "두 휴대폰을 같은 WiFi에 연결하세요". is this shown always? I think we've merged #139 (connecting from different networks)"
+- [Jaewan, 10-27] "on different networks, do we always go to TURN?"
+- [Jaewan, 10-27] "so what's the current flow. the two phones need to be on the same network? or is that just a ui mismatch and we need to fix that ui?"
+- [Jaewan, 10-27] "yes"
+- [Jaewan, 10-27] "I want one more fix for korean. for '<id>, 쓸수 있어요', i want '사용할 수 있는 ID예요'. And for all '쓸/쓰다', use '사용/사용하다'"
+- [Jaewan, 10-27] "yes"
+- [Jaewan, 10-27] "and can you take and save relevant screenshots for this?"
+
+
+[#130]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/130
+[#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138
+[#140]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/140

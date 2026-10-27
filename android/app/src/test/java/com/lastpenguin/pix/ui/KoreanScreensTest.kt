@@ -84,7 +84,8 @@ import org.robolectric.annotation.GraphicsMode
  * Join with a code; Session not found; Subject view; Connection lost. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
- * in a view that ellipsizes on purpose. The text styles' font aliases: Pretendard in Korean, Manrope in English.
+ * in a view that ellipsizes on purpose, and no line breaks inside a word. The text styles' font aliases: Pretendard in
+ * Korean, Manrope in English.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -436,6 +437,7 @@ class KoreanScreensTest {
                 if (english.isNotEmpty()) problems += "${name(view)}: English $english in \"$text\""
             }
             if (view is TextView) cutOff(view)?.let { problems += "${name(view)}: $it, \"${view.text}\"" }
+            if (view is TextView) wordBroken(view)?.let { problems += "${name(view)}: a word broken at \"$it\"" }
         }
         assertEquals(emptyList<String>(), problems)
     }
@@ -468,6 +470,15 @@ class KoreanScreensTest {
             layout.height > height + 1 -> "taller than its view (${layout.height} > $height px)"
             else -> null
         }
+    }
+
+    /** Where [view] breaks a line inside a word, as the text around the break, or null when every break is between words. */
+    private fun wordBroken(view: TextView): String? {
+        val layout = view.layout ?: return null
+        val text = view.text
+        return (0 until layout.lineCount - 1).map { layout.getLineEnd(it) }
+            .firstOrNull { it in 1 until text.length && text[it - 1].isLetterOrDigit() && text[it].isLetterOrDigit() }
+            ?.let { "${text.subSequence(maxOf(0, it - 4), it)}|${text.subSequence(it, minOf(text.length, it + 4))}" }
     }
 
     /** The view's id, or its class when it has none; ids that views make for themselves have no name. */

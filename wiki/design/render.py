@@ -17,19 +17,21 @@ Each drawing has one image in wiki/images/, named after it:
   lighter grey gradient, so its frame shows against the app; in it, a grey figure is the real person and a white
   outline the pose guide. A spinner, which Robolectric's render leaves out, is a three-quarter ring.
 
-The Korean image changes only the text on the screens, the part of each card that clips its content between the
-screen's name and the navigation bar; the arrows, the headings, the boxes where a flow starts and ends, and a box on a
-screen that `wireframes/ko.json` lists under `notes` stay in English. A screen's text that is one of the English
-strings of `android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in, becomes that
-string's Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in ko.json under the
-flow's name, which also keeps the names and Pix IDs of the flow's people as they are. A screen's text with a Latin
-letter that neither gives, or an entry the flow no longer uses, stops the render, so ko.json changes with the drawing;
-render the flows again after a Korean string changes. Anything as wide as its content in the app (a chip, a button, a
-line of text its parent centers, or a row of them) is drawn as one element marked `data-fit` (left, center, or right:
-the side its parent keeps it at), and in Korean it takes its content's width from that side. A dialog is one box
-whose content flows, centered on the screen, with its buttons in a row that wraps (`flex-flow: row-reverse wrap`): as
-in the app, they stand side by side when they fit and stack at the right when they do not, so the Korean dialog takes
-its own height and its own buttons' places.
+The Korean image changes only the text on the screens, the part of each card that clips its content between the screen's
+name and the navigation bar; the arrows, the headings, the boxes where a flow starts and ends, and a box on a screen
+that `wireframes/ko.json` lists under `notes` stay in English, except where they quote a screen's text exactly, such as
+the button an arrow starts from: that part is marked `data-ui` (`tap <span data-ui>Shoot together</span>`) and becomes
+the same Korean as on the screen. A screen's text that is one of the English strings of
+`android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in, becomes that string's
+Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in ko.json under the flow's name,
+which also keeps the names and Pix IDs of the flow's people as they are. A screen's text with a Latin letter that
+neither gives, or an entry the flow no longer uses, stops the render, so ko.json changes with the drawing; render the
+flows again after a Korean string changes. Anything as wide as its content in the app (a chip, a button, a line of text
+its parent centers, or a row of them) is drawn as one element marked `data-fit` (left, center, or right: the side its
+parent keeps it at), and in Korean it takes its content's width from that side. A dialog is one box whose content flows,
+centered on the screen, with its buttons in a row that wraps (`flex-flow: row-reverse wrap`): as in the app, they stand
+side by side when they fit and stack at the right when they do not, so the Korean dialog takes its own height and its
+own buttons' places.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -75,6 +77,8 @@ MARKUP = re.compile(r"(<style\b.*?</style>|<[^>]+>)", re.DOTALL)
 LATIN = re.compile(r"[A-Za-z]")
 ARGUMENT = re.compile(r"%(\d+)\$([sd])")
 VOID = {"br", "hr", "img", "input", "link", "meta", "wbr"}
+# An element outside the screens whose text is a screen's own, such as the button an arrow starts from.
+QUOTED = re.compile(r"<[a-zA-Z][\w-]*\b[^>]*\bdata-ui\b")
 CHROME_PATHS = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "google-chrome",
@@ -219,8 +223,9 @@ def fit_to_text(match: re.Match[str]) -> str:
 
 
 def korean_page(source: Path) -> str:
-    """The flow's page with its screens in Korean and in Pretendard, the font the app uses in Korean, from the app's
-    own files. Stops on a screen's text without Korean, or an entry of ko.json the flow does not use."""
+    """The flow's page with its screens, and the screen text it quotes outside them, in Korean and in Pretendard, the
+    font the app uses in Korean, from the app's own files. Stops on a screen's text without Korean, or an entry of
+    ko.json the flow does not use."""
     flow = source.name.removesuffix(".dc.html")
     korean = Korean(flow)
     page = source.read_text(encoding="utf-8")
@@ -228,8 +233,9 @@ def korean_page(source: Path) -> str:
     body, tail = rest.split("</x-dc>", 1)
     parts = MARKUP.split(body)
     screens, notes = screen_texts(parts, korean.notes)
+    quoted = [i for i in range(2, len(parts), 2) if QUOTED.match(parts[i - 1])]
     missing = []
-    for i in screens:
+    for i in sorted(set(screens) | set(quoted)):
         text = html.unescape(parts[i])
         if not LATIN.search(text):
             continue
@@ -248,7 +254,7 @@ def korean_page(source: Path) -> str:
     body = re.sub(r'<div data-fit="(\w+)" style="([^"]*)">', fit_to_text, "".join(parts))
     page = head + "<x-dc>" + body + "</x-dc>" + tail
     page = page.replace('<html lang="en">', '<html lang="ko">')
-    # Korean breaks lines between words, not inside them.
+    # Korean breaks lines between words, not inside them, as the app does (lineBreakWordStyle phrase).
     page = page.replace("</helmet>", "<style>*{word-break:keep-all;overflow-wrap:break-word}</style>\n</helmet>")
     files = {weight: (STRINGS / "font" / f"pretendard_{name}.otf").as_uri() for name, weight in PRETENDARD.items()}
     faces = "".join(
@@ -256,6 +262,7 @@ def korean_page(source: Path) -> str:
     )
     page = page.replace("</helmet>", f"<style>{faces}</style>\n</helmet>")
     page = page.replace("'Manrope', sans-serif", "'Pretendard', sans-serif")
+    page = page.replace("'IBM Plex Sans', 'Helvetica Neue'", "'IBM Plex Sans', 'Pretendard', 'Helvetica Neue'")
     return page.replace("'DM Mono', monospace", "'DM Mono', 'Pretendard', monospace")
 
 

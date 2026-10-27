@@ -290,6 +290,7 @@
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
     <string name="subject_caption">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요</string>
     <string name="peer_ended_session">%1$s님이 카메라 공유를 끝냈어요</string>
+    <string name="peer_ended_session_unnamed">상대가 카메라 공유를 끝냈어요</string>
     <string name="camera_paused">상대 카메라가 잠시 중지됐어요.</string>
     <string name="session_ended">카메라 공유가 끝났어요.</string>
     <string name="connection_lost_title">연결이 끊겼어요</string>

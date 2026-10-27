@@ -2,10 +2,12 @@
 <!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, and the
      camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that; radius 999 for chips and pills,
      16 for buttons and cards, 28 for sheets. -->
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Type: Manrope for the UI (Pretendard on a phone in Korean: the @font/pix_* aliases), DM Mono for the room code. -->
+    <!-- Every text appearance breaks Korean between words (phrase, Android 13+); before 13, Android breaks inside them. -->
     <style name="TextAppearance.Pix.Title" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_extrabold</item>
         <item name="fontFamily">@font/pix_extrabold</item>
         <item name="android:textSize">24sp</item>
@@ -14,6 +16,7 @@
     </style>
 
     <style name="TextAppearance.Pix.SheetTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_extrabold</item>
         <item name="fontFamily">@font/pix_extrabold</item>
         <item name="android:textSize">22sp</item>
@@ -22,6 +25,7 @@
     </style>
 
     <style name="TextAppearance.Pix.Header" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_bold</item>
         <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">18sp</item>
@@ -30,6 +34,7 @@
     </style>
 
     <style name="TextAppearance.Pix.Action" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_bold</item>
         <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">16sp</item>
@@ -41,6 +46,7 @@
     </style>
 
     <style name="TextAppearance.Pix.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_medium</item>
         <item name="fontFamily">@font/pix_medium</item>
         <item name="android:textSize">15sp</item>
@@ -49,6 +55,7 @@
     </style>
 
     <style name="TextAppearance.Pix.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_medium</item>
         <item name="fontFamily">@font/pix_medium</item>
         <item name="android:textSize">14sp</item>
@@ -61,6 +68,7 @@
     </style>
 
     <style name="TextAppearance.Pix.Label" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_semibold</item>
         <item name="fontFamily">@font/pix_semibold</item>
         <item name="android:textSize">13sp</item>
@@ -74,6 +82,7 @@
     </style>
 
     <style name="TextAppearance.Pix.Caption" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_bold</item>
         <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">12sp</item>

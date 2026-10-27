@@ -574,7 +574,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 
 ### 6.1 Wireframe overview
 
-The wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Each screen is drawn as the app shows it on a Galaxy S22, with the screen's name above it; the screens the app does not have yet use its components. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below. Under each figure, *한국어* opens the same flow with its screens in Korean, as the app shows them (FR-10.2); the labels and notes stay in English.
+The wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Each screen is drawn as the app shows it on a Galaxy S22, with the screen's name above it; the screens the app does not have yet use its components. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below. Under each figure, *한국어* opens the same flow with its screens, and the screen text its labels quote, in Korean, as the app shows them (FR-10.2); the labels and notes stay in English.
 
 - **Arrows**: user input or system event, labeled
 - **Dashed coral frame**: failure case

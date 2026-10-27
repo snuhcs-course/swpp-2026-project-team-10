@@ -6,7 +6,7 @@
   },
   "flow2_pose_generation": {
     "notes": [
-      "Refused description → “The AI service would not create poses for “…” with this photo. Try a different description, or go back to the camera and take another photo.” and"
+      "Refused description → “"
     ]
   },
   "flow3_add_friend": {

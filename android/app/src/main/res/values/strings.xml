@@ -301,6 +301,8 @@
     <string name="leave_session_title">Leave the session?</string>
     <string name="subject_caption">Pinch the video to zoom the photographer\'s camera</string>
     <string name="peer_ended_session">%1$s ended the session</string>
+    <!-- The same, when the session ended before the photographer's name arrived. -->
+    <string name="peer_ended_session_unnamed">The photographer ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
     <string name="session_ended">The session has ended.</string>
     <string name="connection_lost_title">Connection lost</string>

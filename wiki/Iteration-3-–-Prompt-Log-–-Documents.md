@@ -255,7 +255,14 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 10-27] "I want one more fix for korean. for '<id>, 쓸수 있어요', i want '사용할 수 있는 ID예요'. And for all '쓸/쓰다', use '사용/사용하다'"
 - [Jaewan, 10-27] "yes"
 - [Jaewan, 10-27] "and can you take and save relevant screenshots for this?"
-
+- [Jaewan, 10-27] "can you also give me screenshots for before room code en and before connection lost en and before connection lost ko?"
+- [Jaewan, 10-27] "also give me before join en ?"
+- [Jaewan, 10-27] "and I want to check for places where we use '찍다' instead of '촬영하다'"
+- [Jaewan, 10-27] "what do you recommend? to fix and not fix"
+- [Jaewan, 10-27] "when is photo_save_failed used? shouldn't this only mention save failure?"
+- [Jaewan, 10-27] "okay. then fix 찍다 to 촬영하다 as you proposed"
+- [Jaewan, 10-27] "and give me screenshots of before and after, for two usage cases"
+- [Jaewan, 10-27] "yes"
 
 [#130]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/130
 [#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138

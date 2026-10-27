@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -266,6 +266,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             )
                         }
                         showNotice(controls, text)
+                    }
+                }
+                launch {
+                    sessionViewModel.mobileDataPending.collect { pending ->
+                        if (!pending) return@collect
+                        showNotice(controls, getString(R.string.mobile_data_notice))
+                        sessionViewModel.mobileDataNoticeShown()
                     }
                 }
                 launch {

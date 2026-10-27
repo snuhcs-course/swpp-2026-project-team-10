@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -24,8 +24,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Join with code, subject (R&S 6.7). *Join* is enabled once 6 digits are in (FR-8.2). A valid code opens
- * Subject view, an unknown or expired one opens Session not found with the code kept (FR-8.3), and any other
- * failure shows the same-Wi-Fi message here (FR-8.5). The kept code is offered only when Session not found opens
+ * Subject view, an unknown or expired one opens Session not found with the code kept (FR-8.3), too many wrong codes
+ * from this network say so here (NFR-15), and any other failure shows the same-Wi-Fi message here (FR-8.5). The kept code is offered only when Session not found opens
  * this screen again (`keepCode`); otherwise the screen starts empty (#81). Owner: Real-time (#8).
  */
 class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
@@ -91,7 +91,15 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
 
                 else -> {
                     joining = false
-                    binding.statusText.setText(R.string.couldnt_connect_wifi)
+                    binding.statusText.setText(
+                        if (state.reason ==
+                            EndReason.RATE_LIMITED
+                        ) {
+                            R.string.join_rate_limited
+                        } else {
+                            R.string.couldnt_connect_wifi
+                        },
+                    )
                     binding.statusText.isVisible = true
                     updateJoinButton(binding)
                 }

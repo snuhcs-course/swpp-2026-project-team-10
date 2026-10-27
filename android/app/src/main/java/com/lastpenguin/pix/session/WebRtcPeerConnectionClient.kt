@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -41,6 +41,7 @@ class WebRtcPeerConnectionClient(
     private val factory: PeerConnectionFactory,
     config: PeerConfig,
     private val frameSource: CameraFrameSource,
+    relayOnly: Boolean = false,
 ) : PeerConnectionClient {
 
     private val _events = MutableSharedFlow<PeerEvent>(extraBufferCapacity = 256)
@@ -114,7 +115,9 @@ class WebRtcPeerConnectionClient(
     private val peerConnection: PeerConnection
 
     init {
+        // The server's STUN and TURN entries (Design 2.6.7): WebRTC tries direct paths first and falls back to the relay.
         val rtcConfig = PeerConnection.RTCConfiguration(config.iceServers.map { it.toWebRtc() })
+        if (relayOnly) rtcConfig.iceTransportsType = PeerConnection.IceTransportsType.RELAY
         peerConnection = factory.createPeerConnection(rtcConfig, observer)
             ?: error("Could not create a peer connection")
         if (config.role == Role.PHOTOGRAPHER) {

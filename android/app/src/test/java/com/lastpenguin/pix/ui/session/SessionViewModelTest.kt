@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModelStore
@@ -9,6 +9,9 @@ import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.IcePath
+import com.lastpenguin.pix.session.MobileDataNotice
+import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
@@ -22,7 +25,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,7 +37,9 @@ import org.junit.runner.RunWith
  * (#81). Kept: Session not found after a join (NOT_FOUND, EXPIRED), Connection lost (CONNECTION_LOST), and a
  * reconnect that failed for another reason (ERROR). Forgotten: Leave, the photographer's End session (PEER_LEFT),
  * a cancelled or failed join (CANCELLED, ERROR), a room gone while reconnecting (NOT_FOUND), and Start as the
- * photographer.
+ * photographer. The mobile-data notice (FR-6.13): a cellular path the first time (pending until a screen shows it,
+ * remembered only then), a second cellular path, once said before, a Wi-Fi path, no path, and a session that ends
+ * before a screen shows it (dropped, not remembered, said in the next session).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -42,14 +49,20 @@ class SessionViewModelTest {
     private val store = ViewModelStore()
     private val session = FakeSessionManager()
     private val camera = FakeCameraController()
+    private val mobileData = MobileDataNotice.InMemory()
     private lateinit var model: SessionViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
         val syncer = GuideSyncer(session, InMemoryGuideRepository(), InMemoryGuideRepository(), FakeGuideImageCodec())
-        model =
-            SessionViewModel(session, camera, syncer, RemoteControlHandler(session, camera, InMemoryGuideRepository()))
+        model = SessionViewModel(
+            session,
+            camera,
+            syncer,
+            RemoteControlHandler(session, camera, InMemoryGuideRepository()),
+            mobileData,
+        )
         store.put("session", model)
     }
 
@@ -153,6 +166,62 @@ class SessionViewModelTest {
 
         assertNull(model.lastCode)
         assertEquals(SessionEntry.NewRoom to Role.PHOTOGRAPHER, session.starts.last())
+    }
+
+    private fun connected() = session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+
+    @Test
+    fun mobileData_theFirstCellularPath_waitsForAScreen_andIsRememberedOnlyOnceShown() = runTest(dispatcher) {
+        connected()
+        session.setPath(IcePath("relay", "srflx", "cellular", "udp"))
+        runCurrent()
+        assertTrue(model.mobileDataPending.value)
+        assertFalse(mobileData.wasShown())
+
+        model.mobileDataNoticeShown()
+        runCurrent()
+        assertFalse(model.mobileDataPending.value)
+        assertTrue(mobileData.wasShown())
+
+        session.setPath(IcePath("srflx", "srflx", "cellular", null))
+        runCurrent()
+        assertFalse(model.mobileDataPending.value)
+    }
+
+    @Test
+    fun mobileData_saidBefore_wifi_orNoPath_isNotPending() = runTest(dispatcher) {
+        connected()
+        session.setPath(IcePath("host", "host", "wifi", null))
+        runCurrent()
+        session.setPath(null)
+        runCurrent()
+        assertFalse(model.mobileDataPending.value)
+
+        mobileData.markShown()
+        session.setPath(IcePath("relay", "relay", "cellular", "tcp"))
+        runCurrent()
+        assertFalse(model.mobileDataPending.value)
+    }
+
+    @Test
+    fun mobileData_aSessionThatEndsBeforeAScreenShowsIt_dropsIt_andTheNextSessionSaysIt() = runTest(dispatcher) {
+        connected()
+        session.setPath(IcePath("srflx", "srflx", "cellular", null))
+        runCurrent()
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        session.setPath(null)
+        runCurrent()
+        assertFalse(model.mobileDataPending.value)
+
+        // A confirmation after the session ended remembers nothing.
+        model.mobileDataNoticeShown()
+        runCurrent()
+        assertFalse(mobileData.wasShown())
+
+        connected()
+        session.setPath(IcePath("srflx", "srflx", "cellular", null))
+        runCurrent()
+        assertTrue(model.mobileDataPending.value)
     }
 
     private companion object {

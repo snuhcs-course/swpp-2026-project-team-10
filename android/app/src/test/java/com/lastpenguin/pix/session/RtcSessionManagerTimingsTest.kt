@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-07, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,8 +22,9 @@ import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 
 /**
- * The ping lines that align the two phones' `Timings` clocks for cross-phone latencies (NFR-7).
- * Robolectric records logcat, which plain JVM tests cannot read.
+ * The ping lines that align the two phones' `Timings` clocks for cross-phone latencies (NFR-7), and the link's
+ * `ice.pair` and `ice.disconnected` lines (Design 2.6.7, NFR-10). Robolectric records logcat, which plain JVM tests
+ * cannot read.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -64,6 +65,39 @@ class RtcSessionManagerTimingsTest {
         runCurrent()
 
         assertEquals(listOf("rtt 42 ms ts=1000"), timings("rtt"))
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `the candidate pair is logged when first seen and again only when it changes`() = runTest {
+        val (manager, peer) = connected()
+
+        peer.stats = LinkStats("video/H264", 960, 720, 30.0, 2000.0, 12.0, IcePath("host", "host", "wifi", null))
+        advanceTimeBy(4_100)
+        runCurrent()
+        peer.stats = peer.stats!!.copy(path = IcePath("relay", "srflx", "cellular", "udp"))
+        advanceTimeBy(2_000)
+        runCurrent()
+
+        assertEquals(3, peer.statsRequests)
+        assertEquals(
+            listOf(
+                "ice.pair local=host remote=host network=wifi",
+                "ice.pair local=relay/udp remote=srflx network=cellular",
+            ),
+            timings("ice.pair"),
+        )
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a disconnected link is logged`() = runTest {
+        val (manager, peer) = connected()
+
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+
+        assertEquals(listOf("ice.disconnected"), timings("ice.disconnected"))
         manager.leave(EndReason.LEFT)
     }
 

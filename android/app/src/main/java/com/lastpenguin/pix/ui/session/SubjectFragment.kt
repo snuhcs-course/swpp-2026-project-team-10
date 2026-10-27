@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -165,6 +165,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
                 launch {
                     sessionViewModel.transitions.collect { state -> onTransition(state) }
+                }
+                launch {
+                    sessionViewModel.mobileDataPending.collect { pending ->
+                        if (!pending) return@collect
+                        Toast.makeText(requireContext(), R.string.mobile_data_notice, Toast.LENGTH_LONG).show()
+                        sessionViewModel.mobileDataNoticeShown()
+                    }
                 }
             }
         }

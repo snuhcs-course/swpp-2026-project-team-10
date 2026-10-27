@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import kotlinx.serialization.Serializable
@@ -22,8 +22,12 @@ data class PeerInfo(
     val haveGuideId: String? = null,
 )
 
+/**
+ * Why a session ended. [RATE_LIMITED] (too many wrong codes from this phone's network, Design 2.5.2) only ends a
+ * join on this phone and is never sent in `session.leave`.
+ */
 @Serializable
-enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, ERROR }
+enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, ERROR, RATE_LIMITED }
 
 /** Session states (Design 2.4). */
 sealed interface SessionState {

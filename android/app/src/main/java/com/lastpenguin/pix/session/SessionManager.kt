@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -23,6 +23,12 @@ interface SessionManager {
 
     /** Subject: the applied camera values from the last `camera.state`, for the same reason; null until one arrives. */
     val peerCamera: StateFlow<CameraState?>
+
+    /**
+     * The candidate pair the video goes over, read from the link's statistics every 2 s while connected: direct or
+     * through the relay, and over which network (Design 2.6.7). null until the first reading and after the link ends.
+     */
+    val path: StateFlow<IcePath?>
 
     suspend fun start(entry: SessionEntry, role: Role)
 

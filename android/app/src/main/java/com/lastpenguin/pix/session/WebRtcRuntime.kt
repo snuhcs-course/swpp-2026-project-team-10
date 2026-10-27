@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.content.Context
@@ -10,10 +10,15 @@ import org.webrtc.PeerConnectionFactory
 /**
  * The process-wide WebRTC objects: native initialization, one EGL context shared by the encoder, the decoder,
  * and the subject's renderer, and the PeerConnectionFactory. All of it is created on first use, so the camera
- * screen does not pay for loading the native library (NFR-1).
+ * screen does not pay for loading the native library (NFR-1). [relayOnly] makes every peer connection use the TURN
+ * relay only, a debug option for trying the relay on one Wi-Fi (Design 2.6.7).
  * Owner: Real-time (#8).
  */
-class WebRtcRuntime(context: Context, private val frameSource: CameraFrameSource) : PeerConnectionClient.Factory {
+class WebRtcRuntime(
+    context: Context,
+    private val frameSource: CameraFrameSource,
+    private val relayOnly: Boolean = false,
+) : PeerConnectionClient.Factory {
 
     private val appContext = context.applicationContext
 
@@ -47,5 +52,6 @@ class WebRtcRuntime(context: Context, private val frameSource: CameraFrameSource
         factory,
         config,
         frameSource,
+        relayOnly,
     )
 }

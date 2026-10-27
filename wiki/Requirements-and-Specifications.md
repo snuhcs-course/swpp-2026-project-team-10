@@ -26,6 +26,7 @@
 | 2.3 | 2026-10-26 | Camera and Subject view controls and preview size (Iter3-A2, [#136]): smaller controls, the preview right below the top bar with 1:1 in the 4:3 area and 16:9 down under the controls, the shutter in one place, the zoom over the image with quick steps, and a blinking light in place of the Live badge and the name (FR-1.3, FR-1.13, FR-4.10, FR-6.6, FR-6.8, FR-7.1, 6.2, 6.3, 6.5, 6.6, Figures 1, 2, 4, 5). |
 | 2.4 | 2026-10-26 | Sessions across networks (Iter3-P13, [#117]): the mobile-data notice on *Friend connected* and *Subject view* (FR-6.13), and the wrong-code message on *Join with code* (NFR-15) in section 6. |
 | 2.5 | 2026-10-27 | The wireframe figures redrawn from the app's screens (6.1–6.7). |
+| 2.6 | 2026-10-27 | Every wireframe figure also with its screens in Korean (Iter3-P7, [#111]; 6.1–6.7). |
 
 Items marked **TBD** need a team decision.
 
@@ -573,7 +574,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 
 ### 6.1 Wireframe overview
 
-The wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Each screen is drawn as the app shows it on a Galaxy S22, with the screen's name above it; the screens the app does not have yet use its components. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below.
+The wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Each screen is drawn as the app shows it on a Galaxy S22, with the screen's name above it; the screens the app does not have yet use its components. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below. Under each figure, *한국어* opens the same flow with its screens, and the screen text its labels quote, in Korean, as the app shows them (FR-10.2); the labels and notes stay in English.
 
 - **Arrows**: user input or system event, labeled
 - **Dashed coral frame**: failure case
@@ -587,6 +588,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 ![Wireflow 1: pose guide](images/flow1_pose_guide.jpg)
 
 *Figure 1. Camera → Add a pose guide → Reference confirm → Camera + guide → Photo saved, with the "No person found" failure.*
+
+<details><summary>한국어</summary>
+
+![Wireflow 1 in Korean](images/flow1_pose_guide_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -602,6 +609,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 ![Wireflow 2: pose generation](images/flow2_pose_generation.jpg)
 
 *Figure 2. Consent notice (the first time) → Scene photo → Scene photo · Review → Generate poses → Generating poses → Pick a pose → Reference confirm, with the "Couldn't create poses" failure. *Try other poses* goes back to Generate poses with the photo and the description kept, and so does *Edit description* when the service refused the description.*
+
+<details><summary>한국어</summary>
+
+![Wireflow 2 in Korean](images/flow2_pose_generation_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -619,9 +632,21 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 *Figure 3. Friends (empty) → Add a friend → Friends (list), with the "No user found" failure.*
 
+<details><summary>한국어</summary>
+
+![Wireflow 3 in Korean](images/flow3_add_friend_ko.jpg)
+
+</details>
+
 ![Wireflow 3b: sign in, Pix ID, and account](images/flow3b_sign_in.jpg)
 
 *Figure 3b. Friends (signed out) → Sign in → "Do you already have a Pix account?" → Pix ID setup → Friends with a request; below, Sent requests, Sign up with a broken rule, Sign in to add Google, "This Pix ID is taken", and the Account sheet.*
+
+<details><summary>한국어</summary>
+
+![Wireflow 3b in Korean](images/flow3b_sign_in_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -644,6 +669,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 *Figure 4. Invite sent → Friend connected, with the "Invite not accepted" failure. The vertical arrows lead to the subject's phone (Flow 5). Invite sent and Invite not accepted are not built yet (Iteration 3).*
 
+<details><summary>한국어</summary>
+
+![Wireflow 4 in Korean](images/flow4_photographer_ko.jpg)
+
+</details>
+
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Invite sent** | "Waiting for Junhyeong"; "Junhyeong gets a notification. The live view starts when they accept."; *Share invite link* and *Copy link* under "No notification? Send a link instead."; if built (Could), the toggle "Let Junhyeong adjust the camera and guide" (on by default). | *Share invite link* → Android share sheet with the link · *Copy link* → copied · Toggle → allow or block remote control · *Cancel invite* → Friends · Friend accepts, from the notification or the link → Friend connected. | Declined or no answer in 30 s → Invite not accepted. |
@@ -656,6 +687,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 *Figure 5. Invitation → Subject view, with the "Connection lost" failure. Invitation is not built yet (Iteration 3).*
 
+<details><summary>한국어</summary>
+
+![Wireflow 5 in Korean](images/flow5_friend_ko.jpg)
+
+</details>
+
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Invitation** | Opened from the notification "Dongje invites you to shoot together" or from an invite link; "You'll see the framing and pose guide live." | *Accept* → Subject view · *Decline* → closes, and the photographer sees Invite not accepted. | Expired or cancelled → "This invitation is no longer available" (screen to be drawn). |
@@ -667,6 +704,12 @@ In the tables below, **Input → result** lists what the user can do on the scre
 ![Wireflow 6: room code prototype](images/flow6_room_code_prototype.jpg)
 
 *Figure 6. Room code → Join with code → Subject view, with the "Session not found" failure. It opens from *Friends*: *Use a room code instead* when signed out, *Use a room code* under the friend list. Subject view is as in Flow 5.*
+
+<details><summary>한국어</summary>
+
+![Wireflow 6 in Korean](images/flow6_room_code_prototype_ko.jpg)
+
+</details>
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
@@ -759,6 +802,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 [#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
+[#111]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/111
 [#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
 [#115]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/115
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117

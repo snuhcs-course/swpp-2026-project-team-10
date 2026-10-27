@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -44,7 +44,8 @@ import org.robolectric.shadows.ShadowToast
  * stopped for 2 s ("camera paused") / streaming again; the photographer's capabilities with and
  * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
  * toggle, a hidden guide; the brightness panel and a flash tap; the live view on mobile data (FR-6.13); Leave, the
- * back button's question, and the session ending by a lost connection or the photographer.
+ * back button's question, and the session ending by a lost connection or the photographer, named or before the
+ * name arrived.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -303,6 +304,18 @@ class SubjectFragmentRenderTest {
         idle()
 
         assertEquals(string(R.string.peer_ended_session, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun photographerEndsTheSession_beforeTheirNameArrived_saysSoWithoutOne() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+
+        modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        idle()
+
+        assertEquals(string(R.string.peer_ended_session_unnamed), ShadowToast.getTextOfLatestToast())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pix</string>
+    <string name="app_name" translatable="false">Pix</string>
 
     <!-- Common -->
     <string name="cancel">Cancel</string>
@@ -20,7 +20,7 @@
     <string name="starting_camera">Starting camera</string>
     <string name="open_settings">Open settings</string>
     <string name="allow_camera">Allow camera</string>
-    <string name="zoom_ratio">%1$s×</string>
+    <string name="zoom_ratio" translatable="false">%1$s×</string>
     <string name="camera_zoom_description">Camera zoom, %1$s times</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
@@ -43,7 +43,7 @@
     <string name="guide_change_description">Change the pose guide</string>
     <string name="shutter">Take photo</string>
     <string name="guide_opacity">Guide opacity</string>
-    <string name="guide_opacity_percent">%1$d%%</string>
+    <string name="guide_opacity_percent" translatable="false">%1$d%%</string>
     <string name="remove_guide">Remove guide</string>
     <string name="hide_guide">Hide guide</string>
     <string name="show_guide">Show guide</string>
@@ -81,9 +81,9 @@
     <string name="flash_auto">Flash auto</string>
     <string name="flash_on">Flash on</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
-    <string name="aspect_4_3">4:3</string>
-    <string name="aspect_16_9">16:9</string>
-    <string name="aspect_1_1">1:1</string>
+    <string name="aspect_4_3" translatable="false">4:3</string>
+    <string name="aspect_16_9" translatable="false">16:9</string>
+    <string name="aspect_1_1" translatable="false">1:1</string>
     <string name="brightness">Brightness</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
@@ -134,7 +134,7 @@
     <string name="describe_body">Describe a pose, or let Pix suggest four for this place</string>
     <string name="describe_label">Describe the pose</string>
     <string name="describe_hint">e.g. Leaning on the wall, one hand in a pocket</string>
-    <string name="description_counter">%1$d/%2$d</string>
+    <string name="description_counter" translatable="false">%1$d/%2$d</string>
     <string name="description_refused">The last set was refused. Try a different description, or another photo.</string>
     <string name="description_rejected_message">The AI service would not create poses for “%1$s” with this photo. Try a different description, or go back to the camera and take another photo.</string>
     <string name="edit_description">Edit description</string>
@@ -159,7 +159,7 @@
     <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
     <string name="pick_pose_body">Swipe to see each pose</string>
-    <string name="pose_page_counter">%1$d / %2$d</string>
+    <string name="pose_page_counter" translatable="false">%1$d / %2$d</string>
     <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
@@ -185,14 +185,14 @@
     <string name="copy_pix_id">Copy my Pix ID</string>
     <string name="pix_id_copied">Pix ID copied</string>
     <string name="friend_requests">Friend requests</string>
-    <string name="at_pix_id">\@%1$s</string>
+    <string name="at_pix_id" translatable="false">\@%1$s</string>
     <string name="accept">Accept</string>
     <string name="decline">Decline</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="in_session">In a session</string>
     <!-- "Online · @test2" under a friend's name (FR-5.9). -->
-    <string name="friend_status">%1$s · \@%2$s</string>
+    <string name="friend_status" translatable="false">%1$s · \@%2$s</string>
     <string name="invite">Invite</string>
     <string name="invite_not_yet">Invite %1$s. Not available yet</string>
     <string name="remove_friend_title">Remove %1$s?</string>
@@ -280,7 +280,7 @@
     <!-- Flow 6: Room code -->
     <string name="room_code_title">Your room code</string>
     <string name="room_code_body">Ask your friend to open Pix, tap Shoot together › Use a room code, and join with this code.</string>
-    <string name="room_code_placeholder">––– –––</string>
+    <string name="room_code_placeholder" translatable="false">––– –––</string>
     <string name="getting_code">Getting a code…</string>
     <string name="waiting_for_friend">Waiting for your friend…</string>
     <string name="friend_joined_connecting">Your friend joined · connecting…</string>
@@ -301,6 +301,8 @@
     <string name="leave_session_title">Leave the session?</string>
     <string name="subject_caption">Pinch the video to zoom the photographer\'s camera</string>
     <string name="peer_ended_session">%1$s ended the session</string>
+    <!-- The same, when the session ended before the photographer's name arrived. -->
+    <string name="peer_ended_session_unnamed">The photographer ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
     <string name="session_ended">The session has ended.</string>
     <string name="connection_lost_title">Connection lost</string>

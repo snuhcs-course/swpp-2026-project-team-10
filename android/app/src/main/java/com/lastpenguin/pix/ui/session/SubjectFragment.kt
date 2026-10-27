@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -308,10 +308,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             EndReason.CONNECTION_LOST -> findNavController().navigate(R.id.action_subject_to_connectionLost)
 
             EndReason.PEER_LEFT -> {
-                val name = viewModel.uiState.value.photographerName ?: getString(R.string.subject_title_placeholder)
+                val name = viewModel.uiState.value.photographerName
                 Toast.makeText(
                     requireContext(),
-                    getString(R.string.peer_ended_session, name),
+                    name?.let { getString(R.string.peer_ended_session, it) }
+                        ?: getString(R.string.peer_ended_session_unnamed),
                     Toast.LENGTH_SHORT,
                 ).show()
                 backToCamera()

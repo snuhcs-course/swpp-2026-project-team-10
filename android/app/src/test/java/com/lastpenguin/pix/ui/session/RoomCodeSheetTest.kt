@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -20,12 +21,16 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /*
  * Room code's render paths (R&S 6.7, FR-8.1, FR-8.4; Testing Documentation 2.1.6), on the real bottom sheet.
  * Partitions on the session state: Idle, Waiting (the formatted code), Connecting, Connected (the sheet closes),
- * Ended by expiry and by another failure; Join with a code instead; Cancel.
+ * Ended by expiry and by another failure; Join with a code instead; Cancel. The Wi-Fi and expiry notes, each on one
+ * line at the Galaxy S22's 360 × 705 dp, at font scale 1 and 1.3.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -57,6 +62,31 @@ class RoomCodeSheetTest {
         onSheet { binding ->
             assertEquals(string(R.string.room_code_placeholder), binding.codeText.text.toString())
             assertEquals(string(R.string.getting_code), binding.statusText.text.toString())
+        }
+    }
+
+    /** The sheet over an AppCompat activity, as in the app; without one, the notes' start icons are not laid out. */
+    private fun showOverAppCompat(): SheetRoomCodeBinding {
+        TestAppContainer().install()
+        val activity = Robolectric.buildActivity(AppCompatActivity::class.java)
+            .apply { get().setTheme(R.style.Theme_Pix) }
+            .setup()
+            .get()
+        val sheet = RoomCodeSheet()
+        sheet.show(activity.supportFragmentManager, null)
+        idle()
+        return SheetRoomCodeBinding.bind(sheet.requireView())
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun notes_eachFitOnOneLine_onA360dpPhone() {
+        for (scale in listOf(1f, 1.3f)) {
+            RuntimeEnvironment.setFontScale(scale)
+            val binding = showOverAppCompat()
+
+            assertEquals("Wi-Fi at font scale $scale", 1, binding.sameWifiNote.lineCount)
+            assertEquals("expiry at font scale $scale", 1, binding.expiryNote.lineCount)
         }
     }
 

@@ -22,7 +22,9 @@ strings of `android/app/src/main/res/values/strings.xml`, in any case and with i
 string's Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in ko.json under the
 flow's name, which also keeps the names and Pix IDs of the flow's people as they are. A screen's text with a Latin
 letter that neither gives, or an entry the flow no longer uses, stops the render, so ko.json changes with the drawing;
-render the flows again after a Korean string changes.
+render the flows again after a Korean string changes. A chip or a button that wraps its text in the app is drawn as
+one element marked `data-fit` (left, center, or right: the side its row keeps it at), and in Korean it takes its text's
+width from that side.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -188,6 +190,26 @@ def screen_texts(parts: list[str], notes: set[str]) -> tuple[list[int], set[str]
     return [i for i, box in boxes.items() if box not in noted], found
 
 
+SCREEN_WIDTH = 165  # px, a card's screen, inside its border
+
+
+def fit_to_text(match: re.Match[str]) -> str:
+    """A chip or a button that wraps its text in the app, as wide as its Korean text, from the side the app keeps it
+    at (data-fit: left, center, or right), and never wider than the screen's margins."""
+    side, style = match.group(1), match.group(2)
+    left = float(re.search(r"left: ([\d.]+)px", style).group(1))
+    width = float(re.search(r"width: ([\d.]+)px", style).group(1))
+    style = re.sub(r"width: [\d.]+px", f"width: max-content; max-width: {SCREEN_WIDTH - 16}px", style, count=1)
+    if side == "center":
+        style = (
+            re.sub(r"left: [\d.]+px", f"left: {left + width / 2:.1f}px", style, count=1)
+            + "; transform: translateX(-50%)"
+        )
+    elif side == "right":
+        style = re.sub(r"left: [\d.]+px", f"left: auto; right: {SCREEN_WIDTH - left - width:.1f}px", style, count=1)
+    return f'<div data-fit="{side}" style="{style.replace("white-space: nowrap", "white-space: normal")}">'
+
+
 def korean_page(source: Path) -> str:
     """The flow's page with its screens in Korean, and Noto Sans KR for the Hangul, as Android falls back to a Korean
     font. Stops on a screen's text without Korean, or an entry of ko.json the flow does not use."""
@@ -215,7 +237,8 @@ def korean_page(source: Path) -> str:
             f"{source.name}: add to {KOREAN.name} under {flow!r}: {json.dumps(missing, ensure_ascii=False)}; "
             f"remove: {json.dumps(unused, ensure_ascii=False)}"
         )
-    page = head + "<x-dc>" + "".join(parts) + "</x-dc>" + tail
+    body = re.sub(r'<div data-fit="(\w+)" style="([^"]*)">', fit_to_text, "".join(parts))
+    page = head + "<x-dc>" + body + "</x-dc>" + tail
     page = page.replace('<html lang="en">', '<html lang="ko">')
     # Korean breaks lines between words, not inside them.
     page = page.replace("</helmet>", "<style>*{word-break:keep-all;overflow-wrap:break-word}</style>\n</helmet>")

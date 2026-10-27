@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -234,6 +234,7 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ ->
             assertEquals(string(R.string.mobile_data_notice), controls.noticeText.text.toString())
         }
+        assertTrue(runBlocking { modules.mobileData.wasShown() })
     }
 
     @Test

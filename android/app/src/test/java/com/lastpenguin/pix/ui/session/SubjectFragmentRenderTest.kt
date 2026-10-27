@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -24,6 +24,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import java.time.Duration
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -263,6 +264,19 @@ class SubjectFragmentRenderTest {
         idle()
 
         assertEquals(string(R.string.mobile_data_notice), ShadowToast.getTextOfLatestToast())
+        assertTrue(runBlocking { modules.mobileData.wasShown() })
+    }
+
+    @Test
+    fun aMobileDataNoticeWaitingBeforeTheScreenOpens_isShownWhenItOpens() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        modules.session.setPath(IcePath("srflx", "srflx", "cellular", null))
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+
+        assertEquals(string(R.string.mobile_data_notice), ShadowToast.getTextOfLatestToast())
+        assertTrue(runBlocking { modules.mobileData.wasShown() })
     }
 
     @Test

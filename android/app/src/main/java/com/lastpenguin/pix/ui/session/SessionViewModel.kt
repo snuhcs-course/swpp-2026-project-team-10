@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -23,13 +23,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
-/** Short notices for the session's screens: the photographer's camera screen shows them all, Subject view [MobileData]. */
+/** Short notices for the photographer's camera screen. */
 sealed interface SessionNotice {
     /** The other phone left or dropped: "Junhyeong left" (FR-6.10, FR-6.11). */
     data class PeerGone(val name: String, val reason: EndReason) : SessionNotice
@@ -45,9 +47,6 @@ sealed interface SessionNotice {
 
     /** The subject changed the flash: "Junhyeong turned the flash on". */
     data class RemoteFlash(val name: String, val mode: FlashMode) : SessionNotice
-
-    /** The live view goes over this phone's mobile data, said once on each phone (FR-6.13, Design 2.6.7). */
-    data object MobileData : SessionNotice
 }
 
 /**
@@ -77,6 +76,18 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    private val _mobileDataPending = MutableStateFlow(false)
+
+    /**
+     * True while "The live view uses mobile data" waits to be shown (FR-6.13, Design 2.6.7): the Camera screen or
+     * Subject view shows it and calls [mobileDataNoticeShown], and only that remembers it, so a notice that no screen
+     * showed is never lost. A session that ends first drops it.
+     */
+    val mobileDataPending: StateFlow<Boolean> = _mobileDataPending.asStateFlow()
+
+    /** Said in this process; the stored flag may still be on its way. */
+    private var mobileDataSaid = false
 
     /**
      * The code the subject entered last, kept only where it is reused: *Session not found* offers it for editing
@@ -158,6 +169,7 @@ class SessionViewModel(
     private fun onState(state: SessionState) {
         _transitions.tryEmit(state)
         if (state is SessionState.Ended) onEnded(state.reason)
+        if (state !is SessionState.Connected) _mobileDataPending.value = false
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
 
@@ -244,15 +256,19 @@ class SessionViewModel(
         reconnecting = false
     }
 
-    /**
-     * The first time a session's video goes over this phone's cellular network, as its selected candidate pair says,
-     * the screen says so once (FR-6.13). With no screen listening the notice waits for the next change of path.
-     */
+    /** A session's video goes over this phone's cellular network, as its selected candidate pair says (FR-6.13). */
     private suspend fun onPath(path: IcePath?) {
-        if (path?.network != CELLULAR || _notices.subscriptionCount.value == 0) return
+        if (path?.network != CELLULAR || mobileDataSaid || _mobileDataPending.value) return
         if (mobileDataNotice.wasShown()) return
-        mobileDataNotice.markShown()
-        _notices.tryEmit(SessionNotice.MobileData)
+        if (state.value is SessionState.Connected) _mobileDataPending.value = true
+    }
+
+    /** The Camera screen or Subject view showed the mobile-data notice; from now on it is not shown again. */
+    fun mobileDataNoticeShown() {
+        if (!_mobileDataPending.value) return
+        _mobileDataPending.value = false
+        mobileDataSaid = true
+        viewModelScope.launch { mobileDataNotice.markShown() }
     }
 
     private fun onMessage(message: SessionMessage) {

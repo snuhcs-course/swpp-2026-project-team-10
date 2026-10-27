@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -135,11 +135,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     sessionViewModel.transitions.collect { state -> onTransition(state) }
                 }
                 launch {
-                    // The photographer's notices are for the Camera screen; Subject view says only its own network's.
-                    sessionViewModel.notices.collect { notice ->
-                        if (notice is SessionNotice.MobileData) {
-                            Toast.makeText(requireContext(), R.string.mobile_data_notice, Toast.LENGTH_LONG).show()
-                        }
+                    sessionViewModel.mobileDataPending.collect { pending ->
+                        if (!pending) return@collect
+                        Toast.makeText(requireContext(), R.string.mobile_data_notice, Toast.LENGTH_LONG).show()
+                        sessionViewModel.mobileDataNoticeShown()
                     }
                 }
             }

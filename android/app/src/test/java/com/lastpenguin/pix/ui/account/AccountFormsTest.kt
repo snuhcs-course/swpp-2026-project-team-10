@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.view.LayoutInflater
@@ -145,7 +145,7 @@ class AccountFormsTest {
         assertFalse(binding.checkButton.isEnabled)
 
         form.render(AccountUiState(pixIdCheck = PixIdCheck("test5", available = true)))
-        assertEquals("test5 is available", binding.pixIdRule.text.toString())
+        assertEquals("This Pix ID is available", binding.pixIdRule.text.toString())
         assertEquals(green, binding.pixIdRule.currentTextColor)
         assertTrue(binding.checkButton.isEnabled)
 
@@ -229,7 +229,7 @@ class AccountFormsTest {
         form.render(AccountUiState(pixIdCheck = PixIdCheck("test5", available = true)))
 
         assertEquals(listOf("check:test5"), calls)
-        assertEquals("test5 is available", binding.pixIdRule.text.toString())
+        assertEquals("This Pix ID is available", binding.pixIdRule.text.toString())
         assertEquals(green, binding.pixIdRule.currentTextColor)
     }
 

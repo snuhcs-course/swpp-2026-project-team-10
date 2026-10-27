@@ -29,8 +29,8 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * Room code's render paths (R&S 6.7, FR-8.1, FR-8.4; Testing Documentation 2.1.6), on the real bottom sheet.
  * Partitions on the session state: Idle, Waiting (the formatted code), Connecting, Connected (the sheet closes),
- * Ended by expiry and by another failure; Join with a code instead; Cancel. The Wi-Fi and expiry notes, each on one
- * line at the Galaxy S22's 360 × 705 dp, at font scale 1 and 1.3.
+ * Ended by expiry and by another failure; Join with a code instead; Cancel. The expiry note on one line at the Galaxy
+ * S22's 360 × 705 dp, at font scale 1 and 1.3.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -80,13 +80,12 @@ class RoomCodeSheetTest {
 
     @Test
     @Config(qualifiers = "w360dp-h705dp-xxhdpi")
-    fun notes_eachFitOnOneLine_onA360dpPhone() {
+    fun expiryNote_fitsOnOneLine_onA360dpPhone() {
         for (scale in listOf(1f, 1.3f)) {
             RuntimeEnvironment.setFontScale(scale)
             val binding = showOverAppCompat()
 
-            assertEquals("Wi-Fi at font scale $scale", 1, binding.sameWifiNote.lineCount)
-            assertEquals("expiry at font scale $scale", 1, binding.expiryNote.lineCount)
+            assertEquals("at font scale $scale", 1, binding.expiryNote.lineCount)
         }
     }
 
@@ -134,7 +133,7 @@ class RoomCodeSheetTest {
 
         modules.session.setState(SessionState.Ended(EndReason.ERROR))
         idle()
-        onSheet { binding -> assertEquals(string(R.string.couldnt_connect_wifi), binding.statusText.text.toString()) }
+        onSheet { binding -> assertEquals(string(R.string.couldnt_connect), binding.statusText.text.toString()) }
     }
 
     @Test

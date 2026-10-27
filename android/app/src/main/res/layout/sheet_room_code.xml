@@ -58,37 +58,17 @@
         android:text="@string/room_code_body"
         android:textAppearance="@style/TextAppearance.Pix.Body" />
 
-    <!-- One note a line: side by side, "Expires in 10 min" wrapped on a 360 dp phone. -->
-    <LinearLayout
+    <TextView
+        android:id="@+id/expiryNote"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:gravity="center_horizontal"
-        android:orientation="vertical">
-
-        <TextView
-            android:id="@+id/sameWifiNote"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:drawableStartCompat="@drawable/ic_wifi_small"
-            android:drawablePadding="6dp"
-            app:drawableTint="@color/pix_text_faint"
-            android:gravity="center_vertical"
-            android:text="@string/same_wifi"
-            android:textAppearance="@style/TextAppearance.Pix.Caption" />
-
-        <TextView
-            android:id="@+id/expiryNote"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            app:drawableStartCompat="@drawable/ic_clock_small"
-            android:drawablePadding="6dp"
-            app:drawableTint="@color/pix_text_faint"
-            android:gravity="center_vertical"
-            android:text="@string/code_expiry"
-            android:textAppearance="@style/TextAppearance.Pix.Caption" />
-    </LinearLayout>
+        app:drawableStartCompat="@drawable/ic_clock_small"
+        android:drawablePadding="6dp"
+        app:drawableTint="@color/pix_text_faint"
+        android:gravity="center_vertical"
+        android:text="@string/code_expiry"
+        android:textAppearance="@style/TextAppearance.Pix.Caption" />
 
     <Button
         android:id="@+id/joinInsteadButton"

@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Size
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.addCallback
@@ -20,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.AccessibilityDelegateCompat
@@ -95,6 +97,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     // The frame's ratio when the held frame was taken: the grid and the guide stay over a held frame of that ratio.
     private var stillAspect: AspectRatio? = null
 
+    // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
+    private var previewArea = PreviewArea(0f, 0f, 0f)
+
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (binding != null) {
             render(viewModel.uiState.value)
@@ -110,10 +115,22 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.previewView.scaleType = PreviewView.ScaleType.FIT_CENTER
         // TextureView composes predictably with guide and permission/error layers above it.
         controls.previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-        // PreviewView fits the viewport's crop but still draws the camera image around it: show only the frame.
+        // PreviewView fits the viewport's crop but still draws the camera image around it: show only the frame, or,
+        // for 1:1, the whole 4:3 area with the rest dimmed.
         controls.previewView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            clipToFrame(controls.previewView, viewModel.uiState.value.aspect.frameAspect)
+            fitToFrame(controls, viewModel.uiState.value.aspect)
         }
+        // The preview's place follows the screen's height and the bars' (R&S 6.2), known only after layout.
+        val placePreview = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top != oldBottom - oldTop) {
+                view.post { binding?.let { layoutPreview(it, viewModel.uiState.value.aspect) } }
+            }
+        }
+        controls.root.addOnLayoutChangeListener(placePreview)
+        controls.topBar.addOnLayoutChangeListener(placePreview)
+        controls.bottomPanel.addOnLayoutChangeListener(placePreview)
+        // The zoom row stays above the panels over the shutter as they open and close.
+        controls.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(controls) }
         controls.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
             Timings.mark("preview.stream", state.name)
             if (state == PreviewView.StreamState.STREAMING && !previewLogged) {
@@ -200,14 +217,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
-                // The photographer's side of a session: the live badge, End session, and "left" notices (FR-6.8, FR-6.10).
+                // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).
                 launch {
                     sessionViewModel.state.collect { state ->
                         val connected = state as? SessionState.Connected
-                        controls.liveBadge.isVisible = connected != null
+                        renderLiveDot(controls, connected)
                         controls.endSessionButton.isVisible = connected != null
                         controls.shootTogetherButton.isVisible = connected == null && !isScenePhotoActive()
-                        connected?.let { controls.liveBadge.text = getString(R.string.live_badge, it.peer.displayName) }
                         view.keepScreenOn = connected != null
                     }
                 }
@@ -288,9 +304,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             }
                         }
                         if (thumbnail == null) {
-                            controls.galleryButton.setImageResource(R.drawable.gallery_placeholder)
+                            controls.galleryThumbnail.setImageResource(R.drawable.gallery_placeholder)
                         } else {
-                            controls.galleryButton.setImageBitmap(thumbnail)
+                            controls.galleryThumbnail.setImageBitmap(thumbnail)
                         }
                     }
                 }
@@ -374,6 +390,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             AccessibilityActionCompat.ACTION_SCROLL_BACKWARD,
             getString(R.string.zoom_out),
         ) { _, _ -> adjust(1f / 1.1f) }
+        // A tap steps through the quick zoom steps, such as 0.6×, 1×, and 2× (FR-1.3).
+        readout.setOnClickListener { viewModel.onZoomTap() }
+        ViewCompat.replaceAccessibilityAction(
+            readout,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.zoom_next_step),
+        ) { _, _ ->
+            viewModel.onZoomTap()
+            true
+        }
     }
 
     /**
@@ -436,14 +462,56 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.bottomOverlays.addOnLayoutChangeListener(relayout)
     }
 
-    /** Inside the preview's margins and above the first panel at its bottom (the guide's controls, at least). */
+    /** Inside the preview's margins and above the zoom row, the panels over the shutter, and the controls. */
     private fun referenceArea(controls: FragmentCameraBinding): ReferenceArea {
         val margin = (REFERENCE_MARGIN_DP * resources.displayMetrics.density).roundToInt()
         val container = controls.previewContainer
-        val panels = controls.bottomOverlays
-        val panel = panels.children.firstOrNull { it.isVisible }
-        val bottom = if (panel == null) container.height - margin else panels.top + panel.top - margin
+        val zoomTop = (controls.zoomRow.top + controls.zoomRow.translationY).roundToInt()
+        val bottom = minOf(zoomTop - container.top, container.height - previewArea.underControls.roundToInt()) - margin
         return ReferenceArea(margin, margin, container.width - margin, bottom)
+    }
+
+    /**
+     * Puts the preview where previewArea says for [aspect] (R&S 6.2), and the zoom row at the bottom of its image. The
+     * controls get a dark gradient while they lie over it. Margins change only when the place does, as the screen
+     * renders on every zoom step of a pinch.
+     */
+    private fun layoutPreview(controls: FragmentCameraBinding, aspect: AspectRatio) {
+        val root = controls.root
+        if (root.width == 0 || root.height == 0) return
+        val area = previewArea(
+            root.width.toFloat(),
+            root.height.toFloat(),
+            controls.topBar.height - TOP_BAR_OVERHANG_DP * resources.displayMetrics.density,
+            controls.bottomPanel.height.toFloat(),
+            aspect.previewAspect,
+        )
+        previewArea = area
+        val container = controls.previewContainer
+        val params = container.layoutParams as ViewGroup.MarginLayoutParams
+        val top = area.top.roundToInt()
+        val bottom = (root.height - area.bottom).roundToInt()
+        if (params.topMargin != top || params.bottomMargin != bottom) {
+            params.topMargin = top
+            params.bottomMargin = bottom
+            container.layoutParams = params
+        }
+        controls.bottomPanel.setBackgroundResource(if (area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        placeZoomRow(controls)
+    }
+
+    /** The zoom row at the bottom of the image as it shows (1:1 inside the 4:3 area), above the panels and controls. */
+    private fun placeZoomRow(controls: FragmentCameraBinding) {
+        val area = previewArea
+        if (area.bottom <= area.top) return
+        val frame = fitViewfinderFrame(
+            controls.root.width.toFloat(),
+            area.bottom - area.top,
+            viewModel.uiState.value.aspect.frameAspect,
+        )
+        val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
+        val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
+        placeZoomRow(controls.zoomRow, controls.bottomOverlays, imageBottom, margin)
     }
 
     private fun setupCompositionLevel(overlay: CameraCompositionView) {
@@ -503,7 +571,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The grid and the guide follow the chosen frame (AD-10); a new ratio re-fits both at once.
         controls.compositionOverlay.frameAspect = state.aspect.frameAspect
         controls.guideOverlay.frameAspect = state.aspect.frameAspect
-        clipToFrame(controls.previewView, state.aspect.frameAspect)
+        layoutPreview(controls, state.aspect)
+        fitToFrame(controls, state.aspect)
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = overlays
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
@@ -562,6 +631,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             else -> showHint(controls.hintText, R.string.hint_pinch_zoom, R.drawable.ic_zoom_small)
         }
         controls.cameraMessagePanel.isVisible = !granted || unavailable
+        // The permission and camera messages fill the preview; nothing over it applies then.
+        controls.zoomRow.isInvisible = controls.cameraMessagePanel.isVisible
+        renderLiveDot(controls, sessionViewModel.state.value as? SessionState.Connected)
         controls.cameraMessage.setText(if (granted) R.string.camera_unavailable else R.string.camera_permission_message)
         controls.cameraActionButton.setText(if (granted) R.string.try_again else R.string.open_settings)
         controls.requestPermissionButton.isVisible =
@@ -715,7 +787,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.brightnessButton.isVisible = false
             controls.brightnessPanel.isVisible = false
         }
-        if (active) controls.editGuideButton.isVisible = false
+        if (active) {
+            controls.editGuideButton.isVisible = false
+            controls.tipButtonFrame.isVisible = false
+        }
         controls.captureControls.isVisible = !reviewing
         controls.sceneReviewControls.isVisible = reviewing
         if (!active) return
@@ -808,15 +883,25 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    /**
+     * The live light (FR-6.8): on while a session is [connected] and the camera streams to it, so not over a camera
+     * message. A rebind (a lens or a ratio) keeps it, as the held frame stands for a camera about to stream again.
+     */
+    private fun renderLiveDot(controls: FragmentCameraBinding, connected: SessionState.Connected?) {
+        controls.liveDot.isVisible = connected != null && !controls.cameraMessagePanel.isVisible
+        connected?.let { controls.liveDot.contentDescription = getString(R.string.live_badge, it.peer.displayName) }
+    }
+
     /** Puts the preview's last frame over it while the camera rebinds (PreviewHold); false without a frame. */
     private fun showStill(): Boolean {
         val controls = binding ?: return false
         val frame = controls.previewView.bitmap ?: return false
-        controls.aspectStill.setImageBitmap(frame)
+        val aspect = viewModel.uiState.value.aspect
+        controls.aspectStill.setImageBitmap(heldFrame(frame, aspect))
         // The bitmap is the whole camera image; show the old frame only, as the preview did.
         controls.aspectStill.clipBounds = controls.previewView.clipBounds
         controls.aspectStill.isVisible = true
-        stillAspect = viewModel.uiState.value.aspect
+        stillAspect = aspect
         Timings.mark("preview.still", "on")
         stillJob?.cancel()
         // If the stream never reports a restart, the old frame still goes.
@@ -838,15 +923,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    /** Clips [view] to the fit-centered frame of [frameAspect] (AD-10); nothing is clipped before layout. */
-    private fun clipToFrame(view: View, frameAspect: Float) {
-        val frame = fitViewfinderFrame(view.width.toFloat(), view.height.toFloat(), frameAspect)
-        val clip = if (frame.width > 0f) {
+    /**
+     * Clips the preview to the fit-centered frame of [aspect] (AD-10), except 1:1, which shows the whole 4:3 area with
+     * the rest dimmed (R&S 6.2), and puts the live light in the frame's corner. Nothing is clipped before layout.
+     */
+    private fun fitToFrame(controls: FragmentCameraBinding, aspect: AspectRatio) {
+        val view = controls.previewView
+        val frame = fitViewfinderFrame(view.width.toFloat(), view.height.toFloat(), aspect.frameAspect)
+        val clip = if (frame.width > 0f && aspect.previewAspect == aspect.frameAspect) {
             Rect(frame.left.roundToInt(), frame.top.roundToInt(), frame.right.roundToInt(), frame.bottom.roundToInt())
         } else {
             null
         }
         if (view.clipBounds != clip) view.clipBounds = clip
+        controls.compositionOverlay.dimOutside = aspect.previewAspect != aspect.frameAspect
+        controls.liveDot.placeIn(controls.previewContainer, aspect.frameAspect)
     }
 
     /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */
@@ -857,8 +948,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         @ColorRes tint: Int = R.color.pix_text,
     ) {
         chip.setText(text)
-        chip.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
+        setChipIcon(chip, icon)
         TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(requireContext().getColor(tint)))
+    }
+
+    /** Sets [icon] at the start of [chip], at the size of the top bar's icons, or removes it for 0. */
+    private fun setChipIcon(chip: TextView, @DrawableRes icon: Int) {
+        val size = (CHIP_ICON_DP * resources.displayMetrics.density).roundToInt()
+        val drawable = if (icon == 0) null else AppCompatResources.getDrawable(requireContext(), icon)?.mutate()
+        drawable?.setBounds(0, 0, size, size)
+        chip.setCompoundDrawablesRelative(drawable, null, null, null)
     }
 
     private enum class StatusLook { PROGRESS, SUCCESS, ERROR }
@@ -876,15 +975,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             },
         )
         chip.setTextColor(context.getColor(if (look == StatusLook.ERROR) R.color.pix_danger_text else R.color.pix_text))
-        chip.setCompoundDrawablesRelativeWithIntrinsicBounds(
+        setChipIcon(
+            chip,
             when (look) {
                 StatusLook.PROGRESS -> 0
                 StatusLook.SUCCESS -> R.drawable.ic_check_circle_small
                 StatusLook.ERROR -> R.drawable.ic_alert_small
             },
-            0,
-            0,
-            0,
         )
         // The check keeps its own two colors; the alert takes the text color.
         TextViewCompat.setCompoundDrawableTintList(
@@ -936,6 +1033,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_SHRINK_MS = 150L
         private const val FOCUS_RING_HOLD_MS = 700L
         private const val FOCUS_RING_FADE_MS = 200L
+        private const val CHIP_ICON_DP = 14f
 
         /** The reference thumbnail's long side while small, and its margin in the preview's corners (FR-3.9). */
         private const val REFERENCE_SMALL_DP = 72f

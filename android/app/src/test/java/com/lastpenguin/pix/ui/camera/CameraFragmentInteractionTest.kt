@@ -60,7 +60,9 @@ import org.robolectric.annotation.GraphicsMode
  * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
  * together, Use this photo) and system back during the scene photo step; End session; the gallery button with and
  * without an app to open the photo; each capture failure's message; the subject's zoom, brightness, flash, and guide
- * moves as notices, a lost connection, and the live view on mobile data (FR-6.13); the zoom accessibility actions; the reference thumbnail's tap, drag,
+ * moves as notices, a lost connection, and the live view on mobile data (FR-6.13); the zoom accessibility actions
+ * and a tap on the readout through the quick steps (0.6×, 1×, 2×, back to 0.6×), by touch and by TalkBack; the
+ * reference thumbnail's tap, drag,
  * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button; the preview's stream state;
  * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap; its icon kept while other state changes.
  */
@@ -341,6 +343,51 @@ class CameraFragmentInteractionTest {
     }
 
     // ---- Zoom, sliders, focus, and the ratio -----------------------------------------------
+
+    @Test
+    fun aTapOnTheZoomReadout_stepsThroughPointSixOneAndTwo_andBack() {
+        val camera = FakeCameraController(minZoom = 0.6f, maxZoom = 10f)
+        launch(camera)
+
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        val click = AccessibilityActionCompat.ACTION_CLICK.id
+        onScreen { controls, _ -> ViewCompat.performAccessibilityAction(controls.zoomReadout, click, null) }
+        idle()
+
+        assertEquals(listOf(2f, 0.6f, 1f), camera.requests)
+        assertEquals(listOf(true, true, true), camera.requestFinals)
+    }
+
+    @Test
+    fun quickTapsBeforeTheCameraAppliesAStep_goOnFromThatStep_andAPinchStartsAgainFromTheAppliedZoom() {
+        val camera = FakeCameraController(minZoom = 0.6f, maxZoom = 10f).apply { applies = false }
+        launch(camera)
+
+        // Two taps at 1× before the camera applies the first: 2×, then the widest, not 2× twice.
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        assertEquals(listOf(2f, 0.6f), camera.requests)
+
+        // The first step applied late does not stop the third tap going on from the second.
+        camera.applyLocally(2f)
+        idle()
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        assertEquals(listOf(2f, 0.6f, 1f), camera.requests)
+
+        // Another zoom request (here TalkBack's Zoom in) forgets the pending step: the next tap goes on from the
+        // applied zoom, 2×, to the widest, not from the pending 1× to 2×.
+        val zoomIn = AccessibilityActionCompat.ACTION_SCROLL_FORWARD.id
+        onScreen { controls, _ -> ViewCompat.performAccessibilityAction(controls.zoomReadout, zoomIn, null) }
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        assertEquals(5, camera.requests.size)
+        assertEquals(0.6f, camera.requests.last())
+    }
 
     @Test
     fun zoomAccessibilityActions_zoomInAndOut_onlyWhileReady() {

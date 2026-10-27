@@ -1,0 +1,19 @@
+Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
+
+Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated here, shortened to the instruction; status checks are left out.
+
+## Camera screen controls and preview size ([#136])
+
+- [Dongje, 10-26] "The buttons and icons are needlessly large: shrink them sensibly for my review; the S22 is connected. Then let the camera screen grow as much as they shrank; 16:9 now narrows at the sides, so keep the sides and let it grow up and down, even over the buttons. Plan the order and the method for my review." (The issue came from the Codex review of #135. Renders at the S22's 360 × 705 dp beside the phone's own screenshots.)
+- [Dongje, 10-26] "Install the debug build over the S22's app. For 16:9, grow up as far as possible and down by what is left. Subject view looks the same, with the icons as small." (At font scale 1.3 the light bulb still touched *Shoot together*, so it moved to the zoom row.)
+- [Dongje, 10-26] "Take the circle off the flash icon, like brightness, and off the ratio; make the top bar's icons, text, and buttons 0.8 of their size."
+- [Dongje, 10-26] "Drop the Live banner and the subject's *Dongje's camera*; blink a red light at the camera's top right instead. Make hints such as *Tap Guide to add a pose* the size of *Shoot together*." (`LiveDotView`; TalkBack still reads who is connected.)
+- [Dongje, 10-26] "Put the screens from before the task beside the current ones, then go on to the next step." / "Commit here. In 16:9 Guide, the shutter, and the album overlap the image awkwardly: fit them to the space left below; the zoom readout and its text did not shrink."
+- [Dongje, 10-26] "Not only in 16:9: the same in every ratio. Keep the shutter large and let it go over the camera image; the zoom as translucent white text at the bottom of the camera image whatever the ratio; the shutter's place and size never change with the ratio. The bottom may look empty: how would you fix it?" (Three ways were offered; the user took the 4:3 area with 1:1 dimmed in it and the panels in the space below the image.)
+- [Dongje, 10-26] "In 16:9 keep the top bar and let the image go straight down; check where the shutter and Guide end up." / "Center the top bar's icons vertically." (They were centered within 1 dp; the gap under the bar made them look low.)
+- [Dongje, 10-26] "Make Guide and the album translucent over the image, and raise the buttons so that in 16:9 the text and the buttons sit above its bottom edge."
+- [Dongje, 10-26] "Commit, and add the quick zoom steps: a tap on the zoom readout goes to 0.6×, 1×, and 2×." / "Commit and go on to step 3." (Tests, the R&S wireframes of Flows 1, 2, 4, and 5, and the documents.)
+- [Dongje, 10-27] "Check the Codex review on the PR and bring it to me for review." / "Go ahead as recommended. Nothing we see changes with item 4, right?" (Four findings, all valid: the quick steps from the camera's real minimum zoom, the 1:1 frame held during a ratio change dimmed as before, the photographer's light out while a camera message shows, and the readout's tap area the row's height. Renders before and after the last were identical pixel for pixel.)
+- [Dongje, 10-27] "Check the new review and bring it to me as before." / "Go with the recommendation, then commit, push, and resolve." (Three findings, all valid: every control's tap area back to 48 dp on both screens (NFR-16) with what they draw unchanged, the frame held during a ratio change kept in its place while the preview resizes, and quick taps going on from a step the camera has not applied yet. Renders before and after were identical at font scale 1; at 1.3 the image sits 1 px higher, as the old bar had grown to 44.3 dp. The S22 recorded the ratio changes before and after.)
+
+[#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

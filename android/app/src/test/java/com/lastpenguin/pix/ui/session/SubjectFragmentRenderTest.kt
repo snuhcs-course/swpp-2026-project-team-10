@@ -96,7 +96,8 @@ class SubjectFragmentRenderTest {
         launch()
 
         onScreen { binding, _ ->
-            assertEquals(string(R.string.subject_title_placeholder), binding.photographerName.text.toString())
+            assertEquals(View.GONE, binding.liveDot.visibility)
+            assertEquals(string(R.string.subject_title_placeholder), binding.liveDot.contentDescription.toString())
             assertEquals(View.VISIBLE, binding.connectingText.visibility)
             assertEquals(string(R.string.connecting), binding.connectingText.text.toString())
             assertEquals(View.GONE, binding.compositionOverlay.visibility)
@@ -135,13 +136,14 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun connected_showsTheNameTheGridAndTheCapabilities() {
+    fun connected_showsTheLiveLightTheGridAndTheCapabilities() {
         val modules = launch()
 
         connect(modules, exposureRange = -4..4, hasFlash = true)
 
         onScreen { binding, _ ->
-            assertEquals(string(R.string.subject_title, "Dongje"), binding.photographerName.text.toString())
+            assertEquals(View.VISIBLE, binding.liveDot.visibility)
+            assertEquals(string(R.string.subject_title, "Dongje"), binding.liveDot.contentDescription.toString())
             assertEquals(View.GONE, binding.connectingText.visibility)
             assertEquals(View.VISIBLE, binding.compositionOverlay.visibility)
             assertTrue(binding.zoomReadout.isEnabled)

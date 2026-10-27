@@ -16,4 +16,11 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-27] "Check the Codex review on the PR and bring it to me for review." / "Go ahead as recommended. Nothing we see changes with item 4, right?" (Four findings, all valid: the quick steps from the camera's real minimum zoom, the 1:1 frame held during a ratio change dimmed as before, the photographer's light out while a camera message shows, and the readout's tap area the row's height. Renders before and after the last were identical pixel for pixel.)
 - [Dongje, 10-27] "Check the new review and bring it to me as before." / "Go with the recommendation, then commit, push, and resolve." (Three findings, all valid: every control's tap area back to 48 dp on both screens (NFR-16) with what they draw unchanged, the frame held during a ratio change kept in its place while the preview resizes, and quick taps going on from a step the camera has not applied yet. Renders before and after were identical at font scale 1; at 1.3 the image sits 1 px higher, as the old bar had grown to 44.3 dp. The S22 recorded the ratio changes before and after.)
 
+## Reference thumbnail on Subject view ([#132])
+
+- [Dongje, 10-27] "Start with #132: as before, work out what to do in what order and whether anything needs my or the teammates' review." (FR-3.9, NFR-13, AD-6, and AD-15 rule the photo off the subject's phone, and #113 sends no reference pixels, so the plan began with that decision, four questions, and who reviews what.)
+- [Dongje, 10-27] "Go ahead with all of it. Each phone keeps its own corner, not synced, and the thumbnail stays like the photographer's." (A separate `guide.reference.*` transfer and `MirrorReference`, leaving `GuideRepository` and the guide image's code as they were for #113; the thumbnail's code shared with the Camera screen; renders at the S22's size for review.)
+- [Dongje, 10-27] "Commit, then do the documents."
+
+[#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

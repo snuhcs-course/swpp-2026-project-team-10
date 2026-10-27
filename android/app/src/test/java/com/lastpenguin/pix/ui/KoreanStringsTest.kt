@@ -15,6 +15,8 @@ import org.w3c.dom.Element
  * arguments: none, one, two in another order (ready_count), and a Korean string that drops one or adds one. Language:
  * a Korean string in Hangul, one left in English, and a name Korean keeps (Pix ID). Not translated: a string without
  * words, the app's name, and a sentence marked so. The idea chips: the same number, each within the description field.
+ * Fonts: a text style that names a @font/pix_* alias or DM Mono, one that names a Manrope file itself (which would leave
+ * Korean in the phone's font), and an alias with and without its Korean (Pretendard) counterpart in res/font-ko/.
  */
 class KoreanStringsTest {
     private val english = Strings(File("src/main/res/values/strings.xml"))
@@ -55,6 +57,28 @@ class KoreanStringsTest {
             assertTrue(idea, idea.isNotBlank())
             assertTrue(idea, idea.codePointCount(0, idea.length) <= DESCRIPTION_MAX_LENGTH)
         }
+    }
+
+    @Test
+    fun everyTextStyle_namesAFontAlias_soKoreanGetsPretendard() {
+        val styles = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            .parse(File("src/main/res/values/styles.xml")).getElementsByTagName("item")
+        val fonts = (0 until styles.length).map { styles.item(it) as Element }
+            .filter { it.getAttribute("name") in setOf("android:fontFamily", "fontFamily") }
+            .map { it.textContent.trim() }
+        val direct = fonts.filterNot { it.startsWith("@font/pix_") || it == "@font/dm_mono_medium" }
+        assertEquals(emptyList<String>(), direct)
+        assertTrue(fonts.isNotEmpty())
+    }
+
+    @Test
+    fun everyFontAlias_hasItsKoreanFont() {
+        fun aliases(
+            folder: String,
+        ) = File(folder).listFiles { f -> f.name.startsWith("pix_") }.orEmpty().map { it.name }.sorted()
+        val english = aliases("src/main/res/font")
+        assertTrue(english.isNotEmpty())
+        assertEquals(english, aliases("src/main/res/font-ko"))
     }
 
     /** The format arguments of [text], `%1$s` and the like; `%%` is a percent sign, not an argument. */

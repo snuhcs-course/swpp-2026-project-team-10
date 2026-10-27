@@ -6,14 +6,16 @@ Each drawing has one image in wiki/images/, named after it:
 - An `<svg data-image="<name>.png">` in an HTML file here, such as the Design's architecture figure in
   `design_architecture.html`, becomes `<name>.png` at twice its viewBox width over white (`rsvg-convert`).
 - Each wireframe flow of R&S section 6, `wireframes/<name>.dc.html`, becomes `<name>.jpg`, rendered in headless Chrome
-  at the size its `$preview` declares, and `<name>_ko.jpg`, the same flow with its screens in Korean. A flow is a fixed-size HTML page whose elements are placed with `left` and `top`
-  in px. Keep the `support.js` line and the script block at its end, which come from the Claude design canvas format.
+  at the size its `$preview` declares, and `<name>_ko.jpg`, the same flow with its screens in Korean. A flow is a
+  fixed-size HTML page whose elements are placed with `left` and `top` in px. Keep the `support.js` line and the script
+  block at its end, which come from the Claude design canvas format.
   The two arrows between the phones start in Flow 4 and end in Flow 5, so both files have them.
 - A screen is drawn as the app shows it on a Galaxy S22: a card of 168 x 364 px whose top 18 px hold the screen's name,
   then the app's 360 x 705 dp at 165/360 px per dp, and below it the navigation bar with its home indicator. It is in
-  Manrope (DM Mono for the room code) with the colors of `android/app/src/main/res/values/colors.xml` and the app's own
-  icons as inline SVG. A camera image or a photo is a lighter grey gradient, so its frame shows against the app; in it,
-  a grey figure is the real person and a white outline the pose guide.
+  Manrope (DM Mono for the room code; Pretendard in the Korean image, as in the app) with the colors of
+  `android/app/src/main/res/values/colors.xml` and the app's own icons as inline SVG. A camera image or a photo is a
+  lighter grey gradient, so its frame shows against the app; in it, a grey figure is the real person and a white
+  outline the pose guide.
 
 The Korean image changes only the text on the screens, the part of each card that clips its content between the
 screen's name and the navigation bar; the arrows, the headings, the boxes where a flow starts and ends, and a box on a
@@ -55,7 +57,9 @@ DESIGN = Path(__file__).resolve().parent
 IMAGES = DESIGN.parent / "images"
 STRINGS = DESIGN.parent.parent / "android" / "app" / "src" / "main" / "res"
 KOREAN = DESIGN / "wireframes" / "ko.json"
-# Twice the page's size: a screen is drawn at its real proportions, so its smallest text (11 sp, 5 px on a card) needs it.
+# The app's Korean font files, res/font/pretendard_<name>.otf, by the CSS weight each one is.
+PRETENDARD = {"medium": 500, "semibold": 600, "bold": 700, "extrabold": 800}
+# Twice the page's size: a screen is drawn at its real proportions, so its smallest text (11 sp, 5 px) needs it.
 WIREFRAME_SCALE = 2
 WIREFRAME_JPEG_QUALITY = 92
 # Headless Chrome now and then hangs on a page; another try then works.
@@ -167,7 +171,8 @@ class Korean:
 def screen_texts(parts: list[str], notes: set[str]) -> tuple[list[int], set[str]]:
     """The indexes of the texts on the screens in [parts], a flow's markup split by MARKUP, and the [notes] found. A
     card is a top-level element that clips its content, and its screen the box in it that clips too; the screen's
-    name above it and the navigation bar below are not screen text, nor a box on the screen that holds one of [notes]."""
+    name above it and the navigation bar below are not screen text, nor a box on the screen that holds one of
+    [notes]."""
     stack: list[tuple[int, str]] = []  # the open elements: where each starts in parts, and its tag
     boxes: dict[int, int] = {}  # a text on a screen, and the box of the screen it is in
     noted, found = set(), set()
@@ -211,8 +216,8 @@ def fit_to_text(match: re.Match[str]) -> str:
 
 
 def korean_page(source: Path) -> str:
-    """The flow's page with its screens in Korean, and Noto Sans KR for the Hangul, as Android falls back to a Korean
-    font. Stops on a screen's text without Korean, or an entry of ko.json the flow does not use."""
+    """The flow's page with its screens in Korean and in Pretendard, the font the app uses in Korean, from the app's
+    own files. Stops on a screen's text without Korean, or an entry of ko.json the flow does not use."""
     flow = source.name.removesuffix(".dc.html")
     korean = Korean(flow)
     page = source.read_text(encoding="utf-8")
@@ -242,8 +247,13 @@ def korean_page(source: Path) -> str:
     page = page.replace('<html lang="en">', '<html lang="ko">')
     # Korean breaks lines between words, not inside them.
     page = page.replace("</helmet>", "<style>*{word-break:keep-all;overflow-wrap:break-word}</style>\n</helmet>")
-    page = page.replace("family=Manrope:", "family=Noto+Sans+KR:wght@400;500;600;700;800&family=Manrope:")
-    return re.sub(r"'(Manrope|DM Mono)',", r"'\1', 'Noto Sans KR',", page)
+    files = {weight: (STRINGS / "font" / f"pretendard_{name}.otf").as_uri() for name, weight in PRETENDARD.items()}
+    faces = "".join(
+        f"@font-face{{font-family:'Pretendard';font-weight:{weight};src:url('{uri}')}}" for weight, uri in files.items()
+    )
+    page = page.replace("</helmet>", f"<style>{faces}</style>\n</helmet>")
+    page = page.replace("'Manrope', sans-serif", "'Pretendard', sans-serif")
+    return page.replace("'DM Mono', monospace", "'DM Mono', 'Pretendard', monospace")
 
 
 def render_wireframe(source: Path, target: Path, korean: bool = False) -> None:

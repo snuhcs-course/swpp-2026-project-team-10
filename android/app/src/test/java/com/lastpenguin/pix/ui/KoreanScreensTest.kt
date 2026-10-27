@@ -3,11 +3,13 @@ package com.lastpenguin.pix.ui
 
 import android.Manifest
 import android.app.Application
+import android.graphics.Paint
 import android.net.Uri
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
@@ -65,6 +67,7 @@ import java.time.Duration
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
@@ -81,7 +84,7 @@ import org.robolectric.annotation.GraphicsMode
  * Join with a code; Session not found; Subject view; Connection lost. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
- * in a view that ellipsizes on purpose.
+ * in a view that ellipsizes on purpose. The text styles' font aliases: Pretendard in Korean, Manrope in English.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -384,6 +387,33 @@ class KoreanScreensTest {
         TestAppContainer().install()
         scenario = launchFragmentInContainer<ConnectionLostFragment>(themeResId = R.style.Theme_Pix)
         assertKorean(screen())
+    }
+
+    // ---- Fonts ------------------------------------------------------------------------------
+
+    /** How wide [text] is in [font], so two fonts can be told apart by what they draw. */
+    private fun width(font: Int, text: String): Float {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        return Paint().apply {
+            typeface = ResourcesCompat.getFont(context, font)
+            textSize = 48f
+        }.measureText(text)
+    }
+
+    @Test
+    fun inKorean_theFontAliasesArePretendard() {
+        val pairs = listOf(R.font.pix_medium to R.font.pretendard_medium, R.font.pix_bold to R.font.pretendard_bold)
+        for ((alias, pretendard) in pairs) {
+            assertEquals(width(pretendard, "가이드 저장 Pix ID"), width(alias, "가이드 저장 Pix ID"), 0.01f)
+        }
+        assertNotEquals(width(R.font.manrope_bold, "Pix ID"), width(R.font.pix_bold, "Pix ID"), 0.01f)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h705dp-xxhdpi")
+    fun inEnglish_theFontAliasesAreManrope() {
+        assertEquals(width(R.font.manrope_bold, "Pix ID"), width(R.font.pix_bold, "Pix ID"), 0.01f)
+        assertNotEquals(width(R.font.pretendard_bold, "Pix ID"), width(R.font.pix_bold, "Pix ID"), 0.01f)
     }
 
     // ---- The checks ----------------------------------------------------------------------

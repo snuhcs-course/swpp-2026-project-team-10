@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Semibold text: Manrope. res/font-ko/ maps the same name to Pretendard, which has Hangul. -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:font="@font/manrope_semibold"
+        android:fontStyle="normal"
+        android:fontWeight="600" />
+</font-family>

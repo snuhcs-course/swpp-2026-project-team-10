@@ -53,7 +53,9 @@ class RoomCodeSheet : BottomSheetDialogFragment() {
 
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
-        if (dismissedForConnection) return
+        // A configuration change (the language, the font size) also tears the dialog down, but the sheet comes back
+        // with the same room, so the code must stay.
+        if (dismissedForConnection || activity?.isChangingConfigurations == true) return
         val state = sessionViewModel.state.value
         if (state is SessionState.Idle || state is SessionState.Waiting) sessionViewModel.cancelRoom()
     }

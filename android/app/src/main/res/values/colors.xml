@@ -25,6 +25,8 @@
     <color name="pix_guide">#5EEAD4</color>
     <color name="pix_guide_stroke">#805EEAD4</color>
     <color name="pix_danger">#FF6B57</color>
+    <!-- The blinking light while a session streams the camera (FR-6.8), the red of a recording light. -->
+    <color name="pix_recording">#FF3B30</color>
     <color name="pix_danger_stroke">#66FF6B57</color>
     <color name="pix_danger_text">#FFB4A8</color>
     <color name="pix_danger_surface">#1C1416</color>

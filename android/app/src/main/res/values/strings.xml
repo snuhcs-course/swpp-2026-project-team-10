@@ -10,6 +10,8 @@
     <string name="same_wifi">Both phones on the same Wi-Fi</string>
     <string name="connecting">Connecting…</string>
     <string name="couldnt_connect_wifi">Couldn\'t connect. Make sure both phones are on the same Wi-Fi.</string>
+    <string name="join_rate_limited">Too many wrong codes from this network. Try again in a few minutes.</string>
+    <string name="mobile_data_notice">The live view uses mobile data.</string>
 
     <!-- Flow 1: Camera -->
     <string name="shoot_together">Shoot together</string>
@@ -22,6 +24,7 @@
     <string name="camera_zoom_description">Camera zoom, %1$s times</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
+    <string name="zoom_next_step">Next zoom step</string>
     <string name="camera_grid_description">Camera composition grid</string>
     <string name="camera_level_aligned">Camera is level</string>
     <string name="camera_level_tilted">Tilt camera to align the center bar with the horizontal markers</string>

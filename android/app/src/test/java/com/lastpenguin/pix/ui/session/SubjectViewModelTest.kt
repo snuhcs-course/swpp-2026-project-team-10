@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -92,6 +92,23 @@ class SubjectViewModelTest {
         assertTrue(ui.connected)
         assertTrue(ui.canZoom)
     }
+
+    @Test
+    fun `a tap on the readout asks for the next quick step of the photographer's camera, as a final value`() =
+        runTest(dispatcher) {
+            connect()
+            runCurrent()
+
+            viewModel.onZoomTap()
+            viewModel.onZoomTap()
+
+            // From 1×: 2×, then back to the widest, 0.6×.
+            assertEquals(0.6f, viewModel.uiState.value.zoom, 0f)
+            assertEquals(
+                listOf(SessionMessage.ZoomSet(2f, final = true), SessionMessage.ZoomSet(0.6f, final = true)),
+                requests(),
+            )
+        }
 
     @Test
     fun `a slider step shows at once and asks the photographer`() = runTest(dispatcher) {

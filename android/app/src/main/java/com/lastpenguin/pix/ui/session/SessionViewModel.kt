@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -10,6 +10,8 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.IcePath
+import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
@@ -21,9 +23,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
@@ -60,6 +64,7 @@ class SessionViewModel(
     private val camera: CameraController,
     private val guideSyncer: GuideSyncer,
     private val remoteControl: RemoteControlHandler,
+    private val mobileDataNotice: MobileDataNotice,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -71,6 +76,18 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    private val _mobileDataPending = MutableStateFlow(false)
+
+    /**
+     * True while "The live view uses mobile data" waits to be shown (FR-6.13, Design 2.6.7): the Camera screen or
+     * Subject view shows it and calls [mobileDataNoticeShown], and only that remembers it, so a notice that no screen
+     * showed is never lost. A session that ends first drops it.
+     */
+    val mobileDataPending: StateFlow<Boolean> = _mobileDataPending.asStateFlow()
+
+    /** Said in this process; the stored flag may still be on its way. */
+    private var mobileDataSaid = false
 
     /**
      * The code the subject entered last, kept only where it is reused: *Session not found* offers it for editing
@@ -102,6 +119,7 @@ class SessionViewModel(
     init {
         viewModelScope.launch { session.state.collect { onState(it) } }
         viewModelScope.launch { session.incoming.collect { onMessage(it) } }
+        viewModelScope.launch { session.path.collect { onPath(it) } }
         ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
     }
 
@@ -151,6 +169,7 @@ class SessionViewModel(
     private fun onState(state: SessionState) {
         _transitions.tryEmit(state)
         if (state is SessionState.Ended) onEnded(state.reason)
+        if (state !is SessionState.Connected) _mobileDataPending.value = false
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
 
@@ -237,6 +256,21 @@ class SessionViewModel(
         reconnecting = false
     }
 
+    /** A session's video goes over this phone's cellular network, as its selected candidate pair says (FR-6.13). */
+    private suspend fun onPath(path: IcePath?) {
+        if (path?.network != CELLULAR || mobileDataSaid || _mobileDataPending.value) return
+        if (mobileDataNotice.wasShown()) return
+        if (state.value is SessionState.Connected) _mobileDataPending.value = true
+    }
+
+    /** The Camera screen or Subject view showed the mobile-data notice; from now on it is not shown again. */
+    fun mobileDataNoticeShown() {
+        if (!_mobileDataPending.value) return
+        _mobileDataPending.value = false
+        mobileDataSaid = true
+        viewModelScope.launch { mobileDataNotice.markShown() }
+    }
+
     private fun onMessage(message: SessionMessage) {
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
@@ -245,5 +279,8 @@ class SessionViewModel(
 
     private companion object {
         const val BACKGROUND_LIMIT_MS = 60_000L
+
+        /** WebRTC's `networkType` of a candidate on a cellular interface. */
+        const val CELLULAR = "cellular"
     }
 }

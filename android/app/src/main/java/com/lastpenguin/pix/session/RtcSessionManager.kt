@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -79,6 +79,9 @@ class RtcSessionManager(
 
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
+
+    private val _path = MutableStateFlow<IcePath?>(null)
+    override val path: StateFlow<IcePath?> = _path.asStateFlow()
 
     override val eglContext: EglBase.Context
         get() = peers.eglContext
@@ -239,6 +242,9 @@ class RtcSessionManager(
 
             "EXPIRED" -> end(EndReason.EXPIRED)
 
+            // Too many wrong codes from this phone's network address (Design 2.5.2, NFR-15); Join says so.
+            "RATE_LIMITED" -> if (role == Role.SUBJECT) end(EndReason.RATE_LIMITED)
+
             else -> if (_state.value is SessionState.Connecting) fail()
         }
     }
@@ -334,7 +340,10 @@ class RtcSessionManager(
                     Timings.mark("ice.connected")
                 }
 
-                LinkState.DISCONNECTED -> if (_state.value is SessionState.Connected) startDisconnectGrace()
+                LinkState.DISCONNECTED -> {
+                    Timings.mark("ice.disconnected")
+                    if (_state.value is SessionState.Connected) startDisconnectGrace()
+                }
 
                 LinkState.FAILED, LinkState.CLOSED -> onLinkLost()
 
@@ -394,11 +403,20 @@ class RtcSessionManager(
         }
     }
 
-    /** One `stats` line per ping: codec, size, fps, bitrate, and RTT, so NFR-5, 6, and 12 can be read from logcat. */
+    /**
+     * One `stats` line per ping: codec, size, fps, bitrate, and RTT, so NFR-5, 6, and 12 can be read from logcat. An
+     * `ice.pair` line whenever the candidate pair changes says whether the video goes direct or through the relay, and
+     * over which network (Design 2.6.7, NFR-10).
+     */
     private suspend fun logStats() {
         val client = peer ?: return
         val stats = runCatching { client.stats() }.getOrNull() ?: return
         Timings.mark("stats", stats.summary())
+        val path = stats.path
+        if (path != null && path != _path.value) {
+            _path.value = path
+            Timings.mark("ice.pair", path.summary())
+        }
     }
 
     private fun onPeerMessage(text: String) {
@@ -575,6 +593,7 @@ class RtcSessionManager(
         peerHello = null
         lastSeq.clear()
         reliableQueue.clear()
+        _path.value = null
         client.close()
     }
 

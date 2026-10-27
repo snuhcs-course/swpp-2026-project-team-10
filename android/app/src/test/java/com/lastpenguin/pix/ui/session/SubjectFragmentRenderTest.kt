@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
@@ -23,6 +24,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import java.time.Duration
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -41,8 +43,8 @@ import org.robolectric.shadows.ShadowToast
  * with a container of fakes. Partitions: not connected / connected before the first frame / streaming / frames
  * stopped for 2 s ("camera paused") / streaming again; the photographer's capabilities with and
  * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
- * toggle, a hidden guide; the brightness panel and a flash tap; Leave, the back button's question, and the session
- * ending by a lost connection or the photographer.
+ * toggle, a hidden guide; the brightness panel and a flash tap; the live view on mobile data (FR-6.13); Leave, the
+ * back button's question, and the session ending by a lost connection or the photographer.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -94,7 +96,8 @@ class SubjectFragmentRenderTest {
         launch()
 
         onScreen { binding, _ ->
-            assertEquals(string(R.string.subject_title_placeholder), binding.photographerName.text.toString())
+            assertEquals(View.GONE, binding.liveDot.visibility)
+            assertEquals(string(R.string.subject_title_placeholder), binding.liveDot.contentDescription.toString())
             assertEquals(View.VISIBLE, binding.connectingText.visibility)
             assertEquals(string(R.string.connecting), binding.connectingText.text.toString())
             assertEquals(View.GONE, binding.compositionOverlay.visibility)
@@ -133,13 +136,14 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun connected_showsTheNameTheGridAndTheCapabilities() {
+    fun connected_showsTheLiveLightTheGridAndTheCapabilities() {
         val modules = launch()
 
         connect(modules, exposureRange = -4..4, hasFlash = true)
 
         onScreen { binding, _ ->
-            assertEquals(string(R.string.subject_title, "Dongje"), binding.photographerName.text.toString())
+            assertEquals(View.VISIBLE, binding.liveDot.visibility)
+            assertEquals(string(R.string.subject_title, "Dongje"), binding.liveDot.contentDescription.toString())
             assertEquals(View.GONE, binding.connectingText.visibility)
             assertEquals(View.VISIBLE, binding.compositionOverlay.visibility)
             assertTrue(binding.zoomReadout.isEnabled)
@@ -251,6 +255,30 @@ class SubjectFragmentRenderTest {
         val dialog = ShadowDialog.getLatestDialog()
         assertNotNull(dialog)
         assertTrue(dialog.isShowing)
+    }
+
+    @Test
+    fun liveViewOnMobileData_saysSo() {
+        val modules = launch()
+        connect(modules)
+
+        modules.session.setPath(IcePath("relay", "srflx", "cellular", "udp"))
+        idle()
+
+        assertEquals(string(R.string.mobile_data_notice), ShadowToast.getTextOfLatestToast())
+        assertTrue(runBlocking { modules.mobileData.wasShown() })
+    }
+
+    @Test
+    fun aMobileDataNoticeWaitingBeforeTheScreenOpens_isShownWhenItOpens() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        modules.session.setPath(IcePath("srflx", "srflx", "cellular", null))
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+
+        assertEquals(string(R.string.mobile_data_notice), ShadowToast.getTextOfLatestToast())
+        assertTrue(runBlocking { modules.mobileData.wasShown() })
     }
 
     @Test

@@ -9,17 +9,24 @@ plugins {
 }
 
 // The Pix server (Design 2.8, Hosting and Configuration). Release builds use Server A, which runs main.
-// Debug builds use `pix.serverUrl` from local.properties (never committed) or -Ppix.serverUrl=...: Server B, which
-// runs dev (`http://swpp26t10.147-46-242-174.sslip.io/`), or a laptop on the test Wi-Fi
-// (`http://192.168.0.10:8000/`). Their default, 10.0.2.2, is the host machine as seen from the emulator.
+// Debug builds default to the AWS server, which runs dev and, unlike the course servers, answers from any network,
+// cellular data included. To use another server, set `pix.serverUrl` in local.properties (never committed) or pass
+// -Ppix.serverUrl=...: a laptop on the test Wi-Fi (`http://192.168.0.10:8000/`), or the host machine as seen from the
+// emulator (`http://10.0.2.2:8000/`).
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
 val debugServerUrl: String = providers.gradleProperty("pix.serverUrl").orNull
     ?: localProperties.getProperty("pix.serverUrl")
-    ?: "http://10.0.2.2:8000/"
+    ?: "http://3.105.185.251/"
 val releaseServerUrl = "http://swpp26t10.147-46-242-169.sslip.io/"
+
+// Debug builds only: `pix.relayOnly=true` makes WebRTC use the TURN relay even when a direct path exists, so the relay
+// can be tried and measured on one Wi-Fi (Design 2.6.7).
+val debugRelayOnly: Boolean = (
+    providers.gradleProperty("pix.relayOnly").orNull ?: localProperties.getProperty("pix.relayOnly")
+    )?.toBoolean() ?: false
 
 // The web OAuth client of the team's Google Cloud project "Pix" (Design 2.8, Configuration). The app asks Google for
 // ID tokens addressed to it, and both servers check them against the same ID in `PIX_GOOGLE_CLIENT_ID`. It is not a
@@ -39,11 +46,13 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
+        buildConfigField("boolean", "RELAY_ONLY", "false")
     }
 
     buildTypes {
         debug {
             buildConfigField("String", "SERVER_URL", "\"$debugServerUrl\"")
+            buildConfigField("boolean", "RELAY_ONLY", "$debugRelayOnly")
         }
         release {
             buildConfigField("String", "SERVER_URL", "\"$releaseServerUrl\"")

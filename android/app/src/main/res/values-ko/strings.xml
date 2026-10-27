@@ -10,6 +10,8 @@
     <string name="same_wifi">두 휴대폰을 같은 Wi-Fi에 연결하세요</string>
     <string name="connecting">연결 중…</string>
     <string name="couldnt_connect_wifi">연결하지 못했어요. 두 휴대폰이 같은 Wi-Fi에 연결되어 있는지 확인하세요.</string>
+    <string name="join_rate_limited">이 네트워크에서 틀린 코드를 너무 많이 입력했어요. 몇 분 뒤에 다시 시도하세요.</string>
+    <string name="mobile_data_notice">실시간 화면에 모바일 데이터를 사용해요.</string>
 
     <!-- Flow 1: Camera -->
     <string name="shoot_together">함께 찍기</string>
@@ -21,6 +23,7 @@
     <string name="camera_zoom_description">카메라 확대 %1$s배</string>
     <string name="zoom_in">확대</string>
     <string name="zoom_out">축소</string>
+    <string name="zoom_next_step">다음 배율</string>
     <string name="camera_grid_description">격자선</string>
     <string name="camera_level_aligned">카메라가 수평이에요</string>
     <string name="camera_level_tilted">가운데 막대가 양옆 표시와 나란해지도록 카메라를 기울이세요</string>

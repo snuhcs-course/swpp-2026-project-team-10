@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.view.View
@@ -29,8 +29,9 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * Join with code's render paths (R&S 6.7, FR-8.2, FR-8.3, FR-8.5; Testing Documentation 2.1.6), on the real
  * Fragment. Partitions: the field empty, 5 digits, 6 digits; opened fresh or to correct a kept code; Join pressed,
- * then the session connecting (to Subject view), not found or expired (to Session not found), or failing otherwise
- * (the same-Wi-Fi message, Join enabled again); Back.
+ * then the session connecting (to Subject view), not found or expired (to Session not found), refused for too many
+ * wrong codes from this network (its message, Join enabled again; NFR-15), or failing otherwise (the same-Wi-Fi
+ * message, Join enabled again); Back.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -175,6 +176,23 @@ class JoinCodeFragmentTest {
 
         onScreen { binding, _ ->
             assertEquals(string(R.string.couldnt_connect_wifi), binding.statusText.text.toString())
+            assertEquals(View.VISIBLE, binding.statusText.visibility)
+            assertTrue(binding.joinButton.isEnabled)
+        }
+    }
+
+    @Test
+    fun join_tooManyWrongCodesFromThisNetwork_saysSoAndEnablesJoinAgain() {
+        val modules = launch()
+        type("482915")
+        onScreen { binding, _ -> binding.joinButton.performClick() }
+        idle()
+
+        modules.session.setState(SessionState.Ended(EndReason.RATE_LIMITED))
+        idle()
+
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.join_rate_limited), binding.statusText.text.toString())
             assertEquals(View.VISIBLE, binding.statusText.visibility)
             assertTrue(binding.joinButton.isEnabled)
         }

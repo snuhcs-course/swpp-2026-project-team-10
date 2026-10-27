@@ -6,19 +6,23 @@ Each drawing has one image in wiki/images/, named after it:
 - An `<svg data-image="<name>.png">` in an HTML file here, such as the Design's architecture figure in
   `design_architecture.html`, becomes `<name>.png` at twice its viewBox width over white (`rsvg-convert`).
 - Each wireframe flow of R&S section 6, `wireframes/<name>.dc.html`, becomes `<name>.jpg`, rendered in headless Chrome
-  at the size its `$preview` declares, and `<name>_ko.jpg`, the same flow in Korean. A flow is a fixed-size HTML page
-  whose elements are placed with `left` and `top` in px. Keep the `support.js` line and the script block at its end,
-  which come from the Claude design canvas format. The two arrows between the phones start in Flow 4 and end in Flow 5,
-  so both files have them.
+  at the size its `$preview` declares, and `<name>_ko.jpg`, the same flow with its screens in Korean. A flow is a fixed-size HTML page whose elements are placed with `left` and `top`
+  in px. Keep the `support.js` line and the script block at its end, which come from the Claude design canvas format.
+  The two arrows between the phones start in Flow 4 and end in Flow 5, so both files have them.
+- A screen is drawn as the app shows it on a Galaxy S22: a card of 168 x 364 px whose top 18 px hold the screen's name,
+  then the app's 360 x 705 dp at 165/360 px per dp, and below it the navigation bar with its home indicator. It is in
+  Manrope (DM Mono for the room code) with the colors of `android/app/src/main/res/values/colors.xml` and the app's own
+  icons as inline SVG. A camera image or a photo is a lighter grey gradient, so its frame shows against the app; in it,
+  a grey figure is the real person and a white outline the pose guide.
 
-The Korean image changes only the text on the screens, the cards that clip their content. The label in a card's top
-left corner, a box on a card that `wireframes/ko.json` lists under `notes`, and everything outside the cards (the
-arrows, the headings, the boxes where a flow starts and ends) stay in English. A screen's text that is one of the
-English strings of `android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in,
-becomes that string's Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in
-ko.json under the flow's name, which also keeps the names and Pix IDs of the flow's people as they are. A screen's
-text with a Latin letter that neither gives, or an entry the flow no longer uses, stops the render, so ko.json
-changes with the drawing; render the flows again after a Korean string changes.
+The Korean image changes only the text on the screens, the part of each card that clips its content between the
+screen's name and the navigation bar; the arrows, the headings, the boxes where a flow starts and ends, and a box on a
+screen that `wireframes/ko.json` lists under `notes` stay in English. A screen's text that is one of the English
+strings of `android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in, becomes that
+string's Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in ko.json under the
+flow's name, which also keeps the names and Pix IDs of the flow's people as they are. A screen's text with a Latin
+letter that neither gives, or an entry the flow no longer uses, stops the render, so ko.json changes with the drawing;
+render the flows again after a Korean string changes.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -49,16 +53,19 @@ DESIGN = Path(__file__).resolve().parent
 IMAGES = DESIGN.parent / "images"
 STRINGS = DESIGN.parent.parent / "android" / "app" / "src" / "main" / "res"
 KOREAN = DESIGN / "wireframes" / "ko.json"
-# The device scale of the wireframe images exported so far, so a re-rendered flow keeps its size in the wiki.
-WIREFRAME_SCALE = 1.4254
+# Twice the page's size: a screen is drawn at its real proportions, so its smallest text (11 sp, 5 px on a card) needs it.
+WIREFRAME_SCALE = 2
 WIREFRAME_JPEG_QUALITY = 92
+# Headless Chrome now and then hangs on a page; another try then works.
+CHROME_TIMEOUT_S = 120
+CHROME_TRIES = 3
 SVG = re.compile(r'<svg\b[^>]*\bdata-image="([^"]+)"[^>]*>.*?</svg>', re.DOTALL)
 VIEWBOX = re.compile(r'viewBox="[\d.]+ [\d.]+ ([\d.]+) [\d.]+"')
 # A flow's markup split into tags (a style block counts as one) and the texts between them.
 MARKUP = re.compile(r"(<style\b.*?</style>|<[^>]+>)", re.DOTALL)
 LATIN = re.compile(r"[A-Za-z]")
-VOID = {"br", "hr", "img", "input", "link", "meta", "wbr"}
 ARGUMENT = re.compile(r"%(\d+)\$([sd])")
+VOID = {"br", "hr", "img", "input", "link", "meta", "wbr"}
 CHROME_PATHS = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "google-chrome",
@@ -157,11 +164,11 @@ class Korean:
 
 def screen_texts(parts: list[str], notes: set[str]) -> tuple[list[int], set[str]]:
     """The indexes of the texts on the screens in [parts], a flow's markup split by MARKUP, and the [notes] found. A
-    screen is a top-level element that clips its content; its label at its top left, and a box on it that holds one of
-    [notes], are not screen text."""
+    card is a top-level element that clips its content, and its screen the box in it that clips too; the screen's
+    name above it and the navigation bar below are not screen text, nor a box on the screen that holds one of [notes]."""
     stack: list[tuple[int, str]] = []  # the open elements: where each starts in parts, and its tag
     boxes: dict[int, int] = {}  # a text on a screen, and the box of the screen it is in
-    labels, noted, found = set(), set(), set()
+    noted, found = set(), set()
     for i, part in enumerate(parts):
         if i % 2 == 1:  # a tag
             name = re.match(r"</?([a-zA-Z][\w-]*)", part)
@@ -170,22 +177,20 @@ def screen_texts(parts: list[str], notes: set[str]) -> tuple[list[int], set[str]
             elif name and name.group(1).lower() not in VOID | {"style"} and not part.endswith("/>"):
                 stack.append((i, part))  # a style block is one part, so it does not stay open
             continue
-        # stack[0] is the page's root, so stack[1] is a top-level element and stack[2] a box on it
-        if len(stack) < 2 or "overflow: hidden" not in stack[1][1]:
+        # stack[0] is the page's root, stack[1] a card, stack[2] its screen, and stack[3] a box on the screen
+        if len(stack) < 3 or "overflow: hidden" not in stack[1][1] or "overflow: hidden" not in stack[2][1]:
             continue
-        box = stack[2] if len(stack) > 2 else stack[1]
+        box = stack[3] if len(stack) > 3 else stack[2]
         boxes[i] = box[0]
-        if len(stack) > 2 and "left: 12px; top: 10px" in box[1]:
-            labels.add(box[0])
         if (key := clean(html.unescape(part)).casefold()) in notes:
             noted.add(box[0])
             found.add(key)
-    return [i for i, box in boxes.items() if box not in labels | noted], found
+    return [i for i, box in boxes.items() if box not in noted], found
 
 
 def korean_page(source: Path) -> str:
-    """The flow's page with its screens in Korean, and IBM Plex Sans KR for the Hangul. Stops on a screen's text
-    without Korean, or an entry of ko.json the flow does not use."""
+    """The flow's page with its screens in Korean, and Noto Sans KR for the Hangul, as Android falls back to a Korean
+    font. Stops on a screen's text without Korean, or an entry of ko.json the flow does not use."""
     flow = source.name.removesuffix(".dc.html")
     korean = Korean(flow)
     page = source.read_text(encoding="utf-8")
@@ -214,8 +219,8 @@ def korean_page(source: Path) -> str:
     page = page.replace('<html lang="en">', '<html lang="ko">')
     # Korean breaks lines between words, not inside them.
     page = page.replace("</helmet>", "<style>*{word-break:keep-all;overflow-wrap:break-word}</style>\n</helmet>")
-    page = page.replace("family=IBM+Plex+Sans:", "family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Sans:")
-    return re.sub(r"'IBM Plex (Sans|Mono)',", r"'IBM Plex \1', 'IBM Plex Sans KR',", page)
+    page = page.replace("family=Manrope:", "family=Noto+Sans+KR:wght@400;500;600;700;800&family=Manrope:")
+    return re.sub(r"'(Manrope|DM Mono)',", r"'\1', 'Noto Sans KR',", page)
 
 
 def render_wireframe(source: Path, target: Path, korean: bool = False) -> None:
@@ -230,21 +235,24 @@ def render_wireframe(source: Path, target: Path, korean: bool = False) -> None:
         if korean:
             source = Path(tmp) / source.name
             source.write_text(page, encoding="utf-8")
-        subprocess.run(
-            [
-                chrome,
-                "--headless",
-                "--hide-scrollbars",
-                f"--force-device-scale-factor={WIREFRAME_SCALE}",
-                f"--window-size={preview['width']},{preview['height']}",
-                # Time for the web fonts to load before the screenshot.
-                "--virtual-time-budget=10000",
-                f"--screenshot={png}",
-                source.as_uri(),
-            ],
-            check=True,
-            capture_output=True,
-        )
+        command = [
+            chrome,
+            "--headless",
+            "--hide-scrollbars",
+            f"--force-device-scale-factor={WIREFRAME_SCALE}",
+            f"--window-size={preview['width']},{preview['height']}",
+            # Time for the web fonts to load before the screenshot.
+            "--virtual-time-budget=10000",
+            f"--screenshot={png}",
+            source.as_uri(),
+        ]
+        for attempt in range(1, CHROME_TRIES + 1):
+            try:
+                subprocess.run(command, check=True, capture_output=True, timeout=CHROME_TIMEOUT_S)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == CHROME_TRIES:
+                    sys.exit(f"{source.name}: Chrome did not finish within {CHROME_TIMEOUT_S} s, {CHROME_TRIES} times")
         Image.open(png).convert("RGB").save(target, "JPEG", quality=WIREFRAME_JPEG_QUALITY)
 
 

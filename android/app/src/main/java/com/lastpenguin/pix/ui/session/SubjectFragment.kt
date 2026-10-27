@@ -1,8 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.ViewCompat
@@ -17,6 +18,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -25,8 +27,16 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.PinchZoomController
+import com.lastpenguin.pix.ui.camera.PreviewArea
+import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
+import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
+import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
+import com.lastpenguin.pix.ui.camera.placeZoomRow
+import com.lastpenguin.pix.ui.camera.previewArea
+import com.lastpenguin.pix.ui.camera.previewAspect
 import java.text.DecimalFormat
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
@@ -51,6 +61,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
 
+    // Where the video is, and how much of it the top bar and the controls cover (previewArea).
+    private var videoArea = PreviewArea(0f, 0f, 0f)
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
         binding.guideOverlay.editable = false
@@ -65,6 +78,22 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
+        binding.videoContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            binding.liveDot.placeIn(binding.videoContainer, viewModel.uiState.value.aspect.frameAspect)
+        }
+        // The video's place follows the screen's height and the bars' (R&S 6.2, 6.6), known only after layout.
+        val placeVideo = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top != oldBottom - oldTop) {
+                view.post {
+                    if (view.isAttachedToWindow) layoutVideo(binding, viewModel.uiState.value.aspect)
+                }
+            }
+        }
+        // The zoom row stays above the brightness slider as it opens and closes.
+        binding.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(binding) }
+        binding.root.addOnLayoutChangeListener(placeVideo)
+        binding.topBar.addOnLayoutChangeListener(placeVideo)
+        binding.bottomPanel.addOnLayoutChangeListener(placeVideo)
         // The whole area takes the pinch, the margins beside a video of another shape too.
         pinchZoom = PinchZoomController(
             binding.videoContainer,
@@ -93,9 +122,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.uiState.collect { ui ->
-                        binding.photographerName.text = ui.photographerName
+                        binding.liveDot.contentDescription = ui.photographerName
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
+                        layoutVideo(binding, ui.aspect)
+                        binding.liveDot.placeIn(binding.videoContainer, ui.aspect.frameAspect)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.frameAspect = ui.aspect.frameAspect
@@ -127,12 +158,20 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         val streaming = connected && frames.hasFrame()
                         val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
                         binding.connectingText.isVisible = !streaming || stalled
+                        binding.liveDot.isVisible = streaming && !stalled
                         binding.connectingText.setText(if (stalled) R.string.camera_paused else R.string.connecting)
                         delay(STALL_CHECK_MS)
                     }
                 }
                 launch {
                     sessionViewModel.transitions.collect { state -> onTransition(state) }
+                }
+                launch {
+                    sessionViewModel.mobileDataPending.collect { pending ->
+                        if (!pending) return@collect
+                        Toast.makeText(requireContext(), R.string.mobile_data_notice, Toast.LENGTH_LONG).show()
+                        sessionViewModel.mobileDataNoticeShown()
+                    }
                 }
             }
         }
@@ -142,6 +181,48 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         pinchZoom?.finishInteraction()
         brightnessSlider?.finishInteraction()
         super.onPause()
+    }
+
+    /**
+     * Puts the video where previewArea says for [aspect], as on the Camera screen (R&S 6.2, 6.6), and the zoom row at
+     * the bottom of its image. The caption below gets a dark gradient while it lies over the video.
+     */
+    private fun layoutVideo(binding: FragmentSubjectBinding, aspect: AspectRatio) {
+        val root = binding.root
+        if (root.width == 0 || root.height == 0) return
+        val area = previewArea(
+            root.width.toFloat(),
+            root.height.toFloat(),
+            binding.topBar.height - TOP_BAR_OVERHANG_DP * resources.displayMetrics.density,
+            binding.bottomPanel.height.toFloat(),
+            aspect.previewAspect,
+        )
+        videoArea = area
+        val container = binding.videoContainer
+        val params = container.layoutParams as ViewGroup.MarginLayoutParams
+        val top = area.top.roundToInt()
+        val bottom = (root.height - area.bottom).roundToInt()
+        if (params.topMargin != top || params.bottomMargin != bottom) {
+            params.topMargin = top
+            params.bottomMargin = bottom
+            container.layoutParams = params
+        }
+        binding.bottomPanel.setBackgroundResource(if (area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        placeZoomRow(binding)
+    }
+
+    /** The zoom row at the bottom of the video as it shows (1:1 inside the 4:3 area), above the slider and caption. */
+    private fun placeZoomRow(binding: FragmentSubjectBinding) {
+        val area = videoArea
+        if (area.bottom <= area.top) return
+        val frame = fitViewfinderFrame(
+            binding.root.width.toFloat(),
+            area.bottom - area.top,
+            viewModel.uiState.value.aspect.frameAspect,
+        )
+        val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
+        val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
+        placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin)
     }
 
     override fun onDestroyView() {
@@ -209,6 +290,16 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             AccessibilityActionCompat.ACTION_SCROLL_BACKWARD,
             getString(R.string.zoom_out),
         ) { _, _ -> adjust(1f / 1.1f) }
+        // A tap steps through the quick zoom steps, such as 0.6×, 1×, and 2× (FR-1.3).
+        readout.setOnClickListener { viewModel.onZoomTap() }
+        ViewCompat.replaceAccessibilityAction(
+            readout,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.zoom_next_step),
+        ) { _, _ ->
+            viewModel.onZoomTap()
+            true
+        }
     }
 
     private fun onTransition(state: SessionState) {

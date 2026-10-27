@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
@@ -25,6 +25,8 @@ data class LinkStats(
     val framesPerSecond: Double?,
     val bitrateKbps: Double?,
     val roundTripMs: Double?,
+    /** null until a candidate pair is selected. */
+    val path: IcePath? = null,
 ) {
     fun summary(): String = listOfNotNull(
         codec?.let { "codec=$it" },
@@ -32,6 +34,19 @@ data class LinkStats(
         framesPerSecond?.let { String.format(Locale.US, "%.1ffps", it) },
         bitrateKbps?.let { "${it.roundToInt()}kbps" },
         roundTripMs?.let { "rtt=${it.roundToInt()}ms" },
+    ).joinToString(" ")
+}
+
+/**
+ * The candidate pair the video goes over (Design 2.6.7, NFR-10): each side's candidate type (`host`, `srflx`, `prflx`,
+ * or `relay`), this phone's network type, and on a relayed path how this phone reaches the relay (`udp`, `tcp`, `tls`).
+ */
+data class IcePath(val local: String, val remote: String, val network: String?, val relayProtocol: String?) {
+    /** For example `local=relay/tcp remote=srflx network=cellular`, the `ice.pair` line in the Timings log. */
+    fun summary(): String = listOfNotNull(
+        "local=" + (relayProtocol?.let { "$local/$it" } ?: local),
+        "remote=$remote",
+        network?.let { "network=$it" },
     ).joinToString(" ")
 }
 

@@ -1,13 +1,16 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.frameAspect
 
 /** Viewfinder-only composition aids. Never consumes gestures or enters captured/streamed frames. */
 class CameraCompositionView @JvmOverloads constructor(
@@ -45,6 +48,14 @@ class CameraCompositionView @JvmOverloads constructor(
             invalidate()
         }
 
+    /** Darkens the camera's image outside the frame, as 1:1 shows inside the 4:3 area (R&S 6.2). */
+    var dimOutside: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     init {
         // A non-clickable sibling lets touches reach PreviewView (or the editable guide) below it.
         isClickable = false
@@ -78,6 +89,7 @@ class CameraCompositionView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (frame.width == 0f || frame.height == 0f) return
+        if (dimOutside) dimOutsideFrame(canvas, width.toFloat(), height.toFloat(), frame)
         val clipped = canvas.save()
         canvas.clipRect(frame.left, frame.top, frame.right, frame.bottom)
         // Two lines in each direction create nine identically sized cells inside the image only.
@@ -111,4 +123,33 @@ class CameraCompositionView @JvmOverloads constructor(
         canvas.drawLine(x1, y1, x2, y2, barOutline)
         canvas.drawLine(x1, y1, x2, y2, bar)
     }
+}
+
+private const val DIM_ALPHA = 153
+private val outsideDim = Paint().apply { color = Color.argb(DIM_ALPHA, 0, 0, 0) }
+
+/** Darkens [canvas], [width] by [height], outside [frame], as 1:1 shows inside the 4:3 area (R&S 6.2). */
+internal fun dimOutsideFrame(canvas: Canvas, width: Float, height: Float, frame: ViewfinderFrame) {
+    canvas.drawRect(0f, 0f, width, frame.top, outsideDim)
+    canvas.drawRect(0f, frame.bottom, width, height, outsideDim)
+    canvas.drawRect(0f, frame.top, frame.left, frame.bottom, outsideDim)
+    canvas.drawRect(frame.right, frame.top, width, frame.bottom, outsideDim)
+}
+
+/**
+ * The preview's last [bitmap] as the Camera screen holds it while the camera rebinds: of a 1:1 [aspect], the 4:3 area
+ * with the outside dimmed as the live view showed it, because the overlay that dims it goes with the old ratio; of
+ * the others, as it is (the still is clipped to their frame). It is drawn pixel for pixel where the preview was, so it
+ * has no density, which would scale it when the display's size setting differs from the one the bitmap was made for.
+ */
+internal fun heldFrame(bitmap: Bitmap, aspect: AspectRatio): Bitmap {
+    val dim = aspect.previewAspect != aspect.frameAspect
+    val held = if (!dim || bitmap.isMutable) bitmap else bitmap.copy(Bitmap.Config.ARGB_8888, true)
+    if (dim) {
+        val width = held.width.toFloat()
+        val height = held.height.toFloat()
+        dimOutsideFrame(Canvas(held), width, height, fitViewfinderFrame(width, height, aspect.frameAspect))
+    }
+    held.density = Bitmap.DENSITY_NONE
+    return held
 }

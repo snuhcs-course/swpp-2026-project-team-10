@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -30,6 +30,7 @@ import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.RemoteControlHandler
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -65,6 +66,7 @@ class TestAppContainer(
     val auth = FakeAuthRepository()
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
+    val mobileData = MobileDataNotice.InMemory()
     private val syncer = GuideSyncer(session, guides, mirror, FakeGuideImageCodec())
 
     val container = AppContainer(
@@ -85,6 +87,7 @@ class TestAppContainer(
         remoteVideo = video,
         guideSyncer = syncer,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
+        mobileDataNotice = mobileData,
     )
 
     /** Installs the container in the test's [PixApplication]; call before the screen is launched. */

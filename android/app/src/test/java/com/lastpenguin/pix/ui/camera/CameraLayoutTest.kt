@@ -13,6 +13,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.view.PreviewView
+import androidx.lifecycle.MutableLiveData
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -20,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -54,7 +57,8 @@ import org.robolectric.annotation.GraphicsMode
  * Ratios: 4:3, 16:9, and 1:1, each with the preview right below the top bar, the shutter's row in one place, and the
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
  * the top bar: no guide, a guide with a pose tip, and a session, at font scale 1 and 1.3, none overlapping. A guide's
- * panel in the space below a 4:3 image. The frame held while the ratio changes, in its place. The zoom readout's tap
+ * panel in the space below a 4:3 image. The frame held while the ratio changes, in its place and the old ratio's
+ * area until the new one streams; a held 1:1 frame dimmed once. The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
  */
 @RunWith(AndroidJUnit4::class)
@@ -67,6 +71,7 @@ import org.robolectric.annotation.GraphicsMode
 class CameraLayoutTest {
     private class Camera(
         val activity: AppCompatActivity,
+        val fragment: CameraFragment,
         val controls: FragmentCameraBinding,
         val modules: TestAppContainer,
     )
@@ -85,7 +90,7 @@ class CameraLayoutTest {
         val fragment = CameraFragment()
         activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
         idle()
-        return Camera(activity, FragmentCameraBinding.bind(fragment.requireView()), modules)
+        return Camera(activity, fragment, FragmentCameraBinding.bind(fragment.requireView()), modules)
     }
 
     private fun Camera.ratio(aspect: AspectRatio) {
@@ -222,6 +227,60 @@ class CameraLayoutTest {
         assertEquals(Color.RED, drawn.getPixel(still.width / 2, 0))
         assertEquals(Color.RED, drawn.getPixel(still.width / 2, frame.height - 1))
         assertEquals(Color.TRANSPARENT, drawn.getPixel(still.width / 2, frame.height + 1))
+    }
+
+    /** A preview that streams and has a last frame to hold, which PreviewView has not without a surface. */
+    @Suppress("UNCHECKED_CAST")
+    private fun Camera.streaming() {
+        val area = controls.previewContainer
+        fragment.previewFrame = { Bitmap.createBitmap(area.width, area.height, Bitmap.Config.ARGB_8888) }
+        val field = PreviewView::class.java.getDeclaredField("mPreviewStreamStateLiveData")
+        field.isAccessible = true
+        (field.get(controls.previewView) as MutableLiveData<PreviewView.StreamState>).value =
+            PreviewView.StreamState.STREAMING
+        idle()
+    }
+
+    /** The camera's status in a rebind: STARTING, then READY, which lets a held frame go while the preview streams. */
+    private fun Camera.rebind(status: CameraStatus) {
+        (modules.camera as FakeCameraController).setStatus(status)
+        idle()
+    }
+
+    @Test
+    fun aRatioChange_keepsTheHeldFramesPlace_untilTheNewRatioStreams() {
+        val screen = camera()
+        screen.ratio(AspectRatio.R16_9)
+        screen.streaming()
+
+        // 16:9 to 1:1: the held 16:9 frame keeps its 640 dp, though 1:1 shows in the 480 dp 4:3 area.
+        screen.controls.aspectButton.performClick()
+        screen.ratio(AspectRatio.R1_1)
+        screen.rebind(CameraStatus.STARTING)
+        assertTrue(screen.controls.aspectStill.isShown)
+        assertEquals(640, screen.controls.previewContainer.box().height())
+
+        screen.rebind(CameraStatus.READY)
+        assertFalse(screen.controls.aspectStill.isShown)
+        assertEquals(480, screen.controls.previewContainer.box().height())
+    }
+
+    @Test
+    fun aLensSwitchIn1To1_dimsTheHeldFramesOutsideOnce() {
+        val screen = camera()
+        screen.ratio(AspectRatio.R1_1)
+        screen.streaming()
+        assertTrue(screen.controls.compositionOverlay.dimOutside)
+
+        // The held frame carries the dim, and the grid stays over it without its own.
+        screen.rebind(CameraStatus.STARTING)
+        assertTrue(screen.controls.aspectStill.isShown)
+        assertTrue(screen.controls.compositionOverlay.isShown)
+        assertFalse(screen.controls.compositionOverlay.dimOutside)
+
+        screen.rebind(CameraStatus.READY)
+        assertFalse(screen.controls.aspectStill.isShown)
+        assertTrue(screen.controls.compositionOverlay.dimOutside)
     }
 
     // ---- The top bar ------------------------------------------------------------------------

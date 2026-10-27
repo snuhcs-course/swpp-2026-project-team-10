@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
 import com.lastpenguin.pix.core.Timings
@@ -86,6 +87,11 @@ class SubjectViewModel(
         session.send(SessionMessage.ZoomSet(ratio, final))
         Timings.mark("zoom.sent", "$ratio${if (final) " final" else ""}")
     }
+
+    // The quick step a tap asked for until the photographer's camera echoes it, so that a late echo of an earlier step
+    // does not take the readout, and the next tap, back to it (FR-7.1).
+    private var pendingZoomStep: Float? = null
+
     private val exposureSender = StepSender<Int>(viewModelScope, SEND_INTERVAL_MS) { index, final ->
         session.send(SessionMessage.ExposureSet(index, final))
         Timings.mark("exposure.sent", "$index${if (final) " final" else ""}")
@@ -108,7 +114,7 @@ class SubjectViewModel(
                 _uiState.update {
                     it.copy(
                         aspect = camera?.aspect ?: AspectRatio.R4_3,
-                        zoom = camera?.zoom?.takeUnless { zoomSender.adjusting } ?: it.zoom,
+                        zoom = camera?.zoom?.let { zoom -> shownZoom(zoom, by = null, shown = it.zoom) } ?: it.zoom,
                         exposure = camera?.exposure?.takeUnless { exposureSender.adjusting } ?: it.exposure,
                         flash = camera?.flash ?: it.flash,
                     )
@@ -152,7 +158,7 @@ class SubjectViewModel(
                 // While a pinch or the slider is moving its own steps rule the display; the echo wins once it ends.
                 _uiState.update {
                     it.copy(
-                        zoom = if (zoomSender.adjusting) it.zoom else message.zoom,
+                        zoom = shownZoom(message.zoom, message.by, shown = it.zoom),
                         exposure = if (exposureSender.adjusting) it.exposure else message.exposure,
                         flash = message.flash,
                     )
@@ -227,21 +233,44 @@ class SubjectViewModel(
      * `camera.state` decides what stays (Design 2.6.5).
      */
     fun onZoomGesture(ratio: Float, final: Boolean) {
+        pendingZoomStep = null
+        zoomTo(ratio, final)
+    }
+
+    /**
+     * A tap on the zoom readout (FR-7.1): the next quick step of the photographer's camera, sent as a final value and
+     * shown until its echo comes, whatever earlier steps echo meanwhile.
+     */
+    fun onZoomTap() {
+        val ui = _uiState.value
+        val step = nextZoomStep(quickZoomSteps(ui.minZoom, ui.maxZoom), ui.zoom) ?: return
+        if (zoomTo(step, final = true)) pendingZoomStep = step
+    }
+
+    /** Shows [ratio] and asks the photographer for it; false when the zoom cannot be changed. */
+    private fun zoomTo(ratio: Float, final: Boolean): Boolean {
         val ui = _uiState.value
         if (!ratio.isFinite() || !ui.canZoom) {
             // A disabled or interrupted pinch must release echo suppression even if its final request is rejected.
             if (final) zoomSender.cancel()
-            return
+            return false
         }
         val clamped = ratio.coerceIn(ui.minZoom, ui.maxZoom)
         _uiState.update { it.copy(zoom = clamped) }
         if (final) zoomSender.finish(clamped) else zoomSender.step(clamped)
+        return true
     }
 
-    /** A tap on the zoom readout (FR-7.1): the next quick step of the photographer's camera, sent as a final value. */
-    fun onZoomTap() {
-        val ui = _uiState.value
-        nextZoomStep(quickZoomSteps(ui.minZoom, ui.maxZoom), ui.zoom)?.let { onZoomGesture(it, final = true) }
+    /**
+     * The zoom to show for an [echoed] one, [by] whom when known: the [shown] one while a pinch runs, or while a quick
+     * step waits for its echo and this one, not the photographer's own, is of an earlier step.
+     */
+    private fun shownZoom(echoed: Float, by: Role?, shown: Float): Float {
+        if (zoomSender.adjusting) return shown
+        val pending = pendingZoomStep ?: return echoed
+        if (by != Role.PHOTOGRAPHER && !isAtZoomStep(echoed, pending)) return shown
+        pendingZoomStep = null
+        return echoed
     }
 
     /** From the brightness slider (FR-7.3): an exposure index, shown at once and sent like a zoom step. */
@@ -275,6 +304,7 @@ class SubjectViewModel(
     }
 
     private fun endInteractions() {
+        pendingZoomStep = null
         zoomSender.cancel()
         exposureSender.cancel()
         guideSender.cancel()

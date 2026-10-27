@@ -9,10 +9,10 @@ Each drawing has one image in wiki/images/, named after it:
   at the size its `$preview` declares. A flow is a fixed-size HTML page whose elements are placed with `left` and `top`
   in px. Keep the `support.js` line and the script block at its end, which come from the Claude design canvas format.
   The two arrows between the phones start in Flow 4 and end in Flow 5, so both files have them.
-- A screen is drawn as the app shows it on a Galaxy S22: a card of 168 x 336 px whose top 18 px hold the screen's name,
-  then the app's 360 x 705 dp at 165/360 px per dp, in Manrope (DM Mono for the room code) with the colors of
-  `android/app/src/main/res/values/colors.xml` and the app's own icons as inline SVG. In a camera image, a grey figure
-  is the real person and a white outline the pose guide.
+- A screen is drawn as the app shows it on a Galaxy S22: a card of 168 x 364 px whose top 18 px hold the screen's name,
+  then the app's 360 x 705 dp at 165/360 px per dp, and below it the navigation bar with its home indicator. It is in
+  Manrope (DM Mono for the room code) with the colors of `android/app/src/main/res/values/colors.xml` and the app's own
+  icons as inline SVG. In a camera image, a grey figure is the real person and a white outline the pose guide.
 
 Change the drawing, never the image alone, and render it in the same PR:
 

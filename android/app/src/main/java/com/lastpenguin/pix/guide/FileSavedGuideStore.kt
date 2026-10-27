@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -187,20 +187,26 @@ class FileSavedGuideStore(
     /**
      * A folder from before the mask-only transfer: `cutout.webp`'s alpha becomes `mask.png`, and the cutout, which
      * holds the reference's pixels, is deleted. A cutout that cannot be read is left, and the folder fails [read].
+     * A cutout next to a mask is from a move that stopped before the delete, which is tried again at every read.
      */
     private fun migrate(folder: File) {
         val cutout = File(folder, OLD_CUTOUT)
-        if (!cutout.isFile || File(folder, MASK).isFile) return
-        val mask = decode(cutout)?.maskPixels() ?: return
-        val unfinished = File(folder, ".$MASK")
-        try {
-            writeMask(unfinished, mask)
-            if (!unfinished.renameTo(File(folder, MASK))) throw IOException("Could not move $unfinished into place")
-            if (!cutout.delete()) Log.w(TAG, "Could not delete the old cutout of saved guide ${folder.name}")
-        } catch (error: IOException) {
-            unfinished.delete()
-            Log.w(TAG, "Could not move saved guide ${folder.name} to a mask", error)
+        if (!cutout.isFile) return
+        if (!File(folder, MASK).isFile) {
+            val mask = decode(cutout)?.maskPixels() ?: return
+            val unfinished = File(folder, ".$MASK")
+            try {
+                writeMask(unfinished, mask)
+                if (!unfinished.renameTo(File(folder, MASK))) {
+                    throw IOException("Could not move $unfinished into place")
+                }
+            } catch (error: IOException) {
+                unfinished.delete()
+                Log.w(TAG, "Could not move saved guide ${folder.name} to a mask", error)
+                return
+            }
         }
+        if (!cutout.delete()) Log.w(TAG, "Could not delete the old cutout of saved guide ${folder.name}")
     }
 
     /** At most [MAX_MASK_HEIGHT] tall, as the other phone receives it. */

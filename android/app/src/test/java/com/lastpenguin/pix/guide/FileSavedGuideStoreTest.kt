@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -34,7 +35,8 @@ import org.robolectric.annotation.GraphicsMode
  * load: a saved guide (mask at most 720 px tall, outline rebuilt, anchor, aspect, source, state, and reference as
  * saved), an unknown id, an unreadable mask.
  * Migration from before the mask-only transfer (#113): a folder with `cutout.webp` and no `mask.png` is listed,
- * gets `mask.png` from the cutout's alpha, loses the cutout, and loads; one whose cutout cannot be read is deleted.
+ * gets `mask.png` from the cutout's alpha, loses the cutout, and loads; one whose cutout cannot be read is deleted;
+ * one left with both, by a move that stopped before the delete, loses the cutout and keeps its mask.
  * Restart (a new store on the same folder): the saved guides, newest first, and they load; unfinished, broken, and
  * unusable folders (an aspect of 0) are not listed and are deleted.
  * delete: a saved guide (gone from the list, the storage, and the next start), an unknown id.
@@ -307,6 +309,22 @@ class FileSavedGuideStoreTest {
         assertEquals(0, Color.alpha(loaded.mask.getPixel(2, 2)))
         assertEquals(255, Color.alpha(loaded.mask.getPixel(120, 360)))
         assertTrue("the outline is drawn", hasVisiblePixel(loaded.outline))
+    }
+
+    @Test
+    fun restart_folderWithAMaskAndAnOldCutout_losesTheCutoutAndKeepsItsMask() = runTest {
+        val directory = File(folder.root, "guides")
+        store(directory).save(guide("g1"), GuideState()).getOrThrow()
+        val mask = File(directory, "g1/mask.png").readBytes()
+        File(directory, "g1/cutout.webp").writeText("the reference's pixels")
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals(listOf("g1"), after.saved.value.map { it.id })
+        assertEquals(setOf("mask.png", "reference.webp", "meta.json"), File(directory, "g1").list()?.toSet())
+        assertArrayEquals(mask, File(directory, "g1/mask.png").readBytes())
+        assertNotNull(after.load("g1").getOrNull())
     }
 
     @Test

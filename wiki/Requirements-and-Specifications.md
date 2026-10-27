@@ -25,6 +25,7 @@
 | 2.2 | 2026-10-26 | Pose tips as built (Iter3-P11, [#115], [#110]): one tip for the pose the user takes, on the Camera screen (4.1, F4, FR-4.10, US-15, NFR-13, 6.2, Figure 1, 6.8, glossary). |
 | 2.3 | 2026-10-26 | Camera and Subject view controls and preview size (Iter3-A2, [#136]): smaller controls, the preview right below the top bar with 1:1 in the 4:3 area and 16:9 down under the controls, the shutter in one place, the zoom over the image with quick steps, and a blinking light in place of the Live badge and the name (FR-1.3, FR-1.13, FR-4.10, FR-6.6, FR-6.8, FR-7.1, 6.2, 6.3, 6.5, 6.6, Figures 1, 2, 4, 5). |
 | 2.4 | 2026-10-26 | Sessions across networks (Iter3-P13, [#117]): the mobile-data notice on *Friend connected* and *Subject view* (FR-6.13), and the wrong-code message on *Join with code* (NFR-15) in section 6. |
+| 2.5 | 2026-10-27 | The wireframe figures redrawn from the app's screens (6.1–6.7). |
 
 Items marked **TBD** need a team decision.
 
@@ -572,11 +573,11 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 
 ### 6.1 Wireframe overview
 
-The low-fidelity wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below.
+The wireframe is drawn as a wireflow: each row is one task, arrows are user inputs or system events, and failure screens hang below the step where they occur. Each screen is drawn as the app shows it on a Galaxy S22, with the screen's name above it; the screens the app does not have yet use its components. Its source is `wiki/design/wireframes/` in the repository, one file per flow, rendered to the figures below.
 
 - **Arrows**: user input or system event, labeled
 - **Dashed coral frame**: failure case
-- **Dashed mint figure**: the pose guide
+- **White outline**: the pose guide
 - **Grey figure**: the real person
 
 In the tables below, **Input → result** lists what the user can do on the screen and where it leads. **Not allowed / failure** lists blocked inputs and what the screen does when something goes wrong.

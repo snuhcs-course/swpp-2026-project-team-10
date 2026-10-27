@@ -48,6 +48,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
@@ -188,6 +189,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
         controls.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupReference(controls)
+        setupTip(controls)
         controls.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
         }
@@ -594,7 +596,44 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             )
         }
         renderReference(controls, state)
+        renderTip(controls, state)
         renderScenePhoto(controls, generationViewModel.uiState.value)
+    }
+
+    /**
+     * The pose tip (FR-4.10): a touch anywhere closes the banner and still does what it does where it lands; the tip
+     * button opens it again. The banner is clickable as well, so TalkBack can close it.
+     */
+    private fun setupTip(controls: FragmentCameraBinding) {
+        (controls.root as TouchWatchingLayout).onTouchEnd = viewModel::onAnyTouch
+        controls.tipButton.setOnClickListener { viewModel.onTipButton() }
+        controls.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
+        ViewCompat.replaceAccessibilityAction(
+            controls.tipBanner,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.close_tip),
+        ) { _, _ ->
+            viewModel.onAnyTouch()
+            true
+        }
+    }
+
+    /**
+     * The pose tip of the guide on the camera (FR-4.10): hidden with the guide, and the button only while a tip is
+     * coming or there. The scene photo step hides both (renderScenePhoto).
+     */
+    private fun renderTip(controls: FragmentCameraBinding, state: CameraUiState) {
+        val tip = state.tip?.takeIf { state.guide != null && state.guideState.visible }
+        val available = tip != null && tip.state != TipState.Failed
+        controls.tipButtonFrame.isVisible = available
+        controls.tipDot.isVisible = available && tip.unseen
+        controls.tipBanner.isVisible = tip?.open == true
+        controls.tipText.text = when (val shown = tip?.state) {
+            TipState.Preparing -> getString(R.string.tip_preparing)
+            is TipState.Ready -> shown.tip.text
+            TipState.Failed -> getString(R.string.tip_failed)
+            null -> null
+        }
     }
 
     /**
@@ -681,6 +720,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false
+        controls.tipBanner.isVisible = false
         if (scene.shotFailed) {
             showStatus(controls.captureStatus, R.string.scene_shot_failed, StatusLook.ERROR)
         } else {

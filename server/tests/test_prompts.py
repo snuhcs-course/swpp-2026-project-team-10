@@ -1,9 +1,10 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 # prompts.toml partitions (Testing Documentation 2.1.6). The file as shipped; a prompt wrapped over several lines; a
 # pose prompt without {pose}, with it twice, missing, or empty; a suggestion prompt missing or empty; a variation
-# prompt without {description}, with it twice, missing, or empty; an unknown key at the top or in a default pose; a
-# default pose without a field, with an empty one, longer than a description, or not a table; three or five default
-# poses; an id used twice; a file that is not TOML. A pose or description with braces of its own.
+# prompt without {description}, with it twice, missing, or empty; a tip prompt missing or empty; an unknown key at the
+# top or in a default pose; a default pose without a field, with an empty one, longer than a description, or not a
+# table; three or five default poses; an id used twice; a file that is not TOML. A pose or description with braces of
+# its own.
 import tomllib
 
 import pytest
@@ -20,7 +21,8 @@ from pix_server.poses.prompts import (
 POSE_PROMPT = 'pose_prompt = "Same person and place. Pose: {pose}."\n'
 SUGGESTION_PROMPT = 'suggestion_prompt = "Suggest four poses as JSON."\n'
 VARIATION_PROMPT = 'variation_prompt = "Three variations of {description} as JSON."\n'
-MODEL_PROMPTS = SUGGESTION_PROMPT + VARIATION_PROMPT
+TIP_PROMPT = 'tip_prompt = "How to hold the phone, as JSON."\n'
+MODEL_PROMPTS = SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT
 
 
 def default_pose(pose_id: str, pose: str = "waving") -> str:
@@ -45,7 +47,7 @@ def test_shipped_file_has_the_prompts_and_four_default_poses_in_order():
     assert list(prompts.default_poses) == ["hands_on_hips", "wave", "walking", "arms_crossed"]
     assert prompts.pose.count("{pose}") == 1
     assert prompts.variation.count("{description}") == 1
-    for prompt in (prompts.pose, prompts.suggestion, prompts.variation):
+    for prompt in (prompts.pose, prompts.suggestion, prompts.variation, prompts.tip):
         assert "\n" not in prompt and "  " not in prompt
     assert '{"poses": [' in prompts.suggestion and '{"poses": [' in prompts.variation
     assert prompts.default_poses == DEFAULT_POSES
@@ -66,13 +68,22 @@ def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
         ('pose_prompt = "  "\n' + MODEL_PROMPTS + FOUR, "pose_prompt"),
         (POSE_PROMPT + VARIATION_PROMPT + FOUR, "suggestion_prompt"),
         (POSE_PROMPT + 'suggestion_prompt = ""\n' + VARIATION_PROMPT + FOUR, "suggestion_prompt"),
-        (POSE_PROMPT + SUGGESTION_PROMPT + FOUR, "variation_prompt"),
-        (POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = " "\n' + FOUR, "variation_prompt"),
-        (POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = "Three variations."\n' + FOUR, "variation_prompt"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + TIP_PROMPT + FOUR, "variation_prompt"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = " "\n' + TIP_PROMPT + FOUR, "variation_prompt"),
         (
-            POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = "{description} or {description}"\n' + FOUR,
+            POSE_PROMPT + SUGGESTION_PROMPT + 'variation_prompt = "Three variations."\n' + TIP_PROMPT + FOUR,
             "variation_prompt",
         ),
+        (
+            POSE_PROMPT
+            + SUGGESTION_PROMPT
+            + 'variation_prompt = "{description} or {description}"\n'
+            + TIP_PROMPT
+            + FOUR,
+            "variation_prompt",
+        ),
+        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + FOUR, "tip_prompt"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + 'tip_prompt = ""\n' + FOUR, "tip_prompt"),
         (POSE_PROMPT + MODEL_PROMPTS + 'template_prompt = "{pose}"\n' + FOUR, "template_prompt"),
     ],
     ids=[
@@ -86,6 +97,8 @@ def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
         "empty variation",
         "variation without placeholder",
         "variation placeholder twice",
+        "no tip",
+        "empty tip",
         "unknown key",
     ],
 )

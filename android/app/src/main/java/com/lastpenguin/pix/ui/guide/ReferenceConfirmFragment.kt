@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -27,6 +28,12 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
 
+        // Back leaves without the guide: a person still being found and the tip asked for it stop (FR-4.10).
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
+            viewModel.onConfirmLeft()
+            isEnabled = false
+            requireActivity().onBackPressedDispatcher.onBackPressed()
+        }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         binding.useGuideButton.setOnClickListener {
             viewModel.onUseGuide()

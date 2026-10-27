@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -39,6 +39,7 @@ from pix_server.poses.generator import PoseGenerator
 from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.router import router as poses_router
 from pix_server.poses.suggester import PoseSuggester
+from pix_server.poses.tips import PoseTipper
 from pix_server.signaling.registry import SessionRegistry
 from pix_server.signaling.router import router as signaling_router
 from pix_server.store import SessionStore, open_redis
@@ -125,6 +126,7 @@ def create_app(
             ):
                 app.state.pose_generator = PoseGenerator(config, http)
                 app.state.pose_suggester = PoseSuggester(config, http)
+                app.state.pose_tipper = PoseTipper(config, http)
                 app.state.google = google or GoogleTokenVerifier(config.google_client_id, google_http, clock)
                 registry = SessionRegistry(config, store, TurnRelay(config, turn_http).ice_servers)
                 app.state.signaling = registry

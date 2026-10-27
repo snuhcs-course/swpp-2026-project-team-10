@@ -70,6 +70,11 @@
     <string name="move_reference_bottom_left">Move to the bottom left</string>
     <string name="move_reference_bottom_right">Move to the bottom right</string>
     <string name="edit_guide">Edit guide</string>
+    <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
+    <string name="tip_preparing">Preparing a tip…</string>
+    <string name="tip_failed">Couldn\'t get a tip for this pose</string>
+    <string name="show_tip">Show tip</string>
+    <string name="close_tip">Close tip</string>
     <string name="hint_pinch_zoom">Pinch to zoom</string>
     <string name="flash_off">Flash off</string>
     <string name="flash_auto">Flash auto</string>

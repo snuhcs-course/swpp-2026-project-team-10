@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.core.network
 
 import kotlinx.serialization.Serializable
@@ -15,6 +15,20 @@ data class PoseResponseDto(
     val templateId: String? = null,
     val image: String, // Base64 JPEG
     val elapsedMs: Long,
+)
+
+/**
+ * `POST /pose-tips`: [text] is what the app shows. The rest says the same in fields: `framing` (`closer`, `back`,
+ * `keep`), `hold` (where to hold the phone: `crouching`, `waist`, `chest`, `eye`, `above head`), `height` against
+ * the scene (`raise`, `lower`, `keep`), and `angle` (`up`, `level`, `down`).
+ */
+@Serializable
+data class PoseTipDto(
+    val text: String,
+    val framing: String,
+    val hold: String,
+    val height: String,
+    val angle: String,
 )
 
 @Serializable

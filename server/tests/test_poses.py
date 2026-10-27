@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
@@ -13,12 +13,11 @@ import tempfile
 
 import httpx2
 import pytest
-import uvicorn
 from PIL import Image
 from pydantic import SecretStr
 from starlette.formparsers import MultiPartParser
 
-from pix_server.main import MAX_REQUEST_BYTES, create_app
+from pix_server.main import MAX_REQUEST_BYTES
 from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH
 from pix_server.store import Window
@@ -348,29 +347,19 @@ def test_pose_request_is_refused_while_the_session_store_is_down(client, image_a
     assert create_pose(client, make_image()).status_code == 200
 
 
-async def test_dropped_request_cancels_the_image_api_call(settings, image_api, make_image, unused_tcp_port, open_store):
-    # A real server and socket, because the test client cannot close a connection in the middle of a request.
+async def test_dropped_request_cancels_the_image_api_call(live_server, image_api, make_image):
     image_api.delay = 30
-    app = create_app(settings, image_api=httpx2.MockTransport(image_api), redis=open_store)
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=unused_tcp_port, log_level="warning"))
-    serving = asyncio.create_task(server.serve())
-    try:
-        while not server.started:
-            await asyncio.sleep(0.01)
-        async with httpx2.AsyncClient(base_url=f"http://127.0.0.1:{unused_tcp_port}") as phone:
-            with pytest.raises(httpx2.ReadTimeout):
-                await phone.post(
-                    "/api/v1/poses",
-                    files={"image": ("scene.jpg", make_image(), "image/jpeg")},
-                    data={"templateId": "wave", "seed": "1"},
-                    timeout=0.2,
-                )
-        assert len(image_api.requests) == 1
-        async with asyncio.timeout(2):
-            await image_api.cancelled.wait()
-    finally:
-        server.should_exit = True
-        await serving
+    async with httpx2.AsyncClient(base_url=live_server) as phone:
+        with pytest.raises(httpx2.ReadTimeout):
+            await phone.post(
+                "/api/v1/poses",
+                files={"image": ("scene.jpg", make_image(), "image/jpeg")},
+                data={"templateId": "wave", "seed": "1"},
+                timeout=0.2,
+            )
+    assert len(image_api.requests) == 1
+    async with asyncio.timeout(2):
+        await image_api.cancelled.wait()
 
 
 def test_request_that_stays_connected_is_not_cancelled(client, image_api, make_image):

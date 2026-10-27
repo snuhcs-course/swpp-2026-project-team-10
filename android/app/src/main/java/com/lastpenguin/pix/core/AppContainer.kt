@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-25, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -30,7 +30,10 @@ import com.lastpenguin.pix.core.network.PixAuthApi
 import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseTipper
+import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.RemotePoseGenerator
+import com.lastpenguin.pix.generation.RemotePoseTipper
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -91,6 +94,10 @@ class AppContainer(
     val savedGuideStore: SavedGuideStore,
     // ---- Pose generation (#7) ---------------------------------------------------
     val poseGenerator: PoseGenerator,
+    /** How to hold the phone for a generated pose (FR-4.10). */
+    val poseTipper: PoseTipper,
+    /** The tip of the guide on Camera, asked for with [poseTipper]. */
+    val poseTips: PoseTips,
     val generationConsent: GenerationConsent,
     // ---- Accounts and friends (#54) ---------------------------------------------
     val authRepository: AuthRepository,
@@ -176,15 +183,19 @@ class AppContainer(
             )
             val guideSyncer =
                 GuideSyncer(rtcSessionManager, guideRepository, mirrorGuideRepository, WebpGuideImageCodec())
+            val referenceGuideMaker: ReferenceGuideMaker =
+                MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
+            val poseTipper: PoseTipper = RemotePoseTipper(pixApi)
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,
-                referenceGuideMaker =
-                    MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor()),
+                referenceGuideMaker = referenceGuideMaker,
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
+                poseTipper = poseTipper,
+                poseTips = PoseTips(poseTipper, guideRepository.guide, appScope),
                 generationConsent = DataStoreGenerationConsent(appContext),
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),

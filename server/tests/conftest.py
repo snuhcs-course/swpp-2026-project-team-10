@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 import asyncio
 import base64
 import io
@@ -10,6 +10,7 @@ import fakeredis
 import httpx2
 import pytest
 import redis
+import uvicorn
 from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -43,6 +44,16 @@ def encode_image(image_format: str = "JPEG", size: tuple[int, int] = (768, 1024)
     return buffer.getvalue()
 
 
+TIP = {
+    "shot": "full body",
+    "pose": "standing",
+    "camera_now": "chest",
+    "camera_best": "waist",
+    "angle": "up",
+    "framing": "closer",
+    "text": "Zoom in or take a step closer, hold the phone at your waist and tilt it up a little - the legs look longer.",
+}
+
 SUGGESTED_POSES = [
     "Lean one shoulder on the door and smile at the camera",
     "Walk toward the camera and look to the side",
@@ -54,16 +65,21 @@ SUGGESTED_POSES = [
 class ImageApi:
     """Stands in for OpenRouter. The Image API records each request in `requests` and answers with `status` and
     `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
-    `suggestion_status` and `suggestion_body` after `suggestion_delay`."""
+    `suggestion_status` and `suggestion_body` after `suggestion_delay`, except tip requests (the `tip` schema), which
+    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. `cancelled` is set when a call is
+    cancelled while it waits for its answer."""
 
     def __init__(self) -> None:
         self.requests: list[httpx2.Request] = []
         self.suggestion_requests: list[httpx2.Request] = []
+        self.tip_requests: list[httpx2.Request] = []
         self.delay = 0.0
         self.suggestion_delay = 0.0
+        self.tip_delay = 0.0
         self.cancelled = asyncio.Event()
         self.returns(encode_image())
         self.suggests(SUGGESTED_POSES)
+        self.tips(TIP)
 
     def returns(self, image: bytes) -> None:
         self.status = 200
@@ -85,6 +101,18 @@ class ImageApi:
         self.suggestion_status = status
         self.suggestion_body = {"error": {"code": status, "message": message}}
 
+    def tips(self, fields: dict) -> None:
+        self.tip_answers(json.dumps(fields))
+
+    def tip_answers(self, content: object) -> None:
+        """The tip model's message, as written; `tips` writes the JSON the schema asks for."""
+        self.tip_status = 200
+        self.tip_body: object = {"choices": [{"message": {"role": "assistant", "content": content}}]}
+
+    def tip_fails(self, status: int, message: str = "Provider returned error") -> None:
+        self.tip_status = status
+        self.tip_body = {"error": {"code": status, "message": message}}
+
     @property
     def payloads(self) -> list[dict]:
         return [json.loads(request.content) for request in self.requests]
@@ -93,18 +121,30 @@ class ImageApi:
     def suggestion_payloads(self) -> list[dict]:
         return [json.loads(request.content) for request in self.suggestion_requests]
 
+    @property
+    def tip_payloads(self) -> list[dict]:
+        return [json.loads(request.content) for request in self.tip_requests]
+
     async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        schema = json.loads(request.content or b"{}").get("response_format", {}).get("json_schema", {})
+        if request.url.path == "/api/v1/chat/completions" and schema.get("name") == "tip":
+            self.tip_requests.append(request)
+            await self.wait(self.tip_delay)
+            return httpx2.Response(self.tip_status, json=self.tip_body)
         if request.url.path == "/api/v1/chat/completions":
             self.suggestion_requests.append(request)
-            await asyncio.sleep(self.suggestion_delay)
+            await self.wait(self.suggestion_delay)
             return httpx2.Response(self.suggestion_status, json=self.suggestion_body)
         self.requests.append(request)
+        await self.wait(self.delay)
+        return httpx2.Response(self.status, json=self.body)
+
+    async def wait(self, seconds: float) -> None:
         try:
-            await asyncio.sleep(self.delay)
+            await asyncio.sleep(seconds)
         except asyncio.CancelledError:
             self.cancelled.set()
             raise
-        return httpx2.Response(self.status, json=self.body)
 
 
 class TurnApi:
@@ -222,6 +262,11 @@ def settings(database_url):
         suggestion_timeout_seconds=8,
         suggestion_rate_limit=10,
         suggestion_global_limit=500,
+        tip_model="z-ai/glm-5.3-flash",
+        tip_reasoning="low",
+        tip_timeout_seconds=10,
+        tip_rate_limit=20,
+        tip_global_limit=1000,
         join_failure_limit=10,
         join_failure_window_seconds=600,
         turn_key_id="test-turn-key",
@@ -300,6 +345,27 @@ async def make_registry(settings, clock, open_store):
     for registry, connection in started:
         await registry.stop()
         await connection.aclose()
+
+
+@pytest.fixture
+async def live_server(settings, image_api, turn_api, unused_tcp_port, open_store):
+    """Serves the app on a real socket and gives its address, for a test that closes a connection in the middle of a
+    request, which the test client cannot."""
+    app = create_app(
+        settings,
+        image_api=httpx2.MockTransport(image_api),
+        turn_api=httpx2.MockTransport(turn_api),
+        redis=open_store,
+    )
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=unused_tcp_port, log_level="warning"))
+    serving = asyncio.create_task(server.serve())
+    try:
+        while not server.started:
+            await asyncio.sleep(0.01)
+        yield f"http://127.0.0.1:{unused_tcp_port}"
+    finally:
+        server.should_exit = True
+        await serving
 
 
 @pytest.fixture

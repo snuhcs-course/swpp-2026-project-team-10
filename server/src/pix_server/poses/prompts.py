@@ -1,5 +1,5 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
-"""The prompts for the image and suggestion models and the default poses, read from prompts.toml (Design
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+"""The prompts for the image, suggestion, and tip models and the default poses, read from prompts.toml (Design
 Documentation 2.6.3)."""
 
 import tomllib
@@ -28,6 +28,7 @@ class Prompts:
     pose: str
     suggestion: str
     variation: str
+    tip: str
     default_poses: dict[str, DefaultPose]
 
 
@@ -47,7 +48,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
 
     with path.open("rb") as file:
         data = tomllib.load(file)
-    unknown = set(data) - {"pose_prompt", "suggestion_prompt", "variation_prompt", "default_poses"}
+    unknown = set(data) - {"pose_prompt", "suggestion_prompt", "variation_prompt", "tip_prompt", "default_poses"}
     if unknown:
         raise ValueError(f"{path.name}: unknown keys {', '.join(sorted(unknown))}")
     pose = text(data, "pose_prompt", "")
@@ -57,6 +58,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
     variation = text(data, "variation_prompt", "")
     if variation.count(DESCRIPTION_PLACEHOLDER) != 1:
         raise ValueError(f"{path.name}: variation_prompt must hold {DESCRIPTION_PLACEHOLDER} exactly once")
+    tip = text(data, "tip_prompt", "")
     entries = data.get("default_poses")
     if not isinstance(entries, list) or len(entries) != POSE_COUNT:
         raise ValueError(f"{path.name}: exactly {POSE_COUNT} [[default_poses]] are needed")
@@ -74,22 +76,22 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         if len(default.pose) > DESCRIPTION_MAX_LENGTH:
             raise ValueError(f"{path.name}: {where}pose must be at most {DESCRIPTION_MAX_LENGTH} characters")
         poses[default.id] = default
-    return Prompts(pose, suggestion, variation, poses)
+    return Prompts(pose, suggestion, variation, tip, poses)
 
 
 PROMPTS = load_prompts()
 DEFAULT_POSES = PROMPTS.default_poses
 
 
-def checked_pose(pose: str) -> str:
+def checked_pose(pose: str, field: str = "description") -> str:
     """A pose as a request sent it, a description, a suggestion, or a default pose, the way the prompts take it: runs
     of whitespace, line breaks included, become one space, and a pose that is blank or longer than
-    DESCRIPTION_MAX_LENGTH characters is refused."""
+    DESCRIPTION_MAX_LENGTH characters is refused, naming the request's `field`."""
     text = one_line(pose)
     if not text:
-        raise ApiError(400, "INVALID_REQUEST", "description: must not be blank")
+        raise ApiError(400, "INVALID_REQUEST", f"{field}: must not be blank")
     if len(text) > DESCRIPTION_MAX_LENGTH:
-        raise ApiError(400, "INVALID_REQUEST", f"description: at most {DESCRIPTION_MAX_LENGTH} characters")
+        raise ApiError(400, "INVALID_REQUEST", f"{field}: at most {DESCRIPTION_MAX_LENGTH} characters")
     return text
 
 

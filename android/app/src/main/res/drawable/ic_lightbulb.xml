@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A tip on how to hold the phone for a generated pose (FR-4.10). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,3C8.69,3 6,5.69 6,9c0,2.03 1.01,3.83 2.55,4.91c0.59,0.42 0.95,1.1 0.95,1.82V16h5v-0.27c0,-0.72 0.36,-1.4 0.95,-1.82C16.99,12.83 18,11.03 18,9c0,-3.31 -2.69,-6 -6,-6z"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9.5,19h5M10.5,21.5h3"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" />
+</vector>

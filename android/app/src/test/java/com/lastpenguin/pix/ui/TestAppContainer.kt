@@ -16,6 +16,9 @@ import com.lastpenguin.pix.generation.GenerationEvent
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
+import com.lastpenguin.pix.generation.PoseTip
+import com.lastpenguin.pix.generation.PoseTipper
+import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -29,16 +32,20 @@ import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.RemoteControlHandler
+import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
  * An [AppContainer] of fakes for screen tests under Robolectric (Testing Documentation 2.1.3): the camera, the
- * session, and the guide stores are the fakes of the module tests; the guide maker and pose generation answer when
- * the test says so ([maker], [generator]), consent is already given, and the account is signed out ([auth]). [install] puts it where [PixViewModels]
+ * session, and the guide stores are the fakes of the module tests; the guide maker, pose generation, and pose tips
+ * answer when the test says so ([maker], [generator], [tipper]), consent is already given, and the account is signed out ([auth]). [install] puts it where [PixViewModels]
  * looks, so a Fragment launched by FragmentScenario gets its ViewModels with these modules.
  */
 class TestAppContainer(
@@ -53,6 +60,9 @@ class TestAppContainer(
     val maker = ScriptedGuideMaker()
     val saved = SavedGuideStore.InMemory()
     val generator = ScriptedPoseGenerator()
+    val tipper = ScriptedPoseTipper()
+
+    val tips = PoseTips(tipper, guides.guide, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
     val auth = FakeAuthRepository()
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
@@ -67,6 +77,8 @@ class TestAppContainer(
         referenceGuideMaker = maker,
         savedGuideStore = saved,
         poseGenerator = generator,
+        poseTipper = tipper,
+        poseTips = tips,
         generationConsent = consent,
         authRepository = auth,
         friendsRepository = friends,
@@ -136,6 +148,30 @@ class TestAppContainer(
             fun finish() {
                 events.close()
             }
+        }
+    }
+
+    /** Tips what the test says: one [Request] per call, which waits until the test answers it. */
+    class ScriptedPoseTipper : PoseTipper {
+        val requests = mutableListOf<Request>()
+
+        override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> {
+            val request = Request(scene, candidate, pose).also(requests::add)
+            try {
+                return request.answer.await()
+            } catch (error: CancellationException) {
+                request.cancelled = true
+                throw error
+            }
+        }
+
+        class Request(val scene: Bitmap, val candidate: Bitmap, val pose: String) {
+            val answer = CompletableDeferred<Result<PoseTip>>()
+            var cancelled = false
+
+            fun tip(text: String) = check(answer.complete(Result.success(PoseTip(text))))
+
+            fun fail() = check(answer.complete(Result.failure(IOException("No tip"))))
         }
     }
 

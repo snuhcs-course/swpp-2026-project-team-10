@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.net.Uri
@@ -9,8 +9,10 @@ import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentReferenceConfirmBinding
+import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
+import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
@@ -31,7 +33,8 @@ import org.robolectric.shadows.ShadowToast
  * Reference confirm's render paths (R&S 6.2, FR-2.3, FR-2.4; Testing Documentation 2.1.6), on the real Fragment.
  * Partitions on the reference state: nothing yet, working (the person is being found), ready (the outline shown
  * and Use this guide enabled, which puts the guide on the camera), no person found (to that screen), and a photo
- * that could not be used (a toast and the camera).
+ * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
+ * gallery in its place, stops the ask for its tip.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -100,6 +103,39 @@ class ReferenceConfirmFragmentTest {
 
         assertSame(made, modules.guides.guide.value)
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    /** A generated pose's guide on the screen, with its tip asked for. */
+    private fun generatedPose(modules: TestAppContainer): TestAppContainer.ScriptedPoseTipper.Request {
+        scenario!!.onFragment {
+            it.requireActivity().viewModel<ReferenceViewModel>()
+                .onCandidatePicked(bitmap(), TipSource(bitmap(), "Walk past the railing"))
+        }
+        idle()
+        modules.maker.finish(Result.success(guide()))
+        idle()
+        return modules.tipper.requests.single()
+    }
+
+    @Test
+    fun backOnAGeneratedPose_stopsTheAskForItsTip() {
+        val modules = launch()
+        val request = generatedPose(modules)
+
+        onScreen { it.backButton.performClick() }
+        idle()
+
+        assertTrue(request.cancelled)
+    }
+
+    @Test
+    fun anotherPhotoInPlaceOfAGeneratedPose_stopsTheAskForItsTip() {
+        val modules = launch()
+        val request = generatedPose(modules)
+
+        pickPhoto()
+
+        assertTrue(request.cancelled)
     }
 
     @Test

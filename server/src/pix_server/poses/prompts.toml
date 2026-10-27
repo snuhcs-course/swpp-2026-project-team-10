@@ -71,6 +71,48 @@ description asks.
 Answer with JSON only, in this form: {"poses": ["...", "...", "..."]}
 """
 
+# For the tip model (POST /pose-tips): the scene photo, then the candidate the user chose, then how to hold the phone
+# for it. The answer's fields come in the schema's order, so the model decides the shot and the pose before the
+# height and the angle, and writes the sentence last; the rules for the height and the angle are photographers' rules
+# of thumb, and the sentence says each in words, never in numbers, because a number is hard to follow while shooting.
+# The server compares camera_now with camera_best for the height move and checks the sentence. Tried on 2026-10-25
+# with 17 scenes (scripts/try_pose_tips.py).
+tip_prompt = """
+Photo 1 is the scene a photographer took from where they stand. Photo 2 is the photo they now want: the same person
+in a new pose, made from photo 1 by an AI that may have framed the person closer or changed the camera height or
+angle a little. Help the photographer hold the phone for photo 2. Only the phone: never tell the person how to pose,
+because the app already shows the pose. Fill in, in this order:
+- shot: how much of the person photo 2 shows.
+- pose: the kind of pose in photo 2. "sitting" only when the person's hips rest on the ground, a step, a bench, or a
+  ledge; a person standing with their back or side against something is "leaning".
+- camera_now: how the photographer, an adult standing in front of the person, held the phone for photo 1: crouching,
+  at their waist, chest, or eye level, or above their head. A clue: the horizon, or the height where level lines
+  stop slanting, crosses a standing person at about the camera's height; looking down on the head and the ground
+  means a high camera, looking up at the chin means a low one.
+- camera_best and angle: how to hold the phone so this shot and pose look their best, from these rules:
+  - full body of a person standing, walking, or leaning: waist, angle "up" (tilted up a little), so the legs look
+    longer;
+  - knees up or waist up of a person standing, walking, or leaning: chest, angle "level", so the body keeps its
+    proportions;
+  - chest up: eye, angle "down" (tilted down a little), so the face looks its best;
+  - a person sitting or crouching, whatever the shot: crouching, so the phone is at their eye level, angle "level",
+    so you do not look down on them.
+  If photo 2 is clearly taken from below (looking up at the person) or from above (looking down on them), follow
+  photo 2 instead and keep its look.
+- framing: compare how much of the body each photo shows and how tall the person is against the photo's height.
+  "closer" when photo 2 shows less of the body (for example the whole body in photo 1, only down to the knees or
+  the waist in photo 2) or the person is clearly bigger; "back" when photo 2 shows clearly more; otherwise "keep".
+- text: one sentence, at most twenty-five words, in plain words and in this order: how close to get, only when
+  framing is "closer" or "back" ("zoom in or take a step closer", "step back a little"); where to hold the phone by
+  the photographer's own posture ("crouch", "at your waist", "at your chest", "at your eye level"); the angle
+  ("tilt it up a little", "tilt it down a little", or "keep it level"); then a dash and the one reason given in the
+  rule above, in a few words. Say each thing once. Examples: "Zoom in or take a step closer, hold the phone at your
+  waist and tilt it up a little - the legs look longer." "Crouch until the phone is at their eye level and keep it
+  level - you don't look down on them." Never use numbers, units, or degrees, or empty words such as "perfectly",
+  "ensures", "best composition", or "flattering perspective". Do not describe the person's looks.
+Answer with JSON only.
+"""
+
 # The four poses used when the suggestion model fails or its answer is unusable, in this order. Apps from before
 # Iteration 2 also ask for them by id (GET /pose-templates, POST /poses with templateId): they see the `label` and
 # send the `id` back, so keep an `id` while such an app may still be installed. Only `pose` reaches the image model.

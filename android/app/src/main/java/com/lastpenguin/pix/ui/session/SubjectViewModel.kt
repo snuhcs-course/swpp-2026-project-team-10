@@ -1,6 +1,7 @@
 // AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
@@ -14,18 +15,21 @@ import com.lastpenguin.pix.guide.GuideGeometry
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.camera.ReferenceCorner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Subject view (R&S 6.6, FR-6.6, FR-7.1–7.3). */
+/** Subject view (R&S 6.6, FR-3.9, FR-6.6, FR-7.1–7.3). */
 data class SubjectUiState(
     /** For "Dongje's camera"; arrives in `hello`. */
     val photographerName: String? = null,
@@ -57,6 +61,15 @@ data class SubjectUiState(
      * off, a pinch zooms the photographer's camera. Off until the subject turns it on, and off again when the guide goes.
      */
     val guideEditing: Boolean = false,
+    /**
+     * The guide's reference photo in a corner (FR-3.9): the photographer's copy while it belongs to the guide on the
+     * video, null otherwise. It stays while the guide is hidden, as on the photographer's phone.
+     */
+    val reference: Bitmap? = null,
+    /** Whether the thumbnail is enlarged; a new reference photo starts small. */
+    val referenceExpanded: Boolean = false,
+    /** The thumbnail's corner on this phone; never sent, so each phone keeps its own. */
+    val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
 ) {
     val canZoom: Boolean
         get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
@@ -77,6 +90,7 @@ data class SubjectUiState(
 class SubjectViewModel(
     private val session: SessionManager,
     private val mirror: GuideRepository,
+    private val references: MirrorReference,
     val video: RemoteVideo,
 ) : ViewModel() {
 
@@ -178,6 +192,16 @@ class SubjectViewModel(
             }
         }
         viewModelScope.launch {
+            // The photographer's reference arrives after the guide's image and goes with it (Design 2.5.1).
+            combine(mirror.guide, references.reference) { guide, reference ->
+                reference?.photo?.takeIf { guide != null && reference.guideId == guide.id }
+            }.collect { photo ->
+                _uiState.update {
+                    it.copy(reference = photo, referenceExpanded = it.referenceExpanded && photo === it.reference)
+                }
+            }
+        }
+        viewModelScope.launch {
             mirror.state.collect { state ->
                 _uiState.update {
                     it.copy(
@@ -194,6 +218,16 @@ class SubjectViewModel(
                 }
             }
         }
+    }
+
+    /** A tap on the reference thumbnail enlarges it or makes it small again (FR-3.9). */
+    fun setReferenceExpanded(expanded: Boolean) {
+        _uiState.update { it.copy(referenceExpanded = expanded && it.reference != null) }
+    }
+
+    /** A drag or TalkBack moves the thumbnail to [corner], on this phone only. */
+    fun setReferenceCorner(corner: ReferenceCorner) {
+        _uiState.update { it.copy(referenceCorner = corner) }
     }
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */

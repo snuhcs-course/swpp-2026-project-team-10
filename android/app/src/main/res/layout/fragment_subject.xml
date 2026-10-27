@@ -92,6 +92,24 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
+        <!-- The photographer's reference photo (FR-3.9), as on their Camera screen: a tap enlarges it, a drag moves it
+             to another corner of this phone's video. Sized and placed in code; over the guide, so it takes its touches. -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/referenceThumbnail"
+            android:layout_width="54dp"
+            android:layout_height="72dp"
+            android:layout_gravity="top|left"
+            android:background="@color/pix_ground"
+            android:contentDescription="@string/reference_photo"
+            android:padding="0.5dp"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail"
+            app:strokeColor="@color/pix_glass_stroke"
+            app:strokeWidth="1dp"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible" />
+
         <!-- The photographer's camera is streaming (FR-6.6, FR-6.8): the light at the video's top right, placed in code;
              its description names the photographer. -->
         <com.lastpenguin.pix.ui.camera.LiveDotView

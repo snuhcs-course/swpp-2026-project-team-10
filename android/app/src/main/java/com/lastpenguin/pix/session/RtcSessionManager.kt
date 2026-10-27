@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -63,6 +63,8 @@ class RtcSessionManager(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Subject: the id of the guide image this phone already holds, sent in `hello` (Design 2.5.1). */
     private val haveGuideId: () -> String? = { null },
+    /** Subject: the guide whose reference photo this phone already holds, sent in `hello` (FR-3.9). */
+    private val haveReferenceId: () -> String? = { null },
 ) : SessionManager, RemoteVideo {
 
     private val serial = dispatcher.limitedParallelism(1)
@@ -377,6 +379,7 @@ class RtcSessionManager(
             role = checkNotNull(role),
             name = identity.name,
             haveGuideId = if (role == Role.SUBJECT) haveGuideId() else null,
+            haveReferenceId = if (role == Role.SUBJECT) haveReferenceId() else null,
         )
         peer?.send(Channel.RELIABLE, codec.encode(hello))
     }
@@ -389,7 +392,7 @@ class RtcSessionManager(
         connectTimeout = null
         _state.value = SessionState.Connected(
             checkNotNull(sessionId),
-            PeerInfo(hello.name, hello.haveGuideId),
+            PeerInfo(hello.name, hello.haveGuideId, hello.haveReferenceId),
             checkNotNull(role),
         )
         Timings.mark("session.connected")

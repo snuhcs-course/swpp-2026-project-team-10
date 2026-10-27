@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -36,7 +36,10 @@ class RtcSessionManagerTest {
 
     private val incoming = mutableListOf<SessionMessage>()
 
-    private fun TestScope.manager(haveGuideId: () -> String? = { null }): RtcSessionManager {
+    private fun TestScope.manager(
+        haveGuideId: () -> String? = { null },
+        haveReferenceId: () -> String? = { null },
+    ): RtcSessionManager {
         val manager = RtcSessionManager(
             signaling = signaling,
             peers = peers,
@@ -48,6 +51,7 @@ class RtcSessionManagerTest {
             dispatcher = StandardTestDispatcher(testScheduler),
             clock = { 0L },
             haveGuideId = haveGuideId,
+            haveReferenceId = haveReferenceId,
         )
         backgroundScope.launch { manager.incoming.collect { incoming += it } }
         runCurrent()
@@ -59,9 +63,15 @@ class RtcSessionManagerTest {
     private fun FakePeerConnectionClient.sentMessages(): List<SessionMessage> =
         sent.mapNotNull { reader.decode(it.second)?.message }
 
-    private fun hello(role: Role, name: String, haveGuideId: String? = null) =
+    private fun hello(role: Role, name: String, haveGuideId: String? = null, haveReferenceId: String? = null) =
         otherPhone.encode(
-            SessionMessage.Hello(appVersion = "0.1.0", role = role, name = name, haveGuideId = haveGuideId),
+            SessionMessage.Hello(
+                appVersion = "0.1.0",
+                role = role,
+                name = name,
+                haveGuideId = haveGuideId,
+                haveReferenceId = haveReferenceId,
+            ),
         )
 
     /**
@@ -275,8 +285,8 @@ class RtcSessionManagerTest {
     }
 
     @Test
-    fun `the subject says which guide image it already has, and the photographer learns it`() = runTest {
-        val subject = manager(haveGuideId = { "g1" })
+    fun `the subject says which guide image and reference it has, and the photographer learns both`() = runTest {
+        val subject = manager(haveGuideId = { "g1" }, haveReferenceId = { "g1" })
         subject.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
         runCurrent()
         signaling.push(SignalEvent.Opened)
@@ -289,13 +299,17 @@ class RtcSessionManagerTest {
         runCurrent()
         val sent = peer.sentMessages().first() as SessionMessage.Hello
         assertEquals("g1", sent.haveGuideId)
+        assertEquals("g1", sent.haveReferenceId)
         subject.leave(EndReason.LEFT)
         runCurrent()
 
         // The photographer reads it from the subject's hello.
         peers.created.clear()
         signaling.sent.clear()
-        val photographer = manager(haveGuideId = { "ignored on the photographer" })
+        val photographer = manager(
+            haveGuideId = { "ignored on the photographer" },
+            haveReferenceId = { "ignored on the photographer" },
+        )
         photographer.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
         runCurrent()
         signaling.push(SignalEvent.Opened)
@@ -306,11 +320,17 @@ class RtcSessionManagerTest {
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         photographerPeer.open()
         runCurrent()
-        assertEquals(null, (photographerPeer.sentMessages().first() as SessionMessage.Hello).haveGuideId)
-        photographerPeer.deliver(hello(Role.SUBJECT, "Junhyeong", haveGuideId = "g1"))
+        val photographerHello = photographerPeer.sentMessages().first() as SessionMessage.Hello
+        assertEquals(null, photographerHello.haveGuideId)
+        assertEquals(null, photographerHello.haveReferenceId)
+        photographerPeer.deliver(hello(Role.SUBJECT, "Junhyeong", haveGuideId = "g1", haveReferenceId = "g1"))
         runCurrent()
         assertEquals(
-            SessionState.Connected("s_2", PeerInfo("Junhyeong", haveGuideId = "g1"), Role.PHOTOGRAPHER),
+            SessionState.Connected(
+                "s_2",
+                PeerInfo("Junhyeong", haveGuideId = "g1", haveReferenceId = "g1"),
+                Role.PHOTOGRAPHER,
+            ),
             photographer.state.value,
         )
         photographer.leave(EndReason.LEFT)

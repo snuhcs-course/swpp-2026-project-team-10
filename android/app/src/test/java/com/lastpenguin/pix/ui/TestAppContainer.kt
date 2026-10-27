@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -27,9 +27,11 @@ import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
+import com.lastpenguin.pix.session.FakeGuideReferenceCodec
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.RemoteControlHandler
 import java.io.IOException
@@ -55,6 +57,9 @@ class TestAppContainer(
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
+
+    /** The subject's reference photo; a test sets it as the syncer would. */
+    val reference = MirrorReference()
     val settings = CameraSettings.InMemory()
     val consent = IdleConsent()
     val maker = ScriptedGuideMaker()
@@ -67,13 +72,15 @@ class TestAppContainer(
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
     val mobileData = MobileDataNotice.InMemory()
-    private val syncer = GuideSyncer(session, guides, mirror, FakeGuideImageCodec())
+    private val syncer =
+        GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
 
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
         guideRepository = guides,
         mirrorGuideRepository = mirror,
+        mirrorReference = reference,
         referenceGuideMaker = maker,
         savedGuideStore = saved,
         poseGenerator = generator,

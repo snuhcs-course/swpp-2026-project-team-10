@@ -1,8 +1,14 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,12 +19,14 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.GuideReference
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
+import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
@@ -29,6 +37,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,7 +52,9 @@ import org.robolectric.shadows.ShadowToast
  * with a container of fakes. Partitions: not connected / connected before the first frame / streaming / frames
  * stopped for 2 s ("camera paused") / streaming again; the photographer's capabilities with and
  * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
- * toggle, a hidden guide; the brightness panel and a flash tap; the live view on mobile data (FR-6.13); Leave, the
+ * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
+ * gone with a replaced or removed guide, and moved to another corner on this phone only; the brightness panel and a
+ * flash tap; the live view on mobile data (FR-6.13); Leave, the
  * back button's question, and the session ending by a lost connection or the photographer, named or before the
  * name arrived.
  */
@@ -179,6 +190,106 @@ class SubjectFragmentRenderTest {
             assertEquals(AspectRatio.R16_9.frameAspect, binding.guideOverlay.frameAspect)
             assertEquals("+1.0", binding.brightnessValue.text.toString())
         }
+    }
+
+    // ---- The photographer's reference photo (FR-3.9) -------------------------------------------------------
+
+    private fun showReference(modules: TestAppContainer, id: String = "guide-1"): Bitmap {
+        val photo = bitmap(60, 80)
+        modules.reference.set(GuideReference(id, photo))
+        idle()
+        return photo
+    }
+
+    @Test
+    fun theReferencePhoto_showsWithItsGuide_aTapEnlargesIt_andItStaysWhileTheGuideIsHidden() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.referenceThumbnail.visibility) }
+
+        val photo = showReference(modules)
+        val small = onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.referenceThumbnail.visibility)
+            assertSame(photo, (binding.referenceThumbnail.drawable as BitmapDrawable).bitmap)
+            binding.referenceThumbnail.layoutParams.width
+        }
+
+        onScreen { binding, _ -> binding.referenceThumbnail.performClick() }
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.referenceThumbnail.layoutParams.width > small) }
+
+        // The photographer hides the guide: the thumbnail stays, as on their phone.
+        modules.mirror.update(final = true) { it.copy(visible = false) }
+        idle()
+        onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.referenceThumbnail.visibility) }
+    }
+
+    @Test
+    fun theReferencePhoto_goesWhenItsGuideIsReplacedOrRemoved() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+
+        // Another guide before its own reference arrives: the old photo is not its pose.
+        modules.mirror.setGuide(guide(withReference = false).copy(id = "guide-2"))
+        idle()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.referenceThumbnail.visibility) }
+
+        showReference(modules, id = "guide-2")
+        onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.referenceThumbnail.visibility) }
+        modules.mirror.setGuide(null)
+        idle()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.referenceThumbnail.visibility) }
+    }
+
+    @Test
+    fun theReferenceThumbnail_movesToAnotherCorner_onThisPhoneOnly() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        val sent = modules.session.sent.size
+
+        onScreen { binding, _ ->
+            assertTrue(
+                ViewCompat.performAccessibilityAction(binding.referenceThumbnail, R.id.move_reference_top_right, null),
+            )
+        }
+        idle()
+        val top = onScreen { binding, _ ->
+            assertTrue(binding.referenceThumbnail.translationX > binding.videoContainer.width / 2f)
+            binding.referenceThumbnail.translationY
+        }
+
+        // A drag down drops it into the corner below, above the zoom row.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            val far = ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f + binding.videoContainer.height
+            drag(thumbnail, 0f, far)
+        }
+        idle()
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            assertTrue(thumbnail.translationX > binding.videoContainer.width / 2f)
+            assertTrue(thumbnail.translationY > top)
+            val zoomRowTop = binding.zoomRow.top + binding.zoomRow.translationY - binding.videoContainer.top
+            assertTrue(thumbnail.translationY + thumbnail.height <= zoomRowTop)
+        }
+        // Nothing goes to the photographer: each phone keeps its own corner.
+        assertEquals(sent, modules.session.sent.size)
+    }
+
+    private fun drag(view: View, dx: Float, dy: Float) {
+        val down = SystemClock.uptimeMillis()
+        fun event(action: Int, x: Float, y: Float, at: Long) =
+            MotionEvent.obtain(down, at, action, x, y, 0).also { view.dispatchTouchEvent(it) }.recycle()
+        event(MotionEvent.ACTION_DOWN, 5f, 5f, down)
+        event(MotionEvent.ACTION_MOVE, 5f + dx / 2, 5f + dy / 2, down + 16)
+        event(MotionEvent.ACTION_MOVE, 5f + dx, 5f + dy, down + 32)
+        event(MotionEvent.ACTION_UP, 5f + dx, 5f + dy, down + 48)
     }
 
     @Test

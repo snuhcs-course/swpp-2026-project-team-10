@@ -263,6 +263,11 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 10-27] "okay. then fix 찍다 to 촬영하다 as you proposed"
 - [Jaewan, 10-27] "and give me screenshots of before and after, for two usage cases"
 - [Jaewan, 10-27] "yes"
+- [Jaewan, 10-27] "in the room code screen, the 'ask your friend to open~' part kinda looks weird because it's multiline and maybe left align should look better? or should be put a box over that with a question mark at the left"
+- [Jaewan, 10-27] "try it and give me a screenshot"
+- [Jaewan, 10-27] "yes i'll keep it"
+- [Jaewan, 10-27] "yeah and check for that bug"
+- [Jaewan, 10-27] "yeah fix that pattern there too. and just fix the test name, we don't need to fix the testing document"
 
 [#130]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/130
 [#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138

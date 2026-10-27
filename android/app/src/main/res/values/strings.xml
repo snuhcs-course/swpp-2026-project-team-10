@@ -22,6 +22,7 @@
     <string name="camera_zoom_description">Camera zoom, %1$s times</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
+    <string name="zoom_next_step">Next zoom step</string>
     <string name="camera_grid_description">Camera composition grid</string>
     <string name="camera_level_aligned">Camera is level</string>
     <string name="camera_level_tilted">Tilt camera to align the center bar with the horizontal markers</string>

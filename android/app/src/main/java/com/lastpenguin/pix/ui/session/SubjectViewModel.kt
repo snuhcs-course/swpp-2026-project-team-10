@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModel
@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.camera.nextZoomStep
+import com.lastpenguin.pix.camera.quickZoomSteps
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.guide.GuideGeometry
 import com.lastpenguin.pix.guide.GuideRepository
@@ -234,6 +236,12 @@ class SubjectViewModel(
         val clamped = ratio.coerceIn(ui.minZoom, ui.maxZoom)
         _uiState.update { it.copy(zoom = clamped) }
         if (final) zoomSender.finish(clamped) else zoomSender.step(clamped)
+    }
+
+    /** A tap on the zoom readout (FR-7.1): the next quick step of the photographer's camera, sent as a final value. */
+    fun onZoomTap() {
+        val ui = _uiState.value
+        nextZoomStep(quickZoomSteps(ui.minZoom, ui.maxZoom), ui.zoom)?.let { onZoomGesture(it, final = true) }
     }
 
     /** From the brightness slider (FR-7.3): an exposure index, shown at once and sent like a zoom step. */

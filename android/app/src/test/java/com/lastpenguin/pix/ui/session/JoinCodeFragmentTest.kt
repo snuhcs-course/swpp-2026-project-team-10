@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.view.View
@@ -175,7 +175,7 @@ class JoinCodeFragmentTest {
         idle()
 
         onScreen { binding, _ ->
-            assertEquals(string(R.string.couldnt_connect_wifi), binding.statusText.text.toString())
+            assertEquals(string(R.string.couldnt_connect), binding.statusText.text.toString())
             assertEquals(View.VISIBLE, binding.statusText.visibility)
             assertTrue(binding.joinButton.isEnabled)
         }

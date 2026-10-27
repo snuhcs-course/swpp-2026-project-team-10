@@ -27,7 +27,7 @@
 | 2.4 | 2026-10-26 | Sessions across networks (Iter3-P13, [#117]): the mobile-data notice on *Friend connected* and *Subject view* (FR-6.13), and the wrong-code message on *Join with code* (NFR-15) in section 6. |
 | 2.5 | 2026-10-27 | The wireframe figures redrawn from the app's screens (6.1–6.7). |
 | 2.6 | 2026-10-27 | Every wireframe figure also with its screens in Korean (Iter3-P7, [#111]; 6.1–6.7). |
-| 2.7 | 2026-10-27 | Room codes on any network, as built since [#139] (the overview, F8, FR-8.5, US-13, glossary): *Room code* and *Join with code* no longer say both phones must be on the same Wi-Fi, and the connection messages ask for an internet connection (6.6, 6.7, Figures 5 and 6). |
+| 2.7 | 2026-10-27 | Room codes on any network, as built since [#139] (the overview, F8, FR-8.5, US-13, glossary): *Room code* and *Join with code* no longer say both phones must be on the same Wi-Fi, and the connection messages ask for an internet connection; the join steps on *Room code* sit in a box (6.6, 6.7, Figures 5 and 6). |
 | 2.8 | 2026-10-27 | *Check* answers "This Pix ID is available" without repeating the ID, like "This Pix ID is taken" (US-6, 6.4). |
 
 Items marked **TBD** need a team decision.
@@ -715,7 +715,7 @@ In the tables below, **Input → result** lists what the user can do on the scre
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Room code** | A sheet over Camera: "Your room code"; "Ask your friend to open Pix, tap Shoot together › Use a room code, and join with this code."; 6-digit code ("482 915"); "Expires in 10 min"; "Getting a code…", then "Waiting for your friend…", then "Your friend joined · connecting…". | *Cancel* → Camera, and the code expires · *Join with a code instead* → Join with code, and this phone's code is cancelled · Friend joins → Friend connected (Flow 4). | Nobody joins in 10 minutes → "The code expired. Tap Use a room code again for a new one." No server → "Couldn't connect. Check your internet connection and try again." |
+| **Room code** | A sheet over Camera: "Your room code"; 6-digit code ("482 915"); "Ask your friend to open Pix, tap Shoot together › Use a room code, and join with this code." in a box with the people icon; "Expires in 10 min"; "Getting a code…", then "Waiting for your friend…", then "Your friend joined · connecting…". | *Cancel* → Camera, and the code expires · *Join with a code instead* → Join with code, and this phone's code is cancelled · Friend joins → Friend connected (Flow 4). | Nobody joins in 10 minutes → "The code expired. Tap Use a room code again for a new one." No server → "Couldn't connect. Check your internet connection and try again." |
 | **Join with code** | A back arrow; "Join with a code"; "Enter the 6-digit code shown on your friend's camera."; "Room code" over six digit boxes, with the number keyboard open; "Connecting…" while it joins. | Enter 6 digits and *Join* → Subject view (Flow 5) · Back → Camera. | Letters are not accepted. *Join* is disabled until 6 digits are entered. The session cannot be reached → "Couldn't connect. Check your internet connection and try again."; from another network the join connects too (FR-8.5). Too many wrong codes from this network → "Too many wrong codes from this network. Try again in a few minutes." (NFR-15). |
 | **Session not found** | "Session not found"; "Check the code with your friend and try again." | *Try again* → Join with code, with the code kept and selected for editing · *Back* → Camera. | — |
 

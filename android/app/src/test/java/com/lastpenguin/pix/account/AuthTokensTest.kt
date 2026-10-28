@@ -23,7 +23,8 @@ import org.junit.Test
  * emitted, store cleared), no answer (tokens kept, null). Several callers at once: one refresh. Account update: the
  * same user, another user after signing in again, after signing out. Account read from the server (another phone signed
  * in to it may have changed it): changed (kept, tokens stay), the same (nothing written), overtaken by a change on this
- * phone (dropped), with a token refresh on the way (still kept), another user, signed out on the way.
+ * phone, also one that left the account as it was (dropped), with a token refresh on the way (still kept), another
+ * user, signed out on the way.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthTokensTest {
@@ -220,6 +221,23 @@ class AuthTokensTest {
 
         assertEquals("New Name", (tokens.state.value as AuthState.SignedIn).account.displayName)
         assertEquals("New Name", store.stored?.user?.displayName)
+    }
+
+    @Test
+    fun reload_overtakenByAChangeThatLeftTheAccountAsItWas_keepsThatAnswer() = runTest {
+        store.stored = stored()
+        val tokens = tokens()
+        val answer = CompletableDeferred<Unit>()
+
+        // The read sees a name another phone set, then this phone saves its own name again.
+        val read = async { tokens.reload { accountDto().copy(displayName = "New Name").also { answer.await() } } }
+        runCurrent()
+        tokens.update(accountDto())
+        answer.complete(Unit)
+        read.await()
+
+        assertEquals("Test Account 1", (tokens.state.value as AuthState.SignedIn).account.displayName)
+        assertEquals("Test Account 1", store.stored?.user?.displayName)
     }
 
     @Test

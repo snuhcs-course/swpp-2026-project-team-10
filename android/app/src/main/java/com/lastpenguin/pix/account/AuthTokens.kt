@@ -78,8 +78,9 @@ class AuthTokens(
     private var current: StoredSignIn? = null
     private val loaded = CompletableDeferred<Unit>()
 
-    // Counts the changes to the kept account, so a read from the server that one of them overtook is dropped.
-    private var accountChanges = 0L
+    // Counts the writes of the kept account but new tokens, so a read from the server that one of them overtook is
+    // dropped, also when the write left the account as it was: its answer is still the newer one.
+    private var accountWrites = 0L
 
     init {
         scope.launch {
@@ -115,11 +116,11 @@ class AuthTokens(
      */
     suspend fun reload(read: suspend () -> AccountDto) {
         loaded.await()
-        val before = lock.withLock { accountChanges }
+        val before = lock.withLock { accountWrites }
         val user = read()
         lock.withLock {
             val signIn = current ?: return@withLock
-            if (accountChanges != before || signIn.user.id != user.id) return@withLock
+            if (accountWrites != before || signIn.user.id != user.id) return@withLock
             // The same account is not written again, though Friends reads it every 10 s.
             if (signIn.user != user) set(signIn.copy(user = user))
         }
@@ -166,12 +167,13 @@ class AuthTokens(
                 refreshToken = tokens.refreshToken,
                 accessExpiresAt = expiry(tokens.expiresIn),
             ),
+            newTokensOnly = true,
         )
         tokens.accessToken
     }
 
-    private suspend fun set(signIn: StoredSignIn?) {
-        if (signIn?.user != current?.user) accountChanges++
+    private suspend fun set(signIn: StoredSignIn?, newTokensOnly: Boolean = false) {
+        if (!newTokensOnly) accountWrites++
         current = signIn
         store.save(signIn)
         publish()

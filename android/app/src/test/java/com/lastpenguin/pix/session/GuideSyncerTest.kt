@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideState
@@ -202,6 +202,17 @@ class GuideSyncerTest {
         runCurrent()
         assertEquals(listOf("state.final"), sentTypes())
         assertEquals(listOf("g1"), referenceCodec.encoded)
+    }
+
+    @Test
+    fun `a guide removed while its reference is encoded on connect is cleared on the subject's phone`() = runTest {
+        guides.setGuide(withReference("g1"))
+        connected()
+        referenceCodec.onEncode = { guides.setGuide(null) }
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        assertEquals(image + "state.final" + reference + "clear", sentTypes())
     }
 
     @Test

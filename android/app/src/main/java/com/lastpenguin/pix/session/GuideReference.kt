@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -69,7 +69,7 @@ interface GuideReferenceCodec {
     /** The guide's reference photo, ready to send; null when the guide has none or it cannot be encoded. */
     fun encode(guide: ReferenceGuide): EncodedGuideReference?
 
-    /** The photo from received bytes; null if undecodable. */
+    /** The photo from received bytes; null if undecodable or larger than may be sent. */
     fun decode(format: String, bytes: ByteArray): Bitmap?
 }
 
@@ -91,6 +91,11 @@ class JpegGuideReferenceCodec : GuideReferenceCodec {
 
     override fun decode(format: String, bytes: ByteArray): Bitmap? {
         if (format != FORMAT) return null
+        // The size first, without the pixels: a photo larger than the photographer may send is refused before it
+        // can take the memory of a full decode.
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth !in 1..MAX_LONG_SIDE || bounds.outHeight !in 1..MAX_LONG_SIDE) return null
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
     }
 

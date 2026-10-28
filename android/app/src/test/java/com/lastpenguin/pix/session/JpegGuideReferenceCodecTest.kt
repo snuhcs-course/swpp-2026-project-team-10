@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -6,6 +6,7 @@ import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.ReferenceGuide
+import java.io.ByteArrayOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -16,7 +17,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Real JPEG encoding and decoding of the reference photo for Subject view (FR-3.9; Robolectric native graphics).
- * Partitions: a photo wider and taller than 512 px, one already small, none, and another format.
+ * Partitions: a photo wider and taller than 512 px, one already small, none, and another format; on receipt, a photo
+ * larger than 512 px and bytes that are not an image.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -60,5 +62,14 @@ class JpegGuideReferenceCodecTest {
 
         assertNull(codec.encode(guide(null)))
         assertNull(codec.decode("webp", small!!.bytes))
+    }
+
+    @Test
+    fun `a received photo larger than 512 px is refused before it is decoded`() {
+        val out = ByteArrayOutputStream()
+        photo(1200, 400).compress(Bitmap.CompressFormat.JPEG, 85, out)
+
+        assertNull(codec.decode(JpegGuideReferenceCodec.FORMAT, out.toByteArray()))
+        assertNull(codec.decode(JpegGuideReferenceCodec.FORMAT, byteArrayOf(1, 2, 3)))
     }
 }

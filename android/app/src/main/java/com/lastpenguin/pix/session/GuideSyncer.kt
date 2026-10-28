@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -65,21 +66,22 @@ class GuideSyncer(
     fun startAsSender(scope: CoroutineScope) {
         scope.launch {
             val peer = (session.state.value as? SessionState.Connected)?.peer
-            val peerHas = peer?.haveGuideId
-            var imageSent: String? = peerHas
+            var imageSent: String? = peer?.haveGuideId
             var referenceSent: String? = peer?.haveReferenceId
-            val guide = guides.guide.value
-            if (guide == null) {
-                sendClear()
-            } else {
-                if (guide.id != peerHas) imageSent = sendImage(guide)
-                sendState(guides.state.value, final = true)
-                if (guide.id != referenceSent) referenceSent = sendReference(guide)
-            }
-
             var queued: GuideState? = null
             var throttle: Job? = null
-            guides.changes.collect { change ->
+            // The current guide goes once the changes are subscribed to: its image and reference take a while to
+            // encode, and a change made meanwhile waits in the flow for the collector below instead of being lost.
+            guides.changes.onSubscription {
+                val guide = guides.guide.value
+                if (guide == null) {
+                    sendClear()
+                } else {
+                    if (guide.id != imageSent) imageSent = sendImage(guide)
+                    sendState(guides.state.value, final = true)
+                    if (guide.id != referenceSent) referenceSent = sendReference(guide)
+                }
+            }.collect { change ->
                 val state = change.state
                 val id = state.guideId
                 if (id == null) {

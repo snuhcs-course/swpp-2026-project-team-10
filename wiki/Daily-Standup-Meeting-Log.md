@@ -239,6 +239,46 @@ The kickoff on 2026-10-09 replaced that day's standup ([[Team Meetings|Team-Meet
 
 </details>
 
+## Iteration 3
+
+The kickoff on 2026-10-25 replaced that day's standup ([[Team Meetings|Team-Meetings]]).
+
+<details>
+<summary><b>2026-10-26 (Mon)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter3-P10: *Pick a pose* one candidate at a time ([#133]); Iter3-P11: pose tips ([#135]); opened the Camera screen layout PR ([#137]) | Address the review on [#137]; Iter3-A1: the reference photo on Subject view ([#132]) | – |
+| 박재완 | Iteration 3 issues and plan in the documents ([#109], [#130]); moved the wireframes into the repository ([#131]); set up the AWS server for the user test; started the Korean translation ([#111]) | Open the Korean translation PR; Iter3-P8: candidates in the scene photo's ratio ([#112]) | – |
+| 조성민 | Iter3-P13: sessions across networks on the server ([#134]); started the app side | Finish the app side of [#117] and test it on mobile data | – |
+| 한준형 | Planned the shared steps ([#120]) and photos saved on both phones ([#121]) | Take over Iter3-P9: the mask-only guide transfer ([#113]), which the shared steps need first | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-27 (Tue)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged the Camera screen layout ([#137]) and its fixes ([#142]); approved [#138] and [#140]; opened the reference photo on Subject view ([#143]) | Address the review on [#143] and test it on two phones; Iter3-P12: selfie mode ([#116]) | – |
+| 박재완 | Redrew the wireframes to match the app ([#140]); merged the Korean translation ([#138]); updated the room code screens for any network and fixed Korean wording ([#144]); approved [#137] | Review [#143] and the mask-only transfer PR; candidates in the scene photo's ratio ([#112]) | – |
+| 조성민 | Merged sessions across networks in the app ([#139]) and tested it on two phones | Iter3-P14: reconnection after a short drop ([#118]) | – |
+| 한준형 | Took over the mask-only guide transfer ([#113]); approved [#144] | Open its PR and test it on two phones; then send guides from the subject's phone too | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-28 (Wed)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Addressed the review on [#143], tested it on two phones, and merged it; cleaned up the `CLAUDE.md` files and the READMEs ([#147]) | Selfie mode ([#116]) | – |
+| 박재완 | Approved [#145] and [#147]; account changes now show on the user's other phones ([#146]) | Candidates in the scene photo's ratio ([#112]) | – |
+| 조성민 | Started reconnection after a short drop ([#118]) | Continue [#118]; Iter3-P15: invitations and friend requests ([#119]) | – |
+| 한준형 | Finished the mask-only guide transfer, with guides from the subject's phone too, tested it on two phones, and merged it ([#145]); approved [#146] | Test guides from the subject's phone on two phones; then the shared steps ([#120]) and photos on both phones ([#121]) | – |
+
+</details>
+
 [#5]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/5
 [#6]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/6
 [#11]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/11
@@ -306,3 +346,29 @@ The kickoff on 2026-10-09 replaced that day's standup ([[Team Meetings|Team-Meet
 [#93]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/93
 [#94]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/94
 [#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96
+[#109]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/109
+[#111]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/111
+[#112]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/112
+[#113]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/113
+[#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
+[#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
+[#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
+[#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
+[#120]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/120
+[#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
+[#130]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/130
+[#131]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/131
+[#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
+[#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
+[#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
+[#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
+[#137]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/137
+[#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138
+[#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
+[#140]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/140
+[#142]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/142
+[#143]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/143
+[#144]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/144
+[#145]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/145
+[#146]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/146
+[#147]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/147

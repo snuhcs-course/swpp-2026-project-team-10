@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.signaling
 
 import com.lastpenguin.pix.session.EndReason
@@ -15,6 +15,10 @@ class SignalCodecTest {
         assertEquals("""{"type":"room.create"}""", SignalCodec.encode(SignalMessage.RoomCreate))
         assertEquals("""{"type":"room.join","code":"482915"}""", SignalCodec.encode(SignalMessage.RoomJoin("482915")))
         assertEquals("""{"type":"leave"}""", SignalCodec.encode(SignalMessage.Leave))
+        assertEquals(
+            """{"type":"session.join","sessionId":"s_1","rejoin":false,"rejoinToken":"Qm9xY2Fyb2xpbmVfX18"}""",
+            SignalCodec.encode(SignalMessage.SessionJoin("s_1", rejoin = false, rejoinToken = "Qm9xY2Fyb2xpbmVfX18")),
+        )
     }
 
     @Test
@@ -44,6 +48,19 @@ class SignalCodecTest {
             ),
         )
         assertEquals(SignalMessage.PeerJoined(), SignalCodec.decode("""{"type":"peer.joined"}"""))
+        assertEquals(SignalMessage.PeerRejoined, SignalCodec.decode("""{"type":"peer.rejoined"}"""))
+        assertEquals(
+            SignalMessage.RoomCreated("482915", "s_1", rejoinToken = "photographer-token"),
+            SignalCodec.decode(
+                """{"type":"room.created","code":"482915","sessionId":"s_1","iceServers":[],"rejoinToken":"photographer-token"}""",
+            ),
+        )
+        assertEquals(
+            SignalMessage.SessionJoined("s_1", Role.SUBJECT, rejoinToken = "subject-token"),
+            SignalCodec.decode(
+                """{"type":"session.joined","sessionId":"s_1","role":"SUBJECT","iceServers":[],"rejoinToken":"subject-token"}""",
+            ),
+        )
         assertEquals(
             SignalMessage.PeerLeft(EndReason.CONNECTION_LOST),
             SignalCodec.decode("""{"type":"peer.left","reason":"CONNECTION_LOST"}"""),

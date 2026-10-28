@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
@@ -8,6 +8,7 @@ import com.lastpenguin.pix.session.signaling.SignalMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.yield
 import org.webrtc.EglBase
 import org.webrtc.VideoSink
 
@@ -51,7 +52,19 @@ class FakePeerConnectionClient(val config: PeerConfig) : PeerConnectionClient {
     private var offers = 0
     private var answers = 0
 
-    override suspend fun createOffer() = SessionDescription("offer", "v=0 offer ${++offers}")
+    /** How many offers asked for an ICE restart. */
+    var restarts = 0
+
+    /** Local candidates found while a description is made, as WebRTC may report them before it is applied. */
+    var candidatesWhileCreating: List<IceCandidate> = emptyList()
+
+    override suspend fun createOffer(iceRestart: Boolean): SessionDescription {
+        if (iceRestart) restarts++
+        candidatesWhileCreating.forEach { push(PeerEvent.LocalCandidate(it)) }
+        // Lets the manager's serial scope run, as WebRTC's callbacks would, before the offer is applied.
+        yield()
+        return SessionDescription("offer", "v=0 offer ${++offers}")
+    }
 
     override suspend fun createAnswer() = SessionDescription("answer", "v=0 answer ${++answers}")
 

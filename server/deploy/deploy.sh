@@ -13,8 +13,8 @@
 #
 # Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis and their accounts
 # through PostgreSQL (Design 2.7). A deploy builds the image, starts it as the idle copy, waits until it is healthy,
-# points nginx at it, and stops the other copy. Stopping a copy closes its sockets, and a phone cannot come back to
-# its room until the app can rejoin (Design 2.6.7, #56), so the switch still waits until no room is open.
+# points nginx at it, and stops the other copy. Stopping a copy closes its sockets; the app takes its place again
+# (Design 2.6.7, #118), but an older app cannot, so the switch still waits until no room is open.
 #
 # Everything is inside functions and the last line calls main, so bash has read the whole file before a deploy
 # checks out another version of it.

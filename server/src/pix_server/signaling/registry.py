@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 """The sockets of one server process, and the room protocol on top of the session store.
 
 Room state lives in Redis (Design Documentation 2.7), so a room created through one worker can be joined
@@ -9,6 +9,7 @@ published to that worker.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import secrets
@@ -20,7 +21,15 @@ from uuid import uuid4
 from redis.exceptions import RedisError
 
 from pix_server.config import Settings
-from pix_server.signaling.messages import ClientMessage, Leave, ProtocolError, RoomCreate, RoomJoin, Signal
+from pix_server.signaling.messages import (
+    ClientMessage,
+    Leave,
+    ProtocolError,
+    RoomCreate,
+    RoomJoin,
+    SessionJoin,
+    Signal,
+)
 from pix_server.store import Delivery, SessionStore, Window
 from pix_server.turn import stun_only
 
@@ -33,6 +42,11 @@ JOIN_ERRORS = {
     "NOT_FOUND": "No active room with this code",
     "FULL": "This room already has a subject",
     "RATE_LIMITED": "Too many wrong codes from this network; wait a few minutes and try again",
+}
+REJOIN_ERRORS = {
+    "INVALID_STATE": "Leave the current session before joining another",
+    "NOT_FOUND": "This session has ended",
+    "FORBIDDEN": "This phone has no place in the session",
 }
 
 
@@ -52,8 +66,8 @@ def encode(message: dict) -> str:
 
 def render(delivery: Delivery) -> str:
     """The JSON text of a message a store script decided on."""
-    if delivery.kind == "peer.joined":
-        return encode({"type": "peer.joined"})
+    if delivery.kind in ("peer.joined", "peer.rejoined"):
+        return encode({"type": delivery.kind})
     if delivery.kind == "peer.left":
         return encode({"type": "peer.left", "reason": delivery.detail})
     if delivery.kind == "error" and delivery.detail == EXPIRED.code:
@@ -63,6 +77,17 @@ def render(delivery: Delivery) -> str:
 
 async def stun_servers() -> list[dict]:
     return stun_only()
+
+
+def rejoin_token() -> tuple[str, str]:
+    """A new rejoin token and the hash the store keeps of it. The token goes only to its phone, which proves with it
+    that a new socket takes the same place in the session (Design 2.5.2, 2.6.7)."""
+    token = secrets.token_urlsafe(16)
+    return token, token_hash(token)
+
+
+def token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 class SessionRegistry:
@@ -229,6 +254,8 @@ class SessionRegistry:
             await self._create(peer)
         elif isinstance(message, RoomJoin):
             await self._join(peer, message.code)
+        elif isinstance(message, SessionJoin):
+            await self._rejoin(peer, message)
         elif isinstance(message, Signal):
             await self._relay(peer, message, raw_text)
         elif isinstance(message, Leave):
@@ -236,14 +263,22 @@ class SessionRegistry:
 
     async def _create(self, peer: Peer) -> None:
         session_id = f"s_{uuid4().hex}"
+        token, hashed = rejoin_token()
         for _ in range(100):
             code = f"{secrets.randbelow(1_000_000):06d}"
-            status, deliveries = await self.store.create(peer.id, session_id, code)
+            status, deliveries = await self.store.create(peer.id, session_id, code, hashed)
             await self._deliver(deliveries)
             if status == "OK":
                 ice_servers = await self.ice_servers()
                 self.send(
-                    peer, {"type": "room.created", "code": code, "sessionId": session_id, "iceServers": ice_servers}
+                    peer,
+                    {
+                        "type": "room.created",
+                        "code": code,
+                        "sessionId": session_id,
+                        "iceServers": ice_servers,
+                        "rejoinToken": token,
+                    },
                 )
                 return
             if status == "INVALID_STATE":
@@ -258,7 +293,8 @@ class SessionRegistry:
                 self.settings.join_failure_limit,
                 self.settings.join_failure_window_seconds,
             )
-        status, session_id, deliveries = await self.store.join(peer.id, code, failures)
+        token, hashed = rejoin_token()
+        status, session_id, deliveries = await self.store.join(peer.id, code, hashed, failures)
         if status != "OK":
             await self._deliver(deliveries)
             raise ProtocolError(status, JOIN_ERRORS[status])
@@ -273,10 +309,31 @@ class SessionRegistry:
             # another room on the same socket must not hear of this subject there.
             return
         self.send(
-            peer, {"type": "session.joined", "sessionId": session_id, "role": "SUBJECT", "iceServers": ice_servers}
+            peer,
+            {
+                "type": "session.joined",
+                "sessionId": session_id,
+                "role": "SUBJECT",
+                "iceServers": ice_servers,
+                "rejoinToken": token,
+            },
         )
         # It must be on its way before this socket's next signal.
         await self._deliver(joined)
+
+    async def _rejoin(self, peer: Peer, message: SessionJoin) -> None:
+        """A phone whose socket dropped takes its place again with its rejoin token (Design 2.6.7)."""
+        status, role, deliveries = await self.store.rejoin(
+            peer.id, message.sessionId, token_hash(message.rejoinToken), message.rejoin
+        )
+        if status != "OK":
+            await self._deliver(deliveries)
+            raise ProtocolError(status, REJOIN_ERRORS[status])
+        # No new relay credentials: the phone keeps the ones it got first, which outlast any session (AD-14), so
+        # Cloudflare's time does not add to the reconnection. The other phone's peer.joined or peer.rejoined goes out
+        # after this, because its answer is an offer for this socket.
+        self.send(peer, {"type": "session.joined", "sessionId": message.sessionId, "role": role, "iceServers": []})
+        await self._deliver(deliveries)
 
     async def _relay(self, peer: Peer, message: Signal, raw_text: str) -> None:
         sdp_type = message.sdp.type if message.sdp is not None else ""

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModelStore
@@ -19,6 +19,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeGuide
+import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -42,8 +43,9 @@ import org.junit.runner.RunWith
  * reconnect that failed for another reason (ERROR). Forgotten: Leave, the photographer's End session (PEER_LEFT),
  * a cancelled or failed join (CANCELLED, ERROR), a room gone while reconnecting (NOT_FOUND), and Start as the
  * photographer. The mobile-data notice (FR-6.13): a cellular path the first time (pending until a screen shows it,
- * remembered only then), a second cellular path, once said before, a Wi-Fi path, no path, and a session that ends
- * before a screen shows it (dropped, not remembered, said in the next session).
+ * remembered only then), a second cellular path, once said before, a Wi-Fi path, no path, a session that ends
+ * before a screen shows it (dropped, not remembered, said in the next session), and a short drop (still pending).
+ * Reconnecting (Design 2.6.7): the photographer's frames go on, and its capabilities go again once connected.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -139,7 +141,7 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun connectionLost_keepsTheCode_andReconnectJoinsItAgain() = runTest(dispatcher) {
+    fun connectionLost_keepsTheCode_andReconnectRejoinsWithIt() = runTest(dispatcher) {
         model.joinRoom(CODE)
         runCurrent()
         session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
@@ -149,8 +151,10 @@ class SessionViewModelTest {
         model.reconnect()
         runCurrent()
 
-        val join = SessionEntry.RoomCode(CODE) to Role.SUBJECT
-        assertEquals(listOf(join, join), session.starts)
+        assertEquals(
+            listOf(SessionEntry.RoomCode(CODE) to Role.SUBJECT, SessionEntry.Rejoin(CODE) to Role.SUBJECT),
+            session.starts,
+        )
     }
 
     @Test
@@ -198,6 +202,43 @@ class SessionViewModelTest {
     }
 
     private fun connected() = session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+
+    @Test
+    fun reconnecting_keepsTheFrames_andSendsTheCapabilitiesAgainWhenConnected() = runTest(dispatcher) {
+        model.startRoom()
+        val live = SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER)
+        session.setState(live)
+        runCurrent()
+        assertEquals(session.frameSink, camera.sink)
+        assertEquals(1, session.sent.count { it is SessionMessage.Capabilities })
+
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        assertEquals(session.frameSink, camera.sink)
+        // Shoot together does nothing while the session is still there.
+        model.startRoom()
+        runCurrent()
+        assertEquals(1, session.starts.size)
+
+        session.setState(live)
+        runCurrent()
+        assertEquals(2, session.sent.count { it is SessionMessage.Capabilities })
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        runCurrent()
+    }
+
+    @Test
+    fun mobileData_aNoticeWaitingThroughAShortDrop_staysPending() = runTest(dispatcher) {
+        connected()
+        session.setPath(IcePath("relay", "srflx", "cellular", "udp"))
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        assertTrue(model.mobileDataPending.value)
+        connected()
+        runCurrent()
+        assertTrue(model.mobileDataPending.value)
+    }
 
     @Test
     fun mobileData_theFirstCellularPath_waitsForAScreen_andIsRememberedOnlyOnceShown() = runTest(dispatcher) {

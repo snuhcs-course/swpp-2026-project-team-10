@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -138,7 +138,7 @@ class SessionViewModel(
     fun startRoom() {
         val current = state.value
         if (current is SessionState.Waiting || current is SessionState.Connecting ||
-            current is SessionState.Connected
+            current is SessionState.Connected || current is SessionState.Reconnecting
         ) {
             return
         }
@@ -153,7 +153,7 @@ class SessionViewModel(
     }
 
     /** Subject: *Join* with 6 digits. */
-    fun joinRoom(code: String) = join(code, reconnecting = false)
+    fun joinRoom(code: String) = join(SessionEntry.RoomCode(code), code, reconnecting = false)
 
     /** *End session* (photographer) or *Leave* (subject). The subject leaves the room for good, so its code goes too. */
     fun leave() {
@@ -161,34 +161,42 @@ class SessionViewModel(
         viewModelScope.launch { session.leave(EndReason.LEFT) }
     }
 
-    /** *Reconnect* on Connection lost: joins the same code again (FR-6.11). */
+    /**
+     * *Reconnect* on Connection lost: takes this phone's place in the same session again, or joins the same code again
+     * when it has no rejoin token (FR-6.11, Design 2.6.7).
+     */
     fun reconnect() {
-        lastCode?.let { join(it, reconnecting = true) }
+        lastCode?.let { join(SessionEntry.Rejoin(it), it, reconnecting = true) }
     }
 
-    private fun join(code: String, reconnecting: Boolean) {
+    private fun join(entry: SessionEntry, code: String, reconnecting: Boolean) {
         lastCode = code
         this.reconnecting = reconnecting
         role = Role.SUBJECT
-        viewModelScope.launch { session.start(SessionEntry.RoomCode(code), Role.SUBJECT) }
+        viewModelScope.launch { session.start(entry, Role.SUBJECT) }
     }
 
     private fun onState(state: SessionState) {
         _transitions.tryEmit(state)
         if (state is SessionState.Ended) onEnded(state.reason)
-        if (state !is SessionState.Connected) _mobileDataPending.value = false
+        // A short drop keeps a notice that waits; the session it was for goes on.
+        val reconnecting = state is SessionState.Reconnecting
+        if (state !is SessionState.Connected && !reconnecting) _mobileDataPending.value = false
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
+        val inSession = state is SessionState.Connecting || connected != null || reconnecting
 
-        // Frames start while the peer connection is still being set up, so the first video arrives sooner.
-        val streamingNow = role == Role.PHOTOGRAPHER && (state is SessionState.Connecting || connected != null)
+        // Frames start while the peer connection is still being set up, so the first video arrives sooner, and go on
+        // while it reconnects, so the video comes back with the link (Design 2.6.7).
+        val streamingNow = role == Role.PHOTOGRAPHER && inSession
         if (streamingNow && !streaming) camera.setFrameSink(session.videoSink())
         if (!streamingNow && streaming) camera.setFrameSink(null)
         streaming = streamingNow
 
         // The subject listens for the guide from the moment it joins: the photographer sends the image as soon as
-        // its own side is connected, which can be before this phone's Connected, and incoming does not replay.
-        val receivingNow = role == Role.SUBJECT && (state is SessionState.Connecting || connected != null)
+        // its own side is connected, which can be before this phone's Connected, and incoming does not replay. It
+        // keeps listening while the link reconnects, so the guide stays.
+        val receivingNow = role == Role.SUBJECT && inSession
         if (receivingNow && receiverJob == null) {
             receiverJob = viewModelScope.launch { coroutineScope { guideSyncer.startAsReceiver(this) } }
         }
@@ -197,6 +205,8 @@ class SessionViewModel(
             receiverJob = null
         }
 
+        // Stopped while reconnecting and started again at Connected, so the subject gets the capabilities, the
+        // camera's state, and the guide again, whatever a drop lost (Design 2.6.7).
         val liveNow = connected?.role == Role.PHOTOGRAPHER
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {

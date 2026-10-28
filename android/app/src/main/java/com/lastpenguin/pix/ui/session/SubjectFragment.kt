@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -176,13 +176,21 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // "Connecting…" until the session is up and its first frame has arrived; "camera paused" only when
                     // frames stop after that (Design 2.8). A session is Connected before WebRTC delivers the first
                     // frame, so counting the stall from the watchdog's creation showed "paused" before any video.
+                    // While the link reconnects, "Reconnecting…" over the last frame (Design 2.6.7).
                     while (true) {
-                        val connected = sessionViewModel.state.value is SessionState.Connected
-                        val streaming = connected && frames.hasFrame()
+                        val state = sessionViewModel.state.value
+                        val reconnecting = state is SessionState.Reconnecting
+                        val streaming = state is SessionState.Connected && frames.hasFrame()
                         val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
                         binding.connectingText.isVisible = !streaming || stalled
                         binding.liveDot.isVisible = streaming && !stalled
-                        binding.connectingText.setText(if (stalled) R.string.camera_paused else R.string.connecting)
+                        binding.connectingText.setText(
+                            when {
+                                reconnecting -> R.string.reconnecting
+                                stalled -> R.string.camera_paused
+                                else -> R.string.connecting
+                            },
+                        )
                         delay(STALL_CHECK_MS)
                     }
                 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -77,13 +77,16 @@ class RtcSessionManagerTest {
     /**
      * Photographer: start, get a code, and have a subject join and connect. A test that ends while connected must
      * call `leave`, because runTest drains the virtual clock at the end and the ping loop would never let it finish.
+     * Without a [token] the server is one that gives none.
      */
-    private suspend fun TestScope.connectedPhotographer(): Pair<RtcSessionManager, FakePeerConnectionClient> {
+    private suspend fun TestScope.connectedPhotographer(
+        token: String? = null,
+    ): Pair<RtcSessionManager, FakePeerConnectionClient> {
         val manager = manager()
         manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
         runCurrent()
         signaling.push(SignalEvent.Opened)
-        signaling.receive(SignalMessage.RoomCreated("482915", "s_1"))
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1", rejoinToken = token))
         signaling.receive(SignalMessage.PeerJoined())
         runCurrent()
         val peer = peers.created.last()
@@ -93,6 +96,41 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
         return manager to peer
+    }
+
+    /** Subject: join with the code, answer the offer, and connect; [token] as for [connectedPhotographer]. */
+    private suspend fun TestScope.connectedSubject(
+        token: String? = null,
+    ): Pair<RtcSessionManager, FakePeerConnectionClient> {
+        val manager = manager()
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT, iceServers = relay, rejoinToken = token))
+        runCurrent()
+        val peer = peers.created.last()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("offer", "v=0 offer")))
+        peer.open()
+        peer.deliver(hello(Role.PHOTOGRAPHER, "Dongje"))
+        runCurrent()
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT), manager.state.value)
+        return manager to peer
+    }
+
+    /** The `session.join` of a socket opened again during the session. */
+    private fun rejoin(token: String) = SignalMessage.SessionJoin("s_1", rejoin = true, rejoinToken = token)
+
+    /** The SDP types of the signals sent so far, with `candidate` for a candidate. */
+    private fun sentSignals(): List<String> =
+        signaling.sent.filterIsInstance<SignalMessage.Signal>().map { it.sdp?.type ?: "candidate" }
+
+    /** The link drops, and the new socket takes the place back: its `session.join` is answered. */
+    private fun TestScope.dropAndRejoin(peer: FakePeerConnectionClient, role: Role) {
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", role))
+        runCurrent()
     }
 
     @Test
@@ -383,6 +421,9 @@ class RtcSessionManagerTest {
 
         peer.push(PeerEvent.Link(LinkState.FAILED))
         runCurrent()
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+        advanceTimeBy(10_001)
+        runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
         assertTrue(peer.closed)
         assertEquals(SessionMessage.Leave(EndReason.CONNECTION_LOST), incoming.last())
@@ -392,11 +433,12 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(SessionState.Connecting("s_1"), manager.state.value)
         assertEquals(2, peers.created.size)
-        assertEquals(2, signaling.sent.filterIsInstance<SignalMessage.Signal>().count { it.sdp?.type == "offer" })
+        assertEquals(0, peers.created.last().restarts)
+        assertEquals("offer", sentSignals().last())
     }
 
     @Test
-    fun `a short disconnect is tolerated, a long one is not`() = runTest {
+    fun `a link back within 10 s ends Reconnecting, and one that stays down ends the session`() = runTest {
         val (manager, peer) = connectedPhotographer()
 
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
@@ -480,7 +522,7 @@ class RtcSessionManagerTest {
     }
 
     @Test
-    fun `losing the signaling socket does not end a running session`() = runTest {
+    fun `without a rejoin token, losing the signaling socket does not end a running session`() = runTest {
         val (manager, _) = connectedPhotographer()
 
         signaling.push(SignalEvent.Closed(null))
@@ -519,5 +561,368 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(2, signaling.connectedUrls.size)
         assertEquals(SessionState.Connecting(null), manager.state.value)
+    }
+
+    // ---- Reconnection (Design 2.6.7) -----------------------------------------------------------------------------
+
+    @Test
+    fun `a dropped link puts the photographer in Reconnecting, takes its place again, and restarts ICE`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        assertEquals(SessionState.Reconnecting("s_1", 0L), manager.state.value)
+        // A new socket, even though the old one looked open.
+        assertEquals(2, signaling.connectedUrls.size)
+
+        signaling.push(SignalEvent.Opened)
+        runCurrent()
+        assertEquals(rejoin("photographer-token"), signaling.sent.last())
+        assertEquals(0, peer.restarts)
+
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(1, peer.restarts)
+        assertEquals("offer", sentSignals().last())
+
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 restart answer")))
+        peer.push(PeerEvent.Link(LinkState.CONNECTED))
+        runCurrent()
+        assertEquals("v=0 restart answer", peer.remote.last().sdp)
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        // The same connection: its channels and video track stayed.
+        assertEquals(1, peers.created.size)
+        assertFalse(peer.closed)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `the subject coming back gets an ICE restart, also when this phone saw no drop`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+
+        signaling.receive(SignalMessage.PeerRejoined)
+        runCurrent()
+        assertEquals(1, peer.restarts)
+        assertTrue(manager.state.value is SessionState.Connected)
+
+        dropAndRejoin(peer, Role.PHOTOGRAPHER)
+        signaling.receive(SignalMessage.PeerRejoined)
+        runCurrent()
+        // One for its own place back, one for the subject's.
+        assertEquals(3, peer.restarts)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `the subject takes its place again and answers the restart on the same connection`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+
+        dropAndRejoin(peer, Role.SUBJECT)
+        assertEquals(rejoin("subject-token"), signaling.sent.last())
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("offer", "v=0 restart offer")))
+        runCurrent()
+        assertEquals("v=0 restart offer", peer.remote.last().sdp)
+        assertEquals(listOf("answer", "answer"), sentSignals())
+
+        peer.push(PeerEvent.Link(LinkState.CONNECTED))
+        runCurrent()
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT), manager.state.value)
+        assertEquals(1, peers.created.size)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `the other phone's dropped socket does not end a running or reconnecting session`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+
+        signaling.receive(SignalMessage.PeerLeft(EndReason.CONNECTION_LOST))
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Connected)
+
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        signaling.receive(SignalMessage.PeerLeft(EndReason.CONNECTION_LOST))
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+        assertFalse(peer.closed)
+
+        // Leaving on purpose still ends it.
+        signaling.receive(SignalMessage.PeerLeft(EndReason.PEER_LEFT))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.PEER_LEFT), manager.state.value)
+    }
+
+    @Test
+    fun `the photographer gives up after 10 s of reconnecting and keeps the room`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        advanceTimeBy(9_999)
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+        assertTrue(incoming.none { it is SessionMessage.Leave })
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(SessionState.Waiting("482915"), manager.state.value)
+        assertTrue(peer.closed)
+        // "Junhyeong disconnected" comes only now.
+        assertEquals(SessionMessage.Leave(EndReason.CONNECTION_LOST), incoming.last())
+    }
+
+    @Test
+    fun `after 10 s the subject's Reconnect takes its place again with its token and the first credentials`() =
+        runTest {
+            val (manager, peer) = connectedSubject(token = "subject-token")
+            peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+            advanceTimeBy(10_001)
+            runCurrent()
+            assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), manager.state.value)
+
+            manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
+            runCurrent()
+            assertEquals(SessionState.Connecting(null), manager.state.value)
+            signaling.push(SignalEvent.Opened)
+            runCurrent()
+            assertEquals(
+                SignalMessage.SessionJoin("s_1", rejoin = false, rejoinToken = "subject-token"),
+                signaling.sent.last(),
+            )
+
+            signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT))
+            runCurrent()
+            assertEquals(SessionState.Connecting("s_1"), manager.state.value)
+            assertEquals(PeerConfig(Role.SUBJECT, relay), peers.created.last().config)
+            manager.leave(EndReason.LEFT)
+        }
+
+    @Test
+    fun `a subject waiting for an offer takes its place again when the photographer is back`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        advanceTimeBy(10_001)
+        runCurrent()
+        manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT))
+        runCurrent()
+        val created = peers.created.size
+        val sentBefore = signaling.sent.size
+
+        // The photographer was off the server, so the `peer.joined` for this Reconnect went nowhere and no offer comes.
+        signaling.receive(SignalMessage.PeerRejoined)
+        runCurrent()
+        assertEquals(
+            listOf(SignalMessage.SessionJoin("s_1", rejoin = false, rejoinToken = "subject-token")),
+            signaling.sent.drop(sentBefore),
+        )
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT))
+        runCurrent()
+        assertEquals(created, peers.created.size)
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("offer", "v=0 offer")))
+        runCurrent()
+        assertEquals("answer", sentSignals().last())
+
+        // With the offer in, the photographer's next return needs nothing from this phone.
+        val sent = signaling.sent.size
+        signaling.receive(SignalMessage.PeerRejoined)
+        runCurrent()
+        assertEquals(sent, signaling.sent.size)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a Reconnect without a token joins the code again`() = runTest {
+        val (manager, peer) = connectedSubject()
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        // Without a token there is no place to take again, so no new socket.
+        assertEquals(1, signaling.connectedUrls.size)
+        advanceTimeBy(10_001)
+        runCurrent()
+
+        manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        runCurrent()
+        assertEquals(SignalMessage.RoomJoin("482915"), signaling.sent.last())
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a closed data channel means the other phone closed its connection`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+
+        peer.push(PeerEvent.ChannelClosed(Channel.RELIABLE))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), manager.state.value)
+        assertTrue(peer.closed)
+    }
+
+    @Test
+    fun `a realtime channel that closes alone keeps the session, and its messages go reliably`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+
+        peer.push(PeerEvent.ChannelClosed(Channel.REALTIME))
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Connected)
+        assertFalse(peer.closed)
+        manager.send(SessionMessage.ZoomSet(2f))
+        runCurrent()
+        assertEquals(Channel.RELIABLE, peer.sent.last().first)
+        assertEquals(SessionMessage.ZoomSet(2f), peer.sentMessages().last())
+
+        // A drop after that still ends once the link is back, with the reliable channel alone.
+        dropAndRejoin(peer, Role.SUBJECT)
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+        peer.push(PeerEvent.Link(LinkState.CONNECTED))
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Connected)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `an answer to no pending offer is ignored`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 stale answer")))
+        runCurrent()
+        assertEquals(1, peer.remote.size)
+        assertTrue(manager.state.value is SessionState.Connected)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `candidates of a restart go out after its offer, and the subject's wait for its answer`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        // While the new socket has no place, nothing is signaled.
+        peer.push(PeerEvent.LocalCandidate(IceCandidate("0", 0, "candidate:too early")))
+        runCurrent()
+        assertTrue(signaling.sent.filterIsInstance<SignalMessage.Signal>().none { it.candidate != null })
+
+        peer.candidatesWhileCreating = listOf(IceCandidate("0", 0, "candidate:new"))
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(listOf("offer", "offer", "candidate"), sentSignals())
+
+        signaling.receive(SignalMessage.Signal(candidate = IceCandidate("0", 0, "candidate:subject")))
+        runCurrent()
+        assertTrue(peer.candidates.none { it.candidate == "candidate:subject" })
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 restart answer")))
+        runCurrent()
+        assertEquals("candidate:subject", peer.candidates.last().candidate)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a refused rejoin ends a reconnecting session`() = runTest {
+        val (subject, subjectPeer) = connectedSubject(token = "subject-token")
+        subjectPeer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.ServerError("FORBIDDEN", "This phone has no place in the session"))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.NOT_FOUND), subject.state.value)
+
+        val (photographer, peer) = connectedPhotographer(token = "photographer-token")
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.ServerError("NOT_FOUND", "This session has ended"))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), photographer.state.value)
+        assertEquals(SessionMessage.Leave(EndReason.CONNECTION_LOST), incoming.last())
+    }
+
+    @Test
+    fun `a socket that drops while connected is opened again, sooner while reconnecting`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+
+        signaling.push(SignalEvent.Closed(RuntimeException("server restarted")))
+        advanceTimeBy(999)
+        runCurrent()
+        assertEquals(1, signaling.connectedUrls.size)
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(2, signaling.connectedUrls.size)
+
+        // Failing again waits twice as long while the session runs.
+        signaling.push(SignalEvent.Closed(RuntimeException("still down")))
+        advanceTimeBy(1_999)
+        runCurrent()
+        assertEquals(2, signaling.connectedUrls.size)
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(3, signaling.connectedUrls.size)
+
+        // Back in its place while the link runs: no ICE restart.
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(0, peer.restarts)
+        assertTrue(manager.state.value is SessionState.Connected)
+
+        // While reconnecting, every second.
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        assertEquals(4, signaling.connectedUrls.size)
+        signaling.push(SignalEvent.Closed(RuntimeException("no network")))
+        advanceTimeBy(1_001)
+        runCurrent()
+        assertEquals(5, signaling.connectedUrls.size)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `after giving up, the socket is tried again from 1 s, not after the tries while reconnecting`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        // No network: five more sockets fail while it reconnects.
+        repeat(5) {
+            signaling.push(SignalEvent.Closed(RuntimeException("no network")))
+            advanceTimeBy(1_000)
+            runCurrent()
+        }
+        assertEquals(7, signaling.connectedUrls.size)
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertEquals(SessionState.Waiting("482915"), manager.state.value)
+
+        signaling.push(SignalEvent.Closed(RuntimeException("no network")))
+        advanceTimeBy(999)
+        runCurrent()
+        assertEquals(7, signaling.connectedUrls.size)
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(8, signaling.connectedUrls.size)
+        signaling.push(SignalEvent.Closed(RuntimeException("no network")))
+        advanceTimeBy(2_001)
+        runCurrent()
+        assertEquals(9, signaling.connectedUrls.size)
+    }
+
+    @Test
+    fun `a waiting room keeps its code when its socket drops`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1", rejoinToken = "photographer-token"))
+        runCurrent()
+
+        signaling.push(SignalEvent.Closed(null))
+        advanceTimeBy(1_001)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(rejoin("photographer-token"), signaling.sent.last())
+        assertEquals(SessionState.Waiting("482915"), manager.state.value)
     }
 }

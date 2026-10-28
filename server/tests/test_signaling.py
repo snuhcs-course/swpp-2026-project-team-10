@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 import json
 import re
 from contextlib import ExitStack
@@ -14,7 +14,8 @@ def create_room(photographer):
     assert re.fullmatch(r"[0-9]{6}", room["code"])
     assert room["sessionId"].startswith("s_")
     assert isinstance(room["iceServers"], list)
-    assert set(room) == {"type", "code", "sessionId", "iceServers"}
+    assert isinstance(room["rejoinToken"], str) and len(room["rejoinToken"]) >= 16
+    assert set(room) == {"type", "code", "sessionId", "iceServers", "rejoinToken"}
     return room
 
 
@@ -27,8 +28,10 @@ def join_room(photographer, subject, room):
         "sessionId": room["sessionId"],
         "role": "SUBJECT",
         "iceServers": joined["iceServers"],
+        "rejoinToken": joined["rejoinToken"],
     }
     assert isinstance(joined["iceServers"], list)
+    assert isinstance(joined["rejoinToken"], str) and len(joined["rejoinToken"]) >= 16
     assert photographer.receive_json() == {"type": "peer.joined"}
     return joined
 
@@ -39,6 +42,31 @@ def assert_error(socket, code):
     assert message["code"] == code
     assert isinstance(message["message"], str)
     return message
+
+
+def session_join(socket, session_id, token, rejoin=True):
+    """Sends `session.join` and returns the answer."""
+    socket.send_json({"type": "session.join", "sessionId": session_id, "rejoin": rejoin, "rejoinToken": token})
+    return socket.receive_json()
+
+
+def rejoined(session_id, role):
+    """The answer to a successful `session.join`: no new relay credentials, since the phone keeps its own."""
+    return {"type": "session.joined", "sessionId": session_id, "role": role, "iceServers": []}
+
+
+def assert_nothing_more(*sockets):
+    """An answer to an unknown message proves that nothing else was queued for these sockets before it."""
+    for socket in sockets:
+        socket.send_json({"type": "unknown"})
+        assert_error(socket, "UNKNOWN_TYPE")
+
+
+# A session id in the server's format that no session has.
+SESSION_ID = "s_" + "0" * 32
+OFFER = {"type": "signal", "sdp": {"type": "offer", "sdp": "v=0\r\no=restart\r\n"}}
+ANSWER = {"type": "signal", "sdp": {"type": "answer", "sdp": "v=0\r\no=restart\r\n"}}
+LOST = {"type": "peer.left", "reason": "CONNECTION_LOST"}
 
 
 def ice_signal(tag="test"):
@@ -246,6 +274,12 @@ def test_invalid_room_codes(client, code):
         {"type": "signal", "candidate": {"sdpMLineIndex": 0}},
         {"type": "signal", "sdp": {"type": "offer", "sdp": "v=0"}, "candidate": ice_signal()["candidate"]},
         {**ice_signal(), "sessionId": "some-other-room"},
+        {"type": "session.join", "sessionId": "s_7f3a92c1", "rejoinToken": "t" * 22},
+        {"type": "session.join", "sessionId": SESSION_ID},
+        {"type": "session.join", "sessionId": SESSION_ID, "rejoinToken": "t" * 15},
+        {"type": "session.join", "sessionId": SESSION_ID, "rejoinToken": "t" * 65},
+        {"type": "session.join", "sessionId": SESSION_ID, "rejoinToken": "t" * 22, "rejoin": "true"},
+        {"type": "session.join", "sessionId": SESSION_ID, "rejoinToken": "t" * 22, "role": "PHOTOGRAPHER"},
     ],
 )
 def test_invalid_payloads_are_rejected(client, message):
@@ -437,3 +471,166 @@ def test_an_expired_code_counts_as_wrong_and_a_full_room_does_not(client, settin
                 assert try_code(late, waiting["code"])["code"] == "EXPIRED"
                 assert assert_error(other, "EXPIRED")
                 assert try_code(late, room["code"])["code"] == "RATE_LIMITED"
+
+
+# --- Reconnection (Design 2.6.7) ---------------------------------------------------------------------------------------
+
+
+def test_each_place_gets_a_rejoin_token_of_its_own(client):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        joined = join_room(photographer, subject, room)
+    assert room["rejoinToken"] != joined["rejoinToken"]
+
+
+def test_a_subject_whose_socket_dropped_takes_its_place_again(client, turn_api):
+    with client.websocket_connect("/ws") as photographer:
+        room = create_room(photographer)
+        with client.websocket_connect("/ws") as subject:
+            joined = join_room(photographer, subject, room)
+        assert photographer.receive_json() == LOST
+        with client.websocket_connect("/ws") as again:
+            answer = session_join(again, room["sessionId"], joined["rejoinToken"])
+            assert answer == rejoined(room["sessionId"], "SUBJECT")
+            assert photographer.receive_json() == {"type": "peer.rejoined"}
+            # The photographer's ICE restart reaches the new socket, and the answer comes back.
+            photographer.send_json(OFFER)
+            assert again.receive_json() == OFFER
+            again.send_json(ANSWER)
+            assert photographer.receive_json() == ANSWER
+    # A phone that comes back keeps its credentials, so Cloudflare is not asked again.
+    assert len(turn_api.requests) == 2
+
+
+def test_a_phone_that_starts_a_new_connection_is_announced_as_joined(client):
+    with client.websocket_connect("/ws") as photographer:
+        room = create_room(photographer)
+        with client.websocket_connect("/ws") as subject:
+            joined = join_room(photographer, subject, room)
+        assert photographer.receive_json() == LOST
+        with client.websocket_connect("/ws") as again:
+            answer = session_join(again, room["sessionId"], joined["rejoinToken"], rejoin=False)
+            assert answer == rejoined(room["sessionId"], "SUBJECT")
+            assert photographer.receive_json() == {"type": "peer.joined"}
+
+
+def test_a_rejoin_takes_the_place_from_the_phones_old_socket(client):
+    # The server notices a phone's lost socket only when its pings go unanswered, up to 40 s later, so the place is
+    # often still held by it when the phone comes back.
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as new:
+        room = create_room(photographer)
+        with client.websocket_connect("/ws") as old:
+            joined = join_room(photographer, old, room)
+            assert session_join(new, room["sessionId"], joined["rejoinToken"]) == rejoined(room["sessionId"], "SUBJECT")
+            assert photographer.receive_json() == {"type": "peer.rejoined"}
+            old.send_json(ice_signal())
+            assert_error(old, "INVALID_STATE")
+        # The old socket's disconnect changes nothing: no peer.left, and the new socket keeps the place.
+        assert client.get("/internal/stats").json()["connections"] == 2
+        photographer.send_json(ice_signal("after"))
+        assert new.receive_json() == ice_signal("after")
+        assert_nothing_more(photographer, new)
+
+
+def test_a_photographer_whose_socket_dropped_takes_its_room_back(client):
+    with client.websocket_connect("/ws") as subject:
+        with client.websocket_connect("/ws") as photographer:
+            room = create_room(photographer)
+            join_room(photographer, subject, room)
+        assert subject.receive_json() == LOST
+        with client.websocket_connect("/ws") as again:
+            answer = session_join(again, room["sessionId"], room["rejoinToken"])
+            assert answer == rejoined(room["sessionId"], "PHOTOGRAPHER")
+            assert subject.receive_json() == {"type": "peer.rejoined"}
+            again.send_json(OFFER)
+            assert subject.receive_json() == OFFER
+
+
+def test_a_waiting_room_keeps_its_code_when_the_photographer_comes_back(client):
+    with client.websocket_connect("/ws") as photographer:
+        room = create_room(photographer)
+    with client.websocket_connect("/ws") as again, client.websocket_connect("/ws") as subject:
+        assert session_join(again, room["sessionId"], room["rejoinToken"]) == rejoined(
+            room["sessionId"], "PHOTOGRAPHER"
+        )
+        join_room(again, subject, room)
+
+
+def test_the_token_decides_the_place(client):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        join_room(photographer, subject, room)
+        with client.websocket_connect("/ws") as other:
+            answer = session_join(other, room["sessionId"], room["rejoinToken"])
+            assert answer == rejoined(room["sessionId"], "PHOTOGRAPHER")
+            assert subject.receive_json() == {"type": "peer.rejoined"}
+            subject.send_json(ice_signal())
+            assert other.receive_json() == ice_signal()
+
+
+def test_an_unknown_token_or_session_is_refused_and_the_socket_stays_usable(client):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as stranger:
+        room = create_room(photographer)
+        assert session_join(stranger, room["sessionId"], "t" * 22)["code"] == "FORBIDDEN"
+        assert session_join(stranger, SESSION_ID, room["rejoinToken"])["code"] == "NOT_FOUND"
+        create_room(stranger)
+
+
+def test_a_subject_who_left_cannot_come_back_with_its_token(client):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        joined = join_room(photographer, subject, room)
+        subject.send_json({"type": "leave"})
+        assert photographer.receive_json() == {"type": "peer.left", "reason": "PEER_LEFT"}
+        assert session_join(subject, room["sessionId"], joined["rejoinToken"])["code"] == "FORBIDDEN"
+
+
+def test_a_new_subject_makes_the_earlier_subjects_token_useless(client):
+    with client.websocket_connect("/ws") as photographer:
+        room = create_room(photographer)
+        with client.websocket_connect("/ws") as first:
+            joined = join_room(photographer, first, room)
+        assert photographer.receive_json() == LOST
+        with client.websocket_connect("/ws") as second, client.websocket_connect("/ws") as again:
+            join_room(photographer, second, room)
+            assert session_join(again, room["sessionId"], joined["rejoinToken"])["code"] == "FORBIDDEN"
+
+
+def test_a_session_the_photographer_left_is_not_found(client):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        joined = join_room(photographer, subject, room)
+        photographer.send_json({"type": "leave"})
+        assert subject.receive_json() == {"type": "peer.left", "reason": "PEER_LEFT"}
+        assert session_join(subject, room["sessionId"], joined["rejoinToken"])["code"] == "NOT_FOUND"
+
+
+@pytest.mark.parametrize(("seconds", "kept"), [(59, True), (60, False)])
+def test_a_session_waits_sixty_seconds_after_its_last_socket(client, clock, seconds, kept):
+    with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
+        room = create_room(photographer)
+        joined = join_room(photographer, subject, room)
+    clock.advance(seconds)
+    with client.websocket_connect("/ws") as again:
+        answer = session_join(again, room["sessionId"], joined["rejoinToken"])
+    if kept:
+        assert answer == rejoined(room["sessionId"], "SUBJECT")
+    else:
+        assert answer["code"] == "NOT_FOUND"
+
+
+def test_a_socket_rejoins_only_its_own_place(client):
+    with ExitStack() as stack:
+        photographer, subject, other = [stack.enter_context(client.websocket_connect("/ws")) for _ in range(3)]
+        room = create_room(photographer)
+        joined = join_room(photographer, subject, room)
+        other_room = create_room(other)
+        # Its own place again changes nothing, apart from telling the other phone.
+        assert session_join(subject, room["sessionId"], joined["rejoinToken"]) == rejoined(room["sessionId"], "SUBJECT")
+        assert photographer.receive_json() == {"type": "peer.rejoined"}
+        # Not the other place of its session, and not a place in another session.
+        assert session_join(subject, room["sessionId"], room["rejoinToken"])["code"] == "INVALID_STATE"
+        assert session_join(other, room["sessionId"], joined["rejoinToken"])["code"] == "INVALID_STATE"
+        assert session_join(photographer, other_room["sessionId"], other_room["rejoinToken"])["code"] == "INVALID_STATE"
+        subject.send_json(ice_signal())
+        assert photographer.receive_json() == ice_signal()

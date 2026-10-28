@@ -33,4 +33,6 @@ Do not use `CLAUDE.md` as a task log or scratchpad. Do not record temporary prog
 
 Keep the files concise and current. Update or remove outdated information instead of continually appending. Avoid duplicating detailed documentation; link to it instead. Keep each Markdown paragraph and list item on one source line; do not manually wrap prose. Preserve line breaks required for Markdown structure and code blocks.
 
+Group the items under a heading per topic. An item is one rule or pitfall in a few sentences: what to do or to avoid, and what breaks otherwise. The reasons, the walkthroughs, and the history belong in the Design Documentation, the README, the Testing Documentation, or the code's own comments; name the place instead of repeating it. Every session reads these files whole, so each sentence costs context in every task.
+
 Before finishing a task, consider whether it introduced durable knowledge that belongs in one of the three `CLAUDE.md` files. If not, leave them unchanged.

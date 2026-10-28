@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import android.content.Context
@@ -232,6 +232,18 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
 
     override suspend fun setDisplayName(displayName: String) =
         answer("setDisplayName:$displayName") { it.copy(displayName = displayName) }
+
+    /** The account as another phone left it on the server, which [refreshAccount] brings; null when it is unchanged. */
+    var onServer: Account? = null
+
+    override suspend fun refreshAccount(): Result<Unit> {
+        calls += "refreshAccount"
+        (failures["refreshAccount"] ?: failure)?.let { return Result.failure(it) }
+        // Like the real one, a read that comes back after signing out changes nothing.
+        val changed = onServer
+        if (changed != null && state.value is AuthState.SignedIn) signInAs(changed)
+        return Result.success(Unit)
+    }
 
     override suspend fun freshAccessToken(): String? = token
 

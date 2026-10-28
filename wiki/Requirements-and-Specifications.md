@@ -30,7 +30,7 @@
 | 2.7 | 2026-10-27 | Room codes on any network, as built since [#139] (the overview, F8, FR-8.5, US-13, glossary): *Room code* and *Join with code* no longer say both phones must be on the same Wi-Fi, and the connection messages ask for an internet connection; the join steps on *Room code* sit in a box (6.6, 6.7, Figures 5 and 6). |
 | 2.8 | 2026-10-27 | *Check* answers "This Pix ID is available" without repeating the ID, like "This Pix ID is taken" (US-6, 6.4). |
 | 2.9 | 2026-10-28 | The reference thumbnail on Subject view (Iter3-A1, [#132]): the subject sees the guide's reference photo in a corner too, and a 512 px copy of it may go to the session partner's phone (FR-3.9, NFR-13, 6.6). |
-| 2.10 | 2026-10-28 | A guide from the subject's phone (Iter3-P9, [#113]): *Guide* on *Subject view* opens *Add a pose guide* with *Upload a photo* and the saved guides, and the chosen guide appears on both phones (6.6, Figure 5, US-16); *Generate poses here* and the same step on both phones stay to be drawn (6.8). |
+| 2.10 | 2026-10-28 | A guide from the subject's phone (Iter3-P9, [#113]): *Guide* on *Subject view* opens *Add a pose guide* with *Upload a photo* and the saved guides, and the chosen guide appears on both phones (6.6, Figure 5, US-16); Figure 5 also gains the guide-edit mode toggle its Subject view lacked; *Generate poses here* and the same step on both phones stay to be drawn (6.8). |
 
 Items marked **TBD** need a team decision.
 

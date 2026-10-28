@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.DialogInterface
@@ -53,7 +53,9 @@ class RoomCodeSheet : BottomSheetDialogFragment() {
 
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
-        if (dismissedForConnection) return
+        // A configuration change (the language, the font size) also tears the dialog down, but the sheet comes back
+        // with the same room, so the code must stay.
+        if (dismissedForConnection || activity?.isChangingConfigurations == true) return
         val state = sessionViewModel.state.value
         if (state is SessionState.Idle || state is SessionState.Waiting) sessionViewModel.cancelRoom()
     }
@@ -83,7 +85,7 @@ class RoomCodeSheet : BottomSheetDialogFragment() {
                     when (state.reason) {
                         EndReason.EXPIRED -> R.string.code_expired
                         EndReason.CANCELLED, EndReason.LEFT, EndReason.PEER_LEFT -> R.string.getting_code
-                        else -> R.string.couldnt_connect_wifi
+                        else -> R.string.couldnt_connect
                     },
                 )
             }

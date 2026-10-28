@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.content.Context
@@ -68,7 +68,7 @@ fun TextView.showPixIdStatus(pixId: String, refusal: AccountException?, check: P
         answer?.available == false -> showRule(context.getString(R.string.pix_id_taken), broken = true)
 
         answer?.available == true -> {
-            text = context.getString(R.string.pix_id_available, pixId)
+            text = context.getString(R.string.pix_id_available)
             setTextColor(ContextCompat.getColor(context, R.color.pix_live))
         }
 

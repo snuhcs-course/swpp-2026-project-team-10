@@ -31,7 +31,8 @@ its parent centers, or a row of them) is drawn as one element marked `data-fit` 
 parent keeps it at), and in Korean it takes its content's width from that side. A dialog is one box whose content flows,
 centered on the screen, with its buttons in a row that wraps (`flex-flow: row-reverse wrap`): as in the app, they stand
 side by side when they fit and stack at the right when they do not, so the Korean dialog takes its own height and its
-own buttons' places.
+own buttons' places. A sheet whose text sets its height, such as the room code's, flows the same way from the screen's
+bottom.
 
 Change the drawing, never the image alone, and render it in the same PR:
 

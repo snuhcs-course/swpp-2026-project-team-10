@@ -49,46 +49,45 @@
         android:textAppearance="@style/TextAppearance.Pix.Label"
         android:textColor="@color/pix_text" />
 
-    <TextView
+    <!-- What the friend does, in a box of its own under the code's status. -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:gravity="center"
-        android:lineSpacingMultiplier="1.2"
-        android:text="@string/room_code_body"
-        android:textAppearance="@style/TextAppearance.Pix.Body" />
+        android:background="@drawable/bg_list_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
 
-    <!-- One note a line: side by side, "Expires in 10 min" wrapped on a 360 dp phone. -->
-    <LinearLayout
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_people"
+            app:tint="@color/pix_text_soft" />
+
+        <TextView
+            android:id="@+id/joinSteps"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:lineSpacingMultiplier="1.2"
+            android:text="@string/room_code_body"
+            android:textAppearance="@style/TextAppearance.Pix.Body" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/expiryNote"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:gravity="center_horizontal"
-        android:orientation="vertical">
-
-        <TextView
-            android:id="@+id/sameWifiNote"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:drawableStartCompat="@drawable/ic_wifi_small"
-            android:drawablePadding="6dp"
-            app:drawableTint="@color/pix_text_faint"
-            android:gravity="center_vertical"
-            android:text="@string/same_wifi"
-            android:textAppearance="@style/TextAppearance.Pix.Caption" />
-
-        <TextView
-            android:id="@+id/expiryNote"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            app:drawableStartCompat="@drawable/ic_clock_small"
-            android:drawablePadding="6dp"
-            app:drawableTint="@color/pix_text_faint"
-            android:gravity="center_vertical"
-            android:text="@string/code_expiry"
-            android:textAppearance="@style/TextAppearance.Pix.Caption" />
-    </LinearLayout>
+        app:drawableStartCompat="@drawable/ic_clock_small"
+        android:drawablePadding="6dp"
+        app:drawableTint="@color/pix_text_faint"
+        android:gravity="center_vertical"
+        android:text="@string/code_expiry"
+        android:textAppearance="@style/TextAppearance.Pix.Caption" />
 
     <Button
         android:id="@+id/joinInsteadButton"

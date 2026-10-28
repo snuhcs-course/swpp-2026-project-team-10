@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -97,7 +97,7 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
                         ) {
                             R.string.join_rate_limited
                         } else {
-                            R.string.couldnt_connect_wifi
+                            R.string.couldnt_connect
                         },
                     )
                     binding.statusText.isVisible = true

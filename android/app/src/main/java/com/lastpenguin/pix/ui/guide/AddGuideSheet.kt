@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -81,9 +81,12 @@ class AddGuideSheet : BottomSheetDialogFragment() {
         }
     }
 
-    /** However the sheet closes, a saved guide still opening must not replace the guide on the camera. */
+    /**
+     * However the sheet closes, a saved guide still opening must not replace the guide on the camera. A configuration
+     * change (the language, the font size) also tears the dialog down, but the sheet comes back, so the guide opens.
+     */
     override fun onDismiss(dialog: DialogInterface) {
-        referenceViewModel.cancelOpening()
+        if (activity?.isChangingConfigurations != true) referenceViewModel.cancelOpening()
         super.onDismiss(dialog)
     }
 

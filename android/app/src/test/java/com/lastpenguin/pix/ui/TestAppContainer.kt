@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -54,6 +54,7 @@ class TestAppContainer(
     val camera: FakeCameraController = FakeCameraController(),
     val session: FakeSessionManager = FakeSessionManager(),
     frameAspect: () -> Float = { camera.state.value.aspect.frameAspect },
+    val saved: SavedGuideStore = SavedGuideStore.InMemory(),
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -63,7 +64,6 @@ class TestAppContainer(
     val settings = CameraSettings.InMemory()
     val consent = IdleConsent()
     val maker = ScriptedGuideMaker()
-    val saved = SavedGuideStore.InMemory()
     val generator = ScriptedPoseGenerator()
     val tipper = ScriptedPoseTipper()
 

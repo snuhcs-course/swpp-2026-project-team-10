@@ -7,9 +7,8 @@
     <string name="back">Back</string>
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
-    <string name="same_wifi">Both phones on the same Wi-Fi</string>
     <string name="connecting">Connecting…</string>
-    <string name="couldnt_connect_wifi">Couldn\'t connect. Make sure both phones are on the same Wi-Fi.</string>
+    <string name="couldnt_connect">Couldn\'t connect. Check your internet connection and try again.</string>
     <string name="join_rate_limited">Too many wrong codes from this network. Try again in a few minutes.</string>
     <string name="mobile_data_notice">The live view uses mobile data.</string>
 
@@ -245,7 +244,7 @@
     <string name="check">Check</string>
     <string name="check_pix_id_description">Check whether this Pix ID is free</string>
     <string name="checking_pix_id">Checking…</string>
-    <string name="pix_id_available">%1$s is available</string>
+    <string name="pix_id_available">This Pix ID is available</string>
     <string name="sign_up">Sign up</string>
     <string name="pix_id_setup_title">Choose your Pix ID</string>
     <string name="pix_id_setup_body">Friends find you by this ID, so it has no capitals or spaces.</string>
@@ -306,6 +305,6 @@
     <string name="camera_paused">The photographer\'s camera is paused.</string>
     <string name="session_ended">The session has ended.</string>
     <string name="connection_lost_title">Connection lost</string>
-    <string name="connection_lost_message">Video stopped. Check that both phones are on the same Wi-Fi, then reconnect.</string>
+    <string name="connection_lost_message">Video stopped. Check both phones\' internet connection, then reconnect.</string>
     <string name="reconnect">Reconnect</string>
 </resources>

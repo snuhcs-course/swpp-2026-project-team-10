@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -30,7 +30,7 @@ interface SavedGuideStore {
 
     /**
      * Keeps guides for the life of the process only, otherwise like the real store (one copy per id, the oldest
-     * going first); for tests and screens that do not keep guides. The reference, or the cutout, is the thumbnail.
+     * going first); for tests and screens that do not keep guides. The reference, or the outline, is the thumbnail.
      */
     class InMemory(private val clock: () -> Long = System::currentTimeMillis) : SavedGuideStore {
         private class Kept(val saved: SavedGuide, val guide: ReferenceGuide, val state: GuideState)
@@ -41,7 +41,7 @@ interface SavedGuideStore {
 
         override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> {
             kept.firstOrNull { it.saved.id == guide.id }?.let { return Result.success(it.saved) }
-            val entry = Kept(SavedGuide(guide.id, clock(), guide.reference ?: guide.cutout), guide, state)
+            val entry = Kept(SavedGuide(guide.id, clock(), guide.reference ?: guide.outline), guide, state)
             publish((listOf(entry) + kept).take(MAX_SAVED))
             return Result.success(entry.saved)
         }

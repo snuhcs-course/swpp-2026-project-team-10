@@ -44,7 +44,7 @@ class GuideSizesTest {
     }
 
     @Test
-    fun strokeScalesWithTheCutoutHeight() {
+    fun strokeScalesWithTheMaskHeight() {
         val atScreenSize = (GuideState.DEFAULT_HEIGHT * 1440f).toInt()
         assertEquals(8f, outlineStrokePx(atScreenSize), 0.01f)
         assertEquals(4f, outlineStrokePx(atScreenSize / 2), 0.01f)

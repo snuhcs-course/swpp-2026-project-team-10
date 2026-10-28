@@ -60,6 +60,7 @@
     <string name="delete_saved_guide_message">이 휴대폰에서 지워져요. 카메라에 있는 가이드는 그대로 남아요.</string>
     <string name="delete">삭제</string>
     <string name="saved_guide_open_failed">저장한 가이드를 열지 못했어요.</string>
+    <string name="guide_offer_failed">가이드를 보내지 못했어요</string>
     <string name="reference_photo">참고 사진</string>
     <string name="enlarge_reference">크게 보기</string>
     <string name="shrink_reference">작게 보기</string>
@@ -85,6 +86,7 @@
     <string name="peer_disconnected">%1$s님의 연결이 끊겼어요</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
+    <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
     <string name="remote_flash_on_notice">%1$s님이 플래시를 켰어요</string>
     <string name="remote_flash_off_notice">%1$s님이 플래시를 껐어요</string>

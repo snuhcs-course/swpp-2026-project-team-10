@@ -31,6 +31,11 @@
         android:id="@+id/addGuideSheet"
         android:name="com.lastpenguin.pix.ui.guide.AddGuideSheet"
         android:label="Add a pose guide">
+        <!-- True from Subject view: the guide goes to the photographer, and the poses are not offered yet (FR-6.15). -->
+        <argument
+            android:name="fromSubject"
+            android:defaultValue="false"
+            app:argType="boolean" />
         <action
             android:id="@+id/action_addGuide_to_referenceConfirm"
             app:destination="@id/referenceConfirmFragment"
@@ -245,6 +250,14 @@
         android:id="@+id/subjectFragment"
         android:name="com.lastpenguin.pix.ui.session.SubjectFragment"
         android:label="Subject view">
+        <action
+            android:id="@+id/action_subject_to_addGuide"
+            app:destination="@id/addGuideSheet">
+            <argument
+                android:name="fromSubject"
+                android:defaultValue="true"
+                app:argType="boolean" />
+        </action>
         <action
             android:id="@+id/action_subject_to_connectionLost"
             app:destination="@id/connectionLostFragment"

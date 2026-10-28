@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -54,8 +54,10 @@ import org.robolectric.shadows.ShadowToast
  * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
  * gone with a replaced or removed guide, and moved to another corner on this phone only; the brightness panel and a
- * flash tap; the live view on mobile data (FR-6.13); Leave, the
- * back button's question, and the session ending by a lost connection or the photographer, named or before the
+ * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
+ * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
+ * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
+ * the photographer, named or before the
  * name arrived.
  */
 @RunWith(AndroidJUnit4::class)
@@ -345,6 +347,42 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
+    fun guideButton_addsOrChangesTheGuideOnceConnected_andOpensAddAPoseGuide() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        onScreen { binding, _ -> assertFalse(binding.guideButton.isEnabled) }
+
+        connect(modules)
+        onScreen { binding, _ ->
+            assertTrue(binding.guideButton.isEnabled)
+            assertFalse(binding.guideButton.isActivated)
+            assertEquals(string(R.string.guide_add_description), binding.guideButton.contentDescription)
+        }
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.guideButton.isActivated)
+            assertEquals(string(R.string.guide_change_description), binding.guideButton.contentDescription)
+            binding.guideButton.performClick()
+        }
+        idle()
+
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+        assertEquals(true, nav.backStack.last().arguments?.getBoolean("fromSubject"))
+    }
+
+    @Test
+    fun guideThatDidNotGo_saysSo() {
+        val modules = launch()
+
+        // Not connected yet, so the guide cannot go to the photographer.
+        modules.syncer.offer(guide(withReference = false))
+        idle()
+
+        assertEquals(string(R.string.guide_offer_failed), ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
     fun leave_returnsToTheCamera() {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
@@ -398,6 +436,21 @@ class SubjectFragmentRenderTest {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
         connect(modules)
+
+        modules.session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+        idle()
+
+        assertEquals(R.id.connectionLostFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun connectionLost_whileAddAPoseGuideIsOpen_closesItAndOpensConnectionLost() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        onScreen { binding, _ -> binding.guideButton.performClick() }
+        idle()
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
 
         modules.session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
         idle()

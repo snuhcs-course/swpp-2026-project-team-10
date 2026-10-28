@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModelStore
@@ -18,8 +18,10 @@ import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.fakeGuide
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -52,6 +54,7 @@ class SessionViewModelTest {
     private val session = FakeSessionManager()
     private val camera = FakeCameraController()
     private val mobileData = MobileDataNotice.InMemory()
+    private val codec = FakeGuideImageCodec()
     private lateinit var model: SessionViewModel
 
     @Before
@@ -61,9 +64,10 @@ class SessionViewModelTest {
             session,
             InMemoryGuideRepository(),
             InMemoryGuideRepository(),
-            FakeGuideImageCodec(),
+            codec,
             FakeGuideReferenceCodec(),
             MirrorReference(),
+            dispatcher,
         )
         model = SessionViewModel(
             session,
@@ -79,6 +83,22 @@ class SessionViewModelTest {
     fun teardown() {
         store.clear()
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun guideFromTheSubject_isNoticedWithTheirName() = runTest(dispatcher) {
+        val notices = mutableListOf<SessionNotice>()
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        runCurrent()
+
+        val image = codec.encode(fakeGuide("s1"))
+        session.deliver(image.begin())
+        for (i in image.chunks.indices) session.deliver(image.chunk(i))
+        session.deliver(image.end())
+        runCurrent()
+
+        assertEquals(listOf(SessionNotice.RemoteGuide("Junhyeong")), notices)
     }
 
     @Test

@@ -1,21 +1,22 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.os.Build
 import com.lastpenguin.pix.guide.GuideSource
+import com.lastpenguin.pix.guide.MAX_REFERENCE_LONG_SIDE
+import com.lastpenguin.pix.guide.MaskPng
+import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.guide.OutlineExtractor
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.maskPixels
 import com.lastpenguin.pix.guide.outlineStrokePx
+import com.lastpenguin.pix.guide.toMaskBitmap
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.CRC32
-import kotlin.math.roundToInt
 
 /**
- * The guide image as it travels: the cutout only, as WebP with alpha, at most [WebpGuideImageCodec.MAX_HEIGHT] tall
+ * The guide image as it travels: the smoothed mask only, as `mask-png`, at most [MaskGuideImageCodec.MAX_HEIGHT] tall
  * (Design 2.6.1, step 6), already split into the messages of Design 2.5.1.
  * Owner: Real-time (#9).
  */
@@ -29,7 +30,19 @@ class EncodedGuideImage(
     val crc32: Long = GuideImageChunks.crc32(bytes)
     val chunks: List<String> = GuideImageChunks.split(bytes)
 
-    fun begin() = SessionMessage.GuideImageBegin(guideId, format, width, height, bytes.size, chunks.size)
+    /** [anchor] and [source] only when the subject sends its own guide (Design 2.5.1). */
+    fun begin(anchor: NormalizedRect? = null, source: GuideSource? = null) =
+        SessionMessage.GuideImageBegin(
+            guideId,
+            format,
+            width,
+            height,
+            bytes.size,
+            chunks.size,
+            width.toFloat() / height,
+            anchor,
+            source,
+        )
 
     fun chunk(index: Int) = SessionMessage.GuideImageChunk(guideId, index, chunks[index])
 
@@ -42,7 +55,7 @@ object GuideImageChunks {
     const val CHUNK_BYTES = 9 * 1024
     const val MAX_CHUNK_CHARS = 12 * 1024
 
-    /** Far above a 720 px WebP cutout; a `begin` claiming more is refused. */
+    /** Far above a 720 px mask, a few KB; a `begin` claiming more is refused. */
     const val MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
     fun split(bytes: ByteArray): List<String> {
@@ -104,49 +117,40 @@ class GuideImageAssembler private constructor(val begin: SessionMessage.GuideIma
 interface GuideImageCodec {
     fun encode(guide: ReferenceGuide): EncodedGuideImage
 
-    /** A guide from received bytes, with the outline rebuilt from the cutout's alpha (Design 2.6.1, step 5); null if undecodable. */
+    /** A guide from received bytes, with the outline rebuilt from the mask (Design 2.6.1, step 5); null if undecodable. */
     fun decode(guideId: String, format: String, bytes: ByteArray): ReferenceGuide?
 }
 
-class WebpGuideImageCodec(private val outlines: OutlineExtractor = OutlineExtractor()) : GuideImageCodec {
+/**
+ * The smoothed mask alone, as an 8-bit grayscale PNG at most [MAX_HEIGHT] tall ([MaskPng]); none of the reference's
+ * pixels travel (AD-6, AD-15). The PNG is lossless, so the receiving phone traces exactly the mask that was sent.
+ */
+class MaskGuideImageCodec(private val outlines: OutlineExtractor = OutlineExtractor()) : GuideImageCodec {
 
     override fun encode(guide: ReferenceGuide): EncodedGuideImage {
-        val cutout = guide.cutout
-        val scaled = if (cutout.height > MAX_HEIGHT) {
-            val width = maxOf(1, (cutout.width.toFloat() * MAX_HEIGHT / cutout.height).roundToInt())
-            Bitmap.createScaledBitmap(cutout, width, MAX_HEIGHT, true)
-        } else {
-            cutout
-        }
-        val out = ByteArrayOutputStream()
-        check(scaled.compress(compressFormat(), QUALITY, out)) { "WebP encoding failed" }
-        return EncodedGuideImage(guide.id, FORMAT, scaled.width, scaled.height, out.toByteArray())
+        val mask = guide.mask.maskPixels().fitHeight(MAX_HEIGHT)
+        return EncodedGuideImage(guide.id, FORMAT, mask.width, mask.height, MaskPng.encode(mask))
     }
 
     override fun decode(guideId: String, format: String, bytes: ByteArray): ReferenceGuide? {
         if (format != FORMAT) return null
-        val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
-        val cutout = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
-        val outline = outlines.extract(cutout, outlineStrokePx(cutout.height))
+        val mask = MaskPng.decode(bytes, MAX_WIDTH, MAX_HEIGHT) ?: return null
+        val outline = outlines.extract(mask.alpha, mask.width, mask.height, outlineStrokePx(mask.height))
         // The subject only draws the guide; where the photographer got it from does not travel.
-        return ReferenceGuide(guideId, cutout, outline, cutout.width.toFloat() / cutout.height, GuideSource.GALLERY)
+        return ReferenceGuide(
+            guideId,
+            mask.toMaskBitmap(),
+            outline,
+            mask.width.toFloat() / mask.height,
+            GuideSource.GALLERY,
+        )
     }
 
-    @Suppress("DEPRECATION")
-    private fun compressFormat(): Bitmap.CompressFormat =
-        if (Build.VERSION.SDK_INT >=
-            Build.VERSION_CODES.R
-        ) {
-            Bitmap.CompressFormat.WEBP_LOSSY
-        } else {
-            Bitmap.CompressFormat.WEBP
-        }
-
     companion object {
-        const val FORMAT = "webp"
+        const val FORMAT = "mask-png"
         const val MAX_HEIGHT = 720
 
-        /** Lossy WebP keeps the alpha channel; at 90 a 540×720 cutout is a few tens of KB. */
-        const val QUALITY = 90
+        /** No mask made on a phone is wider: its reference photo's long side is at most 1280 px (Design 2.6.1). */
+        const val MAX_WIDTH = MAX_REFERENCE_LONG_SIDE
     }
 }

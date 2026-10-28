@@ -68,7 +68,7 @@ class CameraTipScreenTest {
 
     private fun guide(id: String, source: GuideSource = GuideSource.GENERATED) = ReferenceGuide(
         id = id,
-        cutout = bitmap(),
+        mask = bitmap(),
         outline = bitmap(),
         aspect = 0.5f,
         source = source,

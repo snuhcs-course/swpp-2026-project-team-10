@@ -1,18 +1,20 @@
-# AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Sungmin Jo
 """A photographer phone made of Python, for testing the subject's side with one phone or emulator.
 It creates a room and prints the code. When the subject joins, it offers a test-pattern video and the two data
 channels, exchanges `hello`, sends `camera.capabilities`, echoes every zoom, brightness, and flash request as
-`camera.state`, applies `guide.move` to its guide, sends the guide image from `--guide` (a WebP cutout with
-alpha, as the app would send it) with its `guide.state`, then moves the guide back and forth for `--seconds` the
+`camera.state`, applies `guide.move` to its guide, sends the guide image from `--guide` as the app would send it
+(`mask-png`, protocol 3: the image's alpha, or its gray values when it has none, at most 720 px tall and 1280 px
+wide) with its `guide.state`, then moves the guide back and forth for `--seconds` the
 way a drag would (steps every 50 ms, a final value every 2 s), and ends the session. It is a development tool, not
 part of the server.
     pip install websockets aiortc pillow
-    python tools/fake_photographer.py --guide cutout.webp [--seconds 20] [--clear] [--server ws://127.0.0.1:8000/ws]
+    python tools/fake_photographer.py --guide person.png [--seconds 20] [--clear] [--server ws://127.0.0.1:8000/ws]
 """
 
 import argparse
 import asyncio
 import base64
+import io
 import json
 import math
 import time
@@ -99,10 +101,7 @@ async def main(args):
         }
 
     guide_id = str(uuid.uuid4())
-    with open(args.guide, "rb") as f:
-        guide_bytes = f.read()
-    with Image.open(args.guide) as image:
-        guide_size = image.size
+    guide_bytes, guide_size = mask_png(args.guide)
 
     def send(channel, kind, body):
         channels[channel].send(codec.encode(kind, body))
@@ -162,7 +161,7 @@ async def main(args):
                 send(
                     "reliable",
                     "hello",
-                    {"protocol": 2, "appVersion": "fake", "role": "PHOTOGRAPHER", "name": "fake-photographer"},
+                    {"protocol": 3, "appVersion": "fake", "role": "PHOTOGRAPHER", "name": "fake-photographer"},
                 )
 
         channel.on("message", on_message)
@@ -236,11 +235,12 @@ async def main(args):
                     "guide.image.begin",
                     {
                         "guideId": guide_id,
-                        "format": "webp",
+                        "format": "mask-png",
                         "width": guide_size[0],
                         "height": guide_size[1],
                         "bytes": len(guide_bytes),
                         "chunks": len(chunks),
+                        "aspect": guide_size[0] / guide_size[1],
                     },
                 )
                 for index, chunk in enumerate(chunks):
@@ -290,8 +290,21 @@ async def main(args):
     log("done")
 
 
+def mask_png(path):
+    """The guide image as the app sends it (Design 2.5.1): an 8-bit grayscale PNG of the mask, within the app's limits.
+
+    A cutout with alpha gives its alpha; an image without one is taken as a mask already, by its gray values.
+    """
+    with Image.open(path) as image:
+        mask = image.getchannel("A") if "A" in image.getbands() else image.convert("L")
+    mask.thumbnail((1280, 720))
+    out = io.BytesIO()
+    mask.save(out, "PNG")
+    return out.getvalue(), mask.size
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--guide", required=True, help="a WebP cutout with alpha, at most 720 px tall")
+parser.add_argument("--guide", required=True, help="a cutout with alpha, or a grayscale mask; sent as mask-png")
 parser.add_argument("--seconds", type=float, default=20)
 parser.add_argument("--clear", action="store_true", help="send guide.clear at the end")
 parser.add_argument("--server", default="ws://127.0.0.1:8000/ws")

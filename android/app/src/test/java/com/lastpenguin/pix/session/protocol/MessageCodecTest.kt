@@ -1,8 +1,10 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.Role
 import kotlinx.serialization.json.Json
@@ -26,12 +28,12 @@ class MessageCodecTest {
         val text = codec.encode(SessionMessage.Hello(appVersion = "0.1.0", role = Role.PHOTOGRAPHER, name = "Dongje"))
 
         val envelope = Json.parseToJsonElement(text).jsonObject
-        assertEquals(2, envelope.getValue("v").jsonPrimitive.int)
+        assertEquals(3, envelope.getValue("v").jsonPrimitive.int)
         assertEquals("hello", envelope.getValue("t").jsonPrimitive.content)
         assertEquals(1, envelope.getValue("seq").jsonPrimitive.int)
         assertEquals(1_759_212_345_678L, envelope.getValue("ts").jsonPrimitive.long)
         val body = envelope.getValue("b").jsonObject
-        assertEquals(2, body.getValue("protocol").jsonPrimitive.int)
+        assertEquals(3, body.getValue("protocol").jsonPrimitive.int)
         assertEquals("0.1.0", body.getValue("appVersion").jsonPrimitive.content)
         assertEquals("PHOTOGRAPHER", body.getValue("role").jsonPrimitive.content)
         assertEquals("Dongje", body.getValue("name").jsonPrimitive.content)
@@ -44,7 +46,7 @@ class MessageCodecTest {
         val messages = listOf(
             SessionMessage.Hello(appVersion = "0.1.0", role = Role.SUBJECT, name = "Junhyeong", haveGuideId = "g1"),
             SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(0.6f, 1f, 2f, 3f))),
-            SessionMessage.GuideImageBegin("g1", "webp", 540, 720, 48213, 5),
+            SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f),
             SessionMessage.GuideImageChunk("g1", 0, "UklGRl68AABXRUJQ"),
             SessionMessage.GuideImageEnd("g1", 3735928559L),
             SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, false), false),
@@ -77,6 +79,23 @@ class MessageCodecTest {
     }
 
     @Test
+    fun `only the subject's guide image carries an anchor and a source`() {
+        val anchor = NormalizedRect(0.31f, 0.21f, 0.69f, 0.95f)
+        val fromSubject =
+            SessionMessage.GuideImageBegin("s1", "mask-png", 270, 720, 8560, 1, 0.375f, anchor, GuideSource.GALLERY)
+        val body = Json.parseToJsonElement(codec.encode(fromSubject)).jsonObject.getValue("b").jsonObject
+        assertEquals(0.31f, body.getValue("anchor").jsonObject.getValue("left").jsonPrimitive.content.toFloat(), 0f)
+        assertEquals("GALLERY", body.getValue("source").jsonPrimitive.content)
+        assertEquals(fromSubject, codec.decode(codec.encode(fromSubject))!!.message)
+
+        val fromPhotographer = SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f)
+        val plain = Json.parseToJsonElement(codec.encode(fromPhotographer)).jsonObject.getValue("b").jsonObject
+        assertFalse("anchor" in plain)
+        assertFalse("source" in plain)
+        assertEquals(fromPhotographer, codec.decode(codec.encode(fromPhotographer))!!.message)
+    }
+
+    @Test
     fun `guide clear has an empty body`() {
         val envelope = Json.parseToJsonElement(codec.encode(SessionMessage.GuideClear)).jsonObject
         assertEquals("guide.clear", envelope.getValue("t").jsonPrimitive.content)
@@ -86,7 +105,7 @@ class MessageCodecTest {
     @Test
     fun `decodes the guide state example from the design`() {
         val text = """
-            {"v": 2, "t": "guide.state", "seq": 412, "ts": 1759212349120,
+            {"v": 3, "t": "guide.state", "seq": 412, "ts": 1759212349120,
              "b": {"state": {"guideId": "5f0c2b9e", "cx": 0.32, "cy": 0.55, "height": 0.7,
                              "opacity": 0.5, "style": "OUTLINE", "visible": true}, "final": false}}
         """.trimIndent()

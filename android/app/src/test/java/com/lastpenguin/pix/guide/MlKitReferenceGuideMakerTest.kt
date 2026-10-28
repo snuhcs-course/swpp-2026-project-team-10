@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -16,7 +16,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /*
  * The guide maker's steps after the model (Design 2.6.1, steps 3–6) with a segmenter that answers with a given
- * confidence field: a person as a rectangle (the cutout's size and alpha, the outline, the aspect, the anchor,
+ * confidence field: a person as a rectangle (the mask's size and values, the outline, the aspect, the anchor,
  * the thumbnail); a field with nothing in it (no person); the model not there (the failure passed on); a photo
  * that is not ARGB_8888 (converted); a large photo (shrunk to 1280 px, the thumbnail to 512 px).
  */
@@ -29,9 +29,11 @@ class MlKitReferenceGuideMakerTest {
         private val failure: Exception? = null,
     ) : SubjectSegmenter(ApplicationProvider.getApplicationContext()) {
         var calls = 0
+        var lastConfig: Bitmap.Config? = null
 
         override suspend fun segment(bitmap: Bitmap): Result<Segmentation> {
             calls++
+            lastConfig = bitmap.config
             failure?.let { return Result.failure(it) }
             val width = bitmap.width
             val height = bitmap.height
@@ -54,19 +56,20 @@ class MlKitReferenceGuideMakerTest {
     }
 
     @Test
-    fun aPerson_givesACutoutWithItsAlphaTheOutlineTheAspectTheAnchorAndTheThumbnail() = runBlocking {
+    fun aPerson_givesAMaskTheOutlineTheAspectTheAnchorAndTheThumbnail() = runBlocking {
         val guide = maker(FieldSegmenter(standing)).make(photo(300, 400), GuideSource.GENERATED).getOrThrow()
 
         // The crop is the person's box plus a 2 % margin: about 100×280 in a 300×400 photo.
-        assertTrue("cutout ${guide.cutout.width}x${guide.cutout.height}", guide.cutout.width in 100..120)
-        assertTrue("cutout ${guide.cutout.width}x${guide.cutout.height}", guide.cutout.height in 280..300)
-        assertEquals(guide.cutout.width, guide.outline.width)
-        assertEquals(guide.cutout.height, guide.outline.height)
-        assertEquals(guide.cutout.width.toFloat() / guide.cutout.height, guide.aspect, 1e-6f)
+        assertTrue("mask ${guide.mask.width}x${guide.mask.height}", guide.mask.width in 100..120)
+        assertTrue("mask ${guide.mask.width}x${guide.mask.height}", guide.mask.height in 280..300)
+        assertEquals(guide.mask.width, guide.outline.width)
+        assertEquals(guide.mask.height, guide.outline.height)
+        assertEquals(guide.mask.width.toFloat() / guide.mask.height, guide.aspect, 1e-6f)
         assertEquals(GuideSource.GENERATED, guide.source)
-        // Alpha: the person's pixels opaque in the middle, the background transparent at the top corner.
-        assertEquals(255, Color.alpha(guide.cutout.getPixel(guide.cutout.width / 2, guide.cutout.height / 2)))
-        assertEquals(0, Color.alpha(guide.cutout.getPixel(0, 0)))
+        // The mask alone, no photo pixels (AD-15): the person opaque in the middle, the background clear at the corner.
+        assertEquals(Bitmap.Config.ALPHA_8, guide.mask.config)
+        assertEquals(255, Color.alpha(guide.mask.getPixel(guide.mask.width / 2, guide.mask.height / 2)))
+        assertEquals(0, Color.alpha(guide.mask.getPixel(0, 0)))
         // The anchor is where the crop lies in the photo (FR-3.1): centered horizontally, in the lower part.
         val anchor = checkNotNull(guide.anchor)
         assertTrue("anchor $anchor", abs(anchor.centerX - 0.5f) < 0.03f)
@@ -98,7 +101,7 @@ class MlKitReferenceGuideMakerTest {
         val guide = maker(segmenter).make(photo(120, 160, Bitmap.Config.RGB_565), GuideSource.GALLERY).getOrThrow()
 
         assertEquals(1, segmenter.calls)
-        assertEquals(Bitmap.Config.ARGB_8888, guide.cutout.config)
+        assertEquals(Bitmap.Config.ARGB_8888, segmenter.lastConfig)
     }
 
     @Test
@@ -106,7 +109,7 @@ class MlKitReferenceGuideMakerTest {
         val guide = maker(FieldSegmenter(standing)).make(photo(1600, 2000), GuideSource.GALLERY).getOrThrow()
 
         // Segmented at 1024×1280, so the crop is a third of 1024 wide; the thumbnail's long side is 512.
-        assertTrue("cutout ${guide.cutout.width}", guide.cutout.width in 340..400)
+        assertTrue("mask ${guide.mask.width}", guide.mask.width in 340..400)
         val reference = guide.reference!!
         assertEquals(512, maxOf(reference.width, reference.height))
         assertEquals(410, minOf(reference.width, reference.height))

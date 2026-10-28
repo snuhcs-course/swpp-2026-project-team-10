@@ -258,6 +258,46 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
+        <!-- The Camera screen's Guide button: the guide chosen here goes to the photographer (FR-6.15). -->
+        <LinearLayout
+            android:id="@+id/guideButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:contentDescription="@string/guide_add_description"
+            android:focusable="true"
+            android:gravity="center_horizontal"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_guide_button"
+                android:duplicateParentState="true"
+                android:importantForAccessibility="no"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_guide"
+                app:tint="@color/guide_button_icon" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="16dp"
+                android:layout_marginTop="4dp"
+                android:duplicateParentState="true"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:importantForAccessibility="no"
+                android:text="@string/guide"
+                android:textAppearance="@style/TextAppearance.Pix.Caption"
+                android:textColor="@color/pix_text_soft" />
+        </LinearLayout>
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

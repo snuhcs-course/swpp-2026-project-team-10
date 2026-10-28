@@ -49,8 +49,8 @@ class GuideOverlayViewTest {
     }
 
     @Test
-    fun render_guideWithACutout_drawsTheOutlineAndNeverTheReferencesPixels() = onMain {
-        // The cutout holds the reference's pixels (red); the guide is the outline only (blue, FR-2.2, AD-15).
+    fun render_guideWithAMask_drawsTheOutlineAndNeverTheMask() = onMain {
+        // The mask is red here so that drawing it would show; the guide is the outline only (blue, FR-2.2, AD-15).
         val guide = guide()
         val view = view(300, 400)
         view.render(guide, GuideState(guideId = guide.id, cx = 0.35f, cy = 0.6f, height = 0.5f))
@@ -64,7 +64,7 @@ class GuideOverlayViewTest {
     @Test
     fun opacityMultipliesSourceAlphaWithoutChangingEitherSourceBitmap() = onMain {
         val guide = guide(outline = solid(Color.argb(128, 255, 0, 0)))
-        val originalCutout = pixels(guide.cutout)
+        val originalMask = pixels(guide.mask)
         val originalOutline = pixels(guide.outline)
         val view = view(300, 400)
         view.render(guide, GuideState(guideId = guide.id, opacity = 0.5f))
@@ -74,9 +74,9 @@ class GuideOverlayViewTest {
 
         assertPixel(transparentBackground, 150, 200, Color.argb(64, 255, 0, 0), tolerance = 1)
         assertPixel(blueBackground, 150, 200, Color.rgb(64, 0, 191), tolerance = 1)
-        assertArrayEquals(originalCutout, pixels(guide.cutout))
+        assertArrayEquals(originalMask, pixels(guide.mask))
         assertArrayEquals(originalOutline, pixels(guide.outline))
-        assertFalse(guide.cutout.isRecycled)
+        assertFalse(guide.mask.isRecycled)
         assertFalse(guide.outline.isRecycled)
     }
 
@@ -253,9 +253,9 @@ class GuideOverlayViewTest {
 
     private fun guide(
         id: String = "guide",
-        cutout: Bitmap = solid(Color.RED),
+        mask: Bitmap = solid(Color.RED),
         outline: Bitmap = solid(Color.BLUE),
-    ) = ReferenceGuide(id, cutout, outline, 0.5f, GuideSource.GALLERY)
+    ) = ReferenceGuide(id, mask, outline, 0.5f, GuideSource.GALLERY)
 
     private fun solid(color: Int): Bitmap = bitmap(20, 40).apply { eraseColor(color) }
 

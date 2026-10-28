@@ -1,8 +1,10 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
+import android.view.View
 import androidx.appcompat.app.AlertDialog
+import androidx.core.os.bundleOf
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,7 +39,8 @@ import org.robolectric.shadows.ShadowDialog
  * photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts it), and
  * the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. Saved guides (FR-3.8): none (the section is hidden); one, which a tap puts on the camera, closing the
  * sheet; its ✕, which asks first (Cancel keeps it, Delete removes it); a configuration change, such as the language,
- * while one is still opening (it still opens).
+ * while one is still opening (it still opens). From Subject view (FR-6.15): no Generate poses here, and Replace only
+ * for a guide on the video, not one on this phone's camera.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -53,9 +56,12 @@ class AddGuideSheetTest {
         scenario?.close()
     }
 
-    private fun launch(modules: TestAppContainer = TestAppContainer()): TestAppContainer {
+    private fun launch(modules: TestAppContainer = TestAppContainer(), fromSubject: Boolean = false): TestAppContainer {
         modules.install()
-        scenario = launchFragment<AddGuideSheet>(themeResId = R.style.Theme_Pix)
+        scenario = launchFragment<AddGuideSheet>(
+            fragmentArgs = bundleOf(AddGuideSheet.ARG_FROM_SUBJECT to fromSubject),
+            themeResId = R.style.Theme_Pix,
+        )
         scenario!!.onFragment {
             sheet = it
             generation = it.requireActivity().viewModel()
@@ -76,6 +82,23 @@ class AddGuideSheetTest {
             assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
             assertEquals(string(R.string.cancel), binding.cancelButton.text.toString())
         }
+    }
+
+    @Test
+    fun fromSubjectView_offersNoPosesAndAsksToReplaceTheGuideOnTheVideo() {
+        val modules = TestAppContainer()
+        modules.guides.setGuide(guide())
+        launch(modules, fromSubject = true)
+        onSheet { binding ->
+            assertEquals(View.GONE, binding.generateButton.visibility)
+            assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
+        }
+        scenario?.close()
+
+        val replacing = TestAppContainer()
+        replacing.mirror.setGuide(guide())
+        launch(replacing, fromSubject = true)
+        onSheet { binding -> assertEquals(string(R.string.replace_guide_title), binding.titleText.text.toString()) }
     }
 
     @Test

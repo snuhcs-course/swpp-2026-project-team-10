@@ -62,6 +62,7 @@
     <string name="delete_saved_guide_message">It is removed from this phone. A guide on the camera stays there.</string>
     <string name="delete">Delete</string>
     <string name="saved_guide_open_failed">Couldn\'t open the saved guide.</string>
+    <string name="guide_offer_failed">Couldn\'t send the guide</string>
     <string name="reference_photo">Reference photo</string>
     <string name="enlarge_reference">Enlarge</string>
     <string name="shrink_reference">Make smaller</string>
@@ -90,6 +91,7 @@
     <string name="peer_disconnected">%1$s disconnected</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
+    <string name="remote_guide_notice">%1$s set a pose guide</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_flash_on_notice">%1$s turned the flash on</string>
     <string name="remote_flash_off_notice">%1$s turned the flash off</string>

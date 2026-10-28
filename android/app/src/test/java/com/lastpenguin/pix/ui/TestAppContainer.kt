@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -72,7 +72,7 @@ class TestAppContainer(
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
     val mobileData = MobileDataNotice.InMemory()
-    private val syncer =
+    val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
 
     val container = AppContainer(

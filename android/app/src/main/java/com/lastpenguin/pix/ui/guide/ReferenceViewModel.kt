@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -14,6 +14,7 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.SubjectGuideTarget
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -46,14 +47,16 @@ enum class SavedGuideResult { USED, FAILED }
 /**
  * Add a pose guide → Reference confirm, and the saved guides on Add a pose guide (FR-3.8). Shared by AddGuideSheet,
  * ReferenceConfirmFragment, NoPersonFoundFragment, and PickPoseFragment (activity scope). The guide of a generated
- * pose also gets its tip asked for here, once its person is found (FR-4.10).
- * Owner: PM (#5); saved guides #58; pose tips.
+ * pose also gets its tip asked for here, once its person is found (FR-4.10). Opened from Subject view
+ * ([openFor]), the guide goes to the photographer through [subject] instead of this phone's camera (Design 2.6.5).
+ * Owner: PM (#5); saved guides #58; pose tips; the guide from the subject Iter3-P9.
  */
 class ReferenceViewModel(
     private val maker: ReferenceGuideMaker,
     private val guides: GuideRepository,
     private val savedGuideStore: SavedGuideStore = SavedGuideStore.InMemory(),
     private val tips: PoseTips? = null,
+    private val subject: SubjectGuideTarget? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReferenceUiState>(ReferenceUiState.Idle)
@@ -77,9 +80,23 @@ class ReferenceViewModel(
 
     private var opening: Job? = null
 
-    /** Whether a guide is on the camera, so Add a pose guide asks to replace it (FR-3.6). */
+    /** Whether the guide chosen here goes to the photographer from Subject view rather than to this camera. */
+    var forSubject: Boolean = false
+        private set
+
+    /** Add a pose guide opened from the Camera screen or, with [fromSubject], from Subject view (FR-6.15). */
+    fun openFor(fromSubject: Boolean) {
+        forSubject = fromSubject && subject != null
+    }
+
+    /** Whether a guide is on the camera or the video, so Add a pose guide asks to replace it (FR-3.6). */
     val replacing: Boolean
-        get() = guides.guide.value != null
+        get() = if (forSubject) subject?.current != null else guides.guide.value != null
+
+    private fun use(guide: ReferenceGuide) {
+        val target = subject
+        if (forSubject && target != null) target.offer(guide) else guides.setGuide(guide)
+    }
 
     /** A photo from the system photo picker. */
     fun onPhotoPicked(uri: Uri) {
@@ -106,7 +123,7 @@ class ReferenceViewModel(
         val ready = _uiState.value as? ReferenceUiState.Ready ?: return
         // Its tip goes with it to the camera; leaving the screen now must not drop it.
         if (ready.guide.id == tipFor) tipFor = null
-        guides.setGuide(ready.guide)
+        use(ready.guide)
         _uiState.value = ReferenceUiState.Idle
     }
 
@@ -137,7 +154,7 @@ class ReferenceViewModel(
         opening = viewModelScope.launch {
             val result = try {
                 val (guide, _) = savedGuideStore.load(id).getOrThrow()
-                guides.setGuide(guide)
+                use(guide)
                 SavedGuideResult.USED
             } catch (error: CancellationException) {
                 throw error

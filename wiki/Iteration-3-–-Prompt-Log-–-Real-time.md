@@ -33,6 +33,56 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Sungmin, 10-27] "Yes, go ahead." (Merging `dev` again after #137: the R&S screen rows and the Testing tables took #137's text with this branch's additions.)
 - [Sungmin, 10-27] "The prompt log has to go up as a Markdown file too, so write it."
 
+## The mask-only guide transfer ([#113], PR [#145])
+
+**Before the work (10/27)**
+
+- [Joonhyung, 10-27] "Iteration 3 has started. Check the issues and the documents, and explain in detail what was decided and which parts are mine."
+- [Joonhyung, 10-27] "Before implementing, write the protocol v3 messages in the format of Design 2.5.1. I will use it to agree with Jaewan on 10/28." (A proposal for the shared steps' messages and the guide in either direction, published as a page for the meeting.)
+- [Joonhyung, 10-27] "Explain what AD-7 is, and in the end what exactly needs deciding."
+- [Joonhyung, 10-27] "Explain the part labeled 'guide renderer (local copy)'. When the photographer loads a reference now, does the image go to the subject and the subject make the outline there?" (Yes, but what went was a WebP cutout with the person's pixels; the subject only traced its alpha, so the mask alone would do.)
+- [Joonhyung, 10-27] "I am now taking P9. First explain P9 in detail."
+
+**The photographer's direction (10/27)**
+
+- [Joonhyung, 10-27] "Make `feat/113-mask-only-guide` from `dev`, and as the first PR implement `ReferenceGuide.mask`, the `mask-png` codec, `mask.png` for saved guides with the move from the existing `cutout.webp`, and protocol 3. The subject-to-photographer direction goes in the next PR." (The mask is written and read as an 8-bit grayscale PNG in plain Kotlin, so its bytes do not depend on the platform and the JVM tests reach it; a first comment claimed, unchecked, that `Bitmap.compress` puts `ALPHA_8` in a platform-dependent channel, and was reworded to what is known: there is no grayscale config. 850 unit tests passed.)
+
+**Checks on two phones (10/27 – 10/28)**
+
+- [Joonhyung, 10-27] "Before committing, tell me the procedure to check guide sync and the move of saved guides on two phones." (Seven steps with `adb`, `run-as`, and the `PixTimings`, `PixGuideSync`, `PixSession`, and `PixSavedGuides` lines, and a pass condition for each.)
+- [Joonhyung, 10-27] "Streaming does not connect, maybe because I have no server running. I used to run a local server; can I use the AWS server I have open now?" / "I started the server at the EC2 address. How do I set `pix.serverUrl` to it?" (`local.properties` pointed debug builds at a laptop address; the EC2 name is the same server as the default, and `-Ppix.serverUrl` sets it for one build.)
+- [Joonhyung, 10-28] The `adb` commands as written failed in zsh, which reads `<P>` as a redirection. (The connected serials were listed, and the one guide folder on the Note9 turned out to be saved by the new build, so it did not test the move.)
+- [Joonhyung, 10-28] "I checked 4-3 with screenshots, and 4-4 too. It saves like this." / "I checked 4-5 myself: a guide loaded comes up on the subject too." (With the logs: a saved guide's 9,149-byte `mask.png` went in one chunk, a subject joining again got only the state, and a new guide sent its image once under its new id.)
+- [Joonhyung, 10-28] The protocol 2 build failed in the check worktree for want of `local.properties`. (Its SDK path and the server address were added there, and the build was copied out.)
+- [Joonhyung, 10-28] "If the versions differ, the session ends with *The session has ended* and does not connect. So let's skip step 3." (That is step 5's pass condition; the move from `cutout.webp` stays covered by `FileSavedGuideStoreTest` only, and the PR says so.)
+
+**The PR (10/28)**
+
+- [Joonhyung, 10-28] "Then put me in the AI marker, bring in `dev`, commit on the existing branch, write the PR, and push. Then write the prompt history needed for this feature, but do not commit it yet." (`dev` brought [#138] and [#144]; the Testing Documentation's revision rows and the Views row conflicted, and this branch's rows moved to Design 2.7 and Testing 2.9. 889 unit tests passed.)
+- [Joonhyung, 10-28] "Commit the prompt log to the P9 branch and push it to PR #145."
+- [Joonhyung, 10-28] "Check this review and fix and commit what it asks." / "Push the fix to PR #145." (One Codex finding, and it was right: a move that stopped after `mask.png` was in place, or whose delete failed, left `cutout.webp` with the reference's pixels for good, because a folder with a mask was never moved again. The delete is now tried at every read while the cutout is there; the new test fails on the old code.)
+- [Joonhyung, 10-28] "PR #145 has merge conflicts with its base branch. Merge the base branch in, resolve the conflicts, and push." (`dev` had brought [#143], which sends a 512 px reference copy to the subject for its thumbnail. `AppContainer` built `GuideSyncer` with the removed `WebpGuideImageCodec`, the revision rows moved to Design 2.8 and Testing 2.10, AD-6 and 2.6.1 kept #143's sentences without the one about the WebP cutout, and `android/README.md`, which still described the cutout, was brought up to date. 905 unit tests passed.)
+- [Joonhyung, 10-28] "Update PR #145's summary so it says only the guide image is mask-only, since #143 sends a 512 px reference copy for the thumbnail." (`gh pr edit` failed on GitHub's retired Projects (classic) API, so the description went through the REST API.)
+
+**The subject's direction (10/28)**
+
+- [Joonhyung, 10-28] "'Either phone can send a guide image, for the shared steps' seems to be needed now. Write the spec to implement it." (Scope, AD-7 kept, `anchor` and `source` in `guide.image.begin` within version 3, the photographer adopting the guide without sending it back, the subject drawing it at once, the edge cases, the files, the tests, and the documents, with one decision left: whether the PR includes the *Guide* button on Subject view.)
+- [Joonhyung, 10-28] "Check whether I understood this right and explain it simply: before, the photographer kept `reference.webp` and sent the cutout, from which the subject traced the outline; now it keeps `reference.webp` and `mask.png` and sends the mask. Then is the remaining task S→P done as a mirror image?" (Mostly right, with three corrections: a guide is written to disk only on *Save guide*, the old cutout held the person's colored pixels, and since #143 a reference copy also goes to the subject. The sending is the same both ways; what differs is that the photographer owns the guide, so it adopts the subject's guide, needs its `anchor`, and must not send it back.)
+- [Joonhyung, 10-28] "Is showing the reference copy on the subject already built?" (Yes, by #143: `MirrorReference`, the thumbnail on Subject view, and its tests.)
+- [Joonhyung, 10-28] "Implement the S→P protocol with the spec we made, sending the `anchor` to the photographer too. First draw the flow again, then update the documents (Design, Testing) without a version bump, and include the *Guide* button on Subject view." (The flow was drawn first. Not in the spec, and decided while building it: the subject's answer cannot be told from the photographer's earlier messages, so they wait until a `guide.state` names the offered guide, at most 5 s; the subject's thumbnail uses its own reference photo; the guide screens go back with `backToShooting`, because a fixed `popBackStack(cameraFragment)` from Subject view would have ended the session. Without a version bump the S→P part went into the existing Design 2.8 and Testing 2.10 rows; R&S got its first row for this PR, and Figure 5 was redrawn with the button. 923 unit tests passed.)
+- [Joonhyung, 10-28] "Is the photographer the one that first places the outline? Is that a design choice, and why the subject sends an `anchor` in S→P, or is it because P16 is not done yet? Does P16 also have to show the outline first on the subject?" (A design choice: the start position needs the photographer's camera ratio, so the photographer computes it, and the `anchor` is that computation's input, which the mask alone does not hold. The subject already draws its guide at once, and the photographer's state then settles it; P16 reuses `offer` for a candidate the subject picks.)
+- [Joonhyung, 10-28] "Run the S→P protocol on the emulator, take screenshots, and report." (No phone was connected, so two read-only instances of the one emulator image were started and a saved guide was written into the subject's files, for want of a photo of a person. Both booted, but adb kept them offline even with the emulators and adb started outside the sandbox, so the run was stopped.)
+- [Joonhyung, 10-28] "The emulator is not running now. First commit what is implemented and update the PR." (Committed with `Closes #113`; the PR took the issue's title, both directions, and the device checks still to do.)
+- [Joonhyung, 10-28] "Update the prompt log too, without committing."
+- [Joonhyung, 10-28] "Redraw Flow 5 with the changed UI, the zoom row's toggle included, commit and push it, and resolve the conflicts." (Subject view in Figure 5 gained the guide-edit mode toggle beside the zoom readout, rendered in both languages. `dev` had brought [#146], which took Design 2.8 and Testing 2.10, so this branch's rows moved to 2.9 and 2.11, and the technique rows kept both sides' cases. 935 unit tests passed.)
+- [Joonhyung, 10-28] "Commit the prompt log and push it to PR #145."
+
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
 [#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
+[#113]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/113
+[#145]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/145
+[#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138
+[#144]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/144
+[#143]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/143
+[#146]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/146

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -18,6 +18,8 @@ import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
+import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.SubjectGuideTarget
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -84,6 +86,63 @@ class ReferenceViewModelTest {
         guides.guide.value = guide()
 
         assertEquals(true, model.replacing)
+    }
+
+    @Test
+    fun openFor_subject_sendsTheGuideAndSavedGuidesToThePhotographerInstead() = runTest {
+        val target = FakeTarget()
+        val saved = SavedGuideStore.InMemory()
+        val subjectModel = ReferenceViewModel(maker, guides, saved, subject = target)
+        store.put("subject-reference", subjectModel)
+        subjectModel.openFor(fromSubject = true)
+        assertEquals(true, subjectModel.forSubject)
+        assertEquals(false, subjectModel.replacing)
+        target.current = guide()
+        assertEquals(true, subjectModel.replacing)
+
+        val made = guide()
+        subjectModel.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(made))
+        runCurrent()
+        subjectModel.onUseGuide()
+        val kept = guide()
+        saved.save(kept, GuideState()).getOrThrow()
+        subjectModel.onUseSaved(kept.id)
+        runCurrent()
+
+        assertEquals(listOf(made.id, kept.id), target.offered.map { it.id })
+        assertNull(guides.stored)
+    }
+
+    @Test
+    fun openFor_cameraOrNoTarget_keepsTheGuideOnThisPhone() = runTest {
+        model.openFor(fromSubject = true)
+        assertEquals(false, model.forSubject)
+
+        val target = FakeTarget()
+        val subjectModel = ReferenceViewModel(maker, guides, subject = target)
+        store.put("camera-reference", subjectModel)
+        subjectModel.openFor(fromSubject = true)
+        subjectModel.openFor(fromSubject = false)
+        val made = guide()
+        subjectModel.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(made))
+        runCurrent()
+        subjectModel.onUseGuide()
+
+        assertSame(made, guides.stored)
+        assertEquals(emptyList<ReferenceGuide>(), target.offered)
+    }
+
+    private class FakeTarget : SubjectGuideTarget {
+        override var current: ReferenceGuide? = null
+        val offered = mutableListOf<ReferenceGuide>()
+
+        override fun offer(guide: ReferenceGuide) {
+            offered += guide
+        }
     }
 
     @Test
@@ -306,7 +365,7 @@ class ReferenceViewModelTest {
 
     private fun guide() = ReferenceGuide(
         id = "guide-${guideCount++}",
-        cutout = bitmap(),
+        mask = bitmap(),
         outline = bitmap(),
         aspect = 0.5f,
         source = GuideSource.GENERATED,

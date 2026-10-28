@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -32,8 +32,7 @@ class NoPersonFoundFragment : Fragment(R.layout.fragment_failure) {
         binding.primaryButton.setText(R.string.choose_another_photo)
         binding.primaryButton.setOnClickListener { pickPhoto() }
         binding.secondaryButton.setText(R.string.back_to_camera)
-        binding.secondaryButton.setOnClickListener {
-            findNavController().popBackStack(R.id.cameraFragment, false)
-        }
+        binding.secondaryButton.setOnClickListener { backToShooting(viewModel) }
+        leaveWhenTheSessionEnds(viewModel)
     }
 }

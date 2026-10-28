@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -56,8 +56,9 @@ import org.webrtc.VideoSink
  * A pinch on the video zooms the photographer's camera while guide-edit mode is off, with the Camera screen's
  * readout (FR-7.1, AD-17); with the mode on, drags and pinches move the photographer's guide (FR-7.2). The
  * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3), and the guide's
- * reference photo sits in a corner as on their Camera screen (FR-3.9). System back asks
- * first (R&S 6.9). Owner: Real-time (#8, #10, #57), with the guide from #9.
+ * reference photo sits in a corner as on their Camera screen (FR-3.9). *Guide* opens Add a pose guide, whose guide
+ * goes to the photographer (FR-6.15, Design 2.6.5). System back asks first (R&S 6.9).
+ * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9.
  */
 class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
@@ -123,8 +124,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
         }
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
+        binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
 
         setupReference(binding)
+
+        // A session that ended while Add a pose guide was open has no transition left for this screen to see.
+        (sessionViewModel.state.value as? SessionState.Ended)?.let { view.post { onTransition(it) } }
 
         binding.leaveButton.setOnClickListener { leaveNow() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
@@ -153,6 +158,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
                         binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
+                        // Guide-colored once a guide is on the video; it then replaces the guide on both phones.
+                        binding.guideButton.isActivated = ui.guide != null
+                        binding.guideButton.isEnabled = ui.connected
+                        binding.guideButton.contentDescription = getString(
+                            if (ui.guide == null) R.string.guide_add_description else R.string.guide_change_description,
+                        )
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
@@ -177,6 +188,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
                 launch {
                     sessionViewModel.transitions.collect { state -> onTransition(state) }
+                }
+                launch {
+                    sessionViewModel.guideOfferFailed.collect {
+                        Toast.makeText(requireContext(), R.string.guide_offer_failed, Toast.LENGTH_SHORT).show()
+                    }
                 }
                 launch {
                     sessionViewModel.mobileDataPending.collect { pending ->
@@ -385,7 +401,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun onTransition(state: SessionState) {
         if (state !is SessionState.Ended) return
         when (state.reason) {
-            EndReason.CONNECTION_LOST -> findNavController().navigate(R.id.action_subject_to_connectionLost)
+            EndReason.CONNECTION_LOST -> {
+                // The action is Subject view's: close Add a pose guide first if it is open over this screen.
+                val nav = findNavController()
+                if (nav.currentDestination?.id != R.id.subjectFragment) nav.popBackStack(R.id.subjectFragment, false)
+                nav.navigate(R.id.action_subject_to_connectionLost)
+            }
 
             EndReason.PEER_LEFT -> {
                 val name = viewModel.uiState.value.photographerName

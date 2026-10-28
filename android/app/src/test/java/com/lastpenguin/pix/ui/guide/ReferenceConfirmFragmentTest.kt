@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.net.Uri
@@ -11,10 +11,15 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentReferenceConfirmBinding
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.NoPersonFoundException
+import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.PeerInfo
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -34,7 +39,8 @@ import org.robolectric.shadows.ShadowToast
  * Partitions on the reference state: nothing yet, working (the person is being found), ready (the outline shown
  * and Use this guide enabled, which puts the guide on the camera), no person found (to that screen), and a photo
  * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
- * gallery in its place, stops the ask for its tip.
+ * gallery in its place, stops the ask for its tip. Opened from Subject view: the session ending goes back to Subject
+ * view, which shows what ended it, and stops finding the person; opened from the camera, it stays.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -66,6 +72,46 @@ class ReferenceConfirmFragmentTest {
             it.requireActivity().viewModel<ReferenceViewModel>().onPhotoPicked(Uri.parse("content://photos/1"))
         }
         idle()
+    }
+
+    /** Reference confirm over Subject view, as its *Guide* button and a picked photo open it. */
+    private fun launchFromSubject(): Pair<TestAppContainer, TestNavHostController> {
+        val modules = TestAppContainer().install()
+        val (launched, controller) = launchPrepared<ReferenceConfirmFragment>(R.id.referenceConfirmFragment) {
+            it.viewModel<ReferenceViewModel>().openFor(fromSubject = true)
+        }
+        scenario = launched
+        controller.setCurrentDestination(R.id.subjectFragment)
+        controller.navigate(R.id.action_subject_to_addGuide)
+        controller.navigate(R.id.action_addGuide_to_referenceConfirm)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        idle()
+        return modules to controller
+    }
+
+    @Test
+    fun fromSubjectView_theSessionEnding_goesBackToSubjectView() {
+        val (modules, controller) = launchFromSubject()
+        pickPhoto()
+        assertEquals(R.id.referenceConfirmFragment, controller.currentDestination?.id)
+
+        modules.session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+        idle()
+
+        assertEquals(R.id.subjectFragment, controller.currentDestination?.id)
+        scenario!!.onFragment {
+            assertEquals(ReferenceUiState.Idle, it.requireActivity().viewModel<ReferenceViewModel>().uiState.value)
+        }
+    }
+
+    @Test
+    fun fromTheCamera_aSessionEnding_staysHere() {
+        val modules = launch()
+
+        modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        idle()
+
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
     }
 
     @Test

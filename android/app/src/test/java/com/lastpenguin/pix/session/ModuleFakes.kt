@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -277,8 +277,12 @@ class FakeGuideImageCodec : GuideImageCodec {
     val decoded = mutableListOf<String>()
     var decodes = true
 
+    /** Runs while an image is encoded, as a guide from the other phone could arrive meanwhile. */
+    var onEncode: (ReferenceGuide) -> Unit = {}
+
     override fun encode(guide: ReferenceGuide): EncodedGuideImage {
         encoded += guide.id
+        onEncode(guide)
         return EncodedGuideImage(
             guide.id,
             "fake",

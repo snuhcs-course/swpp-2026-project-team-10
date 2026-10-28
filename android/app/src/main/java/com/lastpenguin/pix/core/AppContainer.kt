@@ -46,6 +46,7 @@ import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.JpegGuideReferenceCodec
+import com.lastpenguin.pix.session.MaskGuideImageCodec
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.OkHttpSignalingClient
@@ -55,7 +56,6 @@ import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.WebRtcRuntime
-import com.lastpenguin.pix.session.WebpGuideImageCodec
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.signalingUrl
@@ -191,7 +191,7 @@ class AppContainer(
                 rtcSessionManager,
                 guideRepository,
                 mirrorGuideRepository,
-                WebpGuideImageCodec(),
+                MaskGuideImageCodec(),
                 JpegGuideReferenceCodec(),
                 mirrorReference,
             )

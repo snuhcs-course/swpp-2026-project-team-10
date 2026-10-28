@@ -32,7 +32,7 @@ object ScreenTestSupport {
 
     fun guide(withReference: Boolean = true) = ReferenceGuide(
         id = "guide-1",
-        cutout = bitmap(),
+        mask = bitmap(),
         outline = bitmap(),
         aspect = 0.5f,
         source = GuideSource.GALLERY,

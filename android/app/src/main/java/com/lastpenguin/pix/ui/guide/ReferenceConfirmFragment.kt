@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -9,12 +9,15 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentReferenceConfirmBinding
+import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.launch
 
 /** Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*. Owner: PM (#5). */
@@ -37,9 +40,10 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         binding.useGuideButton.setOnClickListener {
             viewModel.onUseGuide()
-            findNavController().popBackStack(R.id.cameraFragment, false)
+            backToShooting(viewModel)
         }
         binding.chooseAnotherButton.setOnClickListener { pickPhoto() }
+        leaveWhenTheSessionEnds(viewModel)
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -72,10 +76,34 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
             ReferenceUiState.Failed -> {
                 Toast.makeText(requireContext(), R.string.couldnt_use_photo, Toast.LENGTH_SHORT).show()
-                findNavController().popBackStack(R.id.cameraFragment, false)
+                backToShooting(viewModel)
             }
 
             else -> Unit
+        }
+    }
+}
+
+/** Back to the screen *Add a pose guide* was opened from: Subject view for the subject's guide, else the camera. */
+internal fun Fragment.backToShooting(viewModel: ReferenceViewModel) {
+    findNavController().popBackStack(if (viewModel.forSubject) R.id.subjectFragment else R.id.cameraFragment, false)
+}
+
+/**
+ * Opened from Subject view, this screen covers it, so Subject view does not see the session end: go back to it, which
+ * shows Connection lost or returns to the camera, instead of making a guide for a session that is gone.
+ */
+internal fun Fragment.leaveWhenTheSessionEnds(viewModel: ReferenceViewModel) {
+    if (!viewModel.forSubject) return
+    val session = ViewModelProvider(requireActivity(), PixViewModels.Factory)[SessionViewModel::class.java]
+    viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            session.state.collect { state ->
+                if (state is SessionState.Ended) {
+                    viewModel.onConfirmLeft()
+                    backToShooting(viewModel)
+                }
+            }
         }
     }
 }

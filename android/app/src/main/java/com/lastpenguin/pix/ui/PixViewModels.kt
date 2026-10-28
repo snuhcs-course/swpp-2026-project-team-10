@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -38,6 +38,7 @@ object PixViewModels {
                 container.guideRepository,
                 container.savedGuideStore,
                 container.poseTips,
+                container.guideSyncer,
             )
         }
         initializer {

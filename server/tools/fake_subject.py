@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Sungmin Jo
 """A subject phone made of Python, for testing the photographer's side with one phone or emulator.
 
 It joins a room code through the signaling server, answers the WebRTC offer, exchanges `hello` on the data
@@ -9,7 +9,7 @@ the CRC, and every `guide.state` is printed. It is a development tool, not part 
 
     pip install websockets aiortc
     python tools/fake_subject.py <code> [--seconds 20] [--zoom 2.0] [--move 0.3,0.5,0.9] [--exposure 2]
-                                 [--flash AUTO] [--have-guide <id>] [--save-guide guide.webp]
+                                 [--flash AUTO] [--have-guide <id>] [--save-guide guide.png]
                                  [--server ws://127.0.0.1:8000/ws]
 """
 
@@ -83,7 +83,7 @@ async def main(args):
         if kind == "hello":
             log(f"hello from {body['name']} ({body['role']}, protocol {body['protocol']})")
             hello = {
-                "protocol": 2,
+                "protocol": 3,
                 "appVersion": "fake",
                 "role": "SUBJECT",
                 "name": "fake-subject",
@@ -256,6 +256,6 @@ parser.add_argument("--move", default=None, help="a guide move to send as cx,cy,
 parser.add_argument("--exposure", type=int, default=None, help="a brightness request, as an exposure index")
 parser.add_argument("--flash", default=None, choices=["OFF", "AUTO", "ON"], help="a flash request")
 parser.add_argument("--have-guide", default=None, help="guide id to report in hello, to test that the image is skipped")
-parser.add_argument("--save-guide", default=None, help="write the received guide image (WebP) to this file")
+parser.add_argument("--save-guide", default=None, help="write the received guide image (mask-png) to this file")
 parser.add_argument("--server", default="ws://127.0.0.1:8000/ws")
 asyncio.run(main(parser.parse_args()))

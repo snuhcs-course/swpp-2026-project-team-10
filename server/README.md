@@ -220,6 +220,14 @@ The PR that makes such a change says so. The first was #50, which added PostgreS
 
 A failure at any step leaves the serving copy as it was, and the timer does not try that `server/` tree again; fix the branch, or run `deploy.sh deploy` to retry. On GitHub, the [server-image](../.github/workflows/server-image.yml) workflow builds the image and checks the routes through nginx on every pull request, and the [server-deploy](../.github/workflows/server-deploy.yml) workflow waits after a merge until `/version` shows the commit, so a deploy that failed is a red mark on the commit.
 
+### Changing the deploy files
+
+- `deploy.sh` stays runnable by bash 3.2, so it can be tried on macOS with `PIX_HOME` pointing at a scratch directory, and everything in it stays inside functions, because a deploy checks out another version of the file while it runs.
+- [`deploy/pix.sh`](deploy/pix.sh) is not run but sourced ([Operate it](#operate-it)); when a `deploy.sh` command or a container name changes, change it there too.
+- nginx forwards only `/api/v1/`, `/ws`, and `/health`: a new public route is added to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), and `/internal/*` stays out of it, because `deploy.sh` reads `/internal/stats` inside the container to wait for open rooms before it switches copies. nginx's `pix` log format and the app's `HideQuery` filter leave query strings out of the access logs, and nginx's error log prints a failed request's whole request line, which is why nothing personal (a Pix ID, for one) goes in a path or a query and the lookup is `POST /users/lookup`.
+- `deploy.sh` makes two secrets once and passes them to Compose: PostgreSQL's password (`/opt/pix/db-password`, `PIX_DB_PASSWORD`), which PostgreSQL keeps from when its volume was created, so the file is never regenerated, and the access-token key (`/opt/pix/jwt-secret`, `PIX_JWT_SECRET`). PostgreSQL's files are bind-mounted from `/opt/pix/postgres` (`PIX_POSTGRES_DIR`), not a Docker volume, so `down -v` and volume prunes cannot delete accounts; never delete that directory. Anything that runs this Compose file, the [server-image](../.github/workflows/server-image.yml) workflow included, sets all three.
+- The `test` stage of the [`Dockerfile`](Dockerfile) copies `.env.example` for `tests/test_config.py`, which keeps it in step with `config.py`.
+
 ### Set up a server once
 
 The server needs Docker with the Compose and Buildx plugins (`sudo apt install -y docker.io docker-compose-v2 docker-buildx`). Then, on the server:

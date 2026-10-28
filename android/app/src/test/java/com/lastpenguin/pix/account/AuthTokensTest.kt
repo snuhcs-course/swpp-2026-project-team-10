@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.RefreshBody
@@ -21,7 +21,9 @@ import org.junit.Test
  * more than a minute left, less than a minute left (refreshed first), rejected by the server (refreshed), rejected
  * while another call already refreshed (no second refresh). Refresh answer: new tokens, 401 (signed out, expired
  * emitted, store cleared), no answer (tokens kept, null). Several callers at once: one refresh. Account update: the
- * same user, another user after signing in again, after signing out.
+ * same user, another user after signing in again, after signing out. Account read from the server (another phone signed
+ * in to it may have changed it): changed (kept, tokens stay), the same (nothing written), overtaken by a change on this
+ * phone (dropped), with a token refresh on the way (still kept), another user, signed out on the way.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthTokensTest {
@@ -178,6 +180,74 @@ class AuthTokensTest {
 
         tokens.clear()
         tokens.update(accountDto())
+        assertEquals(AuthState.SignedOut, tokens.state.value)
+        assertNull(store.stored)
+    }
+
+    @Test
+    fun reload_ofAnAccountChangedElsewhere_keepsTheTokensAndChangesTheAccount() = runTest {
+        store.stored = stored()
+        val tokens = tokens()
+
+        tokens.reload { accountDto().copy(displayName = "New Name") }
+
+        assertEquals("New Name", (tokens.state.value as AuthState.SignedIn).account.displayName)
+        assertEquals("New Name", store.stored?.user?.displayName)
+        assertEquals("access-0", store.stored?.accessToken)
+    }
+
+    @Test
+    fun reload_ofTheSameAccount_writesNothing() = runTest {
+        store.stored = stored()
+        val tokens = tokens()
+
+        tokens.reload { accountDto() }
+
+        assertEquals(0, store.saves)
+    }
+
+    @Test
+    fun reload_overtakenByAChangeOnThisPhone_keepsThatChange() = runTest {
+        store.stored = stored()
+        val tokens = tokens()
+        val answer = CompletableDeferred<Unit>()
+
+        val read = async { tokens.reload { accountDto().also { answer.await() } } }
+        runCurrent()
+        tokens.update(accountDto().copy(displayName = "New Name"))
+        answer.complete(Unit)
+        read.await()
+
+        assertEquals("New Name", (tokens.state.value as AuthState.SignedIn).account.displayName)
+        assertEquals("New Name", store.stored?.user?.displayName)
+    }
+
+    @Test
+    fun reload_withATokenRefreshOnTheWay_stillChangesTheAccount() = runTest {
+        store.stored = stored()
+        val tokens = tokens()
+
+        tokens.reload {
+            tokens.refreshAfterRejection("access-0")
+            accountDto().copy(displayName = "New Name")
+        }
+
+        assertEquals("New Name", (tokens.state.value as AuthState.SignedIn).account.displayName)
+        assertEquals(listOf(RefreshBody("refresh-0")), refreshes)
+    }
+
+    @Test
+    fun reload_ofAnotherUser_orAfterSigningOut_changesNothing() = runTest {
+        store.stored = stored()
+        val tokens = tokens()
+
+        tokens.reload { accountDto(id = "u_other") }
+        assertEquals("u_1", (tokens.state.value as AuthState.SignedIn).account.userId)
+
+        tokens.reload {
+            tokens.clear()
+            accountDto()
+        }
         assertEquals(AuthState.SignedOut, tokens.state.value)
         assertNull(store.stored)
     }

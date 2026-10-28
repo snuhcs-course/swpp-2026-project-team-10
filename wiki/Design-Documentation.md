@@ -35,7 +35,8 @@
 | 2.4 | 2026-10-26 | Camera and Subject view layout (Iter3-A2, [#136]): `previewArea` places the preview below the top bar, 1:1 in the 4:3 area and 16:9 under the controls; the shutter in one place; the zoom row over the image, with quick steps from the camera's zoom range; `LiveDotView` in place of the Live badge and the name; every control takes taps on 48 dp (NFR-16) while drawing smaller (2.3, 2.5.1, 2.6.2). |
 | 2.5 | 2026-10-26 | Sessions across networks in the app (Iter3-P13, [#117]): `SessionManager.path` and `IcePath` (2.1, 2.3); the mobile-data notice, the relay-only debug option, and the `ice.pair` line (2.6.7); the wrong-code message decided, with `EndReason.RATE_LIMITED`, and its row leaves *Still open* (2.3, 2.5.2, 1.4.2); debug builds use the AWS server (2.8, *Configuration and secrets*). |
 | 2.6 | 2026-10-27 | The Korean translation as built (Iter3-P7, [#111]): Korean strings behind the same keys, picked by the phone's language and declared for Android 13+'s per-app language, and drawn in Pretendard (2.8, Language); *Still open* gains Korean for the text the server writes. |
-| 2.7 | 2026-10-28 | The mask-only guide transfer from the photographer (Iter3-P9, [#113], first part): `ReferenceGuide.mask` (2.3), `mask-png` and protocol version 3 (2.5.1), `MaskPng` and the hand-over (2.6.1), saved guides with `mask.png` and the move from `cutout.webp` (2.8); AD-6 as built. The subject's direction follows with the shared steps. |
+| 2.7 | 2026-10-27 | The reference thumbnail on Subject view (Iter3-A1, [#132]): a copy of the reference photo, at most 512 px, goes once per guide to the subject's phone for its thumbnail (AD-6 and AD-15 revised, *Still open* row closed); `guide.reference.*` and `hello`'s `haveReferenceId` (2.5.1); `MirrorReference` and `GuideReferenceCodec` (2.1, 2.3); the thumbnail on Subject view (2.6.2). |
+| 2.8 | 2026-10-28 | The mask-only guide transfer from the photographer (Iter3-P9, [#113], first part): `ReferenceGuide.mask` (2.3), `mask-png` and protocol version 3 (2.5.1), `MaskPng` and the hand-over (2.6.1), saved guides with `mask.png` and the move from `cutout.webp` (2.8); AD-6 as built. The subject's direction follows with the shared steps. |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail, and the plan of Iteration 3 (1.4.2, 2.9); the detailed design of each Iteration 3 feature is added in the PR that builds it. **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v2.0). Testing plans will be in the Testing Documentation.
 
@@ -45,14 +46,13 @@ Audience: the development team. This page describes the design of Iterations 1 a
 |----|----|----|----|
 | Zoom stutter: what is left | Built in Iter2-P5 (2.6.5) and measured on the S23 Ultra on 2026-10-22: no stutter before or after, 30 fps (the most it offers apps), and no lens switch, because it zooms to 0.6× natively. Open on the S21, the only test phone with a separate ultrawide, where the lens switch and the held frame can be seen: its before and after numbers (Testing Documentation IT-10, NFR-19), and `PreviewView` in `PERFORMANCE` mode (`SurfaceView`) only if its preview still stutters. The shutter freeze stays Could. | 조성민 (Iter2-P5) | With IT-10 (Iteration 3) |
 | Invite link format | A verified Android App Link needs HTTPS, which the course servers do not have (AD-11). Proposal: `http://<host>/i/<invitationId>` opens a small page from nginx that hands over to Pix through a custom scheme (`pix://i/<invitationId>`) and otherwise says to install Pix (2.6.6). | 조성민 (Iter3-P15) | 10/30 |
-| Reference thumbnail on Subject view | Whether the subject's phone also shows the guide's reference photo in a corner, the same as the photographer's thumbnail (FR-3.9), so the subject sees the pose to copy. It needs the photo on the subject's phone, which AD-6 and AD-15 rule out (only the smoothed mask travels, 2.5.1), so it starts with that decision. Proposal: send a copy with its long side at most 512 px once per guide, used only for the thumbnail. | 박재완 with 한준형 (mask transfer, shared steps) | 10/30, with the shared steps |
 | Shared steps on both phones (FR-6.14–6.16) | The subject's phone can open *Add a pose guide* and *Generate poses here*; both phones show the same step without streaming what is typed or selected, and the first phone to go on moves both. Open: which phone calls the Pix server; how the scene photo, the candidates, and the chosen guide reach the other phone (data-channel chunks like the guide image, 2.5.1); the step messages and the protocol version (3); how this fits AD-7, under which the photographer's phone owns the camera and guide state; and sending each photo to the subject (FR-6.14). | 한준형 | 10/30 |
 | Selfie prompt (FR-1.14) | Whether the pose prompt and the suggestion prompt (2.6.3) work for a selfie as the scene photo, or selfie mode needs prompts of its own. | 박동제 | 10/30 |
 | Korean for the text the server writes (FR-10.2) | The pose tip (2.6.3) and the poses that TalkBack reads on *Pick a pose* come from the server in English on a Korean phone. Proposal: the app sends the language its screens show (a string resource, `en` or `ko`, rather than `Locale.getDefault()`, which can name a language Pix does not have) with `POST /pose-tips`, `tip_prompt` writes the sentence in it, and the check for numbers and units learns Korean (한/두 걸음, 미터, 센티). | 박동제 | 10/30 |
 | Four prompt templates (FR-4.8) | With a description, four templates around the same `{pose}` take the place of the three variations (2.6.3), and the default template is to be improved: `{pose}` is the user's request, read sensibly, with rules such as keeping the face and the clothes and one pose per photo. Open: the four templates, and how a request such as "two photos saluting and two with hands up" is handled. | 박재완 | Week of 11/2 |
 | Prompt history (FR-4.11) | Proposal: kept on the phone, because the server never stores descriptions (NFR-13). Open: how a partner is identified for the history with this person (the Pix ID when both are signed in; a room-code session has no account) and what the subject's phone records. | 박동제 | Week of 11/2 |
 | Offline QR connection (F9) | The plan of 1.4.2: a local-only hotspot, signaling on the photographer's phone, one connection per QR code, and *Resume* on both phones. Open: the detailed design (the QR payload, the local signaling, the hotspot API's limits). | 조성민 | Week of 11/2 |
-| Mask-only transfer with the shared steps | Once the subject can choose a guide on their phone (FR-6.15), the guide is made there and has to reach the photographer's phone, which owns the guide state (AD-7), so the mask travels in either direction, not only P→S (2.5.1). The photographer's reference thumbnail (FR-3.9) is the reference photo, which a mask-only transfer does not carry, so it is left out for a guide from the subject's phone or a 512 px copy is sent (see *Reference thumbnail on Subject view*). A guide the subject saves (FR-6.16) holds only the mask, so its thumbnail comes from the outline (2.8, *Guide store*). The new mask format and the step messages share one protocol bump, to version 3. | 한준형 | 10/28 |
+| Mask-only transfer with the shared steps | Once the subject can choose a guide on their phone (FR-6.15), the guide is made there and has to reach the photographer's phone, which owns the guide state (AD-7), so the mask travels in either direction, not only P→S (2.5.1). The photographer's reference thumbnail (FR-3.9) is the reference photo, which a mask-only transfer does not carry, so it is left out for a guide from the subject's phone or a 512 px copy is sent with `guide.reference.*` (2.5.1), built P→S for Subject view's thumbnail ([#132]) and usable S→P. A guide the subject saves (FR-6.16) holds only the mask, so its thumbnail comes from the outline (2.8, *Guide store*). The new mask format and the step messages share one protocol bump, to version 3. | 한준형 | 10/28 |
 
 **Contents**
 
@@ -261,7 +261,7 @@ sequenceDiagram
 | AD-3 | **Peer-to-peer media with WebRTC; the server only does signaling** | Lowest latency for the live view, no media-server cost, end-to-end encryption. WebRTC also provides congestion control and adaptive quality (NFR-6). | Media server (SFU); sending JPEG frames over WebSocket |
 | AD-4 | **CameraX is the only camera owner and feeds frames to WebRTC** | Only one client can open the camera. CameraX gives us capture, zoom, focus, and exposure for remote control, and one viewport for preview, capture, and streaming, so all three show the same framing. | WebRTC's built-in camera capturer |
 | AD-5 | **Two data channels: *realtime* (unordered, no retransmission) and *reliable* (ordered)** | Continuous values (guide position, zoom) need only the latest value, and retransmitting stale ones adds lag. Images, commands, and results must arrive exactly once. Both reuse the existing peer connection, so there is no server round trip. | One reliable channel; relaying messages through the server |
-| AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp on the subject's phone. It never enters the video or the saved photo. Updates are a few bytes. The photographer sends the smoothed mask, not the cutout, so both phones draw the same outline and no reference pixels travel. | Burning the overlay into the video stream; mirroring the photographer's screen |
+| AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp on the subject's phone. It never enters the video or the saved photo. Updates are a few bytes. The photographer sends the smoothed mask, not the cutout, so both phones draw the same outline and the guide carries no reference pixels. Revised in Iteration 3 ([#132]): apart from the guide, a copy of the reference photo, at most 512 px on its long side, goes once per guide to the subject's phone, only for its corner thumbnail (FR-3.9), so the subject sees the pose to copy; it is never drawn as the guide, never saved, and never goes through the Pix server. | Burning the overlay into the video stream; mirroring the photographer's screen |
 | AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | Avoids conflicting edits: subject actions are requests; the photographer applies them in arrival order and echoes the applied value, so the later change wins and both phones agree (FR-7.6). The subject's requests cover zoom, brightness, flash, and guide moves. | Shared editing on both phones |
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | The riskiest part, streaming and sync, works without accounts, and each way into a session is only an entry point: an accepted invitation yields a `sessionId`, just like a room code does, and the signaling, peer connection, and reconnection code is shared. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots. One codebase and one install, with the role chosen per session. | A separate viewer app for the subject |
@@ -270,7 +270,7 @@ sequenceDiagram
 | AD-12 | **Sign-in with a Pix ID and a password or with Google; the server issues its own tokens** | A Pix ID and a password let anyone use Pix without a Google account, and Google is one tap on every Android phone. The Pix ID is the login name, with no email, and either kind of account can add the other way to sign in; a Google sign-in that no account uses offers to connect an existing account before it creates one. The server verifies a Google ID token once and keeps only the Google subject ID; the token is never stored, and is sent again only to add Google to an existing account after `NOT_REGISTERED` (FR-5.13). The password crosses plain HTTP to the course servers (AD-11, NFR-14) and is stored only as an argon2id hash. A sign-in gives a short access token (JWT) and a rotating refresh token (2.8, Accounts). | Email and password; Kakao sign-in (not on every test phone) |
 | AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | A closed app cannot keep a WebSocket open, so a push is the only way to reach a friend who is not in Pix. Pushes are not guaranteed, so the photographer can share a link through any messenger instead; sending only through KakaoTalk would need it on every test phone. | WebSocket presence only; KakaoTalk-only invitations |
 | AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | STUN alone often fails behind carrier NAT, so cellular sessions need a relay. The course servers cannot host one: a relay needs UDP or TCP 3478 and a UDP port range that the phones reach directly, and only HTTP on port 80 gets in. Cloudflare's relay needs no host of ours, its free monthly allowance is far above our use, and it also listens on TCP 80 and TLS 443 for networks that block UDP. The Pix server requests credentials per session with a key that stays on the server, so the relay cannot be used by others. Media stays SRTP-encrypted, so the relay cannot read it (NFR-14). | coturn on the server host (no open ports); coturn on AWS (cost and upkeep); a media server (SFU); no relay (Wi-Fi only) |
-| AD-15 | **The guide is an outline only and never shows the reference photo's pixels** | Framing the person matters more than the reference's background, and reference pixels over the live scene are confusing. The reference stays visible as a small thumbnail instead. | Semi-transparent cutout; a faint background guide |
+| AD-15 | **The guide is an outline only and never shows the reference photo's pixels** | Framing the person matters more than the reference's background, and reference pixels over the live scene are confusing. The reference stays visible as a small thumbnail instead, on the subject's phone too since Iteration 3 (AD-6). | Semi-transparent cutout; a faint background guide |
 | AD-16 | **Saved guides live in the app's private storage** | Reuse without rebuilding, with nothing in the gallery and nothing on the server (FR-3.8, NFR-13). | Gallery album; server-side guides |
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom gesture, and one toggle makes the rule simple: edit mode on, gestures edit the guide; off, a pinch zooms the camera. The same toggle on Subject view, because the subject both moves the guide (FR-7.2) and zooms. | A zoom slider, in the main layout or in a detail settings panel; deciding by where the finger lands |
 | AD-18 | **Session state lives in a Redis session store, not in the server process** | With shared state the server can run several workers when one process is no longer enough, and a new copy of the app can take over from the old one during a deploy without losing a waiting room (2.8). The state is small and short-lived (rooms, codes, presence, rate-limit windows), which fits Redis's atomic scripts and expiry, and pub/sub carries signals between workers (2.7). Cost: one more service to run, and room transitions become Redis scripts instead of plain Python. NFR-18 (50 sessions) fits in one worker, so this is for growth beyond the course, not for the demo load. | One process with in-memory state; routing each room to one process by its code; session state in the relational database |
@@ -343,7 +343,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               InvitationManager and PushTokenRegistrar (It 3, Iter3-P15, not yet written)
 ├─ session/     SessionModels*, SessionManager*, RtcSessionManager, SignalingClient, OkHttpSignalingClient,
 │               PeerConnectionClient, WebRtcPeerConnectionClient, CameraFrameSource, GuideImageCodec, GuideSyncer,
-│               RemoteControlHandler
+│               GuideReference (GuideReferenceCodec, MirrorReference), RemoteControlHandler
 │  ├─ protocol/  SessionMessage*, message codec, channel routing
 │  └─ signaling/ SignalMessage*
 └─ core/        network/PixApi* (PixApi, PixAuthApi, PixAccountApi), network/ApiModels*, dependency wiring, timing logs
@@ -622,6 +622,10 @@ classDiagram
     +startAsReceiver(scope)
     +attribute(role)
   }
+  class MirrorReference {
+    +reference StateFlow~GuideReference~
+    +set(reference)
+  }
   class RemoteControlHandler {
     +actions SharedFlow~RemoteAction~
     +start(scope)
@@ -636,6 +640,8 @@ classDiagram
     +onExposureGesture(index, final)
     +setBrightnessOpen(open)
     +onFlashTap()
+    +setReferenceExpanded(expanded)
+    +setReferenceCorner(corner)
   }
   RtcSessionManager ..|> SessionManager
   RtcSessionManager --> SignalingClient
@@ -646,11 +652,13 @@ classDiagram
   CameraFrameSource ..|> FrameSink
   GuideSyncer --> SessionManager
   GuideSyncer --> GuideRepository
+  GuideSyncer --> MirrorReference : subject writes the reference photo
   RemoteControlHandler --> SessionManager
   RemoteControlHandler --> CameraController
   RemoteControlHandler --> GuideRepository
   SubjectViewModel --> SessionManager
   SubjectViewModel --> GuideRepository
+  SubjectViewModel --> MirrorReference
 ```
 
 *Figure 7. Session, synchronization, and remote-control classes. The subject's pinch on the live video calls `onZoomGesture(ratio, final)`; its guide gestures and brightness and flash go through `RemoteControlHandler` the same way (2.6.5).*
@@ -819,7 +827,7 @@ data class ReferenceGuide(
     val aspect: Float,            // mask width / height
     val source: GuideSource,      // GALLERY or GENERATED
     val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (the person and its 2 % margin), where a new guide starts (FR-3.1); null on the subject
-    val reference: Bitmap? = null,        // the photo itself, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); never sent, never drawn as the guide; null on the subject
+    val reference: Bitmap? = null,        // the photo itself, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); never drawn as the guide; null in the subject's mirror, whose copy arrives in guide.reference.* and stays in MirrorReference
 )
 
 data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float)   // fractions of an image's width and height
@@ -873,6 +881,7 @@ sealed interface SessionState {
 data class PeerInfo(
     val displayName: String,
     val haveGuideId: String? = null, // subject only: the guide mask it already has, from its hello
+    val haveReferenceId: String? = null, // subject only: the guide whose reference photo it already has (It 3)
 )
 enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, DECLINED, BUSY, ERROR, RATE_LIMITED }
 // RATE_LIMITED: too many wrong codes from this phone's network (2.5.2); it ends a join on this phone and is never sent
@@ -997,6 +1006,7 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
 | `guide.image.begin` | reliable | P→S | Starts sending the guide mask |
 | `guide.image.chunk` | reliable | P→S | One piece of the mask |
 | `guide.image.end` | reliable | P→S | Ends the mask; the subject checks it |
+| `guide.reference.begin` / `.chunk` / `.end` (It 3) | reliable | P→S | The reference photo for the subject's thumbnail (FR-3.9), after the guide's image and state |
 | `guide.state` | realtime / reliable | P→S | Where the guide is drawn, its opacity, and whether it is visible |
 | `guide.clear` | reliable | P→S | The guide was removed |
 | `guide.move` (It 2) | realtime; `final` reliable | S→P | A step of the subject's guide drag or pinch, or its final value (FR-7.2) |
@@ -1020,12 +1030,13 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
     "appVersion": "0.3.0",
     "role": "PHOTOGRAPHER",
     "name": "Dongje",
-    "haveGuideId": null
+    "haveGuideId": null,
+    "haveReferenceId": null
   }
 }
 ```
 
-Sent by both phones as soon as the channels open. A different `protocol` ends the session with an error. `name` is the phone's device name from the system settings (its model when there is none), at most 40 characters, not the Pix display name. The subject puts the ID of the guide image it already has in `haveGuideId`.
+Sent by both phones as soon as the channels open. A different `protocol` ends the session with an error. `name` is the phone's device name from the system settings (its model when there is none), at most 40 characters, not the Pix display name. The subject puts the ID of the guide image it already has in `haveGuideId`, and the ID of the guide whose reference photo it already has in `haveReferenceId` (It 3).
 
 </details>
 
@@ -1091,6 +1102,23 @@ Skipped if the subject reported the same `haveGuideId`. The image is the **smoot
 ```
 
 The subject checks the CRC, decodes the mask, and draws the outline from it with the same `OutlineExtractor` as the photographer, without smoothing again (2.6.1 step 6).
+
+</details>
+
+<details>
+<summary><code>guide.reference.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S (It 3)</summary>
+
+```json
+{
+  "v": 2, "t": "guide.reference.begin", "seq": 11, "ts": 1759212345780,
+  "b": {
+    "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17",
+    "format": "jpeg", "width": 384, "height": 512, "bytes": 41210, "chunks": 5
+  }
+}
+```
+
+The guide's reference photo, for the subject's corner thumbnail only (FR-3.9, AD-6): JPEG at quality 85, at most 512 px on its long side, sent once per guide right after the guide's image and its `guide.state`, so the subject draws the guide first. `guide.reference.chunk` (`guideId`, `index`, `data`) and `guide.reference.end` (`guideId`, `crc32`) split and check it exactly like the image. A guide without a reference photo sends none. Skipped when the subject's `hello` reported the same `haveReferenceId`. The subject keeps it in memory only (`MirrorReference`), never as the guide and never saved, shows it while it belongs to the guide on the video, and drops it when another guide's image arrives or on `guide.clear`. A phone without these types ignores them, so the protocol version stays 2.
 
 </details>
 
@@ -1636,7 +1664,7 @@ The server sends the FCM push `invitation` with the `id` and the inviter's name 
 3.  **Check for a person.** If fewer than 2% of the pixels have confidence ≥ 0.5, the step fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
 4.  **Smooth the mask (It 2, FR-2.9).** Blur the confidence mask with three box blurs whose radius is 0.8 % of the person's height (close to a Gaussian; 9 px for a person 1100 px tall), so its 0.5 level becomes a smooth curve. The person is the largest region of the mask, so a stray blob far above or below does not stretch the height. Then drop separate regions smaller than 1 % of the foreground, such as a stray blob beside a hand, and fill holes smaller than 0.2 %; the gap between an arm and the body stays, and background that reaches the photo's edge is never a hole. People of similar size, such as a couple, are all kept (FR-2.5); a figure that small, far in the background, is dropped with the specks. Crop the mask to its bounding box plus a 2 % margin, store the aspect ratio, and keep the box's position in the photo as `anchor` (FR-3.1).
 5.  **Outline.** Trace the smoothed mask's 0.5 level with marching squares, placing each crossing between two pixels by interpolation, so the line follows the blurred curve instead of pixel steps; a person cut off by the photo's edge stays open there. Round the line with two passes of corner cutting (Chaikin) and draw it as a white anti-aliased line with round joins, about 3 dp on screen and scaled to the mask size, with no fill. The width assumes the default start of 70 % of the frame height; a guide that starts larger or smaller from its `anchor` gets a proportionally thicker or thinner line, the same on both phones, because the subject has no `anchor` (2.6.2). No pixel of the reference is used (AD-15).
-6.  **Hand over.** Put the `ReferenceGuide` into `GuideRepository`, which places it at `anchor` (2.6.2). The subject receives only the **smoothed mask** (single-channel PNG, height ≤ 720 px) and runs step 5 on it, never step 4, so both phones draw the same shape. `ReferenceGuide.mask` is that mask as an `ALPHA_8` bitmap; the guide keeps none of the photo's pixels, and `MaskGuideImageCodec` sends it as `mask-png` (2.5.1). The reference photo itself stays on the photographer's phone, downscaled to 512 px for the corner thumbnail (FR-3.9).
+6.  **Hand over.** Put the `ReferenceGuide` into `GuideRepository`, which places it at `anchor` (2.6.2). The subject receives only the **smoothed mask** (single-channel PNG, height ≤ 720 px) and runs step 5 on it, never step 4, so both phones draw the same shape. `ReferenceGuide.mask` is that mask as an `ALPHA_8` bitmap; the guide keeps none of the photo's pixels, and `MaskGuideImageCodec` sends it as `mask-png` (2.5.1). The reference photo itself stays on the photographer's phone, downscaled to 512 px for the corner thumbnail (FR-3.9); since Iteration 3 a JPEG copy of it also goes once to the subject's phone for its own thumbnail (`guide.reference.*`, 2.5.1), never as the guide.
 
 All steps run on `Dispatchers.Default`. Target: ≤ 2 s from selection to *Reference confirm* including the smoothing (NFR-3); `Timings` marks `smooth.start` and `smooth.end` inside `seg.start`–`seg.end` show how much of it the smoothing takes. On the emulator the whole step took 0.25–0.35 s per photo once the model was loaded.
 
@@ -1673,7 +1701,7 @@ The guide's normalized width is `height × aspect × (H / W)` of the current fra
 
 **Save guide (FR-3.8, Iter2-P18).** The guide's panel holds, in order, *Hide*, the opacity slider with its percentage, *Save guide*, and *Remove*, all icon buttons. *Save guide* keeps the guide on the camera with `SavedGuideStore.save`; its bookmark fills once the guide on the camera is a saved one, which the app knows because a guide keeps its ID when it is saved and loaded. A tap shows one notice for 3 s: "Guide saved. Use it again from Guide.", "Guide saved. The oldest saved guide was removed to keep 20.", "This guide is already saved. Find it under Guide.", or "Couldn't save the guide. Check the phone's storage." *Add a pose guide* lists the saved guides newest first as a row of thumbnails, hidden while there are none; a tap on one puts it on the camera at its reference's place (*Starting position*), and its ✕ deletes it after asking. A guide on the camera stays when its saved copy is deleted.
 
-**Overlay rendering.** `GuideOverlayView` caches the guide and state, then recalculates its drawing bounds when either changes or the View is resized. The outline bitmap is drawn into the destination rectangle with `opacity` applied through `Paint.alpha`; with `visible == false` nothing is drawn. Canvas clipping keeps the guide inside the image rectangle. The reference thumbnail (FR-3.9) is a separate `ShapeableImageView` over the preview on the photographer's phone only; it is not part of the overlay, not streamed, and not in photos. It starts in the top-left corner with its long side 72 dp. A tap enlarges it to half the preview's width, or narrower if it would be taller than its area, and hides the hint chip, which stays above it with the other chips; another tap makes it small again. A drag moves it with the finger and, on release, drops it into the nearest of the four corners (`ReferenceDragController`, `placeReference`); the bottom corners sit above the first panel at the preview's bottom, so it moves up when brightness or a notice opens. TalkBack reads the tap as *Enlarge* or *Make smaller* and offers the other corners as actions. The corner stays for the next guide, and a new guide starts small; the scene photo step hides the thumbnail.
+**Overlay rendering.** `GuideOverlayView` caches the guide and state, then recalculates its drawing bounds when either changes or the View is resized. The outline bitmap is drawn into the destination rectangle with `opacity` applied through `Paint.alpha`; with `visible == false` nothing is drawn. Canvas clipping keeps the guide inside the image rectangle. The reference thumbnail (FR-3.9) is a separate `ShapeableImageView` over the preview; it is not part of the overlay, not streamed in the video, and not in photos. It starts in the top-left corner with its long side 72 dp. A tap enlarges it to half the preview's width, or narrower if it would be taller than its area, and hides the hint chip, which stays above it with the other chips; another tap makes it small again. A drag moves it with the finger and, on release, drops it into the nearest of the four corners (`ReferenceDragController`, `placeReference`); the bottom corners sit above the first panel at the preview's bottom, so it moves up when brightness or a notice opens. TalkBack reads the tap as *Enlarge* or *Make smaller* and offers the other corners as actions. The corner stays for the next guide, and a new guide starts small; the scene photo step hides the thumbnail. Subject view shows the same thumbnail (It 3, [#132]) from the copy in `MirrorReference`, inside the video's margins and above its zoom row: the same size, tap, drag, and TalkBack actions (`showReference` and `setReferenceActions` in `ReferenceThumbnailView.kt`, shared by both screens), a corner of its own that is never sent, so each phone keeps its own, and the thumbnail stays while the photographer hides the guide, as on their phone; it goes when the guide is removed or replaced.
 
 #### 2.6.3 Pose generation
 
@@ -1873,13 +1901,13 @@ erDiagram
 | **App shell, design, and integration** | 한준형 (PM) | Activity, navigation graph, permission flow, `AppContainer` | Iteration 2 design and the shared contracts (Iter2-P3, [#45]); integration (Iter2-P22, [#60]); integration tests (Iter2-P21, [#59]); demo README (Iter2-P23, [#61]); schedule and issues | All screens |
 | **Camera** | 박동제 | Preview, capture to MediaStore, zoom, the viewport, `setFrameSink` | Tap to focus, brightness, flash, aspect ratios; `CameraController` and `CameraCapabilities` additions (Iter2-P10, [#51]) | Session, remote control |
 | **Reference guide** | 박동제 | Picker, segmentation, cutout, outline, *No person found* | Smooth outlines (Iter2-P7, [#49]); the `anchor` and the thumbnail copy of the reference (Iter2-P11, [#52]). Lines for arms and legs in front of the body are out of scope (2.6.1) | Guide overlay |
-| **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, [#52]); saved guides (Iter2-P18, [#58]) | Guide sync, Subject view |
+| **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, [#52]); saved guides (Iter2-P18, [#58]); the reference thumbnail on Subject view (Iter3-A1, [#132]) | Guide sync, Subject view |
 | **Server deployment** | 박재완 | Running on the laptop on the test Wi-Fi | The course servers with Docker, nginx, and blue-green deploys (Iter2-P4, [#46]); the Redis session store (AD-18; Iter2-A2, [#73]) | Everything |
 | **Accounts and friends** | 박재완 | — | Database, sign-in with a Pix ID and a password or with Google, Pix IDs, friend requests, friend list, presence (Iter2-P8, [#50]); Sign-in, Pix ID, and Friends screens (Iter2-P13, [#54]) | Invitations |
 | **Pose generation** | 박재완 | API choice, `POST /poses`, the default poses, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, one prompt, suggested poses (Iter2-P12, [#53]) | Reference guide |
 | **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | `ws://` to the course server. Iteration 3: TURN through Cloudflare, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter3-P13, [#117]; Iter3-P14, [#118]); invitations with push and link (Iter3-P15, [#119]) | Guide sync, remote control |
 | **Remote control** | 조성민 | `RemoteControlHandler` (zoom) | Brightness, flash, guide moves, and notices (Iter2-P17, [#57]); pinch zoom and the guide-edit mode toggle on Subject view (Iter2-P6, [#48]); zoom without stutter (Iter2-P5, [#47]; measured on the S23 Ultra, the S21 numbers with IT-10). Iteration 3: remote focus and the permission switch (Iter2-P17, Could) | UI |
-| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; no `anchor` is sent (2.5.1). Iteration 3: the mask-only transfer in `GuideImageCodec` and the syncer, in either direction (한준형; Iter3-P9, [#113]) | UI |
+| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; no `anchor` is sent (2.5.1). Iteration 3: the mask-only transfer in `GuideImageCodec` and the syncer, in either direction (한준형; Iter3-P9, [#113]); the reference photo for Subject view's thumbnail, `guide.reference.*` (박동제; Iter3-A1, [#132]) | UI |
 
 Invitations need both the accounts server (박재완) and the session entry point (조성민), and the two owners agree the order of the invitation work.
 
@@ -1901,6 +1929,7 @@ Invitations need both the accounts server (박재완) and the session entry poin
 | 박동제 | *Pick a pose* one candidate at a time (Iter3-P10, [#114]; PR [#108]) | 10/30 | 2.6.3 |
 | 박동제 | Pose tips (Iter3-P11, [#115]; PR [#110]) | 10/30 | 2.6.3 |
 | 박동제 | Selfie mode, and whether the prompts suit it (Iter3-P12, [#116]) | 10/30 | 1.4.2, *Still open* |
+| 박동제 | The reference thumbnail on Subject view (Iter3-A1, [#132]) | 10/30 | AD-6, 2.5.1, 2.6.2 |
 | 조성민 | Sessions on different networks (Iter3-P13, [#117]) | 10/30 | 2.6.7 |
 | 조성민 | Reconnection after a short drop (Iter3-P14, [#118]) | 10/30 | 2.6.7 |
 | 조성민 | Invitations and friend requests with push notifications (Iter3-P15, [#119]) | 10/30 | 2.6.6 |
@@ -1985,6 +2014,7 @@ To be written in Iteration 5, with at least two patterns documented in detail. E
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
 [#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
+[#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
 [#120]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/120
 [#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121

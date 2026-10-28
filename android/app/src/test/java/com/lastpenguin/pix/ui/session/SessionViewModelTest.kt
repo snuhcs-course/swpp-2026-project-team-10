@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModelStore
@@ -7,9 +7,11 @@ import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
+import com.lastpenguin.pix.session.FakeGuideReferenceCodec
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.IcePath
+import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -55,7 +57,14 @@ class SessionViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        val syncer = GuideSyncer(session, InMemoryGuideRepository(), InMemoryGuideRepository(), FakeGuideImageCodec())
+        val syncer = GuideSyncer(
+            session,
+            InMemoryGuideRepository(),
+            InMemoryGuideRepository(),
+            FakeGuideImageCodec(),
+            FakeGuideReferenceCodec(),
+            MirrorReference(),
+        )
         model = SessionViewModel(
             session,
             camera,

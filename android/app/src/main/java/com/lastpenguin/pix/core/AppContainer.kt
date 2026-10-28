@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -45,7 +45,9 @@ import com.lastpenguin.pix.guide.SubjectSegmenter
 import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.JpegGuideReferenceCodec
 import com.lastpenguin.pix.session.MaskGuideImageCodec
+import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.OkHttpSignalingClient
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -89,6 +91,8 @@ class AppContainer(
      * the first one, is never moved.
      */
     val mirrorGuideRepository: GuideRepository,
+    /** The subject's copy of the photographer's reference photo, for Subject view's thumbnail (FR-3.9). */
+    val mirrorReference: MirrorReference,
     val referenceGuideMaker: ReferenceGuideMaker,
     /** Guides kept to use again, in the app's private files only (FR-3.8, AD-16, NFR-13). */
     val savedGuideStore: SavedGuideStore,
@@ -123,6 +127,7 @@ class AppContainer(
             val guideRepository: GuideRepository =
                 InMemoryGuideRepository { cameraController.state.value.aspect.frameAspect }
             val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository { NARROWEST_FRAME_ASPECT }
+            val mirrorReference = MirrorReference()
 
             /** Work that outlives every screen: loading the sign-in, presence, reading the saved guides. */
             val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -180,9 +185,16 @@ class AppContainer(
                 serverUrl = BuildConfig.SERVER_URL,
                 identity = SessionIdentity.of(appContext, BuildConfig.VERSION_NAME),
                 haveGuideId = { mirrorGuideRepository.guide.value?.id },
+                haveReferenceId = { mirrorReference.reference.value?.guideId },
             )
-            val guideSyncer =
-                GuideSyncer(rtcSessionManager, guideRepository, mirrorGuideRepository, MaskGuideImageCodec())
+            val guideSyncer = GuideSyncer(
+                rtcSessionManager,
+                guideRepository,
+                mirrorGuideRepository,
+                MaskGuideImageCodec(),
+                JpegGuideReferenceCodec(),
+                mirrorReference,
+            )
             val referenceGuideMaker: ReferenceGuideMaker =
                 MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
             val poseTipper: PoseTipper = RemotePoseTipper(pixApi)
@@ -191,6 +203,7 @@ class AppContainer(
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,
+                mirrorReference = mirrorReference,
                 referenceGuideMaker = referenceGuideMaker,
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -28,13 +28,20 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
+import com.lastpenguin.pix.ui.camera.REFERENCE_MARGIN_DP
+import com.lastpenguin.pix.ui.camera.REFERENCE_SMALL_DP
+import com.lastpenguin.pix.ui.camera.ReferenceArea
+import com.lastpenguin.pix.ui.camera.ReferenceDragController
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
+import com.lastpenguin.pix.ui.camera.placeReference
 import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
+import com.lastpenguin.pix.ui.camera.setReferenceActions
+import com.lastpenguin.pix.ui.camera.showReference
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -48,7 +55,8 @@ import org.webrtc.VideoSink
  * Subject view (R&S 6.6): the photographer's live video, fitted to their frame, with their name and *Leave*.
  * A pinch on the video zooms the photographer's camera while guide-edit mode is off, with the Camera screen's
  * readout (FR-7.1, AD-17); with the mode on, drags and pinches move the photographer's guide (FR-7.2). The
- * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3). System back asks
+ * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3), and the guide's
+ * reference photo sits in a corner as on their Camera screen (FR-3.9). System back asks
  * first (R&S 6.9). Owner: Real-time (#8, #10, #57), with the guide from #9.
  */
 class SubjectFragment : Fragment(R.layout.fragment_subject) {
@@ -60,6 +68,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var brightnessSlider: TrackedSliderController? = null
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
+    private var referenceDrag: ReferenceDragController? = null
 
     // Where the video is, and how much of it the top bar and the controls cover (previewArea).
     private var videoArea = PreviewArea(0f, 0f, 0f)
@@ -115,6 +124,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
 
+        setupReference(binding)
+
         binding.leaveButton.setOnClickListener { leaveNow() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
 
@@ -126,6 +137,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
                         layoutVideo(binding, ui.aspect)
+                        renderReference(binding, ui)
                         binding.liveDot.placeIn(binding.videoContainer, ui.aspect.frameAspect)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
@@ -225,7 +237,75 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin)
     }
 
+    /**
+     * The photographer's reference photo (FR-3.9), as on their Camera screen: a tap enlarges it or makes it small,
+     * and a drag drops it into the nearest corner of this phone's video, which the photographer never sees.
+     */
+    private fun setupReference(binding: FragmentSubjectBinding) {
+        val thumbnail = binding.referenceThumbnail
+        referenceDrag = ReferenceDragController(
+            thumbnail,
+            area = { referenceArea(binding) },
+            onTap = { viewModel.setReferenceExpanded(!viewModel.uiState.value.referenceExpanded) },
+        ) { corner ->
+            corner?.let(viewModel::setReferenceCorner)
+            renderReference(binding, viewModel.uiState.value)
+        }
+        thumbnail.setReferenceActions(
+            expanded = { viewModel.uiState.value.referenceExpanded },
+            corner = { viewModel.uiState.value.referenceCorner },
+            moveTo = viewModel::setReferenceCorner,
+        )
+        // The corners follow the video's size and the slider above the caption, known only after layout.
+        val relayout = View.OnLayoutChangeListener {
+                _,
+                left,
+                top,
+                right,
+                bottom,
+                oldLeft,
+                oldTop,
+                oldRight,
+                oldBottom,
+            ->
+            if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
+                thumbnail.post { if (thumbnail.isAttachedToWindow) renderReference(binding, viewModel.uiState.value) }
+            }
+        }
+        binding.videoContainer.addOnLayoutChangeListener(relayout)
+        binding.bottomOverlays.addOnLayoutChangeListener(relayout)
+    }
+
+    /** The thumbnail in its corner, small or enlarged, while the photographer's reference photo is here. */
+    private fun renderReference(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        val container = binding.videoContainer
+        binding.referenceThumbnail.showReference(ui.reference) { photo ->
+            if (referenceDrag?.isDragging == true || container.width == 0) {
+                null
+            } else {
+                placeReference(
+                    aspect = photo.width.toFloat() / photo.height,
+                    expanded = ui.referenceExpanded,
+                    corner = ui.referenceCorner,
+                    smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
+                    previewWidth = container.width,
+                    area = referenceArea(binding),
+                )
+            }
+        }
+    }
+
+    /** Inside the video's margins and above the zoom row, the slider, and the caption. */
+    private fun referenceArea(binding: FragmentSubjectBinding): ReferenceArea {
+        val margin = (REFERENCE_MARGIN_DP * resources.displayMetrics.density).roundToInt()
+        val container = binding.videoContainer
+        val zoomTop = (binding.zoomRow.top + binding.zoomRow.translationY).roundToInt()
+        val bottom = minOf(zoomTop - container.top, container.height - videoArea.underControls.roundToInt()) - margin
+        return ReferenceArea(margin, margin, container.width - margin, bottom)
+    }
+
     override fun onDestroyView() {
+        referenceDrag = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
         brightnessSlider?.finishInteraction()

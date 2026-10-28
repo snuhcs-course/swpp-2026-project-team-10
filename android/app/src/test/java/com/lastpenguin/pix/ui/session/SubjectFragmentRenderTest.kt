@@ -56,7 +56,8 @@ import org.robolectric.shadows.ShadowToast
  * gone with a replaced or removed guide, and moved to another corner on this phone only; the brightness panel and a
  * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
- * back button's question, and the session ending by a lost connection or the photographer, named or before the
+ * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
+ * the photographer, named or before the
  * name arrived.
  */
 @RunWith(AndroidJUnit4::class)
@@ -435,6 +436,21 @@ class SubjectFragmentRenderTest {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
         connect(modules)
+
+        modules.session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+        idle()
+
+        assertEquals(R.id.connectionLostFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun connectionLost_whileAddAPoseGuideIsOpen_closesItAndOpensConnectionLost() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        onScreen { binding, _ -> binding.guideButton.performClick() }
+        idle()
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
 
         modules.session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
         idle()

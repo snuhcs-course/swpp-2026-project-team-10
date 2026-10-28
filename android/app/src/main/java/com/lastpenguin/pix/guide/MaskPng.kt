@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import java.io.ByteArrayOutputStream
@@ -85,8 +85,12 @@ object MaskPng {
         return out.toByteArray()
     }
 
-    /** The mask in [bytes], or null when they are not an 8-bit grayscale PNG of a plausible size. */
-    fun decode(bytes: ByteArray): MaskPixels? {
+    /**
+     * The mask in [bytes], or null when they are not an 8-bit grayscale PNG of a plausible size. A header wider than
+     * [maxWidth] or taller than [maxHeight] is refused before anything is inflated, so a mask from the other phone
+     * cannot make this phone allocate more than the masks it makes itself.
+     */
+    fun decode(bytes: ByteArray, maxWidth: Int = Int.MAX_VALUE, maxHeight: Int = Int.MAX_VALUE): MaskPixels? {
         if (bytes.size < SIGNATURE.size || !bytes.copyOf(SIGNATURE.size).contentEquals(SIGNATURE)) return null
         var at = SIGNATURE.size
         var width = 0
@@ -110,6 +114,7 @@ object MaskPng {
                     val plain = body[8].toInt() == 8 && body[9].toInt() == COLOR_GRAY &&
                         body[10].toInt() == 0 && body[11].toInt() == 0 && body[12].toInt() == 0
                     if (!plain || width <= 0 || height <= 0 || width.toLong() * height > MAX_PIXELS) return null
+                    if (width > maxWidth || height > maxHeight) return null
                 }
 
                 "IDAT" -> data.write(body)

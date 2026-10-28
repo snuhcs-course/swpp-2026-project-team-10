@@ -401,7 +401,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun onTransition(state: SessionState) {
         if (state !is SessionState.Ended) return
         when (state.reason) {
-            EndReason.CONNECTION_LOST -> findNavController().navigate(R.id.action_subject_to_connectionLost)
+            EndReason.CONNECTION_LOST -> {
+                // The action is Subject view's: close Add a pose guide first if it is open over this screen.
+                val nav = findNavController()
+                if (nav.currentDestination?.id != R.id.subjectFragment) nav.popBackStack(R.id.subjectFragment, false)
+                nav.navigate(R.id.action_subject_to_connectionLost)
+            }
 
             EndReason.PEER_LEFT -> {
                 val name = viewModel.uiState.value.photographerName

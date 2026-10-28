@@ -2,6 +2,7 @@
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideSource
+import com.lastpenguin.pix.guide.MAX_REFERENCE_LONG_SIDE
 import com.lastpenguin.pix.guide.MaskPng
 import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.guide.OutlineExtractor
@@ -133,8 +134,7 @@ class MaskGuideImageCodec(private val outlines: OutlineExtractor = OutlineExtrac
 
     override fun decode(guideId: String, format: String, bytes: ByteArray): ReferenceGuide? {
         if (format != FORMAT) return null
-        val mask = MaskPng.decode(bytes) ?: return null
-        if (mask.height > MAX_HEIGHT) return null
+        val mask = MaskPng.decode(bytes, MAX_WIDTH, MAX_HEIGHT) ?: return null
         val outline = outlines.extract(mask.alpha, mask.width, mask.height, outlineStrokePx(mask.height))
         // The subject only draws the guide; where the photographer got it from does not travel.
         return ReferenceGuide(
@@ -149,5 +149,8 @@ class MaskGuideImageCodec(private val outlines: OutlineExtractor = OutlineExtrac
     companion object {
         const val FORMAT = "mask-png"
         const val MAX_HEIGHT = 720
+
+        /** No mask made on a phone is wider: its reference photo's long side is at most 1280 px (Design 2.6.1). */
+        const val MAX_WIDTH = MAX_REFERENCE_LONG_SIDE
     }
 }

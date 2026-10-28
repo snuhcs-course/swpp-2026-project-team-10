@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import java.util.zip.CRC32
@@ -14,7 +14,8 @@ import org.junit.Test
  * noisy, and with soft edges, so every row filter is used. Format: an 8-bit grayscale PNG with a valid signature and
  * CRCs. Refused (fault injection): another signature, a damaged CRC, a truncated file, another color type or depth,
  * a size claim above MAX_PIXELS, and image data of the wrong length. fitHeight: below, at, and above the limit,
- * the aspect kept, and the mean of the covered pixels.
+ * the aspect kept, and the mean of the covered pixels. Limits: a mask at the width and height limits is read, one
+ * pixel wider or taller is refused.
  */
 class MaskPngTest {
 
@@ -84,6 +85,15 @@ class MaskPngTest {
         )
         // Well-formed chunks, but the image data is one row short of the header's size.
         assertNull(MaskPng.decode(withHeader(good) { putInt(it, 20, 31) }))
+    }
+
+    @Test
+    fun `a mask at the limits is read and one pixel more is refused`() {
+        val bytes = MaskPng.encode(softEllipse(40, 30))
+
+        assertEquals(40 to 30, MaskPng.decode(bytes, maxWidth = 40, maxHeight = 30)?.let { it.width to it.height })
+        assertNull(MaskPng.decode(bytes, maxWidth = 39, maxHeight = 30))
+        assertNull(MaskPng.decode(bytes, maxWidth = 40, maxHeight = 29))
     }
 
     @Test

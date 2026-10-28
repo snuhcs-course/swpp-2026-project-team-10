@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -20,7 +20,8 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The guide image as it travels (Design 2.5.1, `mask-png`), with real bitmaps (Robolectric native graphics):
  * height above, at, and below 720 px; the mask's values both ways, the outline rebuilt, and no colors sent; bytes
- * that are not a mask, another format, and a mask taller than 720 px refused.
+ * that are not a mask, another format, and a mask taller than 720 px or wider than 1280 px refused, which no phone
+ * makes (a wide, flat mask compresses to a few bytes but would take memory to trace).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -100,5 +101,8 @@ class MaskGuideImageCodecTest {
         assertNull(codec.decode("g5", "mask-png", byteArrayOf(1, 2, 3, 4)))
         assertNull(codec.decode("g5", "webp", codec.encode(guide("g5", mask(10, 20))).bytes))
         assertNull(codec.decode("g5", "mask-png", MaskPng.encode(mask(10, 721))))
+        val flat = { width: Int -> MaskPng.encode(MaskPixels(width, 4, IntArray(width * 4) { 255 })) }
+        assertNull(codec.decode("g5", "mask-png", flat(1281)))
+        assertEquals(1280, codec.decode("g5", "mask-png", flat(1280))?.mask?.width)
     }
 }

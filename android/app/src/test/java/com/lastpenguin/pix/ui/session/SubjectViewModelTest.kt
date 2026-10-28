@@ -8,11 +8,15 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeGuideRepository
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
+import com.lastpenguin.pix.session.GuideReference
+import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.camera.ReferenceCorner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,6 +29,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -35,12 +40,13 @@ class SubjectViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val session = FakeSessionManager()
     private val mirror = FakeGuideRepository()
+    private val references = MirrorReference()
     private lateinit var viewModel: SubjectViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        viewModel = SubjectViewModel(session, mirror, FakeRemoteVideo())
+        viewModel = SubjectViewModel(session, mirror, references, FakeRemoteVideo())
     }
 
     @After
@@ -108,6 +114,36 @@ class SubjectViewModelTest {
                 listOf(SessionMessage.ZoomSet(2f, final = true), SessionMessage.ZoomSet(0.6f, final = true)),
                 requests(),
             )
+        }
+
+    @Test
+    fun `the reference photo shows while it is its guide's, a new one starts small, and the corner stays here`() =
+        runTest(dispatcher) {
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            val photo = fakeBitmap()
+            references.set(GuideReference("g1", photo))
+            runCurrent()
+            assertSame(photo, viewModel.uiState.value.reference)
+
+            viewModel.setReferenceExpanded(true)
+            assertTrue(viewModel.uiState.value.referenceExpanded)
+            references.set(GuideReference("g1", fakeBitmap()))
+            runCurrent()
+            assertFalse(viewModel.uiState.value.referenceExpanded)
+
+            // Another guide's photo is not shown, and with no photo there is nothing to enlarge.
+            references.set(GuideReference("g2", fakeBitmap()))
+            runCurrent()
+            assertNull(viewModel.uiState.value.reference)
+            viewModel.setReferenceExpanded(true)
+            assertFalse(viewModel.uiState.value.referenceExpanded)
+
+            val sent = session.sent.size
+            viewModel.setReferenceCorner(ReferenceCorner.BOTTOM_LEFT)
+            assertEquals(ReferenceCorner.BOTTOM_LEFT, viewModel.uiState.value.referenceCorner)
+            assertEquals(sent, session.sent.size)
         }
 
     @Test
@@ -218,7 +254,7 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.CameraStateUpdate(2.5f, Role.PHOTOGRAPHER, final = true))
         runCurrent()
 
-        val late = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        val late = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
         runCurrent()
 
         assertEquals(2.5f, late.uiState.value.zoom, 0f)

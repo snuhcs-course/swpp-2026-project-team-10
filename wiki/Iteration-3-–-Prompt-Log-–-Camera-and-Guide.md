@@ -21,6 +21,7 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-27] "Start with #132: as before, work out what to do in what order and whether anything needs my or the teammates' review." (FR-3.9, NFR-13, AD-6, and AD-15 rule the photo off the subject's phone, and #113 sends no reference pixels, so the plan began with that decision, four questions, and who reviews what.)
 - [Dongje, 10-27] "Go ahead with all of it. Each phone keeps its own corner, not synced, and the thumbnail stays like the photographer's." (A separate `guide.reference.*` transfer and `MirrorReference`, leaving `GuideRepository` and the guide image's code as they were for #113; the thumbnail's code shared with the Camera screen; renders at the S22's size for review.)
 - [Dongje, 10-27] "Commit, then do the documents."
+- [Dongje, 10-28] "The S22 is connected: check the Codex review, fix what needs it, and run the check on the phones." / "Wi-Fi is on, go on with the check." / "Commit, push, then reply and resolve." (Two findings, both valid: a received reference's size is now read before it is decoded, and the photographer subscribes to guide changes before sending the current guide, a gap the guide image already had. IT-14 with an emulator as the photographer and the S22 as the subject passed: the reference 19 ms after the guide, and nothing resent after a rejoin.)
 
 [#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -37,7 +37,7 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         binding.useGuideButton.setOnClickListener {
             viewModel.onUseGuide()
-            findNavController().popBackStack(R.id.cameraFragment, false)
+            backToShooting(viewModel)
         }
         binding.chooseAnotherButton.setOnClickListener { pickPhoto() }
 
@@ -72,10 +72,15 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
             ReferenceUiState.Failed -> {
                 Toast.makeText(requireContext(), R.string.couldnt_use_photo, Toast.LENGTH_SHORT).show()
-                findNavController().popBackStack(R.id.cameraFragment, false)
+                backToShooting(viewModel)
             }
 
             else -> Unit
         }
     }
+}
+
+/** Back to the screen *Add a pose guide* was opened from: Subject view for the subject's guide, else the camera. */
+internal fun Fragment.backToShooting(viewModel: ReferenceViewModel) {
+    findNavController().popBackStack(if (viewModel.forSubject) R.id.subjectFragment else R.id.cameraFragment, false)
 }

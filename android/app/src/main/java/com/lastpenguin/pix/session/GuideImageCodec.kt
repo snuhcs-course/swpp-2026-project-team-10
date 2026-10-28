@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.MaskPng
+import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.guide.OutlineExtractor
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.maskPixels
@@ -28,7 +29,8 @@ class EncodedGuideImage(
     val crc32: Long = GuideImageChunks.crc32(bytes)
     val chunks: List<String> = GuideImageChunks.split(bytes)
 
-    fun begin() =
+    /** [anchor] and [source] only when the subject sends its own guide (Design 2.5.1). */
+    fun begin(anchor: NormalizedRect? = null, source: GuideSource? = null) =
         SessionMessage.GuideImageBegin(
             guideId,
             format,
@@ -37,6 +39,8 @@ class EncodedGuideImage(
             bytes.size,
             chunks.size,
             width.toFloat() / height,
+            anchor,
+            source,
         )
 
     fun chunk(index: Int) = SessionMessage.GuideImageChunk(guideId, index, chunks[index])

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -47,6 +48,9 @@ sealed interface SessionNotice {
 
     /** The subject changed the flash: "Junhyeong turned the flash on". */
     data class RemoteFlash(val name: String, val mode: FlashMode) : SessionNotice
+
+    /** A guide made on the subject's phone is now the guide: "Junhyeong set a pose guide" (FR-6.15, FR-7.4). */
+    data class RemoteGuide(val name: String) : SessionNotice
 }
 
 /**
@@ -76,6 +80,9 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    /** Subject: each guide from this phone that did not reach the photographer, for "Couldn't send the guide". */
+    val guideOfferFailed: Flow<String> = guideSyncer.offerFailed
 
     private val _mobileDataPending = MutableStateFlow(false)
 
@@ -212,6 +219,12 @@ class SessionViewModel(
 
                                 is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
                             }
+                        }
+                    }
+                    launch {
+                        guideSyncer.adopted.collect {
+                            val name = peerName ?: return@collect
+                            _notices.tryEmit(SessionNotice.RemoteGuide(name))
                         }
                     }
                     guideSyncer.startAsSender(this)

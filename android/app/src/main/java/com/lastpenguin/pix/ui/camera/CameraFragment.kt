@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -270,6 +270,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                                 },
                                 notice.name,
                             )
+
+                            is SessionNotice.RemoteGuide -> getString(R.string.remote_guide_notice, notice.name)
                         }
                         showNotice(controls, text)
                     }

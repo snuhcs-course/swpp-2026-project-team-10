@@ -1,12 +1,15 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.Role
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -46,7 +49,10 @@ sealed interface SessionMessage {
     @SerialName("camera.capabilities")
     data class Capabilities(val capabilities: CameraCapabilities) : SessionMessage
 
-    /** [format] is `mask-png` (Design 2.5.1); [aspect] is the mask's width / height. */
+    /**
+     * [format] is `mask-png` (Design 2.5.1); [aspect] is the mask's width / height. [anchor] and [source] come only
+     * from the subject, for a guide made on its phone, which the photographer starts at [anchor] (Iter3-P9).
+     */
     @Serializable
     @SerialName("guide.image.begin")
     data class GuideImageBegin(
@@ -57,6 +63,8 @@ sealed interface SessionMessage {
         val bytes: Int,
         val chunks: Int,
         val aspect: Float? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val anchor: NormalizedRect? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val source: GuideSource? = null,
     ) : SessionMessage
 
     /** [data] is Base64 of at most 12 KiB, so one message stays under 16 KiB. */

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -34,6 +34,7 @@ data class ReferenceGuide(
 )
 
 /** A box as fractions of an image's width and height, right and bottom exclusive (FR-3.1). */
+@Serializable
 data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val height: Float get() = bottom - top
     val centerX: Float get() = (left + right) / 2f

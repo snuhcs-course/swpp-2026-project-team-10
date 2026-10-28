@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -23,7 +24,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Add a pose guide, or Replace the pose guide with one on the camera (R&S 6.2), with the saved guides (FR-3.8).
- * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58.
+ * Opened from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and *Generate poses here* waits
+ * for the shared steps (FR-6.15, Design 2.6.5).
+ * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9.
  */
 class AddGuideSheet : BottomSheetDialogFragment() {
 
@@ -45,6 +48,8 @@ class AddGuideSheet : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = SheetAddGuideBinding.bind(view)
+        referenceViewModel.openFor(arguments?.getBoolean(ARG_FROM_SUBJECT) == true)
+        binding.generateButton.isVisible = !referenceViewModel.forSubject
         // The Guide button opens this sheet in both cases; with a guide on the camera it is the way to replace it.
         if (referenceViewModel.replacing) {
             binding.titleText.setText(R.string.replace_guide_title)
@@ -117,5 +122,10 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     private fun takeScenePhoto() {
         generationViewModel.beginScene()
         dismiss()
+    }
+
+    companion object {
+        /** The navigation argument set by Subject view's *Guide* button. */
+        const val ARG_FROM_SUBJECT = "fromSubject"
     }
 }

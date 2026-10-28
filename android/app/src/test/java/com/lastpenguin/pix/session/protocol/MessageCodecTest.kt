@@ -1,8 +1,10 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.Role
 import kotlinx.serialization.json.Json
@@ -74,6 +76,23 @@ class MessageCodecTest {
         assertEquals(1L, other.seq)
         assertEquals("ping", second.type)
         assertEquals("pong", other.type)
+    }
+
+    @Test
+    fun `only the subject's guide image carries an anchor and a source`() {
+        val anchor = NormalizedRect(0.31f, 0.21f, 0.69f, 0.95f)
+        val fromSubject =
+            SessionMessage.GuideImageBegin("s1", "mask-png", 270, 720, 8560, 1, 0.375f, anchor, GuideSource.GALLERY)
+        val body = Json.parseToJsonElement(codec.encode(fromSubject)).jsonObject.getValue("b").jsonObject
+        assertEquals(0.31f, body.getValue("anchor").jsonObject.getValue("left").jsonPrimitive.content.toFloat(), 0f)
+        assertEquals("GALLERY", body.getValue("source").jsonPrimitive.content)
+        assertEquals(fromSubject, codec.decode(codec.encode(fromSubject))!!.message)
+
+        val fromPhotographer = SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f)
+        val plain = Json.parseToJsonElement(codec.encode(fromPhotographer)).jsonObject.getValue("b").jsonObject
+        assertFalse("anchor" in plain)
+        assertFalse("source" in plain)
+        assertEquals(fromPhotographer, codec.decode(codec.encode(fromPhotographer))!!.message)
     }
 
     @Test

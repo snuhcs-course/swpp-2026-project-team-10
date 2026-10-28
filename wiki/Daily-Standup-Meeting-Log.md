@@ -268,7 +268,7 @@ The kickoff on 2026-10-25 replaced that day's standup ([[Team Meetings|Team-Meet
 </details>
 
 <details>
-<summary><b>2026-10-28 (Wed)</b> · 23:00–23:10</summary>
+<summary><b>2026-10-28 (Wed)</b> · 17:30–18:00</summary>
 
 | Member | Done | Plan | Blockers |
 |---|---|---|---|

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -53,7 +53,12 @@ object PixViewModels {
             )
         }
         initializer {
-            SubjectViewModel(container.sessionManager, container.mirrorGuideRepository, container.remoteVideo)
+            SubjectViewModel(
+                container.sessionManager,
+                container.mirrorGuideRepository,
+                container.mirrorReference,
+                container.remoteVideo,
+            )
         }
         initializer { AccountViewModel(container.authRepository, container.googleIdTokens) }
         initializer { FriendsViewModel(container.authRepository, container.friendsRepository) }

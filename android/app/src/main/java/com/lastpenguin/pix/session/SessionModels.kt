@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import kotlinx.serialization.Serializable
@@ -20,6 +20,8 @@ data class PeerInfo(
     val displayName: String,
     /** Subject only: the guide image it already has, from its `hello`; the photographer skips sending that one. */
     val haveGuideId: String? = null,
+    /** Subject only: the guide whose reference photo it already has, from its `hello` (FR-3.9). */
+    val haveReferenceId: String? = null,
 )
 
 /**

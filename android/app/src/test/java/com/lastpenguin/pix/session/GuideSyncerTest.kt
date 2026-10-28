@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideState
@@ -22,14 +22,28 @@ class GuideSyncerTest {
     private val guides = InMemoryGuideRepository()
     private val mirror = InMemoryGuideRepository()
     private val codec = FakeGuideImageCodec()
+    private val referenceCodec = FakeGuideReferenceCodec()
+    private val mirrorReference = MirrorReference()
 
-    private fun TestScope.syncer() = GuideSyncer(session, guides, mirror, codec, StandardTestDispatcher(testScheduler))
+    private fun TestScope.syncer() =
+        GuideSyncer(
+            session,
+            guides,
+            mirror,
+            codec,
+            referenceCodec,
+            mirrorReference,
+            StandardTestDispatcher(testScheduler),
+        )
 
     private fun sentTypes(): List<String> = session.sent.map { message ->
         when (message) {
             is SessionMessage.GuideImageBegin -> "begin"
             is SessionMessage.GuideImageChunk -> "chunk"
             is SessionMessage.GuideImageEnd -> "end"
+            is SessionMessage.GuideReferenceBegin -> "ref.begin"
+            is SessionMessage.GuideReferenceChunk -> "ref.chunk"
+            is SessionMessage.GuideReferenceEnd -> "ref.end"
             is SessionMessage.GuideStateUpdate -> if (message.final) "state.final" else "state"
             SessionMessage.GuideClear -> "clear"
             else -> "other"
@@ -39,9 +53,17 @@ class GuideSyncerTest {
     private fun states(): List<SessionMessage.GuideStateUpdate> =
         session.sent.filterIsInstance<SessionMessage.GuideStateUpdate>()
 
-    private fun connected(haveGuideId: String? = null) {
-        session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", haveGuideId), Role.PHOTOGRAPHER))
+    private fun connected(haveGuideId: String? = null, haveReferenceId: String? = null) {
+        session.setState(
+            SessionState.Connected("s_1", PeerInfo("Junhyeong", haveGuideId, haveReferenceId), Role.PHOTOGRAPHER),
+        )
     }
+
+    /** A guide with its reference photo, which the fake codec sends as two chunks. */
+    private fun withReference(id: String) = fakeGuide(id).copy(reference = fakeBitmap())
+
+    private val image = listOf("begin", "chunk", "chunk", "chunk", "end")
+    private val reference = listOf("ref.begin", "ref.chunk", "ref.chunk", "ref.end")
 
     // ---- sender --------------------------------------------------------------------------------------------------
 
@@ -162,6 +184,141 @@ class GuideSyncerTest {
         runCurrent()
 
         assertEquals(listOf("clear"), sentTypes())
+    }
+
+    // ---- the reference photo (FR-3.9) ---------------------------------------------------------------------------
+
+    @Test
+    fun `the reference photo goes after the guide's image and state, once per guide`() = runTest {
+        guides.setGuide(withReference("g1"))
+        connected()
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+        assertEquals(image + "state.final" + reference, sentTypes())
+        assertEquals("g1", (session.sent[6] as SessionMessage.GuideReferenceBegin).guideId)
+
+        session.sent.clear()
+        guides.update(final = true) { it.copy(cx = 0.4f) }
+        runCurrent()
+        assertEquals(listOf("state.final"), sentTypes())
+        assertEquals(listOf("g1"), referenceCodec.encoded)
+    }
+
+    @Test
+    fun `a guide removed while its reference is encoded on connect is cleared on the subject's phone`() = runTest {
+        guides.setGuide(withReference("g1"))
+        connected()
+        referenceCodec.onEncode = { guides.setGuide(null) }
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        assertEquals(image + "state.final" + reference + "clear", sentTypes())
+    }
+
+    @Test
+    fun `a guide without a reference photo sends none`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        connected()
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        assertEquals(image + "state.final", sentTypes())
+    }
+
+    @Test
+    fun `a subject that has the guide and its reference gets only the state`() = runTest {
+        guides.setGuide(withReference("g1"))
+        connected(haveGuideId = "g1", haveReferenceId = "g1")
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        assertEquals(listOf("state.final"), sentTypes())
+        assertTrue(referenceCodec.encoded.isEmpty())
+    }
+
+    @Test
+    fun `a subject that has the guide but not its reference gets the reference`() = runTest {
+        guides.setGuide(withReference("g1"))
+        connected(haveGuideId = "g1", haveReferenceId = "old")
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        assertEquals(listOf("state.final") + reference, sentTypes())
+    }
+
+    @Test
+    fun `a new guide sends its reference after its state, and a removed one sends it again when it comes back`() =
+        runTest {
+            connected()
+            syncer().startAsSender(backgroundScope)
+            runCurrent()
+            session.sent.clear()
+
+            guides.setGuide(withReference("g2"))
+            runCurrent()
+            assertEquals(image + "state.final" + reference, sentTypes())
+
+            session.sent.clear()
+            guides.setGuide(null)
+            runCurrent()
+            guides.setGuide(withReference("g2"))
+            runCurrent()
+            assertEquals(listOf("clear") + image + "state.final" + reference, sentTypes())
+            // Encoded once: the second time comes from the cache.
+            assertEquals(listOf("g2"), referenceCodec.encoded)
+        }
+
+    private fun deliver(reference: EncodedGuideReference, skip: Int? = null) {
+        session.deliver(reference.begin())
+        for (i in reference.chunks.indices) if (i != skip) session.deliver(reference.chunk(i))
+        session.deliver(reference.end())
+    }
+
+    private fun deliver(image: EncodedGuideImage) {
+        session.deliver(image.begin())
+        for (i in image.chunks.indices) session.deliver(image.chunk(i))
+        session.deliver(image.end())
+    }
+
+    @Test
+    fun `the subject keeps the reference for its guide, and drops it with the guide`() = runTest {
+        syncer().startAsReceiver(backgroundScope)
+        runCurrent()
+
+        deliver(codec.encode(fakeGuide("g1")))
+        deliver(referenceCodec.encode(withReference("g1"))!!)
+        runCurrent()
+        assertEquals("g1", mirrorReference.reference.value?.guideId)
+        assertEquals(listOf("reference:g1"), referenceCodec.decoded)
+
+        // Another guide's image: the old reference is not its own.
+        deliver(codec.encode(fakeGuide("g2")))
+        runCurrent()
+        assertNull(mirrorReference.reference.value)
+
+        deliver(referenceCodec.encode(withReference("g2"))!!)
+        runCurrent()
+        assertEquals("g2", mirrorReference.reference.value?.guideId)
+        session.deliver(SessionMessage.GuideClear)
+        runCurrent()
+        assertNull(mirrorReference.reference.value)
+    }
+
+    @Test
+    fun `a reference that comes before its guide's image stays, and a broken one is dropped`() = runTest {
+        syncer().startAsReceiver(backgroundScope)
+        runCurrent()
+
+        deliver(referenceCodec.encode(withReference("g1"))!!)
+        runCurrent()
+        deliver(codec.encode(fakeGuide("g1")))
+        runCurrent()
+        assertEquals("g1", mirrorReference.reference.value?.guideId)
+
+        deliver(referenceCodec.encode(withReference("g2"))!!, skip = 1)
+        runCurrent()
+        assertEquals("g1", mirrorReference.reference.value?.guideId)
+        assertEquals("g1", mirror.guide.value?.id)
     }
 
     // ---- receiver ------------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -38,6 +38,8 @@ sealed interface SessionMessage {
         val role: Role,
         val name: String,
         val haveGuideId: String? = null,
+        /** Subject only: the guide whose reference photo it already has; the photographer skips sending that one. */
+        val haveReferenceId: String? = null,
     ) : SessionMessage
 
     @Serializable
@@ -63,6 +65,30 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("guide.image.end")
     data class GuideImageEnd(val guideId: String, val crc32: Long) : SessionMessage
+
+    /**
+     * The guide's reference photo, for the subject's thumbnail only (FR-3.9): a JPEG at most 512 px on its long side,
+     * sent once per guide after its image and state, in chunks like the image. Never drawn as the guide or saved.
+     */
+    @Serializable
+    @SerialName("guide.reference.begin")
+    data class GuideReferenceBegin(
+        val guideId: String,
+        val format: String,
+        val width: Int,
+        val height: Int,
+        val bytes: Int,
+        val chunks: Int,
+    ) : SessionMessage
+
+    /** [data] is Base64 of at most 12 KiB, as for the guide image. */
+    @Serializable
+    @SerialName("guide.reference.chunk")
+    data class GuideReferenceChunk(val guideId: String, val index: Int, val data: String) : SessionMessage
+
+    @Serializable
+    @SerialName("guide.reference.end")
+    data class GuideReferenceEnd(val guideId: String, val crc32: Long) : SessionMessage
 
     /**
      * Realtime while a gesture runs; reliable when [final] (gesture ended). [by] is the subject when the state is

@@ -422,30 +422,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             corner?.let(viewModel::setReferenceCorner)
             renderReference(controls, viewModel.uiState.value)
         }
-        ViewCompat.setAccessibilityDelegate(
-            thumbnail,
-            object : AccessibilityDelegateCompat() {
-                override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
-                    super.onInitializeAccessibilityNodeInfo(host, info)
-                    val state = viewModel.uiState.value
-                    val label = if (state.referenceExpanded) R.string.shrink_reference else R.string.enlarge_reference
-                    info.addAction(
-                        AccessibilityActionCompat(AccessibilityNodeInfoCompat.ACTION_CLICK, getString(label)),
-                    )
-                    for ((corner, move) in REFERENCE_MOVES) {
-                        if (corner != state.referenceCorner) {
-                            info.addAction(AccessibilityActionCompat(move.first, getString(move.second)))
-                        }
-                    }
-                }
-
-                override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean {
-                    val corner = REFERENCE_MOVES.entries.firstOrNull { it.value.first == action }?.key
-                        ?: return super.performAccessibilityAction(host, action, args)
-                    viewModel.setReferenceCorner(corner)
-                    return true
-                }
-            },
+        thumbnail.setReferenceActions(
+            expanded = { viewModel.uiState.value.referenceExpanded },
+            corner = { viewModel.uiState.value.referenceCorner },
+            moveTo = viewModel::setReferenceCorner,
         )
         // The corners follow the preview's size and the panels at its bottom, which grow when brightness or a notice
         // opens; both are known only after layout.
@@ -726,42 +706,23 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
      * shows its own hint. Layout changes call this alone, so it applies every rule of its own, the scene photo's too.
      */
     private fun renderReference(controls: FragmentCameraBinding, state: CameraUiState) {
-        val thumbnail = controls.referenceThumbnail
         // The scene photo frames a new scene, which an earlier guide's reference is not part of.
         val reference = state.guide?.reference?.takeUnless { isScenePhotoActive() }
-        val shown = thumbnail.isVisible
-        thumbnail.isVisible = reference != null
         // The enlarged photo reaches under the chips: the hint steps aside, and a capture status stays on top.
         controls.hintText.isInvisible = reference != null && state.referenceExpanded
-        if (reference == null) {
-            thumbnail.setImageDrawable(null)
-            return
-        }
-        // Set only when it changes: a new drawable would lay the screen out again on every render.
-        if ((thumbnail.drawable as? BitmapDrawable)?.bitmap !== reference) thumbnail.setImageBitmap(reference)
-        if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) return
-        val placement = placeReference(
-            aspect = reference.width.toFloat() / reference.height,
-            expanded = state.referenceExpanded,
-            corner = state.referenceCorner,
-            smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
-            previewWidth = controls.previewContainer.width,
-            area = referenceArea(controls),
-        )
-        val params = thumbnail.layoutParams
-        if (params.width != placement.width || params.height != placement.height) {
-            params.width = placement.width
-            params.height = placement.height
-            thumbnail.layoutParams = params
-        }
-        val x = placement.x.toFloat()
-        val y = placement.y.toFloat()
-        if (!shown) {
-            thumbnail.animate().cancel()
-            thumbnail.translationX = x
-            thumbnail.translationY = y
-        } else if (thumbnail.translationX != x || thumbnail.translationY != y) {
-            thumbnail.animate().translationX(x).translationY(y).setDuration(REFERENCE_MOVE_MS).start()
+        controls.referenceThumbnail.showReference(reference) { photo ->
+            if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) {
+                null
+            } else {
+                placeReference(
+                    aspect = photo.width.toFloat() / photo.height,
+                    expanded = state.referenceExpanded,
+                    corner = state.referenceCorner,
+                    smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
+                    previewWidth = controls.previewContainer.width,
+                    area = referenceArea(controls),
+                )
+            }
         }
     }
 
@@ -1049,18 +1010,5 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_HOLD_MS = 700L
         private const val FOCUS_RING_FADE_MS = 200L
         private const val CHIP_ICON_DP = 14f
-
-        /** The reference thumbnail's long side while small, and its margin in the preview's corners (FR-3.9). */
-        private const val REFERENCE_SMALL_DP = 72f
-        private const val REFERENCE_MARGIN_DP = 12f
-        private const val REFERENCE_MOVE_MS = 150L
-
-        /** TalkBack's way to move the reference thumbnail: an action id and its label for each corner. */
-        private val REFERENCE_MOVES = mapOf(
-            ReferenceCorner.TOP_LEFT to (R.id.move_reference_top_left to R.string.move_reference_top_left),
-            ReferenceCorner.TOP_RIGHT to (R.id.move_reference_top_right to R.string.move_reference_top_right),
-            ReferenceCorner.BOTTOM_LEFT to (R.id.move_reference_bottom_left to R.string.move_reference_bottom_left),
-            ReferenceCorner.BOTTOM_RIGHT to (R.id.move_reference_bottom_right to R.string.move_reference_bottom_right),
-        )
     }
 }

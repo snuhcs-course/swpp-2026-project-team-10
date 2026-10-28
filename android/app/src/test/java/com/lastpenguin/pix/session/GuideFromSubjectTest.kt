@@ -31,7 +31,11 @@ import org.junit.Test
  * Subject, the offered guide (state-based): drawn at once at its anchor and sent with anchor and source; kept when a
  * state names it, while the photographer's own messages wait; dropped after the deadline, which draws the
  * photographer's guide and state again and reports it; still adopted after a clear that came first; an answer after
- * the deadline still finds its image; an offer while not connected sends nothing and is reported.
+ * the deadline still finds its image; an offer while not connected sends nothing and is reported; a reference of the
+ * photographer's earlier guide that arrives after the answer leaves the offered guide's own thumbnail.
+ * Photographer, while its first guide is still being sent: a guide adopted from the subject gets no image back and
+ * nothing of the first guide after its state; a guide replaced on this phone gets its image before its state, and the
+ * first guide's state and reference are not sent.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GuideFromSubjectTest {
@@ -182,7 +186,70 @@ class GuideFromSubjectTest {
         assertFalse(GuideSyncer.usable(NormalizedRect(0f, 0.6f, 1f, 0.4f)))
     }
 
+    @Test
+    fun `a guide adopted while the first guide goes out is not sent back`() = runTest {
+        guides.setGuide(fakeGuide("p1").copy(reference = fakeBitmap()))
+        connectedAs(Role.PHOTOGRAPHER)
+        var arrived = false
+        codec.onEncode = { guide ->
+            if (guide.id == "p1" && !arrived) {
+                arrived = true
+                deliverFromSubject("s1")
+            }
+        }
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        assertEquals("s1", guides.guide.value?.id)
+        assertEquals(listOf("p1"), sentImages())
+        assertEquals("s1" to Role.SUBJECT, states().last().let { it.state.guideId to it.by })
+        // Nothing of the first guide follows the adopted guide's state.
+        val adopted = session.sent.indexOfFirst { it is SessionMessage.GuideStateUpdate && it.state.guideId == "s1" }
+        assertTrue(session.sent.drop(adopted).none { it is SessionMessage.GuideReferenceBegin && it.guideId == "p1" })
+    }
+
+    @Test
+    fun `a guide replaced while the first one goes out sends no state or reference of the wrong guide`() = runTest {
+        guides.setGuide(fakeGuide("p1").copy(reference = fakeBitmap()))
+        connectedAs(Role.PHOTOGRAPHER)
+        codec.onEncode =
+            { guide -> if (guide.id == "p1") guides.setGuide(fakeGuide("p2").copy(reference = fakeBitmap())) }
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        val order = session.sent.mapNotNull { message ->
+            when (message) {
+                is SessionMessage.GuideImageBegin -> "image ${message.guideId}"
+                is SessionMessage.GuideStateUpdate -> "state ${message.state.guideId}"
+                is SessionMessage.GuideReferenceBegin -> "reference ${message.guideId}"
+                else -> null
+            }
+        }
+        assertEquals(listOf("image p1", "image p2", "state p2", "reference p2"), order)
+    }
+
     // ---- subject --------------------------------------------------------------------------------------------------
+
+    @Test
+    fun `a late reference of the photographer's earlier guide leaves the offered guide's thumbnail`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        syncer.offer(mine("s1").copy(reference = fakeBitmap()))
+        runCurrent()
+        deliverFromPhotographer("p1")
+        session.deliver(SessionMessage.GuideStateUpdate(GuideState("s1"), final = true, by = Role.SUBJECT))
+        val reference = FakeGuideReferenceCodec().encode(fakeGuide("p1").copy(reference = fakeBitmap()))!!
+        session.deliver(reference.begin())
+        for (i in reference.chunks.indices) session.deliver(reference.chunk(i))
+        session.deliver(reference.end())
+        runCurrent()
+
+        assertEquals("s1", mirror.guide.value?.id)
+        assertEquals("s1", mirrorReference.reference.value?.guideId)
+    }
 
     @Test
     fun `an offered guide is drawn at once and sent with its anchor and source`() = runTest {

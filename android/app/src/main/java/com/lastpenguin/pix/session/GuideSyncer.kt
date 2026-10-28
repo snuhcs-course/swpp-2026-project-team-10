@@ -128,9 +128,14 @@ class GuideSyncer(
                 if (guide == null) {
                     sendClear()
                 } else {
-                    if (guide.id != peerHas) peerHas = sendImage(guide)
-                    sendState(guides.state.value, final = true)
-                    if (guide.id != referenceSent) referenceSent = sendReference(guide)
+                    if (guide.id != peerHas) sendImage(guide)
+                    // A guide adopted from the subject while this one went out is sent by the collector: this one's
+                    // state and reference would follow the adopted guide's otherwise, and show its thumbnail.
+                    val state = guides.state.value
+                    if (state.guideId == guide.id) sendState(state, final = true)
+                    if (guide.id != referenceSent && guides.guide.value?.id == guide.id) {
+                        referenceSent = sendReference(guide)
+                    }
                 }
             }.collect { change ->
                 val state = change.state
@@ -145,7 +150,7 @@ class GuideSyncer(
                 }
                 if (id != peerHas) {
                     val current = guides.guide.value
-                    if (current != null && current.id == id) peerHas = sendImage(current)
+                    if (current != null && current.id == id) sendImage(current)
                 }
                 if (change.final) {
                     throttle?.cancel()
@@ -332,7 +337,8 @@ class GuideSyncer(
                         return
                     }
                     theirReference = GuideReference(begin.guideId, photo)
-                    if (offered == null) mirrorReference.set(theirReference)
+                    // Only the shown guide's: a late reference of a guide since replaced must not take its corner.
+                    if (offered == null && mirror.guide.value?.id == begin.guideId) mirrorReference.set(theirReference)
                     Timings.mark("guide.applied", "reference ${begin.guideId} ${bytes.size} B")
                 }
 
@@ -405,13 +411,17 @@ class GuideSyncer(
         }
     }
 
-    private suspend fun sendImage(guide: ReferenceGuide): String {
+    /**
+     * The subject counts as having [guide] from the start: a guide adopted from the subject while this one is encoded
+     * sets [peerHas] to its own id, which this send must not overwrite, or the adopted guide's image would go back.
+     */
+    private suspend fun sendImage(guide: ReferenceGuide) {
+        peerHas = guide.id
         val image = encoded[guide.id] ?: withContext(dispatcher) { codec.encode(guide) }.also { cache(it) }
         session.send(image.begin())
         for (index in image.chunks.indices) session.send(image.chunk(index))
         session.send(image.end())
         Timings.mark("guide.sent", "image ${guide.id} ${image.bytes.size} B in ${image.chunks.size} chunks")
-        return guide.id
     }
 
     private fun cache(image: EncodedGuideImage) {

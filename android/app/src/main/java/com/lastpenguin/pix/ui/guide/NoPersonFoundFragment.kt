@@ -33,5 +33,6 @@ class NoPersonFoundFragment : Fragment(R.layout.fragment_failure) {
         binding.primaryButton.setOnClickListener { pickPhoto() }
         binding.secondaryButton.setText(R.string.back_to_camera)
         binding.secondaryButton.setOnClickListener { backToShooting(viewModel) }
+        leaveWhenTheSessionEnds(viewModel)
     }
 }

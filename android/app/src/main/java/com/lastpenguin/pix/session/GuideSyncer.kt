@@ -268,10 +268,16 @@ class GuideSyncer(
         private val images = GuideImageReceiver()
         private var referenceAssembler: GuideReferenceAssembler? = null
 
-        /** The photographer's guide as last received, and its newest state; null before any or after a clear. */
-        private var theirs: ReferenceGuide? = null
+        /**
+         * The photographer's guide as last received, and its newest state; null before any or after a clear. A
+         * reconnecting subject starts from the guide its mirror still holds, whose image `hello` said it has, so the
+         * photographer sends only its state.
+         */
+        private var theirs: ReferenceGuide? = mirror.guide.value
         private var theirState: SessionMessage.GuideStateUpdate? = null
-        private var theirReference: GuideReference? = null
+        private var theirReference: GuideReference? = mirrorReference.reference.value?.takeIf {
+            it.guideId == theirs?.id
+        }
 
         /** The guide offered from this phone that no `guide.state` has named yet, and its deadline. */
         private var offered: ReferenceGuide? = null

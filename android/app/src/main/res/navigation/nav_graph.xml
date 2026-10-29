@@ -259,11 +259,20 @@
                 app:argType="boolean" />
         </action>
         <action
+            android:id="@+id/action_subject_to_pickPose"
+            app:destination="@id/subjectPickPoseFragment" />
+        <action
             android:id="@+id/action_subject_to_connectionLost"
             app:destination="@id/connectionLostFragment"
             app:popUpTo="@id/subjectFragment"
             app:popUpToInclusive="true" />
     </fragment>
+
+    <!-- The photographer's candidates on the subject's phone (FR-6.15); back is Subject view. -->
+    <fragment
+        android:id="@+id/subjectPickPoseFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectPickPoseFragment"
+        android:label="Pick a pose" />
 
     <fragment
         android:id="@+id/connectionLostFragment"

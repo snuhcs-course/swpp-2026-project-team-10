@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -24,6 +24,7 @@ import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
@@ -32,6 +33,10 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import java.time.Duration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -50,15 +55,17 @@ import org.robolectric.shadows.ShadowToast
 /*
  * Subject view's render paths (R&S 6.6, Testing Documentation 2.1.6), on the real Fragment under FragmentScenario
  * with a container of fakes. Partitions: not connected / connected before the first frame / streaming / frames
- * stopped for 2 s ("camera paused") / streaming again; the photographer's capabilities with and
+ * stopped for 2 s ("camera paused") / streaming again / reconnecting; the photographer's capabilities with and
  * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
  * gone with a replaced or removed guide, and moved to another corner on this phone only; the brightness panel and a
  * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
- * the photographer, named or before the
- * name arrived.
+ * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
+ * and filled; the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", Pick a
+ * pose opened once per set and then by its button, a set the photographer closes after Back, which says so, and a
+ * set kept through a reconnect, with "Reconnecting…" in place of what the photographer is doing.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -66,9 +73,13 @@ import org.robolectric.shadows.ShadowToast
 class SubjectFragmentRenderTest {
     private var scenario: FragmentScenario<SubjectFragment>? = null
 
+    /** Where the subject's pose syncer runs in the tests of the photographer's set, as the session would run it. */
+    private val receiving = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     @After
     fun tearDown() {
         scenario?.close()
+        receiving.cancel()
     }
 
     private fun launch(): TestAppContainer {
@@ -390,6 +401,117 @@ class SubjectFragmentRenderTest {
 
         assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
         assertEquals(true, nav.backStack.last().arguments?.getBoolean("fromSubject"))
+    }
+
+    @Test
+    fun saveGuide_showsWithAGuide_savesItOnThisPhone_andIsFilledOnceSaved() {
+        val modules = launch()
+        connect(modules)
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.saveGuideButton.visibility) }
+
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.saveGuideButton.visibility)
+            assertTrue(binding.saveGuideButton.isEnabled)
+            assertEquals(string(R.string.save_guide), binding.saveGuideButton.contentDescription)
+            binding.saveGuideButton.performClick()
+        }
+        idle()
+
+        assertEquals(listOf("guide-1"), modules.saved.saved.value.map { it.id })
+        assertEquals(string(R.string.guide_saved_notice), ShadowToast.getTextOfLatestToast())
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.guide_saved), binding.saveGuideButton.contentDescription)
+        }
+    }
+
+    private fun poseStep(modules: TestAppContainer, step: PoseSetStep) {
+        modules.session.deliver(SessionMessage.PoseStep("set1", step))
+        // The status check runs every 500 ms on the main looper.
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+    }
+
+    @Test
+    fun thePhotographersSet_saysWhatTheyAreDoing_andOpensPickAPoseOncePerSet() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        idle()
+
+        poseStep(modules, PoseSetStep.GENERATING)
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.connectingText.visibility)
+            assertEquals(string(R.string.peer_creating_poses, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(View.GONE, binding.pickPoseButton.visibility)
+        }
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+
+        poseStep(modules, PoseSetStep.PICKING)
+        assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
+        }
+
+        // Back keeps it closed, though Subject view renders again; its button opens it again.
+        nav.popBackStack()
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        onScreen { binding, _ -> binding.pickPoseButton.performClick() }
+        idle()
+        assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun aSetThePhotographerClosesAfterBack_saysSo_andTheStatusGoes() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        poseStep(modules, PoseSetStep.GENERATING)
+        poseStep(modules, PoseSetStep.PICKING)
+        nav.popBackStack()
+        idle()
+
+        poseStep(modules, PoseSetStep.CLOSED)
+
+        assertEquals(string(R.string.peer_closed_poses, "Dongje"), ShadowToast.getTextOfLatestToast())
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.pickPoseButton.visibility)
+            assertEquals(View.GONE, binding.connectingText.visibility)
+        }
+    }
+
+    @Test
+    fun aSetKeptThroughAReconnect_saysReconnectingMeanwhile_andIsNotOpenedAgain() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        poseStep(modules, PoseSetStep.GENERATING)
+        poseStep(modules, PoseSetStep.PICKING)
+        nav.popBackStack()
+        idle()
+
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.reconnecting), binding.connectingText.text.toString())
+            assertEquals(View.GONE, binding.pickPoseButton.visibility)
+        }
+
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
+        }
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
     }
 
     @Test

@@ -21,13 +21,30 @@
             style="@style/Widget.Pix.Header.Back"
             android:contentDescription="@string/back" />
 
-        <TextView
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:accessibilityHeading="true"
-            android:text="@string/reference_title"
-            android:textAppearance="@style/TextAppearance.Pix.Header" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/reference_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+            <!-- "Junhyeong chose this pose" when the subject's pick brought the candidate here (FR-6.15). -->
+            <TextView
+                android:id="@+id/chosenByText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                android:visibility="gone"
+                tools:text="Junhyeong chose this pose"
+                tools:visibility="visible" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- The outline over a neutral background (FR-2.3). Dark, so the light stroke stands out as it does on the camera. -->

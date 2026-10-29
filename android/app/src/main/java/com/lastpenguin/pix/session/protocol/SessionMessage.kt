@@ -50,8 +50,9 @@ sealed interface SessionMessage {
     data class Capabilities(val capabilities: CameraCapabilities) : SessionMessage
 
     /**
-     * [format] is `mask-png` (Design 2.5.1); [aspect] is the mask's width / height. [anchor] and [source] come only
-     * from the subject, for a guide made on its phone, which the photographer starts at [anchor] (Iter3-P9).
+     * [format] is `mask-png` (Design 2.5.1); [aspect] is the mask's width / height. [anchor] and [source] come from the
+     * subject for a guide made on its phone, which the photographer starts at [anchor] (Iter3-P9), and from the
+     * photographer for the subject's *Save guide*, whose guide its `guide.state` still places (Iter3-P16).
      */
     @Serializable
     @SerialName("guide.image.begin")
@@ -132,6 +133,55 @@ sealed interface SessionMessage {
     @SerialName("guide.clear")
     data object GuideClear : SessionMessage
 
+    /**
+     * Where the photographer's set of candidates [setId] is (Design 2.5.1, 2.6.5, Iter3-P16): the subject's *Pick a
+     * pose* follows it. [poseIds] are the created candidates in the photographer's order, with PICKING; [poseId] and
+     * [by] say whose *Use this pose* decided, with CHOSEN. A set ends once, with CHOSEN or CLOSED.
+     */
+    @Serializable
+    @SerialName("pose.step")
+    data class PoseStep(
+        val setId: String,
+        val step: PoseSetStep,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val poseIds: List<String> = emptyList(),
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val poseId: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val by: Role? = null,
+    ) : SessionMessage
+
+    /**
+     * A copy of the candidate [poseId] of the set [setId], for the subject's *Pick a pose* only: a JPEG at most 1024 px
+     * on its long side, in chunks like the guide image. Never drawn as the guide or saved.
+     */
+    @Serializable
+    @SerialName("pose.candidate.begin")
+    data class PoseCandidateBegin(
+        val setId: String,
+        val poseId: String,
+        val format: String,
+        val width: Int,
+        val height: Int,
+        val bytes: Int,
+        val chunks: Int,
+    ) : SessionMessage
+
+    /** [data] is Base64 of at most 12 KiB, as for the guide image. */
+    @Serializable
+    @SerialName("pose.candidate.chunk")
+    data class PoseCandidateChunk(val setId: String, val poseId: String, val index: Int, val data: String) :
+        SessionMessage
+
+    @Serializable
+    @SerialName("pose.candidate.end")
+    data class PoseCandidateEnd(val setId: String, val poseId: String, val crc32: Long) : SessionMessage
+
+    /**
+     * The subject's *Use this pose* on the candidate [poseId] (FR-6.15), a request like its others (AD-7): the
+     * photographer takes it only while the set [setId] is PICKING and nobody has chosen, and answers with `pose.step`.
+     */
+    @Serializable
+    @SerialName("pose.pick")
+    data class PosePick(val setId: String, val poseId: String) : SessionMessage
+
     @Serializable
     @SerialName("camera.zoom.set")
     data class ZoomSet(
@@ -187,3 +237,10 @@ sealed interface SessionMessage {
     @SerialName("pong")
     data class Pong(val ts: Long) : SessionMessage
 }
+
+/**
+ * The steps of the photographer's set of candidates (Design 2.6.5): GENERATING from *Generate 4 poses* or *Skip*,
+ * PICKING once its *Pick a pose* opens, then CHOSEN by the first *Use this pose*, or CLOSED without a choice.
+ */
+@Serializable
+enum class PoseSetStep { GENERATING, PICKING, CHOSEN, CLOSED }

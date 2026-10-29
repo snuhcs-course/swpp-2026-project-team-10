@@ -49,7 +49,7 @@ enum class SavedGuideResult { USED, FAILED }
  * ReferenceConfirmFragment, NoPersonFoundFragment, and PickPoseFragment (activity scope). The guide of a generated
  * pose also gets its tip asked for here, once its person is found (FR-4.10). Opened from Subject view
  * ([openFor]), the guide goes to the photographer through [subject] instead of this phone's camera (Design 2.6.5).
- * Owner: PM (#5); saved guides #58; pose tips; the guide from the subject Iter3-P9.
+ * Owner: PM (#5); saved guides #58; pose tips; the guide from the subject Iter3-P9; the subject's pick Iter3-P16.
  */
 class ReferenceViewModel(
     private val maker: ReferenceGuideMaker,
@@ -66,6 +66,14 @@ class ReferenceViewModel(
 
     /** The guide whose tip was asked for and that has not gone on the camera yet. */
     private var tipFor: String? = null
+
+    private val _chosenBy = MutableStateFlow<String?>(null)
+
+    /**
+     * The subject whose pick on their *Pick a pose* this candidate is, for Reference confirm's "… chose this pose"
+     * (Design 2.6.5); null for this phone's own choice and for an uploaded photo.
+     */
+    val chosenBy: StateFlow<String?> = _chosenBy.asStateFlow()
 
     /** Newest first, for Add a pose guide. */
     val savedGuides: StateFlow<List<SavedGuide>> = savedGuideStore.saved
@@ -100,14 +108,17 @@ class ReferenceViewModel(
 
     /** A photo from the system photo picker. */
     fun onPhotoPicked(uri: Uri) {
+        _chosenBy.value = null
         make { maker.make(uri) }
     }
 
     /**
      * The pose chosen on Pick a pose. With [tipFrom], the scene and the pose it was made from, its tip is asked for
-     * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10).
+     * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10). [chosenBy] names the subject
+     * when it was their pick in a session (FR-6.15).
      */
-    fun onCandidatePicked(image: Bitmap, tipFrom: TipSource? = null) {
+    fun onCandidatePicked(image: Bitmap, tipFrom: TipSource? = null, chosenBy: String? = null) {
+        _chosenBy.value = chosenBy
         make(
             onReady = { guide ->
                 if (tipFrom != null && tips != null) {

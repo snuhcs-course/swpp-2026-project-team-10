@@ -30,7 +30,7 @@ class EncodedGuideImage(
     val crc32: Long = GuideImageChunks.crc32(bytes)
     val chunks: List<String> = GuideImageChunks.split(bytes)
 
-    /** [anchor] and [source] only when the subject sends its own guide (Design 2.5.1). */
+    /** [anchor] and [source] as the guide has them; neither is sent when null (Design 2.5.1). */
     fun begin(anchor: NormalizedRect? = null, source: GuideSource? = null) =
         SessionMessage.GuideImageBegin(
             guideId,

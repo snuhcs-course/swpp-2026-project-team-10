@@ -28,11 +28,13 @@ import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeGuideReferenceCodec
+import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
+import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -75,6 +77,9 @@ class TestAppContainer(
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
 
+    /** The photographer's candidates on the subject's phone; on the main thread, as the screens collect it. */
+    val poses = PoseSyncer(session, FakePoseCandidateCodec(), Dispatchers.Unconfined)
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
@@ -93,6 +98,7 @@ class TestAppContainer(
         sessionManager = session,
         remoteVideo = video,
         guideSyncer = syncer,
+        poseSyncer = poses,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
     )

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -46,10 +46,12 @@ import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.JpegGuideReferenceCodec
+import com.lastpenguin.pix.session.JpegPoseCandidateCodec
 import com.lastpenguin.pix.session.MaskGuideImageCodec
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.OkHttpSignalingClient
+import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.RtcSessionManager
@@ -112,6 +114,8 @@ class AppContainer(
     /** The photographer's live video for the Subject view. */
     val remoteVideo: RemoteVideo,
     val guideSyncer: GuideSyncer,
+    /** The photographer's candidates on the subject's *Pick a pose* (FR-6.15, Design 2.6.5). */
+    val poseSyncer: PoseSyncer,
     val remoteControlHandler: RemoteControlHandler,
     /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
     val mobileDataNotice: MobileDataNotice,
@@ -216,6 +220,7 @@ class AppContainer(
                 sessionManager = rtcSessionManager,
                 remoteVideo = rtcSessionManager,
                 guideSyncer = guideSyncer,
+                poseSyncer = PoseSyncer(rtcSessionManager, JpegPoseCandidateCodec()),
                 remoteControlHandler = RemoteControlHandler(
                     rtcSessionManager,
                     cameraController,

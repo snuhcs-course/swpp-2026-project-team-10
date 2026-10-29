@@ -40,7 +40,8 @@ import org.robolectric.shadows.ShadowToast
  * and Use this guide enabled, which puts the guide on the camera), no person found (to that screen), and a photo
  * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
  * gallery in its place, stops the ask for its tip. Opened from Subject view: the session ending goes back to Subject
- * view, which shows what ended it, and stops finding the person; opened from the camera, it stays.
+ * view, which shows what ended it, and stops finding the person; opened from the camera, it stays. A candidate the
+ * subject picked says whose pick it is under the title; this phone's own pick and an uploaded photo say nothing.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -87,6 +88,30 @@ class ReferenceConfirmFragmentTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         idle()
         return modules to controller
+    }
+
+    @Test
+    fun theSubjectsPick_saysWhoseItIs_andAPhotoAfterItDoesNot() {
+        launch()
+        scenario!!.onFragment {
+            it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap(), chosenBy = "Junhyeong")
+        }
+        idle()
+        assertTrue(onScreen { it.chosenByText.isShown })
+        assertEquals(string(R.string.peer_chose_this_pose, "Junhyeong"), onScreen { it.chosenByText.text.toString() })
+
+        pickPhoto()
+
+        assertFalse(onScreen { it.chosenByText.isShown })
+    }
+
+    @Test
+    fun thisPhonesOwnPick_saysNothingUnderTheTitle() {
+        launch()
+        scenario!!.onFragment { it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap()) }
+        idle()
+
+        assertFalse(onScreen { it.chosenByText.isShown })
     }
 
     @Test

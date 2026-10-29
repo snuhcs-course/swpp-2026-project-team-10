@@ -165,6 +165,12 @@
     <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
+    <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
+    <string name="pose_shared_hint">%1$s sees these poses too. The first to choose decides.</string>
+    <string name="peer_chose_this_pose">%1$s chose this pose</string>
+    <string name="peer_chose_pose">%1$s chose a pose</string>
+    <string name="peer_closed_poses">%1$s closed the poses</string>
+    <string name="pose_pick_failed">Couldn\'t send your pick</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>
     <string name="generation_failed_message">The request failed or took longer than 60 seconds. Your photo is kept, so you can try again.</string>
 
@@ -306,6 +312,8 @@
     <!-- The same, when the session ended before the photographer's name arrived. -->
     <string name="peer_ended_session_unnamed">The photographer ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
+    <string name="peer_creating_poses">%1$s is creating poses…</string>
+    <string name="peer_picking_pose">%1$s is picking a pose…</string>
     <string name="session_ended">The session has ended.</string>
     <string name="connection_lost_title">Connection lost</string>
     <string name="connection_lost_message">Video stopped. Check both phones\' internet connection, then reconnect.</string>

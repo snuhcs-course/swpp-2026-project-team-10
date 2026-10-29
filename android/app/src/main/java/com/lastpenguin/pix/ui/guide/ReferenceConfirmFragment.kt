@@ -20,7 +20,10 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.launch
 
-/** Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*. Owner: PM (#5). */
+/**
+ * Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*; under the title, whose
+ * pick it is when the subject chose the candidate (FR-6.15). Owner: PM (#5).
+ */
 class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
     private val viewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
@@ -47,7 +50,13 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state -> render(binding, state) }
+                launch { viewModel.uiState.collect { state -> render(binding, state) } }
+                launch {
+                    viewModel.chosenBy.collect { name ->
+                        binding.chosenByText.isVisible = name != null
+                        if (name != null) binding.chosenByText.text = getString(R.string.peer_chose_this_pose, name)
+                    }
+                }
             }
         }
     }

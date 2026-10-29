@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-24, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.View
@@ -15,12 +15,18 @@ import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.session.PeerInfo
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.PoseSetStep
+import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,8 +43,10 @@ import org.robolectric.annotation.GraphicsMode
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
  * Cancel. Pick a pose: only the ready candidates, one per page with a counter; the page on screen is the selected
  * pose, so Use this pose works at once and takes the pose swiped to (to Reference confirm); a pose selected before
- * the screen opens is the one shown; Try other poses (back to Generate poses), system back. Couldn't create poses: Try again, a rejected description with Edit
- * description, Back to camera.
+ * the screen opens is the one shown; Try other poses (back to Generate poses), system back; in a session, the hint
+ * that the subject sees the poses too, and the subject's pick that comes first, which opens Reference confirm with its
+ * candidate (Design 2.6.5). Couldn't create poses: Try again, a rejected description with Edit description, Back to
+ * camera.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -255,6 +263,44 @@ class GenerationScreensTest {
                 GenerationUiState.Phase.IDLE,
                 it.requireActivity().viewModel<GenerationViewModel>().uiState.value.phase,
             )
+        }
+    }
+
+    @Test
+    fun pick_saysTheSubjectSeesThePosesToo_onlyInASession() {
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        s.onFragment { assertFalse(FragmentPickPoseBinding.bind(it.requireView()).sharedHint.isShown) }
+
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        idle()
+
+        s.onFragment {
+            val hint = FragmentPickPoseBinding.bind(it.requireView()).sharedHint
+            assertTrue(hint.isShown)
+            assertEquals(string(R.string.pose_shared_hint, "Junhyeong"), hint.text.toString())
+        }
+    }
+
+    @Test
+    fun pick_theSubjectsPickThatComesFirst_opensReferenceConfirmWithItsCandidate() {
+        val modules = modules()
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        val set = modules.session.sent.filterIsInstance<SessionMessage.PoseStep>().first().setId
+
+        modules.session.deliver(SessionMessage.PosePick(set, "pose-4"))
+        idle()
+
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
+        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        val end = modules.session.sent.filterIsInstance<SessionMessage.PoseStep>().last()
+        assertEquals(PoseSetStep.CHOSEN, end.step)
+        assertEquals("pose-4" to Role.SUBJECT, end.poseId to end.by)
+        s.onFragment {
+            assertEquals("Junhyeong", it.requireActivity().viewModel<ReferenceViewModel>().chosenBy.value)
         }
     }
 

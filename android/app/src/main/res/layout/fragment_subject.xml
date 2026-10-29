@@ -183,8 +183,8 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- The Camera screen's row: brightness button, zoom readout (FR-7.1), and the guide-edit mode toggle, over the
-         bottom of the video (placed in code). -->
+    <!-- The Camera screen's row: brightness button, zoom readout (FR-7.1), Save guide (FR-6.16), and the guide-edit
+         mode toggle, over the bottom of the video (placed in code). -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
@@ -228,6 +228,19 @@
             android:textSize="11sp"
             tools:text="1.0×" />
 
+        <!-- Save guide (FR-6.16), beside the toggle while a guide is on the video: filled once saved on this phone. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/saveGuideButton"
+            style="@style/Widget.Pix.Button.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="48dp"
+            android:contentDescription="@string/save_guide"
+            android:visibility="gone"
+            app:icon="@drawable/ic_bookmark"
+            tools:visibility="visible" />
+
         <!-- Shown while a guide is on the video (AD-17); checked while gestures edit the guide. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/editGuideButton"
@@ -258,44 +271,92 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- The Camera screen's Guide button: the guide chosen here goes to the photographer (FR-6.15). -->
+        <!-- Guide and, while the photographer's candidates are ready, Pick a pose beside it (FR-6.15). -->
         <LinearLayout
-            android:id="@+id/guideButton"
+            android:id="@+id/guideRow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="8dp"
-            android:clickable="true"
-            android:contentDescription="@string/guide_add_description"
-            android:focusable="true"
-            android:gravity="center_horizontal"
-            android:minWidth="48dp"
-            android:minHeight="48dp"
-            android:orientation="vertical"
-            android:paddingHorizontal="8dp">
+            android:orientation="horizontal">
 
-            <ImageView
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_guide_button"
-                android:duplicateParentState="true"
-                android:importantForAccessibility="no"
-                android:padding="9dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_guide"
-                app:tint="@color/guide_button_icon" />
-
-            <TextView
+            <!-- The Camera screen's Guide button: the guide chosen here goes to the photographer (FR-6.15). -->
+            <LinearLayout
+                android:id="@+id/guideButton"
                 android:layout_width="wrap_content"
-                android:layout_height="16dp"
-                android:layout_marginTop="4dp"
-                android:duplicateParentState="true"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:importantForAccessibility="no"
-                android:text="@string/guide"
-                android:textAppearance="@style/TextAppearance.Pix.Caption"
-                android:textColor="@color/pix_text_soft" />
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:contentDescription="@string/guide_add_description"
+                android:focusable="true"
+                android:gravity="center_horizontal"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
+                android:orientation="vertical"
+                android:paddingHorizontal="8dp">
+
+                <ImageView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/bg_guide_button"
+                    android:duplicateParentState="true"
+                    android:importantForAccessibility="no"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_guide"
+                    app:tint="@color/guide_button_icon" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="16dp"
+                    android:layout_marginTop="4dp"
+                    android:duplicateParentState="true"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:importantForAccessibility="no"
+                    android:text="@string/guide"
+                    android:textAppearance="@style/TextAppearance.Pix.Caption"
+                    android:textColor="@color/pix_text_soft" />
+            </LinearLayout>
+
+            <!-- Opens the subject's Pick a pose again while the photographer's candidates are ready (FR-6.15). -->
+            <LinearLayout
+                android:id="@+id/pickPoseButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:contentDescription="@string/pick_pose_title"
+                android:focusable="true"
+                android:gravity="center_horizontal"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
+                android:orientation="vertical"
+                android:paddingHorizontal="8dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/bg_guide_button"
+                    android:duplicateParentState="true"
+                    android:importantForAccessibility="no"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_sparkle"
+                    app:tint="@color/guide_button_icon" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="16dp"
+                    android:layout_marginTop="4dp"
+                    android:duplicateParentState="true"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:importantForAccessibility="no"
+                    android:text="@string/pick_pose_title"
+                    android:textAppearance="@style/TextAppearance.Pix.Caption"
+                    android:textColor="@color/pix_text_soft" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

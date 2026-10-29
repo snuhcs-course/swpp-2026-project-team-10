@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -22,10 +22,13 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
+import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
 import com.lastpenguin.pix.ui.camera.REFERENCE_MARGIN_DP
@@ -57,8 +60,10 @@ import org.webrtc.VideoSink
  * readout (FR-7.1, AD-17); with the mode on, drags and pinches move the photographer's guide (FR-7.2). The
  * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3), and the guide's
  * reference photo sits in a corner as on their Camera screen (FR-3.9). *Guide* opens Add a pose guide, whose guide
- * goes to the photographer (FR-6.15, Design 2.6.5). System back asks first (R&S 6.9).
- * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9.
+ * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
+ * the photographer creates poses or picks one, the video says so, and their candidates open on this phone's *Pick a
+ * pose* (Design 2.6.5). System back asks first (R&S 6.9).
+ * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide* and the candidates Iter3-P16.
  */
 class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
@@ -125,6 +130,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
+        binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
+        binding.pickPoseButton.setOnClickListener { openPick() }
 
         setupReference(binding)
 
@@ -164,6 +171,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.guideButton.contentDescription = getString(
                             if (ui.guide == null) R.string.guide_add_description else R.string.guide_change_description,
                         )
+                        renderSaveGuide(binding, ui)
+                        renderPoses(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
@@ -176,21 +185,23 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // "Connecting…" until the session is up and its first frame has arrived; "camera paused" only when
                     // frames stop after that (Design 2.8). A session is Connected before WebRTC delivers the first
                     // frame, so counting the stall from the watchdog's creation showed "paused" before any video.
-                    // While the link reconnects, "Reconnecting…" over the last frame (Design 2.6.7).
+                    // While the link reconnects, "Reconnecting…" over the last frame (Design 2.6.7). While the
+                    // photographer creates poses or picks one, its camera is off, and the text says why.
                     while (true) {
                         val state = sessionViewModel.state.value
+                        val connected = state is SessionState.Connected
                         val reconnecting = state is SessionState.Reconnecting
-                        val streaming = state is SessionState.Connected && frames.hasFrame()
+                        val streaming = connected && frames.hasFrame()
                         val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
-                        binding.connectingText.isVisible = !streaming || stalled
+                        val poses = poseStatus(viewModel.uiState.value).takeIf { connected }
+                        binding.connectingText.isVisible = !streaming || stalled || poses != null
                         binding.liveDot.isVisible = streaming && !stalled
-                        binding.connectingText.setText(
-                            when {
-                                reconnecting -> R.string.reconnecting
-                                stalled -> R.string.camera_paused
-                                else -> R.string.connecting
-                            },
-                        )
+                        binding.connectingText.text = when {
+                            reconnecting -> getString(R.string.reconnecting)
+                            !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
+                            poses != null -> poses
+                            else -> getString(R.string.camera_paused)
+                        }
                         delay(STALL_CHECK_MS)
                     }
                 }
@@ -200,6 +211,29 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 launch {
                     sessionViewModel.guideOfferFailed.collect {
                         Toast.makeText(requireContext(), R.string.guide_offer_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+                launch {
+                    viewModel.guideSaveNotices.collect { notice ->
+                        val text = when (notice) {
+                            GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
+
+                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
+                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
+
+                            GuideSaveNotice.ALREADY_SAVED -> getString(R.string.guide_already_saved_notice)
+
+                            GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
+                        }
+                        Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
+                    }
+                }
+                launch {
+                    // A set that ended while this screen is in front; its Pick a pose says so itself while open.
+                    viewModel.poseSetEnds.collect { end ->
+                        poseSetEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
+                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
                 launch {
@@ -339,6 +373,47 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         renderer?.release()
         renderer = null
         super.onDestroyView()
+    }
+
+    /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */
+    private fun renderSaveGuide(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        val button = binding.saveGuideButton
+        button.isVisible = ui.guide != null
+        val icon = if (ui.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
+        // Setting the same icon again would redraw the button on every state change.
+        if (button.tag != icon) {
+            button.setIconResource(icon)
+            button.tag = icon
+        }
+        button.contentDescription = getString(if (ui.guideSaved) R.string.guide_saved else R.string.save_guide)
+        button.isEnabled = ui.connected && !ui.savingGuide
+    }
+
+    /**
+     * The photographer's candidates (Design 2.6.5): *Pick a pose* opens by itself the first time this screen sees a
+     * set ready while it is in front, and the button beside *Guide* opens it while the set is ready.
+     */
+    private fun renderPoses(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        val picking = ui.poseStep == PoseSetStep.PICKING && ui.connected
+        binding.pickPoseButton.isVisible = picking
+        val setId = ui.poseSetId ?: return
+        if (!picking || !viewModel.claimPickOpening(setId)) return
+        if (findNavController().currentDestination?.id == R.id.subjectFragment) openPick()
+    }
+
+    private fun openPick() {
+        val nav = findNavController()
+        if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_pickPose)
+    }
+
+    /** "Dongje is creating poses…" or "Dongje is picking a pose…" while the photographer's set is open. */
+    private fun poseStatus(ui: SubjectUiState): String? {
+        val name = ui.photographerName ?: return null
+        return when (ui.poseStep) {
+            PoseSetStep.GENERATING -> getString(R.string.peer_creating_poses, name)
+            PoseSetStep.PICKING -> getString(R.string.peer_picking_pose, name)
+            else -> null
+        }
     }
 
     /** Brightness and flash, hidden when the photographer's phone has no range or no flash (FR-7.3). */

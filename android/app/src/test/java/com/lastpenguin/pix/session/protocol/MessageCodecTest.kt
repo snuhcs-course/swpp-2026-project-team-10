@@ -53,6 +53,13 @@ class MessageCodecTest {
             SessionMessage.GuideClear,
             SessionMessage.ZoomSet(2f),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
+            SessionMessage.PoseStep("set1", PoseSetStep.GENERATING),
+            SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-4")),
+            SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-4", by = Role.SUBJECT),
+            SessionMessage.PoseCandidateBegin("set1", "pose-4", "jpeg", 768, 1024, 151_320, 17),
+            SessionMessage.PoseCandidateChunk("set1", "pose-4", 0, "/9j/4AAQSkZJRgABAQ"),
+            SessionMessage.PoseCandidateEnd("set1", "pose-4", 3735928559L),
+            SessionMessage.PosePick("set1", "pose-4"),
             SessionMessage.Leave(EndReason.LEFT),
             SessionMessage.Ping(1_759_212_360_000L),
             SessionMessage.Pong(1_759_212_360_000L),
@@ -79,20 +86,46 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `only the subject's guide image carries an anchor and a source`() {
+    fun `a guide image carries an anchor and a source only when the guide has them`() {
         val anchor = NormalizedRect(0.31f, 0.21f, 0.69f, 0.95f)
-        val fromSubject =
+        val placed =
             SessionMessage.GuideImageBegin("s1", "mask-png", 270, 720, 8560, 1, 0.375f, anchor, GuideSource.GALLERY)
-        val body = Json.parseToJsonElement(codec.encode(fromSubject)).jsonObject.getValue("b").jsonObject
+        val body = Json.parseToJsonElement(codec.encode(placed)).jsonObject.getValue("b").jsonObject
         assertEquals(0.31f, body.getValue("anchor").jsonObject.getValue("left").jsonPrimitive.content.toFloat(), 0f)
         assertEquals("GALLERY", body.getValue("source").jsonPrimitive.content)
-        assertEquals(fromSubject, codec.decode(codec.encode(fromSubject))!!.message)
+        assertEquals(placed, codec.decode(codec.encode(placed))!!.message)
 
-        val fromPhotographer = SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f)
-        val plain = Json.parseToJsonElement(codec.encode(fromPhotographer)).jsonObject.getValue("b").jsonObject
+        val unplaced = SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f)
+        val plain = Json.parseToJsonElement(codec.encode(unplaced)).jsonObject.getValue("b").jsonObject
         assertFalse("anchor" in plain)
         assertFalse("source" in plain)
-        assertEquals(fromPhotographer, codec.decode(codec.encode(fromPhotographer))!!.message)
+        assertEquals(unplaced, codec.decode(codec.encode(unplaced))!!.message)
+    }
+
+    @Test
+    fun `a set's step sends only the fields of its step, as in the design`() {
+        val picking = SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-2"))
+        val body = Json.parseToJsonElement(codec.encode(picking)).jsonObject.getValue("b").jsonObject
+        assertEquals("PICKING", body.getValue("step").jsonPrimitive.content)
+        assertEquals(setOf("setId", "step", "poseIds"), body.keys)
+
+        val generating = Json.parseToJsonElement(codec.encode(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING)))
+        assertEquals(setOf("setId", "step"), generating.jsonObject.getValue("b").jsonObject.keys)
+
+        val example = codec.decode(
+            """{"v":3,"t":"pose.step","seq":3,"ts":1,"b":{"setId":"set1","step":"CHOSEN","poseId":"pose-2","by":"SUBJECT"}}""",
+        )
+        assertEquals(
+            SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-2", by = Role.SUBJECT),
+            example!!.message,
+        )
+    }
+
+    @Test
+    fun `a set's step with an unknown step or without its set is dropped`() {
+        assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"setId":"set1","step":"PAUSED"}}"""))
+        assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"step":"PICKING"}}"""))
+        assertNull(codec.decode("""{"v":3,"t":"pose.pick","seq":1,"ts":0,"b":{"setId":"set1","poseId":7}}"""))
     }
 
     @Test

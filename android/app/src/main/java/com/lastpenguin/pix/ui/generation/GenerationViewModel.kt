@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -16,6 +16,10 @@ import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.TipSource
+import com.lastpenguin.pix.session.PoseShare
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SubjectPick
+import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
@@ -44,6 +48,11 @@ data class GenerationUiState(
     val phase: Phase = Phase.IDLE,
     /** The shutter gave no photo; told on Camera until the next attempt. */
     val shotFailed: Boolean = false,
+    /**
+     * Whose *Use this pose* took a candidate of this set (Design 2.6.5): this phone's, or in a session the subject's,
+     * which Pick a pose then goes on with as with its own. The first one decides; nothing is selected after it.
+     */
+    val chosenBy: Role? = null,
 ) {
     /**
      * FRAMING and REVIEWING are the scene photo step on the Camera screen: the live camera, whose shutter takes the
@@ -66,16 +75,21 @@ data class GenerationUiState(
         }
 }
 
+/** What *Use this pose* hands on to Reference confirm: the candidate, and what its tip is asked from (FR-4.10). */
+data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
+
 /**
  * Pose generation (Design 2.2, Figure 8). Shared by the Camera screen, for the scene photo, and the four
- * generation screens (activity scope).
- * Owner: Server/AI/Sync (#7).
+ * generation screens (activity scope). In a session, each set also goes to the subject's *Pick a pose* through
+ * [share], and the subject's first pick of it counts as a *Use this pose* (Design 2.6.5).
+ * Owner: Server/AI/Sync (#7); the set on both phones Iter3-P16.
  */
 class GenerationViewModel(
     private val generator: PoseGenerator,
     private val camera: CameraController,
     private val consent: GenerationConsent,
     private val limitMs: Long = RemotePoseGenerator.TIMEOUT_MS,
+    private val share: PoseShare = PoseShare.None,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GenerationUiState())
@@ -86,9 +100,13 @@ class GenerationViewModel(
 
     private var consentGiven = false
 
+    /** The set being generated or picked from, as [share] knows it; null between sets. */
+    private var setId: String? = null
+
     init {
         // Only ever sets it: an answer read before the user agreed must not take that agreement back.
         viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
+        viewModelScope.launch { share.picks.collect(::onSubjectPick) }
     }
 
     /**
@@ -175,19 +193,19 @@ class GenerationViewModel(
      * the photo and the text kept and the set discarded; nothing is sent until the user asks again (FR-4.6, US-5).
      */
     fun describeAgain() {
+        val state = _uiState.value
+        val ended = state.phase == GenerationUiState.Phase.PICKING || state.phase == GenerationUiState.Phase.FAILED
+        if (!ended || state.scene == null) return
         _uiState.update {
-            val ended = it.phase == GenerationUiState.Phase.PICKING || it.phase == GenerationUiState.Phase.FAILED
-            if (ended && it.scene != null) {
-                it.copy(
-                    phase = GenerationUiState.Phase.DESCRIBING,
-                    poses = emptyList(),
-                    candidates = emptyMap(),
-                    selectedPoseId = null,
-                )
-            } else {
-                it
-            }
+            it.copy(
+                phase = GenerationUiState.Phase.DESCRIBING,
+                poses = emptyList(),
+                candidates = emptyMap(),
+                selectedPoseId = null,
+                chosenBy = null,
+            )
         }
+        closeSet()
     }
 
     /**
@@ -201,13 +219,23 @@ class GenerationViewModel(
 
     private fun start(scene: Bitmap, request: PoseRequest, description: String) {
         generating?.cancel()
+        closeSet()
+        val id = UUID.randomUUID().toString()
+        setId = id
+        share.open(id)
         _uiState.value = GenerationUiState(
             scene = scene,
             request = request,
             description = description,
             phase = GenerationUiState.Phase.GENERATING,
         )
-        generating = viewModelScope.launch { generate(scene, request) }
+        generating = viewModelScope.launch { generate(id, scene, request) }
+    }
+
+    /** The open set ends without a choice, for the subject's *Pick a pose* too; one that was chosen stays chosen. */
+    private fun closeSet() {
+        setId?.let(share::close)
+        setId = null
     }
 
     /**
@@ -219,16 +247,44 @@ class GenerationViewModel(
         shooting = null
         generating?.cancel()
         generating = null
+        closeSet()
         _uiState.value = GenerationUiState()
     }
 
-    /** Only a finished candidate can be selected, and only once generation has ended (R&S 6.3). */
+    /** Only a finished candidate can be selected, only once generation has ended, and not after a choice (R&S 6.3). */
     fun select(poseId: String) {
         _uiState.update {
-            val selectable = it.phase == GenerationUiState.Phase.PICKING &&
+            val selectable = it.phase == GenerationUiState.Phase.PICKING && it.chosenBy == null &&
                 it.candidates[poseId] is CandidateEvent.Ready
             if (selectable) it.copy(selectedPoseId = poseId) else it
         }
+    }
+
+    /**
+     * *Use this pose*: the selected candidate, unless the subject's pick came first (Design 2.6.5), in which case
+     * null, and Pick a pose goes on with the subject's. The set counts as chosen here before Reference confirm opens.
+     */
+    fun usePose(): PoseUse? {
+        val state = _uiState.value
+        val image = state.selectedImage
+        val poseId = state.selectedPoseId
+        if (state.phase != GenerationUiState.Phase.PICKING || state.chosenBy != null || image == null ||
+            poseId == null
+        ) {
+            return null
+        }
+        _uiState.update { it.copy(chosenBy = Role.PHOTOGRAPHER) }
+        setId?.let { share.chosen(it, poseId, Role.PHOTOGRAPHER) }
+        return PoseUse(image, state.tipSource)
+    }
+
+    /** The subject's *Use this pose* (FR-6.15): taken only for this set while nobody has chosen (AD-7). */
+    private fun onSubjectPick(pick: SubjectPick) {
+        val state = _uiState.value
+        val open = pick.setId == setId && state.phase == GenerationUiState.Phase.PICKING && state.chosenBy == null
+        if (!open || state.candidates[pick.poseId] !is CandidateEvent.Ready) return
+        _uiState.update { it.copy(selectedPoseId = pick.poseId, chosenBy = Role.SUBJECT) }
+        share.chosen(pick.setId, pick.poseId, Role.SUBJECT)
     }
 
     /**
@@ -236,11 +292,11 @@ class GenerationViewModel(
      * rejected every pose of a description (US-5). One limit covers the whole run, the suggestions included, so
      * Generating poses never lasts longer than the 60 s it says (NFR-4).
      */
-    private suspend fun generate(scene: Bitmap, request: PoseRequest) {
+    private suspend fun generate(id: String, scene: Bitmap, request: PoseRequest) {
         Timings.mark("pose.start", if (request is PoseRequest.Suggested) "suggested" else "described")
         val inTime = withTimeoutOrNull(limitMs) {
             try {
-                generator.generate(scene, request, Random.nextLong()).collect { event -> receive(event) }
+                generator.generate(scene, request, Random.nextLong()).collect { event -> receive(id, event) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -260,9 +316,16 @@ class GenerationViewModel(
                 it.copy(phase = GenerationUiState.Phase.FAILED, descriptionRejected = rejected)
             }
         }
+        val ended = _uiState.value
+        if (ended.phase == GenerationUiState.Phase.PICKING) {
+            // In the pager's order, which the subject's Pick a pose follows.
+            share.picking(id, ended.poses.map { it.id }.filter { ended.candidates[it] is CandidateEvent.Ready })
+        } else {
+            closeSet()
+        }
     }
 
-    private fun receive(event: GenerationEvent) {
+    private fun receive(id: String, event: GenerationEvent) {
         when (event) {
             is GenerationEvent.Planned -> {
                 Timings.mark("pose.planned")
@@ -272,6 +335,7 @@ class GenerationViewModel(
             is CandidateEvent -> {
                 if (event is CandidateEvent.Ready && _uiState.value.readyCount == 0) Timings.mark("pose.first")
                 _uiState.update { it.copy(candidates = it.candidates + (event.poseId to event)) }
+                if (event is CandidateEvent.Ready) share.candidate(id, event.poseId, event.image)
             }
         }
     }

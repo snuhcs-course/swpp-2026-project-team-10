@@ -67,6 +67,13 @@ class MessageCodecTest {
             SessionMessage.GuideConfirmImageChunk("c1", "g1", 0, "iVBORw0KGgo"),
             SessionMessage.GuideConfirmImageEnd("c1", "g1", 3735928559L),
             SessionMessage.GuideConfirmUse("c1", "g1"),
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.SUBJECT, rejected = true),
+            SessionMessage.PoseDescription("d1", DescriptionStep.STARTED),
+            SessionMessage.PoseSceneBegin("d1", "jpeg", 768, 1024, 151_320, 17),
+            SessionMessage.PoseSceneChunk("d1", 0, "/9j/4AAQSkZJRgABAQ"),
+            SessionMessage.PoseSceneEnd("d1", 3735928559L),
+            SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "벽에 기대기"),
+            SessionMessage.PoseDescriptionGo("d1", "", suggest = true),
             SessionMessage.Leave(EndReason.LEFT),
             SessionMessage.Ping(1_759_212_360_000L),
             SessionMessage.Pong(1_759_212_360_000L),
@@ -150,6 +157,26 @@ class MessageCodecTest {
         )
         assertNull(codec.decode("""{"v":3,"t":"guide.confirm","seq":1,"ts":0,"b":{"confirmId":"c1","step":"SHOWN"}}"""))
         assertNull(codec.decode("""{"v":3,"t":"guide.confirm.use","seq":1,"ts":0,"b":{"confirmId":"c1"}}"""))
+    }
+
+    @Test
+    fun `a description sends its text, writer, and rejection only while open, and an unknown step is dropped`() {
+        val ended = Json.parseToJsonElement(codec.encode(SessionMessage.PoseDescription("d1", DescriptionStep.CLOSED)))
+        assertEquals("pose.description", ended.jsonObject.getValue("t").jsonPrimitive.content)
+        assertEquals(setOf("descriptionId", "step"), ended.jsonObject.getValue("b").jsonObject.keys)
+
+        val example = codec.decode(
+            """{"v":3,"t":"pose.description","seq":2,"ts":1,"b":{"descriptionId":"d1","step":"OPEN","text":"wave","writer":"PHOTOGRAPHER"}}""",
+        )
+        assertEquals(
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.PHOTOGRAPHER),
+            example!!.message,
+        )
+        val unknownStep = """{"v":3,"t":"pose.description","seq":1,"ts":0,"b":{"descriptionId":"d1","step":"TYPING"}}"""
+        assertNull(codec.decode(unknownStep))
+        // A go without its text and its choice.
+        val incomplete = """{"v":3,"t":"pose.description.go","seq":1,"ts":0,"b":{"descriptionId":"d1"}}"""
+        assertNull(codec.decode(incomplete))
     }
 
     @Test

@@ -168,6 +168,10 @@
     <string name="peer_used_guide">%1$s님이 이 가이드를 사용했어요</string>
     <string name="peer_closed_reference">%1$s님이 참고 사진을 닫았어요</string>
     <string name="guide_use_failed">선택을 보내지 못했어요</string>
+    <string name="describe_shared_hint">%1$s님도 이 화면을 보고 함께 쓸 수 있어요.</string>
+    <string name="peer_typing">%1$s님이 입력하고 있어요…</string>
+    <string name="peer_closed_describe">%1$s님이 포즈 생성을 닫았어요</string>
+    <string name="describe_go_failed">요청을 보내지 못했어요</string>
     <string name="generation_failed_title">포즈를 생성하지 못했어요</string>
     <string name="generation_failed_message">문제가 생겼거나 60초 넘게 걸렸어요. 사진은 그대로 있으니 다시 시도해 보세요.</string>
 
@@ -307,6 +311,7 @@
     <string name="peer_creating_poses">%1$s님이 포즈를 만들고 있어요…</string>
     <string name="peer_picking_pose">%1$s님이 포즈를 고르고 있어요…</string>
     <string name="peer_checking_guide">%1$s님이 가이드를 확인하고 있어요…</string>
+    <string name="peer_describing_pose">%1$s님이 포즈를 설명하고 있어요…</string>
     <string name="session_ended">카메라 공유가 끝났어요.</string>
     <string name="connection_lost_title">연결이 끊겼어요</string>
     <string name="connection_lost_message">영상이 멈췄어요. 두 휴대폰의 인터넷 연결을 확인하고 다시 연결하세요.</string>

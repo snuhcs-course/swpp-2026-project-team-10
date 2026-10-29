@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.View
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
+import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
@@ -18,6 +19,7 @@ import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
@@ -39,7 +41,9 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The four generation screens (R&S 6.3, FR-4.4–4.8, US-5; Testing Documentation 2.1.6) on the real Fragments,
  * with the shared GenerationViewModel put in the right phase before each screen's view is created. Generate poses: opens with the scene and the
- * idea chips, Generate 4 poses and Skip start a run and open Generating poses, Cancel. Generating poses: the set
+ * idea chips, Generate 4 poses and Skip start a run and open Generating poses, Cancel; in a session, the hint, this
+ * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
+ * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
  * Cancel. Pick a pose: only the ready candidates, one per page with a counter; the page on screen is the selected
  * pose, so Use this pose works at once and takes the pose swiped to (to Reference confirm); a pose selected before
@@ -126,6 +130,83 @@ class GenerationScreensTest {
         idle()
         assertTrue(modules.generator.runs.single().cancelled)
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    /** Generate poses in a session with Junhyeong; the screen's SessionViewModel sends it to the subject. */
+    private fun describingInASession(
+        modules: TestAppContainer,
+    ): Pair<FragmentScenario<DescribePoseFragment>, TestNavHostController> {
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        val (s, nav) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        idle()
+        return s to nav
+    }
+
+    private fun descriptionId(modules: TestAppContainer): String =
+        modules.session.sent.filterIsInstance<SessionMessage.PoseDescription>().last().descriptionId
+
+    @Test
+    fun describe_inASession_saysSo_andTypingHereHoldsTheField() {
+        val modules = modules()
+        val (s, _) = describingInASession(modules)
+
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            assertTrue(binding.sharedHint.isShown)
+            assertEquals(string(R.string.describe_shared_hint, "Junhyeong"), binding.sharedHint.text.toString())
+            binding.descriptionInput.requestFocus()
+            binding.descriptionInput.setText("wave")
+        }
+        idle()
+
+        val last = modules.session.sent.filterIsInstance<SessionMessage.PoseDescription>().last()
+        assertEquals("wave", last.text)
+        assertEquals(Role.PHOTOGRAPHER, last.writer)
+        assertNotNull(modules.session.sent.filterIsInstance<SessionMessage.PoseSceneBegin>().singleOrNull())
+    }
+
+    @Test
+    fun describe_theSubjectsTyping_isShownAndHoldsTheField_untilItEnds() {
+        val modules = modules()
+        val (s, _) = describingInASession(modules)
+        val id = descriptionId(modules)
+
+        modules.session.deliver(SessionMessage.PoseDescriptionEdit(id, holding = true, text = "jump"))
+        idle()
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            assertEquals("jump", binding.descriptionInput.text.toString())
+            assertFalse(binding.descriptionInput.isEnabled)
+            assertFalse(binding.generateButton.isEnabled)
+            assertTrue(binding.descriptionTyping.isShown)
+            assertEquals(string(R.string.peer_typing, "Junhyeong"), binding.descriptionTyping.text.toString())
+        }
+
+        modules.session.deliver(SessionMessage.PoseDescriptionEdit(id, holding = false, text = "jump high"))
+        idle()
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            assertEquals("jump high", binding.descriptionInput.text.toString())
+            assertTrue(binding.descriptionInput.isEnabled)
+            assertFalse(binding.descriptionTyping.isShown)
+        }
+    }
+
+    @Test
+    fun describe_theSubjectsGenerateComingFirst_opensGeneratingPoses() {
+        val modules = modules()
+        val (_, nav) = describingInASession(modules)
+
+        val id = descriptionId(modules)
+        modules.session.deliver(SessionMessage.PoseDescriptionEdit(id, holding = true, text = "jump"))
+        modules.session.deliver(SessionMessage.PoseDescriptionGo(id, "jump", suggest = false))
+        idle()
+
+        assertEquals(PoseRequest.Described("jump"), modules.generator.runs.single().request)
+        assertEquals(R.id.generatingFragment, nav.currentDestination?.id)
+        val end = modules.session.sent.filterIsInstance<SessionMessage.PoseDescription>().last()
+        assertEquals(DescriptionStep.STARTED, end.step)
     }
 
     // ---- Generating poses ------------------------------------------------------------

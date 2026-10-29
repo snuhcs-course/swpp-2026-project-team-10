@@ -175,6 +175,10 @@
     <string name="peer_used_guide">%1$s used this guide</string>
     <string name="peer_closed_reference">%1$s closed the reference</string>
     <string name="guide_use_failed">Couldn\'t send your choice</string>
+    <string name="describe_shared_hint">%1$s sees this too and can write it with you.</string>
+    <string name="peer_typing">%1$s is typing…</string>
+    <string name="peer_closed_describe">%1$s closed Generate poses</string>
+    <string name="describe_go_failed">Couldn\'t send your request</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>
     <string name="generation_failed_message">The request failed or took longer than 60 seconds. Your photo is kept, so you can try again.</string>
 
@@ -319,6 +323,7 @@
     <string name="peer_creating_poses">%1$s is creating poses…</string>
     <string name="peer_picking_pose">%1$s is picking a pose…</string>
     <string name="peer_checking_guide">%1$s is checking the guide…</string>
+    <string name="peer_describing_pose">%1$s is describing a pose…</string>
     <string name="session_ended">The session has ended.</string>
     <string name="connection_lost_title">Connection lost</string>
     <string name="connection_lost_message">Video stopped. Check both phones\' internet connection, then reconnect.</string>

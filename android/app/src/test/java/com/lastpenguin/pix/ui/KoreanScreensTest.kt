@@ -40,8 +40,12 @@ import com.lastpenguin.pix.session.confirmChunk
 import com.lastpenguin.pix.session.confirmEnd
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.ConfirmStep
+import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.session.sceneBegin
+import com.lastpenguin.pix.session.sceneChunk
+import com.lastpenguin.pix.session.sceneEnd
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -71,6 +75,7 @@ import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
+import com.lastpenguin.pix.ui.session.SubjectDescribeFragment
 import com.lastpenguin.pix.ui.session.SubjectFragment
 import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
 import java.time.Duration
@@ -275,6 +280,18 @@ class KoreanScreensTest {
         generationModules()
         scenario = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }.first
         assertKorean(screen())
+    }
+
+    @Test
+    fun describePoses_whileTheSubjectTypes_isInKorean() {
+        val modules = generationModules()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        scenario = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }.first
+        idle()
+        val id = modules.session.sent.filterIsInstance<SessionMessage.PoseDescription>().last().descriptionId
+        modules.session.deliver(SessionMessage.PoseDescriptionEdit(id, holding = true, text = "벽에 기대서 웃기"))
+        idle()
+        assertKorean(screen(), *people)
     }
 
     @Test
@@ -503,6 +520,45 @@ class KoreanScreensTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
         photographerConfirming(modules)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    /** The photographer's Generate poses on the subject's phone, the photographer typing. */
+    private fun photographerDescribing(modules: TestAppContainer) {
+        modules.descriptions.startAsReceiver(receiving)
+        idle()
+        modules.session.deliver(
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "벽에 기대서 웃기", Role.PHOTOGRAPHER),
+        )
+        val copy = checkNotNull(FakePoseCandidateCodec().encode("d1", bitmap()))
+        modules.session.deliver(copy.sceneBegin("d1"))
+        for (i in copy.chunks.indices) modules.session.deliver(copy.sceneChunk("d1", i))
+        modules.session.deliver(copy.sceneEnd("d1"))
+        idle()
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whileThePhotographerDescribesAPose_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectFragment)
+        }
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerDescribing(modules)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun subjectsGeneratePoses_whileThePhotographerTypes_isInKorean() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerDescribing(modules)
+        scenario = launchFragmentInContainer<SubjectDescribeFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectDescribeFragment)
+        }
         assertKorean(screen(), *people)
     }
 

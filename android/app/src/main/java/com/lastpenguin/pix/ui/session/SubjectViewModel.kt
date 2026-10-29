@@ -18,6 +18,8 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.ConfirmEnd
 import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.DescriptionEnd
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.PoseSetEnd
 import com.lastpenguin.pix.session.PoseSyncer
@@ -96,6 +98,8 @@ data class SubjectUiState(
      * reference*; null when there is none.
      */
     val confirmId: String? = null,
+    /** The photographer's open *Generate poses* (Design 2.6.5), which this phone shows too; null when there is none. */
+    val describeId: String? = null,
 ) {
     val canZoom: Boolean
         get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
@@ -111,8 +115,8 @@ data class SubjectUiState(
  * Every control is a request to the photographer (AD-7): the screen shows the requested value at once, sends steps
  * at most every [SEND_INTERVAL_MS] and the final value right away ([StepSender]), and the photographer's echo in
  * `camera.state` or `guide.state` decides what stays once the gesture is over (Design 2.6.5). The guide on the video
- * can be saved on this phone, and the photographer's set of candidates ([poses]) and Reference confirm ([confirms])
- * show here while they are open.
+ * can be saved on this phone, and the photographer's Generate poses ([descriptions]), set of candidates ([poses]),
+ * and Reference confirm ([confirms]) show here while they are open.
  * Owner: Real-time (#8 live view, #10 remote zoom, #57 remote controls), with the guide from #9; *Save guide*, the
  * photographer's candidates, and their Reference confirm Iter3-P16.
  */
@@ -124,6 +128,7 @@ class SubjectViewModel(
     private val savedGuides: SavedGuideStore = SavedGuideStore.InMemory(),
     private val poses: PoseSyncer? = null,
     private val confirms: ConfirmSyncer? = null,
+    private val descriptions: DescriptionSyncer? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubjectUiState())
@@ -145,6 +150,12 @@ class SubjectViewModel(
 
     /** The last confirm whose *Your reference* this screen opened by itself, so it opens once per confirm. */
     private var confirmOpenedFor: String? = null
+
+    /** Each of the photographer's Generate poses that ended, for its notice while this screen is in front. */
+    val describeEnds: Flow<DescriptionEnd> = descriptions?.ended ?: emptyFlow()
+
+    /** The last description whose *Generate poses* this screen opened by itself, so it opens once per description. */
+    private var describeOpenedFor: String? = null
 
     private val zoomSender = StepSender<Float>(viewModelScope, SEND_INTERVAL_MS) { ratio, final ->
         session.send(SessionMessage.ZoomSet(ratio, final))
@@ -269,6 +280,13 @@ class SubjectViewModel(
                 syncer.mirror.collect { confirm -> _uiState.update { it.copy(confirmId = confirm?.confirmId) } }
             }
         }
+        descriptions?.let { syncer ->
+            viewModelScope.launch {
+                syncer.mirror.collect { description ->
+                    _uiState.update { it.copy(describeId = description?.descriptionId) }
+                }
+            }
+        }
         viewModelScope.launch {
             mirror.state.collect { state ->
                 _uiState.update {
@@ -340,6 +358,13 @@ class SubjectViewModel(
     fun claimConfirmOpening(confirmId: String): Boolean {
         if (confirmOpenedFor == confirmId) return false
         confirmOpenedFor = confirmId
+        return true
+    }
+
+    /** Whether Subject view should open *Generate poses* by itself for [describeId] now: once per description. */
+    fun claimDescribeOpening(describeId: String): Boolean {
+        if (describeOpenedFor == describeId) return false
+        describeOpenedFor = describeId
         return true
     }
 

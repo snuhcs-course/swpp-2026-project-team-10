@@ -265,11 +265,20 @@
             android:id="@+id/action_subject_to_confirm"
             app:destination="@id/subjectConfirmFragment" />
         <action
+            android:id="@+id/action_subject_to_describe"
+            app:destination="@id/subjectDescribeFragment" />
+        <action
             android:id="@+id/action_subject_to_connectionLost"
             app:destination="@id/connectionLostFragment"
             app:popUpTo="@id/subjectFragment"
             app:popUpToInclusive="true" />
     </fragment>
+
+    <!-- The photographer's Generate poses on the subject's phone, where both write the description (FR-6.15). -->
+    <fragment
+        android:id="@+id/subjectDescribeFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectDescribeFragment"
+        android:label="Generate poses" />
 
     <!-- The photographer's candidates on the subject's phone (FR-6.15); back is Subject view. -->
     <fragment

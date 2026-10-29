@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.IcePath
@@ -61,8 +62,8 @@ sealed interface SessionNotice {
  *
  * On the photographer's phone, camera frames go to the session from the moment a subject starts connecting,
  * and the camera's capabilities are sent once the data channels are up. Guide sync (#9), remote zoom (#10), and the
- * photographer's candidates and Reference confirm on the subject's *Pick a pose* and *Your reference* (Iter3-P16) hook
- * in at the same place.
+ * photographer's Generate poses, candidates, and Reference confirm on the subject's screens of the same steps
+ * (Iter3-P16) hook in at the same place.
  *
  * Owner: Real-time (#8), with guide sync (#9) and remote zoom (#10).
  */
@@ -74,6 +75,7 @@ class SessionViewModel(
     private val mobileDataNotice: MobileDataNotice,
     private val poseSyncer: PoseSyncer? = null,
     private val confirmSyncer: ConfirmSyncer? = null,
+    private val descriptionSyncer: DescriptionSyncer? = null,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -208,6 +210,7 @@ class SessionViewModel(
                     guideSyncer.startAsReceiver(this)
                     poseSyncer?.startAsReceiver(this)
                     confirmSyncer?.startAsReceiver(this)
+                    descriptionSyncer?.startAsReceiver(this)
                 }
             }
         }
@@ -217,8 +220,8 @@ class SessionViewModel(
         }
 
         // Stopped while reconnecting and started again at Connected, so the subject gets the capabilities, the
-        // camera's state, the guide, the pose set, and the Reference confirm again, whatever a drop lost (Design
-        // 2.6.7).
+        // camera's state, the guide, Generate poses, the pose set, and the Reference confirm again, whatever a drop
+        // lost (Design 2.6.7).
         val liveNow = connected?.role == Role.PHOTOGRAPHER
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {
@@ -252,6 +255,7 @@ class SessionViewModel(
                     guideSyncer.startAsSender(this)
                     poseSyncer?.startAsSender(this)
                     confirmSyncer?.startAsSender(this)
+                    descriptionSyncer?.startAsSender(this)
                 }
             }
         }

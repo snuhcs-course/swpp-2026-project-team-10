@@ -26,6 +26,7 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeGuideReferenceCodec
@@ -88,6 +89,10 @@ class TestAppContainer(
         Dispatchers.Unconfined,
     )
 
+    /** The photographer's Generate poses on the subject's phone, the same way, with a scene photo a screen can draw. */
+    val descriptions =
+        DescriptionSyncer(session, FakePoseCandidateCodec { ScreenTestSupport.bitmap(60, 80) }, Dispatchers.Unconfined)
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
@@ -108,6 +113,7 @@ class TestAppContainer(
         guideSyncer = syncer,
         poseSyncer = poses,
         confirmSyncer = confirms,
+        descriptionSyncer = descriptions,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
     )

@@ -45,6 +45,7 @@ import com.lastpenguin.pix.guide.SubjectSegmenter
 import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.JpegGuideReferenceCodec
 import com.lastpenguin.pix.session.JpegPoseCandidateCodec
@@ -119,6 +120,8 @@ class AppContainer(
     val poseSyncer: PoseSyncer,
     /** The outline on the photographer's Reference confirm on the subject's *Your reference* (FR-6.15, Design 2.6.5). */
     val confirmSyncer: ConfirmSyncer,
+    /** The photographer's *Generate poses* on the subject's, where both write the description (FR-6.15, Design 2.6.5). */
+    val descriptionSyncer: DescriptionSyncer,
     val remoteControlHandler: RemoteControlHandler,
     /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
     val mobileDataNotice: MobileDataNotice,
@@ -225,6 +228,7 @@ class AppContainer(
                 guideSyncer = guideSyncer,
                 poseSyncer = PoseSyncer(rtcSessionManager, JpegPoseCandidateCodec()),
                 confirmSyncer = ConfirmSyncer(rtcSessionManager, MaskGuideImageCodec()),
+                descriptionSyncer = DescriptionSyncer(rtcSessionManager, JpegPoseCandidateCodec()),
                 remoteControlHandler = RemoteControlHandler(
                     rtcSessionManager,
                     cameraController,

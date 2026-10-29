@@ -14,6 +14,7 @@ import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.SubjectConfirmViewModel
+import com.lastpenguin.pix.ui.session.SubjectDescribeViewModel
 import com.lastpenguin.pix.ui.session.SubjectPickViewModel
 import com.lastpenguin.pix.ui.session.SubjectViewModel
 
@@ -50,6 +51,7 @@ object PixViewModels {
                 container.cameraController,
                 container.generationConsent,
                 share = container.poseSyncer,
+                descriptions = container.descriptionSyncer,
             )
         }
         initializer {
@@ -61,6 +63,7 @@ object PixViewModels {
                 container.mobileDataNotice,
                 container.poseSyncer,
                 container.confirmSyncer,
+                container.descriptionSyncer,
             )
         }
         initializer {
@@ -72,10 +75,12 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseSyncer,
                 container.confirmSyncer,
+                container.descriptionSyncer,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }
         initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
+        initializer { SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer) }
         initializer { AccountViewModel(container.authRepository, container.googleIdTokens) }
         initializer { FriendsViewModel(container.authRepository, container.friendsRepository) }
     }

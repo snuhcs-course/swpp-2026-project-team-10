@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -16,6 +16,8 @@ import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.TipSource
+import com.lastpenguin.pix.session.DescriptionRequest
+import com.lastpenguin.pix.session.DescriptionShare
 import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SubjectPick
@@ -40,6 +42,11 @@ data class GenerationUiState(
     val description: String = "",
     /** The service rejected every pose of the description: Couldn't create poses and Generate poses say so (US-5). */
     val descriptionRejected: Boolean = false,
+    /**
+     * In a session, whose field holds the description on Generate poses (Design 2.6.5): this phone's while it types,
+     * the subject's while theirs does, then nobody; the other phone's field waits meanwhile.
+     */
+    val descriptionWriter: Role? = null,
     /** The poses of the set, once known; one slot each. */
     val poses: List<PlannedPose> = emptyList(),
     /** Results so far by pose id; the four slots fill as they arrive. */
@@ -80,9 +87,11 @@ data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
 
 /**
  * Pose generation (Design 2.2, Figure 8). Shared by the Camera screen, for the scene photo, and the four
- * generation screens (activity scope). In a session, each set also goes to the subject's *Pick a pose* through
- * [share], and the subject's first pick of it counts as a *Use this pose* (Design 2.6.5).
- * Owner: Server/AI/Sync (#7); the set on both phones Iter3-P16.
+ * generation screens (activity scope). In a session, Generate poses goes to the subject's phone through
+ * [descriptions], where either phone writes the description, one at a time, and starts the set; each set goes to the
+ * subject's *Pick a pose* through [share], and the subject's first pick of it counts as a *Use this pose* (Design
+ * 2.6.5).
+ * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16.
  */
 class GenerationViewModel(
     private val generator: PoseGenerator,
@@ -90,6 +99,7 @@ class GenerationViewModel(
     private val consent: GenerationConsent,
     private val limitMs: Long = RemotePoseGenerator.TIMEOUT_MS,
     private val share: PoseShare = PoseShare.None,
+    private val descriptions: DescriptionShare = DescriptionShare.None,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GenerationUiState())
@@ -103,10 +113,14 @@ class GenerationViewModel(
     /** The set being generated or picked from, as [share] knows it; null between sets. */
     private var setId: String? = null
 
+    /** Generate poses as [descriptions] knows it, while the phase is DESCRIBING; null otherwise. */
+    private var descriptionId: String? = null
+
     init {
         // Only ever sets it: an answer read before the user agreed must not take that agreement back.
         viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
         viewModelScope.launch { share.picks.collect(::onSubjectPick) }
+        viewModelScope.launch { descriptions.requests.collect(::onSubjectRequest) }
     }
 
     /**
@@ -160,15 +174,101 @@ class GenerationViewModel(
 
     /** *Use this photo*: Generate poses asks what to pose (FR-4.8). Still nothing is sent. */
     fun useScene() {
-        _uiState.update {
-            val reviewing = it.phase == GenerationUiState.Phase.REVIEWING && it.scene != null
-            if (reviewing) it.copy(phase = GenerationUiState.Phase.DESCRIBING) else it
+        val state = _uiState.value
+        if (state.phase != GenerationUiState.Phase.REVIEWING || state.scene == null) return
+        _uiState.update { it.copy(phase = GenerationUiState.Phase.DESCRIBING) }
+        openDescription()
+    }
+
+    /** Generate poses opened: the subject's phone shows it too, with the scene photo and the text kept (FR-6.15). */
+    private fun openDescription() {
+        val state = _uiState.value
+        val scene = state.scene ?: return
+        val id = UUID.randomUUID().toString()
+        descriptionId = id
+        _uiState.update { it.copy(descriptionWriter = null) }
+        descriptions.open(id, scene, state.description, state.descriptionRejected)
+    }
+
+    /** The description field changed; kept so the text survives a rejected set (US-5). Not while the subject types. */
+    fun onDescriptionChanged(text: String) {
+        val state = _uiState.value
+        if (state.phase != GenerationUiState.Phase.DESCRIBING || state.descriptionWriter == Role.SUBJECT) return
+        _uiState.update { it.copy(description = text) }
+        reportDescription()
+    }
+
+    /**
+     * This phone's description field took or lost focus: it holds the description while the subject's does not
+     * (Design 2.6.5). False when the subject's field holds it, so this one is not to be typed in.
+     */
+    fun onDescriptionFocus(focused: Boolean): Boolean {
+        val state = _uiState.value
+        if (state.phase != GenerationUiState.Phase.DESCRIBING) return false
+        val writer = state.descriptionWriter
+        if (writer == Role.SUBJECT) return !focused
+        val next = if (focused) Role.PHOTOGRAPHER else null
+        if (writer != next) {
+            _uiState.update { it.copy(descriptionWriter = next) }
+            reportDescription()
+        }
+        return true
+    }
+
+    private fun reportDescription() {
+        val id = descriptionId ?: return
+        val state = _uiState.value
+        descriptions.update(id, state.description, state.descriptionWriter)
+    }
+
+    /**
+     * The subject's field and buttons on Generate poses (FR-6.15), requests like its others (AD-7): an edit is taken
+     * while this phone's field does not hold the description, and *Generate 4 poses* or *Skip* the same way, with the
+     * subject's text while its field held it.
+     */
+    private fun onSubjectRequest(request: DescriptionRequest) {
+        val state = _uiState.value
+        val describing = state.phase == GenerationUiState.Phase.DESCRIBING
+        when (request) {
+            is DescriptionRequest.Edit -> {
+                if (!describing || request.descriptionId != descriptionId) return
+                val writer = state.descriptionWriter
+                when {
+                    writer == Role.PHOTOGRAPHER -> return
+
+                    request.holding -> _uiState.update {
+                        it.copy(description = request.text, descriptionWriter = Role.SUBJECT)
+                    }
+
+                    writer == Role.SUBJECT -> _uiState.update {
+                        it.copy(description = request.text, descriptionWriter = null)
+                    }
+
+                    else -> return
+                }
+                reportDescription()
+            }
+
+            is DescriptionRequest.Go -> {
+                if (!describing || request.descriptionId != descriptionId) return
+                val writer = state.descriptionWriter
+                if (writer == Role.PHOTOGRAPHER) return
+                val text = if (writer == Role.SUBJECT) request.text else state.description
+                _uiState.update { it.copy(description = text, descriptionWriter = null) }
+                if (request.suggest) suggestPoses() else generate(text)
+            }
+
+            DescriptionRequest.Gone -> if (describing && state.descriptionWriter == Role.SUBJECT) {
+                _uiState.update { it.copy(descriptionWriter = null) }
+                reportDescription()
+            }
         }
     }
 
-    /** The description field changed; kept so the text survives a rejected set (US-5). */
-    fun onDescriptionChanged(text: String) {
-        _uiState.update { if (it.phase == GenerationUiState.Phase.DESCRIBING) it.copy(description = text) else it }
+    /** Generate poses ended: a set [started] from it, or it closed, also on the subject's phone. */
+    private fun endDescription(started: Boolean) {
+        descriptionId?.let { descriptions.end(it, started) }
+        descriptionId = null
     }
 
     /**
@@ -177,16 +277,20 @@ class GenerationViewModel(
      */
     fun generate(description: String) {
         val state = _uiState.value
-        if (state.phase != GenerationUiState.Phase.DESCRIBING || state.scene == null) return
+        if (!state.canStart || state.scene == null) return
         start(state.scene, PoseRequest.of(description), description)
     }
 
     /** *Skip, suggest poses for me*: the server chooses four poses for the scene (FR-4.4). */
     fun suggestPoses() {
         val state = _uiState.value
-        if (state.phase != GenerationUiState.Phase.DESCRIBING || state.scene == null) return
+        if (!state.canStart || state.scene == null) return
         start(state.scene, PoseRequest.Suggested, state.description)
     }
+
+    /** Generate poses can start a set: not while the subject's field holds the description (Design 2.6.5). */
+    private val GenerationUiState.canStart: Boolean
+        get() = phase == GenerationUiState.Phase.DESCRIBING && descriptionWriter != Role.SUBJECT
 
     /**
      * *Try other poses* on Pick a pose and *Edit description* on Couldn't create poses: back to Generate poses with
@@ -206,6 +310,7 @@ class GenerationViewModel(
             )
         }
         closeSet()
+        openDescription()
     }
 
     /**
@@ -219,6 +324,7 @@ class GenerationViewModel(
 
     private fun start(scene: Bitmap, request: PoseRequest, description: String) {
         generating?.cancel()
+        endDescription(started = true)
         closeSet()
         val id = UUID.randomUUID().toString()
         setId = id
@@ -247,6 +353,7 @@ class GenerationViewModel(
         shooting = null
         generating?.cancel()
         generating = null
+        endDescription(started = false)
         closeSet()
         _uiState.value = GenerationUiState()
     }

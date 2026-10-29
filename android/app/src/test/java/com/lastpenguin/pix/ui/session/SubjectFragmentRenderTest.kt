@@ -25,6 +25,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.ConfirmStep
+import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
@@ -69,7 +70,9 @@ import org.robolectric.shadows.ShadowToast
  * set kept through a reconnect, with "Reconnecting…" in place of what the photographer is doing; the photographer's
  * Reference confirm (FR-6.15): "checking the guide", Your reference opened once per confirm and then by the same
  * button, a set still picking shown before the confirm that follows it, and a guide the photographer uses after Back,
- * which says so.
+ * which says so; the photographer's Generate poses (FR-6.15): "describing a pose" in place of "camera paused", Generate
+ * poses opened once per description and then by the same button, a set held here shown before it, and a close after
+ * Back, which says so.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -590,6 +593,79 @@ class SubjectFragmentRenderTest {
         confirmStep(modules, ConfirmStep.USED, Role.PHOTOGRAPHER)
 
         assertEquals(string(R.string.peer_used_guide, "Dongje"), ShadowToast.getTextOfLatestToast())
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.pickPoseButton.visibility)
+            assertEquals(View.GONE, binding.connectingText.visibility)
+        }
+    }
+
+    private fun describeStep(modules: TestAppContainer, step: DescriptionStep, id: String = "d1") {
+        modules.session.deliver(SessionMessage.PoseDescription(id, step))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+    }
+
+    @Test
+    fun thePhotographersGeneratePoses_saysTheyAreDescribing_andOpensItOncePerDescription() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.descriptions.startAsReceiver(receiving)
+        idle()
+
+        describeStep(modules, DescriptionStep.OPEN)
+        assertEquals(R.id.subjectDescribeFragment, nav.currentDestination?.id)
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.peer_describing_pose, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
+            assertEquals(string(R.string.describe_title), binding.pickPoseLabel.text.toString())
+        }
+
+        // Back keeps it closed, though Subject view renders again; its button opens it again.
+        nav.popBackStack()
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        onScreen { binding, _ -> binding.pickPoseButton.performClick() }
+        idle()
+        assertEquals(R.id.subjectDescribeFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun aSetHeldHere_isShownBeforeTheDescriptionThatFollowsIt() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        modules.descriptions.startAsReceiver(receiving)
+        idle()
+        poseStep(modules, PoseSetStep.GENERATING)
+        poseStep(modules, PoseSetStep.PICKING)
+        nav.popBackStack()
+        idle()
+
+        // Try other poses: the new description comes before the set's end.
+        describeStep(modules, DescriptionStep.OPEN)
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        assertEquals(string(R.string.pick_pose_title), onScreen { binding, _ -> binding.pickPoseLabel.text.toString() })
+
+        poseStep(modules, PoseSetStep.CLOSED)
+        assertEquals(R.id.subjectDescribeFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun generatePosesThePhotographerClosesAfterBack_saysSo_andTheStatusGoes() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.descriptions.startAsReceiver(receiving)
+        idle()
+        describeStep(modules, DescriptionStep.OPEN)
+        nav.popBackStack()
+        idle()
+
+        describeStep(modules, DescriptionStep.CLOSED)
+
+        assertEquals(string(R.string.peer_closed_describe, "Dongje"), ShadowToast.getTextOfLatestToast())
         onScreen { binding, _ ->
             assertEquals(View.GONE, binding.pickPoseButton.visibility)
             assertEquals(View.GONE, binding.connectingText.visibility)

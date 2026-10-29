@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -22,6 +22,8 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.SUGGESTED
 import com.lastpenguin.pix.generation.planned
 import com.lastpenguin.pix.generation.testBitmap
+import com.lastpenguin.pix.session.DescriptionRequest
+import com.lastpenguin.pix.session.DescriptionShare
 import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SubjectPick
@@ -60,6 +62,7 @@ class GenerationViewModelTest {
     private val camera = FakeCamera()
     private val consent = FakeConsent()
     private val share = RecordingShare()
+    private val descriptions = RecordingDescriptions()
     private lateinit var model: GenerationViewModel
 
     private val state get() = model.uiState.value
@@ -67,7 +70,7 @@ class GenerationViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        model = GenerationViewModel(generator, camera, consent, LIMIT_MS, share)
+        model = GenerationViewModel(generator, camera, consent, LIMIT_MS, share, descriptions)
         store.put("generation", model)
     }
 
@@ -710,6 +713,130 @@ class GenerationViewModelTest {
         assertTrue(consent.given)
     }
 
+    // ---- Generate poses on both phones (FR-6.15, Design 2.6.5) ---------------------------------------------------
+    // Partitions: the description shared from its opening to its end (a set started, Cancel), opened again with its text
+    // and whether it was rejected; this phone's field holding it while focused; the subject's edit taken while this
+    // phone's field is free and dropped while it holds it or for another description; this phone's typing and start
+    // refused while the subject's field holds it; the subject's Generate 4 poses with its text and Skip, dropped while
+    // this phone's field holds it; a dropped link freeing the subject's field.
+
+    @Test
+    fun generatePoses_isSharedFromItsOpeningToTheSetItStarts() = runTest {
+        describeAPhoto()
+        assertTrue(model.onDescriptionFocus(true))
+        model.onDescriptionChanged("wave")
+        model.onDescriptionFocus(false)
+        model.generate("wave")
+        runCurrent()
+
+        assertEquals(
+            listOf("open ''", "update '' PHOTOGRAPHER", "update 'wave' PHOTOGRAPHER", "update 'wave' null", "started"),
+            descriptions.calls,
+        )
+        assertEquals(1, descriptions.ids.toSet().size)
+    }
+
+    @Test
+    fun aRejectedDescription_opensAgainWithItsText_andCancelClosesIt() = runTest {
+        describeAPhoto()
+        model.onDescriptionChanged("피 흘리는 모습")
+        model.generate("피 흘리는 모습")
+        runCurrent()
+        val run = generator.runs.single()
+        run.plan(List(4) { "피 흘리는 모습" })
+        run.send(*(1..4).map { failed("pose-$it", GenerationError.REJECTED) }.toTypedArray())
+        run.finish()
+        runCurrent()
+
+        model.describeAgain()
+        model.cancel()
+
+        assertEquals("open '피 흘리는 모습' rejected", descriptions.calls[descriptions.calls.size - 2])
+        assertEquals("closed", descriptions.calls.last())
+        assertEquals(2, descriptions.ids.toSet().size)
+    }
+
+    @Test
+    fun theSubjectsField_holdsTheDescriptionOnlyWhileThisPhonesDoesNot() = runTest {
+        describeAPhoto()
+        val id = descriptions.ids.single()
+        model.onDescriptionFocus(true)
+
+        descriptions.request(DescriptionRequest.Edit(id, holding = true, text = "jump"))
+        runCurrent()
+        assertEquals(Role.PHOTOGRAPHER, state.descriptionWriter)
+        assertEquals("", state.description)
+
+        model.onDescriptionFocus(false)
+        descriptions.request(DescriptionRequest.Edit(id, holding = true, text = "jump"))
+        descriptions.request(DescriptionRequest.Edit("another", holding = true, text = "other"))
+        runCurrent()
+        assertEquals(Role.SUBJECT, state.descriptionWriter)
+        assertEquals("jump", state.description)
+
+        // This phone's field and buttons wait meanwhile.
+        assertFalse(model.onDescriptionFocus(true))
+        model.onDescriptionChanged("mine")
+        model.generate("mine")
+        model.suggestPoses()
+        runCurrent()
+        assertEquals(Role.SUBJECT, state.descriptionWriter)
+        assertEquals("jump", state.description)
+        assertTrue(generator.runs.isEmpty())
+
+        descriptions.request(DescriptionRequest.Edit(id, holding = false, text = "jump high"))
+        runCurrent()
+        assertNull(state.descriptionWriter)
+        assertEquals("jump high", state.description)
+        assertEquals("update 'jump high' null", descriptions.calls.last())
+    }
+
+    @Test
+    fun theSubjectsGenerate_startsTheSetWithItsText_andItsSkipAsksForSuggestions() = runTest {
+        describeAPhoto()
+        descriptions.request(DescriptionRequest.Edit(descriptions.ids.last(), holding = true, text = "jump"))
+        descriptions.request(DescriptionRequest.Go(descriptions.ids.last(), "jump high", suggest = false))
+        runCurrent()
+        assertEquals(PoseRequest.Described("jump high"), generator.runs.single().request)
+        assertEquals("jump high", state.description)
+        assertEquals("started", descriptions.calls.last())
+
+        model.cancel()
+        describeAPhoto()
+        model.onDescriptionChanged("lean")
+        descriptions.request(DescriptionRequest.Go(descriptions.ids.last(), "stale", suggest = true))
+        runCurrent()
+        assertEquals(PoseRequest.Suggested, generator.runs.last().request)
+        assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
+    }
+
+    @Test
+    fun theSubjectsGenerate_isDroppedWhileThisPhonesFieldHoldsTheDescription_orForAnotherOne() = runTest {
+        describeAPhoto()
+        model.onDescriptionFocus(true)
+
+        descriptions.request(DescriptionRequest.Go(descriptions.ids.single(), "jump", suggest = false))
+        descriptions.request(DescriptionRequest.Go("another", "jump", suggest = true))
+        runCurrent()
+
+        assertTrue(generator.runs.isEmpty())
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+    }
+
+    @Test
+    fun aDroppedLink_freesTheSubjectsField() = runTest {
+        describeAPhoto()
+        descriptions.request(DescriptionRequest.Edit(descriptions.ids.single(), holding = true, text = "jump"))
+        runCurrent()
+
+        descriptions.request(DescriptionRequest.Gone)
+        runCurrent()
+
+        assertNull(state.descriptionWriter)
+        assertEquals("jump", state.description)
+        assertTrue(model.onDescriptionFocus(true))
+    }
+
     /** *Generate poses here*, the shutter, and *Use this photo*: Generate poses is shown. */
     private fun TestScope.describeAPhoto() {
         model.beginScene()
@@ -730,6 +857,31 @@ class GenerationViewModelTest {
 
     private fun failed(poseId: String, error: GenerationError = GenerationError.SERVER) =
         CandidateEvent.Failed(poseId, error)
+
+    /** Records what the ViewModel tells the subject's Generate poses, and passes on the requests a test sends. */
+    private class RecordingDescriptions : DescriptionShare {
+        val calls = mutableListOf<String>()
+        val ids = mutableListOf<String>()
+        private val sent = MutableSharedFlow<DescriptionRequest>(extraBufferCapacity = 8)
+        override val requests: Flow<DescriptionRequest> = sent
+
+        fun request(request: DescriptionRequest) = check(sent.tryEmit(request))
+
+        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean) {
+            ids += descriptionId
+            calls += "open '$text'" + if (rejected) " rejected" else ""
+        }
+
+        override fun update(descriptionId: String, text: String, writer: Role?) {
+            check(descriptionId == ids.last())
+            calls += "update '$text' $writer"
+        }
+
+        override fun end(descriptionId: String, started: Boolean) {
+            check(descriptionId == ids.last())
+            calls += if (started) "started" else "closed"
+        }
+    }
 
     /** Records what the ViewModel tells the subject's phone, and passes on the picks a test sends. */
     private class RecordingShare : PoseShare {

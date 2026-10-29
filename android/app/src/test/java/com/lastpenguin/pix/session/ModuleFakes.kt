@@ -327,8 +327,11 @@ class FakeGuideReferenceCodec : GuideReferenceCodec {
     }
 }
 
-/** Encodes a candidate as its id's bytes and decodes any `fake` bytes, with no graphics. */
-class FakePoseCandidateCodec : PoseCandidateCodec {
+/**
+ * Encodes a candidate as its id's bytes and decodes any `fake` bytes, with no graphics; a screen test that draws the
+ * decoded image passes [decodeAs] with a real bitmap, as for [FakeGuideImageCodec].
+ */
+class FakePoseCandidateCodec(private val decodeAs: () -> Bitmap = { fakeBitmap() }) : PoseCandidateCodec {
     val encoded = mutableListOf<String>()
     val decoded = mutableListOf<String>()
     var encodes = true
@@ -347,6 +350,6 @@ class FakePoseCandidateCodec : PoseCandidateCodec {
     override fun decode(format: String, bytes: ByteArray): Bitmap? {
         if (format != "fake" || !decodes) return null
         decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
-        return fakeBitmap()
+        return decodeAs()
     }
 }

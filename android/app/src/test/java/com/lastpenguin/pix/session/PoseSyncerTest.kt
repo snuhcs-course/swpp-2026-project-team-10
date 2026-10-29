@@ -22,7 +22,7 @@ import org.junit.Test
  * ModuleFakes.kt.
  * Photographer, the set (state-based): GENERATING, each candidate as it arrives, then PICKING with its order, then
  * CHOSEN with whose pick; CLOSED from GENERATING or PICKING; one end per set, so a close after a choice sends nothing;
- * a candidate or a step after the end is not sent; a candidate that cannot be encoded is left out.
+ * a candidate or a step after the end is not sent; a candidate that cannot be encoded is left out, also from PICKING.
  * Photographer, the connection: nothing goes while no subject is connected; a sender started later (a reconnect)
  * sends the open set again, its candidates first; a set that ended meanwhile goes as its end alone; a set that ends
  * while a copy is encoded sends no more copies, and no PICKING it has moved past.
@@ -176,6 +176,8 @@ class PoseSyncerTest {
         runCurrent()
 
         assertEquals(listOf("GENERATING", "pose-2", "PICKING"), sentOrder())
+        // PICKING names only the copy that went out, so the subject is not told of one it cannot have.
+        assertEquals(listOf("pose-2"), steps().last().poseIds)
     }
 
     // ---- photographer: the connection ---------------------------------------------------------------------------

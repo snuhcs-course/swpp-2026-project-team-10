@@ -93,12 +93,16 @@ class SubjectConfirmFragmentTest {
     /** The screen over Subject view, as Subject view opens it. */
     private fun launch(): TestNavHostController {
         val nav = TestNavHostController(ApplicationProvider.getApplicationContext())
-        scenario = launchFragmentInContainer<SubjectConfirmFragment>(themeResId = R.style.Theme_Pix)
-        scenario!!.onFragment {
-            nav.setGraph(R.navigation.nav_graph)
-            nav.setCurrentDestination(R.id.subjectFragment)
-            nav.navigate(R.id.action_subject_to_confirm)
-            Navigation.setViewNavController(it.requireView(), nav)
+        nav.setGraph(R.navigation.nav_graph)
+        nav.setCurrentDestination(R.id.subjectFragment)
+        nav.navigate(R.id.action_subject_to_confirm)
+        // The controller is there as soon as the view is, before the screen's collectors start, as in the app.
+        scenario = launchFragmentInContainer(themeResId = R.style.Theme_Pix) {
+            SubjectConfirmFragment().also { fragment ->
+                fragment.viewLifecycleOwnerLiveData.observeForever { owner ->
+                    if (owner != null) Navigation.setViewNavController(fragment.requireView(), nav)
+                }
+            }
         }
         idle()
         return nav

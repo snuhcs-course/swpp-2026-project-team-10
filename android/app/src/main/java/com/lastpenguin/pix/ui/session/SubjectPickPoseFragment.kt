@@ -56,7 +56,10 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
                 launch { viewModel.uiState.collect { ui -> render(binding, pages, ui) } }
                 launch {
                     viewModel.ended.collect { end ->
-                        poseSetEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
+                        // Only this screen's set: an end kept from an earlier one says nothing about it.
+                        val ui = viewModel.uiState.value
+                        if (end.setId != ui.setId) return@collect
+                        poseSetEndNotice(requireContext(), end, ui.photographerName)?.let {
                             Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
                         }
                         backToSubject()

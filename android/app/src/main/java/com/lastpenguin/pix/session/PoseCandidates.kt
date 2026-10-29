@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -78,7 +78,12 @@ interface PoseCandidateCodec {
     fun decode(format: String, bytes: ByteArray): Bitmap?
 }
 
-class JpegPoseCandidateCodec : PoseCandidateCodec {
+/**
+ * A copy as JPEG at most [MAX_LONG_SIDE] on its long side, at [QUALITY] or, for a detailed image that would not fit
+ * the receiver's [maxBytes], at a lower quality; one that does not fit at the lowest is left out (null), so the sender
+ * never announces a copy the subject must refuse.
+ */
+class JpegPoseCandidateCodec(private val maxBytes: Int = PoseCandidateAssembler.MAX_BYTES) : PoseCandidateCodec {
 
     override fun encode(poseId: String, image: Bitmap): EncodedPoseCandidate? {
         val long = maxOf(image.width, image.height)
@@ -88,9 +93,14 @@ class JpegPoseCandidateCodec : PoseCandidateCodec {
         } else {
             image
         }
-        val out = ByteArrayOutputStream()
-        if (!scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)) return null
-        return EncodedPoseCandidate(poseId, FORMAT, scaled.width, scaled.height, out.toByteArray())
+        for (quality in QUALITIES) {
+            val out = ByteArrayOutputStream()
+            if (!scaled.compress(Bitmap.CompressFormat.JPEG, quality, out)) return null
+            if (out.size() <= maxBytes) {
+                return EncodedPoseCandidate(poseId, FORMAT, scaled.width, scaled.height, out.toByteArray())
+            }
+        }
+        return null
     }
 
     override fun decode(format: String, bytes: ByteArray): Bitmap? {
@@ -114,5 +124,8 @@ class JpegPoseCandidateCodec : PoseCandidateCodec {
 
         /** As the scene photo and the reference copy. */
         const val QUALITY = 85
+
+        /** What a copy over the receiver's limit is tried at next; noise-like detail still fits at the last. */
+        private val QUALITIES = listOf(QUALITY, 70, 55)
     }
 }

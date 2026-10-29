@@ -43,10 +43,10 @@ import org.robolectric.shadows.ShadowToast
  * The subject's Pick a pose (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's set
  * delivered to the container's PoseSyncer. Partitions: the candidates shown as on the photographer's phone, with the
  * hint and without Try other poses; Use this pose sent as a pick and waiting; the set's end by the photographer's
- * choice or close (a notice and back to Subject view), by this phone's own pick (back without a notice); a pick no
- * step answers in 5 s (a notice, and it can be tapped again); Back (Subject view, the set kept); the link
- * reconnecting (the candidates kept, Use this pose waiting until it is back); the session ending (back to Subject
- * view, which shows what ended it).
+ * choice or close (a notice and back to Subject view), by this phone's own pick (back without a notice), and an end
+ * kept from an earlier set (nothing); a pick no step answers in 5 s (a notice, and it can be tapped again); Back
+ * (Subject view, the set kept); the link reconnecting (the candidates kept, Use this pose waiting until it is back);
+ * the session ending (back to Subject view, which shows what ended it).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -95,12 +95,16 @@ class SubjectPickPoseFragmentTest {
     /** The screen over Subject view, as Subject view opens it. */
     private fun launch(): TestNavHostController {
         val nav = TestNavHostController(ApplicationProvider.getApplicationContext())
-        scenario = launchFragmentInContainer<SubjectPickPoseFragment>(themeResId = R.style.Theme_Pix)
-        scenario!!.onFragment {
-            nav.setGraph(R.navigation.nav_graph)
-            nav.setCurrentDestination(R.id.subjectFragment)
-            nav.navigate(R.id.action_subject_to_pickPose)
-            Navigation.setViewNavController(it.requireView(), nav)
+        nav.setGraph(R.navigation.nav_graph)
+        nav.setCurrentDestination(R.id.subjectFragment)
+        nav.navigate(R.id.action_subject_to_pickPose)
+        // The controller is there as soon as the view is, before the screen's collectors start, as in the app.
+        scenario = launchFragmentInContainer(themeResId = R.style.Theme_Pix) {
+            SubjectPickPoseFragment().also { fragment ->
+                fragment.viewLifecycleOwnerLiveData.observeForever { owner ->
+                    if (owner != null) Navigation.setViewNavController(fragment.requireView(), nav)
+                }
+            }
         }
         idle()
         return nav
@@ -180,6 +184,27 @@ class SubjectPickPoseFragmentTest {
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
         assertEquals(0, ShadowToast.shownToastCount())
+    }
+
+    @Test
+    fun anEndKeptFromAnEarlierSet_leavesThisOneOpen() {
+        // set0 ended while no screen read it; its end waits in the syncer.
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        modules.session.deliver(SessionMessage.PoseStep("set0", PoseSetStep.GENERATING))
+        modules.session.deliver(SessionMessage.PoseStep("set0", PoseSetStep.CLOSED))
+        idle()
+        step(modules, PoseSetStep.GENERATING)
+        candidate(modules, "pose-1")
+        step(modules, PoseSetStep.PICKING, poseIds = listOf("pose-1"))
+
+        val nav = launch()
+
+        assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
+        assertEquals(0, ShadowToast.shownToastCount())
+        assertTrue(onScreen { it.usePoseButton.isEnabled })
     }
 
     @Test

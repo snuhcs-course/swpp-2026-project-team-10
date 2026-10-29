@@ -175,11 +175,15 @@ class PoseSyncer(
             var announced: String? = null
             var sentStep: PoseSetStep? = null
             val sent = mutableSetOf<String>()
+
+            // The copies that went out; PICKING names only these, so the subject is never told of one it cannot have.
+            val delivered = mutableSetOf<String>()
             shared.collect { set ->
                 if (set == null) return@collect
                 if (set.setId != announced) {
                     announced = set.setId
                     sent.clear()
+                    delivered.clear()
                     // A set that ended before this sender heard of it goes as its end alone: a subject that held it
                     // through a reconnect closes it, and any other drops the set it holds or has nothing to drop.
                     val step = if (set.open) PoseSetStep.GENERATING else set.step
@@ -190,7 +194,7 @@ class PoseSyncer(
                     // A set that ended or was replaced while an earlier copy was encoded sends no more of them.
                     if (shared.value?.let { it.setId == set.setId && it.open } != true) break
                     if (!sent.add(poseId)) continue
-                    sendCandidate(set.setId, poseId, image)
+                    if (sendCandidate(set.setId, poseId, image)) delivered += poseId
                 }
                 // A set that moved on while a copy was encoded sends the step it is at now, from the newer value,
                 // never this one's: a PICKING sent for a set already closed would open the subject's Pick a pose.
@@ -201,7 +205,8 @@ class PoseSyncer(
                     PoseSetStep.GENERATING -> Unit
 
                     PoseSetStep.PICKING -> if (sentStep == PoseSetStep.GENERATING) {
-                        send(SessionMessage.PoseStep(set.setId, PoseSetStep.PICKING, poseIds = set.poseIds))
+                        val poseIds = set.poseIds.filter { it in delivered }
+                        send(SessionMessage.PoseStep(set.setId, PoseSetStep.PICKING, poseIds = poseIds))
                         sentStep = PoseSetStep.PICKING
                     }
 
@@ -224,16 +229,18 @@ class PoseSyncer(
         }
     }
 
-    private suspend fun sendCandidate(setId: String, poseId: String, image: Bitmap) {
+    /** False for a candidate whose copy could not be made, for example one that would not fit the subject's limit. */
+    private suspend fun sendCandidate(setId: String, poseId: String, image: Bitmap): Boolean {
         val copy = withContext(dispatcher) { codec.encode(poseId, image) }
         if (copy == null) {
             Log.w(TAG, "Could not encode candidate $poseId")
-            return
+            return false
         }
         session.send(copy.begin(setId))
         for (index in copy.chunks.indices) session.send(copy.chunk(setId, index))
         session.send(copy.end(setId))
         Timings.mark("pose.sent", "candidate $poseId ${copy.bytes.size} B in ${copy.chunks.size} chunks")
+        return true
     }
 
     private fun send(step: SessionMessage.PoseStep) {

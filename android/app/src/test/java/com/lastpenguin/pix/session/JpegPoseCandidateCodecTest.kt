@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -15,8 +15,10 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Real JPEG encoding and decoding of a candidate's copy for the subject's Pick a pose (FR-6.15; Robolectric native
- * graphics). Partitions: a candidate wider or taller than 1024 px, one already small, and another format; on receipt
- * (boundary), a copy of 1024 px and of 1025 px on its long side, and bytes that are not an image.
+ * graphics). Partitions: a candidate wider or taller than 1024 px, one already small, and another format; the
+ * receiver's byte limit (boundary): a copy that fits at quality 85, one that fits only at a lower quality, and one that
+ * fits at none, which is left out; on receipt (boundary), a copy of 1024 px and of 1025 px on its long side, and bytes
+ * that are not an image.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -48,6 +50,33 @@ class JpegPoseCandidateCodecTest {
             assertEquals(copy.width, decoded?.width)
             assertEquals(copy.height, decoded?.height)
         }
+    }
+
+    /** A detailed image: noise, as in foliage or gravel, compresses least. */
+    private fun noise(width: Int, height: Int): Bitmap {
+        val random = java.util.Random(7)
+        val pixels =
+            IntArray(width * height) { Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256)) }
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
+    }
+
+    private fun size(image: Bitmap, quality: Int): Int =
+        ByteArrayOutputStream().also { image.compress(Bitmap.CompressFormat.JPEG, quality, it) }.size()
+
+    @Test
+    fun `a copy over the receiver's limit is made at a lower quality, and one that never fits is left out`() {
+        val detailed = noise(400, 300)
+        val at85 = size(detailed, JpegPoseCandidateCodec.QUALITY)
+
+        // At the limit, quality 85 is kept.
+        assertEquals(at85, JpegPoseCandidateCodec(maxBytes = at85).encode("pose-1", detailed)?.bytes?.size)
+        // One byte under it, a lower quality fits.
+        val lower = JpegPoseCandidateCodec(maxBytes = at85 - 1).encode("pose-1", detailed)
+        assertNotNull(lower)
+        assertTrue(lower!!.bytes.size < at85)
+        assertEquals(400, lower.width)
+        // Under the lowest quality's size, nothing is sent.
+        assertNull(JpegPoseCandidateCodec(maxBytes = size(detailed, 55) - 1).encode("pose-1", detailed))
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -17,22 +17,25 @@ interface PixApi {
 
     /**
      * Four poses for the scene: suggested ones when [description] is null (FR-4.4), or the description followed by
-     * three variations of it, so that the four candidates differ (FR-4.8). A null part is left out of the request.
+     * three variations of it, so that the four candidates differ (FR-4.8). [selfie] is `true` for a selfie's scene,
+     * which gets selfie poses (FR-1.14). A null part is left out of the request.
      */
     @Multipart
     @POST("api/v1/pose-suggestions")
     suspend fun suggestPoses(
         @Part image: MultipartBody.Part,
         @Part("description") description: RequestBody?,
+        @Part("selfie") selfie: RequestBody?,
     ): PoseSuggestionsDto
 
-    /** One candidate per call; the app sends one call per pose of the set in parallel. */
+    /** One candidate per call; the app sends one call per pose of the set in parallel. [selfie] as above. */
     @Multipart
     @POST("api/v1/poses")
     suspend fun createPose(
         @Part image: MultipartBody.Part,
         @Part("description") description: RequestBody,
         @Part("seed") seed: RequestBody,
+        @Part("selfie") selfie: RequestBody?,
     ): PoseResponseDto
 
     /**

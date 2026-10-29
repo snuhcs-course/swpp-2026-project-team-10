@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -126,8 +126,13 @@ class TestAppContainer(
     class ScriptedPoseGenerator : PoseGenerator {
         val runs = mutableListOf<Run>()
 
-        override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> {
-            val run = Run(scene, request).also(runs::add)
+        override fun generate(
+            scene: Bitmap,
+            request: PoseRequest,
+            seed: Long,
+            selfie: Boolean,
+        ): Flow<GenerationEvent> {
+            val run = Run(scene, request, selfie).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -138,7 +143,7 @@ class TestAppContainer(
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest) {
+        class Run(val scene: Bitmap, val request: PoseRequest, val selfie: Boolean = false) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 

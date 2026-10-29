@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -56,7 +56,8 @@ import org.robolectric.annotation.GraphicsMode
  * The camera screens' layout on the Galaxy S22's app area, 360 x 705 dp (R&S 6.2, 6.6; Testing Documentation 2.1.6).
  * Ratios: 4:3, 16:9, and 1:1, each with the preview right below the top bar, the shutter's row in one place, and the
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
- * the top bar: no guide, a guide with a pose tip, and a session, at font scale 1 and 1.3, none overlapping. A guide's
+ * the top bar: no guide, a guide with a pose tip, and a session, at font scale 1 and 1.3, none overlapping. The camera
+ * switch between the shutter and the gallery button (FR-1.14). A guide's
  * panel in the space below a 4:3 image. The frame held while the ratio changes, in its place and the old ratio's
  * area until the new one streams; a held 1:1 frame dimmed once. The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
@@ -165,6 +166,7 @@ class CameraLayoutTest {
         for (view in listOf(
             screen.controls.guideButton,
             screen.controls.shutterButton,
+            screen.controls.switchCameraButton,
             screen.controls.galleryButton,
         )) {
             assertTrue(
@@ -173,6 +175,21 @@ class CameraLayoutTest {
             )
         }
         assertTrue(row.box().top > screen.controls.previewContainer.box().top)
+    }
+
+    @Test
+    fun theCameraSwitch_sitsBetweenTheShutterAndTheGallery_onTheirCenterLine() {
+        val screen = camera()
+
+        val shutter = screen.controls.shutterButton.box()
+        val switch = screen.controls.switchCameraButton.box()
+        val gallery = screen.controls.galleryButton.box()
+
+        assertTrue("$switch after $shutter", switch.left > shutter.right)
+        assertTrue("$switch before $gallery", switch.right <= gallery.left)
+        assertTrue("$gallery inside the screen", gallery.right <= 360)
+        assertEquals(shutter.centerY(), switch.centerY())
+        assertEquals(shutter.centerY(), gallery.centerY())
     }
 
     @Test

@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.ImageFormat
+import android.graphics.Rect
 import androidx.camera.core.ImageProxy
 import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.core.Timings
@@ -14,7 +15,8 @@ import org.webrtc.VideoFrame
  * Feeds camera frames into the WebRTC video source (Design 2.6.4). The photographer passes it to
  * CameraController.setFrameSink while connected. Each frame is packed to NV21, cropped to the viewport of the chosen aspect ratio, and
  * handed over with its rotation, so the encoder sends the sensor's landscape buffer and the subject's renderer
- * turns it upright. A small pool reuses the NV21 arrays.
+ * turns it upright. The front camera's frames are flipped first, so the subject sees the photographer's mirrored
+ * preview and the guide lines up on both phones (FR-1.14). A small pool reuses the NV21 arrays.
  * Owner: Real-time (#8).
  */
 class CameraFrameSource(private val clock: () -> Long = System::nanoTime) : FrameSink {
@@ -26,7 +28,7 @@ class CameraFrameSource(private val clock: () -> Long = System::nanoTime) : Fram
     private val pool = ArrayBlockingQueue<ByteArray>(POOL_SIZE)
     private var frames = 0L
 
-    override fun onFrame(image: ImageProxy) {
+    override fun onFrame(image: ImageProxy, mirrored: Boolean) {
         try {
             val observer = observer ?: return
             if (image.format != ImageFormat.YUV_420_888) return
@@ -43,19 +45,28 @@ class CameraFrameSource(private val clock: () -> Long = System::nanoTime) : Fram
                 planes[2].toYuvPlane(),
                 nv21,
             )
+            val rotation = image.imageInfo.rotationDegrees
+            // Turned by a quarter, the upright frame's left and right are the buffer's rows.
+            val rows = rotation % 180 != 0
+            if (mirrored) YuvToNv21.mirror(nv21, width, height, rows)
             val full = NV21Buffer(nv21, width, height) { pool.offer(nv21) }
-            val crop = image.cropRect
+            val crop = image.cropRect.let { crop ->
+                when {
+                    !mirrored -> crop
+                    rows -> Rect(crop.left, height - crop.bottom, crop.right, height - crop.top)
+                    else -> Rect(width - crop.right, crop.top, width - crop.left, crop.bottom)
+                }
+            }
             val buffer = if (crop.left == 0 && crop.top == 0 && crop.width() == width && crop.height() == height) {
                 full
             } else {
                 full.cropAndScale(crop.left, crop.top, crop.width(), crop.height(), crop.width(), crop.height())
                     .also { full.release() }
             }
-            val frame = VideoFrame(buffer, image.imageInfo.rotationDegrees, clock())
+            val frame = VideoFrame(buffer, rotation, clock())
             observer.onFrameCaptured(frame)
             frame.release()
             if (++frames == 1L || frames % LOG_EVERY == 0L) {
-                val rotation = image.imageInfo.rotationDegrees
                 Timings.mark(
                     "frames",
                     "n=$frames ${width}x$height crop=${crop.width()}x${crop.height()} rotation=$rotation",

@@ -34,6 +34,8 @@
     <string name="photo_storage_failed">Couldn\'t write the photo. Check available storage and try again.</string>
     <string name="photo_camera_closed">The camera closed before the photo was taken. Return to the camera and try again.</string>
     <string name="open_last_photo">Open last saved photo in gallery</string>
+    <string name="switch_to_front_camera">Switch to the front camera</string>
+    <string name="switch_to_rear_camera">Switch to the rear camera</string>
     <string name="gallery_unavailable">No app is available to open this photo.</string>
     <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
     <string name="hint_add_guide">Tap Guide to add a pose</string>

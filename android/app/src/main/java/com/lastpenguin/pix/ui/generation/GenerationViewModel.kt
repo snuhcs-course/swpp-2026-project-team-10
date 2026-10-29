@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationConsent
@@ -30,6 +31,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 data class GenerationUiState(
     /** The photo the user took and confirmed; kept for *Try again* and *Try other poses*. */
     val scene: Bitmap? = null,
+    /** The scene photo is a selfie from the front camera: the server makes selfie poses of it (FR-1.14). */
+    val selfie: Boolean = false,
     /** What the set was asked for; *Try again* asks for it again. */
     val request: PoseRequest? = null,
     /** The description field's text on Generate poses, kept for *Try other poses* and when the service rejects it. */
@@ -58,9 +61,13 @@ data class GenerationUiState(
     val selectedImage: Bitmap?
         get() = (candidates[selectedPoseId] as? CandidateEvent.Ready)?.image
 
-    /** What the selected candidate's tip is asked from: the scene and the pose it was made with (FR-4.10). */
+    /**
+     * What the selected candidate's tip is asked from: the scene and the pose it was made with (FR-4.10). None for a
+     * selfie: the tip tells a photographer standing in front of the person how to hold the phone.
+     */
     val tipSource: TipSource?
         get() {
+            if (selfie) return null
             val pose = poses.firstOrNull { it.id == selectedPoseId } ?: return null
             return scene?.let { TipSource(it, pose.text) }
         }
@@ -113,6 +120,8 @@ class GenerationViewModel(
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         shooting = viewModelScope.launch {
+            // The camera the frame comes from, read with it: a selfie gets selfie poses (FR-1.14).
+            val selfie = camera.facing.value == CameraFacing.FRONT
             val frame = camera.grabFrame()
             frame.exceptionOrNull()?.let { Log.w(TAG, "No scene photo: $it") }
             _uiState.update { state ->
@@ -122,6 +131,7 @@ class GenerationViewModel(
 
                     frame.isSuccess -> state.copy(
                         scene = frame.getOrNull(),
+                        selfie = selfie,
                         phase = GenerationUiState.Phase.REVIEWING,
                         shotFailed = false,
                     )
@@ -160,14 +170,14 @@ class GenerationViewModel(
     fun generate(description: String) {
         val state = _uiState.value
         if (state.phase != GenerationUiState.Phase.DESCRIBING || state.scene == null) return
-        start(state.scene, PoseRequest.of(description), description)
+        start(state.scene, state.selfie, PoseRequest.of(description), description)
     }
 
     /** *Skip, suggest poses for me*: the server chooses four poses for the scene (FR-4.4). */
     fun suggestPoses() {
         val state = _uiState.value
         if (state.phase != GenerationUiState.Phase.DESCRIBING || state.scene == null) return
-        start(state.scene, PoseRequest.Suggested, state.description)
+        start(state.scene, state.selfie, PoseRequest.Suggested, state.description)
     }
 
     /**
@@ -196,18 +206,21 @@ class GenerationViewModel(
      */
     fun retry() {
         val state = _uiState.value
-        if (state.scene != null && state.request != null) start(state.scene, state.request, state.description)
+        if (state.scene != null && state.request != null) {
+            start(state.scene, state.selfie, state.request, state.description)
+        }
     }
 
-    private fun start(scene: Bitmap, request: PoseRequest, description: String) {
+    private fun start(scene: Bitmap, selfie: Boolean, request: PoseRequest, description: String) {
         generating?.cancel()
         _uiState.value = GenerationUiState(
             scene = scene,
+            selfie = selfie,
             request = request,
             description = description,
             phase = GenerationUiState.Phase.GENERATING,
         )
-        generating = viewModelScope.launch { generate(scene, request) }
+        generating = viewModelScope.launch { generate(scene, selfie, request) }
     }
 
     /**
@@ -236,11 +249,14 @@ class GenerationViewModel(
      * rejected every pose of a description (US-5). One limit covers the whole run, the suggestions included, so
      * Generating poses never lasts longer than the 60 s it says (NFR-4).
      */
-    private suspend fun generate(scene: Bitmap, request: PoseRequest) {
-        Timings.mark("pose.start", if (request is PoseRequest.Suggested) "suggested" else "described")
+    private suspend fun generate(scene: Bitmap, selfie: Boolean, request: PoseRequest) {
+        Timings.mark(
+            "pose.start",
+            (if (request is PoseRequest.Suggested) "suggested" else "described") + if (selfie) " selfie" else "",
+        )
         val inTime = withTimeoutOrNull(limitMs) {
             try {
-                generator.generate(scene, request, Random.nextLong()).collect { event -> receive(event) }
+                generator.generate(scene, request, Random.nextLong(), selfie).collect { event -> receive(event) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

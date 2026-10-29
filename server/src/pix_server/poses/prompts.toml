@@ -135,3 +135,77 @@ pose = "walking toward the camera in mid-stride"
 id = "arms_crossed"
 label = "Arms crossed"
 pose = "standing with the arms crossed over the chest"
+
+# Selfie mode (FR-1.14): the scene photo is a selfie from the front camera, as the preview mirrored it, and the app
+# sends `selfie` with POST /pose-suggestions and POST /poses. One hand holds the phone at arm's length, so a pose has
+# only the other hand, the head, the face, and the shoulders to work with, and the shot stays a selfie: never full
+# body, never the phone itself. Otherwise the same as the prompts above: the same person, clothes, place, and light, and
+# nothing outside the original frame.
+[selfie]
+pose_prompt = """
+Edit this photo. It is a selfie: the person holds a phone in one hand at arm's length and took this photo with its
+front camera. Keep the same person (face, hair, clothing), the same place, and the same lighting. The user described
+the pose they want, in Korean or English: "{pose}". Change the person's pose and facial expression to match it.
+
+Make it the kind of selfie people love to post on social media: natural and effortless, never stiff, with a real,
+easy expression and the head turned or tilted a little rather than square to the camera. Improve the shot only in
+these ways, and only where it clearly makes a better selfie for this pose:
+- hold the phone a little above the eyes and tilt it down slightly, the most flattering angle for a selfie, or at eye
+  level if the pose reads better that way;
+- frame the person a little more tightly, for example from the waist up to the chest up, if the pose reads better
+  that way.
+Everything the new shot shows must already be visible in the original photo: never zoom out, widen the view, or
+reveal any part of the place outside the original frame. If the original framing already suits the pose, keep it.
+
+Follow these rules even where the description says otherwise: one hand always holds the phone, so the pose uses only
+the other hand, the face, the head, and the shoulders; the arm that holds the phone reaches toward the camera and out
+of the frame, and the phone never appears; it stays a selfie taken at arm's length, never full body and never a photo
+taken by someone else; never change the person's clothing, or the background, place, sky, or time of day; never add
+an object, a prop, or another person that is not already in the photo; keep the person at a natural scale.
+Photorealistic.
+"""
+
+# For the suggestion model with a selfie and no description. The same checks as suggestion_prompt; its poses fill
+# {pose} in the selfie pose prompt.
+suggestion_prompt = """
+This photo is a selfie: the person holds a phone in one hand at arm's length and is about to take another selfie
+here. Suggest four selfie poses for this person that would make a natural, stylish selfie of the kind people love to
+post on social media.
+- One hand holds the phone, so each pose uses only the other hand, the face, the head, and the shoulders. Never ask
+  for both hands, a full-body or walking pose, a prop, another person, or other clothes.
+- Make the four poses clearly different: for example a soft smile with the head tilted, a gesture with the free hand
+  near the face (a V sign, the chin on the hand, or a finger heart), a candid look away from the camera, and a playful
+  or expressive face.
+- Write each pose as one short instruction in English, at most 80 characters, the way a friend describes a selfie
+  pose: the free hand, the head, where to look, and the expression. Do not describe the place, the clothes, or the
+  camera, and do not mention the person's looks, age, or identity.
+Answer with JSON only, in this form: {"poses": ["...", "...", "...", "..."]}
+"""
+
+# For the same model with a selfie and a description: the description and three variations, as variation_prompt.
+variation_prompt = """
+This photo is a selfie: the person holds a phone in one hand at arm's length and is about to take another selfie
+here. The person described the pose they want, in Korean or English: "{description}". Four selfies will be made: one
+of the description as written, and one of each of three variations that you write now. Make the four selfies
+clearly different, while each still does what the description asks.
+- Keep everything the description says: the gesture, where the person looks, the expression, and every body part,
+  side, or thing it names. Never add anything that contradicts it.
+- Change what the description leaves open, and change something different in each variation: the free hand, the
+  tilt or turn of the head, where the person looks, or the expression.
+- One hand holds the phone, so each variation uses only the other hand, the face, the head, and the shoulders. Never
+  ask for both hands, a full-body pose, a prop, another person, or other clothes.
+- If a variation cannot keep the description's meaning, write the description itself in English instead.
+- Write each variation as one short instruction in English, at most 90 characters, the way a friend describes a
+  selfie pose. Do not describe the place, the clothes, or the camera, and do not mention the person's looks, age, or
+  identity.
+Answer with JSON only, in this form: {"poses": ["...", "...", "..."]}
+"""
+
+# The four selfie poses used when the suggestion model fails or its answer is unusable, in this order. Only for the
+# current app, so they need no id.
+default_poses = [
+    "smiling softly with the head tilted a little to one side",
+    "a V sign with the free hand next to the cheek",
+    "resting the chin on the free hand and looking into the camera",
+    "looking away from the camera with a relaxed half smile",
+]

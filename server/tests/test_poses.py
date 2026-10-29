@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
@@ -6,6 +6,7 @@
 # 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short. Image API: a candidate in JPEG, PNG,
 # or WEBP; a refusal (403) of a template and of a description, with one message for both; another failing status; an unreadable answer; no
 # answer in time; no key. Limits: each window full, and a request refused before the image API, which is not counted.
+# Selfie (FR-1.14): `selfie` true, false, left out, and not a boolean.
 import asyncio
 import base64
 import io
@@ -19,16 +20,18 @@ from starlette.formparsers import MultiPartParser
 
 from pix_server.main import MAX_REQUEST_BYTES
 from pix_server.poses.limiter import PoseLimiter
-from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH
+from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH, pose_prompt
 from pix_server.store import Window
 
 
-def create_pose(client, image, template_id="wave", seed="1829304756", description=None):
+def create_pose(client, image, template_id="wave", seed="1829304756", description=None, selfie=None):
     data = {"seed": seed}
     if template_id is not None:
         data["templateId"] = template_id
     if description is not None:
         data["description"] = description
+    if selfie is not None:
+        data["selfie"] = selfie
     return client.post("/api/v1/poses", files={"image": ("scene.jpg", image, "image/jpeg")}, data=data)
 
 
@@ -432,3 +435,19 @@ def test_description_is_not_logged(client, image_api, make_image, caplog, status
     assert "OpenRouter" in caplog.text
     assert "SECRET" not in caplog.text
     assert "벽에" not in caplog.text
+
+
+@pytest.mark.parametrize(("selfie", "is_selfie"), [("true", True), ("false", False), (None, False)])
+def test_selfie_says_which_pose_prompt_the_image_api_gets(client, image_api, make_image, selfie, is_selfie):
+    response = create_pose(client, make_image(), template_id=None, description="윙크하며 브이", selfie=selfie)
+
+    assert response.status_code == 200
+    [payload] = image_api.payloads
+    assert payload["prompt"] == pose_prompt("윙크하며 브이", selfie=is_selfie)
+
+
+def test_selfie_that_is_not_a_boolean_is_invalid(client, image_api, make_image):
+    response = create_pose(client, make_image(), template_id=None, description="wink", selfie="maybe")
+
+    assert_error(response, 400, "INVALID_REQUEST")
+    assert image_api.requests == []

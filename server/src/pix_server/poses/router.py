@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -85,9 +85,12 @@ async def suggest_poses(
     image: UploadFile,
     # Left out, or empty, for suggested poses; FastAPI reads an empty form field as left out.
     description: Annotated[str | None, Form()] = None,
+    # The scene is a selfie (FR-1.14); apps from before Iteration 3 leave it out.
+    selfie: Annotated[bool, Form()] = False,
 ) -> PoseSuggestionsResponse:
     """Four poses for the scene, which the app then sends as the descriptions of its four POST /poses: four poses
-    suggested for the scene, or, with a description, the description and three variations of it."""
+    suggested for the scene, or, with a description, the description and three variations of it; selfie poses for a
+    selfie."""
     if description is not None:
         checked_pose(description)
     scene = await image.read()
@@ -95,8 +98,8 @@ async def suggest_poses(
     await count(request, "suggestions")
     suggester: PoseSuggester = request.app.state.pose_suggester
     if description is None:
-        return PoseSuggestionsResponse(poses=await suggester.suggest(scene))
-    return PoseSuggestionsResponse(poses=await suggester.vary(scene, description))
+        return PoseSuggestionsResponse(poses=await suggester.suggest(scene, selfie))
+    return PoseSuggestionsResponse(poses=await suggester.vary(scene, description, selfie))
 
 
 @router.post("/poses")
@@ -107,12 +110,14 @@ async def create_pose(
     # FastAPI reads an empty form field as left out, so an empty description with a template asks for the template.
     template_id: Annotated[str | None, Form(alias="templateId")] = None,
     description: Annotated[str | None, Form()] = None,
+    # The scene is a selfie (FR-1.14): the selfie pose prompt; apps from before Iteration 3 leave it out.
+    selfie: Annotated[bool, Form()] = False,
 ) -> PoseResponse:
     started = time.perf_counter()
     if (template_id is None) == (description is None):
         raise ApiError(400, "INVALID_REQUEST", "templateId or description: send exactly one")
     if description is not None:
-        prompt = pose_prompt(description)
+        prompt = pose_prompt(description, selfie)
     elif (default := DEFAULT_POSES.get(template_id)) is not None:
         # An app from before Iteration 2; its template is a default pose, sent with the same prompt.
         prompt = pose_prompt(default.pose)

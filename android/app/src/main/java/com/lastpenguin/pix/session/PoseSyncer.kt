@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -177,6 +177,7 @@ class PoseSyncer(
             val sent = mutableSetOf<String>()
 
             // The copies that went out; PICKING names only these, so the subject is never told of one it cannot have.
+            // One that names none still says the photographer is picking; the subject then opens no Pick a pose.
             val delivered = mutableSetOf<String>()
             shared.collect { set ->
                 if (set == null) return@collect

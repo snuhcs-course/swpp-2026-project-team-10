@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -93,6 +93,8 @@ data class SubjectUiState(
      */
     val poseSetId: String? = null,
     val poseStep: PoseSetStep? = null,
+    /** With PICKING: whether a candidate's copy is here to pick from; a set with none opens no *Pick a pose*. */
+    val posesReady: Boolean = false,
     /**
      * The photographer's open Reference confirm of the chosen pose (Design 2.6.5), which this phone shows on *Your
      * reference*; null when there is none.
@@ -271,7 +273,8 @@ class SubjectViewModel(
         poses?.let { syncer ->
             viewModelScope.launch {
                 syncer.mirror.collect { set ->
-                    _uiState.update { it.copy(poseSetId = set?.setId, poseStep = set?.step) }
+                    val ready = set?.ready?.isNotEmpty() == true
+                    _uiState.update { it.copy(poseSetId = set?.setId, poseStep = set?.step, posesReady = ready) }
                 }
             }
         }

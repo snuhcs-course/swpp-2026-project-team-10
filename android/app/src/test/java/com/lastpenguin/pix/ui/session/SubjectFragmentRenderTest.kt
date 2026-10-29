@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -19,6 +19,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.GuideReference
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
@@ -66,13 +67,14 @@ import org.robolectric.shadows.ShadowToast
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
  * and filled; the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", Pick a
- * pose opened once per set and then by its button, a set the photographer closes after Back, which says so, and a
+ * pose opened once per set and then by its button, a set with no copy here, which opens nothing, a set the
+ * photographer closes after Back, which says so, and a
  * set kept through a reconnect, with "Reconnecting…" in place of what the photographer is doing; the photographer's
  * Reference confirm (FR-6.15): "checking the guide", Your reference opened once per confirm and then by the same
  * button, a set still picking shown before the confirm that follows it, and a guide the photographer uses after Back,
  * which says so; the photographer's Generate poses (FR-6.15): "describing a pose" in place of "camera paused", Generate
- * poses opened once per description and then by the same button, a set held here shown before it, and a close after
- * Back, which says so.
+ * poses opened once per description and then by the same button, opened once Add a pose guide closes when it came
+ * under the sheet, a set held here shown before it, and a close after Back, which says so.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -433,10 +435,20 @@ class SubjectFragmentRenderTest {
         }
     }
 
-    private fun poseStep(modules: TestAppContainer, step: PoseSetStep) {
-        modules.session.deliver(SessionMessage.PoseStep("set1", step))
+    private fun poseStep(modules: TestAppContainer, step: PoseSetStep, poseIds: List<String> = emptyList()) {
+        modules.session.deliver(SessionMessage.PoseStep("set1", step, poseIds))
         // The status check runs every 500 ms on the main looper.
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+    }
+
+    /** The photographer's set ready to pick from on this phone: pose-1's copy, then PICKING naming it. */
+    private fun picking(modules: TestAppContainer) {
+        val copy = checkNotNull(FakePoseCandidateCodec().encode("pose-1", bitmap()))
+        modules.session.deliver(copy.begin("set1"))
+        for (i in copy.chunks.indices) modules.session.deliver(copy.chunk("set1", i))
+        modules.session.deliver(copy.end("set1"))
+        idle()
+        poseStep(modules, PoseSetStep.PICKING, listOf("pose-1"))
     }
 
     @Test
@@ -455,7 +467,7 @@ class SubjectFragmentRenderTest {
         }
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
 
-        poseStep(modules, PoseSetStep.PICKING)
+        picking(modules)
         assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
         onScreen { binding, _ ->
             assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
@@ -473,6 +485,25 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
+    fun aSetWithNoCopyHere_saysTheyArePicking_andOpensNothing() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        poseStep(modules, PoseSetStep.GENERATING)
+
+        // No copy fitted the subject's limit, so PICKING names none (Codex's review).
+        poseStep(modules, PoseSetStep.PICKING)
+
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(View.GONE, binding.pickPoseButton.visibility)
+        }
+    }
+
+    @Test
     fun aSetThePhotographerClosesAfterBack_saysSo_andTheStatusGoes() {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
@@ -480,7 +511,7 @@ class SubjectFragmentRenderTest {
         modules.poses.startAsReceiver(receiving)
         idle()
         poseStep(modules, PoseSetStep.GENERATING)
-        poseStep(modules, PoseSetStep.PICKING)
+        picking(modules)
         nav.popBackStack()
         idle()
 
@@ -501,7 +532,7 @@ class SubjectFragmentRenderTest {
         modules.poses.startAsReceiver(receiving)
         idle()
         poseStep(modules, PoseSetStep.GENERATING)
-        poseStep(modules, PoseSetStep.PICKING)
+        picking(modules)
         nav.popBackStack()
         idle()
 
@@ -562,7 +593,7 @@ class SubjectFragmentRenderTest {
         modules.confirms.startAsReceiver(receiving)
         idle()
         poseStep(modules, PoseSetStep.GENERATING)
-        poseStep(modules, PoseSetStep.PICKING)
+        picking(modules)
         nav.popBackStack()
         idle()
 
@@ -639,7 +670,7 @@ class SubjectFragmentRenderTest {
         modules.descriptions.startAsReceiver(receiving)
         idle()
         poseStep(modules, PoseSetStep.GENERATING)
-        poseStep(modules, PoseSetStep.PICKING)
+        picking(modules)
         nav.popBackStack()
         idle()
 
@@ -649,6 +680,25 @@ class SubjectFragmentRenderTest {
         assertEquals(string(R.string.pick_pose_title), onScreen { binding, _ -> binding.pickPoseLabel.text.toString() })
 
         poseStep(modules, PoseSetStep.CLOSED)
+        assertEquals(R.id.subjectDescribeFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun aStepThatComesUnderAddAPoseGuide_opensOnceTheSheetCloses() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.descriptions.startAsReceiver(receiving)
+        idle()
+        onScreen { binding, _ -> binding.guideButton.performClick() }
+        idle()
+
+        describeStep(modules, DescriptionStep.OPEN)
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+
+        // Closing the sheet changes nothing Subject view renders from (Codex's review).
+        nav.popBackStack()
+        idle()
         assertEquals(R.id.subjectDescribeFragment, nav.currentDestination?.id)
     }
 

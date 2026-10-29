@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -15,6 +15,8 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
@@ -77,6 +79,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
+
+    // Set while a step waits for this screen to be the current destination again (inFront).
+    private var frontWatch: Pair<NavController, NavController.OnDestinationChangedListener>? = null
 
     // Where the video is, and how much of it the top bar and the controls cover (previewArea).
     private var videoArea = PreviewArea(0f, 0f, 0f)
@@ -388,6 +393,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onDestroyView() {
+        stopWatchingFront()
         referenceDrag = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
@@ -420,7 +426,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
      * the button beside *Guide* opens it again while it lasts.
      */
     private fun renderPoses(binding: FragmentSubjectBinding, ui: SubjectUiState) {
-        val picking = ui.poseStep == PoseSetStep.PICKING && ui.connected
+        // A set with no copy here has nothing to pick from: the photographer picks on its own phone.
+        val picking = ui.poseStep == PoseSetStep.PICKING && ui.posesReady && ui.connected
         val confirming = confirming(ui)
         val describing = describing(ui)
         binding.pickPoseButton.isVisible = picking || confirming || describing
@@ -434,14 +441,46 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val confirmId = ui.confirmId
         val setId = ui.poseSetId
         val describeId = ui.describeId
-        // Each opens only while this screen is in front; openConfirm, openPick, and openDescribe check it.
+        // Each is claimed only while this screen is the current destination, or one that came while Add a pose guide
+        // covers it would be spent without opening.
         if (confirming && confirmId != null) {
-            if (viewModel.claimConfirmOpening(confirmId)) openConfirm()
+            if (inFront(binding) && viewModel.claimConfirmOpening(confirmId)) openConfirm()
         } else if (picking && setId != null) {
-            if (viewModel.claimPickOpening(setId)) openPick()
+            if (inFront(binding) && viewModel.claimPickOpening(setId)) openPick()
         } else if (describing && describeId != null) {
-            if (viewModel.claimDescribeOpening(describeId)) openDescribe()
+            if (inFront(binding) && viewModel.claimDescribeOpening(describeId)) openDescribe()
         }
+    }
+
+    /**
+     * Whether this screen is the current destination. Under Add a pose guide it is not, and closing the sheet changes
+     * nothing this screen renders from, so the steps are rendered again once this screen is current.
+     */
+    private fun inFront(binding: FragmentSubjectBinding): Boolean {
+        val nav = findNavController()
+        if (nav.currentDestination?.id == R.id.subjectFragment) return true
+        if (frontWatch == null) {
+            val listener = object : NavController.OnDestinationChangedListener {
+                override fun onDestinationChanged(
+                    controller: NavController,
+                    destination: NavDestination,
+                    arguments: Bundle?,
+                ) {
+                    if (destination.id != R.id.subjectFragment) return
+                    stopWatchingFront()
+                    // After the change, not inside it, since opening a step navigates.
+                    binding.root.post { if (view != null) renderPoses(binding, viewModel.uiState.value) }
+                }
+            }
+            frontWatch = nav to listener
+            nav.addOnDestinationChangedListener(listener)
+        }
+        return false
+    }
+
+    private fun stopWatchingFront() {
+        frontWatch?.let { (nav, listener) -> nav.removeOnDestinationChangedListener(listener) }
+        frontWatch = null
     }
 
     /**

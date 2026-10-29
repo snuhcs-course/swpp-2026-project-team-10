@@ -77,7 +77,7 @@ jobs:
       - name: Check the public address
         run: |
           if ! live=$(curl -fsS -m 10 "$SERVER_URL/version"); then
-            echo "::error::$SERVER_URL does not answer. An instance stopped and started without an Elastic IP gets another address, and the app still uses this one."
+            echo "::error::$SERVER_URL, the app's address, does not answer. Check that the instance is running and that this Elastic IP is still associated with it."
             exit 1
           fi
           echo "$SERVER_URL is on $live"

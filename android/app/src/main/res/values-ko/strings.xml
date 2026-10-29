@@ -304,7 +304,7 @@
     <string name="invite_busy">%1$s님은 다른 카메라 공유 중이에요</string>
     <string name="invite_waiting">%1$s님을 기다리는 중</string>
     <string name="invite_sending">초대를 보내는 중…</string>
-    <string name="invite_waiting_body">%1$s님에게 알림이 가요. 수락하면 실시간 화면이 시작돼요.</string>
+    <string name="invite_waiting_body">%1$s님에게 알림이 가요. 수락하면 카메라 공유가 시작돼요.</string>
     <string name="invite_accepted_connecting">%1$s님이 수락했어요 · 연결 중…</string>
     <string name="invite_link_hint">알림이 안 왔나요? 링크를 대신 보내세요.</string>
     <string name="share_invite_link">초대 링크 공유</string>
@@ -315,7 +315,7 @@
     <string name="invite_not_accepted_title">초대가 수락되지 않았어요</string>
     <string name="invite_not_accepted_message">%1$s님이 거절했거나 1분 안에 답하지 않았어요.</string>
     <string name="invite_again">다시 초대</string>
-    <string name="invitation_title">%1$s님이 카메라를 보여 주려고 해요</string>
+    <string name="invitation_title">%1$s님이 카메라를 공유하려고 해요</string>
     <string name="invitation_body">구도와 포즈 가이드를 실시간으로 볼 수 있어요.</string>
     <string name="invitation_loading">초대를 여는 중…</string>
     <string name="invitation_gone_title">더 이상 유효하지 않은 초대예요</string>

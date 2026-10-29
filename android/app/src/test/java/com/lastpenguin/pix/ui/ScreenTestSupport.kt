@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.app.Application
@@ -73,7 +73,8 @@ object ScreenTestSupport {
         scenario.onFragment { fragment ->
             val activity = fragment.requireActivity()
             nav.setGraph(R.navigation.nav_graph)
-            nav.setCurrentDestination(destination)
+            // The arguments go to the destination too, which refuses to open without a required one.
+            nav.setCurrentDestination(destination, args ?: Bundle())
             Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
             prepare(activity)
         }

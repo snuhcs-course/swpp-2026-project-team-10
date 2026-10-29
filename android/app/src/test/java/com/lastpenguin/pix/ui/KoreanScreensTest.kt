@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
 import com.lastpenguin.pix.account.Friend
 import com.lastpenguin.pix.account.FriendRequest
+import com.lastpenguin.pix.account.InvitationStatus
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -58,12 +59,17 @@ import com.lastpenguin.pix.ui.guide.NoPersonFoundFragment
 import com.lastpenguin.pix.ui.guide.ReferenceConfirmFragment
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.ConnectionLostFragment
+import com.lastpenguin.pix.ui.session.InvitationFragment
+import com.lastpenguin.pix.ui.session.InviteNotAcceptedFragment
+import com.lastpenguin.pix.ui.session.InviteSentSheet
 import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
+import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectFragment
 import java.time.Duration
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -345,6 +351,52 @@ class KoreanScreensTest {
         val modules = TestAppContainer().install()
         scenario = launchFragment<RoomCodeSheet>(themeResId = R.style.Theme_Pix)
         modules.session.setState(SessionState.Waiting("482915"))
+        assertKorean(screen())
+    }
+
+    @Test
+    fun inviteSent_waitingForAFriend_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragment<InviteSentSheet>(themeResId = R.style.Theme_Pix)
+        scenario!!.onFragment { it.requireActivity().viewModel<SessionViewModel>().invite(sent.to) }
+        idle()
+        modules.session.setState(SessionState.Inviting("inv_1"))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun inviteNotAccepted_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchPrepared<InviteNotAcceptedFragment>(R.id.inviteNotAcceptedFragment) {
+            val sessionViewModel = it.viewModel<SessionViewModel>()
+            sessionViewModel.invite(sent.to)
+            idle()
+            // Invite sent read the Sent in the app.
+            runBlocking { sessionViewModel.inviteResults.first() }
+        }.first
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun invitation_open_isInKorean() {
+        TestAppContainer().also { it.auth.signInAs(account) }.install()
+        scenario = launchPrepared<InvitationFragment>(
+            R.id.invitationFragment,
+            bundleOf(InvitationFragment.ARG_INVITATION_ID to "inv_1"),
+        ) {}.first
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun invitation_noLongerAvailable_isInKorean() {
+        TestAppContainer().also {
+            it.auth.signInAs(account)
+            it.invitations.opened = it.invitations.opened.copy(status = InvitationStatus.EXPIRED)
+        }.install()
+        scenario = launchPrepared<InvitationFragment>(
+            R.id.invitationFragment,
+            bundleOf(InvitationFragment.ARG_INVITATION_ID to "inv_1"),
+        ) {}.first
         assertKorean(screen())
     }
 

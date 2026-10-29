@@ -106,6 +106,33 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Sungmin, 10-29] "Do the reviews on PR #149 need fixing? If so, fix them, commit, and push." (Three Codex findings, all right. Two restarts asked for at once, when both phones take their places back, could both be answered while the photographer applied only the first answer, leaving the phones with different ICE credentials: a restart now waits for the pending answer, at most 2 s, because an offer that went to the subject's old socket is never answered, and plain serializing would have held back the restart that saved IT-4. A *Reconnect* that failed before the server answered dropped its token, so the next one joined the code, which a server still holding the old socket refuses as `FULL`: the token is now kept until the server refuses it, which also explains the first failed tap. The background limit skipped `Reconnecting`: it now counts, and its deadline holds when the link comes back. Each fix has a test that fails without it; 967 unit tests passed.)
 - [Sungmin, 10-29] "Write the AI prompt log for this too, then commit and push it."
 
+## Invitations with push notifications ([#119], PRs [#153] and the app's)
+
+**The plan (10/29)**
+
+- [Sungmin, 10-29] "Pull `dev`: it has been updated." ([#149] and [#150] had come in, so the branch for #119 could start from `dev` with reconnection in it.)
+- [Sungmin, 10-29] "I'm starting #119: write a detailed plan first. Do I need other screens for it? And there are hardly any screens for friends, such as a friend's profile: is that worth adding, in another issue? The plan first." (Two PRs, the server first. The documented flow had two gaps: accepting created the session, but the photographer's phone got no token for its place, and `invitation.accepted` would be lost while the photographer's socket reconnected. The plan opened the session when the invitation is sent instead, so both phones take their places with `session.join` as after a drop. Four decisions with a recommendation each: when the session opens, the link's format, the Firebase setup, and whether 30 s is enough for the link. The screens were already in R&S 6.5 and 6.6: *Invite sent*, *Invite not accepted*, and *Invitation*, whose "no longer available" became a state of its own screen. A friend's profile adds little to shooting together and would bring photo storage; a row sheet, initials, and a request badge were offered for after the user test.)
+- [Sungmin, 10-29] "Why is Firebase needed here?" (Android keeps no socket open for a closed app; Google Play services' one connection per phone, reached through FCM, is what wakes it, and other push services use it too. Only FCM is used, which is free.)
+- [Sungmin, 10-29] "What else do I have to do besides signing up for Firebase? In detail." (A Firebase project with Analytics off, the Android app `com.lastpenguin.pix` for `google-services.json`, and a service account with only the FCM role for the server's key, kept outside the repository; Jaewan to install it on the AWS server.)
+- [Sungmin, 10-29] "I put `google-services.json` in `android/app` and the key file in the repository's folder. Check them." (The key belonged to another Google Cloud project than the app's, `pix-swpp-fall-2026` against `pix-swpp`, so the server could not have sent to the app's tokens; it also sat in the public repository's folder, which nothing ignored. The check read only the key's type, project, and account, never the private key.)
+- [Sungmin, 10-29] "I made it again: `pix-swpp-5b…json`." (The right project. On the questions that followed: the key moved out of the repository to `~/pix-secrets/`, the session opens when the invitation is sent, and the link is a page served at `/i/<id>`.)
+
+**The server (10/29)**
+
+- (The server PR: the `invitations` table, the `INVITE`, `ACCEPT_INVITATION`, and `END_INVITATION` scripts, `REJOIN` sending `peer.joined` to a photographer that comes after the subject, the FCM sender over HTTP v1 with `google-auth`'s signer instead of `firebase-admin`, and the link page; FCM keeps the data key `from` for itself, so the name went as `fromName`. A mutation check found the 30 s boundary's tests passing with the comparison broken, since the session store also refuses an expired room; decline and cancel at the boundary, which need no room, now catch it. A script that restored the mutated files with `git checkout` was blocked by the session's guard before it ran, because it would also have thrown away the uncommitted work; the mutants ran again from copies in the scratchpad. The real key was checked against Google with `validate_only`, sending nothing. 597 server tests passed.)
+- [Sungmin, 10-29] "Can't I test it yet? Which key do I install on AWS?" (Not until the app registers its token and shows the notification, which is the second PR; the key to install is the service account's, not `google-services.json`.)
+- [Sungmin, 10-29] "Commit and push it." (PR [#153].)
+- [Sungmin, 10-29] "Can't I install the key on AWS myself? See whether I can." (This Mac had no SSH key, host entry, or AWS credentials for that server, although its SSH port answered; Jaewan could add the public key, or install the key themselves.)
+- [Sungmin, 10-29] "So I ask for `fcm-sender.json` to be installed on the AWS server?" / "Before my PR is merged, or after?" (Yes, handed over in person rather than through a messenger; before the merge it needs no restart, since the deploy starts the new copy with it.)
+- [Sungmin, 10-29] "It's installed on AWS." / "Merged." (The deploy of `00e9396` served the link page and the endpoints.)
+
+**The app (10/29)**
+
+- [Sungmin, 10-29] "Make a branch from the latest `dev` and start." (The `google-services` plugin worked with AGP 9.3. `InvitationManager`, `PushTokenRegistrar`, the `push/` package, `SessionEntry.Invite` and `SessionEntry.Invitation`, `Inviting`, the three screens, the deep links, and the access token on every session socket, so a friend in a session is `BUSY`. An invitation's photographer could not go back to `Waiting` without a code, which would have crashed, so its session ends there. Both phones got the APK against the AWS server.)
+- [Sungmin, 10-29] "Is the link really working? Check it. The rest seems to work." (On the emulator's Chrome the page's *Open in Pix* opened *Invitation*. The phone's log showed the link opened on the inviting phone itself, where it cannot be accepted, just as the 30 s ran out.)
+- [Sungmin, 10-29] "Let's make it 60 s; 30 s is too short. It works. Make it 60 s, then commit and push." (60 s on the server, the photographer's own wait at 80 s, and "within a minute"; one test that could not fail, since another timer ended the session first, now checks that a connected session outlasts the invitation's wait. 1007 unit tests passed.)
+- [Sungmin, 10-29] "Go on with the rest." (Tests of the three screens and their Korean, the token in the socket's upgrade, Flows 3, 3b, 4, and 5 redrawn, and the documents. Two Korean strings followed the wireframe's earlier translation.)
+
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
 [#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
@@ -118,3 +145,6 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
 [#149]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/149
 [#148]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/148
+[#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
+[#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
+[#153]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/153

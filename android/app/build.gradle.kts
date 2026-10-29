@@ -1,10 +1,12 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
+    // Reads app/google-services.json, the app's Firebase project, for push notifications (Design 2.6.6).
+    alias(libs.plugins.google.services)
     jacoco
 }
 
@@ -173,6 +175,10 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+
+    // Invitations and friend requests (#119): push notifications through Firebase Cloud Messaging only.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.

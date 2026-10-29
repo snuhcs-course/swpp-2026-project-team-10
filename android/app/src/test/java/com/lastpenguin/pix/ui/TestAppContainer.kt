@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -8,6 +8,7 @@ import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.account.FakeAuthRepository
 import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
+import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
@@ -71,6 +72,7 @@ class TestAppContainer(
     val auth = FakeAuthRepository()
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
+    val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
@@ -90,6 +92,7 @@ class TestAppContainer(
         authRepository = auth,
         friendsRepository = friends,
         googleIdTokens = FakeGoogleIdTokens(),
+        invitationManager = invitations,
         sessionManager = session,
         remoteVideo = video,
         guideSyncer = syncer,

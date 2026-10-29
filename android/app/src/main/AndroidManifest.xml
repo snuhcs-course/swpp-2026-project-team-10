@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- WebRTC watches for network changes during a session (Design 2.6.4). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Invitations and friend requests arrive as notifications (Design 2.6.6); asked for on Friends. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".PixApplication"
@@ -20,15 +22,41 @@
         android:theme="@style/Theme.Pix"
         tools:targetApi="31">
 
-        <!-- Portrait only (R&S 6.9). -->
+        <!-- Portrait only (R&S 6.9). Single-top, so a notification or a link opens its screen in the running Pix. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- The invite link's page opens pix://invite/<id> (Design 2.6.6). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="invite"
+                    android:scheme="pix" />
+            </intent-filter>
         </activity>
+
+        <service
+            android:name=".push.PixMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- A phone gets an FCM token only once someone signs in (PushTokenRegistrar), and Firebase sends no analytics. -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="true" />
     </application>
 </manifest>

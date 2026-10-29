@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
@@ -19,10 +19,14 @@ class FakeSignalingClient : SignalingClient {
 
     val sent = mutableListOf<SignalMessage>()
     val connectedUrls = mutableListOf<String>()
+
+    /** The access token each socket opened with, null for an anonymous one, in order. */
+    val connectedTokens = mutableListOf<String?>()
     var closeCount = 0
 
-    override fun connect(url: String) {
+    override fun connect(url: String, accessToken: String?) {
         connectedUrls += url
+        connectedTokens += accessToken
     }
 
     override fun send(signal: SignalMessage) {

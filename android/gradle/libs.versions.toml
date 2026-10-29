@@ -24,6 +24,9 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 # WebRTC prebuilt (Design 1.2): a maintained libwebrtc build that keeps the org.webrtc package.
 webrtc = "137.7151.01"
+# Push notifications for invitations and friend requests (Design 1.2, 2.6.6): Firebase Cloud Messaging only.
+firebaseBom = "34.0.0"
+googleServices = "4.4.3"
 junit = "4.13.2"
 androidxTestJunit = "1.3.0"
 # Runs View, Canvas, and touch tests on the JVM (Android SDK 36 support needs 4.16+).
@@ -68,6 +71,8 @@ androidx-credentials = { group = "androidx.credentials", name = "credentials", v
 androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
@@ -76,3 +81,4 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

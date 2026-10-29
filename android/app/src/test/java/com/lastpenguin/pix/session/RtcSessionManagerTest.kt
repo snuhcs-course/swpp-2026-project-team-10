@@ -39,6 +39,7 @@ class RtcSessionManagerTest {
     private fun TestScope.manager(
         haveGuideId: () -> String? = { null },
         haveReferenceId: () -> String? = { null },
+        accessToken: suspend () -> String? = { null },
     ): RtcSessionManager {
         val manager = RtcSessionManager(
             signaling = signaling,
@@ -52,6 +53,7 @@ class RtcSessionManagerTest {
             clock = { 0L },
             haveGuideId = haveGuideId,
             haveReferenceId = haveReferenceId,
+            accessToken = accessToken,
         )
         backgroundScope.launch { manager.incoming.collect { incoming += it } }
         runCurrent()
@@ -994,5 +996,213 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(rejoin("photographer-token"), signaling.sent.last())
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
+    }
+
+    // ---- Invitations (Design 2.6.6) ---------------------------------------------------------------------------------
+
+    private fun photographerPlace() = SessionPlace("s_1", "photographer-token", relay)
+
+    /** Photographer: an invitation was sent and this phone took the place it opened; the friend has not come yet. */
+    private suspend fun TestScope.invitingPhotographer(): RtcSessionManager {
+        val manager = manager()
+        manager.start(SessionEntry.Invite("inv_1", photographerPlace()), Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
+        runCurrent()
+        return manager
+    }
+
+    @Test
+    fun `an invitation's photographer takes its place and waits in Inviting until the friend comes`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.Invite("inv_1", photographerPlace()), Role.PHOTOGRAPHER)
+        runCurrent()
+        assertEquals(SessionState.Inviting("inv_1"), manager.state.value)
+        signaling.push(SignalEvent.Opened)
+        runCurrent()
+        assertEquals(
+            listOf(SignalMessage.SessionJoin("s_1", rejoin = false, rejoinToken = "photographer-token")),
+            signaling.sent,
+        )
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(SessionState.Inviting("inv_1"), manager.state.value)
+        assertTrue(peers.created.isEmpty())
+
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        assertEquals(SessionState.Connecting("s_1"), manager.state.value)
+        val peer = peers.created.single()
+        // The credentials came with the invitation; the answer to session.join has none.
+        assertEquals(relay, peer.config.iceServers)
+        assertEquals(listOf("offer"), sentSignals())
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
+        peer.open()
+        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        runCurrent()
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        manager.leave()
+    }
+
+    @Test
+    fun `an invitation's friend takes the place accepting gave it and answers the offer`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.Invitation("inv_1", SessionPlace("s_1", "subject-token", relay)), Role.SUBJECT)
+        runCurrent()
+        assertEquals(SessionState.Connecting(null), manager.state.value)
+        signaling.push(SignalEvent.Opened)
+        runCurrent()
+        assertEquals(
+            listOf(SignalMessage.SessionJoin("s_1", rejoin = false, rejoinToken = "subject-token")),
+            signaling.sent,
+        )
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT))
+        runCurrent()
+        assertEquals(SessionState.Connecting("s_1"), manager.state.value)
+        val peer = peers.created.single()
+        assertEquals(relay, peer.config.iceServers)
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("offer", "v=0 offer")))
+        runCurrent()
+        assertEquals(listOf("answer"), sentSignals())
+        manager.leave()
+    }
+
+    @Test
+    fun `an invitation's entries fit only their own role`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.Invite("inv_1", photographerPlace()), Role.SUBJECT)
+        manager.start(SessionEntry.Invitation("inv_1", photographerPlace()), Role.PHOTOGRAPHER)
+        runCurrent()
+        assertEquals(SessionState.Idle, manager.state.value)
+        assertTrue(signaling.connectedUrls.isEmpty())
+    }
+
+    @Test
+    fun `a decline ends the photographer's invitation`() = runTest {
+        val manager = invitingPhotographer()
+        signaling.receive(SignalMessage.ServerError("DECLINED", "Your friend declined the invitation"))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.DECLINED), manager.state.value)
+    }
+
+    @Test
+    fun `an invitation nobody joined in time, or whose session is gone, ends as expired`() = runTest {
+        val manager = invitingPhotographer()
+        signaling.receive(SignalMessage.ServerError("EXPIRED"))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.EXPIRED), manager.state.value)
+
+        // The session expired before this phone's session.join reached the server.
+        manager.start(SessionEntry.Invite("inv_2", photographerPlace()), Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.ServerError("NOT_FOUND"))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.EXPIRED), manager.state.value)
+    }
+
+    @Test
+    fun `an invitation ends after 80 s without the server's word, and not before`() = runTest {
+        val manager = invitingPhotographer()
+        advanceTimeBy(79_999)
+        runCurrent()
+        assertEquals(SessionState.Inviting("inv_1"), manager.state.value)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.EXPIRED), manager.state.value)
+        assertEquals(SignalMessage.Leave, signaling.sent.last())
+    }
+
+    @Test
+    fun `a friend who connected in time is not cut off when the invitation's time runs out`() = runTest {
+        val manager = invitingPhotographer()
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        val peer = peers.created.single()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
+        peer.open()
+        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        runCurrent()
+        advanceTimeBy(81_000)
+        runCurrent()
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        assertFalse(SignalMessage.Leave in signaling.sent)
+        manager.leave()
+    }
+
+    @Test
+    fun `the subject leaving an invitation's session ends it, since no code can bring anyone back`() = runTest {
+        val manager = invitingPhotographer()
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        val peer = peers.created.single()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
+        peer.open()
+        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        runCurrent()
+        signaling.receive(SignalMessage.PeerLeft(EndReason.PEER_LEFT))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.PEER_LEFT), manager.state.value)
+        assertEquals(SignalMessage.Leave, signaling.sent.last())
+        assertEquals(SessionMessage.Leave(EndReason.PEER_LEFT), incoming.last())
+    }
+
+    @Test
+    fun `a link lost for 10 s ends an invitation's session for the photographer`() = runTest {
+        val manager = invitingPhotographer()
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        val peer = peers.created.single()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
+        peer.open()
+        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        runCurrent()
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        advanceTimeBy(10_001)
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), manager.state.value)
+    }
+
+    @Test
+    fun `a photographer whose socket drops while inviting takes its place again`() = runTest {
+        val manager = invitingPhotographer()
+        signaling.push(SignalEvent.Closed(RuntimeException("no network")))
+        runCurrent()
+        assertEquals(SessionState.Inviting("inv_1"), manager.state.value)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(2, signaling.connectedUrls.size)
+        signaling.push(SignalEvent.Opened)
+        runCurrent()
+        assertEquals(
+            SignalMessage.SessionJoin("s_1", rejoin = true, rejoinToken = "photographer-token"),
+            signaling.sent.last(),
+        )
+        // The friend took its place meanwhile: the server says so with peer.joined, sent to the photographer.
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        assertEquals(SessionState.Connecting("s_1"), manager.state.value)
+        manager.leave()
+    }
+
+    @Test
+    fun `every socket of a session counts as the signed-in user's`() = runTest {
+        var token = "access-1"
+        val manager = manager(accessToken = { token })
+        manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1", rejoinToken = "photographer-token"))
+        runCurrent()
+        token = "access-2"
+        signaling.push(SignalEvent.Closed(RuntimeException("no network")))
+        advanceTimeBy(1_000)
+        runCurrent()
+        // Each socket asks for the token when it opens, so a refreshed one is used.
+        assertEquals(listOf<String?>("access-1", "access-2"), signaling.connectedTokens)
+        manager.leave()
     }
 }

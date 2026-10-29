@@ -6,6 +6,9 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.lastpenguin.pix.account.AccountError
+import com.lastpenguin.pix.account.FakeInvitationManager
+import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeCameraController
@@ -20,6 +23,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
+import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -27,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -60,6 +65,7 @@ class SessionViewModelTest {
     private val session = FakeSessionManager()
     private val camera = FakeCameraController()
     private val mobileData = MobileDataNotice.InMemory()
+    private val invitations = FakeInvitationManager()
     private val codec = FakeGuideImageCodec()
     private lateinit var model: SessionViewModel
 
@@ -81,6 +87,7 @@ class SessionViewModelTest {
             syncer,
             RemoteControlHandler(session, camera, InMemoryGuideRepository()),
             mobileData,
+            invitations,
         )
         store.put("session", model)
     }
@@ -324,5 +331,85 @@ class SessionViewModelTest {
 
     private companion object {
         const val CODE = "123456"
+    }
+
+    // ---- Invitations (Design 2.6.6; FR-6.1–6.3, FR-6.9) ---------------------------------------------------------------
+
+    private val friend = PixUser("u_2", "test2", "Test Account 2")
+
+    private fun TestScope.inviteResults(): MutableList<InviteResult> {
+        val results = mutableListOf<InviteResult>()
+        backgroundScope.launch { model.inviteResults.collect { results += it } }
+        return results
+    }
+
+    @Test
+    fun invite_sendsTheInvitation_andTakesThePhotographersPlace() = runTest(dispatcher) {
+        val results = inviteResults()
+        model.invite(friend)
+        runCurrent()
+
+        assertEquals(listOf("invite:u_2"), invitations.calls)
+        assertEquals(SessionEntry.Invite("inv_1", invitations.sent.place) to Role.PHOTOGRAPHER, session.starts.single())
+        assertEquals(invitations.sent, model.invitation.value)
+        assertEquals(listOf<InviteResult>(InviteResult.Sent), results)
+    }
+
+    @Test
+    fun invite_aFriendInAnotherSession_saysSo_andStartsNothing() = runTest(dispatcher) {
+        val results = inviteResults()
+        invitations.failure = AccountError.BUSY
+        model.invite(friend)
+        runCurrent()
+
+        assertEquals(listOf<InviteResult>(InviteResult.Failed(friend, AccountError.BUSY)), results)
+        assertTrue(session.starts.isEmpty())
+        assertNull(model.invitation.value)
+    }
+
+    @Test
+    fun invite_whileASessionIsOpen_orTwiceAtOnce_sendsOne() = runTest(dispatcher) {
+        session.setState(SessionState.Waiting(CODE))
+        runCurrent()
+        model.invite(friend)
+        runCurrent()
+        assertTrue(invitations.calls.isEmpty())
+
+        session.setState(SessionState.Ended(EndReason.CANCELLED))
+        runCurrent()
+        model.invite(friend)
+        model.invite(friend)
+        runCurrent()
+        assertEquals(listOf("invite:u_2"), invitations.calls)
+    }
+
+    @Test
+    fun cancelInvite_whileWaiting_cancelsOnTheServerAndLeaves_butNotOnceTheFriendCame() = runTest(dispatcher) {
+        model.invite(friend)
+        runCurrent()
+        session.setState(SessionState.Connecting("s_1"))
+        runCurrent()
+        model.cancelInvite()
+        runCurrent()
+        assertTrue(session.leaves.isEmpty())
+
+        session.setState(SessionState.Inviting("inv_1"))
+        runCurrent()
+        model.cancelInvite()
+        runCurrent()
+        assertEquals(listOf("invite:u_2", "cancel:inv_1"), invitations.calls)
+        assertEquals(listOf(EndReason.CANCELLED), session.leaves)
+    }
+
+    @Test
+    fun joinInvitation_takesTheFriendsPlace_asTheSubject() = runTest(dispatcher) {
+        model.joinRoom(CODE)
+        runCurrent()
+        val place = SessionPlace("s_1", "subject-token", emptyList())
+        model.joinInvitation("inv_1", place)
+        runCurrent()
+
+        assertEquals(SessionEntry.Invitation("inv_1", place) to Role.SUBJECT, session.starts.last())
+        assertNull(model.lastCode)
     }
 }

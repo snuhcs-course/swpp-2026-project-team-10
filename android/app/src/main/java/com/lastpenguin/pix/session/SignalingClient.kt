@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.signaling.SignalMessage
@@ -21,8 +21,11 @@ sealed interface SignalEvent {
 interface SignalingClient {
     val events: SharedFlow<SignalEvent>
 
-    /** Opens a new socket; an earlier one is closed first. Events for the new socket follow. */
-    fun connect(url: String)
+    /**
+     * Opens a new socket; an earlier one is closed first. Events for the new socket follow. With [accessToken] the
+     * socket counts as the signed-in user's, so friends see them in a session (Design 2.5.2, FR-6.9).
+     */
+    fun connect(url: String, accessToken: String? = null)
 
     fun send(signal: SignalMessage)
 

@@ -6,6 +6,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.account.AccountError
+import com.lastpenguin.pix.account.AccountException
+import com.lastpenguin.pix.account.InvitationManager
+import com.lastpenguin.pix.account.PixUser
+import com.lastpenguin.pix.account.SentInvitation
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.EndReason
@@ -17,9 +22,11 @@ import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
 import com.lastpenguin.pix.session.SessionManager
+import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /** Short notices for the photographer's camera screen. */
@@ -53,9 +61,16 @@ sealed interface SessionNotice {
     data class RemoteGuide(val name: String) : SessionNotice
 }
 
+/** What *Invite* did (FR-6.1, FR-6.9): the invitation went out, or why it did not. */
+sealed interface InviteResult {
+    data object Sent : InviteResult
+
+    data class Failed(val friend: PixUser, val error: AccountError) : InviteResult
+}
+
 /**
- * Starts, joins, and ends a room-code session (R&S 6.7, Design 2.4). Shared by the session screens
- * and the Camera screen's live badge (activity scope).
+ * Starts, joins, and ends a session, with a room code or an invitation (R&S 6.5–6.7, Design 2.4, 2.6.6). Shared by
+ * the session screens and the Camera screen's live badge (activity scope).
  *
  * On the photographer's phone, camera frames go to the session from the moment a subject starts connecting,
  * and the camera's capabilities are sent once the data channels are up. Guide sync (#9) and remote zoom (#10)
@@ -69,6 +84,7 @@ class SessionViewModel(
     private val guideSyncer: GuideSyncer,
     private val remoteControl: RemoteControlHandler,
     private val mobileDataNotice: MobileDataNotice,
+    private val invitations: InvitationManager,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -104,6 +120,22 @@ class SessionViewModel(
     var lastCode: String? = null
         private set
 
+    private val _invitation = MutableStateFlow<SentInvitation?>(null)
+
+    /**
+     * Photographer: the invitation *Invite sent* shows (FR-6.2). It stays after the session ends, so *Invite not
+     * accepted* names the friend and *Invite again* knows whom to invite (FR-6.3).
+     */
+    val invitation: StateFlow<SentInvitation?> = _invitation.asStateFlow()
+
+    private val _inviteResults = Channel<InviteResult>(Channel.BUFFERED)
+
+    /** What each *Invite* did, once, for the screen that asked: Friends or *Invite not accepted*. */
+    val inviteResults: Flow<InviteResult> = _inviteResults.receiveAsFlow()
+
+    /** An invitation is on its way to the server, so a second tap sends none. */
+    private var sendingInvite = false
+
     /** Whether the current join is a *Reconnect*; decides what an `Ended` does with [lastCode]. */
     private var reconnecting = false
 
@@ -137,11 +169,7 @@ class SessionViewModel(
     /** Photographer: *Shoot together* → a new room code, unless a room is already open or live. */
     fun startRoom() {
         val current = state.value
-        if (current is SessionState.Waiting || current is SessionState.Connecting ||
-            current is SessionState.Connected || current is SessionState.Reconnecting
-        ) {
-            return
-        }
+        if (isOpen(current)) return
         lastCode = null // This phone is the photographer now; a code it joined earlier is stale.
         role = Role.PHOTOGRAPHER
         viewModelScope.launch { session.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER) }
@@ -150,6 +178,52 @@ class SessionViewModel(
     /** Photographer: *Cancel* on Room code. The code expires. */
     fun cancelRoom() {
         viewModelScope.launch { session.leave(EndReason.CANCELLED) }
+    }
+
+    /**
+     * Photographer: *Invite* on Friends, or *Invite again* (FR-6.1–6.3). The server opens the session with this phone's
+     * place, which it takes at once, waiting in `Inviting` for the friend. Ignored while a session is open or another
+     * invitation is on its way.
+     */
+    fun invite(friend: PixUser) {
+        if (sendingInvite || isOpen(state.value)) return
+        sendingInvite = true
+        viewModelScope.launch {
+            invitations.invite(friend.userId)
+                .onSuccess { sent ->
+                    lastCode = null
+                    role = Role.PHOTOGRAPHER
+                    _invitation.value = sent
+                    session.start(SessionEntry.Invite(sent.id, sent.place), Role.PHOTOGRAPHER)
+                    _inviteResults.send(InviteResult.Sent)
+                }
+                .onFailure { error ->
+                    val reason = (error as? AccountException)?.error ?: AccountError.UNKNOWN
+                    _inviteResults.send(InviteResult.Failed(friend, reason))
+                }
+            sendingInvite = false
+        }
+    }
+
+    /**
+     * Photographer: *Cancel invite*, or *Invite sent* closed while waiting (FR-6.2). Cancelled on the server first, so
+     * the friend's *Invitation* says it is no longer available (FR-6.4); the session ends either way.
+     */
+    fun cancelInvite() {
+        val sent = _invitation.value ?: return
+        if (state.value !is SessionState.Inviting) return
+        viewModelScope.launch {
+            invitations.cancel(sent.id)
+            session.leave(EndReason.CANCELLED)
+        }
+    }
+
+    /** Subject: *Accept* on Invitation gave this phone its place, which the session takes now (FR-6.1). */
+    fun joinInvitation(invitationId: String, place: SessionPlace) {
+        lastCode = null
+        reconnecting = false
+        role = Role.SUBJECT
+        viewModelScope.launch { session.start(SessionEntry.Invitation(invitationId, place), Role.SUBJECT) }
     }
 
     /** Subject: *Join* with 6 digits. */
@@ -264,6 +338,10 @@ class SessionViewModel(
     }
 
     private fun isLive(state: SessionState) = state is SessionState.Connected || state is SessionState.Reconnecting
+
+    /** A room waits, an invitation waits, or a session runs: no other session can start on this phone. */
+    private fun isOpen(state: SessionState) = state is SessionState.Waiting || state is SessionState.Inviting ||
+        state is SessionState.Connecting || isLive(state)
 
     /**
      * What an end does with the kept code (#81): *Connection lost* keeps it for *Reconnect*; an unknown or expired

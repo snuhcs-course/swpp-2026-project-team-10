@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "130778589131",
+    "project_id": "pix-swpp",
+    "storage_bucket": "pix-swpp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:130778589131:android:1e932374a55032981b384e",
+        "android_client_info": {
+          "package_name": "com.lastpenguin.pix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCp6CIgUgdpwCWfvTxaiegKYQGGOajnCUc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

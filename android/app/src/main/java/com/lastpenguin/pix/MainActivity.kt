@@ -1,10 +1,12 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.navigation.fragment.NavHostFragment
 import com.lastpenguin.pix.databinding.ActivityMainBinding
 
 /** The only activity. Every screen is a destination in `res/navigation/nav_graph.xml` (Design 2.8). */
@@ -20,5 +22,16 @@ class MainActivity : AppCompatActivity() {
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
+    }
+
+    /**
+     * A notification or an invite link while Pix runs (single-top): its screen opens on top of what is shown. At a start
+     * the navigation graph opens the deep link itself, over Camera (Design 2.6.6).
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val link = intent.data ?: return
+        val navController = (supportFragmentManager.findFragmentById(R.id.navHost) as? NavHostFragment)?.navController
+        if (navController?.graph?.hasDeepLink(link) == true) navController.navigate(link)
     }
 }

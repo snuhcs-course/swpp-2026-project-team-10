@@ -132,6 +132,8 @@
         android:id="@+id/friendsFragment"
         android:name="com.lastpenguin.pix.ui.account.FriendsFragment"
         android:label="Friends">
+        <!-- A friend request's notification (FR-5.7). -->
+        <deepLink app:uri="pix://friends" />
         <action
             android:id="@+id/action_friends_to_signIn"
             app:destination="@id/signInFragment" />
@@ -152,6 +154,11 @@
         <action
             android:id="@+id/action_friends_to_roomCode"
             app:destination="@id/roomCodeSheet"
+            app:popUpTo="@id/cameraFragment" />
+        <!-- Invite sent floats over Camera too, so the camera is on when the friend accepts (R&S 6.5). -->
+        <action
+            android:id="@+id/action_friends_to_inviteSent"
+            app:destination="@id/inviteSentSheet"
             app:popUpTo="@id/cameraFragment" />
     </fragment>
 
@@ -206,6 +213,52 @@
             app:popUpTo="@id/roomCodeSheet"
             app:popUpToInclusive="true" />
     </dialog>
+
+    <!-- Flow 4: Invite sent and Invite not accepted (photographer) -->
+    <dialog
+        android:id="@+id/inviteSentSheet"
+        android:name="com.lastpenguin.pix.ui.session.InviteSentSheet"
+        android:label="Invite sent">
+        <!-- Cancel invite goes back to Friends (R&S 6.5). -->
+        <action
+            android:id="@+id/action_inviteSent_to_friends"
+            app:destination="@id/friendsFragment"
+            app:popUpTo="@id/cameraFragment" />
+        <action
+            android:id="@+id/action_inviteSent_to_inviteNotAccepted"
+            app:destination="@id/inviteNotAcceptedFragment"
+            app:popUpTo="@id/cameraFragment" />
+    </dialog>
+
+    <fragment
+        android:id="@+id/inviteNotAcceptedFragment"
+        android:name="com.lastpenguin.pix.ui.session.InviteNotAcceptedFragment"
+        android:label="Invite not accepted">
+        <action
+            android:id="@+id/action_inviteNotAccepted_to_inviteSent"
+            app:destination="@id/inviteSentSheet"
+            app:popUpTo="@id/cameraFragment" />
+    </fragment>
+
+    <!-- Flow 5: Invitation (subject), from the notification or the invite link (Design 2.6.6) -->
+    <fragment
+        android:id="@+id/invitationFragment"
+        android:name="com.lastpenguin.pix.ui.session.InvitationFragment"
+        android:label="Invitation">
+        <argument
+            android:name="invitationId"
+            app:argType="string" />
+        <deepLink app:uri="pix://invite/{invitationId}" />
+        <action
+            android:id="@+id/action_invitation_to_subject"
+            app:destination="@id/subjectFragment"
+            app:popUpTo="@id/invitationFragment"
+            app:popUpToInclusive="true" />
+        <!-- A signed-out phone signs in on Friends, then back here (Sign in returns to Friends). -->
+        <action
+            android:id="@+id/action_invitation_to_friends"
+            app:destination="@id/friendsFragment" />
+    </fragment>
 
     <!-- Flow 6: Join with code (subject) -->
     <fragment

@@ -318,7 +318,7 @@
                     android:textColor="@color/pix_text_soft" />
             </LinearLayout>
 
-            <!-- Opens the subject's Pick a pose again while the photographer's candidates are ready (FR-6.15). -->
+            <!-- Opens the subject's Pick a pose or Your reference again while the photographer's step lasts (FR-6.15). -->
             <LinearLayout
                 android:id="@+id/pickPoseButton"
                 android:layout_width="wrap_content"
@@ -346,6 +346,7 @@
                     app:tint="@color/guide_button_icon" />
 
                 <TextView
+                    android:id="@+id/pickPoseLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="16dp"
                     android:layout_marginTop="4dp"

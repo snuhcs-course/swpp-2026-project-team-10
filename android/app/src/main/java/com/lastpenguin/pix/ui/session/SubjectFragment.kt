@@ -61,9 +61,11 @@ import org.webrtc.VideoSink
  * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3), and the guide's
  * reference photo sits in a corner as on their Camera screen (FR-3.9). *Guide* opens Add a pose guide, whose guide
  * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
- * the photographer creates poses or picks one, the video says so, and their candidates open on this phone's *Pick a
- * pose* (Design 2.6.5). System back asks first (R&S 6.9).
- * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide* and the candidates Iter3-P16.
+ * the photographer creates poses, picks one, or checks its guide, the video says so, and their candidates open on this
+ * phone's *Pick a pose* and the chosen pose's outline on its *Your reference* (Design 2.6.5). System back asks first
+ * (R&S 6.9).
+ * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide*, the candidates, and the outline
+ * Iter3-P16.
  */
 class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
@@ -131,7 +133,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
-        binding.pickPoseButton.setOnClickListener { openPick() }
+        binding.pickPoseButton.setOnClickListener {
+            if (confirming(viewModel.uiState.value)) openConfirm() else openPick()
+        }
 
         setupReference(binding)
 
@@ -232,6 +236,14 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // A set that ended while this screen is in front; its Pick a pose says so itself while open.
                     viewModel.poseSetEnds.collect { end ->
                         poseSetEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
+                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                launch {
+                    // A confirm that ended while this screen is in front; its Your reference says so itself while open.
+                    viewModel.confirmEnds.collect { end ->
+                        confirmEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
                             Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -390,25 +402,51 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     /**
-     * The photographer's candidates (Design 2.6.5): *Pick a pose* opens by itself the first time this screen sees a
-     * set ready while it is in front, and the button beside *Guide* opens it while the set is ready.
+     * The photographer's candidates and the chosen pose's outline (Design 2.6.5): *Pick a pose* or *Your reference*
+     * opens by itself the first time this screen sees the set ready or the confirm open while it is in front, and the
+     * button beside *Guide* opens it again while it lasts.
      */
     private fun renderPoses(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val picking = ui.poseStep == PoseSetStep.PICKING && ui.connected
-        binding.pickPoseButton.isVisible = picking
-        val setId = ui.poseSetId ?: return
-        if (!picking || !viewModel.claimPickOpening(setId)) return
-        if (findNavController().currentDestination?.id == R.id.subjectFragment) openPick()
+        val confirming = confirming(ui)
+        binding.pickPoseButton.isVisible = picking || confirming
+        val label = if (confirming) R.string.reference_title else R.string.pick_pose_title
+        binding.pickPoseLabel.setText(label)
+        binding.pickPoseButton.contentDescription = getString(label)
+        val confirmId = ui.confirmId
+        val setId = ui.poseSetId
+        // Each opens only while this screen is in front; openConfirm and openPick check it.
+        if (confirming && confirmId != null) {
+            if (viewModel.claimConfirmOpening(confirmId)) openConfirm()
+        } else if (picking && setId != null) {
+            if (viewModel.claimPickOpening(setId)) openPick()
+        }
     }
+
+    /**
+     * Whether the photographer's Reference confirm is open here. It follows the choice that ended the set, so a set
+     * still PICKING here is shown first: its end is on its way.
+     */
+    private fun confirming(ui: SubjectUiState): Boolean =
+        ui.confirmId != null && ui.connected && ui.poseStep != PoseSetStep.PICKING
 
     private fun openPick() {
         val nav = findNavController()
         if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_pickPose)
     }
 
-    /** "Dongje is creating poses…" or "Dongje is picking a pose…" while the photographer's set is open. */
+    private fun openConfirm() {
+        val nav = findNavController()
+        if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_confirm)
+    }
+
+    /**
+     * "Dongje is creating poses…", "Dongje is picking a pose…", or "Dongje is checking the guide…" while a step of the
+     * photographer's is open.
+     */
     private fun poseStatus(ui: SubjectUiState): String? {
         val name = ui.photographerName ?: return null
+        if (confirming(ui)) return getString(R.string.peer_checking_guide, name)
         return when (ui.poseStep) {
             PoseSetStep.GENERATING -> getString(R.string.peer_creating_poses, name)
             PoseSetStep.PICKING -> getString(R.string.peer_picking_pose, name)

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -30,10 +30,16 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.confirmBegin
+import com.lastpenguin.pix.session.confirmChunk
+import com.lastpenguin.pix.session.confirmEnd
+import com.lastpenguin.pix.session.fakeGuide
+import com.lastpenguin.pix.session.protocol.ConfirmStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
@@ -64,6 +70,7 @@ import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
+import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
 import com.lastpenguin.pix.ui.session.SubjectFragment
 import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
 import java.time.Duration
@@ -198,6 +205,24 @@ class KoreanScreensTest {
         scenario = launchFragmentInContainer<ReferenceConfirmFragment>(themeResId = R.style.Theme_Pix).also {
             it.attachNav(R.id.referenceConfirmFragment)
         }
+        scenario!!.onFragment {
+            it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(
+                bitmap(),
+                chosenBy = "Test Account 2",
+            )
+        }
+        idle()
+        modules.maker.finish(Result.success(guide()))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun referenceConfirm_ofAChosenPose_inASession_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<ReferenceConfirmFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.referenceConfirmFragment)
+        }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         scenario!!.onFragment {
             it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(
                 bitmap(),
@@ -452,6 +477,43 @@ class KoreanScreensTest {
         modules.mirror.setGuide(guide())
         photographerPicking(modules)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    /** The photographer's Reference confirm READY on the subject's phone, with its outline. */
+    private fun photographerConfirming(modules: TestAppContainer) {
+        modules.confirms.startAsReceiver(receiving)
+        idle()
+        modules.session.deliver(SessionMessage.GuideConfirm("c1", ConfirmStep.READY, guideId = "g1"))
+        val image = FakeGuideImageCodec().encode(fakeGuide("g1"))
+        modules.session.deliver(image.confirmBegin("c1"))
+        for (i in image.chunks.indices) modules.session.deliver(image.confirmChunk("c1", i))
+        modules.session.deliver(image.confirmEnd("c1"))
+        idle()
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whileThePhotographerChecksTheGuide_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectFragment)
+        }
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerConfirming(modules)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun subjectsYourReference_isInKorean() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerConfirming(modules)
+        scenario = launchFragmentInContainer<SubjectConfirmFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectConfirmFragment)
+        }
         assertKorean(screen(), *people)
     }
 

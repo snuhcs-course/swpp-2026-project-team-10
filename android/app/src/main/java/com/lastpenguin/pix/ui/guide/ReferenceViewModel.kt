@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -14,7 +14,11 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.ConfirmShare
+import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SubjectGuideTarget
+import com.lastpenguin.pix.session.SubjectUse
+import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -49,7 +53,10 @@ enum class SavedGuideResult { USED, FAILED }
  * ReferenceConfirmFragment, NoPersonFoundFragment, and PickPoseFragment (activity scope). The guide of a generated
  * pose also gets its tip asked for here, once its person is found (FR-4.10). Opened from Subject view
  * ([openFor]), the guide goes to the photographer through [subject] instead of this phone's camera (Design 2.6.5).
- * Owner: PM (#5); saved guides #58; pose tips; the guide from the subject Iter3-P9; the subject's pick Iter3-P16.
+ * The Reference confirm of a pose chosen on Pick a pose is on the subject's phone too, through [confirms], and the
+ * first *Use this guide* to reach this phone decides (Design 2.6.5, *Reference confirm on both phones*).
+ * Owner: PM (#5); saved guides #58; pose tips; the guide from the subject Iter3-P9; the subject's pick and use
+ * Iter3-P16.
  */
 class ReferenceViewModel(
     private val maker: ReferenceGuideMaker,
@@ -57,6 +64,7 @@ class ReferenceViewModel(
     private val savedGuideStore: SavedGuideStore = SavedGuideStore.InMemory(),
     private val tips: PoseTips? = null,
     private val subject: SubjectGuideTarget? = null,
+    private val confirms: ConfirmShare = ConfirmShare.None,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReferenceUiState>(ReferenceUiState.Idle)
@@ -75,6 +83,22 @@ class ReferenceViewModel(
      */
     val chosenBy: StateFlow<String?> = _chosenBy.asStateFlow()
 
+    /** The Reference confirm the subject's phone shows too, from a pose chosen on Pick a pose until it ends. */
+    private var sharedId: String? = null
+
+    private val _sharing = MutableStateFlow(false)
+
+    /** Whether the subject's phone shows this Reference confirm too, for its hint (FR-6.15). */
+    val sharing: StateFlow<Boolean> = _sharing.asStateFlow()
+
+    private val _usedBySubject = Channel<Unit>(Channel.BUFFERED)
+
+    /**
+     * Each *Use this guide* of the subject's that set the guide on this camera: Reference confirm then goes back to
+     * the camera, as after this phone's own tap. Kept until the screen reads it.
+     */
+    val usedBySubject: Flow<Unit> = _usedBySubject.receiveAsFlow()
+
     /** Newest first, for Add a pose guide. */
     val savedGuides: StateFlow<List<SavedGuide>> = savedGuideStore.saved
 
@@ -87,6 +111,10 @@ class ReferenceViewModel(
     val savedGuideResults: Flow<SavedGuideResult> = _savedGuideResults.receiveAsFlow()
 
     private var opening: Job? = null
+
+    init {
+        viewModelScope.launch { confirms.uses.collect(::onSubjectUse) }
+    }
 
     /** Whether the guide chosen here goes to the photographer from Subject view rather than to this camera. */
     var forSubject: Boolean = false
@@ -106,19 +134,25 @@ class ReferenceViewModel(
         if (forSubject && target != null) target.offer(guide) else guides.setGuide(guide)
     }
 
-    /** A photo from the system photo picker. */
+    /** A photo from the system photo picker; on a Reference confirm the subject shares, it stays shared. */
     fun onPhotoPicked(uri: Uri) {
         _chosenBy.value = null
+        sharedId?.let(confirms::finding)
         make { maker.make(uri) }
     }
 
     /**
      * The pose chosen on Pick a pose. With [tipFrom], the scene and the pose it was made from, its tip is asked for
      * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10). [chosenBy] names the subject
-     * when it was their pick in a session (FR-6.15).
+     * when it was their pick in a session (FR-6.15). Its Reference confirm goes to the subject's phone too, which
+     * shows it while a session is connected.
      */
     fun onCandidatePicked(image: Bitmap, tipFrom: TipSource? = null, chosenBy: String? = null) {
         _chosenBy.value = chosenBy
+        val id = UUID.randomUUID().toString()
+        sharedId = id
+        _sharing.value = true
+        confirms.open(id)
         make(
             onReady = { guide ->
                 if (tipFrom != null && tips != null) {
@@ -131,11 +165,35 @@ class ReferenceViewModel(
 
     /** *Use this guide*. */
     fun onUseGuide() {
+        useReady(Role.PHOTOGRAPHER)
+    }
+
+    /**
+     * The subject's *Use this guide* (FR-6.15): taken only while the outline it names is on screen and nobody has used
+     * it, judged here in the order things happen on this phone (AD-7); then it is as this phone's own tap.
+     */
+    private fun onSubjectUse(use: SubjectUse) {
         val ready = _uiState.value as? ReferenceUiState.Ready ?: return
+        if (use.confirmId != sharedId || use.guideId != ready.guide.id) return
+        if (useReady(Role.SUBJECT)) _usedBySubject.trySend(Unit)
+    }
+
+    private fun useReady(by: Role): Boolean {
+        val ready = _uiState.value as? ReferenceUiState.Ready ?: return false
         // Its tip goes with it to the camera; leaving the screen now must not drop it.
         if (ready.guide.id == tipFor) tipFor = null
         use(ready.guide)
         _uiState.value = ReferenceUiState.Idle
+        endShare { confirms.used(it, ready.guide.id, by) }
+        return true
+    }
+
+    /** The shared Reference confirm ends once, with [end]. */
+    private fun endShare(end: (confirmId: String) -> Unit) {
+        val id = sharedId ?: return
+        sharedId = null
+        _sharing.value = false
+        end(id)
     }
 
     /**
@@ -148,6 +206,7 @@ class ReferenceViewModel(
             _uiState.value = ReferenceUiState.Idle
         }
         discardTip()
+        endShare(confirms::close)
     }
 
     private fun discardTip() {
@@ -197,9 +256,12 @@ class ReferenceViewModel(
             _uiState.value = block().fold(
                 onSuccess = {
                     onReady(it)
+                    sharedId?.let { id -> confirms.ready(id, it) }
                     ReferenceUiState.Ready(it)
                 },
                 onFailure = {
+                    // No person found and a photo that cannot be used leave Reference confirm, shared or not.
+                    endShare(confirms::close)
                     if (it is NoPersonFoundException) ReferenceUiState.NoPersonFound else ReferenceUiState.Failed
                 },
             )

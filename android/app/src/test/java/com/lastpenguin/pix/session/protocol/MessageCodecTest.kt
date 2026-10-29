@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -60,6 +60,13 @@ class MessageCodecTest {
             SessionMessage.PoseCandidateChunk("set1", "pose-4", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PoseCandidateEnd("set1", "pose-4", 3735928559L),
             SessionMessage.PosePick("set1", "pose-4"),
+            SessionMessage.GuideConfirm("c1", ConfirmStep.FINDING),
+            SessionMessage.GuideConfirm("c1", ConfirmStep.READY, guideId = "g1"),
+            SessionMessage.GuideConfirm("c1", ConfirmStep.USED, guideId = "g1", by = Role.SUBJECT),
+            SessionMessage.GuideConfirmImageBegin("c1", "g1", "mask-png", 480, 720, 18_204, 2),
+            SessionMessage.GuideConfirmImageChunk("c1", "g1", 0, "iVBORw0KGgo"),
+            SessionMessage.GuideConfirmImageEnd("c1", "g1", 3735928559L),
+            SessionMessage.GuideConfirmUse("c1", "g1"),
             SessionMessage.Leave(EndReason.LEFT),
             SessionMessage.Ping(1_759_212_360_000L),
             SessionMessage.Pong(1_759_212_360_000L),
@@ -126,6 +133,23 @@ class MessageCodecTest {
         assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"setId":"set1","step":"PAUSED"}}"""))
         assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"step":"PICKING"}}"""))
         assertNull(codec.decode("""{"v":3,"t":"pose.pick","seq":1,"ts":0,"b":{"setId":"set1","poseId":7}}"""))
+    }
+
+    @Test
+    fun `a confirm's step sends only the fields of its step, and an unknown step is dropped`() {
+        val finding = Json.parseToJsonElement(codec.encode(SessionMessage.GuideConfirm("c1", ConfirmStep.FINDING)))
+        assertEquals("guide.confirm", finding.jsonObject.getValue("t").jsonPrimitive.content)
+        assertEquals(setOf("confirmId", "step"), finding.jsonObject.getValue("b").jsonObject.keys)
+
+        val example = codec.decode(
+            """{"v":3,"t":"guide.confirm","seq":4,"ts":1,"b":{"confirmId":"c1","step":"USED","guideId":"g1","by":"PHOTOGRAPHER"}}""",
+        )
+        assertEquals(
+            SessionMessage.GuideConfirm("c1", ConfirmStep.USED, guideId = "g1", by = Role.PHOTOGRAPHER),
+            example!!.message,
+        )
+        assertNull(codec.decode("""{"v":3,"t":"guide.confirm","seq":1,"ts":0,"b":{"confirmId":"c1","step":"SHOWN"}}"""))
+        assertNull(codec.decode("""{"v":3,"t":"guide.confirm.use","seq":1,"ts":0,"b":{"confirmId":"c1"}}"""))
     }
 
     @Test

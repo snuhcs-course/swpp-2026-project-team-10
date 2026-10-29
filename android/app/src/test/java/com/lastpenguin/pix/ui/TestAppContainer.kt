@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -25,6 +25,7 @@ import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeGuideReferenceCodec
@@ -80,6 +81,13 @@ class TestAppContainer(
     /** The photographer's candidates on the subject's phone; on the main thread, as the screens collect it. */
     val poses = PoseSyncer(session, FakePoseCandidateCodec(), Dispatchers.Unconfined)
 
+    /** The photographer's Reference confirm on the subject's phone, the same way, with outlines a screen can draw. */
+    val confirms = ConfirmSyncer(
+        session,
+        FakeGuideImageCodec { id -> ScreenTestSupport.guide(withReference = false).copy(id = id) },
+        Dispatchers.Unconfined,
+    )
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
@@ -99,6 +107,7 @@ class TestAppContainer(
         remoteVideo = video,
         guideSyncer = syncer,
         poseSyncer = poses,
+        confirmSyncer = confirms,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
     )

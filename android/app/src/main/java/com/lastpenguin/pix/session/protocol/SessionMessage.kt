@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -182,6 +182,55 @@ sealed interface SessionMessage {
     @SerialName("pose.pick")
     data class PosePick(val setId: String, val poseId: String) : SessionMessage
 
+    /**
+     * Where the photographer's Reference confirm [confirmId] of a pose chosen in a session is (Design 2.5.1, 2.6.5,
+     * Iter3-P16): the subject's *Your reference* follows it. [guideId] names the outline on screen, with READY, and the
+     * guide used, with USED and [by] whose *Use this guide* it was. A confirm ends once, with USED or CLOSED.
+     */
+    @Serializable
+    @SerialName("guide.confirm")
+    data class GuideConfirm(
+        val confirmId: String,
+        val step: ConfirmStep,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val guideId: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val by: Role? = null,
+    ) : SessionMessage
+
+    /**
+     * The mask of the outline [guideId] on Reference confirm [confirmId], for the subject's *Your reference* only:
+     * `mask-png` like the guide image, from which the subject traces the outline, in chunks like it.
+     */
+    @Serializable
+    @SerialName("guide.confirm.image.begin")
+    data class GuideConfirmImageBegin(
+        val confirmId: String,
+        val guideId: String,
+        val format: String,
+        val width: Int,
+        val height: Int,
+        val bytes: Int,
+        val chunks: Int,
+    ) : SessionMessage
+
+    /** [data] is Base64 of at most 12 KiB, as for the guide image. */
+    @Serializable
+    @SerialName("guide.confirm.image.chunk")
+    data class GuideConfirmImageChunk(val confirmId: String, val guideId: String, val index: Int, val data: String) :
+        SessionMessage
+
+    @Serializable
+    @SerialName("guide.confirm.image.end")
+    data class GuideConfirmImageEnd(val confirmId: String, val guideId: String, val crc32: Long) : SessionMessage
+
+    /**
+     * The subject's *Use this guide* on the outline [guideId] (FR-6.15), a request like its others (AD-7): the
+     * photographer takes it only while its Reference confirm [confirmId] shows that outline, and answers with
+     * `guide.confirm`.
+     */
+    @Serializable
+    @SerialName("guide.confirm.use")
+    data class GuideConfirmUse(val confirmId: String, val guideId: String) : SessionMessage
+
     @Serializable
     @SerialName("camera.zoom.set")
     data class ZoomSet(
@@ -244,3 +293,11 @@ sealed interface SessionMessage {
  */
 @Serializable
 enum class PoseSetStep { GENERATING, PICKING, CHOSEN, CLOSED }
+
+/**
+ * The steps of the photographer's Reference confirm of a pose chosen in a session (Design 2.6.5): FINDING while the
+ * person is found, again after *Choose another photo*, READY with the outline, then USED by the first *Use this
+ * guide*, or CLOSED without a guide.
+ */
+@Serializable
+enum class ConfirmStep { FINDING, READY, USED, CLOSED }

@@ -24,6 +24,7 @@ import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.ConfirmStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
@@ -65,7 +66,10 @@ import org.robolectric.shadows.ShadowToast
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
  * and filled; the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", Pick a
  * pose opened once per set and then by its button, a set the photographer closes after Back, which says so, and a
- * set kept through a reconnect, with "Reconnecting…" in place of what the photographer is doing.
+ * set kept through a reconnect, with "Reconnecting…" in place of what the photographer is doing; the photographer's
+ * Reference confirm (FR-6.15): "checking the guide", Your reference opened once per confirm and then by the same
+ * button, a set still picking shown before the confirm that follows it, and a guide the photographer uses after Back,
+ * which says so.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -512,6 +516,84 @@ class SubjectFragmentRenderTest {
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
         }
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+    }
+
+    private fun confirmStep(modules: TestAppContainer, step: ConfirmStep, by: Role? = null) {
+        modules.session.deliver(SessionMessage.GuideConfirm("c1", step, by = by))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+    }
+
+    @Test
+    fun thePhotographersReference_saysTheyAreChecking_andOpensYourReferenceOncePerConfirm() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.confirms.startAsReceiver(receiving)
+        idle()
+
+        confirmStep(modules, ConfirmStep.FINDING)
+        assertEquals(R.id.subjectConfirmFragment, nav.currentDestination?.id)
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.peer_checking_guide, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
+            assertEquals(string(R.string.reference_title), binding.pickPoseLabel.text.toString())
+            assertEquals(string(R.string.reference_title), binding.pickPoseButton.contentDescription)
+        }
+
+        // Back keeps it closed, though Subject view renders again; its button opens it again.
+        nav.popBackStack()
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        onScreen { binding, _ -> binding.pickPoseButton.performClick() }
+        idle()
+        assertEquals(R.id.subjectConfirmFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun aSetStillPickingHere_isShownBeforeTheConfirmThatFollowsIt() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        modules.confirms.startAsReceiver(receiving)
+        idle()
+        poseStep(modules, PoseSetStep.GENERATING)
+        poseStep(modules, PoseSetStep.PICKING)
+        nav.popBackStack()
+        idle()
+
+        // The confirm's first step comes before the set's end.
+        confirmStep(modules, ConfirmStep.FINDING)
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(string(R.string.pick_pose_title), binding.pickPoseLabel.text.toString())
+        }
+
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, by = Role.PHOTOGRAPHER))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertEquals(R.id.subjectConfirmFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun aGuideThePhotographerUsesAfterBack_saysSo_andTheStatusGoes() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.confirms.startAsReceiver(receiving)
+        idle()
+        confirmStep(modules, ConfirmStep.FINDING)
+        nav.popBackStack()
+        idle()
+
+        confirmStep(modules, ConfirmStep.USED, Role.PHOTOGRAPHER)
+
+        assertEquals(string(R.string.peer_used_guide, "Dongje"), ShadowToast.getTextOfLatestToast())
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.pickPoseButton.visibility)
+            assertEquals(View.GONE, binding.connectingText.visibility)
+        }
     }
 
     @Test

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """The sockets of one server process, and the room protocol on top of the session store.
 
 Room state lives in Redis (Design Documentation 2.7), so a room created through one worker can be joined
@@ -48,6 +48,12 @@ REJOIN_ERRORS = {
     "NOT_FOUND": "This session has ended",
     "FORBIDDEN": "This phone has no place in the session",
 }
+# What ends a waiting room on the photographer's phone: nobody joined in time, a room code's or an invitation's, or
+# the friend declined the invitation.
+NOTICES = {
+    "EXPIRED": "Nobody joined in time; the room has expired",
+    "DECLINED": "Your friend declined the invitation",
+}
 
 
 @dataclass(eq=False)
@@ -70,8 +76,8 @@ def render(delivery: Delivery) -> str:
         return encode({"type": delivery.kind})
     if delivery.kind == "peer.left":
         return encode({"type": "peer.left", "reason": delivery.detail})
-    if delivery.kind == "error" and delivery.detail == EXPIRED.code:
-        return encode({"type": "error", "code": EXPIRED.code, "message": EXPIRED.message})
+    if delivery.kind == "error" and delivery.detail in NOTICES:
+        return encode({"type": "error", "code": delivery.detail, "message": NOTICES[delivery.detail]})
     raise ValueError(f"Unknown delivery: {delivery.kind} {delivery.detail}")
 
 
@@ -330,10 +336,32 @@ class SessionRegistry:
             await self._deliver(deliveries)
             raise ProtocolError(status, REJOIN_ERRORS[status])
         # No new relay credentials: the phone keeps the ones it got first, which outlast any session (AD-14), so
-        # Cloudflare's time does not add to the reconnection. The other phone's peer.joined or peer.rejoined goes out
-        # after this, because its answer is an offer for this socket.
+        # Cloudflare's time does not add to the reconnection. A peer.joined or peer.rejoined goes out after this,
+        # because what it starts is an offer for this socket, or from it.
         self.send(peer, {"type": "session.joined", "sessionId": message.sessionId, "role": role, "iceServers": []})
         await self._deliver(deliveries)
+
+    # --- invitations -----------------------------------------------------------------------------------------------
+
+    async def invite(self, invitation: str, expires_at: float) -> tuple[str, str]:
+        """Opens the room of an invitation (Design 2.6.6), which expires at `expires_at` unless the friend joins, and
+        returns its session id and the photographer's rejoin token, with which the photographer takes its place."""
+        session_id = f"s_{uuid4().hex}"
+        token, hashed = rejoin_token()
+        await self._deliver(await self.store.invite(session_id, hashed, invitation, expires_at))
+        return session_id, token
+
+    async def accept_invitation(self, session_id: str, deadline: float) -> str | None:
+        """The rejoin token of the subject's place for the friend who accepted, to be taken by `deadline`; None when
+        the room has ended."""
+        token, hashed = rejoin_token()
+        accepted, deliveries = await self.store.accept_invitation(session_id, hashed, deadline)
+        await self._deliver(deliveries)
+        return token if accepted else None
+
+    async def end_invitation(self, session_id: str, notice: str = "") -> None:
+        """Removes the room of an invitation nobody accepted; the photographer hears the error `notice`, if any."""
+        await self._deliver(await self.store.end_invitation(session_id, notice))
 
     async def _relay(self, peer: Peer, message: Signal, raw_text: str) -> None:
         sdp_type = message.sdp.type if message.sdp is not None else ""

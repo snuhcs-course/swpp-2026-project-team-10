@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 import asyncio
 import base64
 import io
@@ -12,6 +12,8 @@ import pytest
 import redis
 import uvicorn
 from argon2 import PasswordHasher
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import text
@@ -175,6 +177,42 @@ class TurnApi:
         return httpx2.Response(self.status, json=self.body)
 
 
+class FcmApi:
+    """Stands in for Google's token endpoint and Firebase Cloud Messaging. It records each request for an access token
+    in `token_requests` and each push in `pushes`, as FCM's `message` with the request's `authorization` header. A
+    device token in `unregistered` answers 404, as FCM does once the app is gone; `status` answers every other push,
+    `token_status` every token request, and both wait `delay` first."""
+
+    def __init__(self) -> None:
+        self.token_requests: list[httpx2.Request] = []
+        self.pushes: list[dict] = []
+        self.unregistered: set[str] = set()
+        self.status = 200
+        self.token_status = 200
+        self.delay = 0.0
+
+    async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        await asyncio.sleep(self.delay)
+        if request.url.path == "/token":
+            self.token_requests.append(request)
+            if self.token_status != 200:
+                return httpx2.Response(self.token_status, json={"error": "invalid_grant"})
+            return httpx2.Response(200, json={"access_token": "test-fcm-access", "expires_in": 3599})
+        message = json.loads(request.content)["message"]
+        self.pushes.append({**message, "authorization": request.headers["authorization"], "url": str(request.url)})
+        if message["token"] in self.unregistered:
+            return httpx2.Response(404, json={"error": {"status": "NOT_FOUND"}})
+        return httpx2.Response(self.status, json={"name": "projects/pix-test/messages/1"})
+
+
+@dataclass(frozen=True)
+class FcmKey:
+    """A service account key file as the Google Cloud console gives one, with a key made for the tests."""
+
+    path: str
+    public_pem: bytes
+
+
 class FakeGoogle:
     """Stands in for Google's token check. A token `google:<subject>` or `google:<subject>:<name>` is valid; any
     other is invalid. `available = False` makes every check fail as if Google's keys could not be fetched, and
@@ -226,6 +264,36 @@ def turn_api():
 
 
 @pytest.fixture
+def fcm_api():
+    return FcmApi()
+
+
+@pytest.fixture(scope="session")
+def fcm_key(tmp_path_factory):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+    path = tmp_path_factory.mktemp("fcm") / "fcm-sender.json"
+    path.write_text(
+        json.dumps(
+            {
+                "type": "service_account",
+                "project_id": "pix-test",
+                "private_key_id": "test-key-id",
+                "private_key": private_pem.decode(),
+                "client_email": "pix-fcm-sender@pix-test.iam.gserviceaccount.com",
+                "token_uri": "https://oauth2.googleapis.com/token",
+            }
+        )
+    )
+    public_pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return FcmKey(path=str(path), public_pem=public_pem)
+
+
+@pytest.fixture
 def database_url(tmp_path):
     """A new SQLite file per test, or, with PIX_TEST_DATABASE_URL set, that PostgreSQL emptied first, which shows
     that the migrations and queries behave the same on the servers' database."""
@@ -237,7 +305,7 @@ def database_url(tmp_path):
 
 
 @pytest.fixture
-def settings(database_url):
+def settings(database_url, fcm_key):
     return Settings(
         _env_file=None,
         database_url=database_url,
@@ -273,6 +341,10 @@ def settings(database_url):
         turn_api_token="test-turn-token",
         turn_ttl_seconds=14400,
         turn_timeout_seconds=3,
+        invitation_ttl_seconds=30,
+        invitation_join_seconds=15,
+        fcm_credentials_file=fcm_key.path,
+        fcm_timeout_seconds=5,
     )
 
 
@@ -348,13 +420,14 @@ async def make_registry(settings, clock, open_store):
 
 
 @pytest.fixture
-async def live_server(settings, image_api, turn_api, unused_tcp_port, open_store):
+async def live_server(settings, image_api, turn_api, fcm_api, unused_tcp_port, open_store):
     """Serves the app on a real socket and gives its address, for a test that closes a connection in the middle of a
     request, which the test client cannot."""
     app = create_app(
         settings,
         image_api=httpx2.MockTransport(image_api),
         turn_api=httpx2.MockTransport(turn_api),
+        fcm_api=httpx2.MockTransport(fcm_api),
         redis=open_store,
     )
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=unused_tcp_port, log_level="warning"))
@@ -374,12 +447,13 @@ def google():
 
 
 @pytest.fixture
-def client(settings, clock, image_api, turn_api, open_store, google):
+def client(settings, clock, image_api, turn_api, fcm_api, open_store, google):
     app = create_app(
         settings,
         clock=clock,
         image_api=httpx2.MockTransport(image_api),
         turn_api=httpx2.MockTransport(turn_api),
+        fcm_api=httpx2.MockTransport(fcm_api),
         redis=open_store,
         google=google,
         # Real argon2id at the lowest cost, so a test hashes in microseconds.

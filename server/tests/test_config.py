@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """`.env.example` against `Settings`: deploy.sh reads the example to tell which settings a server must set, so it has
 to list every setting, with the right defaults.
 
@@ -22,7 +22,7 @@ LINE = re.compile(r"^(#\s*)?([A-Z][A-Z0-9_]*)=(.*)$")
 # Settings a server must provide: the example leaves them empty.
 REQUIRED = {"OPENROUTER_API_KEY", "PIX_GOOGLE_CLIENT_ID", "PIX_TURN_KEY_ID", "PIX_TURN_API_TOKEN"}
 # Optional settings set elsewhere on a server, with no default worth showing.
-SET_ELSEWHERE = {"PIX_REDIS_URL", "PIX_DATABASE_URL", "PIX_JWT_SECRET"}
+SET_ELSEWHERE = {"PIX_REDIS_URL", "PIX_DATABASE_URL", "PIX_JWT_SECRET", "PIX_FCM_CREDENTIALS_FILE"}
 
 
 @pytest.fixture(autouse=True)
@@ -78,6 +78,7 @@ def test_startup_warns_about_each_unset_setting_a_server_must_provide(caplog):
     assert "OPENROUTER_API_KEY" in caplog.text
     assert "PIX_GOOGLE_CLIENT_ID" in caplog.text
     assert "PIX_TURN_KEY_ID" in caplog.text
+    assert "PIX_FCM_CREDENTIALS_FILE" in caplog.text
     caplog.clear()
     configured = Settings(
         _env_file=None,
@@ -85,6 +86,7 @@ def test_startup_warns_about_each_unset_setting_a_server_must_provide(caplog):
         google_client_id="client",
         turn_key_id="turn-key",
         turn_api_token=SecretStr("turn-token"),
+        fcm_credentials_file="/run/pix-secrets/fcm-sender.json",
     )
     with caplog.at_level(logging.WARNING, logger="pix_server.main"):
         warn_about_missing_settings(configured)

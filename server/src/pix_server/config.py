@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """Environment configuration for the Pix server."""
 
 from typing import Literal
@@ -81,3 +81,14 @@ class Settings(BaseSettings):
     turn_ttl_seconds: PositiveInt = 14400
     # After this the phone gets STUN only, so a slow TURN API never holds up a room.
     turn_timeout_seconds: PositiveFloat = 3
+
+    # Invitations (Design Documentation 2.6.6): how long the friend has to answer (FR-6.3), and how long after
+    # accepting the friend's phone has to take its place before the room expires.
+    invitation_ttl_seconds: PositiveFloat = 30
+    invitation_join_seconds: PositiveFloat = 15
+    # The key file of a service account that may send Firebase Cloud Messaging for the app's Firebase project (AD-13).
+    # While it is unset or unreadable, invitations and friend requests send no push; an invitation still reaches the
+    # friend through its link. On a server the Compose file sets the path inside the container.
+    fcm_credentials_file: str | None = None
+    # A push that takes longer is given up.
+    fcm_timeout_seconds: PositiveFloat = 5

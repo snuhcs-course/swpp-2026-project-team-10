@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 # The Pix server on the course server. deploy.sh drives this file and supplies the variables
 # On the server, use deploy.sh instead of calling docker compose by hand.
 name: pix
@@ -18,6 +18,12 @@ x-app: &app
     PIX_DATABASE_URL: postgresql+asyncpg://pix:${PIX_DB_PASSWORD:?deploy.sh sets PIX_DB_PASSWORD}@postgres:5432/pix
     # Signs access tokens; both copies need the same one.
     PIX_JWT_SECRET: ${PIX_JWT_SECRET:?deploy.sh sets PIX_JWT_SECRET}
+    # The push sender's key (Design 2.6.6); while the file is missing the app sends no pushes.
+    PIX_FCM_CREDENTIALS_FILE: /run/pix-secrets/fcm-sender.json
+  volumes:
+    # Keys the app reads as files, readable only by its user, uid 10001 (README, Push notifications). A directory, so
+    # the app still starts while the key is missing.
+    - ${PIX_SECRETS_DIR:-/opt/pix/secrets}:/run/pix-secrets:ro
   depends_on:
     redis:
       condition: service_healthy

@@ -1,0 +1,83 @@
+# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park
+name: server-deploy-aws
+
+# Deploys dev to the temporary AWS server (Design 2.8, Hosting). Unlike the course servers, GitHub can reach it, so
+# instead of a timer on the server pulling, this workflow has AWS Systems Manager run the PixDeploy document there,
+# which runs deploy.sh. Its access key may run only that document on that one instance, and it is a secret of the aws
+# environment, which only dev may use, so no SSH port needs to be open. The AWS side is set up once
+# (server/README.md, The AWS server).
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions: {}
+
+# deploy.sh keeps running on the server when a run is cancelled, so a newer push waits for it instead. A waiting run
+# is replaced by the next push, so the newest commit is deployed next.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: server-deploy-aws
+    # A manual run from another branch would not get the environment's key.
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment: aws
+    # Waiting for another deploy (at most 15 min), then a build and up to 10 min of waiting for open rooms.
+    timeout-minutes: 45
+    env:
+      AWS_DEFAULT_REGION: ap-southeast-2
+      AWS_INSTANCE_ID: i-07f7e5dd7cc4cc9cc
+      # Debug builds of the app use this address (android/app/build.gradle.kts).
+      SERVER_URL: http://3.105.185.251
+    steps:
+      # PixDeploy waits for a deploy already running (an operator's, or the timer's if it is still on), because
+      # deploy.sh refuses to run beside another, then runs deploy.sh deploy: dev's newest commit, which includes this
+      # one, and only records a commit that does not change server/. Systems Manager runs it as root and returns its
+      # output once it ends; the full build log stays in /opt/pix/state/last-build.log.
+      - name: Run deploy.sh on the server
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          # --timeout-seconds: a server that does not pick the command up within 2 minutes is offline.
+          id=$(aws ssm send-command \
+            --instance-ids "$AWS_INSTANCE_ID" \
+            --document-name PixDeploy \
+            --comment "deploy ${GITHUB_SHA::12}, run $GITHUB_RUN_ID" \
+            --timeout-seconds 120 \
+            --query Command.CommandId --output text)
+          echo "Systems Manager command $id"
+          while :; do
+            sleep 10
+            # The invocation exists only a moment after send-command returns.
+            if ! result=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$AWS_INSTANCE_ID" --output json 2>&1); then
+              case "$result" in
+                *InvocationDoesNotExist*) continue ;;
+                *) echo "$result" >&2; exit 1 ;;
+              esac
+            fi
+            status=$(jq -r .Status <<< "$result")
+            case "$status" in
+              Pending | InProgress | Delayed) ;;
+              *) break ;;
+            esac
+          done
+          jq -r .StandardOutputContent <<< "$result"
+          jq -r .StandardErrorContent <<< "$result" >&2
+          if [ "$status" != Success ]; then
+            echo "::error::The deploy ended with $(jq -r .StatusDetails <<< "$result") (exit code $(jq -r .ResponseCode <<< "$result")). If it was not delivered, check that the instance is online in Systems Manager's Fleet Manager; otherwise, on the server: sudo /opt/pix/repo/server/deploy/deploy.sh status, and /opt/pix/state/last-build.log"
+            exit 1
+          fi
+
+      # deploy.sh checked /health through nginx on the server itself; this checks the address the app uses.
+      - name: Check the public address
+        run: |
+          if ! live=$(curl -fsS -m 10 "$SERVER_URL/version"); then
+            echo "::error::$SERVER_URL does not answer. An instance stopped and started without an Elastic IP gets another address, and the app still uses this one."
+            exit 1
+          fi
+          echo "$SERVER_URL is on $live"

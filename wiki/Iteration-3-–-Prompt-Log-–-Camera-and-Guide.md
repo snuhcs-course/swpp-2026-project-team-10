@@ -23,5 +23,14 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-27] "Commit, then do the documents."
 - [Dongje, 10-28] "The S22 is connected: check the Codex review, fix what needs it, and run the check on the phones." / "Wi-Fi is on, go on with the check." / "Commit, push, then reply and resolve." (Two findings, both valid: a received reference's size is now read before it is decoded, and the photographer subscribes to guide changes before sending the current guide, a gap the guide image already had. IT-14 with an emulator as the photographer and the S22 as the subject passed: the reference 19 ms after the guide, and nothing resent after a rejoin.)
 
+## Selfie mode ([#116])
+
+- [Dongje, 10-29] "I'll work on #116; do it as before. Go ahead on your own; selfie mode will probably need prompts of its own, which can follow our base prompt format. Update dev first and tell me what I have to decide." (The camera switch next to the shutter, the front camera mirrored everywhere, selfie prompts in a `[selfie]` table of `prompts.toml`, and a `selfie` field on the pose endpoints; four decisions listed.)
+- [Dongje, 10-29] "No need to enforce the rule against selfie mode during a session." (The switch stays in a session, so the frames the subject sees are mirrored like the preview and the guide lines up on both phones.)
+- [Dongje, 10-29] "Open it as a draft PR for now."
+- [Dongje, 10-29] "Go ahead as recommended, and take the selfies from Wikimedia. Also lower the top bar's black area very slightly and make its buttons that much larger, never too big like before; lower the shutter, Guide, and the other bottom buttons by as much, and make them a bit larger too." (Saved selfies mirrored like the preview, no pose tip for a selfie, and FR-1.14 without "while no session runs". On three Wikimedia Commons selfies through the server, the current prompts made photos someone else took, and the selfie prompts kept all twelve candidates selfies. The top bar 4 dp taller, the bottom row 4 dp lower, and each control 2 to 4 dp larger, checked on the S22.)
+- [Dongje, 10-29] "You can use the S22." (The front camera's photo and scene photo compared with its preview on the phone, without sharing any screen that shows a face.)
+
+[#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
 [#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

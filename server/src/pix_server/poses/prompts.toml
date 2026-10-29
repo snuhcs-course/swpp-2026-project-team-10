@@ -140,7 +140,9 @@ pose = "standing with the arms crossed over the chest"
 # sends `selfie` with POST /pose-suggestions and POST /poses. One hand holds the phone at arm's length, so a pose has
 # only the other hand, the head, the face, and the shoulders to work with, and the shot stays a selfie: never full
 # body, never the phone itself. Otherwise the same as the prompts above: the same person, clothes, place, and light, and
-# nothing outside the original frame.
+# nothing outside the original frame. Tried on 2026-10-29 with three selfies through the server: the prompts above
+# turned each into a photo someone else took, with both hands free and the arm that held the phone gone, while these
+# kept all twelve candidates selfies.
 [selfie]
 pose_prompt = """
 Edit this photo. It is a selfie: the person holds a phone in one hand at arm's length and took this photo with its

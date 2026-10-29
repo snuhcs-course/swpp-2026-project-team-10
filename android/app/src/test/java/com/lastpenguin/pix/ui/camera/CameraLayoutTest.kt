@@ -146,14 +146,17 @@ class CameraLayoutTest {
         for ((aspect, height) in listOf(AspectRatio.R4_3 to 480, AspectRatio.R16_9 to 640, AspectRatio.R1_1 to 480)) {
             screen.ratio(aspect)
             val preview = screen.controls.previewContainer.box()
-            // The bar's 48 dp touch height reaches 4 dp over the image, which starts below what the bar draws.
+            // The bar draws 48 dp; its 52 dp touch height reaches 4 dp over the image, which starts below that.
             assertEquals("$aspect", screen.controls.topBar.box().bottom - TOP_BAR_OVERHANG_DP.toInt(), preview.top)
+            assertEquals("$aspect", 48, preview.top)
             assertEquals("$aspect", 360, preview.width())
             assertEquals("$aspect", height, preview.height())
             shutters += screen.controls.shutterButton.box()
         }
         assertEquals(1, shutters.distinct().size)
-        assertEquals(68, shutters.first().height())
+        assertEquals(72, shutters.first().height())
+        // The row ends 18 dp above the screen's bottom.
+        assertEquals(705 - 18, screen.controls.captureControls.box().bottom)
     }
 
     @Test
@@ -197,7 +200,7 @@ class CameraLayoutTest {
         val screen = camera()
         val margin = ZOOM_ROW_MARGIN_DP.toInt()
         screen.ratio(AspectRatio.R4_3)
-        assertEquals(524 - margin, screen.controls.zoomRow.box().bottom)
+        assertEquals(528 - margin, screen.controls.zoomRow.box().bottom)
 
         // 1:1 shows inside the 4:3 area: the row is at the bottom of the square, not of the area.
         screen.ratio(AspectRatio.R1_1)

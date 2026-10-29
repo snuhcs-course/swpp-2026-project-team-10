@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 # One-time setup of a course server for the Pix server (server/README.md, Deploy). It installs no packages and
 # creates no users. Run it as root from the checkout, with the branch this server follows:
 #
@@ -27,6 +27,8 @@ docker compose version > /dev/null 2>&1 || die "Docker Compose is missing: sudo 
 docker buildx version > /dev/null 2>&1 || die "Docker Buildx is missing: sudo apt install -y docker-buildx"
 
 mkdir -p "$PIX_HOME/state"
+# Keys the app reads as files (README, Push notifications): only the app's user in the container, uid 10001, reads them.
+install -d -m 700 -o 10001 -g 10001 "$PIX_HOME/secrets"
 # Only the BRANCH line changes; settings such as MAX_WAIT_SECONDS that someone added stay.
 CONF=$PIX_HOME/deploy.conf
 {

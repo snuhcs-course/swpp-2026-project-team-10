@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -118,6 +118,9 @@ class RtcSessionManager(
     /** Subject: the session lost last, which *Reconnect* takes the place in again (SessionEntry.Rejoin). */
     private var lost: LostSession? = null
 
+    /** Subject: the ticket this *Reconnect* uses, kept for another try if it fails before the server refuses it. */
+    private var ticket: LostSession? = null
+
     // ---- Peer connection fields, reset for every connection attempt -----------
     @Volatile
     private var peer: PeerConnectionClient? = null
@@ -130,6 +133,12 @@ class RtcSessionManager(
 
     /** Photographer: an offer has gone out and its answer has not come; an answer without one is stale. */
     private var offerPending = false
+
+    /** Photographer: while active, the pending offer may still be answered, so a restart waits for that answer. */
+    private var answerWait: Job? = null
+
+    /** Photographer: a restart asked for during [answerWait], which goes once that answer is in or the wait is over. */
+    private var restartQueued = false
 
     /** Local candidates wait while a description is being made, so none with new ICE credentials goes out before it. */
     private var holdingCandidates = false
@@ -165,6 +174,7 @@ class RtcSessionManager(
         this@RtcSessionManager.role = role
         // A Reconnect takes its place in the session it lost; without a token for it, it joins the code again.
         val ticket = lost?.takeIf { entry is SessionEntry.Rejoin && it.code == entry.code }
+        this@RtcSessionManager.ticket = ticket
         lost = null
         code = when (entry) {
             SessionEntry.NewRoom -> null
@@ -464,11 +474,26 @@ class RtcSessionManager(
 
     /**
      * Photographer: an offer with new ICE credentials on the same peer connection, so the channels, the video track,
-     * and what is queued on them stay (Design 2.6.7). Each one replaces the last; an answer to an older one never
-     * comes, because the subject only receives offers on the socket that holds its place.
+     * and what is queued on them stay (Design 2.6.7). Both phones taking their places back can ask for two restarts
+     * at once, and the subject answers every offer that reaches its socket, so a restart waits while the last offer
+     * may still be answered: an answer always meets the offer it answers. An offer that went to the subject's old
+     * socket is never answered, so the wait ends after [ANSWER_WAIT_MS].
      */
     private fun restartIce() {
         val client = peer ?: return
+        if (offerPending && answerWait?.isActive == true) {
+            restartQueued = true
+            return
+        }
+        restartQueued = false
+        // Pending from now, not from when the offer is made, so a second request meanwhile waits too.
+        offerPending = true
+        answerWait?.cancel()
+        answerWait = scope.launch {
+            delay(ANSWER_WAIT_MS)
+            answerWait = null
+            if (restartQueued) restartIce()
+        }
         // The subject's candidates of the old answer must not meet the new offer; they wait for the new answer.
         remoteDescriptionSet = false
         scope.launch {
@@ -518,10 +543,13 @@ class RtcSessionManager(
                             return
                         }
                         offerPending = false
+                        answerWait?.cancel()
+                        answerWait = null
                         client.applyRemote(sdp)
                         remoteDescriptionSet = true
                         flushCandidates(client)
                         Timings.mark("answer.applied")
+                        if (restartQueued) restartIce()
                     }
 
                     else -> Log.w(TAG, "Unexpected SDP ${sdp.type} for role $role")
@@ -877,6 +905,9 @@ class RtcSessionManager(
         remoteDescriptionSet = false
         pendingCandidates.clear()
         offerPending = false
+        answerWait?.cancel()
+        answerWait = null
+        restartQueued = false
         holdingCandidates = false
         heldCandidates.clear()
         openChannels.clear()
@@ -896,13 +927,18 @@ class RtcSessionManager(
         val id = sessionId
         val token = rejoinToken
         val lostCode = code
-        lost = if (reason == EndReason.CONNECTION_LOST && role == Role.SUBJECT && id != null && token != null &&
-            lostCode != null
-        ) {
-            LostSession(lostCode, id, token, iceServers)
-        } else {
-            null
+        lost = when {
+            reason == EndReason.CONNECTION_LOST && role == Role.SUBJECT && id != null && token != null &&
+                lostCode != null -> LostSession(lostCode, id, token, iceServers)
+
+            // A Reconnect that failed without an answer, such as one tapped before the network is back, keeps its
+            // ticket: the next try still takes the place with the token instead of joining the code, which a server
+            // still holding the old socket would refuse as FULL. A refusal (NOT_FOUND) or Leave drops it.
+            reason == EndReason.ERROR -> ticket
+
+            else -> null
         }
+        ticket = null
         closePeer()
         signalingJob?.cancel()
         signalingJob = null
@@ -929,6 +965,9 @@ class RtcSessionManager(
     private companion object {
         const val TAG = "PixSession"
         const val CONNECT_TIMEOUT_MS = 15_000L
+
+        /** How long a restart waits for the answer to the last offer, about ten round trips through the server. */
+        const val ANSWER_WAIT_MS = 2_000L
 
         /** How long both phones try to restore a dropped link before giving up (FR-6.12, NFR-11). */
         const val RECONNECT_BUDGET_MS = 10_000L

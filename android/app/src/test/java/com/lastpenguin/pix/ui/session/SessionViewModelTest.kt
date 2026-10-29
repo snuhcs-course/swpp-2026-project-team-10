@@ -1,6 +1,9 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -24,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -223,6 +227,30 @@ class SessionViewModelTest {
         session.setState(live)
         runCurrent()
         assertEquals(2, session.sent.count { it is SessionMessage.Capabilities })
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        runCurrent()
+    }
+
+    @Test
+    fun background_endsAReconnectingSessionOnTime_alsoWhenTheLinkComesBack() = runTest(dispatcher) {
+        val process = ProcessLifecycleOwner.get().lifecycle as LifecycleRegistry
+        process.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        model.startRoom()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+
+        // To the background while reconnecting; the link is back 30 s later, and the deadline stays.
+        process.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        advanceTimeBy(30_000)
+        session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        advanceTimeBy(29_999)
+        runCurrent()
+        assertTrue(session.leaves.isEmpty())
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(listOf(EndReason.LEFT), session.leaves)
+
+        process.handleLifecycleEvent(Lifecycle.Event.ON_START)
         session.setState(SessionState.Ended(EndReason.LEFT))
         runCurrent()
     }

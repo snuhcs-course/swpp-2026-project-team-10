@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -604,12 +604,47 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(1, peer.restarts)
         assertTrue(manager.state.value is SessionState.Connected)
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer 1")))
 
         dropAndRejoin(peer, Role.PHOTOGRAPHER)
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer 2")))
         signaling.receive(SignalMessage.PeerRejoined)
         runCurrent()
         // One for its own place back, one for the subject's.
         assertEquals(3, peer.restarts)
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a restart asked for while an offer waits goes once it is answered, or after 2 s`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+        dropAndRejoin(peer, Role.PHOTOGRAPHER)
+        assertEquals(1, peer.restarts)
+
+        // The subject's place is back too before that offer is answered: the second restart waits for the answer,
+        // which would otherwise be taken for its own and leave the phones with different ICE credentials.
+        signaling.receive(SignalMessage.PeerRejoined)
+        runCurrent()
+        assertEquals(1, peer.restarts)
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer 1")))
+        runCurrent()
+        assertEquals("v=0 answer 1", peer.remote.last().sdp)
+        assertEquals(2, peer.restarts)
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer 2")))
+        runCurrent()
+        assertEquals("v=0 answer 2", peer.remote.last().sdp)
+
+        // An offer never answered, as one sent to the subject's old socket, holds the next restart for 2 s only.
+        signaling.receive(SignalMessage.PeerRejoined)
+        runCurrent()
+        assertEquals(3, peer.restarts)
+        signaling.receive(SignalMessage.PeerRejoined)
+        advanceTimeBy(1_999)
+        runCurrent()
+        assertEquals(3, peer.restarts)
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(4, peer.restarts)
         manager.leave(EndReason.LEFT)
     }
 
@@ -696,6 +731,41 @@ class RtcSessionManagerTest {
             assertEquals(PeerConfig(Role.SUBJECT, relay), peers.created.last().config)
             manager.leave(EndReason.LEFT)
         }
+
+    @Test
+    fun `a Reconnect that fails before the server answers keeps its token for the next one`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        advanceTimeBy(10_001)
+        runCurrent()
+
+        // Tapped before the network is back: the socket fails before it opens.
+        manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Closed(RuntimeException("no network")))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.ERROR), manager.state.value)
+
+        manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        runCurrent()
+        assertEquals(
+            SignalMessage.SessionJoin("s_1", rejoin = false, rejoinToken = "subject-token"),
+            signaling.sent.last(),
+        )
+
+        // A refusal drops it: the next try joins the code.
+        signaling.receive(SignalMessage.ServerError("FORBIDDEN", "This phone has no place in the session"))
+        runCurrent()
+        assertEquals(SessionState.Ended(EndReason.NOT_FOUND), manager.state.value)
+        manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        runCurrent()
+        assertEquals(SignalMessage.RoomJoin("482915"), signaling.sent.last())
+        manager.leave(EndReason.LEFT)
+    }
 
     @Test
     fun `a subject waiting for an offer takes its place again when the photographer is back`() = runTest {

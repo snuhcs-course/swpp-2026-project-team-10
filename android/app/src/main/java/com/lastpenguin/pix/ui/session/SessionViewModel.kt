@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -255,12 +255,15 @@ class SessionViewModel(
     private fun onAppBackground(background: Boolean) {
         backgroundJob?.cancel()
         backgroundJob = null
-        if (!background || role != Role.PHOTOGRAPHER || state.value !is SessionState.Connected) return
+        if (!background || role != Role.PHOTOGRAPHER || !isLive(state.value)) return
+        // The deadline holds through a drop: a session reconnecting, or back from it, still ends on time.
         backgroundJob = viewModelScope.launch {
             delay(BACKGROUND_LIMIT_MS)
-            if (state.value is SessionState.Connected) session.leave(EndReason.LEFT)
+            if (isLive(state.value)) session.leave(EndReason.LEFT)
         }
     }
+
+    private fun isLive(state: SessionState) = state is SessionState.Connected || state is SessionState.Reconnecting
 
     /**
      * What an end does with the kept code (#81): *Connection lost* keeps it for *Reconnect*; an unknown or expired

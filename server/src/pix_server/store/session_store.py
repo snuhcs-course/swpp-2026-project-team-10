@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """Session state shared by every server process, kept in Redis (Design Documentation 2.7, AD-18).
 
 Each server process is one worker with its own id. The store runs the room transitions as scripts, carries
@@ -81,6 +81,9 @@ class SessionStore:
                 "CREATE",
                 "JOIN",
                 "REJOIN",
+                "INVITE",
+                "ACCEPT_INVITATION",
+                "END_INVITATION",
                 "ROUTE",
                 "LEAVE",
                 "DISCONNECT",
@@ -173,6 +176,21 @@ class SessionStore:
         `keep` says the phone keeps its peer connection, so the other phone hears `peer.rejoined`, not `peer.joined`."""
         status, role, out = await self._run("REJOIN", connection, session_id, token_hash, "1" if keep else "0")
         return status, role, _deliveries(out)
+
+    async def invite(self, session_id: str, token_hash: str, invitation: str, expires_at: float) -> list[Delivery]:
+        """Opens an invitation's room, with nobody in it and no code; `token_hash` is the hash of the photographer's
+        rejoin token. It expires at `expires_at` unless the friend has taken its place."""
+        return _deliveries(await self._run("INVITE", session_id, token_hash, invitation, f"{expires_at:.6f}"))
+
+    async def accept_invitation(self, session_id: str, token_hash: str, deadline: float) -> tuple[bool, list[Delivery]]:
+        """Opens the subject's place of an invitation's room to the rejoin token with the hash `token_hash`, to be taken
+        by `deadline`. False when the room has ended or has a subject already."""
+        status, out = await self._run("ACCEPT_INVITATION", session_id, token_hash, f"{deadline:.6f}")
+        return status == "OK", _deliveries(out)
+
+    async def end_invitation(self, session_id: str, notice: str = "") -> list[Delivery]:
+        """Removes the room of an invitation nobody accepted; the photographer hears the error `notice`, if any."""
+        return _deliveries(await self._run("END_INVITATION", session_id, notice))
 
     async def seated(self, session_id: str, connection: str) -> bool:
         """Whether `connection` still holds the subject's place in the session and its photographer is still there.

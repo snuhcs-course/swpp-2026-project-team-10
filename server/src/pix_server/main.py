@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -35,6 +35,9 @@ from pix_server.errors import (
     handle_store_error,
     handle_validation_error,
 )
+from pix_server.invitations.push import PushSender, load_service_account
+from pix_server.invitations.router import pages as invitation_pages
+from pix_server.invitations.router import router as invitations_router
 from pix_server.poses.generator import PoseGenerator
 from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.router import router as poses_router
@@ -78,6 +81,8 @@ def warn_about_missing_settings(settings: Settings) -> None:
         logger.warning("PIX_GOOGLE_CLIENT_ID is not set: Google sign-in answers UNAVAILABLE")
     if not settings.turn_key_id or settings.turn_api_token is None or not settings.turn_api_token.get_secret_value():
         logger.warning("PIX_TURN_KEY_ID or PIX_TURN_API_TOKEN is not set: phones get STUN only, without the relay")
+    if not settings.fcm_credentials_file:
+        logger.warning("PIX_FCM_CREDENTIALS_FILE is not set: invitations and friend requests send no pushes")
 
 
 def jwt_secret(settings: Settings) -> str:
@@ -93,14 +98,15 @@ def create_app(
     clock: Callable[[], float] = time.time,
     image_api: httpx2.AsyncBaseTransport | None = None,
     turn_api: httpx2.AsyncBaseTransport | None = None,
+    fcm_api: httpx2.AsyncBaseTransport | None = None,
     redis: Callable[[], Redis] | None = None,
     google: GoogleVerifier | None = None,
     password_hasher: PasswordHasher | None = None,
 ) -> FastAPI:
     """`image_api` replaces the network connection to OpenRouter, for the image and suggestion models, `turn_api` the
-    one to Cloudflare's TURN API, `redis` opens the session store, `google` verifies Google ID tokens, and
-    `password_hasher` sets the cost of argon2id; tests pass fakes or cheaper ones. `clock` is wall-clock time, because
-    every worker compares it with times other workers stored."""
+    one to Cloudflare's TURN API, `fcm_api` the one to Google's token endpoint and FCM, `redis` opens the session
+    store, `google` verifies Google ID tokens, and `password_hasher` sets the cost of argon2id; tests pass fakes or
+    cheaper ones. `clock` is wall-clock time, because every worker compares it with times other workers stored."""
     config = settings if settings is not None else Settings()
 
     @asynccontextmanager
@@ -118,16 +124,19 @@ def create_app(
         try:
             await migrate(database)
             app.state.database = async_sessionmaker(database, expire_on_commit=False)
-            # The generator and the relay enforce their own deadlines, so their clients set none.
+            # The generator, the relay, and the push sender enforce their own deadlines, so their clients set none.
             async with (
                 httpx2.AsyncClient(transport=image_api, timeout=None) as http,
                 httpx2.AsyncClient() as google_http,
                 httpx2.AsyncClient(transport=turn_api, timeout=None) as turn_http,
+                httpx2.AsyncClient(transport=fcm_api, timeout=None) as fcm_http,
             ):
                 app.state.pose_generator = PoseGenerator(config, http)
                 app.state.pose_suggester = PoseSuggester(config, http)
                 app.state.pose_tipper = PoseTipper(config, http)
                 app.state.google = google or GoogleTokenVerifier(config.google_client_id, google_http, clock)
+                account = load_service_account(config.fcm_credentials_file)
+                app.state.push = PushSender(account, fcm_http, clock, config.fcm_timeout_seconds)
                 registry = SessionRegistry(config, store, TurnRelay(config, turn_http).ice_servers)
                 app.state.signaling = registry
                 await registry.start()
@@ -144,6 +153,8 @@ def create_app(
     app.include_router(poses_router)
     app.include_router(accounts_router)
     app.include_router(friends_router)
+    app.include_router(invitations_router)
+    app.include_router(invitation_pages)
     app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_REQUEST_BYTES)
     app.add_exception_handler(ApiError, handle_api_error)
     app.add_exception_handler(RequestValidationError, handle_validation_error)

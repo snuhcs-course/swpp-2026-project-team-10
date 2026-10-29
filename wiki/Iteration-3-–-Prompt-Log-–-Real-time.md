@@ -106,7 +106,7 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Sungmin, 10-29] "Do the reviews on PR #149 need fixing? If so, fix them, commit, and push." (Three Codex findings, all right. Two restarts asked for at once, when both phones take their places back, could both be answered while the photographer applied only the first answer, leaving the phones with different ICE credentials: a restart now waits for the pending answer, at most 2 s, because an offer that went to the subject's old socket is never answered, and plain serializing would have held back the restart that saved IT-4. A *Reconnect* that failed before the server answered dropped its token, so the next one joined the code, which a server still holding the old socket refuses as `FULL`: the token is now kept until the server refuses it, which also explains the first failed tap. The background limit skipped `Reconnecting`: it now counts, and its deadline holds when the link comes back. Each fix has a test that fails without it; 967 unit tests passed.)
 - [Sungmin, 10-29] "Write the AI prompt log for this too, then commit and push it."
 
-## Invitations with push notifications ([#119], PRs [#153] and the app's)
+## Invitations with push notifications ([#119], PRs [#153] and [#154])
 
 **The plan (10/29)**
 
@@ -132,6 +132,7 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Sungmin, 10-29] "Is the link really working? Check it. The rest seems to work." (On the emulator's Chrome the page's *Open in Pix* opened *Invitation*. The phone's log showed the link opened on the inviting phone itself, where it cannot be accepted, just as the 30 s ran out.)
 - [Sungmin, 10-29] "Let's make it 60 s; 30 s is too short. It works. Make it 60 s, then commit and push." (60 s on the server, the photographer's own wait at 80 s, and "within a minute"; one test that could not fail, since another timer ended the session first, now checks that a connected session outlasts the invitation's wait. 1007 unit tests passed.)
 - [Sungmin, 10-29] "Go on with the rest." (Tests of the three screens and their Korean, the token in the socket's upgrade, Flows 3, 3b, 4, and 5 redrawn, and the documents. Two Korean strings followed the wireframe's earlier translation.)
+- [Sungmin, 10-29] "The PR is [#154]. Fix what its review asks for, then commit and push." (Codex found three: *Cancel invite* did nothing once the friend had accepted and the phones were connecting, yet went to *Friends*, so it now ends the session, while closing the sheet then keeps it, as on *Room code*; *Invitation* navigated on transitions, which a screen stopped with Pix in the background, or recreated, missed, leaving it on "Connecting…", so it follows the session's state with its flag in its ViewModel; and *Accept* with another session open spent the invitation, since the session ignores a second start, so it is refused before the server is called. `JoinCodeFragment` and *Connection lost* also navigate on transitions; this PR leaves them as they are. Six mutants of the fixes each failed a new test; 1040 unit tests passed.)
 
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
@@ -148,3 +149,4 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
 [#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
 [#153]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/153
+[#154]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/154

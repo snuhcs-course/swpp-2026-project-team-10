@@ -207,23 +207,38 @@ class SessionViewModel(
 
     /**
      * Photographer: *Cancel invite*, or *Invite sent* closed while waiting (FR-6.2). Cancelled on the server first, so
-     * the friend's *Invitation* says it is no longer available (FR-6.4); the session ends either way.
+     * the friend's *Invitation* says it is no longer available (FR-6.4); the session ends either way. Once the friend
+     * has accepted, the invitation is answered, so only the session ends, also while the phones are still connecting.
      */
     fun cancelInvite() {
         val sent = _invitation.value ?: return
-        if (state.value !is SessionState.Inviting) return
-        viewModelScope.launch {
-            invitations.cancel(sent.id)
-            session.leave(EndReason.CANCELLED)
+        when (state.value) {
+            is SessionState.Inviting -> viewModelScope.launch {
+                invitations.cancel(sent.id)
+                session.leave(EndReason.CANCELLED)
+            }
+
+            is SessionState.Connecting -> viewModelScope.launch { session.leave(EndReason.CANCELLED) }
+
+            else -> Unit
         }
     }
 
-    /** Subject: *Accept* on Invitation gave this phone its place, which the session takes now (FR-6.1). */
-    fun joinInvitation(invitationId: String, place: SessionPlace) {
+    /** A room or an invitation waits, or a session runs, on this phone, so *Accept* on Invitation must wait (FR-6.9). */
+    val busy: Boolean
+        get() = isOpen(state.value)
+
+    /**
+     * Subject: *Accept* on Invitation gave this phone its place, which the session takes now (FR-6.1). False, with
+     * nothing changed, while another session is open here, which the session would keep instead.
+     */
+    fun joinInvitation(invitationId: String, place: SessionPlace): Boolean {
+        if (busy) return false
         lastCode = null
         reconnecting = false
         role = Role.SUBJECT
         viewModelScope.launch { session.start(SessionEntry.Invitation(invitationId, place), Role.SUBJECT) }
+        return true
     }
 
     /** Subject: *Join* with 6 digits. */

@@ -322,6 +322,7 @@
     <string name="invitation_gone_message">친구에게 다시 초대해 달라고 하세요.</string>
     <string name="invitation_sign_in">친구가 초대한 계정으로 Pix에 로그인한 뒤 수락하세요.</string>
     <string name="invitation_failed_title">초대를 열지 못했어요</string>
+    <string name="invitation_in_session">지금 다른 카메라 공유 중이에요. 먼저 끝낸 뒤 수락하세요.</string>
     <string name="invitation_notification">%1$s님이 카메라 공유에 초대했어요</string>
     <string name="friend_request_notification">%1$s님이 친구 요청을 보냈어요</string>
     <string name="friend_request_notification_body">친구 화면에서 수락하거나 거절하세요.</string>

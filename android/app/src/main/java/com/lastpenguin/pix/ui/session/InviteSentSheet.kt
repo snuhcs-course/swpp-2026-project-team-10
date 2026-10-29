@@ -33,7 +33,9 @@ import kotlinx.coroutines.launch
  * Invite sent, photographer (R&S 6.5; FR-6.1–6.3), over Camera, so the camera is on when the friend accepts. The friend
  * gets a push; *Share invite link* and *Copy link* are for a push that does not arrive (AD-13). The sheet closes when
  * the friend is connected, opens *Invite not accepted* when the friend declines or a minute passes, and *Cancel invite*, or
- * closing it any other way while waiting, cancels the invitation. The remote-control toggle (FR-7.5) is not built.
+ * closing it any other way while waiting, cancels the invitation. *Cancel invite* after the friend accepted ends the
+ * session they are joining; closing the sheet then keeps it, as on Room code. The remote-control toggle (FR-7.5) is not
+ * built.
  * Owner: Real-time (#119).
  */
 class InviteSentSheet : BottomSheetDialogFragment() {
@@ -68,7 +70,7 @@ class InviteSentSheet : BottomSheetDialogFragment() {
         // A configuration change (the language, the font size) also tears the dialog down, but the sheet comes back
         // for the same invitation.
         if (leaving || activity?.isChangingConfigurations == true) return
-        sessionViewModel.cancelInvite()
+        if (sessionViewModel.state.value is SessionState.Inviting) sessionViewModel.cancelInvite()
     }
 
     private fun render(binding: SheetInviteSentBinding, state: SessionState, sent: SentInvitation?) {

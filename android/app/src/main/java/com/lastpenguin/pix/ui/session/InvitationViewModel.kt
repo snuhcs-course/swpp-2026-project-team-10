@@ -61,6 +61,12 @@ class InvitationViewModel(private val invitations: InvitationManager, private va
     private var invitationId: String? = null
     private var opened: OpenedInvitation? = null
 
+    /**
+     * The session took the place *Accept* gave, so its state decides what follows. Kept here, not in the screen, so a
+     * screen recreated while the phones connect still follows the session.
+     */
+    var joining = false
+
     init {
         // A sign-in made from this screen (through Friends) offers the answer when the screen comes back.
         viewModelScope.launch { auth.state.collect { show() } }

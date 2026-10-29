@@ -25,16 +25,14 @@ import kotlinx.coroutines.launch
 /**
  * Invitation, the friend's phone (R&S 6.6; FR-6.1, FR-6.4), opened from the notification or the invite link through
  * the deep link `pix://invite/{invitationId}`. *Accept* takes this phone's place in the session and opens Subject view
- * once it has it; *Decline* closes, and the photographer sees *Invite not accepted*. An invitation that cannot be
- * answered any more says so. Owner: Real-time (#119).
+ * once it has it; *Decline* closes, and the photographer sees *Invite not accepted*. *Accept* while another session is
+ * open on this phone says so and accepts nothing. An invitation that cannot be answered any more says so. Owner:
+ * Real-time (#119).
  */
 class InvitationFragment : Fragment(R.layout.fragment_failure) {
 
     private val viewModel: InvitationViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
-
-    /** *Accept* went through and the session is taking the place; the session's states decide what follows. */
-    private var joining = false
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentFailureBinding.bind(view)
@@ -46,35 +44,43 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
                 launch {
                     viewModel.events.collect { event ->
                         when (event) {
-                            is InvitationEvent.Accepted -> {
-                                joining = true
-                                sessionViewModel.joinInvitation(event.invitationId, event.place)
-                            }
-
+                            is InvitationEvent.Accepted -> join(event)
                             InvitationEvent.Declined -> backToCamera()
-
-                            is InvitationEvent.AnswerFailed -> Toast.makeText(
-                                requireContext(),
-                                requireContext().accountMessage(event.error),
-                                Toast.LENGTH_LONG,
-                            ).show()
+                            is InvitationEvent.AnswerFailed -> toast(requireContext().accountMessage(event.error))
                         }
                     }
                 }
-                launch { sessionViewModel.transitions.collect(::onTransition) }
+                // The state, not its transitions: a session that connected or ended while the screen was stopped, as
+                // with Pix in the background, still decides what follows when it comes back.
+                launch { sessionViewModel.state.collect(::onSession) }
             }
         }
     }
 
-    private fun onTransition(state: SessionState) {
-        if (!joining) return
+    /** A session open on this phone would keep the invitation's from starting, so nothing is accepted (FR-6.9). */
+    private fun accept() {
+        if (sessionViewModel.busy) toast(getString(R.string.invitation_in_session)) else viewModel.accept()
+    }
+
+    private fun join(accepted: InvitationEvent.Accepted) {
+        if (sessionViewModel.joinInvitation(accepted.invitationId, accepted.place)) {
+            viewModel.joining = true
+            return
+        }
+        // A session opened here after *Accept* was tapped; the invitation is answered, so it is gone for this phone.
+        toast(getString(R.string.invitation_in_session))
+        viewModel.gone()
+    }
+
+    private fun onSession(state: SessionState) {
+        if (!viewModel.joining) return
         when (state) {
-            is SessionState.Connecting -> if (state.sessionId != null) {
-                findNavController().navigate(R.id.action_invitation_to_subject)
-            }
+            is SessionState.Connecting -> if (state.sessionId != null) navigate(R.id.action_invitation_to_subject)
+
+            is SessionState.Connected, is SessionState.Reconnecting -> navigate(R.id.action_invitation_to_subject)
 
             is SessionState.Ended -> {
-                joining = false
+                viewModel.joining = false
                 when (state.reason) {
                     // The photographer left between the accept and this phone taking its place.
                     EndReason.NOT_FOUND, EndReason.EXPIRED -> viewModel.gone()
@@ -82,7 +88,7 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
                     EndReason.CANCELLED, EndReason.LEFT -> Unit
 
                     else -> {
-                        Toast.makeText(requireContext(), R.string.couldnt_connect, Toast.LENGTH_LONG).show()
+                        toast(getString(R.string.couldnt_connect))
                         viewModel.gone()
                     }
                 }
@@ -120,7 +126,7 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
                 binding.failureMessage.setText(if (state.answering) R.string.connecting else R.string.invitation_body)
                 binding.primaryButton.setText(R.string.accept)
                 binding.primaryButton.isEnabled = !state.answering
-                binding.primaryButton.setOnClickListener { viewModel.accept() }
+                binding.primaryButton.setOnClickListener { accept() }
                 binding.secondaryButton.setText(R.string.decline)
                 binding.secondaryButton.isEnabled = !state.answering
                 binding.secondaryButton.setOnClickListener { viewModel.decline() }
@@ -165,6 +171,10 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
 
     private fun backToCamera() {
         findNavController().popBackStack(R.id.cameraFragment, false)
+    }
+
+    private fun toast(text: String) {
+        Toast.makeText(requireContext(), text, Toast.LENGTH_LONG).show()
     }
 
     companion object {

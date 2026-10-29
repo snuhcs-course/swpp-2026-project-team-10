@@ -384,20 +384,34 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun cancelInvite_whileWaiting_cancelsOnTheServerAndLeaves_butNotOnceTheFriendCame() = runTest(dispatcher) {
+    fun cancelInvite_whileWaiting_cancelsOnTheServerAndLeaves() = runTest(dispatcher) {
         model.invite(friend)
         runCurrent()
-        session.setState(SessionState.Connecting("s_1"))
+        session.setState(SessionState.Inviting("inv_1"))
+        runCurrent()
+        model.cancelInvite()
+        runCurrent()
+
+        assertEquals(listOf("invite:u_2", "cancel:inv_1"), invitations.calls)
+        assertEquals(listOf(EndReason.CANCELLED), session.leaves)
+    }
+
+    @Test
+    fun cancelInvite_onceTheFriendAccepted_leavesTheSessionTheyAreJoining_butNotOnceConnected() = runTest(dispatcher) {
+        model.invite(friend)
+        runCurrent()
+        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         runCurrent()
         model.cancelInvite()
         runCurrent()
         assertTrue(session.leaves.isEmpty())
 
-        session.setState(SessionState.Inviting("inv_1"))
+        session.setState(SessionState.Connecting("s_1"))
         runCurrent()
         model.cancelInvite()
         runCurrent()
-        assertEquals(listOf("invite:u_2", "cancel:inv_1"), invitations.calls)
+        // The invitation is answered, so the server has nothing to cancel.
+        assertEquals(listOf("invite:u_2"), invitations.calls)
         assertEquals(listOf(EndReason.CANCELLED), session.leaves)
     }
 
@@ -406,10 +420,34 @@ class SessionViewModelTest {
         model.joinRoom(CODE)
         runCurrent()
         val place = SessionPlace("s_1", "subject-token", emptyList())
-        model.joinInvitation("inv_1", place)
+        assertTrue(model.joinInvitation("inv_1", place))
         runCurrent()
 
         assertEquals(SessionEntry.Invitation("inv_1", place) to Role.SUBJECT, session.starts.last())
         assertNull(model.lastCode)
+    }
+
+    @Test
+    fun joinInvitation_whileASessionIsOpen_startsNothing_andKeepsTheCode() = runTest(dispatcher) {
+        model.joinRoom(CODE)
+        runCurrent()
+        val place = SessionPlace("s_2", "subject-token", emptyList())
+        for (open in listOf(
+            SessionState.Waiting(CODE),
+            SessionState.Inviting("inv_0"),
+            SessionState.Connecting("s_1"),
+            SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT),
+            SessionState.Reconnecting("s_1", since = 0L),
+        )) {
+            session.setState(open)
+            runCurrent()
+
+            assertTrue(open.toString(), model.busy)
+            assertFalse(open.toString(), model.joinInvitation("inv_1", place))
+        }
+        runCurrent()
+
+        assertEquals(listOf(SessionEntry.RoomCode(CODE) to Role.SUBJECT), session.starts)
+        assertEquals(CODE, model.lastCode)
     }
 }

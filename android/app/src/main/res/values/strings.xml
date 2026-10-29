@@ -334,6 +334,7 @@
     <string name="invitation_gone_message">Ask your friend to invite you again.</string>
     <string name="invitation_sign_in">Sign in to Pix with the account your friend invited, then accept.</string>
     <string name="invitation_failed_title">Couldn\'t open the invitation</string>
+    <string name="invitation_in_session">You\'re in another session. Leave it first, then accept.</string>
     <string name="invitation_notification">%1$s invites you to shoot together</string>
     <string name="friend_request_notification">%1$s sent you a friend request</string>
     <string name="friend_request_notification_body">Open Friends to accept or decline.</string>

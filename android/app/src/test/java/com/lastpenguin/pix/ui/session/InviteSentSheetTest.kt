@@ -37,8 +37,9 @@ import org.robolectric.shadows.ShadowToast
  * on the session state: Inviting (the friend's name, the link enabled), Connecting (accepted), Connected (the sheet
  * closes, nothing cancelled), Ended by a decline or the expiry (Invite not accepted), Ended otherwise (Couldn't connect,
  * the sheet closes). Input: Share invite link (the share sheet with the link), Copy link (the clipboard), Cancel
- * invite (cancelled on the server, the session left, Friends), the sheet closed while waiting (cancelled), and a
- * configuration change while waiting (kept).
+ * invite while waiting (cancelled on the server, the session left, Friends) or once the friend accepted (the session
+ * left, Friends), the sheet closed while waiting (cancelled) or once the friend accepted (kept), and a configuration
+ * change while waiting (kept).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -170,6 +171,36 @@ class InviteSentSheetTest {
         assertEquals(listOf("invite:u_2", "cancel:inv_1"), modules.invitations.calls)
         assertEquals(listOf(EndReason.CANCELLED), modules.session.leaves)
         assertEquals(R.id.friendsFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun cancelInvite_onceTheFriendAccepted_endsTheSessionTheyAreJoining_andOpensFriends() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.inviteSentSheet)
+        inviting(modules)
+        modules.session.setState(SessionState.Connecting("s_1"))
+        idle()
+
+        onSheet { binding -> binding.cancelButton.performClick() }
+        idle()
+
+        assertEquals(listOf("invite:u_2"), modules.invitations.calls)
+        assertEquals(listOf(EndReason.CANCELLED), modules.session.leaves)
+        assertEquals(R.id.friendsFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun closingTheSheetOnceTheFriendAccepted_keepsTheSession() {
+        val modules = launch()
+        inviting(modules)
+        modules.session.setState(SessionState.Connecting("s_1"))
+        idle()
+
+        sheet.dismiss()
+        idle()
+
+        assertEquals(listOf("invite:u_2"), modules.invitations.calls)
+        assertTrue(modules.session.leaves.isEmpty())
     }
 
     @Test

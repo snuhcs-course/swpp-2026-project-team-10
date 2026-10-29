@@ -189,18 +189,19 @@ Accounts, sessions (refresh tokens), devices, friend requests, and friendships a
 
 ## Deploy
 
-The server runs on the two course servers (Design §2.8, Hosting and Deployment). Each is reachable only through the course's HTTP proxy on port 80, so there is no HTTPS or WSS, and the two cannot reach each other.
+The server runs on the two course servers, and on a temporary AWS server until the course servers can be reached from outside the campus network (Design §2.8, Hosting and Deployment). Each course server is reachable only through the course's HTTP proxy on port 80, so there is no HTTPS or WSS, and the two cannot reach each other.
 
 | Server | Address | Branch | Use |
 | --- | --- | --- | --- |
 | A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds of the app use it. |
 | B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging; set `pix.serverUrl` to it in a debug build. |
+| AWS (`ap-southeast-2`) | `http://3.105.185.251` | `dev` | Debug builds use it by default; every network reaches it, cellular data included. |
 
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs nginx on port 80, Redis, PostgreSQL, and two copies of the app, `app-blue` and `app-green`, built from the [`Dockerfile`](Dockerfile). One copy serves and the other is stopped; each copy runs two workers, and both copies use the same Redis, whose port is not published and which writes nothing to disk, and the same PostgreSQL, whose port is not published either and whose files are in `/opt/pix/postgres` on the server's own disk, where nothing backs them up yet. nginx forwards `/api/v1/`, `/ws`, and `/health` to the serving copy, answers `/version` with the commit that is live, and answers `404` for everything else, so FastAPI's `/docs` and the app's `/internal` routes are not public. The secrets, that directory, and the routes are what [Changing the deploy files](#changing-the-deploy-files) is about.
 
 ### How a deploy happens
 
-GitHub cannot push to the servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights and is advised against on a public repository. So each server pulls. A systemd timer runs [`deploy/deploy.sh auto`](deploy/deploy.sh) every minute as root:
+GitHub cannot push to the course servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights and is advised against on a public repository. So each course server pulls; the AWS server is deployed from GitHub instead ([The AWS server](#the-aws-server)). A systemd timer runs [`deploy/deploy.sh auto`](deploy/deploy.sh) every minute as root:
 
 1. It fetches the server's branch. If the commit is already recorded, it stops.
 2. If the commit does not change `server/`, it records the commit and restarts nothing.
@@ -243,6 +244,54 @@ sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 ```
 
 [`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It sets the branch in `/opt/pix/deploy.conf`, keeping any other setting there, creates `/opt/pix/.env` from `.env.example` (readable by root only), and installs the systemd units. Secrets exist only in `/opt/pix/.env`; `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before it is merged, pass it to the first deploy: `deploy.sh deploy feat/2-deploy`.
+
+### The AWS server
+
+The AWS server is set up like a course server, with `setup.sh dev`, but without the timer. GitHub can reach it, so the [server-deploy-aws](../.github/workflows/server-deploy-aws.yml) workflow deploys it after each push to `dev`. The workflow has AWS Systems Manager run the `PixDeploy` document on the server, which waits for any deploy already running there and then runs `deploy.sh deploy`. It shows what `deploy.sh` printed in the run and then checks `/version` at the public address. A failed deploy is a red mark on the commit. *Re-run jobs*, or *Run workflow* on `dev`, tries again, even a `server/` tree that failed before. The workflow signs in with the access key of an IAM user that may run only `PixDeploy` on this one instance, so a leaked key can do no more than deploy `dev` again. The key is a secret of the repository's `aws` environment, which only `dev` may use. The security group needs only port 80 open, plus SSH for operators.
+
+Set it up once in the AWS console, in the server's region (`ap-southeast-2`):
+
+1. **Let Systems Manager reach the server.** Create an IAM role for EC2 with the managed policy `AmazonSSMManagedInstanceCore` and attach it to the instance (*EC2 › Instances › Actions › Security › Modify IAM role*). Ubuntu and Amazon Linux images include the SSM agent. The instance shows as online in *Systems Manager › Fleet Manager* within a few minutes; on Ubuntu, run `sudo snap restart amazon-ssm-agent` if it does not.
+2. **Create the `PixDeploy` document** (*Systems Manager › Documents › Create document › Command or Session*, type *Command*, format YAML), with this content. When a change to `deploy.sh` touches its command or its lock, change the document too:
+
+   ```yaml
+   schemaVersion: "2.2"
+   description: Deploys the newest commit of the Pix server's branch with deploy.sh (server/README.md, The AWS server).
+   mainSteps:
+     - action: aws:runShellScript
+       name: deploy
+       inputs:
+         timeoutSeconds: "2400"
+         runCommand:
+           - 'flock -w 900 /opt/pix/deploy.lock true || { echo "another deploy held the lock for 15 minutes" >&2; exit 1; }'
+           - /opt/pix/repo/server/deploy/deploy.sh deploy
+   ```
+
+3. **Create the IAM user the workflow signs in as**, `pix-github-deploy`, without console access. Give it this inline policy, which lets it run `PixDeploy` on that one instance and read the output:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": "ssm:SendCommand",
+         "Resource": [
+           "arn:aws:ec2:ap-southeast-2:<account-id>:instance/<instance-id>",
+           "arn:aws:ssm:ap-southeast-2:<account-id>:document/PixDeploy"
+         ]
+       },
+       { "Effect": "Allow", "Action": "ssm:GetCommandInvocation", "Resource": "*" }
+     ]
+   }
+   ```
+
+   Then create an access key for it (*Security credentials › Create access key*, for an application running outside AWS).
+4. **Store the key in GitHub.** This needs a repository admin. In *Settings › Environments*, create the environment `aws`, limit its deployment branches to `dev`, and add the secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Delete the key from wherever it was passed along.
+5. **Point the workflow at the instance.** Put the instance ID in the workflow's `env`; it is not a secret.
+6. **Turn the timer off on the server** with `sudo systemctl disable --now pix-deploy.timer`, so the workflow is the only thing that deploys and its log shows each build. If the timer stays on, deploys still work, but the run often shows only that the commit was already live.
+
+To replace the key, create a second one, update the two secrets, and then delete the old key. Delete the user when the AWS server is shut down.
 
 ### Settings
 

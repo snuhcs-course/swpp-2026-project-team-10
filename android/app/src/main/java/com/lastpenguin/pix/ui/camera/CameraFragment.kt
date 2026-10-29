@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -224,13 +224,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 launch { viewModel.uiState.collect(::render) }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
                 // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).
+                // While the link reconnects the light is off, and the session can still be ended (Design 2.6.7).
                 launch {
                     sessionViewModel.state.collect { state ->
                         val connected = state as? SessionState.Connected
+                        val live = connected != null || state is SessionState.Reconnecting
                         renderLiveDot(controls, connected)
-                        controls.endSessionButton.isVisible = connected != null
-                        controls.shootTogetherButton.isVisible = connected == null && !isScenePhotoActive()
-                        view.keepScreenOn = connected != null
+                        controls.endSessionButton.isVisible = live
+                        controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
+                        view.keepScreenOn = live
                     }
                 }
                 launch {
@@ -743,7 +745,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         sceneBack?.isEnabled = active
         controls.sceneTitle.isVisible = active
         controls.sceneCancelButton.isVisible = active
-        controls.shootTogetherButton.isVisible = !active && sessionViewModel.state.value !is SessionState.Connected
+        val session = sessionViewModel.state.value
+        controls.shootTogetherButton.isVisible =
+            !active && session !is SessionState.Connected && session !is SessionState.Reconnecting
         // Guide and the thumbnail keep their place, so the shutter stays where it is.
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active

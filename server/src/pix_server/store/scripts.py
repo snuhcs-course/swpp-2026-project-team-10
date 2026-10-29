@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 """Lua scripts that change session state inside Redis (Design Documentation 2.7).
 
 Redis runs a script as one step, so two workers cannot interleave inside a room transition. Every script gets the
@@ -6,10 +6,11 @@ current time from its caller, which lets the tests move a fake clock, and return
 `{connection, worker, kind, detail}` rows; the caller turns a row into JSON and sends it to that worker's socket.
 The scripts avoid `cjson` and `unpack`, which the in-process Redis used by the tests does not provide.
 
-Keys: `session:<id>` (hash), `code:<code>`, `conn:<id>` (hash), `conns:<worker>` (set), `worker:<worker>`
-(heartbeat with a real expiry), `presence:<user>` (the signed-in user's connections), and the indexes `sessions`,
-`workers`, `deadlines` (sorted by the next time a session has to be looked at), and `expired` (recently expired
-codes, sorted by the time to forget them).
+Keys: `session:<id>` (hash; `photographer_token` and `subject_token` hold the SHA-256 of each place's rejoin
+token, never the token), `code:<code>`, `conn:<id>` (hash), `conns:<worker>` (set), `worker:<worker>` (heartbeat
+with a real expiry), `presence:<user>` (the signed-in user's connections), and the indexes `sessions`, `workers`,
+`deadlines` (sorted by the next time a session has to be looked at), and `expired` (recently expired codes, sorted
+by the time to forget them).
 
 Only REGISTER adds a worker to `workers`. Every other script refuses to run for a worker that is not in it,
 because that worker has lost its state: Redis restarted empty, or the sweeper took the worker for dead.
@@ -167,7 +168,8 @@ return out
 """
 )
 
-# ARGV[6..8]: connection, new session id, candidate room code. Returns {status, out}.
+# ARGV[6..9]: connection, new session id, candidate room code, and the hash of the photographer's rejoin token.
+# Returns {status, out}.
 CREATE = (
     _PRELUDE
     + """
@@ -181,7 +183,7 @@ elseif redis.call('EXISTS', 'code:' .. code) == 1 or redis.call('ZSCORE', 'expir
   status = 'COLLISION'
 else
   redis.call('HSET', 'session:' .. sid, 'code', code, 'photographer', conn, 'subject', '',
-    'expires_at', num(now + room_ttl), 'empty_since', '')
+    'expires_at', num(now + room_ttl), 'empty_since', '', 'photographer_token', ARGV[9], 'subject_token', '')
   redis.call('SET', 'code:' .. code, sid)
   redis.call('SADD', 'sessions', sid)
   redis.call('HSET', 'conn:' .. conn, 'session', sid)
@@ -191,8 +193,9 @@ return {status, out}
 """
 )
 
-# ARGV[6..11]: connection, room code, and the window of wrong codes from the client's address ("" for none), its
-# limit, its length in seconds, and a unique member. Returns {status, session id, out}. A wrong code, unknown or
+# ARGV[6..12]: connection, room code, the window of wrong codes from the client's address ("" for none), its limit,
+# its length in seconds, a unique member, and the hash of the subject's rejoin token, which replaces an earlier
+# subject's. Returns {status, session id, out}. A wrong code, unknown or
 # expired, counts in the window; while it is full, every join from that address answers RATE_LIMITED without the
 # code being looked at, so codes cannot be guessed.
 JOIN = (
@@ -219,7 +222,7 @@ else
   elseif s[2] ~= '' then
     status = 'FULL'
   else
-    redis.call('HSET', 'session:' .. sid, 'subject', conn, 'expires_at', '')
+    redis.call('HSET', 'session:' .. sid, 'subject', conn, 'expires_at', '', 'subject_token', ARGV[12])
     redis.call('HSET', 'conn:' .. conn, 'session', sid)
     schedule(sid)
     emit(s[1], 'peer.joined')
@@ -269,7 +272,52 @@ return {status, expected, target, target_worker, out}
 """
 )
 
-# ARGV[6]: connection. The photographer leaving ends the session; the subject leaving frees its place.
+# ARGV[6..9]: connection, session id, the hash of a rejoin token, and "1" when the phone keeps its peer connection or
+# "0" when it starts a new one. Returns {status, role, out}. The token decides the place. A socket that still holds it
+# is taken to be the same phone's old one, which the server would notice only once its pings go unanswered: it gives
+# the place up at once and keeps no session, so its later disconnect changes nothing. The other phone hears
+# `peer.rejoined` (an ICE restart is enough) or `peer.joined` (a new peer connection).
+REJOIN = (
+    _PRELUDE
+    + """
+local conn, sid, token, keep = ARGV[6], ARGV[7], ARGV[8], ARGV[9]
+sweep()
+touch(conn)
+local status, role = 'OK', ''
+local current = redis.call('HGET', 'conn:' .. conn, 'session')
+local s = redis.call('HMGET', 'session:' .. sid, 'code', 'photographer', 'subject',
+  'photographer_token', 'subject_token')
+local seat, holder, other
+if current ~= '' and current ~= sid then
+  status = 'INVALID_STATE'
+elseif not s[1] then
+  status = 'NOT_FOUND'
+elseif s[4] == token then
+  role, seat, holder, other = 'PHOTOGRAPHER', 'photographer', s[2], s[3]
+elseif s[5] ~= '' and s[5] == token then
+  role, seat, holder, other = 'SUBJECT', 'subject', s[3], s[2]
+else
+  status = 'FORBIDDEN'
+end
+if status == 'OK' and current == sid and holder ~= conn then
+  -- This socket holds the other place.
+  status, role = 'INVALID_STATE', ''
+end
+if status == 'OK' then
+  if holder ~= '' and holder ~= conn and redis.call('EXISTS', 'conn:' .. holder) == 1 then
+    redis.call('HSET', 'conn:' .. holder, 'session', '')
+  end
+  redis.call('HSET', 'session:' .. sid, seat, conn, 'empty_since', '')
+  redis.call('HSET', 'conn:' .. conn, 'session', sid)
+  schedule(sid)
+  emit(other, keep == '1' and 'peer.rejoined' or 'peer.joined')
+end
+return {status, role, out}
+"""
+)
+
+# ARGV[6]: connection. The photographer leaving ends the session; the subject leaving frees its place for good, so its
+# rejoin token no longer works.
 LEAVE = (
     _PRELUDE
     + """
@@ -285,7 +333,7 @@ if sid and sid ~= '' then
   else
     redis.call('HSET', 'conn:' .. conn, 'session', '')
     if s[2] == conn then
-      redis.call('HSET', 'session:' .. sid, 'subject', '')
+      redis.call('HSET', 'session:' .. sid, 'subject', '', 'subject_token', '')
       if s[1] ~= '' then
         emit(s[1], 'peer.left', 'PEER_LEFT')
       else

@@ -39,8 +39,9 @@ Send JSON **text** frames to `/ws` on a persistent connection. A socket belongs 
 
 | Client message | Result |
 | --- | --- |
-| `{"type":"room.create"}` | Sender gets `{"type":"room.created","code":"482915","sessionId":"s_…","iceServers":[…]}`, its own STUN and TURN entries (Design 2.5.2). |
-| `{"type":"room.join","code":"482915"}` | Subject gets `{"type":"session.joined","sessionId":"s_…","role":"SUBJECT","iceServers":[…]}`, asked for only once the join succeeded; photographer gets `{"type":"peer.joined"}`. |
+| `{"type":"room.create"}` | Sender gets `{"type":"room.created","code":"482915","sessionId":"s_…","iceServers":[…],"rejoinToken":"…"}`, its own STUN and TURN entries (Design 2.5.2) and the token that lets a new socket take its place again. |
+| `{"type":"room.join","code":"482915"}` | Subject gets `{"type":"session.joined","sessionId":"s_…","role":"SUBJECT","iceServers":[…],"rejoinToken":"…"}`, the credentials asked for only once the join succeeded; photographer gets `{"type":"peer.joined"}`. |
+| `{"type":"session.join","sessionId":"s_…","rejoin":true,"rejoinToken":"…"}` | A phone whose socket dropped takes its place again (Design 2.6.7). It gets `{"type":"session.joined","sessionId":"s_…","role":"…","iceServers":[]}` and keeps its first credentials; the other phone gets `{"type":"peer.rejoined"}`, or `{"type":"peer.joined"}` with `"rejoin":false`, when the phone starts a new peer connection. |
 | `{"type":"signal","sdp":{"type":"offer","sdp":"v=0\r\n…"}}` | Forwarded unchanged to the subject. Only the photographer sends offers; only the subject sends answers. |
 | `{"type":"signal","candidate":{"sdpMid":"0","sdpMLineIndex":0,"candidate":"candidate:…"}}` | Forwarded unchanged to the other phone. `sdpMid` may be null; an empty candidate marks the end of candidates. |
 | `{"type":"leave"}` | Other phone gets `{"type":"peer.left","reason":"PEER_LEFT"}`. There is no acknowledgment to the sender. |
@@ -49,19 +50,22 @@ A `signal` has exactly one non-null `sdp` or `candidate`; the unused field may b
 
 Room codes are random six-digit strings, including possible leading zeroes, and unique among active/recently expired codes. An unjoined room expires after ten minutes; its photographer receives an `EXPIRED` error and can create a new room on the same socket. Once joined, a session does not expire at that deadline.
 
-An explicit photographer `leave` cancels the room immediately and releases both sockets. A subject `leave` releases that subject and notifies the photographer; the room remains available for a manual join while the photographer is still connected. On an unexpected socket disconnect, the remaining peer receives `peer.left` with reason `CONNECTION_LOST`. A room without a photographer cannot be joined. Sessions are removed 60 seconds after their last socket disconnects (or earlier if an unjoined code expires). Rejoining a room after a drop is not built yet (Iter3-P14, #118); after losing the socket, create a new room.
+An explicit photographer `leave` cancels the room immediately and releases both sockets. A subject `leave` releases that subject and notifies the photographer; the room remains available for a manual join while the photographer is still connected. On an unexpected socket disconnect, the remaining peer receives `peer.left` with reason `CONNECTION_LOST`. A room without a photographer cannot be joined. Sessions are removed 60 seconds after their last socket disconnects (or earlier if an unjoined code expires); until then either phone takes its place again with `session.join` and its token.
+
+Each place has its own rejoin token, and the session store keeps only its SHA-256. The token decides the place and the role. A socket that still holds the place is taken to be the phone's old one, which the server notices only once its pings go unanswered: the place moves to the new socket at once, and the old socket keeps no session, so its disconnect later sends no `peer.left`. A subject that joins with the code makes the earlier subject's token useless, and a subject `leave` ends its own.
 
 Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active room with this code"}`.
 
 | Code | Meaning |
 | --- | --- |
-| `NOT_FOUND` | Unknown/cancelled room, or photographer disconnected. |
+| `NOT_FOUND` | Unknown/cancelled room, or photographer disconnected; for `session.join`, a session that ended. |
+| `FORBIDDEN` | A `session.join` whose token has no place in the session. |
 | `FULL` | A subject already occupies the room, or no code could be allocated. |
 | `EXPIRED` | Room expired. Codes are remembered for another ten minutes, then report `NOT_FOUND`. |
 | `RATE_LIMITED` | The client's address sent `PIX_JOIN_FAILURE_LIMIT` (100) wrong codes, unknown or expired, within `PIX_JOIN_FAILURE_WINDOW_SECONDS` (600). Every join from it is refused, the right code included, until the oldest leaves the window, so codes cannot be guessed. The count is per address, in the session store. |
 | `UNKNOWN_TYPE` | Unrecognized message type. |
 | `INVALID_MESSAGE` | Malformed JSON, binary frame, invalid fields, or invalid signaling payload. |
-| `INVALID_STATE` | Already in a room, signaling before joining, or SDP from the wrong role. |
+| `INVALID_STATE` | Already in a room (for `session.join`, another session, or the other place of this one), signaling before joining, or SDP from the wrong role. |
 | `PEER_UNAVAILABLE` | No connected counterpart to receive a signal. |
 
 Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. The server also closes its sockets with 1013 when the session store fails or restarts ([Session store](#session-store)); the phone can connect again later. Request bodies, room codes, and signaling payloads are not logged by the app.
@@ -163,7 +167,7 @@ Room state is in Redis and not in the server process (Design §2.7, AD-18): sess
 - **Workers.** Each server process is one worker. A room created through one worker can be joined through another, and a signal for a socket on another worker travels over Redis pub/sub. The image runs two workers.
 - **Transitions.** Create, join, leave, disconnect, and expiry each run as one Lua script inside Redis ([`store/scripts.py`](src/pix_server/store/scripts.py)), so two workers cannot seat two subjects in one room. The caller passes the time in, which is why the tests can move a clock.
 - **Housekeeping.** Every `PIX_CLEANUP_INTERVAL_SECONDS` each worker renews a heartbeat that lasts `PIX_WORKER_TTL_SECONDS` (15), and the one worker that gets a lock for that interval expires rooms and removes empty sessions. A worker whose heartbeat ran out, for example after a crash, loses its sockets in the store, and the other phones get `peer.left` with `CONNECTION_LOST`.
-- **A worker that stops** gives up its sockets at once. Its sessions stay in the store for the usual 60 s, which is what a phone that reconnects will come back to once the app can rejoin (Design §2.6.7; Iter3-P14, #118).
+- **A worker that stops** gives up its sockets at once. Its sessions stay in the store for the usual 60 s, in which a phone that reconnects takes its place again with `session.join` (Design §2.6.7, #118).
 - **Redis down or restarted.** When a worker's call to Redis fails, or it finds that it is no longer registered there (Redis came back empty, or the other workers took it for dead), messages for its sockets may have been lost. It closes all of them with 1013 and registers again: a live session goes on phone to phone, and a waiting room ends on the phone with an error instead of keeping a code that no longer works. Until Redis answers, `/health` answers `503`, new sockets are closed with 1013, and pose requests answer `503 UNAVAILABLE`. A restart loses the open rooms; the workers carry on with new ones.
 
 | `PIX_REDIS_URL` | Where the rooms are |
@@ -203,7 +207,7 @@ GitHub cannot push to the course servers: SSH goes through a campus-only relay w
 2. If the commit does not change `server/`, it records the commit and restarts nothing.
 3. It builds the image. pytest runs as a build stage, so a commit whose tests fail stops here.
 4. It starts the image as the idle copy and waits for the container's health check, which also needs Redis; PostgreSQL has to be healthy before the copy starts, and the copy migrates it as it starts. Redis and PostgreSQL are started with the first copy and are left running by later deploys.
-5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. The two copies share their rooms through Redis, but stopping a copy closes its sockets, and the app cannot come back to its room until it can rejoin (Design §2.6.7; Iter3-P14, #118); until then the wait stays. After 10 minutes it goes on anyway: sessions that are already live continue, because the video goes phone to phone, and rooms still waiting for a subject end.
+5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. The two copies share their rooms through Redis, and the app takes its place again after its socket drops (Design §2.6.7, #118), but stopping a copy also closes the sockets of phones with an older app, which cannot; for them the wait stays. After 10 minutes it goes on anyway: sessions that are already live continue, because the video goes phone to phone, and rooms still waiting for a subject end.
 6. It points nginx at the new copy and reloads it, checks `/health` through nginx, and stops the old copy with 70 s for requests in flight (Uvicorn's graceful shutdown is 65 s, longer than a pose request may take).
 7. It records the commit, which `/version` then shows, and deletes images other than the two copies'.
 

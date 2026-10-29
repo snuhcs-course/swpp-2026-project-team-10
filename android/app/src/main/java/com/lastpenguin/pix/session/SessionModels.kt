@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import kotlinx.serialization.Serializable
@@ -13,6 +13,13 @@ sealed interface SessionEntry {
 
     /** Subject joins with a code (Iteration 1). */
     data class RoomCode(val code: String) : SessionEntry
+
+    /**
+     * Subject: *Reconnect* after the connection was lost (FR-6.11). Takes this phone's place in the same session again
+     * with its rejoin token while the photographer still holds it, or joins [code] again when it has no token, as with
+     * a server that gives none (Design 2.6.7).
+     */
+    data class Rejoin(val code: String) : SessionEntry
 }
 
 @Serializable
@@ -41,6 +48,12 @@ sealed interface SessionState {
     data class Connecting(val sessionId: String?) : SessionState
 
     data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role) : SessionState
+
+    /**
+     * Both phones: the link dropped while connected, and the session tries to restore it for up to 10 s from [since],
+     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11).
+     */
+    data class Reconnecting(val sessionId: String, val since: Long) : SessionState
 
     data class Ended(val reason: EndReason) : SessionState
 }

@@ -8,6 +8,7 @@
     <string name="back_to_camera">카메라로 돌아가기</string>
     <string name="try_again">다시 시도</string>
     <string name="connecting">연결 중…</string>
+    <string name="reconnecting">다시 연결하는 중…</string>
     <string name="couldnt_connect">연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도하세요.</string>
     <string name="join_rate_limited">이 네트워크에서 틀린 코드를 너무 많이 입력했어요. 몇 분 뒤에 다시 시도하세요.</string>
     <string name="mobile_data_notice">카메라 공유에 모바일 데이터를 사용해요.</string>

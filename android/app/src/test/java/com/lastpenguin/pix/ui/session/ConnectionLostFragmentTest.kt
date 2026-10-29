@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.fragment.app.testing.FragmentScenario
@@ -92,7 +92,7 @@ class ConnectionLostFragmentTest {
     }
 
     @Test
-    fun reconnect_joinsTheSameCode_andOpensSubjectViewWhenConnecting() {
+    fun reconnect_rejoinsTheSameSession_andOpensSubjectViewWhenConnecting() {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.connectionLostFragment)
         lostAfterJoining(modules)
@@ -104,7 +104,7 @@ class ConnectionLostFragmentTest {
             assertFalse(binding.primaryButton.isEnabled)
             assertEquals(string(R.string.connecting), binding.failureMessage.text.toString())
         }
-        assertEquals(SessionEntry.RoomCode("482915") to Role.SUBJECT, modules.session.starts.last())
+        assertEquals(SessionEntry.Rejoin("482915") to Role.SUBJECT, modules.session.starts.last())
 
         modules.session.setState(SessionState.Connecting("s1"))
         idle()

@@ -1,7 +1,8 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 """The registry on the session store, without sockets. Each registry stands for one worker process."""
 
 import asyncio
+import hashlib
 import json
 
 import pytest
@@ -166,11 +167,13 @@ async def test_room_created_through_one_worker_is_joined_through_another(make_re
     await handle(second, subject, type="room.join", code=room["code"])
     await handle(second, subject, **answer)
     # A registry without a relay gives every phone the STUN server only.
-    assert await receive(subject) == {
+    joined = await receive(subject)
+    assert joined == {
         "type": "session.joined",
         "sessionId": room["sessionId"],
         "role": "SUBJECT",
         "iceServers": [{"urls": ["stun:stun.cloudflare.com:3478"]}],
+        "rejoinToken": joined["rejoinToken"],
     }
     assert await receive(photographer) == {"type": "peer.joined"}
     assert await receive(photographer) == answer
@@ -186,6 +189,45 @@ async def test_room_created_through_one_worker_is_joined_through_another(make_re
     assert exc.value.code == "PEER_UNAVAILABLE"
     await handle(second, subject, type="room.join", code=room["code"])
     assert await receive(photographer) == {"type": "peer.joined"}
+
+
+async def test_a_subject_rejoins_through_a_third_worker(make_registry):
+    first, second, third = await make_registry(), await make_registry(), await make_registry()
+    photographer, room = await create_room(first)
+    subject = await second.connect()
+    await handle(second, subject, type="room.join", code=room["code"])
+    token = (await receive(subject))["rejoinToken"]
+    assert await receive(photographer) == {"type": "peer.joined"}
+    await second.disconnect(subject)
+    assert await receive(photographer) == LEFT
+    again = await third.connect()
+    await handle(third, again, type="session.join", sessionId=room["sessionId"], rejoin=True, rejoinToken=token)
+    assert await receive(again) == {
+        "type": "session.joined",
+        "sessionId": room["sessionId"],
+        "role": "SUBJECT",
+        "iceServers": [],
+    }
+    assert await receive(photographer) == {"type": "peer.rejoined"}
+    offer = {"type": "signal", "sdp": {"type": "offer", "sdp": "v=0"}}
+    await handle(first, photographer, **offer)
+    assert await receive(again) == offer
+
+
+async def test_the_store_keeps_only_a_hash_of_each_rejoin_token(make_registry, open_store):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    await handle(registry, subject, type="room.join", code=room["code"])
+    token = (await receive(subject))["rejoinToken"]
+    connection = open_store()
+    try:
+        session = await connection.hgetall(f"session:{room['sessionId']}")
+    finally:
+        await connection.aclose()
+    assert session["photographer_token"] == hashlib.sha256(room["rejoinToken"].encode()).hexdigest()
+    assert session["subject_token"] == hashlib.sha256(token.encode()).hexdigest()
+    assert not any(secret in value for value in session.values() for secret in (room["rejoinToken"], token))
 
 
 def held_relay(registry):

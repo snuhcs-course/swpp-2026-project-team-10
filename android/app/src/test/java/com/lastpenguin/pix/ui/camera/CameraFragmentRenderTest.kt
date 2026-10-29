@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -424,6 +424,22 @@ class CameraFragmentRenderTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
 
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun reconnectingSession_turnsTheLightOff_andKeepsEndSession() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.liveDot.visibility)
+            assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
+            assertEquals(View.GONE, controls.shootTogetherButton.visibility)
+        }
     }
 
     @Test

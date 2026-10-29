@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -144,6 +144,27 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.camera_paused), binding.connectingText.text.toString())
         }
 
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.connectingText.visibility) }
+    }
+
+    @Test
+    fun reconnecting_saysSoOverTheLastFrame_andDisablesTheControls() {
+        val modules = launch()
+        connect(modules)
+
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.connectingText.visibility)
+            assertEquals(string(R.string.reconnecting), binding.connectingText.text.toString())
+            assertEquals(View.GONE, binding.liveDot.visibility)
+            assertFalse(binding.zoomReadout.isEnabled)
+        }
+
+        // Back with the link: the video plays on, without the caption.
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         modules.video.deliverFrame()
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
         onScreen { binding, _ -> assertEquals(View.GONE, binding.connectingText.visibility) }

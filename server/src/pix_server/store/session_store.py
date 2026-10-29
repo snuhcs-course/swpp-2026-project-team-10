@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 """Session state shared by every server process, kept in Redis (Design Documentation 2.7, AD-18).
 
 Each server process is one worker with its own id. The store runs the room transitions as scripts, carries
@@ -75,7 +75,18 @@ class SessionStore:
         self._pubsub = None
         self._scripts = {
             name: redis.register_script(getattr(scripts, name))
-            for name in ("BEAT", "CONNECT", "CREATE", "JOIN", "ROUTE", "LEAVE", "DISCONNECT", "RELEASE", "STATS")
+            for name in (
+                "BEAT",
+                "CONNECT",
+                "CREATE",
+                "JOIN",
+                "REJOIN",
+                "ROUTE",
+                "LEAVE",
+                "DISCONNECT",
+                "RELEASE",
+                "STATS",
+            )
         }
         self._register = redis.register_script(scripts.REGISTER)
         self._rate_limit = redis.register_script(scripts.RATE_LIMIT)
@@ -141,16 +152,27 @@ class SessionStore:
         """Registers a socket; one with a signed-in `user` makes that user online (FR-5.9)."""
         return _deliveries(await self._run("CONNECT", connection, user or ""))
 
-    async def create(self, connection: str, session_id: str, code: str) -> tuple[str, list[Delivery]]:
-        status, out = await self._run("CREATE", connection, session_id, code)
+    async def create(self, connection: str, session_id: str, code: str, token_hash: str) -> tuple[str, list[Delivery]]:
+        """Opens a room; `token_hash` is the hash of the photographer's rejoin token."""
+        status, out = await self._run("CREATE", connection, session_id, code, token_hash)
         return status, _deliveries(out)
 
-    async def join(self, connection: str, code: str, failures: Window | None = None) -> tuple[str, str, list[Delivery]]:
-        """Seats a subject. A wrong code counts in `failures`, and while that window is full every join answers
-        RATE_LIMITED."""
+    async def join(
+        self, connection: str, code: str, token_hash: str, failures: Window | None = None
+    ) -> tuple[str, str, list[Delivery]]:
+        """Seats a subject, whose rejoin token has the hash `token_hash`. A wrong code counts in `failures`, and while
+        that window is full every join answers RATE_LIMITED."""
         limits = [failures.key, str(failures.limit), f"{failures.seconds:.6f}"] if failures else ["", "0", "0"]
-        status, session_id, out = await self._run("JOIN", connection, code, *limits, uuid4().hex)
+        status, session_id, out = await self._run("JOIN", connection, code, *limits, uuid4().hex, token_hash)
         return status, session_id, _deliveries(out)
+
+    async def rejoin(
+        self, connection: str, session_id: str, token_hash: str, keep: bool
+    ) -> tuple[str, str, list[Delivery]]:
+        """Gives the place whose rejoin token has the hash `token_hash` to `connection`: `(status, role, deliveries)`.
+        `keep` says the phone keeps its peer connection, so the other phone hears `peer.rejoined`, not `peer.joined`."""
+        status, role, out = await self._run("REJOIN", connection, session_id, token_hash, "1" if keep else "0")
+        return status, role, _deliveries(out)
 
     async def seated(self, session_id: str, connection: str) -> bool:
         """Whether `connection` still holds the subject's place in the session and its photographer is still there.

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -152,8 +152,10 @@ class WebRtcPeerConnectionClient(
         }
     }
 
-    override suspend fun createOffer(): SessionDescription =
-        createLocal { peerConnection.createOffer(it, MediaConstraints()) }
+    override suspend fun createOffer(iceRestart: Boolean): SessionDescription {
+        if (iceRestart) peerConnection.restartIce()
+        return createLocal { peerConnection.createOffer(it, MediaConstraints()) }
+    }
 
     override suspend fun createAnswer(): SessionDescription =
         createLocal { peerConnection.createAnswer(it, MediaConstraints()) }

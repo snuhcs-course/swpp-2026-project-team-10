@@ -8,6 +8,7 @@
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
     <string name="connecting">Connecting…</string>
+    <string name="reconnecting">Reconnecting…</string>
     <string name="couldnt_connect">Couldn\'t connect. Check your internet connection and try again.</string>
     <string name="join_rate_limited">Too many wrong codes from this network. Try again in a few minutes.</string>
     <string name="mobile_data_notice">The live view uses mobile data.</string>

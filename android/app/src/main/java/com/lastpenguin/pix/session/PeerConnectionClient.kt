@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
@@ -76,8 +76,12 @@ sealed interface PeerEvent {
 interface PeerConnectionClient {
     val events: SharedFlow<PeerEvent>
 
-    /** Photographer: creates the offer and applies it as the local description. */
-    suspend fun createOffer(): SessionDescription
+    /**
+     * Photographer: creates the offer and applies it as the local description. With [iceRestart] the offer carries new
+     * ICE credentials, so both phones gather and check again on the same connection; the channels and the video track
+     * stay (Design 2.6.7).
+     */
+    suspend fun createOffer(iceRestart: Boolean = false): SessionDescription
 
     /** Subject, after [applyRemote] with the photographer's offer: creates and applies the answer. */
     suspend fun createAnswer(): SessionDescription

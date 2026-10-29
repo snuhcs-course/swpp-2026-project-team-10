@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -42,13 +42,15 @@ internal fun signalingUrl(serverUrl: String): String =
  * [SessionManager] with room codes, WebSocket signaling, and WebRTC (Design 2.2, Figure 7; states in 2.4).
  *
  * Three phases, so that a later entry point (an invitation, Design AD-8) changes only the first:
- * 1. **Get a session.** `room.create` or `room.join` over signaling.
+ * 1. **Get a session.** `room.create`, `room.join`, or `session.join` over signaling.
  * 2. **Connect the peers.** The photographer offers, the subject answers, ICE candidates are relayed.
- * 3. **Run the session.** hello, ping, messages on the two channels, and leaving.
+ * 3. **Run the session.** hello, ping, messages on the two channels, reconnecting after a drop, and leaving.
  *
  * Every signaling and WebRTC callback hops onto one serial scope, so the fields below are only touched there
- * (Design 2.8, Concurrency). When the subject leaves or drops, the photographer keeps the room and goes back to
- * `Waiting(code)`, so the subject's *Reconnect* can join the same code again (FR-6.10, FR-6.11).
+ * (Design 2.8, Concurrency). A link that drops while connected puts both phones in `Reconnecting` for up to 10 s:
+ * each takes its place on the server again over a new socket with its rejoin token, and the photographer restarts ICE
+ * on the same peer connection (Design 2.6.7). After that, or when the subject leaves, the photographer keeps the room
+ * and goes back to `Waiting(code)`, so the subject's *Reconnect* can take its place again (FR-6.10 to FR-6.12).
  * Owner: Real-time (#8).
  */
 class RtcSessionManager(
@@ -96,16 +98,55 @@ class RtcSessionManager(
     private var iceServers: List<IceServer> = emptyList()
     private var signalingJob: Job? = null
 
+    /** This phone's proof that a new socket may take its place again; null from a server that gives none. */
+    private var rejoinToken: String? = null
+
+    /** The first message of the session's first socket: `room.create`, `room.join`, or `session.join`. */
+    private var greeting: SignalMessage? = null
+
+    /** Whether the socket was opened again during the session, so that its first message is `session.join`. */
+    private var reopened = false
+
+    /** Whether the current socket holds this phone's place, so that the server relays its signals. */
+    private var joined = false
+
+    /** A `session.join` for a place this phone already had is waiting for its answer, which opens no new peer. */
+    private var rejoining = false
+    private var socketRetry: Job? = null
+    private var socketFailures = 0
+
+    /** Subject: the session lost last, which *Reconnect* takes the place in again (SessionEntry.Rejoin). */
+    private var lost: LostSession? = null
+
+    /** Subject: the ticket this *Reconnect* uses, kept for another try if it fails before the server refuses it. */
+    private var ticket: LostSession? = null
+
     // ---- Peer connection fields, reset for every connection attempt -----------
     @Volatile
     private var peer: PeerConnectionClient? = null
     private var peerJob: Job? = null
     private var connectTimeout: Job? = null
-    private var disconnectGrace: Job? = null
+    private var reconnectBudget: Job? = null
     private var pingJob: Job? = null
     private var remoteDescriptionSet = false
     private val pendingCandidates = ArrayList<IceCandidate>()
+
+    /** Photographer: an offer has gone out and its answer has not come; an answer without one is stale. */
+    private var offerPending = false
+
+    /** Photographer: while active, the pending offer may still be answered, so a restart waits for that answer. */
+    private var answerWait: Job? = null
+
+    /** Photographer: a restart asked for during [answerWait], which goes once that answer is in or the wait is over. */
+    private var restartQueued = false
+
+    /** Local candidates wait while a description is being made, so none with new ICE credentials goes out before it. */
+    private var holdingCandidates = false
+    private val heldCandidates = ArrayList<IceCandidate>()
     private val openChannels = EnumSet.noneOf(Channel::class.java)
+
+    /** The realtime channel closed during the session while the reliable one runs, which then carries its messages. */
+    private var realtimeLost = false
     private var helloSent = false
     private var peerHello: SessionMessage.Hello? = null
     private val lastSeq = HashMap<String, Long>()
@@ -123,7 +164,7 @@ class RtcSessionManager(
         }
         val valid = when (entry) {
             SessionEntry.NewRoom -> role == Role.PHOTOGRAPHER
-            is SessionEntry.RoomCode -> role == Role.SUBJECT
+            is SessionEntry.RoomCode, is SessionEntry.Rejoin -> role == Role.SUBJECT
         }
         if (!valid) {
             Log.w(TAG, "start ignored: $entry does not fit the role $role")
@@ -131,9 +172,28 @@ class RtcSessionManager(
         }
         active = true
         this@RtcSessionManager.role = role
-        code = (entry as? SessionEntry.RoomCode)?.code
+        // A Reconnect takes its place in the session it lost; without a token for it, it joins the code again.
+        val ticket = lost?.takeIf { entry is SessionEntry.Rejoin && it.code == entry.code }
+        this@RtcSessionManager.ticket = ticket
+        lost = null
+        code = when (entry) {
+            SessionEntry.NewRoom -> null
+            is SessionEntry.RoomCode -> entry.code
+            is SessionEntry.Rejoin -> entry.code
+        }
+        greeting = when {
+            ticket != null -> SignalMessage.SessionJoin(ticket.sessionId, rejoin = false, rejoinToken = ticket.token)
+            entry is SessionEntry.RoomCode -> SignalMessage.RoomJoin(entry.code)
+            entry is SessionEntry.Rejoin -> SignalMessage.RoomJoin(entry.code)
+            else -> SignalMessage.RoomCreate
+        }
         sessionId = null
-        iceServers = emptyList()
+        iceServers = ticket?.iceServers ?: emptyList()
+        rejoinToken = ticket?.token
+        reopened = false
+        joined = false
+        rejoining = false
+        socketFailures = 0
         _peerCapabilities.value = null
         _peerCamera.value = null
         // The photographer stays Idle until the code arrives; the subject is connecting from the first moment.
@@ -162,7 +222,7 @@ class RtcSessionManager(
 
     override suspend fun leave(reason: EndReason) = withContext(serial) {
         if (!active) return@withContext
-        if (openChannels.size == 2) {
+        if (Channel.RELIABLE in openChannels) {
             sendNow(SessionMessage.Leave(reason))
             // Give the data channel a moment to flush, so the other phone shows "left", not "connection lost".
             delay(LEAVE_FLUSH_MS)
@@ -188,11 +248,7 @@ class RtcSessionManager(
     private suspend fun onSignal(event: SignalEvent) {
         if (!active) return
         when (event) {
-            SignalEvent.Opened -> when (role) {
-                Role.PHOTOGRAPHER -> signaling.send(SignalMessage.RoomCreate)
-                Role.SUBJECT -> signaling.send(SignalMessage.RoomJoin(checkNotNull(code)))
-                null -> Unit
-            }
+            SignalEvent.Opened -> onSignalingOpened()
 
             is SignalEvent.Closed -> onSignalingClosed()
 
@@ -201,23 +257,21 @@ class RtcSessionManager(
                     code = message.code
                     sessionId = message.sessionId
                     iceServers = message.iceServers
+                    rejoinToken = message.rejoinToken
+                    joined = true
                     _state.value = SessionState.Waiting(message.code)
                     Timings.mark("room.created")
                 }
 
                 is SignalMessage.PeerJoined -> onPeerJoined()
 
-                is SignalMessage.SessionJoined -> {
-                    sessionId = message.sessionId
-                    iceServers = message.iceServers
-                    _state.value = SessionState.Connecting(message.sessionId)
-                    Timings.mark("room.joined")
-                    openPeer()
-                }
+                is SignalMessage.PeerRejoined -> onPeerRejoined()
+
+                is SignalMessage.SessionJoined -> if (reopened || rejoining) onRejoined() else onJoined(message)
 
                 is SignalMessage.Signal -> onRemoteSignal(message)
 
-                is SignalMessage.PeerLeft -> onPeerGone(message.reason)
+                is SignalMessage.PeerLeft -> onPeerLeft(message.reason)
 
                 is SignalMessage.ServerError -> onServerError(message)
 
@@ -226,21 +280,93 @@ class RtcSessionManager(
         }
     }
 
+    private fun onSignalingOpened() {
+        val id = sessionId
+        val token = rejoinToken
+        if (reopened && id != null && token != null) {
+            rejoining = true
+            signaling.send(SignalMessage.SessionJoin(id, rejoin = true, rejoinToken = token))
+        } else {
+            greeting?.let(signaling::send)
+        }
+    }
+
+    /** Subject: its place in the session, from `room.join` or a Reconnect's `session.join`. */
+    private fun onJoined(message: SignalMessage.SessionJoined) {
+        sessionId = message.sessionId
+        // A Reconnect's answer has neither; the credentials and the token from the first join still hold.
+        iceServers = message.iceServers.ifEmpty { iceServers }
+        rejoinToken = message.rejoinToken ?: rejoinToken
+        joined = true
+        _state.value = SessionState.Connecting(message.sessionId)
+        Timings.mark("room.joined")
+        openPeer()
+    }
+
+    /** A socket opened again during the session has this phone's place back (Design 2.6.7). */
+    private fun onRejoined() {
+        rejoining = false
+        joined = true
+        socketFailures = 0
+        Timings.mark("signaling.rejoined")
+        // An offer sent before, over the old socket or while the subject was away, may never have arrived.
+        if (role == Role.PHOTOGRAPHER && _state.value is SessionState.Reconnecting) restartIce()
+    }
+
     private fun onSignalingClosed() {
-        if (_state.value is SessionState.Connected) {
-            // The media runs phone to phone; only "left" notifications from the server are lost now.
+        joined = false
+        rejoining = false
+        val state = _state.value
+        val inSession = state is SessionState.Connected || state is SessionState.Reconnecting
+        if (rejoinToken != null && (inSession || state is SessionState.Waiting)) {
+            // A dropped socket, or a server that restarted: the place waits for this phone on the server (Design 2.6.7).
+            // The tries while reconnecting do not count, so a session back or given up starts again at 1 s instead of
+            // leaving the room off the server for 30 s after the network returned.
+            val retry = if (state is SessionState.Reconnecting) {
+                SOCKET_RETRY_MS
+            } else {
+                socketFailures++
+                minOf(SOCKET_RETRY_MAX_MS, SOCKET_RETRY_MS shl minOf(socketFailures - 1, SOCKET_RETRY_DOUBLINGS))
+            }
+            reopenSignaling(retry)
+            return
+        }
+        if (inSession) {
+            // Without a token the phone cannot take its place again. The media runs phone to phone; only "left"
+            // notifications from the server are lost now.
             Log.w(TAG, "Signaling closed during a session; the session continues")
             return
         }
-        val midConnection = _state.value is SessionState.Connecting && sessionId != null
+        val midConnection = state is SessionState.Connecting && sessionId != null
         end(if (midConnection) EndReason.CONNECTION_LOST else EndReason.ERROR)
+    }
+
+    /** Opens a new socket after [delayMs]; its first message takes this phone's place again. */
+    private fun reopenSignaling(delayMs: Long = 0) {
+        socketRetry?.cancel()
+        joined = false
+        socketRetry = scope.launch {
+            delay(delayMs)
+            reopened = true
+            signaling.connect(signalingUrl(serverUrl))
+        }
+    }
+
+    /** Signals go only over a socket that holds this phone's place; the server would refuse them on another. */
+    private fun sendSignal(signal: SignalMessage.Signal) {
+        if (joined) signaling.send(signal) else Log.w(TAG, "Signal dropped: the socket has no place in the session")
     }
 
     private fun onServerError(error: SignalMessage.ServerError) {
         Log.w(TAG, "Server error ${error.code}: ${error.message}")
+        if (rejoining && error.code in REJOIN_REFUSALS) {
+            onRejoinRefused()
+            return
+        }
         when (error.code) {
-            // FULL means the photographer already has a subject; "Session not found" is the closest screen.
-            "NOT_FOUND", "FULL" -> if (role == Role.SUBJECT) end(EndReason.NOT_FOUND)
+            // FULL means the photographer already has a subject, and FORBIDDEN that a Reconnect's place went to
+            // another subject; "Session not found" is the closest screen.
+            "NOT_FOUND", "FULL", "FORBIDDEN" -> if (role == Role.SUBJECT) end(EndReason.NOT_FOUND)
 
             "EXPIRED" -> end(EndReason.EXPIRED)
 
@@ -248,6 +374,31 @@ class RtcSessionManager(
             "RATE_LIMITED" -> if (role == Role.SUBJECT) end(EndReason.RATE_LIMITED)
 
             else -> if (_state.value is SessionState.Connecting) fail()
+        }
+    }
+
+    /**
+     * The server no longer has this phone's place: the session ended while the socket was away (the photographer left,
+     * or nobody was there for 60 s), or another subject took the place. A running session goes on phone to phone, as
+     * it would without a token; one that is reconnecting cannot.
+     */
+    private fun onRejoinRefused() {
+        rejoining = false
+        when (_state.value) {
+            is SessionState.Connected -> Log.w(TAG, "The session has no place on the server any more; it continues")
+
+            is SessionState.Reconnecting -> when (role) {
+                Role.PHOTOGRAPHER -> {
+                    notifyPeerGone(EndReason.CONNECTION_LOST)
+                    end(EndReason.CONNECTION_LOST)
+                }
+
+                Role.SUBJECT -> end(EndReason.NOT_FOUND)
+
+                null -> Unit
+            }
+
+            else -> end(EndReason.ERROR)
         }
     }
 
@@ -259,6 +410,33 @@ class RtcSessionManager(
         _state.value = SessionState.Connecting(sessionId)
         Timings.mark("peer.joined")
         openPeer()
+    }
+
+    /**
+     * Photographer: the subject took its place again over a new socket and keeps its peer connection, so an ICE restart
+     * is enough. Also while this phone's own link looks fine, because the subject may have seen a drop it did not; on a
+     * working link a restart does not interrupt the video.
+     *
+     * Subject: the photographer is back on the server. A subject still waiting for an offer may have taken its place
+     * while the photographer was away (a Reconnect during the photographer's own drop), and that `peer.joined` went
+     * nowhere, so it takes its place again on this socket and the photographer now gets one (Design 2.6.7).
+     */
+    private fun onPeerRejoined() {
+        val state = _state.value
+        when (role) {
+            Role.PHOTOGRAPHER -> if (state is SessionState.Connected || state is SessionState.Reconnecting) restartIce()
+
+            Role.SUBJECT -> {
+                val id = sessionId
+                val token = rejoinToken
+                if (state is SessionState.Connecting && !remoteDescriptionSet && id != null && token != null) {
+                    rejoining = true
+                    signaling.send(SignalMessage.SessionJoin(id, rejoin = false, rejoinToken = token))
+                }
+            }
+
+            null -> Unit
+        }
     }
 
     private fun openPeer() {
@@ -282,10 +460,57 @@ class RtcSessionManager(
         }
     }
 
-    private suspend fun sendOffer(client: PeerConnectionClient) {
-        val offer = client.createOffer()
-        signaling.send(SignalMessage.Signal(sdp = offer))
-        Timings.mark("offer.sent")
+    private suspend fun sendOffer(client: PeerConnectionClient, iceRestart: Boolean = false) {
+        holdingCandidates = true
+        try {
+            val offer = client.createOffer(iceRestart)
+            offerPending = true
+            sendSignal(SignalMessage.Signal(sdp = offer))
+        } finally {
+            releaseCandidates()
+        }
+        Timings.mark(if (iceRestart) "ice.restarted" else "offer.sent")
+    }
+
+    /**
+     * Photographer: an offer with new ICE credentials on the same peer connection, so the channels, the video track,
+     * and what is queued on them stay (Design 2.6.7). Both phones taking their places back can ask for two restarts
+     * at once, and the subject answers every offer that reaches its socket, so a restart waits while the last offer
+     * may still be answered: an answer always meets the offer it answers. An offer that went to the subject's old
+     * socket is never answered, so the wait ends after [ANSWER_WAIT_MS].
+     */
+    private fun restartIce() {
+        val client = peer ?: return
+        if (offerPending && answerWait?.isActive == true) {
+            restartQueued = true
+            return
+        }
+        restartQueued = false
+        // Pending from now, not from when the offer is made, so a second request meanwhile waits too.
+        offerPending = true
+        answerWait?.cancel()
+        answerWait = scope.launch {
+            delay(ANSWER_WAIT_MS)
+            answerWait = null
+            if (restartQueued) restartIce()
+        }
+        // The subject's candidates of the old answer must not meet the new offer; they wait for the new answer.
+        remoteDescriptionSet = false
+        scope.launch {
+            try {
+                sendOffer(client, iceRestart = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Could not restart ICE", e)
+            }
+        }
+    }
+
+    private fun releaseCandidates() {
+        holdingCandidates = false
+        heldCandidates.forEach { sendSignal(SignalMessage.Signal(candidate = it)) }
+        heldCandidates.clear()
     }
 
     private suspend fun onRemoteSignal(signal: SignalMessage.Signal) {
@@ -298,19 +523,33 @@ class RtcSessionManager(
             signal.sdp?.let { sdp ->
                 when {
                     sdp.type == "offer" && role == Role.SUBJECT -> {
+                        // An offer on a connection that already has one is the photographer's ICE restart.
+                        val restart = remoteDescriptionSet
                         client.applyRemote(sdp)
                         remoteDescriptionSet = true
                         flushCandidates(client)
-                        val answer = client.createAnswer()
-                        signaling.send(SignalMessage.Signal(sdp = answer))
-                        Timings.mark("answer.sent")
+                        holdingCandidates = true
+                        try {
+                            sendSignal(SignalMessage.Signal(sdp = client.createAnswer()))
+                        } finally {
+                            releaseCandidates()
+                        }
+                        Timings.mark(if (restart) "ice.restarted" else "answer.sent")
                     }
 
                     sdp.type == "answer" && role == Role.PHOTOGRAPHER -> {
+                        if (!offerPending) {
+                            Log.w(TAG, "An answer to no pending offer; ignored")
+                            return
+                        }
+                        offerPending = false
+                        answerWait?.cancel()
+                        answerWait = null
                         client.applyRemote(sdp)
                         remoteDescriptionSet = true
                         flushCandidates(client)
                         Timings.mark("answer.applied")
+                        if (restartQueued) restartIce()
                     }
 
                     else -> Log.w(TAG, "Unexpected SDP ${sdp.type} for role $role")
@@ -319,9 +558,12 @@ class RtcSessionManager(
             signal.candidate?.let { candidate ->
                 if (remoteDescriptionSet) client.addIceCandidate(candidate) else pendingCandidates += candidate
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Could not apply the remote signal", e)
-            fail()
+            // A restart that fails leaves the link as it was: running, or reconnecting until the budget runs out.
+            if (_state.value is SessionState.Connecting) fail()
         }
     }
 
@@ -333,21 +575,32 @@ class RtcSessionManager(
     private fun onPeerEvent(client: PeerConnectionClient, event: PeerEvent) {
         if (client !== peer) return
         when (event) {
-            is PeerEvent.LocalCandidate -> signaling.send(SignalMessage.Signal(candidate = event.candidate))
+            is PeerEvent.LocalCandidate ->
+                if (holdingCandidates) {
+                    heldCandidates += event.candidate
+                } else {
+                    sendSignal(SignalMessage.Signal(candidate = event.candidate))
+                }
 
             is PeerEvent.Link -> when (event.state) {
                 LinkState.CONNECTED -> {
-                    disconnectGrace?.cancel()
-                    disconnectGrace = null
                     Timings.mark("ice.connected")
+                    maybeReconnected()
                 }
 
-                LinkState.DISCONNECTED -> {
-                    Timings.mark("ice.disconnected")
-                    if (_state.value is SessionState.Connected) startDisconnectGrace()
+                LinkState.DISCONNECTED, LinkState.FAILED -> {
+                    if (event.state == LinkState.DISCONNECTED) Timings.mark("ice.disconnected")
+                    when (_state.value) {
+                        is SessionState.Connected -> startReconnecting()
+
+                        // The budget decides; a restart can bring back a link that failed.
+                        is SessionState.Reconnecting -> Unit
+
+                        else -> if (event.state == LinkState.FAILED) onLinkLost()
+                    }
                 }
 
-                LinkState.FAILED, LinkState.CLOSED -> onLinkLost()
+                LinkState.CLOSED -> onLinkLost()
 
                 LinkState.CONNECTING -> Unit
             }
@@ -361,7 +614,22 @@ class RtcSessionManager(
                 maybeConnected()
             }
 
-            is PeerEvent.ChannelClosed -> Log.d(TAG, "${event.channel} channel closed")
+            is PeerEvent.ChannelClosed -> {
+                Log.d(TAG, "${event.channel} channel closed")
+                openChannels -= event.channel
+                val state = _state.value
+                if (state !is SessionState.Connected && state !is SessionState.Reconnecting) return
+                if (event.channel == Channel.RELIABLE) {
+                    // The channels outlast a drop, so the reliable one closes when the other phone closed its
+                    // connection: it gave up reconnecting, or its app went away. No restart can open it again.
+                    onLinkLost()
+                } else {
+                    // The realtime channel can also close alone, on this phone (WebRTC closes a channel whose send
+                    // failed). It carries only steps and pings, which go on the reliable channel from now on.
+                    Log.w(TAG, "Realtime channel lost; its messages go on the reliable channel")
+                    realtimeLost = true
+                }
+            }
 
             is PeerEvent.Message -> onPeerMessage(event.text)
 
@@ -390,11 +658,7 @@ class RtcSessionManager(
         if (_state.value !is SessionState.Connecting || openChannels.size != 2) return
         connectTimeout?.cancel()
         connectTimeout = null
-        _state.value = SessionState.Connected(
-            checkNotNull(sessionId),
-            PeerInfo(hello.name, hello.haveGuideId, hello.haveReferenceId),
-            checkNotNull(role),
-        )
+        _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role))
         Timings.mark("session.connected")
         pingJob?.cancel()
         pingJob = scope.launch {
@@ -405,6 +669,49 @@ class RtcSessionManager(
             }
         }
     }
+
+    /**
+     * The link dropped while connected: both phones try for [RECONNECT_BUDGET_MS] to restore it (Design 2.6.7, NFR-11).
+     * The socket is opened again even if it looks open, since one on a network without internet would take OkHttp's
+     * pings longer than the budget to fail; its `session.join` answer starts the photographer's ICE restart.
+     */
+    private fun startReconnecting() {
+        val id = sessionId ?: return
+        val since = clock()
+        _state.value = SessionState.Reconnecting(id, since)
+        Timings.mark("session.reconnecting")
+        reconnectBudget?.cancel()
+        reconnectBudget = scope.launch {
+            delay(RECONNECT_BUDGET_MS)
+            Log.w(TAG, "Not reconnected after ${RECONNECT_BUDGET_MS / 1000} s")
+            onLinkLost()
+        }
+        when {
+            rejoinToken != null -> {
+                socketFailures = 0
+                reopenSignaling()
+            }
+
+            // A server without rejoin tokens: restart over the socket as it is.
+            role == Role.PHOTOGRAPHER -> restartIce()
+        }
+    }
+
+    /**
+     * Reconnecting ends once the link is connected again with the reliable channel still open, as an ICE restart keeps
+     * the channels; the realtime one may have been lost before (`realtimeLost`).
+     */
+    private fun maybeReconnected() {
+        val state = _state.value as? SessionState.Reconnecting ?: return
+        val hello = peerHello ?: return
+        if (Channel.RELIABLE !in openChannels) return
+        reconnectBudget?.cancel()
+        reconnectBudget = null
+        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role))
+        Timings.mark("session.reconnected", "${clock() - state.since} ms")
+    }
+
+    private fun peerInfo(hello: SessionMessage.Hello) = PeerInfo(hello.name, hello.haveGuideId, hello.haveReferenceId)
 
     /**
      * One `stats` line per ping: codec, size, fps, bitrate, and RTT, so NFR-5, 6, and 12 can be read from logcat. An
@@ -477,7 +784,9 @@ class RtcSessionManager(
     private fun sendNow(message: SessionMessage): Boolean {
         val client = peer ?: return false
         val text = codec.encode(message)
-        return when (router.channelFor(message)) {
+        val routed = router.channelFor(message)
+        val channel = if (routed == Channel.REALTIME && realtimeLost) Channel.RELIABLE else routed
+        return when (channel) {
             Channel.REALTIME -> client.send(Channel.REALTIME, text)
 
             Channel.RELIABLE -> {
@@ -504,6 +813,21 @@ class RtcSessionManager(
 
     // ---- Leaving, losing, and ending ------------------------------------------------
 
+    /**
+     * The server says the other phone left, or that its socket dropped. While the link runs or is being restored, a
+     * dropped socket is often only the other phone's old one going: the link decides (Design 2.6.7).
+     */
+    private fun onPeerLeft(reason: EndReason) {
+        val state = _state.value
+        if (reason == EndReason.CONNECTION_LOST &&
+            (state is SessionState.Connected || state is SessionState.Reconnecting)
+        ) {
+            Log.d(TAG, "The other phone's socket dropped; the link decides")
+            return
+        }
+        onPeerGone(reason)
+    }
+
     /** The other phone left on purpose, or the server reported it gone. */
     private fun onPeerGone(reason: EndReason) {
         val onPurpose = reason == EndReason.LEFT || reason == EndReason.PEER_LEFT || reason == EndReason.CANCELLED
@@ -527,7 +851,7 @@ class RtcSessionManager(
         }
     }
 
-    /** The peer connection failed, or the connecting or disconnect timer ran out. */
+    /** The peer connection failed or closed, or the connecting or reconnecting timer ran out. */
     private fun onLinkLost() {
         when (role) {
             Role.PHOTOGRAPHER -> {
@@ -567,17 +891,6 @@ class RtcSessionManager(
         }
     }
 
-    private fun startDisconnectGrace() {
-        if (disconnectGrace?.isActive == true) return
-        disconnectGrace = scope.launch {
-            delay(DISCONNECT_GRACE_MS)
-            if (active) {
-                Log.w(TAG, "Not reconnected after ${DISCONNECT_GRACE_MS / 1000} s")
-                onLinkLost()
-            }
-        }
-    }
-
     private fun closePeer() {
         val client = peer ?: return
         peer = null
@@ -587,11 +900,18 @@ class RtcSessionManager(
         pingJob = null
         connectTimeout?.cancel()
         connectTimeout = null
-        disconnectGrace?.cancel()
-        disconnectGrace = null
+        reconnectBudget?.cancel()
+        reconnectBudget = null
         remoteDescriptionSet = false
         pendingCandidates.clear()
+        offerPending = false
+        answerWait?.cancel()
+        answerWait = null
+        restartQueued = false
+        holdingCandidates = false
+        heldCandidates.clear()
         openChannels.clear()
+        realtimeLost = false
         helloSent = false
         peerHello = null
         lastSeq.clear()
@@ -603,21 +923,62 @@ class RtcSessionManager(
     private fun end(reason: EndReason) {
         if (!active) return
         active = false
+        // What the subject's Reconnect needs to take its place again while the photographer still holds it.
+        val id = sessionId
+        val token = rejoinToken
+        val lostCode = code
+        lost = when {
+            reason == EndReason.CONNECTION_LOST && role == Role.SUBJECT && id != null && token != null &&
+                lostCode != null -> LostSession(lostCode, id, token, iceServers)
+
+            // A Reconnect that failed without an answer, such as one tapped before the network is back, keeps its
+            // ticket: the next try still takes the place with the token instead of joining the code, which a server
+            // still holding the old socket would refuse as FULL. A refusal (NOT_FOUND) or Leave drops it.
+            reason == EndReason.ERROR -> ticket
+
+            else -> null
+        }
+        ticket = null
         closePeer()
         signalingJob?.cancel()
         signalingJob = null
+        socketRetry?.cancel()
+        socketRetry = null
         signaling.close()
         role = null
         code = null
         sessionId = null
+        rejoinToken = null
+        greeting = null
         _state.value = SessionState.Ended(reason)
         Timings.mark("session.ended", reason.name)
     }
 
+    /** Subject: a session it lost by its connection, with what a Reconnect needs to take its place again. */
+    private class LostSession(
+        val code: String,
+        val sessionId: String,
+        val token: String,
+        val iceServers: List<IceServer>,
+    )
+
     private companion object {
         const val TAG = "PixSession"
         const val CONNECT_TIMEOUT_MS = 15_000L
-        const val DISCONNECT_GRACE_MS = 10_000L
+
+        /** How long a restart waits for the answer to the last offer, about ten round trips through the server. */
+        const val ANSWER_WAIT_MS = 2_000L
+
+        /** How long both phones try to restore a dropped link before giving up (FR-6.12, NFR-11). */
+        const val RECONNECT_BUDGET_MS = 10_000L
+
+        /** A dropped socket is opened again after 1 s, every second while reconnecting, and otherwise doubling to 30 s. */
+        const val SOCKET_RETRY_MS = 1_000L
+        const val SOCKET_RETRY_MAX_MS = 30_000L
+        const val SOCKET_RETRY_DOUBLINGS = 5
+
+        /** The answers to `session.join` that mean the place is gone. */
+        val REJOIN_REFUSALS = setOf("NOT_FOUND", "FORBIDDEN")
         const val PING_INTERVAL_MS = 2_000L
         const val LEAVE_FLUSH_MS = 150L
         const val BACKPRESSURE_BYTES = 256L * 1024

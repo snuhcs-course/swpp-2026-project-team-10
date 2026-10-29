@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-25, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.content.Context
@@ -34,7 +34,8 @@ class WebRtcRuntime(
             // Android's network monitor only reports networks known to ConnectivityManager, which leaves out the
             // phone's own hotspot interface. A phone that hosts the test hotspot then offers only cellular
             // candidates and never connects. Enumerating interfaces directly includes the hotspot (and Wi-Fi)
-            // addresses; the cost is no reaction to network switches, which the session's own grace timer covers.
+            // addresses; the cost is no reaction to network switches, which the session's reconnection covers: its
+            // ICE restart gathers on the interfaces there are then (Design 2.6.7).
             disableNetworkMonitor = true
         }
         PeerConnectionFactory.builder()

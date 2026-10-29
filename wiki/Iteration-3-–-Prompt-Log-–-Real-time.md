@@ -77,6 +77,35 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Joonhyung, 10-28] "Redraw Flow 5 with the changed UI, the zoom row's toggle included, commit and push it, and resolve the conflicts." (Subject view in Figure 5 gained the guide-edit mode toggle beside the zoom readout, rendered in both languages. `dev` had brought [#146], which took Design 2.8 and Testing 2.10, so this branch's rows moved to 2.9 and 2.11, and the technique rows kept both sides' cases. 935 unit tests passed.)
 - [Joonhyung, 10-28] "Commit the prompt log and push it to PR #145."
 
+## Reconnection after a short drop ([#118], PR [#149])
+
+**The plan and the build (10/27)**
+
+- [Sungmin, 10-27] "Now I'll take issue #118. Pull `dev` first, then write a concrete, detailed plan of how to build it. Do not implement yet." (The server holds a dead socket for up to about 40 s, until Uvicorn's pings go unanswered, so a phone coming back over a new socket would find its place taken. The plan: a rejoin token per place, which takes the place back even from the old socket; `Reconnecting` with a 10 s budget on both phones; an ICE restart from the photographer on the same peer connection, so the channels and the video track stay; six decisions, each with a recommendation.)
+- [Sungmin, 10-27] "Can you implement it now?" (With the recommended decisions. On the server, the token in `room.created` and `session.joined`, stored only as a SHA-256, `session.join`, and the `REJOIN` Lua script; in the app, `SessionState.Reconnecting`, `SessionEntry.Rejoin`, local candidates held until their description is out, and the socket opened again on every drop. 13 new server tests and 12 manager tests; a mutation check showed that the candidate and `peer.left` tests catch their regressions. 860 unit tests passed.)
+
+**`dev` again (10/28)**
+
+- [Sungmin, 10-28] "Pull `dev` again and resolve the conflicts." (Seven PRs had come in, [#138] to [#148], and 15 files conflicted. [#144] had already replaced the "same Wi-Fi" text on *Connection lost*, so this branch's text and its redrawn Flow 5 were dropped; `reconnecting` got its Korean string; IT-13 was taken by the Korean walk-through, so the Wi-Fi-off script became IT-16; the revision rows moved to Design 2.10, R&S 2.11, and Testing 2.13. One gap had no conflict marker: the reconnect path built `PeerInfo` without [#143]'s `haveReferenceId`, so the photographer would have sent the reference photo again after every drop. 961 unit tests passed.)
+
+**Two phones (10/28 – 10/29)**
+
+- [Sungmin, 10-28] "How do I test this?" / "Why a local server? Can't I test with the AWS server?" (AWS runs `dev`, which gives no tokens, so the app would take the path for older servers: the subject would not open its socket again and would miss the restart offer. Running this branch there would need Jaewan, since the server is shared and serves the user test of 10/31.)
+- [Sungmin, 10-28] "I connected a phone: install it." (The S25 Ultra, and the emulator as the second phone, against a server on the laptop, with an APK built for its address.)
+- [Sungmin, 10-28] "OK, done." (The phone had been the photographer, in airplane mode both times. A short drop came back in 3.8 s. The long one ended on time, but the photographer's socket waited 30 s to come back, because the tries while reconnecting had counted toward its backoff, and a subject's *Reconnect* made while the photographer was off the server would never get an offer.)
+- [Sungmin, 10-28] "OK, go ahead with the fixes." (The tries while reconnecting no longer count, and a subject waiting for an offer sends `session.join` again when `peer.rejoined` says the photographer is back. The second test at first passed without its fix, because the repeated `session.join` equals the *Reconnect*'s first one; it now compares only the messages sent after `peer.rejoined`.)
+- [Sungmin, 10-28] "Install it again." (Now on the S23 Ultra; both devices' logs went to files, so they outlast a closed emulator.)
+- [Sungmin, 10-28] "Why doesn't the outline show on the emulator? It's painfully slow." (Play services never download ML Kit's segmentation module on the emulator, so the guide maker waits 60 s and fails. The guide came from the phone instead, through *Guide* on Subject view ([#145]).)
+- [Sungmin, 10-28] "Testing is done." (The system logs showed airplane mode on the emulator, the photographer, not on the phone. The backoff fix held: the photographer's socket tried again 1, 2, and 4 s after giving up and was back on the third try, and the *Reconnect* connected at once. Earlier, a tap on the phone had been followed by its realtime channel closing alone, with no drop on either side, and the new rule that a closed channel ends the session turned that into *Connection lost*; `dev` had only logged it.)
+- [Sungmin, 10-28] "OK, go ahead with the fix." (Only the reliable channel closing ends the session; after the realtime channel closes alone, its steps and pings go on the reliable one, and reconnecting ends with the reliable channel alone. One mutant ran for 24 minutes: its failing assertion left the session connected, and the ping loop kept `runTest` draining virtual time.)
+- [Sungmin, 10-29] "Done." (IT-4 as written, with airplane mode on the subject's phone for 6 s: `session.reconnected` 4102 ms and 3917 ms, and the video and the guide back on the same connection. With 20 s both phones gave up at 10 s; a *Reconnect* tapped 12 ms before Wi-Fi was back failed and kept the screen, and the next one connected in 0.7 s.)
+
+**The PR (10/29)**
+
+- [Sungmin, 10-29] "I think this can be committed and pushed as it is." (Before the commit, the AI markers of the files this PR changed were dated and named for it.)
+- [Sungmin, 10-29] "Do the reviews on PR #149 need fixing? If so, fix them, commit, and push." (Three Codex findings, all right. Two restarts asked for at once, when both phones take their places back, could both be answered while the photographer applied only the first answer, leaving the phones with different ICE credentials: a restart now waits for the pending answer, at most 2 s, because an offer that went to the subject's old socket is never answered, and plain serializing would have held back the restart that saved IT-4. A *Reconnect* that failed before the server answered dropped its token, so the next one joined the code, which a server still holding the old socket refuses as `FULL`: the token is now kept until the server refuses it, which also explains the first failed tap. The background limit skipped `Reconnecting`: it now counts, and its deadline holds when the link comes back. Each fix has a test that fails without it; 967 unit tests passed.)
+- [Sungmin, 10-29] "Write the AI prompt log for this too, then commit and push it."
+
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
 [#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
@@ -86,3 +115,6 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#144]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/144
 [#143]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/143
 [#146]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/146
+[#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
+[#149]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/149
+[#148]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/148

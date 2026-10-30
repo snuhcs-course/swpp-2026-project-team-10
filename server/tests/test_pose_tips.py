@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
 # POST /pose-tips partitions (Testing Documentation 2.1.6). Photos: a scene and a candidate within the contract, and
 # either one not a JPEG, too large, carrying EXIF, or missing. Pose: one in Korean with extra whitespace, of 100
 # characters and of 101, blank, or missing. The model's answer: usable, with each framing it may judge; JSON in a code
@@ -8,7 +8,9 @@
 # the phone lower, higher, or where it was. Upstream: a refusal (403), a failing status, an unreadable body, no answer
 # in time, no connection, no key. The phone: staying connected, or dropping the request while the model works.
 # Limits: each window full, counted apart from poses and suggestions; refused input not counted; the session store
-# down. Privacy: neither the pose nor the answer nor the upstream body is logged.
+# down. Privacy: neither the pose nor the answer nor the upstream body is logged. Language (FR-10.2): `ko`, `en`, left
+# out, and another value; a Korean sentence that is usable, one with words that only contain a count ("한쪽", "두 손"),
+# and one with a count of steps, with or without a space, a unit, or a degree in digits or in words.
 import asyncio
 import base64
 import json
@@ -44,9 +46,11 @@ def photos(make_image):
     return make_image(size=(576, 1024)), make_image(size=(768, 1024))
 
 
-def ask(client, photos, pose=POSE, files=None):
+def ask(client, photos, pose=POSE, files=None, language=None):
     scene, candidate = photos
     data = {"pose": pose} if pose is not None else {}
+    if language is not None:
+        data["language"] = language
     if files is None:
         files = {"scene": ("scene.jpg", scene, "image/jpeg"), "candidate": ("candidate.jpg", candidate, "image/jpeg")}
     return client.post("/api/v1/pose-tips", files=files, data=data)
@@ -93,6 +97,61 @@ def test_tip_comes_from_the_model_for_the_scene_and_the_candidate(client, image_
         {"type": "text", "text": f'Photo 2, the photo they want, with the pose "{POSE}":'},
         image_url(candidate),
     ]
+
+
+@pytest.mark.parametrize(("language", "korean"), [("ko", True), ("en", False), (None, False)])
+def test_language_says_whether_the_sentence_is_asked_in_korean(client, image_api, photos, language, korean):
+    assert ask(client, photos, language=language).status_code == 200
+    [payload] = image_api.tip_payloads
+    texts = [part["text"] for part in payload["messages"][0]["content"] if part["type"] == "text"]
+    assert texts[0] == PROMPTS.tip
+    assert (PROMPTS.tip_korean in texts) is korean
+    if korean:
+        assert texts[1] == PROMPTS.tip_korean  # right after the rules it changes, before the photos
+
+
+def test_language_the_app_does_not_have_is_refused_before_a_call(client, image_api, photos):
+    assert_error(ask(client, photos, language="ja"), 400, "INVALID_REQUEST")
+    assert image_api.tip_requests == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "줌을 당기거나 조금 다가가서 허리 높이에서 살짝 위로 기울이세요 - 다리가 길어 보여요.",
+        "한쪽 어깨가 보이게 가슴 높이에서 두 손으로 수평으로 드세요 - 몸의 비율이 그대로 보여요.",
+    ],
+    ids=["usable", "words containing a count"],
+)
+def test_korean_sentence_is_shown(client, image_api, photos, text):
+    image_api.tips(ANSWER | {"text": text})
+    response = ask(client, photos, language="ko")
+    assert response.status_code == 200
+    assert response.json()["text"] == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "한 걸음 다가가서 허리 높이에서 드세요.",
+        "두걸음 물러나서 가슴 높이에서 드세요.",
+        "1미터 뒤로 물러나서 드세요.",
+        "삼십 센티 낮춰서 드세요.",
+        "십오 도 위로 기울이세요.",
+        "15° 위로 기울이세요.",
+    ],
+    ids=[
+        "count of steps",
+        "count without a space",
+        "unit with digits",
+        "unit in words",
+        "degrees in words",
+        "degree sign",
+    ],
+)
+def test_korean_sentence_with_a_count_a_unit_or_a_degree_is_unusable(client, image_api, photos, text):
+    image_api.tips(ANSWER | {"text": text})
+    assert_error(ask(client, photos, language="ko"), 502, "UPSTREAM_ERROR")
 
 
 @pytest.mark.parametrize("framing", ["closer", "back", "keep"])

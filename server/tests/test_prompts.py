@@ -1,7 +1,8 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 # prompts.toml partitions (Testing Documentation 2.1.6). The file as shipped; a prompt wrapped over several lines; a
 # pose prompt without {pose}, with it twice, missing, or empty; a suggestion prompt missing or empty; a variation
-# prompt without {description}, with it twice, missing, or empty; a tip prompt missing or empty; an unknown key at the
+# prompt without {description}, with it twice, missing, or empty; a tip prompt or its Korean addition missing or
+# empty; an unknown key at the
 # top or in a default pose; a default pose without a field, with an empty one, longer than a description, or not a
 # table; three or five default poses; an id used twice; a file that is not TOML. A pose or description with braces of
 # its own. The [selfie] table (FR-1.14): missing or not a table; its pose prompt without {pose} or with it twice, its
@@ -25,7 +26,8 @@ POSE_PROMPT = 'pose_prompt = "Same person and place. Pose: {pose}."\n'
 SUGGESTION_PROMPT = 'suggestion_prompt = "Suggest four poses as JSON."\n'
 VARIATION_PROMPT = 'variation_prompt = "Three variations of {description} as JSON."\n'
 TIP_PROMPT = 'tip_prompt = "How to hold the phone, as JSON."\n'
-MODEL_PROMPTS = SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT
+TIP_KOREAN = 'tip_korean = "The sentence in Korean."\n'
+MODEL_PROMPTS = SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT + TIP_KOREAN
 
 
 def selfie(
@@ -63,8 +65,9 @@ def test_shipped_file_has_the_prompts_and_four_default_poses_in_order():
     assert list(prompts.default_poses) == ["hands_on_hips", "wave", "walking", "arms_crossed"]
     assert prompts.pose.count("{pose}") == 1
     assert prompts.variation.count("{description}") == 1
-    for prompt in (prompts.pose, prompts.suggestion, prompts.variation, prompts.tip):
+    for prompt in (prompts.pose, prompts.suggestion, prompts.variation, prompts.tip, prompts.tip_korean):
         assert "\n" not in prompt and "  " not in prompt
+    assert "한 걸음" in prompts.tip_korean  # its examples of what not to write are Korean
     assert '{"poses": [' in prompts.suggestion and '{"poses": [' in prompts.variation
     assert prompts.default_poses == DEFAULT_POSES
 
@@ -113,6 +116,8 @@ def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
         ),
         (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + FOUR, "tip_prompt"),
         (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + 'tip_prompt = ""\n' + FOUR, "tip_prompt"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT + FOUR, "tip_korean"),
+        (POSE_PROMPT + SUGGESTION_PROMPT + VARIATION_PROMPT + TIP_PROMPT + 'tip_korean = " "\n' + FOUR, "tip_korean"),
         (POSE_PROMPT + MODEL_PROMPTS + 'template_prompt = "{pose}"\n' + FOUR, "template_prompt"),
     ],
     ids=[
@@ -128,6 +133,8 @@ def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
         "variation placeholder twice",
         "no tip",
         "empty tip",
+        "no Korean tip",
+        "empty Korean tip",
         "unknown key",
     ],
 )

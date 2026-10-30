@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
 """Try the pose tip prompt on scene photos and candidates made once (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY in server/.env:
@@ -7,6 +7,7 @@ It does not import pix_server. Run it through uv from server/ with OPENROUTER_AP
     uv run --env-file .env scripts/try_pose_tips.py set scene.jpg --name k01
     uv run --env-file .env scripts/try_pose_tips.py tips
     uv run --env-file .env scripts/try_pose_tips.py tips --prompt-file scripts/out/tip_prompt.txt --label v2 --rounds 2
+    uv run --env-file .env scripts/try_pose_tips.py tips --language ko --label ko
 
 `candidates` makes one candidate per scene, the way the app and the server do: the scene prepared like the app's
 (upright, long side 1024 px, JPEG 85, no EXIF), a pose the suggestion model chose for it (the n-th scene takes the
@@ -64,9 +65,13 @@ TEXT_MAX_LENGTH = 140
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
+KOREAN_COUNTS = "한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|스무"
+KOREAN_DEGREES = "[일이삼사오육칠팔구]?[십백][일이삼사오육칠팔구]?|[일이삼사오육칠팔구]"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
-    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b",
+    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
+    rf"|(?<![가-힣])({KOREAN_COUNTS})\s*(걸음|발짝|발자국|발|뼘|보)(?![가-힣])|미터|센티|센치|밀리|인치|피트"
+    rf"|(?<![가-힣])({KOREAN_DEGREES})\s*도(?![가-힣])",
     re.IGNORECASE,
 )
 
@@ -88,7 +93,7 @@ TIP_SCHEMA = {
     "required": ["shot", "pose", "camera_now", "camera_best", "angle", "framing", "text"],
     "additionalProperties": False,
 }
-ANGLE_WORDS = re.compile(r"\b(tilt|tilted|tilting|level|angle|straight)\b", re.IGNORECASE)
+ANGLE_WORDS = re.compile(r"\b(tilt|tilted|tilting|level|angle|straight)\b|기울|수평|똑바로|각도", re.IGNORECASE)
 
 
 def one_line(text: str) -> str:
@@ -295,7 +300,10 @@ async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number:
     scene = (folder / "scene.jpg").read_bytes()
     with Image.open(folder / "candidate.jpg") as image:
         candidate = jpeg(image, CANDIDATE_LONG_SIDE)
+    # The server adds the Korean instruction right after the tip prompt when the phone's screens are in Korean.
+    korean = [{"type": "text", "text": args.korean}] if args.korean else []
     parts = [
+        *korean,
         {"type": "text", "text": "Photo 1, the scene:"},
         {"type": "image_url", "image_url": {"url": data_url(scene)}},
         {"type": "text", "text": f'Photo 2, the photo they want, with the pose "{pose}":'},
@@ -405,6 +413,7 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
     prompt = one_line(
         args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else server_prompts()["tip_prompt"]
     )
+    args.korean = one_line(server_prompts()["tip_korean"]) if args.language == "ko" else None
     folders = sorted(folder for folder in PAIRS.glob("*") if (folder / "candidate.jpg").is_file())
     if args.only:
         folders = [folder for folder in folders if folder.name in args.only]
@@ -475,6 +484,9 @@ def main() -> None:
     tips.add_argument("--prompt-file", type=Path, help="tip prompt (default: the server's)")
     tips.add_argument("--label", help="appended to the run folder's name")
     tips.add_argument("--rounds", type=int, default=1, help="calls per pair, to see the spread")
+    tips.add_argument(
+        "--language", default="en", choices=["en", "ko"], help="the sentence's language, as the app sends"
+    )
     tips.add_argument("--only", nargs="+", metavar="SCENE", help="only these pairs, by folder name")
     reasoning = ["minimal", "low", "medium", "high"]
     tips.add_argument("--reasoning", default="low", choices=reasoning, help="default: the server's")

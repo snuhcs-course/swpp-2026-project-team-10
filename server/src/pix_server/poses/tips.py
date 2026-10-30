@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
 """How to hold the phone for the candidate the user chose, from a vision model through OpenRouter's chat completions
 (Design Documentation 2.6.3)."""
 
@@ -8,7 +8,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, get_args
 
 import httpx2
 
@@ -30,6 +30,9 @@ Level = Literal["crouching", "waist", "chest", "eye", "above head"]
 LEVELS: tuple[Level, ...] = ("crouching", "waist", "chest", "eye", "above head")
 Angle = Literal["up", "level", "down"]
 Height = Literal["raise", "lower", "keep"]
+# The language of the phone's screens, in which the sentence is written (FR-10.2).
+Language = Literal["en", "ko"]
+LANGUAGES: tuple[Language, ...] = get_args(Language)
 
 # The fields come in this order so the model decides the shot and the pose before the height and the angle, and writes
 # the sentence last. OpenRouter passes the schema to every model that takes one; the answer is still checked.
@@ -48,13 +51,18 @@ ANSWER_SCHEMA = {
     "additionalProperties": False,
 }
 # A number, a unit, or a degree is hard to follow while shooting, so a sentence with one is not shown: digits, numbers
-# in words ("two steps"), "one" before a step or a unit, units, and degrees.
+# in words ("two steps"), "one" before a step or a unit, units, and degrees; in Korean, a count of steps ("한 걸음"),
+# units, and a degree in words ("십오 도").
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
+KOREAN_COUNTS = "한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|스무"
+KOREAN_DEGREES = "[일이삼사오육칠팔구]?[십백][일이삼사오육칠팔구]?|[일이삼사오육칠팔구]"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
-    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b",
+    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
+    rf"|(?<![가-힣])({KOREAN_COUNTS})\s*(걸음|발짝|발자국|발|뼘|보)(?![가-힣])|미터|센티|센치|밀리|인치|피트"
+    rf"|(?<![가-힣])({KOREAN_DEGREES})\s*도(?![가-힣])",
     re.IGNORECASE,
 )
 
@@ -94,8 +102,12 @@ class PoseTipper:
         self._settings = settings
         self._http = http
 
-    async def tip(self, scene: bytes, candidate: bytes, pose: str) -> PoseTip:
-        """The tip for taking `candidate`, made with `pose` from `scene`, or the ApiError the endpoint answers with."""
+    async def tip(self, scene: bytes, candidate: bytes, pose: str, language: Language = "en") -> PoseTip:
+        """The tip for taking `candidate`, made with `pose` from `scene`, its sentence in `language`, or the ApiError
+        the endpoint answers with."""
+        instructions = [{"type": "text", "text": PROMPTS.tip}]
+        if language == "ko":
+            instructions.append({"type": "text", "text": PROMPTS.tip_korean})
         key = self._settings.openrouter_api_key
         if key is None or not key.get_secret_value():
             logger.error("OPENROUTER_API_KEY is not set, so tips cannot be made")
@@ -106,7 +118,7 @@ class PoseTipper:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": PROMPTS.tip},
+                        *instructions,
                         {"type": "text", "text": "Photo 1, the scene:"},
                         {"type": "image_url", "image_url": {"url": data_url(scene)}},
                         {"type": "text", "text": f'Photo 2, the photo they want, with the pose "{pose}":'},

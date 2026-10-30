@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -392,6 +392,7 @@ class RemotePoseGeneratorTest {
             scene: MultipartBody.Part,
             candidate: MultipartBody.Part,
             pose: RequestBody,
+            language: RequestBody,
         ): PoseTipDto = error("Pose generation never asks for a tip")
 
         private fun RequestBody.text(): String = Buffer().also(::writeTo).readUtf8()

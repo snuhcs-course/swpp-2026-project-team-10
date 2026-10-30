@@ -28,6 +28,10 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-26] "Document the tips as built, as compactly as possible." (The plan had a tip for each candidate on *Pick a pose*; the documents now follow the build.)
 - [Dongje, 10-26] "Check the Codex review on the PR, decide what to fix, and let me review the plan." / "Make the button position an A2 issue, with the camera screen's buttons and preview size; fix #2 too." (Fixed: the server cancels a dropped tip request, a tip names its guide, and numbers in words are refused; the request size stays, measured at 604 KB at most; the top bar went to [#136].)
 
+## Pose tips in Korean ([#156])
+
+- [Dongje, 10-30] "On a new branch: the pose tips are written only in English; when the app's language is Korean, the tip should be in Korean too. Create the issue, list the tasks, and go ahead on your own." (The app sends the screens' language from a resource that `values-ko` overrides; the server adds a Korean instruction with Korean examples, and the number check learns Korean counts, units, and degrees. Tried on the 16 trial pairs: every Korean sentence usable, the decisions within the spread of English's own rounds.)
+
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
 [#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
@@ -35,3 +39,4 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
 [#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
+[#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156

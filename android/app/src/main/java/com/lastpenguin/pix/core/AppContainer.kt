@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -34,6 +34,7 @@ import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseTipper
+import com.lastpenguin.pix.generation.screenLanguage
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -207,7 +208,7 @@ class AppContainer(
             )
             val referenceGuideMaker: ReferenceGuideMaker =
                 MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
-            val poseTipper: PoseTipper = RemotePoseTipper(pixApi)
+            val poseTipper: PoseTipper = RemotePoseTipper(pixApi, language = { screenLanguage(appContext.resources) })
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),

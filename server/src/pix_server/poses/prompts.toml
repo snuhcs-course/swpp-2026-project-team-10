@@ -113,6 +113,20 @@ because the app already shows the pose. Fill in, in this order:
 Answer with JSON only.
 """
 
+# Added after tip_prompt when the phone's screens are in Korean (POST /pose-tips with `language` ko, FR-10.2): the
+# sentence in Korean, the other fields as the schema lists them. The server refuses a Korean sentence with a count of
+# steps, a unit, or a degree as it does an English one.
+tip_korean = """
+Write text in Korean instead of English, in the polite and friendly style of an app (해요체), at most eighty
+characters, in the same order and by the same rules: how close to get, only when framing is "closer" or "back" ("줌을
+당기거나 조금 다가가서", "조금 뒤로 물러나서"); where to hold the phone by the photographer's own posture ("쪼그려 앉아서",
+"허리 높이에서", "가슴 높이에서", "눈높이에서"); the angle ("살짝 위로 기울이세요", "살짝 아래로 기울이세요", "수평으로
+드세요"); then a dash and the reason in a few words. Examples: "줌을 당기거나 조금 다가가서 허리 높이에서 살짝 위로
+기울이세요 - 다리가 길어 보여요." "쪼그려 앉아서 상대 눈높이에 맞추고 수평으로 드세요 - 내려다보지 않게 돼요." Never count
+steps or use numbers, units, or degrees ("한 걸음", "두 걸음", "1미터", "30센티"): say "조금" instead. Keep every other
+field in English, exactly as the schema lists it.
+"""
+
 # The four poses used when the suggestion model fails or its answer is unusable, in this order. Apps from before
 # Iteration 2 also ask for them by id (GET /pose-templates, POST /poses with templateId): they see the `label` and
 # send the `id` back, so keep an `id` while such an app may still be installed. Only `pose` reaches the image model.

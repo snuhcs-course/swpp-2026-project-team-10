@@ -15,7 +15,7 @@ from pix_server.poses.generator import PoseGenerator, check_scene
 from pix_server.poses.limiter import Kind, PoseLimiter
 from pix_server.poses.prompts import DEFAULT_POSES, checked_pose, pose_prompt
 from pix_server.poses.suggester import PoseSuggester
-from pix_server.poses.tips import Angle, Framing, Height, Level, PoseTipper
+from pix_server.poses.tips import Angle, Framing, Height, Language, Level, PoseTipper
 
 router = APIRouter(prefix="/api/v1")
 
@@ -149,9 +149,11 @@ async def pose_tip(
     scene: UploadFile,
     candidate: UploadFile,
     pose: Annotated[str, Form()],
+    # The language of the phone's screens, in which the sentence is written (FR-10.2); apps before it leave it out.
+    language: Annotated[Language, Form()] = "en",
 ) -> PoseTipResponse:
     """How to hold the phone for the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate,
-    and the pose it was made with (Design Documentation 2.6.3)."""
+    and the pose it was made with, the sentence in the language of the phone's screens (Design Documentation 2.6.3)."""
     pose = checked_pose(pose, "pose")
     scene_bytes = await scene.read()
     check_scene(scene_bytes)
@@ -160,5 +162,5 @@ async def pose_tip(
     await count(request, "tips")
     tipper: PoseTipper = request.app.state.pose_tipper
     # A tip the phone stopped waiting for, because the user took another candidate, is not waited for either.
-    tip = await while_connected(request, tipper.tip(scene_bytes, candidate_bytes, pose))
+    tip = await while_connected(request, tipper.tip(scene_bytes, candidate_bytes, pose, language))
     return PoseTipResponse(text=tip.text, framing=tip.framing, hold=tip.hold, height=tip.height, angle=tip.angle)

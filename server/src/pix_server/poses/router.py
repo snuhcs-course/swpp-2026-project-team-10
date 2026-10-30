@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -116,6 +116,10 @@ async def create_pose(
     started = time.perf_counter()
     if (template_id is None) == (description is None):
         raise ApiError(400, "INVALID_REQUEST", "templateId or description: send exactly one")
+    if template_id is not None and selfie:
+        # A template is a default pose for an app from before Iteration 2, which never sends `selfie`, and some of them
+        # need both hands or the whole body; a selfie sends its pose as a description.
+        raise ApiError(400, "INVALID_REQUEST", "selfie: send a description, not a templateId")
     if description is not None:
         prompt = pose_prompt(description, selfie)
     elif (default := DEFAULT_POSES.get(template_id)) is not None:

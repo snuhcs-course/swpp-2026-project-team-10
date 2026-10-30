@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -357,7 +357,8 @@ class CameraXController(
                 if (!current.open || current.failed) current.frames.clear()
                 state.error?.let {
                     Log.w(TAG, "Camera state error ${it.code}", it.cause)
-                    if (recoverPrimary(current)) return@Observer
+                    // A failing ultrawide or front camera gives the primary rear camera back, opened or not.
+                    if (recoverPrimary(current) || recoverRear(current)) return@Observer
                 }
                 restoreZoomIfNeeded(current)
                 restoreExposureIfNeeded(current)
@@ -833,7 +834,10 @@ class CameraXController(
         publishStatus(CameraStatus.UNAVAILABLE)
     }
 
-    /** A front camera that cannot be bound gives the rear one back rather than no camera at all (FR-1.14). */
+    /**
+     * A front camera that cannot be bound, or that fails once open, gives the rear one back rather than no camera at
+     * all (FR-1.14). The rear camera that fails too stays UNAVAILABLE, with no switch back.
+     */
     private fun recoverRear(current: Binding): Boolean {
         if (binding !== current || current.facing != CameraFacing.FRONT) return false
         Log.w(TAG, "Front camera unavailable; restoring the rear camera")

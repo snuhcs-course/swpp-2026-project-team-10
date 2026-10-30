@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
@@ -6,7 +6,7 @@
 # 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short. Image API: a candidate in JPEG, PNG,
 # or WEBP; a refusal (403) of a template and of a description, with one message for both; another failing status; an unreadable answer; no
 # answer in time; no key. Limits: each window full, and a request refused before the image API, which is not counted.
-# Selfie (FR-1.14): `selfie` true, false, left out, and not a boolean.
+# Selfie (FR-1.14): `selfie` true, false, left out, and not a boolean; with a template, refused.
 import asyncio
 import base64
 import io
@@ -444,6 +444,13 @@ def test_selfie_says_which_pose_prompt_the_image_api_gets(client, image_api, mak
     assert response.status_code == 200
     [payload] = image_api.payloads
     assert payload["prompt"] == pose_prompt("윙크하며 브이", selfie=is_selfie)
+
+
+def test_selfie_with_a_template_is_invalid(client, image_api, make_image):
+    response = create_pose(client, make_image(), template_id="wave", selfie="true")
+
+    assert "selfie" in assert_error(response, 400, "INVALID_REQUEST")
+    assert image_api.requests == []
 
 
 def test_selfie_that_is_not_a_boolean_is_invalid(client, image_api, make_image):

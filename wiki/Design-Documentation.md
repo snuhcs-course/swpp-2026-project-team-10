@@ -374,7 +374,8 @@ interface CameraController {
     val facing: StateFlow<CameraFacing>               // It 3: the camera chosen; the front one is mirrored everywhere (2.6.4)
     val hasFrontCamera: StateFlow<Boolean>            // It 3: false hides the camera switch
     fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider)
-    fun setFacing(facing: CameraFacing)                // It 3: rebinds after any photo being saved; zoom and brightness start at 1x and 0
+    fun setFacing(facing: CameraFacing)                // It 3: rebinds after any photo being saved; zoom and brightness start at 1x and 0;
+                                                       // a front camera that cannot be bound, or fails once open, gives the rear one back
     fun setZoom(ratio: Float, final: Boolean = true)   // primary-relative, clamped to [minZoom, maxZoom]; pinch and remote both call this; the newest value
                                                        // once per display frame, and final = false (a pinch's steps) holds the lens (It 2, 2.6.5)
     fun setFocusPoint(x: Float, y: Float)              // It 2: frame coordinates 0..1 (FR-1.4); also the remote focus request (Could)
@@ -1511,7 +1512,7 @@ The server sends the photo and the suggestion prompt to the suggestion model (2.
 { "error": { "code": "UPSTREAM_TIMEOUT", "message": "The image service did not answer within 60 s" } }
 ```
 
-`image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9). With a `description`, the response's `templateId` is `null`: the app tells its four requests apart by itself and names them `pose-1` … `pose-4` (2.3). A refusal answers `422 REJECTED` with the same message for a description as for a template: the image service does not say whether it refused the photo or the text, and the app's suggested poses and variations are sent as descriptions too (US-5). A `templateId` names a default pose (`GET /pose-templates`), which goes into the same prompt as a description. The app sends `selfie` with every request of a set whose scene photo came from the front camera, so the set's suggestions and candidates all use the selfie prompts.
+`image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9). With a `description`, the response's `templateId` is `null`: the app tells its four requests apart by itself and names them `pose-1` … `pose-4` (2.3). A refusal answers `422 REJECTED` with the same message for a description as for a template: the image service does not say whether it refused the photo or the text, and the app's suggested poses and variations are sent as descriptions too (US-5). A `templateId` names a default pose (`GET /pose-templates`), which goes into the same prompt as a description. The app sends `selfie` with every request of a set whose scene photo came from the front camera, so the set's suggestions and candidates all use the selfie prompts. `selfie` with a `templateId` answers `400 INVALID_REQUEST`: templates come only from apps before Iteration 2, which never send it, and some default poses need both hands or the whole body.
 
 **The description.** The server trims it and turns each run of whitespace, line breaks included, into one space; it then has to be 1–100 characters. Characters are Unicode code points, which are never more than what the app's field counts, so whatever the field accepts passes; the app sends it as a `text/plain; charset=utf-8` part. An empty `description` is the same as none, so one next to a `templateId` asks for the template. The description is passed in Korean or English as written, inside the pose prompt (2.6.3), and is never written to a log (NFR-13).
 

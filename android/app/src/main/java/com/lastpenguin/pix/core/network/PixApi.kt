@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -137,4 +137,27 @@ interface PixAccountApi {
     /** `204` also for someone who is not a friend (FR-5.10). */
     @DELETE("api/v1/friends/{userId}")
     suspend fun removeFriend(@Path("userId") userId: String)
+
+    /** This phone's FCM token for the sign-in, so its pushes reach this phone (Design 2.6.6). */
+    @POST("api/v1/devices")
+    suspend fun registerDevice(@Body body: DeviceBody)
+
+    /** `403 NOT_FRIENDS`, `409 BUSY` (FR-6.1, FR-6.9). */
+    @POST("api/v1/invitations")
+    suspend fun invite(@Body body: InviteBody): SentInvitationDto
+
+    /** Needs no sign-in, so a link opens it on any phone (FR-6.4); `404 NOT_FOUND`. */
+    @GET("api/v1/invitations/{id}")
+    suspend fun invitation(@Path("id") invitationId: String): OpenedInvitationDto
+
+    /** The friend; `404 NOT_FOUND` for someone else's invitation, `410 INVITATION_GONE` once answered or expired. */
+    @POST("api/v1/invitations/{id}/accept")
+    suspend fun acceptInvitation(@Path("id") invitationId: String): SessionPlaceDto
+
+    @POST("api/v1/invitations/{id}/decline")
+    suspend fun declineInvitation(@Path("id") invitationId: String)
+
+    /** The photographer. */
+    @POST("api/v1/invitations/{id}/cancel")
+    suspend fun cancelInvitation(@Path("id") invitationId: String)
 }

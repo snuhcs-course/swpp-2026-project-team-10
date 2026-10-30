@@ -82,9 +82,10 @@ class Settings(BaseSettings):
     # After this the phone gets STUN only, so a slow TURN API never holds up a room.
     turn_timeout_seconds: PositiveFloat = 3
 
-    # Invitations (Design Documentation 2.6.6): how long the friend has to answer (FR-6.3), and how long after
-    # accepting the friend's phone has to take its place before the room expires.
-    invitation_ttl_seconds: PositiveFloat = 30
+    # Invitations (Design Documentation 2.6.6): how long the friend has to answer (FR-6.3; 60 s since 2026-10-29, as
+    # 30 s was too short to send the link through a messenger), and how long after accepting the friend's phone has to
+    # take its place before the room expires.
+    invitation_ttl_seconds: PositiveFloat = 60
     invitation_join_seconds: PositiveFloat = 15
     # The key file of a service account that may send Firebase Cloud Messaging for the app's Firebase project (AD-13).
     # While it is unset or unreadable, invitations and friend requests send no push; an invitation still reaches the

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.signaling.SignalCodec
@@ -25,7 +25,7 @@ import org.junit.Test
 
 /*
  * Partitions for the signaling socket (Design 2.5.2), against a MockWebServer that upgrades to a WebSocket: the
- * socket opened; a known message decoded and an unknown one ignored; a message sent reaching the server; the server
+ * socket opened, with the signed-in user's access token or anonymous; a known message decoded and an unknown one ignored; a message sent reaching the server; the server
  * closing (Closed without an error) and the connection failing (Closed with one); a second connect, after which the
  * first socket is silent; close, which emits nothing, and send without a socket, which only logs.
  */
@@ -81,6 +81,19 @@ class OkHttpSignalingClientTest {
         client.connect(url())
 
         assertEquals(SignalEvent.Opened, next())
+    }
+
+    @Test
+    fun connect_withAnAccessToken_sendsItInTheUpgrade_andWithoutOne_sendsNone() {
+        serve()
+        client.connect(url(), "access-1")
+        assertEquals(SignalEvent.Opened, next())
+        assertEquals("Bearer access-1", server.takeRequest(5, TimeUnit.SECONDS)!!.getHeader("Authorization"))
+
+        serve()
+        client.connect(url())
+        assertEquals(SignalEvent.Opened, next())
+        assertNull(server.takeRequest(5, TimeUnit.SECONDS)!!.getHeader("Authorization"))
     }
 
     @Test

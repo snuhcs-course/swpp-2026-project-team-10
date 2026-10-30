@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
 import com.lastpenguin.pix.account.Friend
 import com.lastpenguin.pix.account.FriendRequest
+import com.lastpenguin.pix.account.InvitationStatus
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -52,6 +53,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.account.AccountSheet
@@ -72,6 +74,9 @@ import com.lastpenguin.pix.ui.guide.NoPersonFoundFragment
 import com.lastpenguin.pix.ui.guide.ReferenceConfirmFragment
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.ConnectionLostFragment
+import com.lastpenguin.pix.ui.session.InvitationFragment
+import com.lastpenguin.pix.ui.session.InviteNotAcceptedFragment
+import com.lastpenguin.pix.ui.session.InviteSentSheet
 import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
@@ -445,6 +450,47 @@ class KoreanScreensTest {
         val modules = TestAppContainer().install()
         scenario = launchFragment<RoomCodeSheet>(themeResId = R.style.Theme_Pix)
         modules.session.setState(SessionState.Waiting("482915"))
+        assertKorean(screen())
+    }
+
+    @Test
+    fun inviteSent_waitingForAFriend_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragment<InviteSentSheet>(themeResId = R.style.Theme_Pix)
+        scenario!!.onFragment { it.requireActivity().inviteFromFriends(sent.to) }
+        modules.session.setState(SessionState.Inviting("inv_1"))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun inviteNotAccepted_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchPrepared<InviteNotAcceptedFragment>(R.id.inviteNotAcceptedFragment) {
+            it.inviteFromFriends(sent.to)
+        }.first
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun invitation_open_isInKorean() {
+        TestAppContainer().also { it.auth.signInAs(account) }.install()
+        scenario = launchPrepared<InvitationFragment>(
+            R.id.invitationFragment,
+            bundleOf(InvitationFragment.ARG_INVITATION_ID to "inv_1"),
+        ) {}.first
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun invitation_noLongerAvailable_isInKorean() {
+        TestAppContainer().also {
+            it.auth.signInAs(account)
+            it.invitations.opened = it.invitations.opened.copy(status = InvitationStatus.EXPIRED)
+        }.install()
+        scenario = launchPrepared<InvitationFragment>(
+            R.id.invitationFragment,
+            bundleOf(InvitationFragment.ARG_INVITATION_ID to "inv_1"),
+        ) {}.first
         assertKorean(screen())
     }
 

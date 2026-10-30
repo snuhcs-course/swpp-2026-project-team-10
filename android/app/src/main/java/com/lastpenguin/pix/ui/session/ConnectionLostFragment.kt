@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -19,7 +19,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Connection lost, subject (R&S 6.6, FR-6.11). *Reconnect* joins the same code again; if the photographer has
- * closed the room, "The session has ended" and back to the camera. Owner: Real-time (#8).
+ * closed the room, "The session has ended" and back to the camera. An invitation's session has no code, and its
+ * photographer has ended it by now (Design 2.4), so it says so at once. Owner: Real-time (#8).
  */
 class ConnectionLostFragment : Fragment(R.layout.fragment_failure) {
 
@@ -35,6 +36,7 @@ class ConnectionLostFragment : Fragment(R.layout.fragment_failure) {
         binding.primaryButton.setText(R.string.reconnect)
         binding.primaryButton.setOnClickListener {
             if (sessionViewModel.lastCode == null) {
+                Toast.makeText(requireContext(), R.string.session_ended, Toast.LENGTH_SHORT).show()
                 backToCamera()
                 return@setOnClickListener
             }

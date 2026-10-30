@@ -193,25 +193,25 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Header</item>
     </style>
 
-    <!-- A pill in the camera screens' top bar, such as Shoot together: 32 dp of glass in the middle of the bar's 44 dp,
-         with a 48 dp touch height whose last 4 dp reach over the image's top edge. -->
+    <!-- A pill in the camera screens' top bar, such as Shoot together: 36 dp of glass in the middle of the bar's 48 dp,
+         with a 52 dp touch height whose last 4 dp reach over the image's top edge. -->
     <style name="Widget.Pix.Button.Glass" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="android:minHeight">48dp</item>
+        <item name="android:minHeight">52dp</item>
         <item name="android:insetTop">6dp</item>
         <item name="android:insetBottom">10dp</item>
-        <item name="android:paddingStart">10dp</item>
-        <item name="android:paddingEnd">11dp</item>
-        <item name="cornerRadius">16dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">13dp</item>
+        <item name="cornerRadius">18dp</item>
         <item name="backgroundTint">@color/pix_glass</item>
         <item name="strokeColor">@color/pix_glass_stroke</item>
         <item name="strokeWidth">1dp</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="iconTint">@color/button_secondary_text</item>
-        <item name="iconSize">14dp</item>
-        <item name="iconPadding">5dp</item>
+        <item name="iconSize">16dp</item>
+        <item name="iconPadding">6dp</item>
         <item name="rippleColor">#1FFFFFFF</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
-        <item name="android:textSize">11sp</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <style name="Widget.Pix.Button.Glass.Danger">
@@ -241,26 +241,26 @@
          with a 48 x 48 dp touch area whose last 4 dp reach over the image's top edge. -->
     <style name="Widget.Pix.Button.Icon.TopBar">
         <item name="android:minWidth">48dp</item>
-        <item name="android:minHeight">48dp</item>
+        <item name="android:minHeight">52dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">4dp</item>
         <item name="android:paddingStart">13dp</item>
         <item name="android:paddingEnd">13dp</item>
-        <item name="iconSize">14dp</item>
+        <item name="iconSize">16dp</item>
     </style>
 
-    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text, in a 48 x 48 dp
+    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text, in a 48 x 52 dp
          touch area that adds 8 dp after the label and 4 dp below the bar, so the label stays where it was. -->
     <style name="Widget.Pix.Button.Text.TopBar">
         <item name="android:minWidth">48dp</item>
-        <item name="android:minHeight">48dp</item>
+        <item name="android:minHeight">52dp</item>
         <item name="android:paddingStart">8dp</item>
         <item name="android:paddingEnd">16dp</item>
         <item name="android:paddingTop">6dp</item>
         <item name="android:paddingBottom">10dp</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="rippleColor">#1FFFFFFF</item>
-        <item name="android:textSize">11sp</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->

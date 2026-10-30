@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -135,13 +135,17 @@ class RemotePoseTipperTest {
             return answer()
         }
 
-        override suspend fun suggestPoses(image: MultipartBody.Part, description: RequestBody?): PoseSuggestionsDto =
-            error("A tip never asks for poses")
+        override suspend fun suggestPoses(
+            image: MultipartBody.Part,
+            description: RequestBody?,
+            selfie: RequestBody?,
+        ): PoseSuggestionsDto = error("A tip never asks for poses")
 
         override suspend fun createPose(
             image: MultipartBody.Part,
             description: RequestBody,
             seed: RequestBody,
+            selfie: RequestBody?,
         ): PoseResponseDto = error("A tip never asks for a candidate")
 
         private fun MultipartBody.Part.bytes(): ByteArray = Buffer().also(body::writeTo).readByteArray()

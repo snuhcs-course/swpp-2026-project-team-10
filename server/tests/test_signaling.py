@@ -1,6 +1,7 @@
-# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
 import json
 import re
+import time
 from contextlib import ExitStack
 
 import pytest
@@ -514,6 +515,15 @@ def test_a_phone_that_starts_a_new_connection_is_announced_as_joined(client):
             assert photographer.receive_json() == {"type": "peer.joined"}
 
 
+def wait_for_connections(client, expected):
+    """A closed socket frees its place in the store from a task of its own, so the count can take a moment to drop,
+    longer against a real Redis."""
+    deadline = time.monotonic() + 2
+    while client.get("/internal/stats").json()["connections"] != expected and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert client.get("/internal/stats").json()["connections"] == expected
+
+
 def test_a_rejoin_takes_the_place_from_the_phones_old_socket(client):
     # The server notices a phone's lost socket only when its pings go unanswered, up to 40 s later, so the place is
     # often still held by it when the phone comes back.
@@ -526,7 +536,7 @@ def test_a_rejoin_takes_the_place_from_the_phones_old_socket(client):
             old.send_json(ice_signal())
             assert_error(old, "INVALID_STATE")
         # The old socket's disconnect changes nothing: no peer.left, and the new socket keeps the place.
-        assert client.get("/internal/stats").json()["connections"] == 2
+        wait_for_connections(client, 2)
         photographer.send_json(ice_signal("after"))
         assert new.receive_json() == ice_signal("after")
         assert_nothing_more(photographer, new)

@@ -41,7 +41,12 @@
 | 2.10 | 2026-10-28 | Reconnection after a short drop (Iter3-P14, [#118]): `SessionState.Reconnecting` and `SessionEntry.Rejoin` (2.1, 2.3); states (2.4, Figure 9); `rejoinToken`, `session.join`, and `peer.rejoined`, an ICE restart as an offer with new credentials (2.5.2, Figure 3c); drop detection, the restart, giving up, and the reconnection marks (2.6.7); the `REJOIN` script and the token hashes (2.7); timeouts and the reason the deploy still waits for open rooms (2.8). After the first run on two phones: tries while reconnecting no longer count toward the socket's backoff, a subject waiting for an offer takes its place again on `peer.rejoined`, and only the reliable channel closing ends the session (2.5.2, 2.6.7). After the review: a restart waits for the answer to the last offer, a failed *Reconnect* keeps its token, and the background limit counts while reconnecting (2.6.7, 2.8). |
 | 2.11 | 2026-10-29 | The AWS server deployed from GitHub through AWS Systems Manager instead of a timer (2.8, *Deployment*; 2.10). |
 | 2.12 | 2026-10-29 | Invitations and push on the server (Iter3-P15, [#119]). An invitation opens its session when it is sent, with only the photographer's place, and accepting opens the friend's, so both phones take theirs with `session.join` and the photographer hears `peer.joined`; `invitation.accepted` is dropped, because it gave the photographer no token for its place and would be lost while the photographer's socket reconnected (Figure 3b, 1.1.2, 1.1.3, 2.5.2, 2.5.3, 2.6.6). A decline or the 30 s expiry reaches a waiting photographer as `DECLINED` or `EXPIRED`; the `INVITE`, `ACCEPT_INVITATION`, and `END_INVITATION` scripts and the change to `REJOIN` (2.7); pushes through FCM HTTP v1 with `fromName`, and the friend request's push (1.2, 2.5.3, 2.6.6, 2.8); the invite link `http://<host>/i/<id>` decided and out of *Still open* (2.6.6); `PIX_FCM_CREDENTIALS_FILE` and the secrets folder (2.8). The app's side follows in its own pull request. |
-| 2.13 | 2026-10-29 | Selfie mode as built (Iter3-P12, [#116]): `CameraFacing`, `CameraController.facing` and `setFacing`, and a mirrored `FrameSink` (1.4.2, 2.1); the front camera mirrored in the photo, the scene photo, and the streamed video, also in a session (2.6.4); `selfie` on `POST /pose-suggestions` and `POST /poses` and the selfie prompts, tried on three selfies; no pose tip for a selfie (2.5.3, 2.6.3); *Still open* row closed. |
+| 2.13 | 2026-10-29 | Pick a pose on both phones and *Save guide* on Subject view (Iter3-P16, [#120]): no *Generate poses here* on the subject's phone; the photographer's candidates go to the subject (`pose.step`, `pose.candidate.*`, `pose.pick`, 2.5.1), and the first *Use this pose* to reach the photographer's phone decides (AD-7, 2.6.5); `PoseSyncer` (2.1); the photographer's guide image carries `anchor` and `source` too, for the subject's *Save guide* (2.3, 2.5.1, 2.6.5); the *Still open* row keeps only the photos on both phones (FR-6.14). The protocol version stays 3. |
+| 2.14 | 2026-10-29 | *Reference confirm* on both phones (Iter3-P16, [#120], after the review of PR #151): the photographer's phone still makes the outline, and sends it to the subject's *Your reference* with its step (`guide.confirm`, `guide.confirm.image.*`, 2.5.1); the first *Use this guide* to reach the photographer's phone decides (`guide.confirm.use`, AD-7, 2.6.5); `ConfirmSyncer` (2.1); the subject's controls wait on it while reconnecting, and it is sent again (2.6.7). The protocol version stays 3. |
+| 2.15 | 2026-10-29 | *Generate poses* on both phones (Iter3-P16, [#120], after item 3 of the review of PR #151): the photographer's description step goes to the subject's *Generate poses* with a copy of the scene photo (`pose.description`, `pose.scene.*`, 2.5.1); one field at a time holds the description, which the photographer's phone decides, and the subject's *Generate 4 poses* or *Skip* starts the set there (`pose.description.edit`, `pose.description.go`, AD-7, 2.6.5); `DescriptionSyncer` (2.1); sent again after a reconnect (2.6.7). The scene photo still never reaches the server from the subject's phone. The protocol version stays 3. |
+| 2.16 | 2026-10-29 | After Codex's review of PR #151: a candidate's or the scene photo's copy that would not fit the subject's 1 MiB is made again at a lower quality, and left out when it fits at none, also from `PICKING`; a screen of the subject's ignores an end kept from an earlier set, confirm, or description (2.5.1, 2.6.5). |
+| 2.17 | 2026-10-30 | After Codex's second review of PR #151: a set with no copy on the subject's phone opens no *Pick a pose* there, and a shared step that comes while *Add a pose guide* covers Subject view opens once the sheet closes (2.6.5). |
+| 2.18 | 2026-10-30 | Selfie mode as built (Iter3-P12, [#116]): `CameraFacing`, `CameraController.facing` and `setFacing`, and a mirrored `FrameSink` (1.4.2, 2.1); the front camera mirrored in the photo, the scene photo, and the streamed video, also in a session (2.6.4); `selfie` on `POST /pose-suggestions` and `POST /poses` and the selfie prompts, tried on three selfies; no pose tip for a selfie (2.5.3, 2.6.3); *Still open* row closed. |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail, and the plan of Iteration 3 (1.4.2, 2.9); the detailed design of each Iteration 3 feature is added in the PR that builds it. **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v2.0). Testing plans will be in the Testing Documentation.
 
@@ -50,7 +55,7 @@ Audience: the development team. This page describes the design of Iterations 1 a
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | Zoom stutter: what is left | Built in Iter2-P5 (2.6.5) and measured on the S23 Ultra on 2026-10-22: no stutter before or after, 30 fps (the most it offers apps), and no lens switch, because it zooms to 0.6× natively. Open on the S21, the only test phone with a separate ultrawide, where the lens switch and the held frame can be seen: its before and after numbers (Testing Documentation IT-10, NFR-19), and `PreviewView` in `PERFORMANCE` mode (`SurfaceView`) only if its preview still stutters. The shutter freeze stays Could. | 조성민 (Iter2-P5) | With IT-10 (Iteration 3) |
-| Shared steps on both phones (FR-6.14–6.16) | The subject's phone can open *Add a pose guide* and *Generate poses here*; both phones show the same step without streaming what is typed or selected, and the first phone to go on moves both. Open: which phone calls the Pix server; how the scene photo, the candidates, and the chosen guide reach the other phone (data-channel chunks like the guide image, 2.5.1); the step messages and the protocol version (3); how this fits AD-7, under which the photographer's phone owns the camera and guide state; and sending each photo to the subject (FR-6.14). | 한준형 | 10/30 |
+| Photos on both phones (FR-6.14) | Each photo taken in a session is saved on both phones. Open: how the photographer's phone sends each photo in full quality to the subject (data-channel chunks like the guide image, 2.5.1, or another path) and its messages. The guide and pose steps of FR-6.15 and FR-6.16 are decided (2.6.5, Iter3-P16). | 한준형 | 10/30 |
 | Korean for the text the server writes (FR-10.2) | The pose tip (2.6.3) and the poses that TalkBack reads on *Pick a pose* come from the server in English on a Korean phone. Proposal: the app sends the language its screens show (a string resource, `en` or `ko`, rather than `Locale.getDefault()`, which can name a language Pix does not have) with `POST /pose-tips`, `tip_prompt` writes the sentence in it, and the check for numbers and units learns Korean (한/두 걸음, 미터, 센티). | 박동제 | 10/30 |
 | Four prompt templates (FR-4.8) | With a description, four templates around the same `{pose}` take the place of the three variations (2.6.3), and the default template is to be improved: `{pose}` is the user's request, read sensibly, with rules such as keeping the face and the clothes and one pose per photo. Open: the four templates, and how a request such as "two photos saluting and two with hands up" is handled. | 박재완 | Week of 11/2 |
 | Prompt history (FR-4.11) | Proposal: kept on the phone, because the server never stores descriptions (NFR-13). Open: how a partner is identified for the history with this person (the Pix ID when both are signed in; a room-code session has no account) and what the subject's phone records. | 박동제 | Week of 11/2 |
@@ -269,7 +274,7 @@ sequenceDiagram
 | AD-4 | **CameraX is the only camera owner and feeds frames to WebRTC** | Only one client can open the camera. CameraX gives us capture, zoom, focus, and exposure for remote control, and one viewport for preview, capture, and streaming, so all three show the same framing. | WebRTC's built-in camera capturer |
 | AD-5 | **Two data channels: *realtime* (unordered, no retransmission) and *reliable* (ordered)** | Continuous values (guide position, zoom) need only the latest value, and retransmitting stale ones adds lag. Images, commands, and results must arrive exactly once. Both reuse the existing peer connection, so there is no server round trip. | One reliable channel; relaying messages through the server |
 | AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp on the subject's phone. It never enters the video or the saved photo. Updates are a few bytes. The photographer sends the smoothed mask, not the cutout, so both phones draw the same outline and the guide carries no reference pixels. Revised in Iteration 3 ([#132]): apart from the guide, a copy of the reference photo, at most 512 px on its long side, goes once per guide to the subject's phone, only for its corner thumbnail (FR-3.9), so the subject sees the pose to copy; it is never drawn as the guide, never saved, and never goes through the Pix server. | Burning the overlay into the video stream; mirroring the photographer's screen |
-| AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | Avoids conflicting edits: subject actions are requests; the photographer applies them in arrival order and echoes the applied value, so the later change wins and both phones agree (FR-7.6). The subject's requests cover zoom, brightness, flash, guide moves, and, since Iteration 3, a guide made on the subject's phone: the photographer adopts it as its own guide when it arrives, so of two guides chosen at once the later to arrive wins. | Shared editing on both phones |
+| AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | Avoids conflicting edits: subject actions are requests; the photographer applies them in arrival order and echoes the applied value, so the later change wins and both phones agree (FR-7.6). The subject's requests cover zoom, brightness, flash, guide moves, and, since Iteration 3, a guide made on the subject's phone: the photographer adopts it as its own guide when it arrives, so of two guides chosen at once the later to arrive wins. The subject's typing on *Generate poses*, taken only while the photographer's field does not hold the description, its *Generate 4 poses* or *Skip*, its *Use this pose* on the photographer's candidates, and its *Use this guide* on the outline of the chosen pose are requests too, each taken only while nobody has gone on, so the first to reach the photographer's phone decides (2.6.5). | Shared editing on both phones |
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | The riskiest part, streaming and sync, works without accounts, and each way into a session is only an entry point: an accepted invitation yields a `sessionId`, just like a room code does, and the signaling, peer connection, and reconnection code is shared. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots. One codebase and one install, with the role chosen per session. | A separate viewer app for the subject |
 | AD-10 | **One frame in the chosen aspect ratio (4:3, 16:9, or 1:1), shown whole (fit) on both phones** | The user picks the ratio; 16:9 fits Instagram stories without cropping. Preview, capture, and stream share one CameraX `ViewPort`, so what you see is what is captured, and showing the whole frame on both phones keeps guide coordinates identical. The other ratios are cut from the middle of the sensor's 4:3: 16:9 keeps the full height and drops the sides, and 1:1 keeps the full width and drops the top and bottom (2.6.2). | Fixed 3:4; full-screen 9:16 with cropping |
@@ -297,7 +302,7 @@ The plan from the kickoff of 2026-10-25 (Team Meetings); the tasks and owners ar
 | Feature | How the design changes |
 |----|----|
 | **Pose generation** (FR-4.3, FR-4.6, FR-4.8, FR-4.10, FR-4.11) | The server asks the image model for the scene photo's own ratio instead of 3:4 (2.6.3). *Pick a pose* shows one candidate at a time ([#108]). A tip for the chosen candidate from a vision model ([#110], 2.6.3), four prompt templates in place of the three variations, and a history of descriptions (*Still open*). |
-| **Shared steps on both phones** (FR-6.14–6.16) | The subject's phone can start guide selection and pose generation, both phones show the same step, the first phone to go on moves both, and photos are saved on both phones: new data-channel messages and image transfers (*Still open*). |
+| **Shared steps on both phones** (FR-6.14–6.16) | The subject's phone opens guide selection; both phones write the description on *Generate poses*, one field at a time; poses are generated on the photographer's phone, whose candidates both phones show on *Pick a pose*, the first *Use this pose* deciding, and then the chosen pose's outline on *Reference confirm*, the first *Use this guide* deciding (2.5.1, 2.6.5); guides can be saved on either phone; photos are saved on both phones (*Still open*). |
 | **Offline connection with a QR code** (F9) | The photographer's phone opens a local-only hotspot and runs the signaling itself, so neither the server nor a shared Wi-Fi is needed. The QR code carries the hotspot's connection details. The phone accepts only one connection per QR code, and the session starts only after both people tap *Resume*. This is another session entry point (AD-8). |
 | **Selfie mode** (FR-1.14) | The front camera as another `CameraController` selection (`setFacing`), with no ultrawide routing. It is a mirror everywhere: the preview, the photo, the scene photo, and the video a subject sees (2.6.4). It is offered in a session too (decided on 10/29; it was to be offered only while no session runs). A selfie's scene photo gets prompts of its own, because the others turned a selfie into a photo someone else took (2.6.3). |
 | **Settings, language, and tutorial** (F10, FR-3.10) | A settings screen with the language (Korean strings behind the same resource keys, the phone's language by default), the guide's color and line thickness, a latency indicator for sessions (from the `ping` round trip, 2.5.1), and how-to-use help; a tutorial on first use that the settings screen can start again. |
@@ -350,7 +355,9 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               InvitationManager and PushTokenRegistrar (It 3, Iter3-P15, not yet written)
 ├─ session/     SessionModels*, SessionManager*, RtcSessionManager, SignalingClient, OkHttpSignalingClient,
 │               PeerConnectionClient, WebRtcPeerConnectionClient, CameraFrameSource, GuideImageCodec, GuideSyncer,
-│               GuideReference (GuideReferenceCodec, MirrorReference), RemoteControlHandler
+│               GuideReference (GuideReferenceCodec, MirrorReference), PoseSyncer (It 3: PoseShare,
+│               PoseCandidateCodec, MirrorPoseSet), ConfirmSyncer (It 3: ConfirmShare, MirrorConfirm),
+│               DescriptionSyncer (It 3: DescriptionShare, MirrorDescription), RemoteControlHandler
 │  ├─ protocol/  SessionMessage*, message codec, channel routing
 │  └─ signaling/ SignalMessage*
 └─ core/        network/PixApi* (PixApi, PixAuthApi, PixAccountApi), network/ApiModels*, dependency wiring, timing logs
@@ -507,7 +514,10 @@ classDiagram
     +uiState StateFlow~ReferenceUiState~
     +savedGuides StateFlow
     +savedGuideResults Flow
+    +sharing StateFlow~Boolean~
+    +usedBySubject Flow
     +onPhotoPicked(uri)
+    +onCandidatePicked(image, tipFrom, chosenBy)
     +onUseGuide()
     +onUseSaved(id)
     +onDeleteSaved(id)
@@ -645,6 +655,56 @@ classDiagram
     +reference StateFlow~GuideReference~
     +set(reference)
   }
+  class PoseShare {
+    <<interface>>
+    +picks Flow~PosePick~
+    +open(setId)
+    +candidate(setId, poseId, image)
+    +picking(setId, poseIds)
+    +chosen(setId, poseId, by)
+    +close(setId)
+  }
+  class PoseSyncer {
+    +mirror StateFlow~MirrorPoseSet~
+    +ended Flow~PoseSetEnd~
+    +pickFailed Flow~String~
+    +startAsSender(scope)
+    +startAsReceiver(scope)
+    +pick(poseId) Boolean
+  }
+  class DescriptionShare {
+    <<interface>>
+    +requests Flow~DescriptionRequest~
+    +open(descriptionId, scene, text, rejected)
+    +update(descriptionId, text, writer)
+    +end(descriptionId, started)
+  }
+  class DescriptionSyncer {
+    +mirror StateFlow~MirrorDescription~
+    +ended Flow~DescriptionEnd~
+    +goFailed Flow~String~
+    +startAsSender(scope)
+    +startAsReceiver(scope)
+    +edit(holding, text) Boolean
+    +go(text, suggest) Boolean
+  }
+  class ConfirmShare {
+    <<interface>>
+    +uses Flow~SubjectUse~
+    +open(confirmId)
+    +finding(confirmId)
+    +ready(confirmId, guide)
+    +used(confirmId, guideId, by)
+    +close(confirmId)
+  }
+  class ConfirmSyncer {
+    +mirror StateFlow~MirrorConfirm~
+    +ended Flow~ConfirmEnd~
+    +useFailed Flow~String~
+    +startAsSender(scope)
+    +startAsReceiver(scope)
+    +use(guideId) Boolean
+  }
   class RemoteControlHandler {
     +actions SharedFlow~RemoteAction~
     +start(scope)
@@ -661,6 +721,7 @@ classDiagram
     +onFlashTap()
     +setReferenceExpanded(expanded)
     +setReferenceCorner(corner)
+    +onSaveGuide()
   }
   RtcSessionManager ..|> SessionManager
   RtcSessionManager --> SignalingClient
@@ -678,6 +739,16 @@ classDiagram
   SubjectViewModel --> SessionManager
   SubjectViewModel --> GuideRepository
   SubjectViewModel --> MirrorReference
+  PoseSyncer ..|> PoseShare
+  PoseSyncer --> SessionManager
+  SubjectViewModel --> PoseSyncer : the photographer's candidates
+  ConfirmSyncer ..|> ConfirmShare
+  ConfirmSyncer --> SessionManager
+  ConfirmSyncer --> GuideImageCodec : the outline's mask
+  SubjectViewModel --> ConfirmSyncer : the photographer's Reference confirm
+  DescriptionSyncer ..|> DescriptionShare
+  DescriptionSyncer --> SessionManager
+  SubjectViewModel --> DescriptionSyncer : the photographer's Generate poses
 ```
 
 *Figure 7. Session, synchronization, and remote-control classes. The subject's pinch on the live video calls `onZoomGesture(ratio, final)`; its guide gestures and brightness and flash go through `RemoteControlHandler` the same way (2.6.5).*
@@ -698,6 +769,7 @@ classDiagram
     +retry()
     +cancel()
     +select(poseId)
+    +usePose() PoseUse
   }
   class PoseGenerator {
     <<interface>>
@@ -713,6 +785,7 @@ classDiagram
     +createPose(image, description, seed)
   }
   GenerationViewModel --> PoseGenerator
+  GenerationViewModel --> PoseShare : the set, to the subject (It 3)
   RemotePoseGenerator ..|> PoseGenerator
   RemotePoseGenerator --> PixApi
 ```
@@ -847,7 +920,7 @@ data class ReferenceGuide(
     val outline: Bitmap,          // ARGB_8888, same size as mask, drawn from it: a white anti-aliased line about 3 dp on screen, no fill
     val aspect: Float,            // mask width / height
     val source: GuideSource,      // GALLERY or GENERATED
-    val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (the person and its 2 % margin), where a new guide starts (FR-3.1); null on the subject
+    val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (the person and its 2 % margin), where a new guide starts (FR-3.1); on the subject too since Iter3-P16, for Save guide
     val reference: Bitmap? = null,        // the photo itself, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); never drawn as the guide; null in the subject's mirror, whose copy arrives in guide.reference.* and stays in MirrorReference
 )
 
@@ -1018,7 +1091,7 @@ Each protocol has a summary table, followed by a JSON example for every message 
 
 #### 2.5.1 Data channel protocol (phone ↔ phone)
 
-The photographer opens two channels when it creates the offer: `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). Every message uses one JSON envelope: `v` is the protocol version, 3 (`hello` ends the session with a phone that speaks another version), `t` the type, `seq` a counter per type, `ts` the send time in milliseconds, and `b` the body. In code, `SessionMessage` uses `t` as its class discriminator, so the codec keeps `t` at the top and moves the other fields into `b`. Receivers ignore unknown types and unknown fields, so older builds keep working, and drop a `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, or `guide.move`, on either channel, whose `seq` is not newer than the last one applied for that type; other types are never dropped. Version 3 (Iteration 3) sends the guide image as the mask alone (`mask-png`), which a version-2 phone cannot draw; both phones update together. The guide image also goes S→P, for a guide made on the subject's phone, which the photographer adopts as its own (AD-7, 2.6.5); its new fields are optional, so the version stays 3. Only the photographer takes photos; the subject sends requests.
+The photographer opens two channels when it creates the offer: `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). Every message uses one JSON envelope: `v` is the protocol version, 3 (`hello` ends the session with a phone that speaks another version), `t` the type, `seq` a counter per type, `ts` the send time in milliseconds, and `b` the body. In code, `SessionMessage` uses `t` as its class discriminator, so the codec keeps `t` at the top and moves the other fields into `b`. Receivers ignore unknown types and unknown fields, so older builds keep working, and drop a `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, or `guide.move`, on either channel, whose `seq` is not newer than the last one applied for that type; other types are never dropped. Version 3 (Iteration 3) sends the guide image as the mask alone (`mask-png`), which a version-2 phone cannot draw; both phones update together. The guide image also goes S→P, for a guide made on the subject's phone, which the photographer adopts as its own (AD-7, 2.6.5); its new fields are optional, so the version stays 3. Since Iter3-P16 the photographer sends `anchor` and `source` with its own guide images too, for the subject's *Save guide*, and the `pose.*` messages show the photographer's candidates on the subject's *Pick a pose* (2.6.5); a phone without them ignores them, so the version stays 3. Only the photographer takes photos; the subject sends requests.
 
 | Type | Channel | Dir. | Purpose |
 |----|----|----|----|
@@ -1037,6 +1110,16 @@ The photographer opens two channels when it creates the offer: `realtime` (`orde
 | `camera.focus.set` (Could) | reliable | S→P | The subject's focus point (FR-7.7) |
 | `camera.state` | realtime / reliable | P→S | The zoom, exposure, flash, and aspect ratio actually applied, and who changed it |
 | `control.permission` (Could) | reliable | P→S | Whether remote control is allowed (FR-7.5) |
+| `pose.step` (It 3) | reliable | P→S | Where the photographer's set of candidates is: being created, ready to pick, chosen, or closed (FR-6.15) |
+| `pose.candidate.begin` / `.chunk` / `.end` (It 3) | reliable | P→S | A copy of one candidate for the subject's *Pick a pose* |
+| `pose.pick` (It 3) | reliable | S→P | The candidate the subject used (FR-6.15) |
+| `pose.description` (It 3) | reliable | P→S | Where the photographer's *Generate poses* is: open with the description and whose field holds it, started, or closed (FR-6.15) |
+| `pose.scene.begin` / `.chunk` / `.end` (It 3) | reliable | P→S | A copy of the scene photo for the subject's *Generate poses* |
+| `pose.description.edit` (It 3) | reliable | S→P | The subject's field holding the description, with its text, or giving it back (FR-6.15) |
+| `pose.description.go` (It 3) | reliable | S→P | The subject's *Generate 4 poses* or *Skip* (FR-6.15) |
+| `guide.confirm` (It 3) | reliable | P→S | Where the photographer's *Reference confirm* of a chosen pose is: finding the person, the outline ready, used, or closed (FR-6.15) |
+| `guide.confirm.image.begin` / `.chunk` / `.end` (It 3) | reliable | P→S | The outline's mask for the subject's *Your reference* |
+| `guide.confirm.use` (It 3) | reliable | S→P | The subject's *Use this guide* on that outline (FR-6.15) |
 | `session.leave` | reliable | both | Leaving on purpose |
 | `ping / pong` | realtime | both | Round-trip time for measurement |
 
@@ -1094,7 +1177,7 @@ Sent once the session is connected, and again whenever the photographer's capabi
 }
 ```
 
-Skipped if the subject reported the same `haveGuideId`. The image is the **smoothed mask** only (`mask-png`: 8-bit single-channel PNG, height ≤ 720 px), never the reference's pixels (AD-6, AD-15). There is no `anchor`: the photographer sends `guide.state` after every image, also to a subject that joins late, and the subject places the guide from it (2.6.2). The PNG's gray value is the mask, written and read by `MaskPng` on both phones rather than by `Bitmap.compress`, and lossless, so the subject traces exactly the mask that was sent; a mask is a few KB, one or two chunks. The receiver takes the size from the PNG itself and refuses one taller than 720 px or wider than 1280 px, the widest a phone makes (its reference photo's long side, 2.6.1), at the header and before inflating it, so a flat mask that compresses to a few bytes cannot make the other phone allocate more than its own masks. Version 2 sent a `webp` cutout here, whose RGB held the reference's pixels.
+Skipped if the subject reported the same `haveGuideId`. The image is the **smoothed mask** only (`mask-png`: 8-bit single-channel PNG, height ≤ 720 px), never the reference's pixels (AD-6, AD-15). The subject places the guide from the `guide.state` the photographer sends after every image, also to a subject that joins late (2.6.2); the `anchor` and `source` that the image carries since Iter3-P16, as below, the subject keeps only for *Save guide* (2.6.5). The PNG's gray value is the mask, written and read by `MaskPng` on both phones rather than by `Bitmap.compress`, and lossless, so the subject traces exactly the mask that was sent; a mask is a few KB, one or two chunks. The receiver takes the size from the PNG itself and refuses one taller than 720 px or wider than 1280 px, the widest a phone makes (its reference photo's long side, 2.6.1), at the header and before inflating it, so a flat mask that compresses to a few bytes cannot make the other phone allocate more than its own masks. Version 2 sent a `webp` cutout here, whose RGB held the reference's pixels.
 
 From the subject (It 3), for a guide made on the subject's phone (2.6.5):
 
@@ -1110,7 +1193,7 @@ From the subject (It 3), for a guide made on the subject's phone (2.6.5):
 }
 ```
 
-The same image, chunks, and checks, with two more fields that only the subject sends. `anchor` is the mask's box in its reference photo (`ReferenceGuide.anchor`, fractions of the photo, right and bottom exclusive), which the photographer cannot find from the mask alone, because the mask is cut to the person; `source` is `GALLERY` or `GENERATED`. The photographer adopts the guide with the same `guideId` as its own, in place of any other, starting at `anchor` like a guide it made (FR-3.1); a missing box, or one with a value that is not finite, outside 0..1, or without area, starts it centered, and a missing or unknown `source` counts as `GALLERY`. It then sends `guide.state` with `by: SUBJECT` and no image, because it counts the subject as having that guide, as with `haveGuideId`. No reference photo goes S→P, so the photographer's Camera screen shows no thumbnail for that guide (FR-3.9). An image the photographer refuses leaves its own guide as it was.
+The same image, chunks, and checks, with two more fields, which the photographer sends with its own guides too since Iter3-P16. `anchor` is the mask's box in its reference photo (`ReferenceGuide.anchor`, fractions of the photo, right and bottom exclusive), which the photographer cannot find from the mask alone, because the mask is cut to the person; `source` is `GALLERY` or `GENERATED`. The photographer adopts the guide with the same `guideId` as its own, in place of any other, starting at `anchor` like a guide it made (FR-3.1); a missing box, or one with a value that is not finite, outside 0..1, or without area, starts it centered, and a missing or unknown `source` counts as `GALLERY`. It then sends `guide.state` with `by: SUBJECT` and no image, because it counts the subject as having that guide, as with `haveGuideId`. No reference photo goes S→P, so the photographer's Camera screen shows no thumbnail for that guide (FR-3.9). An image the photographer refuses leaves its own guide as it was.
 
 </details>
 
@@ -1265,6 +1348,134 @@ A tap on the live video, in frame coordinates (2.6.2). The photographer calls `s
 ```
 
 Sent after `hello` and whenever the photographer changes the switch (FR-7.5). While `allowed` is false the subject disables its controls and the photographer ignores `camera.*.set` and `guide.move`. Until the switch is built, the subject assumes `true`.
+
+</details>
+
+<details>
+<summary><code>pose.step</code> · reliable · P→S (It 3)</summary>
+
+```json
+{
+  "v": 3, "t": "pose.step", "seq": 3, "ts": 1759212400100,
+  "b": { "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "step": "PICKING", "poseIds": ["pose-1", "pose-2", "pose-4"] }
+}
+```
+
+Where the photographer's set is (2.6.5, *Pick a pose on both phones*): `GENERATING` when *Generate 4 poses* or *Skip* starts a set, `PICKING` when the photographer's *Pick a pose* opens, with the created candidates in its order, `CHOSEN` with `poseId` and `by` once a *Use this pose* decided, and `CLOSED` when the set ends without a choice (Back, *Try other poses*, *Cancel*, or no candidate). `setId` is a new UUID for each set, *Try again* included, and a set ends once, with `CHOSEN` or `CLOSED`. The subject drops the set's candidates when it ends, when another set starts or ends, and when the session ends, and keeps them while the link reconnects (2.6.7). Once the link is back, the photographer sends its last set again: an open one with its candidates, which the subject does not read again when it has them, and an ended one as its end alone, which closes it on a subject that held it through the drop and which any other subject ignores, since it has no set or only an older one, which goes.
+
+</details>
+
+<details>
+<summary><code>pose.candidate.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S (It 3)</summary>
+
+```json
+{
+  "v": 3, "t": "pose.candidate.begin", "seq": 2, "ts": 1759212391400,
+  "b": {
+    "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "poseId": "pose-2",
+    "format": "jpeg", "width": 768, "height": 1024, "bytes": 151320, "chunks": 17
+  }
+}
+```
+
+A copy of one created candidate for the subject's *Pick a pose*: JPEG at quality 85, or at 70 or 55 when a detailed one would not fit the subject's 1 MiB, at most 1024 px on its long side, sent as soon as the candidate arrives on the photographer's phone, so most are on the subject's phone when `PICKING` comes; the reliable channel's order puts every candidate sent before it first. `pose.candidate.chunk` (`setId`, `poseId`, `index`, `data`) and `pose.candidate.end` (`setId`, `poseId`, `crc32`) split and check it like the guide image; the subject refuses one larger than 1024 px or 1 MiB at the header. A candidate whose copy fits at none of the three qualities is not sent, and `PICKING` names only the candidates whose copy went out. The subject keeps it in memory only, never draws it as a guide, and never saves it. The scene photo goes to the subject only as `pose.scene.*`, for its *Generate poses*, and the guide made from the chosen candidate goes like any guide, as `guide.image.*` from the photographer.
+
+</details>
+
+<details>
+<summary><code>pose.pick</code> · reliable · S→P (It 3)</summary>
+
+```json
+{ "v": 3, "t": "pose.pick", "seq": 1, "ts": 1759212405200, "b": { "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "poseId": "pose-2" } }
+```
+
+The subject's *Use this pose*, a request like every subject action (AD-7). The photographer takes it only while its own set with that `setId` is `PICKING` and nobody has chosen; it then opens Reference confirm with that candidate and sends `pose.step` `CHOSEN` with `by: SUBJECT`. A pick for another set, after a choice, or after the set closed is dropped, and the step already sent answers it. Without an answer within 5 s the subject says "Couldn't send your pick".
+
+</details>
+
+<details>
+<summary><code>pose.description</code> · reliable · P→S (It 3)</summary>
+
+```json
+{ "v": 3, "t": "pose.description", "seq": 4, "ts": 1759212380200, "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "step": "OPEN", "text": "Jumping with both arms up", "writer": "PHOTOGRAPHER" } }
+```
+
+Where the photographer's *Generate poses* is (2.6.5, *Generate poses on both phones*): `OPEN` from *Use this photo*, and again from *Try other poses* or *Edit description*, with the description's `text`, `writer` (the phone whose field holds it; left out while nobody types), and `rejected` (true after the service refused the last description; left out otherwise), sent again at each change; `STARTED` once *Generate 4 poses* or *Skip*, on either phone, started a set, whose `pose.step` follows; `CLOSED` at *Cancel*. `descriptionId` is a new UUID each time *Generate poses* opens, and a description ends once. The subject drops its copy at the end, when another description starts or ends, and when the session ends, and keeps it while the link reconnects (2.6.7); once the link is back, the photographer sends the description as it is now, with its photo, which the subject does not read again when it has it, or only the end of one that ended during the drop.
+
+</details>
+
+<details>
+<summary><code>pose.scene.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S (It 3)</summary>
+
+```json
+{
+  "v": 3, "t": "pose.scene.begin", "seq": 1, "ts": 1759212380300,
+  "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "format": "jpeg", "width": 768, "height": 1024, "bytes": 151320, "chunks": 17 }
+}
+```
+
+A copy of the scene photo for the subject's *Generate poses*, sent once after the first `pose.description`: JPEG at quality 85, at most 1024 px on its long side, like a candidate's copy. `pose.scene.chunk` (`descriptionId`, `index`, `data`) and `pose.scene.end` (`descriptionId`, `crc32`) split and check it like the guide image; the subject refuses one larger than 1024 px or 1 MiB at the header. The subject keeps it in memory only, never sends it on, and never saves it.
+
+</details>
+
+<details>
+<summary><code>pose.description.edit</code> · reliable · S→P (It 3)</summary>
+
+```json
+{ "v": 3, "t": "pose.description.edit", "seq": 3, "ts": 1759212382100, "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "holding": true, "text": "Jumping with both" } }
+```
+
+The subject's description field, a request like every subject action (AD-7): `holding: true` with the text so far from a tap on the field and at each change, then `holding: false` with the last text when the field gives the description back (Done, the keyboard closing, a button, or leaving the screen); a chip sends both at once. The photographer takes it only while its own field does not hold the description, and answers with `pose.description`; one that comes while the photographer types is dropped, and the subject's field waits once that step arrives.
+
+</details>
+
+<details>
+<summary><code>pose.description.go</code> · reliable · S→P (It 3)</summary>
+
+```json
+{ "v": 3, "t": "pose.description.go", "seq": 1, "ts": 1759212384000, "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "text": "Jumping with both arms up", "suggest": false } }
+```
+
+The subject's *Generate 4 poses* with its `text`, or *Skip* with `suggest: true`. The photographer takes it only while that description is open and its own field does not hold it, using the subject's text when the subject's field held the description and its own otherwise, which is what the subject saw; it then starts the set as for its own tap and sends `pose.description` `STARTED`. Without an answer within 5 s the subject says "Couldn't send your request".
+
+</details>
+
+<details>
+<summary><code>guide.confirm</code> · reliable · P→S (It 3)</summary>
+
+```json
+{ "v": 3, "t": "guide.confirm", "seq": 2, "ts": 1759212406900, "b": { "confirmId": "5b0e9c1d-7a24-4f3e-8d6b-2c9a0f1e3d47", "step": "READY", "guideId": "8f14e45f-ceea-467a-9b6c-1d2e3f4a5b6c" } }
+```
+
+Where the photographer's *Reference confirm* of a pose chosen on *Pick a pose* is (2.6.5, *Reference confirm on both phones*): `FINDING` while its phone separates the person, again after *Choose another photo*; `READY` with `guideId` once the outline is on screen, followed by its mask; `USED` with `guideId` and `by` once a *Use this guide* decided; `CLOSED` when it ends without a guide (Back, no person found, or a photo that cannot be used). `confirmId` is a new UUID for each chosen pose, and a confirm ends once. A *Reference confirm* opened from *Add a pose guide* on the Camera screen sends nothing. The subject drops its copy at the end, when another confirm starts or ends, and when the session ends, and keeps it while the link reconnects (2.6.7); once the link is back, the photographer sends the step its confirm is at, with the outline, which the subject does not read again when it has it, or only the end of a confirm that ended during the drop.
+
+</details>
+
+<details>
+<summary><code>guide.confirm.image.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S (It 3)</summary>
+
+```json
+{
+  "v": 3, "t": "guide.confirm.image.begin", "seq": 1, "ts": 1759212407000,
+  "b": {
+    "confirmId": "5b0e9c1d-7a24-4f3e-8d6b-2c9a0f1e3d47", "guideId": "8f14e45f-ceea-467a-9b6c-1d2e3f4a5b6c",
+    "format": "mask-png", "width": 540, "height": 720, "bytes": 9120, "chunks": 1
+  }
+}
+```
+
+The smoothed mask of the outline on *Reference confirm*, as `guide.image.*` sends a guide's (2.6.1): `mask-png` at most 720 px tall, from which the subject traces the same outline. `guide.confirm.image.chunk` (`confirmId`, `guideId`, `index`, `data`) and `guide.confirm.image.end` (`confirmId`, `guideId`, `crc32`) split and check it like the guide image; the subject refuses one taller than 720 px or wider than 1280 px at the header, and reads only the outline its copy is `READY` with. It is shown on *Your reference* only, kept in memory, and never drawn as the guide or saved; the guide used goes like any guide, as `guide.image.*` from the photographer.
+
+</details>
+
+<details>
+<summary><code>guide.confirm.use</code> · reliable · S→P (It 3)</summary>
+
+```json
+{ "v": 3, "t": "guide.confirm.use", "seq": 1, "ts": 1759212409300, "b": { "confirmId": "5b0e9c1d-7a24-4f3e-8d6b-2c9a0f1e3d47", "guideId": "8f14e45f-ceea-467a-9b6c-1d2e3f4a5b6c" } }
+```
+
+The subject's *Use this guide*, a request like every subject action (AD-7). The photographer takes it only while its *Reference confirm* `confirmId` shows the outline `guideId` and nobody has used it; it then sets that guide, as after its own tap, and sends `guide.confirm` `USED` with `by: SUBJECT`. A use of another outline, while the person is being found, or after the confirm ended is dropped, and the step already sent answers it. Without an answer within 5 s the subject says "Couldn't send your choice".
 
 </details>
 
@@ -1788,7 +1999,11 @@ The guide's normalized width is `height × aspect × (H / W)` of the current fra
 - **Zoom.** The subject pinches the live video (AD-17) while guide-edit mode is off. `SubjectViewModel.onZoomGesture(ratio, final)` receives the pinch: each step updates the subject's readout immediately (optimistic) and is sent as a non-final `camera.zoom.set` on the realtime channel at most every 50 ms, the newest value winning; the pinch's end, cancellation, or the screen pausing sends one final request on the reliable channel. The photographer clamps every request to `[minZoom, maxZoom]`, applies it through `CameraController.setZoom` with the request's `final`, so the subject's pinch holds the lens like the photographer's own, and echoes the applied value in `camera.state`; the subject's readout settles on that echo (AD-7). A final zoom, brightness, or flash request that the camera has not reported applied within 500 ms (waiting longer while the camera is `STARTING`) is confirmed if the camera already holds the value, and otherwise answered with the current state, `by: PHOTOGRAPHER`, so the subject's control snaps back; a request applied later, within 5 s, still counts as the subject's and still gets its one notice.
 - **Brightness and flash (It 2, FR-7.3).** Subject view's brightness button opens the Camera screen's slider on the photographer's exposure range (`camera.capabilities`), and its flash button sits in the top bar; both are hidden when the photographer's camera has no range or no flash. The slider sends `camera.exposure.set` with the same step-then-final pattern as zoom (`StepSender`), and the flash button sends `camera.flash.set` and shows the tapped mode until the echo confirms or reverts it. The photographer clamps the index to the range and applies it through `setExposure`, and applies the flash through `setFlash` when it has one; a request the camera cannot take (no range, no flash) is answered with the unchanged `camera.state`. A change of exposure, flash, or ratio on the camera, from either phone, goes out as `camera.state` as soon as the camera reports it, `by: SUBJECT` when it matches the subject's pending request, and a step of the subject's slider is echoed as a step. The photographer's own brightness slider and flash button (FR-1.11, FR-1.12) call the same controller methods, so a change from either side ends in the same echoed state.
 - **Guide moves (It 2, FR-7.2).** Subject view shows the guide-edit mode toggle while a guide is on the video (off by default, 2.6.2). With the mode on, the subject's drag and pinch on the guide are applied on the subject's phone first, clamped with `GuideGeometry` for the photographer's frame (`camera.state.aspect`) so the finger never leaves the photographer's limits, and sent as `guide.move` with the resulting center and height in frame coordinates, steps at most every 50 ms and the final value at once. `RemoteControlHandler` drops a move while the photographer has no guide or has hidden it, or for a guide it has since replaced (the move names its guide), and otherwise applies it to the photographer's `GuideRepository`, which clamps again like the photographer's own gestures and emits a `GuideChange`; `GuideSyncer` sends the resulting `guide.state` with `by: SUBJECT` (`attribute`), and the final move makes one notice. While the subject's gesture runs, its screen keeps its own guide and takes only the photographer's `visible` and `opacity` from the mirror; the first `guide.state` after the final value settles the guide. If both people move the guide at once, the photographer applies the requests in arrival order, so the later change wins and both phones agree (FR-7.6).
-- **Guide from the subject (It 3, FR-6.15, FR-6.16, [#113]).** Subject view's *Guide* button opens *Add a pose guide* with *Upload a photo* and the subject's saved guides; *Generate poses here* comes with the shared steps (Iter3-P16). Reference confirm runs on the subject's phone as on the photographer's, and *Use this guide* or a saved guide returns to Subject view. `ReferenceViewModel` hands the guide to `GuideSyncer.offer` instead of the phone's own `GuideRepository`. `offer` draws it on the subject's mirror at once, at its `anchor` clamped for the narrowest frame, keeps the guide's own reference photo for Subject view's thumbnail, and sends `guide.image.*` with `anchor` and `source` (2.5.1); it returns false, sending nothing, unless the session is connected. The photographer's `GuideSyncer` assembles and checks the image like the subject's, marks the subject as having it, so the change that follows sends no image back, and sets it with `attribute(SUBJECT)`, so its first `guide.state` says `by: SUBJECT`; the Camera screen shows "Junhyeong set a pose guide". From then on the guide is the photographer's own: the photographer can move, hide, save, or remove it, and the subject moves it with `guide.move`. The subject keeps the guide once a `guide.state` names it. A state for another guide, `guide.clear`, or a session that ends first drops it: the mirror follows the photographer again (after a reconnect, the guide the mirror kept, whose image the photographer did not send again), and Subject view says "Couldn't send the guide". It is not sent again; the subject chooses again. Of two guides chosen at once, the one that reaches the photographer later wins (AD-7). The subject shows a reference photo only for the guide on its video, so a late reference of a guide since replaced keeps out of the corner, and the photographer sends a guide's state and reference only while that guide is still its own. *Reference confirm* and *No person found* cover Subject view, so while opened from it they follow the session themselves: when it ends they go back to Subject view, which shows *Connection lost* or returns to the camera.
+- **Guide from the subject (It 3, FR-6.15, FR-6.16, [#113]).** Subject view's *Guide* button opens *Add a pose guide* with *Upload a photo* and the subject's saved guides; there is no *Generate poses here* on the subject's phone (*Pick a pose on both phones*, below). Reference confirm runs on the subject's phone as on the photographer's, and *Use this guide* or a saved guide returns to Subject view. `ReferenceViewModel` hands the guide to `GuideSyncer.offer` instead of the phone's own `GuideRepository`. `offer` draws it on the subject's mirror at once, at its `anchor` clamped for the narrowest frame, keeps the guide's own reference photo for Subject view's thumbnail, and sends `guide.image.*` with `anchor` and `source` (2.5.1); it returns false, sending nothing, unless the session is connected. The photographer's `GuideSyncer` assembles and checks the image like the subject's, marks the subject as having it, so the change that follows sends no image back, and sets it with `attribute(SUBJECT)`, so its first `guide.state` says `by: SUBJECT`; the Camera screen shows "Junhyeong set a pose guide". From then on the guide is the photographer's own: the photographer can move, hide, save, or remove it, and the subject moves it with `guide.move`. The subject keeps the guide once a `guide.state` names it. A state for another guide, `guide.clear`, or a session that ends first drops it: the mirror follows the photographer again (after a reconnect, the guide the mirror kept, whose image the photographer did not send again), and Subject view says "Couldn't send the guide". It is not sent again; the subject chooses again. Of two guides chosen at once, the one that reaches the photographer later wins (AD-7). The subject shows a reference photo only for the guide on its video, so a late reference of a guide since replaced keeps out of the corner, and the photographer sends a guide's state and reference only while that guide is still its own. *Reference confirm* and *No person found* cover Subject view, so while opened from it they follow the session themselves: when it ends they go back to Subject view, which shows *Connection lost* or returns to the camera.
+- **Generate poses on both phones (It 3, FR-6.15, US-16, [#120]).** The description is written on both phones, one field at a time, and the set it asks for is still requested from the photographer's phone alone. `GenerationViewModel` tells `DescriptionSyncer`, as `DescriptionShare`, about each *Generate poses*: opened at *Use this photo*, *Try other poses*, or *Edit description*, with the scene photo, the kept text, and whether it was refused; each change of the text and of `descriptionWriter`, the field that holds it; and the single end, `STARTED` when a set starts or `CLOSED` at *Cancel* (2.5.1). While the session is connected, the photographer's `DescriptionSyncer` sends each change, and after the first one a copy of the scene photo (`PoseCandidateCodec`, encoded off the main thread, left out when the description ended meanwhile). A field holds the description from a tap on it, through focus, until Done, the keyboard closing, a button, or leaving the screen (`DescriptionForm`), and the photographer's phone decides whose, in the order things happen there (AD-7): its own field takes it at once unless the subject's holds it, and the subject's `pose.description.edit` takes it only while the photographer's does not. While one field holds it, the other phone's field, chips, and buttons wait, show the holder's text, and say "Junhyeong is typing…" or "Dongje is typing…"; a chip on the subject's phone sends its text at once, holding and giving back in one go. The subject's `pose.description.go` starts the set with the subject's text, or the photographer's when nobody held the field, as for the photographer's own tap, unless the photographer's field holds the description; the photographer's *Generate poses* then opens Generating poses by itself, and the subject's closes, while Subject view says "Dongje is creating poses…". When the link drops, the sender stops and tells `GenerationViewModel` (`DescriptionRequest.Gone`), so a field the subject held is free again. The subject's `DescriptionSyncer` keeps the copy in `MirrorDescription`, in memory only, and Subject view opens the subject's *Generate poses* once per description while it is in front, and otherwise shows *Generate poses* beside *Guide* while it is open, unless a set or a confirm held there is newer: a set closed by *Try other poses* may end there after the new description started. *Cancel* on the photographer's phone closes the subject's with "Dongje closed Generate poses"; the subject's Back or *Cancel* only closes its own screen. A *Generate 4 poses* or *Skip* that no end answers within 5 s says "Couldn't send your request". The subject's *Generate poses* covers Subject view, so it follows the session itself, like the guide screens. Both screens say "… sees this too and can write it with you." while the session is connected.
+- **Pick a pose on both phones (It 3, FR-6.15, US-16, [#120]).** Poses are generated on the photographer's phone only, so the Pix server is called from one phone, a set has one owner, and the subject's phone never sends a scene. `GenerationViewModel` tells `PoseSyncer`, as `PoseShare`, where its set is: a new set at *Generate 4 poses* or *Skip* (`GENERATING`), each candidate as it arrives, `PICKING` with the created candidates in the pager's order when Pick a pose opens, `CHOSEN` at the first *Use this pose*, and `CLOSED` for a set that ends otherwise. While the session is connected, the photographer's `PoseSyncer` sends what the subject does not have yet, in that order: the step, each candidate's copy (`PoseCandidateCodec`, JPEG ≤ 1024 px, encoded off the main thread one at a time), then `PICKING` or the end (2.5.1); after a reconnect it sends the set again, or only its end when it ended during the drop, while the subject keeps the set and its *Pick a pose* through the drop, with *Use this pose* waiting (2.6.7). The photographer's camera is off on the generation screens, so the subject's video pauses meanwhile: Subject view says "Dongje is describing a pose…", "Dongje is creating poses…", or "Dongje is picking a pose…" in place of "camera paused". The subject's `PoseSyncer` keeps the set in `MirrorPoseSet`, in memory only, and Subject view opens the subject's *Pick a pose* once per set at `PICKING` while it is in front, and otherwise shows *Pick a pose* beside *Guide* while the set is open. A set with no copy on the subject's phone, because none fitted or none arrived, opens neither, and Subject view only says the photographer is picking. Subject view counts as in front only while it is the current destination, so a set, a confirm, or a description that comes while *Add a pose guide* covers it opens once the sheet closes. Neither phone sends a swipe. The first choice decides, judged on the photographer's phone in the order things happen there (AD-7): the photographer's own *Use this pose* marks the set chosen before Reference confirm opens; the subject's `pose.pick` is taken only while that set is `PICKING` and unchosen, and `PickPoseFragment` then goes on as for the photographer's own tap, with the subject's candidate and its tip (FR-4.10), and Reference confirm says "Junhyeong chose this pose". Both phones then show its outline (*Reference confirm on both phones*, below). On the subject, `CHOSEN` or `CLOSED` closes *Pick a pose*: from the photographer's choice or close, with "Dongje chose a pose" or "Dongje closed the poses"; from the subject's own choice, without a notice. A pick that no step answers within 5 s says "Couldn't send your pick" and can be tapped again. The subject's *Pick a pose* covers Subject view, so it follows the session itself, like the guide screens.
+- **Reference confirm on both phones (It 3, FR-6.15, US-16, [#120]).** The pose chosen on *Pick a pose*, by either phone, goes to the photographer's *Reference confirm*, and the subject sees it there too, on *Your reference*, instead of waiting on Subject view for a guide it cannot check. The person is still separated on the photographer's phone (FR-4.6), whose segmentation and outline the subject's phone does not repeat. `ReferenceViewModel` tells `ConfirmSyncer`, as `ConfirmShare`, where a confirm opened by `onCandidatePicked` is: a new confirm (`FINDING`), the guide once the person is found (`READY`), `FINDING` again for *Choose another photo*, which only the photographer has, then `USED` at the first *Use this guide* or `CLOSED` at Back, No person found, or a photo that cannot be used. A *Reference confirm* opened from *Add a pose guide* is not shared. While the session is connected, the photographer's `ConfirmSyncer` sends each step, and with `READY` then the outline's mask (`GuideImageCodec`, encoded off the main thread), unless the confirm moved on meanwhile (2.5.1). The subject's `ConfirmSyncer` keeps the copy in `MirrorConfirm`, in memory only, traces the outline from the mask as for a guide, and Subject view opens *Your reference* once per confirm while it is in front, and otherwise shows *Your reference* beside *Guide* while it is open, in place of *Pick a pose*, and "Dongje is checking the guide…" over the paused video. A set the subject still holds as `PICKING` is shown first, since its end, sent at the same moment as the confirm's start, may come after it. The first use decides, judged on the photographer's phone (AD-7): its own *Use this guide* ends the confirm before the screen closes; the subject's `guide.confirm.use` is taken only while that outline is on screen, and then `ReferenceViewModel` sets the guide as for its own tap, keeping the guide's tip (FR-4.10), and *Reference confirm* goes back to the camera with "Junhyeong used this guide". The guide then reaches the subject like any guide (`guide.image.*`). On the subject, `USED` or `CLOSED` closes *Your reference*: from the photographer's use or close, with "Dongje used this guide" or "Dongje closed the reference"; from its own use, without a notice. An end kept from an earlier confirm, which no screen read, closes nothing. A use that no step answers within 5 s says "Couldn't send your choice" and can be tapped again, and `FINDING` after another photo drops it without a notice, since the screen shows that photo's progress instead. The subject's *Your reference* covers Subject view, so it follows the session itself, like the guide screens. Both screens say "… sees this guide too. The first to use it decides." while the session is connected.
+- **Save guide on Subject view (It 3, FR-6.16, [#120]).** The button sits beside the guide-edit mode toggle while a guide is on the video. The subject's mirror guide is saved like the photographer's (FR-3.8, `SavedGuideStore`, 2.8): its mask as received, the reference copy that `MirrorReference` holds for it, its `anchor` and `source`, which the photographer's `guide.image.begin` carries for this (2.5.1), and the mirror's state. Both phones know the guide by the same id, so each keeps one copy, and the button is filled once this phone has it. A guide saved before its reference arrived keeps the outline as its thumbnail. It is used again from the subject's *Add a pose guide*, which offers it to the photographer (*Guide from the subject*, above).
 - **Remote focus (Could, FR-7.7).** A tap on the live video sends `camera.focus.set`; the photographer calls `setFocusPoint`. No echo. **TODO** Iteration 3 (Iter2-P17): the message is in the protocol; the subject's tap and the handler are not built.
 - **Permission (Could, FR-7.5).** `control.permission` from the photographer disables the subject's controls and makes the photographer drop every request while `allowed` is false. Until it is built, remote control is always allowed. **TODO** Iteration 3 (Iter2-P17): the message is in the protocol; the switch and the subject's disabled state are not built.
 - **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing, so every ratio on both phones is in primary-relative units.
@@ -1808,8 +2023,8 @@ The guide's normalized width is `height × aspect × (H / W)` of the current fra
 #### 2.6.7 Reconnection and sessions across networks (Iteration 3)
 
 - **ICE.** Each phone of a session gets Cloudflare's STUN and TURN entries with credentials of its own from the server's `turn` module, valid for 4 h (AD-14, 2.5.2); without a TURN key, or when Cloudflare fails, the phone gets the STUN server alone. WebRTC tries a direct path first and falls back to the relay; nothing in the app changes between the two. A debug build with `pix.relayOnly=true` uses the relay alone (`IceTransportsType.RELAY`), so the relay can be tried and measured on one Wi-Fi.
-- **Drop detection.** `PeerConnection` state `DISCONNECTED` or `FAILED` while connected moves `SessionState` to `Reconnecting` and starts a 10 s budget (NFR-11); both phones see it, since both stop receiving. The subject's video view keeps the last frame with "Reconnecting…", and its controls wait; the photographer's live light goes out, *End session* stays, and its camera keeps sending frames, so the video comes back with the link. The server's `peer.left` with `CONNECTION_LOST` changes nothing then: it is often the other phone's old socket going. The reliable channel closing ends the session at once (the photographer back to `Waiting`, the subject to *Connection lost*), because the channels outlast a drop and the reliable one closes when the other phone closed its connection, after giving up or leaving. The realtime channel can also close alone, on one phone (WebRTC closes a channel whose send failed; seen once in the first run on two phones): the session goes on, and its steps and pings go on the reliable channel from then on (`realtimeLost`); `Reconnecting` then ends with the reliable channel alone.
-- **Restart.** Each phone opens a new signaling socket at once, even if the old one looks open, since one on a network without internet would take OkHttp's 15 s pings longer than the budget to fail, and sends `session.join` with `rejoin: true` and its rejoin token (2.5.2). The server moves the place to the new socket, also from an old socket it still thinks open, and tells the other phone `peer.rejoined`. The photographer, which always creates the offer, sends an offer with new ICE credentials (`restartIce`) when its own place is back and again on every `peer.rejoined`, also while its own link looks fine, since the subject may have seen a drop it did not; on a working link a restart does not interrupt the video. Both phones taking their places back can ask for two restarts at once, and the subject answers every offer that reaches its socket, so a restart asked for while the last offer may still be answered waits for that answer, or for 2 s when none comes (an offer sent to the subject's old socket): an answer always meets the offer it answers, and one that comes with no offer pending is dropped. Local candidates wait until their description has gone out, and the photographer holds the subject's candidates until the new answer is applied, so none meets the wrong ICE credentials; signals go only over a socket that holds the place. The connection, its two data channels, and the video track stay, and so does what was queued on the reliable channel; `Reconnecting` ends when ICE connects again with both channels open. The photographer's `Connected` work starts again then, so the subject gets `camera.capabilities`, `camera.state`, the guide image (unless the subject's first `hello` named it), and the final `guide.state` again. While the session runs or the room waits, a socket that drops is opened again after 1 s, doubling to 30 s; while reconnecting, every second, and those tries do not count toward the doubling, so a session that is back or given up starts again at 1 s instead of keeping its place off the server for up to 30 s after the network returned. Without a token (a server from before reconnection) a phone cannot take its place again: the photographer restarts over the socket as it is, and otherwise only WebRTC's own recovery remains.
+- **Drop detection.** `PeerConnection` state `DISCONNECTED` or `FAILED` while connected moves `SessionState` to `Reconnecting` and starts a 10 s budget (NFR-11); both phones see it, since both stop receiving. The subject's video view keeps the last frame with "Reconnecting…", and its controls wait, the field and the buttons on its *Generate poses*, *Use this pose* on its *Pick a pose*, and *Use this guide* on its *Your reference* included (2.6.5); the photographer's live light goes out, *End session* stays, and its camera keeps sending frames, so the video comes back with the link. The server's `peer.left` with `CONNECTION_LOST` changes nothing then: it is often the other phone's old socket going. The reliable channel closing ends the session at once (the photographer back to `Waiting`, the subject to *Connection lost*), because the channels outlast a drop and the reliable one closes when the other phone closed its connection, after giving up or leaving. The realtime channel can also close alone, on one phone (WebRTC closes a channel whose send failed; seen once in the first run on two phones): the session goes on, and its steps and pings go on the reliable channel from then on (`realtimeLost`); `Reconnecting` then ends with the reliable channel alone.
+- **Restart.** Each phone opens a new signaling socket at once, even if the old one looks open, since one on a network without internet would take OkHttp's 15 s pings longer than the budget to fail, and sends `session.join` with `rejoin: true` and its rejoin token (2.5.2). The server moves the place to the new socket, also from an old socket it still thinks open, and tells the other phone `peer.rejoined`. The photographer, which always creates the offer, sends an offer with new ICE credentials (`restartIce`) when its own place is back and again on every `peer.rejoined`, also while its own link looks fine, since the subject may have seen a drop it did not; on a working link a restart does not interrupt the video. Both phones taking their places back can ask for two restarts at once, and the subject answers every offer that reaches its socket, so a restart asked for while the last offer may still be answered waits for that answer, or for 2 s when none comes (an offer sent to the subject's old socket): an answer always meets the offer it answers, and one that comes with no offer pending is dropped. Local candidates wait until their description has gone out, and the photographer holds the subject's candidates until the new answer is applied, so none meets the wrong ICE credentials; signals go only over a socket that holds the place. The connection, its two data channels, and the video track stay, and so does what was queued on the reliable channel; `Reconnecting` ends when ICE connects again with both channels open. The photographer's `Connected` work starts again then, so the subject gets `camera.capabilities`, `camera.state`, the guide image (unless the subject's first `hello` named it), the final `guide.state`, and *Generate poses*, the pose set, and the *Reference confirm* (2.5.1) again; a field the subject held on *Generate poses* is free again from the drop. While the session runs or the room waits, a socket that drops is opened again after 1 s, doubling to 30 s; while reconnecting, every second, and those tries do not count toward the doubling, so a session that is back or given up starts again at 1 s instead of keeping its place off the server for up to 30 s after the network returned. Without a token (a server from before reconnection) a phone cannot take its place again: the photographer restarts over the socket as it is, and otherwise only WebRTC's own recovery remains.
 - **Give up.** After 10 s the photographer says "&lt;name&gt; disconnected" and returns to `Waiting` (room code) or `Idle` (invitation), and the subject shows *Connection lost* with *Reconnect*. *Reconnect* (`SessionEntry.Rejoin`) sends `session.join` with `rejoin: false` and the token, so the photographer starts a new connection on `peer.joined`, using the credentials of the first join; it works while the photographer still holds the session (60 s after its last socket), also while the server still holds the subject's dead socket, and joins the code again only without a token. A *Reconnect* that fails before the server answers, such as one tapped before the network is back, keeps that token for the next try; a refusal drops it. A photographer that is itself off the server then (its own drop) misses that `peer.joined`; when it takes its place back, the subject, still waiting for an offer, gets `peer.rejoined` and sends its `session.join` once more on the same socket, so the photographer gets `peer.joined` after all. A rejoin the server refuses (`NOT_FOUND`, `FORBIDDEN`) ends a reconnecting session at once: the subject sees "The session has ended"; a running session goes on phone to phone.
 - **Server deploys and restarts.** To a phone these look like a dropped signaling socket. A connected session continues, because the media goes phone to phone, and the phone takes its place again over a new socket; so does a photographer waiting with a room code, whose code keeps working. The session is still there because it lives in the session store, not in the server process that was replaced (AD-18, 2.7; 2.8, Deployment). Coming back makes the photographer restart ICE once (`peer.rejoined`), which a working link does not notice.
 - **Cellular notice (FR-6.13).** The first time a session's selected candidate pair uses a cellular interface (`SessionManager.path`, whose `network` is `cellular`), the app shows "The live view uses mobile data" once: as a notice on the Camera screen, and as a toast on Subject view. The notice waits in `SessionViewModel.mobileDataPending` until one of those screens shows it and confirms (`mobileDataNoticeShown`); only then is the flag set in DataStore (`MobileDataNotice`), so a notice the app was in the background for is shown on return, never lost. A session that ends first drops it, and the next session on cellular data says it.
@@ -1959,7 +2174,7 @@ erDiagram
 | **Pose generation** | 박재완 | API choice, `POST /poses`, the default poses, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, one prompt, suggested poses (Iter2-P12, [#53]) | Reference guide |
 | **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | `ws://` to the course server. Iteration 3: TURN through Cloudflare, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter3-P13, [#117]; Iter3-P14, [#118]); invitations with push and link (Iter3-P15, [#119]) | Guide sync, remote control |
 | **Remote control** | 조성민 | `RemoteControlHandler` (zoom) | Brightness, flash, guide moves, and notices (Iter2-P17, [#57]); pinch zoom and the guide-edit mode toggle on Subject view (Iter2-P6, [#48]); zoom without stutter (Iter2-P5, [#47]; measured on the S23 Ultra, the S21 numbers with IT-10). Iteration 3: remote focus and the permission switch (Iter2-P17, Could) | UI |
-| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; no `anchor` is sent P→S, and a guide from the subject carries its own (2.5.1). Iteration 3: the mask-only transfer in `GuideImageCodec` and the syncer, in either direction (한준형; Iter3-P9, [#113]); the reference photo for Subject view's thumbnail, `guide.reference.*` (박동제; Iter3-A1, [#132]) | UI |
+| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state`; `anchor` and `source` go with the image both ways, and the subject keeps them for *Save guide* (2.5.1). Iteration 3: the mask-only transfer in `GuideImageCodec` and the syncer, in either direction (한준형; Iter3-P9, [#113]); the reference photo for Subject view's thumbnail, `guide.reference.*` (박동제; Iter3-A1, [#132]) | UI |
 
 Invitations need both the accounts server (박재완) and the session entry point (조성민), and the two owners agree the order of the invitation work.
 
@@ -1985,7 +2200,7 @@ Invitations need both the accounts server (박재완) and the session entry poin
 | 조성민 | Sessions on different networks (Iter3-P13, [#117]) | 10/30 | 2.6.7 |
 | 조성민 | Reconnection after a short drop (Iter3-P14, [#118]) | 10/30 | 2.6.7 |
 | 조성민 | Invitations and friend requests with push notifications (Iter3-P15, [#119]) | 10/30 | 2.6.6 |
-| 한준형 | Shared steps: the subject's phone opens guide selection and pose generation, both phones show the same step, and guides can be saved on either phone (Iter3-P16, [#120]) | 10/30 | *Still open* |
+| 한준형 | Shared steps: the subject's phone opens guide selection, both phones show the photographer's candidates on *Pick a pose* with the first choice deciding, and guides can be saved on either phone (Iter3-P16, [#120]) | 10/30 | 2.5.1, 2.6.5 |
 | 한준형 | Photos taken in a session saved on both phones (Iter3-P17, [#121]) | 10/30 | *Still open* |
 | 조성민 | The offline QR connection (Iter3-P22, [#122]) | 11/5 | 1.4.2, *Still open* |
 | 한준형 | The settings screen and the first-use tutorial (Iter3-P23, [#123]) | 11/5 | 1.4.2 |

@@ -1,8 +1,10 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.session
 
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
+import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -103,6 +105,20 @@ class GuideSyncerTest {
         assertEquals(3, begin.chunks)
         assertEquals(0.3f, states().single().state.cx, 0f)
         assertEquals(listOf("g1"), codec.encoded)
+    }
+
+    @Test
+    fun `the image carries the guide's anchor and source, for the subject's Save guide`() = runTest {
+        val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
+        guides.setGuide(fakeGuide("g1").copy(anchor = box, source = GuideSource.GENERATED))
+        connected()
+
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        val begin = session.sent.first() as SessionMessage.GuideImageBegin
+        assertEquals(box, begin.anchor)
+        assertEquals(GuideSource.GENERATED, begin.source)
     }
 
     @Test
@@ -343,6 +359,26 @@ class GuideSyncerTest {
         assertEquals(0.3f, mirror.state.value.cx, 0f)
         assertEquals(0.5f, mirror.state.value.height, 0f)
     }
+
+    @Test
+    fun `the subject's guide keeps the anchor and source its image carried, and its state still places it`() =
+        runTest {
+            syncer().startAsReceiver(backgroundScope)
+            runCurrent()
+            val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
+            val image = image("g1")
+
+            session.deliver(image.begin(box, GuideSource.GENERATED))
+            for (i in image.chunks.indices) session.deliver(image.chunk(i))
+            session.deliver(image.end())
+            session.deliver(SessionMessage.GuideStateUpdate(GuideState("g1", cx = 0.8f, height = 0.4f), final = true))
+            runCurrent()
+
+            assertEquals(box, mirror.guide.value?.anchor)
+            assertEquals(GuideSource.GENERATED, mirror.guide.value?.source)
+            assertEquals(0.8f, mirror.state.value.cx, 0f)
+            assertEquals(0.4f, mirror.state.value.height, 0f)
+        }
 
     @Test
     fun `a state that arrives before its image is applied once the image is there`() = runTest {

@@ -259,11 +259,38 @@
                 app:argType="boolean" />
         </action>
         <action
+            android:id="@+id/action_subject_to_pickPose"
+            app:destination="@id/subjectPickPoseFragment" />
+        <action
+            android:id="@+id/action_subject_to_confirm"
+            app:destination="@id/subjectConfirmFragment" />
+        <action
+            android:id="@+id/action_subject_to_describe"
+            app:destination="@id/subjectDescribeFragment" />
+        <action
             android:id="@+id/action_subject_to_connectionLost"
             app:destination="@id/connectionLostFragment"
             app:popUpTo="@id/subjectFragment"
             app:popUpToInclusive="true" />
     </fragment>
+
+    <!-- The photographer's Generate poses on the subject's phone, where both write the description (FR-6.15). -->
+    <fragment
+        android:id="@+id/subjectDescribeFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectDescribeFragment"
+        android:label="Generate poses" />
+
+    <!-- The photographer's candidates on the subject's phone (FR-6.15); back is Subject view. -->
+    <fragment
+        android:id="@+id/subjectPickPoseFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectPickPoseFragment"
+        android:label="Pick a pose" />
+
+    <!-- The outline on the photographer's Reference confirm, on the subject's phone (FR-6.15); back is Subject view. -->
+    <fragment
+        android:id="@+id/subjectConfirmFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectConfirmFragment"
+        android:label="Your reference" />
 
     <fragment
         android:id="@+id/connectionLostFragment"

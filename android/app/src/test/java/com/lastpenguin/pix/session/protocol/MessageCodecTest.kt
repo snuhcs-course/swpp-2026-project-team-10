@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -53,6 +53,27 @@ class MessageCodecTest {
             SessionMessage.GuideClear,
             SessionMessage.ZoomSet(2f),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
+            SessionMessage.PoseStep("set1", PoseSetStep.GENERATING),
+            SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-4")),
+            SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-4", by = Role.SUBJECT),
+            SessionMessage.PoseCandidateBegin("set1", "pose-4", "jpeg", 768, 1024, 151_320, 17),
+            SessionMessage.PoseCandidateChunk("set1", "pose-4", 0, "/9j/4AAQSkZJRgABAQ"),
+            SessionMessage.PoseCandidateEnd("set1", "pose-4", 3735928559L),
+            SessionMessage.PosePick("set1", "pose-4"),
+            SessionMessage.GuideConfirm("c1", ConfirmStep.FINDING),
+            SessionMessage.GuideConfirm("c1", ConfirmStep.READY, guideId = "g1"),
+            SessionMessage.GuideConfirm("c1", ConfirmStep.USED, guideId = "g1", by = Role.SUBJECT),
+            SessionMessage.GuideConfirmImageBegin("c1", "g1", "mask-png", 480, 720, 18_204, 2),
+            SessionMessage.GuideConfirmImageChunk("c1", "g1", 0, "iVBORw0KGgo"),
+            SessionMessage.GuideConfirmImageEnd("c1", "g1", 3735928559L),
+            SessionMessage.GuideConfirmUse("c1", "g1"),
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.SUBJECT, rejected = true),
+            SessionMessage.PoseDescription("d1", DescriptionStep.STARTED),
+            SessionMessage.PoseSceneBegin("d1", "jpeg", 768, 1024, 151_320, 17),
+            SessionMessage.PoseSceneChunk("d1", 0, "/9j/4AAQSkZJRgABAQ"),
+            SessionMessage.PoseSceneEnd("d1", 3735928559L),
+            SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "벽에 기대기"),
+            SessionMessage.PoseDescriptionGo("d1", "", suggest = true),
             SessionMessage.Leave(EndReason.LEFT),
             SessionMessage.Ping(1_759_212_360_000L),
             SessionMessage.Pong(1_759_212_360_000L),
@@ -79,20 +100,83 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `only the subject's guide image carries an anchor and a source`() {
+    fun `a guide image carries an anchor and a source only when the guide has them`() {
         val anchor = NormalizedRect(0.31f, 0.21f, 0.69f, 0.95f)
-        val fromSubject =
+        val placed =
             SessionMessage.GuideImageBegin("s1", "mask-png", 270, 720, 8560, 1, 0.375f, anchor, GuideSource.GALLERY)
-        val body = Json.parseToJsonElement(codec.encode(fromSubject)).jsonObject.getValue("b").jsonObject
+        val body = Json.parseToJsonElement(codec.encode(placed)).jsonObject.getValue("b").jsonObject
         assertEquals(0.31f, body.getValue("anchor").jsonObject.getValue("left").jsonPrimitive.content.toFloat(), 0f)
         assertEquals("GALLERY", body.getValue("source").jsonPrimitive.content)
-        assertEquals(fromSubject, codec.decode(codec.encode(fromSubject))!!.message)
+        assertEquals(placed, codec.decode(codec.encode(placed))!!.message)
 
-        val fromPhotographer = SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f)
-        val plain = Json.parseToJsonElement(codec.encode(fromPhotographer)).jsonObject.getValue("b").jsonObject
+        val unplaced = SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f)
+        val plain = Json.parseToJsonElement(codec.encode(unplaced)).jsonObject.getValue("b").jsonObject
         assertFalse("anchor" in plain)
         assertFalse("source" in plain)
-        assertEquals(fromPhotographer, codec.decode(codec.encode(fromPhotographer))!!.message)
+        assertEquals(unplaced, codec.decode(codec.encode(unplaced))!!.message)
+    }
+
+    @Test
+    fun `a set's step sends only the fields of its step, as in the design`() {
+        val picking = SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-2"))
+        val body = Json.parseToJsonElement(codec.encode(picking)).jsonObject.getValue("b").jsonObject
+        assertEquals("PICKING", body.getValue("step").jsonPrimitive.content)
+        assertEquals(setOf("setId", "step", "poseIds"), body.keys)
+
+        val generating = Json.parseToJsonElement(codec.encode(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING)))
+        assertEquals(setOf("setId", "step"), generating.jsonObject.getValue("b").jsonObject.keys)
+
+        val example = codec.decode(
+            """{"v":3,"t":"pose.step","seq":3,"ts":1,"b":{"setId":"set1","step":"CHOSEN","poseId":"pose-2","by":"SUBJECT"}}""",
+        )
+        assertEquals(
+            SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-2", by = Role.SUBJECT),
+            example!!.message,
+        )
+    }
+
+    @Test
+    fun `a set's step with an unknown step or without its set is dropped`() {
+        assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"setId":"set1","step":"PAUSED"}}"""))
+        assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"step":"PICKING"}}"""))
+        assertNull(codec.decode("""{"v":3,"t":"pose.pick","seq":1,"ts":0,"b":{"setId":"set1","poseId":7}}"""))
+    }
+
+    @Test
+    fun `a confirm's step sends only the fields of its step, and an unknown step is dropped`() {
+        val finding = Json.parseToJsonElement(codec.encode(SessionMessage.GuideConfirm("c1", ConfirmStep.FINDING)))
+        assertEquals("guide.confirm", finding.jsonObject.getValue("t").jsonPrimitive.content)
+        assertEquals(setOf("confirmId", "step"), finding.jsonObject.getValue("b").jsonObject.keys)
+
+        val example = codec.decode(
+            """{"v":3,"t":"guide.confirm","seq":4,"ts":1,"b":{"confirmId":"c1","step":"USED","guideId":"g1","by":"PHOTOGRAPHER"}}""",
+        )
+        assertEquals(
+            SessionMessage.GuideConfirm("c1", ConfirmStep.USED, guideId = "g1", by = Role.PHOTOGRAPHER),
+            example!!.message,
+        )
+        assertNull(codec.decode("""{"v":3,"t":"guide.confirm","seq":1,"ts":0,"b":{"confirmId":"c1","step":"SHOWN"}}"""))
+        assertNull(codec.decode("""{"v":3,"t":"guide.confirm.use","seq":1,"ts":0,"b":{"confirmId":"c1"}}"""))
+    }
+
+    @Test
+    fun `a description sends its text, writer, and rejection only while open, and an unknown step is dropped`() {
+        val ended = Json.parseToJsonElement(codec.encode(SessionMessage.PoseDescription("d1", DescriptionStep.CLOSED)))
+        assertEquals("pose.description", ended.jsonObject.getValue("t").jsonPrimitive.content)
+        assertEquals(setOf("descriptionId", "step"), ended.jsonObject.getValue("b").jsonObject.keys)
+
+        val example = codec.decode(
+            """{"v":3,"t":"pose.description","seq":2,"ts":1,"b":{"descriptionId":"d1","step":"OPEN","text":"wave","writer":"PHOTOGRAPHER"}}""",
+        )
+        assertEquals(
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.PHOTOGRAPHER),
+            example!!.message,
+        )
+        val unknownStep = """{"v":3,"t":"pose.description","seq":1,"ts":0,"b":{"descriptionId":"d1","step":"TYPING"}}"""
+        assertNull(codec.decode(unknownStep))
+        // A go without its text and its choice.
+        val incomplete = """{"v":3,"t":"pose.description.go","seq":1,"ts":0,"b":{"descriptionId":"d1"}}"""
+        assertNull(codec.decode(incomplete))
     }
 
     @Test

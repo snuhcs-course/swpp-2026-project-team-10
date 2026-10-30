@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -15,15 +15,24 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentReferenceConfirmBinding
+import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
-/** Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*. Owner: PM (#5). */
+/**
+ * Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*; under the title,
+ * whose pick it is when the subject chose the candidate (FR-6.15). In a session the subject sees the outline of a chosen
+ * pose too, and a *Use this guide* of theirs that comes first goes back to the camera like this phone's own (Design
+ * 2.6.5).
+ * Owner: PM (#5); the outline on both phones Iter3-P16.
+ */
 class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
     private val viewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
+    private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
 
     /** *Choose another photo*; closing the picker keeps the current result. */
     private val pickPhoto = registerPhotoPicker { uri -> uri?.let(viewModel::onPhotoPicked) }
@@ -47,10 +56,39 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state -> render(binding, state) }
+                launch { viewModel.uiState.collect { state -> render(binding, state) } }
+                launch {
+                    viewModel.chosenBy.collect { name ->
+                        binding.chosenByText.isVisible = name != null
+                        if (name != null) binding.chosenByText.text = getString(R.string.peer_chose_this_pose, name)
+                    }
+                }
+                launch {
+                    // The subject's phone shows this outline too while a session is connected (FR-6.15).
+                    combine(viewModel.sharing, sessionViewModel.state) { sharing, session ->
+                        subjectName(session).takeIf { sharing }
+                    }.collect { name ->
+                        binding.sharedHint.isVisible = name != null
+                        if (name != null) binding.sharedHint.text = getString(R.string.reference_shared_hint, name)
+                    }
+                }
+                launch {
+                    // The subject's Use this guide came first: the guide is on the camera, as after this phone's own.
+                    viewModel.usedBySubject.collect {
+                        subjectName(sessionViewModel.state.value)?.let { name ->
+                            val text = getString(R.string.peer_used_guide, name)
+                            Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
+                        }
+                        backToShooting(viewModel)
+                    }
+                }
             }
         }
     }
+
+    /** The connected subject's name while this phone is the photographer; null outside a session. */
+    private fun subjectName(session: SessionState): String? =
+        (session as? SessionState.Connected)?.takeIf { it.role == Role.PHOTOGRAPHER }?.peer?.displayName
 
     private fun render(binding: FragmentReferenceConfirmBinding, state: ReferenceUiState) {
         val ready = state as? ReferenceUiState.Ready

@@ -66,6 +66,18 @@
         android:textColor="@color/pix_text_faint"
         tools:text="1 / 4" />
 
+    <!-- In a session: the subject sees these candidates too, and the first choice decides (FR-6.15). -->
+    <TextView
+        android:id="@+id/sharedHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+        android:visibility="gone"
+        tools:text="Junhyeong sees these poses too. The first to choose decides."
+        tools:visibility="visible" />
+
     <Button
         android:id="@+id/usePoseButton"
         android:layout_width="match_parent"

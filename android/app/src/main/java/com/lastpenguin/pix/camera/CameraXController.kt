@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -103,8 +103,10 @@ class CameraXController(
     private var retainedExposure = 0
     private var flash = FlashMode.OFF
 
-    // The light for the scene photo (setTorch). CameraX turns it off whenever the camera closes, so it is kept here.
+    // The light for the scene photo (setTorch). CameraX turns it off whenever the camera closes, so it is kept here;
+    // only the newest request's answer is published.
     private var torch = false
+    private var torchRequest = 0
 
     // Whether the bound lens has a flash; a separately exposed ultrawide may not.
     private var lensHasFlash = true
@@ -171,6 +173,7 @@ class CameraXController(
                     pendingZoom = null
                     pendingFinal = true
                     current.frames.clear()
+                    _state.update { it.copy(torch = false) }
                     refreshStatus(current)
                 }
 
@@ -355,6 +358,7 @@ class CameraXController(
                 }
                 val opened = open && !current.open
                 current.open = open
+                if (!open) _state.update { it.copy(torch = false) }
                 // CameraX can wait for another camera client without attaching an error.
                 // Keep retry/settings guidance visible while waiting; a later OPEN recovers automatically.
                 current.failed = state.error != null || state.type == CameraXState.Type.PENDING_OPEN
@@ -623,12 +627,23 @@ class CameraXController(
         }
     }
 
-    /** The kept light on an open camera with a flash; a closed one gets it when it opens again. */
+    /**
+     * The kept light on an open camera with a flash; a closed one gets it when it opens again. The state says it is on
+     * only once CameraX has applied it, so the scene photo is never taken before the light is on.
+     */
     private fun applyTorch(current: Binding) {
         val camera = current.camera ?: return
         if (!current.open || current.failed || !camera.cameraInfo.hasFlashUnit()) return
+        val on = torch
+        val request = ++torchRequest
         try {
-            camera.cameraControl.enableTorch(torch)
+            val applied = camera.cameraControl.enableTorch(on)
+            applied.addListener({
+                if (binding !== current || request != torchRequest) return@addListener
+                // CameraX drops a request when the camera closes, and then the light is off until it opens again.
+                val lit = on && runCatching { applied.get() }.isSuccess
+                _state.update { it.copy(torch = lit) }
+            }, mainExecutor)
         } catch (error: Exception) {
             Log.w(TAG, "Torch request could not start", error)
         }
@@ -887,6 +902,7 @@ class CameraXController(
         val current = binding ?: return
         binding = null
         current.active = false
+        _state.update { it.copy(torch = false) }
         publishStatus(if (preserveZoomPlan) CameraStatus.STARTING else CameraStatus.IDLE)
         if (!preserveZoomPlan) {
             _capabilities.value = null

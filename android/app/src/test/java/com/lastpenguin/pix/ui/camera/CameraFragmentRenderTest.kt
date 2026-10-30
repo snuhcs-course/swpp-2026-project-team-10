@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -426,6 +426,27 @@ class CameraFragmentRenderTest {
         assertFalse(camera.torchOn)
         assertEquals(listOf(true, false), camera.torchRequests.dropWhile { !it })
         assertEquals(emptyList<FlashMode>(), camera.flashRequests)
+    }
+
+    @Test
+    fun scenePhoto_theLightButtonSaysOnOnlyOnceTheCameraHasTheLightOn() {
+        val camera = FakeCameraController(hasFlash = true).apply { applies = false }
+        launch(camera)
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+
+        onScreen { controls, _ -> controls.flashButton.performClick() }
+        idle()
+        assertTrue(camera.torchOn)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
+        }
+
+        camera.state.value = camera.state.value.copy(torch = true)
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_light_on), controls.flashButton.contentDescription)
+        }
     }
 
     @Test

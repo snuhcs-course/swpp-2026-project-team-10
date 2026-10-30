@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -67,7 +67,10 @@ class PoseTips(
 
     private val tips = MutableStateFlow(Tips())
 
-    /** The requests in flight by guide id; [prepare] runs on the main thread and a language change on [scope]. */
+    /**
+     * The requests in flight by guide id. Every change that asks for a tip or drops one holds it, so they happen one at a
+     * time: [prepare] and [discard] run on the main thread, a guide or language change on [scope].
+     */
     private val asking = mutableMapOf<String, Job>()
 
     /**
@@ -85,20 +88,26 @@ class PoseTips(
             guideOnCamera.distinctUntilChanged { old, new -> old === new }.collect { guide ->
                 val id = guide?.id
                 // Only the guide the tip was prepared for brings one; the one on Camera before loses its own.
-                tips.update {
-                    Tips(
-                        onCamera = id,
-                        pending = it.pending.takeIf { pending -> pending != id },
-                        states = it.states.filterKeys { key -> key == it.pending },
-                        asked = it.asked.filterKeys { key -> key == it.pending },
-                    )
+                synchronized(asking) {
+                    tips.update {
+                        Tips(
+                            onCamera = id,
+                            pending = it.pending.takeIf { pending -> pending != id },
+                            states = it.states.filterKeys { key -> key == it.pending },
+                            asked = it.asked.filterKeys { key -> key == it.pending },
+                        )
+                    }
                 }
             }
         }
         scope.launch {
             language.drop(1).collect { now ->
-                for ((id, asked) in tips.value.asked) {
-                    if (asked.language != now) ask(id, Asked(asked.candidate, asked.source, now))
+                synchronized(asking) {
+                    for ((id, asked) in tips.value.asked) {
+                        // Checked again right before it is asked: a guide dropped since the change began stays dropped.
+                        if (asked.language == now || tips.value.asked[id] !== asked) continue
+                        ask(id, Asked(asked.candidate, asked.source, now))
+                    }
                 }
             }
         }
@@ -109,15 +118,15 @@ class PoseTips(
      * the one of the guide on Camera, which would stay *Preparing* if this guide is not used.
      */
     fun prepare(guide: ReferenceGuide, candidate: Bitmap, source: TipSource) {
-        val onCamera = tips.value.onCamera
         synchronized(asking) {
-            val older = asking.keys.filter { it != onCamera }
-            older.forEach { id -> asking.remove(id)?.cancel() }
+            val onCamera = tips.value.onCamera
+            asking.keys.filter { it != onCamera }.forEach { id -> asking.remove(id)?.cancel() }
+            tips.update { it.copy(pending = guide.id).kept() }
+            ask(guide.id, Asked(candidate, source, language.value))
         }
-        tips.update { it.copy(pending = guide.id).kept() }
-        ask(guide.id, Asked(candidate, source, language.value))
     }
 
+    /** Asks for the tip of [guideId] from [asked], in place of any request for it; called holding [asking]. */
     private fun ask(guideId: String, asked: Asked) {
         tips.update {
             it.copy(states = it.states + (guideId to TipState.Preparing), asked = it.asked + (guideId to asked))
@@ -130,7 +139,7 @@ class PoseTips(
             // A guide that left in the meantime, unused or replaced, keeps no tip, and one asked again keeps the newer.
             tips.update { if (it.asked[guideId] === asked) it.copy(states = it.states + (guideId to state)) else it }
         }
-        synchronized(asking) { asking.put(guideId, job) }?.cancel()
+        asking.put(guideId, job)?.cancel()
     }
 
     /**
@@ -138,11 +147,10 @@ class PoseTips(
      * without it, or another photo took its place. Its request is cancelled, which the server passes on to the model.
      */
     fun discard(guideId: String) {
-        var dropped = false
-        tips.update {
-            dropped = it.pending == guideId
-            if (dropped) it.copy(pending = null).kept() else it
+        synchronized(asking) {
+            if (tips.value.pending != guideId) return
+            tips.update { it.copy(pending = null).kept() }
+            asking.remove(guideId)?.cancel()
         }
-        if (dropped) synchronized(asking) { asking.remove(guideId) }?.cancel()
     }
 }

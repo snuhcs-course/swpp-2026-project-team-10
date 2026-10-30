@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -776,16 +776,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
         controls.zoomReadout.isInvisible = reviewing
         // The scene photo is a frame of the live preview: a photo's flash, the ratio, and brightness do not apply to it.
-        // While the scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1).
+        // While the scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1). It says on
+        // only once the camera has the light on, so it never claims a light that is not.
         if (active) {
             val light = !reviewing && camera.hasFlash
             controls.cameraSettings.isVisible = light
             controls.aspectButton.isVisible = false
             controls.flashButton.isVisible = light
             controls.flashButton.isEnabled = ready
-            controls.flashButton.setIconResource(if (scene.light) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+            controls.flashButton.setIconResource(if (camera.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
             controls.flashButton.contentDescription =
-                getString(if (scene.light) R.string.scene_light_on else R.string.scene_light_off)
+                getString(if (camera.torch) R.string.scene_light_on else R.string.scene_light_off)
             controls.brightnessButton.isVisible = false
             controls.brightnessPanel.isVisible = false
         }

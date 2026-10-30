@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -26,10 +26,12 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -165,10 +167,18 @@ class GenerationViewModel(
         _uiState.value = GenerationUiState(phase = GenerationUiState.Phase.FRAMING)
     }
 
-    /** The shutter during FRAMING: the camera's current frame becomes the photo to confirm. */
+    /**
+     * The shutter during FRAMING: the camera's current frame becomes the photo to confirm. With the light chosen but not
+     * on yet, the frame waits until the camera has it on, then [LIGHT_SETTLE_MS] for a frame lit by it and for the
+     * exposure to follow, so the scene is not taken dark; after [LIGHT_WAIT_MS] without it, the frame is taken as it is.
+     */
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         shooting = viewModelScope.launch {
+            if (_uiState.value.light && !camera.state.value.torch) {
+                val lit = withTimeoutOrNull(LIGHT_WAIT_MS) { camera.state.first { it.torch } }
+                if (lit != null) delay(LIGHT_SETTLE_MS)
+            }
             // The camera the frame comes from, read with it: a selfie gets selfie poses (FR-1.14).
             val selfie = camera.facing.value == CameraFacing.FRONT
             val frame = camera.grabFrame()
@@ -495,7 +505,13 @@ class GenerationViewModel(
         }
     }
 
-    private companion object {
-        const val TAG = "PixPoses"
+    companion object {
+        private const val TAG = "PixPoses"
+
+        /** How long the scene photo waits for the light the user turned on (FR-4.1). */
+        const val LIGHT_WAIT_MS = 1_000L
+
+        /** How long after the light comes on the scene photo is taken: the camera's exposure follows it. */
+        const val LIGHT_SETTLE_MS = 500L
     }
 }

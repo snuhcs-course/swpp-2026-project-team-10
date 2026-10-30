@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -6,9 +6,11 @@ import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.ReferenceGuide
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -26,7 +28,7 @@ import org.junit.Test
 // prepared guide before it goes on Camera, the guide already on Camera, and an older guide. The screens' language
 // changing (FR-10.2): with the tip on Camera ready, with the one prepared still being asked for (its older answer
 // arriving late), and with only a guide that has no tip. A newer guide prepared, then discarded, while the tip on
-// Camera is still being asked for.
+// Camera is still being asked for, and a guide discarded while a language change asks the others again.
 @OptIn(ExperimentalCoroutinesApi::class)
 class PoseTipsTest {
     private val tipper = RecordingTipper()
@@ -300,13 +302,38 @@ class PoseTipsTest {
         assertEquals(GuideTip("g1", TipState.Ready(PoseTip(KOREAN_TEXT))), tips.onCamera.value)
     }
 
+    @Test
+    fun aGuideDiscardedWhileTheLanguageChangeAsksAgainIsNotAskedAgain() = runTest {
+        val tips = tips()
+        val current = guide("g1")
+        tips.prepare(current, candidate, TipSource(scene, POSE))
+        onCamera.value = current
+        runCurrent()
+        val newer = guide("g2")
+        tips.prepare(newer, candidate, TipSource(scene, "Sit on the step"))
+        runCurrent()
+        // Asking the guide on Camera again cancels its first request: the newer guide is discarded right then, before
+        // its own turn.
+        tipper.requests[0].whenCancelled = { tips.discard(newer.id) }
+
+        language.value = KOREAN
+        runCurrent()
+
+        assertEquals(listOf(POSE, "Sit on the step", POSE), tipper.requests.map { it.pose })
+        assertTrue(tipper.requests[1].cancelled)
+        assertEquals(GuideTip("g1", TipState.Preparing), tips.onCamera.value)
+    }
+
     private class RecordingTipper : PoseTipper {
         val requests = mutableListOf<Request>()
 
         override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> {
             val request = Request(scene, candidate, pose).also(requests::add)
             try {
-                return request.result.await()
+                return suspendCancellableCoroutine { continuation ->
+                    continuation.invokeOnCancellation { request.whenCancelled() }
+                    request.result.invokeOnCompletion { continuation.resume(request.result.getCompleted()) }
+                }
             } catch (error: CancellationException) {
                 request.cancelled = true
                 throw error
@@ -316,6 +343,9 @@ class PoseTipsTest {
         class Request(val scene: Bitmap, val candidate: Bitmap, val pose: String) {
             val result = CompletableDeferred<Result<PoseTip>>()
             var cancelled = false
+
+            /** Runs the moment the request is cancelled, inside the call that cancels it. */
+            var whenCancelled: () -> Unit = {}
 
             fun answer(text: String) = result.complete(Result.success(PoseTip(text)))
 

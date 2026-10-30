@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -160,7 +160,10 @@ class FakeCameraController(
     val exposureRequests = mutableListOf<Int>()
     val flashRequests = mutableListOf<FlashMode>()
 
-    /** Each light request, and whether the light is on; it is kept like the controller's, flash or not. */
+    /**
+     * Each light request, and the light kept, flash or not, like the controller's; [state]'s `torch` follows at once on
+     * a camera with a flash that [applies].
+     */
     val torchRequests = mutableListOf<Boolean>()
     var torchOn = false
 
@@ -178,6 +181,7 @@ class FakeCameraController(
     override fun setTorch(on: Boolean) {
         torchRequests += on
         torchOn = on
+        if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(torch = on)
     }
 
     override fun setAspectRatio(ratio: AspectRatio) = Unit

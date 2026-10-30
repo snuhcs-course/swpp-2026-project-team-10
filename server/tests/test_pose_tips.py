@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
+# AI-generated with Claude Code, 2026-10-31, reviewed by Dongje Park
 # POST /pose-tips partitions (Testing Documentation 2.1.6). Photos: a scene and a candidate within the contract, and
 # either one not a JPEG, too large, carrying EXIF, or missing. Pose: one in Korean with extra whitespace, of 100
 # characters and of 101, blank, or missing. The model's answer: usable, with each framing it may judge; JSON in a code
@@ -11,10 +11,10 @@
 # down. Privacy: neither the pose nor the answer nor the upstream body is logged. Language (FR-10.2): `ko`, `en`, left
 # out, and another value; a sentence in the language asked for, in the other one, in both, in another script (Japanese),
 # with one, or with no letters; a Korean sentence that is usable, one with words that only contain a count ("한쪽", "두 손")
-# or that look like one (구도, 두 발로, 이발) or a unit (밀리지), and one with a count of steps, with or without a space, of words
-# run together ("한두", "열한", "이십"), or with an ending ("한 걸음만"), a unit, or a degree in digits or in words, of one digit
-# or more, with or without an ending, a unit with an ending or after a native count, and degrees of three digits; a
-# Korean sentence of 80 characters and of 81.
+# or that look like one (구도, 두 발로, 두 발을, 이발, 이 도시) or a unit (밀리지), and one with a count of steps, with or
+# without a space, of words run together ("한두", "열한", "이십"), or with an ending ("한 걸음만", "한 발만큼"), a unit,
+# or a degree in digits or in words, of one digit or more, with or without an ending, a unit with any ending, after a
+# count or not, 밀리 after a count, and degrees of three digits; a Korean sentence of 80 characters and of 81.
 import asyncio
 import base64
 import json
@@ -129,8 +129,15 @@ def test_language_the_app_does_not_have_is_refused_before_a_call(client, image_a
         "한쪽 어깨가 보이게 가슴 높이에서 두 손으로 수평으로 드세요 - 몸의 비율이 그대로 보여요.",
         "두 발로 단단히 서서 구도를 맞추고 가슴 높이에서 드세요 - 이발한 머리까지 깔끔하게 담겨요.",
         "가슴 높이에서 수평으로 드세요 - 인물이 한쪽으로 밀리지 않아요.",
+        "두 발을 모은 모습과 이 도시 풍경이 다 담기게 가슴 높이에서 드세요.",
     ],
-    ids=["usable", "words containing a count", "words that look like a count", "words that look like a unit"],
+    ids=[
+        "usable",
+        "words containing a count",
+        "words that look like a count",
+        "words that look like a unit",
+        "words that look like a step or a degree",
+    ],
 )
 def test_korean_sentence_is_shown(client, image_api, photos, text):
     image_api.tips(ANSWER | {"text": text})
@@ -159,6 +166,13 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "백이십 도로 기울이세요.",
         "삼십 센티쯤 낮춰서 드세요.",
         "다섯센티 물러나서 드세요.",
+        "몇 미터까지 물러나세요.",
+        "미터보다 조금 더 물러나세요.",
+        "삼십 센티만큼 낮추세요.",
+        "두 밀리만 낮추세요.",
+        "삼십 도만큼 기울이세요.",
+        "오 도까지 기울이세요.",
+        "한 발만큼 다가가세요.",
     ],
     ids=[
         "count of steps",
@@ -178,6 +192,13 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "degrees of three digits",
         "unit with an ending",
         "unit after a native count",
+        "unit after a count with another ending",
+        "unit alone with another ending",
+        "unit in words with another ending",
+        "밀리 after a count",
+        "degrees with another ending",
+        "one digit of degrees with another ending",
+        "native count of 발 with another ending",
     ],
 )
 def test_korean_sentence_with_a_count_a_unit_or_a_degree_is_unusable(client, image_api, photos, text):

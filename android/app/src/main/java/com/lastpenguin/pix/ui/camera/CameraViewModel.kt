@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -105,6 +105,8 @@ data class CameraUiState(
     /** False hides the flash button (FR-1.12). */
     val hasFlash: Boolean = false,
     val flash: FlashMode = FlashMode.OFF,
+    /** The phone's light for the scene photo is on, as the camera applied it (FR-4.1). */
+    val torch: Boolean = false,
     /** The frame's shape (FR-1.13, AD-10): the preview, the grid, the guide, and the saved photo follow it. */
     val aspect: AspectRatio = AspectRatio.R4_3,
     /** The camera in use (FR-1.14); the front one is selfie mode. */
@@ -189,7 +191,9 @@ class CameraViewModel(
         }
         viewModelScope.launch {
             camera.state.collect { state ->
-                _uiState.update { it.copy(exposure = state.exposure, flash = state.flash, aspect = state.aspect) }
+                _uiState.update {
+                    it.copy(exposure = state.exposure, flash = state.flash, aspect = state.aspect, torch = state.torch)
+                }
             }
         }
         viewModelScope.launch {

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-31, reviewed by Jaewan Park and Dongje Park
 """Try the pose tip prompt on scene photos and candidates made once (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY in server/.env:
@@ -74,17 +74,20 @@ KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱
 KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
 KOREAN_DIGIT = "[일이삼사오육칠팔구]"
 KOREAN_TENS = f"(?:{KOREAN_DIGIT}?[십백])+{KOREAN_DIGIT}?"
-DEGREE_ENDING = "(로|만|씩|쯤|가량|를|의|에)?"
-KOREAN_UNITS = "센티미터|밀리미터|미터|센티|센치|밀리|인치|피트"
-UNIT_ENDING = "(만|씩|쯤|가량|정도|를|을|의|에|로|으로|은|는|이|가|도)?"
+KOREAN_COUNT = f"{KOREAN_NATIVE}|(?:수|몇)?{KOREAN_SINO}|반|몇|수"
+KOREAN_UNITS = "센티미터|밀리미터|미터|센티|센치|인치|피트"
+# The particles after an amount, one after another ("쯤에서"); after 발 and 보, only those of an amount, because "두 발로"
+# is about feet.
+KOREAN_ENDINGS = "(?:만|씩|쯤|가량|정도|만큼|까지|보다|부터|로|를|의|에|에서|은|는|이|가|도)*"
+STEP_ENDINGS = "(?:만|씩|쯤|가량|정도|만큼)*"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
     rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)"
-    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO}|반|몇)?\s*({KOREAN_UNITS}){UNIT_ENDING}(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보)(만|씩|쯤|가량)?(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_TENS}\s*도{DEGREE_ENDING}(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{DEGREE_ENDING}(?![가-힣])",
+    rf"|(?<![가-힣])({KOREAN_UNITS})|(?<![가-힣])({KOREAN_COUNT})\s*({KOREAN_UNITS}|밀리)"
+    rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보){STEP_ENDINGS}(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_TENS}\s*도"
+    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{KOREAN_ENDINGS}(?![가-힣])",
     re.IGNORECASE,
 )
 # The server refuses a sentence with a letter not of the language asked for, or with none, as poses/tips.py does.

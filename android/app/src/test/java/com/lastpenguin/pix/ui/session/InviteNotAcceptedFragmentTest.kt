@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.fragment.app.testing.FragmentScenario
@@ -9,12 +9,10 @@ import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
-import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,10 +42,7 @@ class InviteNotAcceptedFragmentTest {
     private fun launch(): TestAppContainer {
         val modules = TestAppContainer().install()
         val (launched, navController) = launchPrepared<InviteNotAcceptedFragment>(R.id.inviteNotAcceptedFragment) {
-            val sessionViewModel = it.viewModel<SessionViewModel>()
-            sessionViewModel.invite(friend)
-            idle()
-            runBlocking { sessionViewModel.inviteResults.first() }
+            it.inviteFromFriends(friend)
         }
         scenario = launched
         nav = navController

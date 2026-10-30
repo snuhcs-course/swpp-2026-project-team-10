@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.ClipboardManager
@@ -18,8 +18,8 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
-import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,8 +66,7 @@ class InviteSentSheetTest {
 
     /** The invitation went out, as from Friends, and the session waits for the friend. */
     private fun inviting(modules: TestAppContainer, activity: FragmentActivity = sheet.requireActivity()) {
-        activity.viewModel<SessionViewModel>().invite(friend)
-        idle()
+        activity.inviteFromFriends(friend)
         modules.session.setState(SessionState.Inviting("inv_1"))
         idle()
     }

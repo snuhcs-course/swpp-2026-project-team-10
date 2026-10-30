@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -51,6 +51,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.account.AccountSheet
@@ -77,7 +78,6 @@ import com.lastpenguin.pix.ui.session.InviteSentSheet
 import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
-import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
 import com.lastpenguin.pix.ui.session.SubjectDescribeFragment
@@ -88,7 +88,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -439,8 +438,7 @@ class KoreanScreensTest {
     fun inviteSent_waitingForAFriend_isInKorean() {
         val modules = TestAppContainer().install()
         scenario = launchFragment<InviteSentSheet>(themeResId = R.style.Theme_Pix)
-        scenario!!.onFragment { it.requireActivity().viewModel<SessionViewModel>().invite(sent.to) }
-        idle()
+        scenario!!.onFragment { it.requireActivity().inviteFromFriends(sent.to) }
         modules.session.setState(SessionState.Inviting("inv_1"))
         assertKorean(screen(), *people)
     }
@@ -449,11 +447,7 @@ class KoreanScreensTest {
     fun inviteNotAccepted_isInKorean() {
         TestAppContainer().install()
         scenario = launchPrepared<InviteNotAcceptedFragment>(R.id.inviteNotAcceptedFragment) {
-            val sessionViewModel = it.viewModel<SessionViewModel>()
-            sessionViewModel.invite(sent.to)
-            idle()
-            // Invite sent read the Sent in the app.
-            runBlocking { sessionViewModel.inviteResults.first() }
+            it.inviteFromFriends(sent.to)
         }.first
         assertKorean(screen(), *people)
     }

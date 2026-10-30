@@ -29,7 +29,6 @@ import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +39,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /** Short notices for the photographer's camera screen. */
@@ -135,10 +133,14 @@ class SessionViewModel(
      */
     val invitation: StateFlow<SentInvitation?> = _invitation.asStateFlow()
 
-    private val _inviteResults = Channel<InviteResult>(Channel.BUFFERED)
+    private val _inviteResults = MutableSharedFlow<InviteResult>(extraBufferCapacity = 1)
 
-    /** What each *Invite* did, once, for the screen that asked: Friends or *Invite not accepted*. */
-    val inviteResults: Flow<InviteResult> = _inviteResults.receiveAsFlow()
+    /**
+     * What each *Invite* did, for the screen that asked while it is open: Friends or *Invite not accepted*. Only an open
+     * one can show *Invite sent*, so an invitation the server makes once neither is, as when the photographer went back
+     * to Camera before the answer, is cancelled rather than left waiting unseen.
+     */
+    val inviteResults: Flow<InviteResult> = _inviteResults.asSharedFlow()
 
     /** An invitation is on its way to the server, so a second tap sends none. */
     private var sendingInvite = false
@@ -195,7 +197,8 @@ class SessionViewModel(
      * Photographer: *Invite* on Friends, or *Invite again* (FR-6.1–6.3). The server opens the session with this phone's
      * place, which it takes at once, waiting in `Inviting` for the friend. Ignored while a session is open or another
      * invitation is on its way. A session started while it is on its way, as with *Use a room code*, keeps this phone,
-     * so the invitation is cancelled rather than left to a friend whose *Accept* would find nobody waiting.
+     * so the invitation is cancelled rather than left to a friend whose *Accept* would find nobody waiting; so is one
+     * whose screen has closed meanwhile ([inviteResults]).
      */
     fun invite(friend: PixUser) {
         if (sendingInvite || isOpen(state.value)) return
@@ -204,7 +207,7 @@ class SessionViewModel(
         viewModelScope.launch {
             invitations.invite(friend.userId)
                 .onSuccess { sent ->
-                    if (started != startedBefore) {
+                    if (started != startedBefore || _inviteResults.subscriptionCount.value == 0) {
                         invitations.cancel(sent.id)
                         return@onSuccess
                     }
@@ -213,11 +216,11 @@ class SessionViewModel(
                     started++
                     _invitation.value = sent
                     session.start(SessionEntry.Invite(sent.id, sent.place), Role.PHOTOGRAPHER)
-                    _inviteResults.send(InviteResult.Sent)
+                    _inviteResults.emit(InviteResult.Sent)
                 }
                 .onFailure { error ->
                     val reason = (error as? AccountException)?.error ?: AccountError.UNKNOWN
-                    _inviteResults.send(InviteResult.Failed(friend, reason))
+                    _inviteResults.emit(InviteResult.Failed(friend, reason))
                 }
             sendingInvite = false
         }

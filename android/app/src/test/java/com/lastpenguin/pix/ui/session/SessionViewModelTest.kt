@@ -338,6 +338,7 @@ class SessionViewModelTest {
 
     private val friend = PixUser("u_2", "test2", "Test Account 2")
 
+    /** Friends, open while the invitation is on its way, as it sent it: it takes what each *Invite* did. */
     private fun TestScope.inviteResults(): MutableList<InviteResult> {
         val results = mutableListOf<InviteResult>()
         backgroundScope.launch { model.inviteResults.collect { results += it } }
@@ -370,6 +371,7 @@ class SessionViewModelTest {
 
     @Test
     fun invite_whileASessionIsOpen_orTwiceAtOnce_sendsOne() = runTest(dispatcher) {
+        inviteResults()
         session.setState(SessionState.Waiting(CODE))
         runCurrent()
         model.invite(friend)
@@ -382,6 +384,31 @@ class SessionViewModelTest {
         model.invite(friend)
         runCurrent()
         assertEquals(listOf("invite:u_2"), invitations.calls)
+    }
+
+    @Test
+    fun invite_answeredAfterItsScreenClosed_cancelsTheInvitation_andStartsNothing() = runTest(dispatcher) {
+        val friends = backgroundScope.launch { model.inviteResults.collect {} }
+        val answer = CompletableDeferred<Unit>()
+        invitations.inviteGate = answer
+        runCurrent()
+        model.invite(friend)
+        runCurrent()
+        // Back to Camera before the server answered.
+        friends.cancel()
+        runCurrent()
+        answer.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf("invite:u_2", "cancel:inv_1"), invitations.calls)
+        assertTrue(session.starts.isEmpty())
+        assertNull(model.invitation.value)
+
+        // Nothing waits, so the next *Invite* goes out.
+        inviteResults()
+        model.invite(friend)
+        runCurrent()
+        assertEquals(SessionEntry.Invite("inv_1", invitations.sent.place) to Role.PHOTOGRAPHER, session.starts.single())
     }
 
     @Test
@@ -400,6 +427,7 @@ class SessionViewModelTest {
 
     @Test
     fun cancelInvite_whileWaiting_cancelsOnTheServerAndLeaves() = runTest(dispatcher) {
+        inviteResults()
         model.invite(friend)
         runCurrent()
         session.setState(SessionState.Inviting("inv_1"))
@@ -413,6 +441,7 @@ class SessionViewModelTest {
 
     @Test
     fun cancelInvite_whileWaiting_leavesAtOnce_soARoomCanStartBeforeTheServerAnswers() = runTest(dispatcher) {
+        inviteResults()
         model.invite(friend)
         runCurrent()
         session.setState(SessionState.Inviting("inv_1"))
@@ -438,6 +467,7 @@ class SessionViewModelTest {
 
     @Test
     fun cancelInvite_onceTheFriendAccepted_leavesTheSessionTheyAreJoining_butNotOnceConnected() = runTest(dispatcher) {
+        inviteResults()
         model.invite(friend)
         runCurrent()
         session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))

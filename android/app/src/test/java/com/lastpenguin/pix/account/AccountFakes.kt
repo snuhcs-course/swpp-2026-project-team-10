@@ -194,9 +194,9 @@ class FakeAccountApi : PixAccountApi {
 }
 
 /**
- * Answers with what a test sets, or with [failure]; every call is recorded by name. [acceptGate] and [cancelGate], when
- * set, hold `accept` and `cancel` until the test completes them, so what happens while the answer is on its way can be
- * seen.
+ * Answers with what a test sets, or with [failure]; every call is recorded by name. [inviteGate], [acceptGate], and
+ * [cancelGate], when set, hold `invite`, `accept`, and `cancel` until the test completes them, so what happens while
+ * the answer is on its way can be seen.
  */
 class FakeInvitationManager : InvitationManager {
     val calls = mutableListOf<String>()
@@ -211,6 +211,7 @@ class FakeInvitationManager : InvitationManager {
     var opened =
         OpenedInvitation("inv_1", PixUser("u_1", "test1", "Test Account 1"), InvitationStatus.PENDING, 1_030_000)
     var place = SessionPlace("s_1", "subject-token", emptyList())
+    var inviteGate: CompletableDeferred<Unit>? = null
     var acceptGate: CompletableDeferred<Unit>? = null
     var cancelGate: CompletableDeferred<Unit>? = null
 
@@ -219,7 +220,10 @@ class FakeInvitationManager : InvitationManager {
         return failure?.let { Result.failure(AccountException(it)) } ?: Result.success(value())
     }
 
-    override suspend fun invite(friendId: String) = answer("invite:$friendId") { sent }
+    override suspend fun invite(friendId: String): Result<SentInvitation> {
+        inviteGate?.await()
+        return answer("invite:$friendId") { sent }
+    }
 
     override suspend fun open(invitationId: String) = answer("open:$invitationId") { opened }
 

@@ -1,7 +1,5 @@
 Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
 
-Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated here, shortened to the instruction; status checks are left out.
-
 ## Camera screen controls and preview size ([#136])
 
 - [Dongje, 10-26] "The buttons and icons are needlessly large: shrink them sensibly for my review; the S22 is connected. Then let the camera screen grow as much as they shrank; 16:9 now narrows at the sides, so keep the sides and let it grow up and down, even over the buttons. Plan the order and the method for my review." (The issue came from the Codex review of #135. Renders at the S22's 360 × 705 dp beside the phone's own screenshots.)

@@ -46,6 +46,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-31] "Check the Codex review and fix it, as before." (Fifth review: a unit, or a degree of a whole number, is refused whatever ending follows, and `PoseTips` asks or drops a tip one change at a time, so a discarded guide is never asked again.)
 - [Dongje, 10-31] "Check the Codex review again and fix it; a new one came in." (Sixth review: `PoseTips` follows the language from its first value and cancels the request of a guide that leaves Camera.)
 - [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (Seventh review: 몇 and 반 count before a step.)
+- [Dongje, 10-31] "The reviews keep coming: while fixing them, structure the code so that edge cases are as unlikely as possible." (Ninth review, with a restructure: the Korean check is a table of measures over one count vocabulary, with 영 before a degree, and `PoseTips` changes its tips through one function whose difference starts and cancels the requests.)
 
 ## A light for the scene photo ([#158])
 
@@ -54,6 +55,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-31] "Check the Codex review and fix it, as before." (The button says the light is on only once the camera has it, and a scene shot before that waits for the light.)
 - [Dongje, 10-31] "Check the Codex review again and fix it; a new one came in." (An answer to the light that arrives after the camera closed is dropped.)
 - [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (A lens without a flash takes the scene without waiting for the light. Eighth review: a shot waits until the light has been on for half a second, also right after it came on, and a light that does not go off is asked once more.)
+- [Dongje, 10-31] "The reviews keep coming: while fixing them, structure the code so that edge cases are as unlikely as possible." (A shot waits until the light is as chosen, on or off, for half a second; a failed light request is asked once more either way.)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110

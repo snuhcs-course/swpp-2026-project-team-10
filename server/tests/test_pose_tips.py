@@ -11,11 +11,11 @@
 # down. Privacy: neither the pose nor the answer nor the upstream body is logged. Language (FR-10.2): `ko`, `en`, left
 # out, and another value; a sentence in the language asked for, in the other one, in both, in another script (Japanese),
 # with one, or with no letters; a Korean sentence that is usable, one with words that only contain a count ("한쪽", "두 손")
-# or that look like one (구도, 두 발로, 두 발을, 이발, 이 도시) or a unit (밀리지), and one with a count of steps, with or
+# or that look like one (구도, 영도, 두 발로, 두 발을, 이발, 이 도시) or a unit (밀리지), and one with a count of steps, with or
 # without a space, of words run together ("한두", "열한", "이십"), of 몇 or 반 ("몇 걸음", "반 걸음", "반 발"), or with an
 # ending ("한 걸음만", "한 발만큼"), a unit, or a degree in digits or in words, of one digit or more, with or without an
-# ending, a unit with any ending, after a count or not, 밀리 after a count, and degrees of three digits; a Korean
-# sentence of 80 characters and of 81.
+# ending, a unit with any ending, after a count or not, 밀리 after a count, and degrees of zero or three digits; a
+# Korean sentence of 80 characters and of 81.
 import asyncio
 import base64
 import json
@@ -131,6 +131,7 @@ def test_language_the_app_does_not_have_is_refused_before_a_call(client, image_a
         "두 발로 단단히 서서 구도를 맞추고 가슴 높이에서 드세요 - 이발한 머리까지 깔끔하게 담겨요.",
         "가슴 높이에서 수평으로 드세요 - 인물이 한쪽으로 밀리지 않아요.",
         "두 발을 모은 모습과 이 도시 풍경이 다 담기게 가슴 높이에서 드세요.",
+        "영도 바다가 다 담기게 가슴 높이에서 수평으로 드세요.",
     ],
     ids=[
         "usable",
@@ -138,6 +139,7 @@ def test_language_the_app_does_not_have_is_refused_before_a_call(client, image_a
         "words that look like a count",
         "words that look like a unit",
         "words that look like a step or a degree",
+        "a place that looks like zero degrees",
     ],
 )
 def test_korean_sentence_is_shown(client, image_api, photos, text):
@@ -177,6 +179,8 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "몇 걸음 뒤로 물러나세요.",
         "반 걸음 다가가세요.",
         "반 발 물러나세요.",
+        "영 도로 기울이세요.",
+        "영 도를 유지하세요.",
     ],
     ids=[
         "count of steps",
@@ -206,6 +210,8 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "몇 before a step",
         "반 before a step",
         "반 before 발",
+        "zero degrees with an ending",
+        "zero degrees with another ending",
     ],
 )
 def test_korean_sentence_with_a_count_a_unit_or_a_degree_is_unusable(client, image_api, photos, text):

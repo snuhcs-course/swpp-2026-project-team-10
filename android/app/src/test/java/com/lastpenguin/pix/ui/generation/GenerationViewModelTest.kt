@@ -226,6 +226,29 @@ class GenerationViewModelTest {
     }
 
     @Test
+    fun aShotRightAfterTheLightWasTurnedOff_waitsUntilItIsOff_andForTheExposure() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
+        camera.lightApplies = false
+        model.toggleLight()
+        runCurrent()
+        assertTrue(camera.state.value.torch)
+
+        model.takeScene()
+        runCurrent()
+        assertEquals(0, camera.grabs)
+        camera.state.value = camera.state.value.copy(torch = false)
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS - 1)
+        assertEquals(0, camera.grabs)
+        advanceTimeBy(2)
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
     fun aLightThatDoesNotComeOn_leavesTheSceneAsItIs_afterAWhile() = runTest {
         camera.lightApplies = false
         model.beginScene()

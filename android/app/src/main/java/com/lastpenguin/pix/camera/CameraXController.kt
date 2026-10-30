@@ -630,8 +630,9 @@ class CameraXController(
 
     /**
      * The kept light on an open camera with a flash; a closed one gets it when it opens again. The state says it is on
-     * only once CameraX has applied it, so the scene photo is never taken before the light is on. A request that fails
-     * on an open camera leaves the state as it was, and turning the light off is asked once more while [retry].
+     * only once CameraX has applied it, so the scene photo is never taken before the light is as chosen. A request that
+     * fails on an open camera leaves the state as it was and is asked once more while [retry]; [setTorch] asks again
+     * after that, because the kept light then still differs from the state.
      */
     private fun applyTorch(current: Binding, retry: Boolean = true) {
         val camera = current.camera ?: return
@@ -645,7 +646,7 @@ class CameraXController(
                 if (binding !== current || request != torchRequest || !current.open) return@addListener
                 when {
                     runCatching { applied.get() }.isSuccess -> _state.update { it.copy(torch = on) }
-                    !on && retry -> applyTorch(current, retry = false)
+                    retry -> applyTorch(current, retry = false)
                     else -> Log.w(TAG, "The camera did not turn the light ${if (on) "on" else "off"}")
                 }
             }, mainExecutor)

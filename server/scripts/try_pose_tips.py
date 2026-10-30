@@ -70,26 +70,42 @@ KOREAN_TEXT_MAX_LENGTH = 80  # what tip_korean asks for
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
-KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
-KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
-KOREAN_DIGIT = "[일이삼사오육칠팔구]"
-KOREAN_TENS = f"(?:{KOREAN_DIGIT}?[십백])+{KOREAN_DIGIT}?"
-KOREAN_COUNT = f"{KOREAN_NATIVE}|(?:수|몇)?{KOREAN_SINO}|반|몇|수"
-KOREAN_UNITS = "센티미터|밀리미터|미터|센티|센치|인치|피트"
-# The particles after an amount, one after another ("쯤에서"); after 발 and 보, only those of an amount, because "두 발로"
-# is about feet.
-KOREAN_ENDINGS = "(?:만|씩|쯤|가량|정도|만큼|까지|보다|부터|로|를|의|에|에서|은|는|이|가|도)*"
-STEP_ENDINGS = "(?:만|씩|쯤|가량|정도|만큼)*"
-MEASURE = re.compile(
-    rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
-    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
-    rf"|(?<![가-힣])({KOREAN_COUNT})\s*(걸음|발짝|발자국|뼘)"
-    rf"|(?<![가-힣])({KOREAN_UNITS})|(?<![가-힣])({KOREAN_COUNT})\s*({KOREAN_UNITS}|밀리)"
-    rf"|(?<![가-힣])({KOREAN_NATIVE}|반|몇)\s*(발|보){STEP_ENDINGS}(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_TENS}\s*도"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{KOREAN_ENDINGS}(?![가-힣])",
-    re.IGNORECASE,
+ENGLISH_MEASURES = (
+    rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b",
+    r"\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b",
 )
+# Korean, word by word. Every measure takes the same counts, COUNT: native ones, also run together ("한두", "서너",
+# "대여섯", "열한"), Sino-Korean numbers ("이십", "백이십", "수십"), 몇, 반, 수, and 영. Only a measure that is also an
+# ordinary word narrows its counts or endings, as its comment says.
+NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
+SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
+DIGIT = "[일이삼사오육칠팔구]"
+TENS = f"(?:{DIGIT}?[십백])+{DIGIT}?"
+COUNT = f"(?:{NATIVE}|(?:수|몇)?{SINO}|반|몇|수|영)"
+UNITS = "센티미터|밀리미터|미터|센티|센치|인치|피트"
+WORD_START = "(?<![가-힣])"
+WORD_END = "(?![가-힣])"
+# The particles after an amount, one after another ("쯤에서"), and those that only follow an amount ("만큼").
+PARTICLES = "(?:만|씩|쯤|가량|정도|만큼|까지|보다|부터|로|를|의|에|에서|은|는|이|가|도)*"
+AMOUNT_PARTICLES = "(?:만|씩|쯤|가량|정도|만큼)*"
+KOREAN_MEASURES = (
+    # Steps after a count, joined or not, whatever follows ("한 걸음", "두걸음만", "몇 걸음", "반 걸음").
+    rf"{WORD_START}{COUNT}\s*(?:걸음|발짝|발자국|뼘)",
+    # A unit at the start of a word, after a count or none, whatever follows ("미터보다", "몇 미터까지", "삼십센티만큼"),
+    # so 파라미터 is not one, and a word that only begins like one (미터기) is refused with it.
+    rf"{WORD_START}(?:{COUNT}\s*)?(?:{UNITS})",
+    # 밀리 only after a count, because "밀리지 않게" is a verb.
+    rf"{WORD_START}{COUNT}\s*밀리",
+    # 발 and 보 only after a count that is not also a word ("이 발" is this foot), with the particles of an amount
+    # ("한 발만큼"), because "두 발로 서서" is about feet and 이발 or 구보 are words of their own.
+    rf"{WORD_START}(?:{NATIVE}|반|몇)\s*[발보]{AMOUNT_PARTICLES}{WORD_END}",
+    # Degrees after a number with tens, whatever follows ("백이십 도만큼"); after one digit or zero, only with a space
+    # and particles ("구 도까지", "영 도로"), because 구도, 영도, and "이 도시" are words, though "이 도로" (this road) is
+    # refused with them.
+    rf"{WORD_START}{TENS}\s*도",
+    rf"{WORD_START}(?:영|{DIGIT})\s+도{PARTICLES}{WORD_END}",
+)
+MEASURE = re.compile("|".join(ENGLISH_MEASURES + KOREAN_MEASURES), re.IGNORECASE)
 # The server refuses a sentence with a letter not of the language asked for, or with none, as poses/tips.py does.
 SCRIPTS = {"en": re.compile("[A-Za-z]"), "ko": re.compile("[가-힣]")}
 

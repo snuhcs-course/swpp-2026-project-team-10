@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -11,7 +11,7 @@ from fastapi import APIRouter, Form, Request, UploadFile
 from pydantic import BaseModel
 
 from pix_server.errors import ApiError
-from pix_server.poses.generator import PoseGenerator, check_scene
+from pix_server.poses.generator import PoseGenerator, aspect_ratio, check_scene
 from pix_server.poses.limiter import Kind, PoseLimiter
 from pix_server.poses.prompts import DEFAULT_POSES, checked_pose, pose_prompt
 from pix_server.poses.suggester import PoseSuggester
@@ -128,14 +128,14 @@ async def create_pose(
     else:
         raise ApiError(400, "UNKNOWN_TEMPLATE", "No pose template with this id")
     scene = await image.read()
-    check_scene(scene)
+    ratio = aspect_ratio(check_scene(scene))
     await count(request, "poses")
 
     generator: PoseGenerator = request.app.state.pose_generator
     # The image API does not bill a generation it could not deliver. A refusal keeps the generator's own message: the
     # image service does not say whether it refused the photo or the text, and every pose of the current app,
     # suggested ones included, arrives as a description (US-5).
-    candidate = await while_connected(request, generator.generate(scene, prompt, seed))
+    candidate = await while_connected(request, generator.generate(scene, prompt, seed, ratio))
     return PoseResponse(
         templateId=template_id,
         image=base64.b64encode(candidate).decode(),

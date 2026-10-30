@@ -43,4 +43,4 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 [#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
 [#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
-[#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
+[#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150

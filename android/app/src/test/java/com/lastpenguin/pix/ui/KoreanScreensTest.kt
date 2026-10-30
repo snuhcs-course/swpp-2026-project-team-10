@@ -179,8 +179,8 @@ class KoreanScreensTest {
         modules.guides.setGuide(guide)
         assertKorean(screen())
 
-        // tip_korean's longest kind of sentence: a move, a height, an angle, and why, near its 80 characters.
-        val tip = "줌을 당기거나 조금 다가가서 쪼그려 앉아 상대 눈높이에 맞추고 폰을 수평으로 드세요 - 내려다보지 않아서 표정과 자세가 더 자연스러워 보여요."
+        // tip_korean's longest kind of sentence: a move, a height, an angle, and why, at the server's 80 characters.
+        val tip = "줌을 당기거나 조금 다가가서 쪼그려 앉아 상대 눈높이에 맞추고 폰을 수평으로 드세요 - 내려다보지 않아서 표정과 자세가 훨씬 자연스러워 보여요."
         modules.tipper.requests.single().tip(tip)
         val root = screen()
         assertEquals(tip, FragmentCameraBinding.bind(root).tipText.text.toString())

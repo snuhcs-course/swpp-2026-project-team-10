@@ -22,7 +22,10 @@ logger = logging.getLogger(__name__)
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # The thinking budget is a share of max_tokens, so this leaves room for it as well as for the answer, about 100 tokens.
 MAX_TOKENS = 4000
-TEXT_MAX_LENGTH = 160  # the banner on Camera shows two or three lines
+# The banner on Camera shows two or three lines. tip_prompt limits English in words (twenty-five), so this leaves it
+# room; tip_korean limits Korean in characters, so the server keeps to the same number.
+TEXT_MAX_LENGTH = 160
+KOREAN_TEXT_MAX_LENGTH = 80
 
 Framing = Literal["closer", "back", "keep"]
 # Where the photographer holds the phone, by their own posture, lowest first.
@@ -58,18 +61,19 @@ NUMBER_WORDS = (
 )
 # Korean counts run their words together ("한두", "서너", "대여섯", "열한", "이십"). A step unit takes any ending
 # ("한 걸음만"); 발 and 보 count steps only after a native count and with a few endings, because "두 발로 서서" is about
-# feet and 이발 or 구보 are words of their own. A degree written with one Sino-Korean digit needs a space ("구 도"), so
-# 구도 (the composition) is not one.
+# feet and 이발 or 구보 are words of their own. A degree takes a few endings ("십오 도로"); written with one Sino-Korean
+# digit it needs a space ("구 도로"), so 구도 (the composition) is not one, though "이 도로" (this road) is refused too.
 KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
 KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
 KOREAN_DIGIT = "[일이삼사오육칠팔구]"
+DEGREE_ENDING = "(로|만|씩|쯤|가량|를|의|에)?"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
     rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)|미터|센티|센치|밀리|인치|피트"
     rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보)(만|씩|쯤|가량)?(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도(로|만|씩|쯤|가량|를|의|에)?(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도(?![가-힣])",
+    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도{DEGREE_ENDING}(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{DEGREE_ENDING}(?![가-힣])",
     re.IGNORECASE,
 )
 HANGUL = re.compile("[가-힣]")
@@ -99,7 +103,8 @@ def usable_tip(answer: str, language: Language = "en") -> PoseTip | None:
         return None
     if framing not in ("closer", "back", "keep"):
         return None
-    if not 0 < len(text) <= TEXT_MAX_LENGTH or MEASURE.search(text):
+    limit = KOREAN_TEXT_MAX_LENGTH if language == "ko" else TEXT_MAX_LENGTH
+    if not 0 < len(text) <= limit or MEASURE.search(text):
         return None
     # A model can leave out the Korean instruction; a sentence in another language would not suit the screens.
     in_language = HANGUL.search(text) and not LATIN.search(text) if language == "ko" else not HANGUL.search(text)

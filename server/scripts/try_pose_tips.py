@@ -73,13 +73,14 @@ NUMBER_WORDS = (
 KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
 KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
 KOREAN_DIGIT = "[일이삼사오육칠팔구]"
+DEGREE_ENDING = "(로|만|씩|쯤|가량|를|의|에)?"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
     rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)|미터|센티|센치|밀리|인치|피트"
     rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보)(만|씩|쯤|가량)?(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도(로|만|씩|쯤|가량|를|의|에)?(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도(?![가-힣])",
+    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도{DEGREE_ENDING}(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{DEGREE_ENDING}(?![가-힣])",
     re.IGNORECASE,
 )
 # The server refuses a sentence that is not in the language asked for, as poses/tips.py does.

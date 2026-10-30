@@ -12,7 +12,8 @@
 # out, and another value; a sentence in the language asked for, in the other one, or in both; a Korean sentence that is
 # usable, one with words that only contain a count ("한쪽", "두 손") or that look like one (구도, 두 발로, 이발), and
 # one with a count of steps, with or without a space, of words run together ("한두", "열한", "이십"), or with an ending
-# ("한 걸음만"), a unit, or a degree in digits or in words, with or without an ending.
+# ("한 걸음만"), a unit, or a degree in digits or in words, of one digit or more, with or without an ending; a Korean
+# sentence of 80 characters and of 81.
 import asyncio
 import base64
 import json
@@ -151,6 +152,8 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "한 걸음만 다가가서 드세요.",
         "한 발만 물러나서 드세요.",
         "삼십 도로 기울이세요.",
+        "구 도로 기울이세요.",
+        "오 도만 기울이세요.",
     ],
     ids=[
         "count of steps",
@@ -165,11 +168,25 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "count with an ending",
         "native count of 발",
         "degrees with an ending",
+        "one digit of degrees with an ending",
+        "one digit of degrees with another ending",
     ],
 )
 def test_korean_sentence_with_a_count_a_unit_or_a_degree_is_unusable(client, image_api, photos, text):
     image_api.tips(ANSWER | {"text": text})
     assert_error(ask(client, photos, language="ko"), 502, "UPSTREAM_ERROR")
+
+
+@pytest.mark.parametrize(("length", "shown"), [(80, True), (81, False)])
+def test_korean_sentence_is_shown_up_to_eighty_characters(client, image_api, photos, length, shown):
+    # tip_korean asks for at most eighty characters, and the server keeps to them; English has 160.
+    text = KOREAN_TEXT + "아" * (length - len(KOREAN_TEXT))
+    image_api.tips(ANSWER | {"text": text})
+    response = ask(client, photos, language="ko")
+    if shown:
+        assert response.json()["text"] == text
+    else:
+        assert_error(response, 502, "UPSTREAM_ERROR")
 
 
 @pytest.mark.parametrize(

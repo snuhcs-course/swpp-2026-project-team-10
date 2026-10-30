@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Invite sent, photographer (R&S 6.5, FR-6.1, FR-6.2): waiting for the friend, the link fallback, and Cancel invite. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingBottom="24dp">
+
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <!-- The friend's initial, as on Friends. -->
+    <TextView
+        android:id="@+id/avatarText"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:background="@drawable/bg_avatar"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:textAppearance="@style/TextAppearance.Pix.Title"
+        tools:text="J" />
+
+    <!-- "Waiting for Junhyeong", "Sending the invitation…", or "Junhyeong accepted · connecting…". -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:accessibilityHeading="true"
+        android:accessibilityLiveRegion="polite"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Pix.Title"
+        tools:text="Waiting for Junhyeong" />
+
+    <TextView
+        android:id="@+id/bodyText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.2"
+        android:textAppearance="@style/TextAppearance.Pix.Body"
+        tools:text="Junhyeong gets a notification. The live view starts when they accept." />
+
+    <!-- The link, for a friend whose notification does not arrive (AD-13). -->
+    <TextView
+        android:id="@+id/linkHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:gravity="center"
+        android:text="@string/invite_link_hint"
+        android:textAppearance="@style/TextAppearance.Pix.Caption" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/shareButton"
+            style="@style/Widget.Pix.Button.Secondary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/share_invite_link" />
+
+        <Button
+            android:id="@+id/copyButton"
+            style="@style/Widget.Pix.Button.Secondary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="@string/copy_link" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/cancelButton"
+        style="@style/Widget.Pix.Button.Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/cancel_invite" />
+</LinearLayout>

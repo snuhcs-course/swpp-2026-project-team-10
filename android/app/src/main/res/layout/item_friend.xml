@@ -48,13 +48,12 @@
             tools:text="Online · @test2" />
     </LinearLayout>
 
-    <!-- Invitations come with Iter2-P15; until then the button is shown disabled. -->
+    <!-- Invite sent (FR-6.1); a friend offline still gets the push. -->
     <Button
         android:id="@+id/inviteButton"
         style="@style/Widget.Pix.Button.Secondary.Small"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:enabled="false"
         android:text="@string/invite" />
 </LinearLayout>

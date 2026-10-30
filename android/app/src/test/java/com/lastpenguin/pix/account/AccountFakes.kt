@@ -1,28 +1,35 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.account
 
 import android.content.Context
 import com.lastpenguin.pix.core.network.AcceptedRequestDto
 import com.lastpenguin.pix.core.network.AccountDto
 import com.lastpenguin.pix.core.network.AuthDto
+import com.lastpenguin.pix.core.network.DeviceBody
 import com.lastpenguin.pix.core.network.FriendDto
 import com.lastpenguin.pix.core.network.FriendRequestBody
 import com.lastpenguin.pix.core.network.FriendRequestsDto
 import com.lastpenguin.pix.core.network.FriendsDto
 import com.lastpenguin.pix.core.network.GoogleTokenBody
+import com.lastpenguin.pix.core.network.InviteBody
 import com.lastpenguin.pix.core.network.LogInBody
 import com.lastpenguin.pix.core.network.LookupBody
 import com.lastpenguin.pix.core.network.LookupDto
+import com.lastpenguin.pix.core.network.OpenedInvitationDto
 import com.lastpenguin.pix.core.network.PasswordBody
 import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixAuthApi
 import com.lastpenguin.pix.core.network.PixIdCheckBody
 import com.lastpenguin.pix.core.network.PixIdCheckDto
 import com.lastpenguin.pix.core.network.RefreshBody
+import com.lastpenguin.pix.core.network.SentInvitationDto
 import com.lastpenguin.pix.core.network.SentRequestDto
+import com.lastpenguin.pix.core.network.SessionPlaceDto
 import com.lastpenguin.pix.core.network.SignUpBody
 import com.lastpenguin.pix.core.network.TokensDto
 import com.lastpenguin.pix.core.network.UpdateMeBody
+import com.lastpenguin.pix.core.network.UserDto
+import com.lastpenguin.pix.session.SessionPlace
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -108,6 +115,17 @@ class FakeAccountApi : PixAccountApi {
     var lookup: suspend (LookupBody) -> LookupDto = { throw httpError(404, "NOT_FOUND") }
     var sent: SentRequestDto = SentRequestDto(id = "fr_1")
     var accepted: (String) -> FriendDto = { FriendDto("u_2", "test2", "Test Account 2", online = true) }
+    var invited = SentInvitationDto(
+        id = "inv_1",
+        to = UserDto("u_2", "test2", "Test Account 2"),
+        status = "PENDING",
+        expiresAt = 1_030_000,
+        link = "http://pix.test/i/inv_1",
+        sessionId = "s_1",
+        rejoinToken = "photographer-token",
+    )
+    var opened = OpenedInvitationDto("inv_1", UserDto("u_1", "test1", "Test Account 1"), "PENDING", 1_030_000)
+    var place = SessionPlaceDto("s_1", "subject-token")
     val bodies = mutableListOf<Any>()
 
     private fun call(name: String, body: Any? = null) {
@@ -159,6 +177,67 @@ class FakeAccountApi : PixAccountApi {
     override suspend fun friends(): FriendsDto = FriendsDto(friends).also { call("friends") }
 
     override suspend fun removeFriend(userId: String) = call("remove:$userId")
+
+    override suspend fun registerDevice(body: DeviceBody) = call("registerDevice", body)
+
+    override suspend fun invite(body: InviteBody): SentInvitationDto = invited.also { call("invite", body) }
+
+    override suspend fun invitation(invitationId: String): OpenedInvitationDto =
+        opened.also { call("invitation:$invitationId") }
+
+    override suspend fun acceptInvitation(invitationId: String): SessionPlaceDto =
+        place.also { call("acceptInvitation:$invitationId") }
+
+    override suspend fun declineInvitation(invitationId: String) = call("declineInvitation:$invitationId")
+
+    override suspend fun cancelInvitation(invitationId: String) = call("cancelInvitation:$invitationId")
+}
+
+/**
+ * Answers with what a test sets, or with [failure]; every call is recorded by name. [inviteGate], [acceptGate], and
+ * [cancelGate], when set, hold `invite`, `accept`, and `cancel` until the test completes them, so what happens while
+ * the answer is on its way can be seen.
+ */
+class FakeInvitationManager : InvitationManager {
+    val calls = mutableListOf<String>()
+    var failure: AccountError? = null
+    var sent = SentInvitation(
+        "inv_1",
+        PixUser("u_2", "test2", "Test Account 2"),
+        expiresAt = 1_030_000,
+        link = "http://pix.test/i/inv_1",
+        place = SessionPlace("s_1", "photographer-token", emptyList()),
+    )
+    var opened =
+        OpenedInvitation("inv_1", PixUser("u_1", "test1", "Test Account 1"), InvitationStatus.PENDING, 1_030_000)
+    var place = SessionPlace("s_1", "subject-token", emptyList())
+    var inviteGate: CompletableDeferred<Unit>? = null
+    var acceptGate: CompletableDeferred<Unit>? = null
+    var cancelGate: CompletableDeferred<Unit>? = null
+
+    private fun <T> answer(name: String, value: () -> T): Result<T> {
+        calls += name
+        return failure?.let { Result.failure(AccountException(it)) } ?: Result.success(value())
+    }
+
+    override suspend fun invite(friendId: String): Result<SentInvitation> {
+        inviteGate?.await()
+        return answer("invite:$friendId") { sent }
+    }
+
+    override suspend fun open(invitationId: String) = answer("open:$invitationId") { opened }
+
+    override suspend fun accept(invitationId: String): Result<SessionPlace> {
+        acceptGate?.await()
+        return answer("accept:$invitationId") { place }
+    }
+
+    override suspend fun decline(invitationId: String) = answer("decline:$invitationId") {}
+
+    override suspend fun cancel(invitationId: String): Result<Unit> {
+        cancelGate?.await()
+        return answer("cancel:$invitationId") {}
+    }
 }
 
 /** An [AuthRepository] whose answers a test sets; it records the calls and signs in like the real one. */

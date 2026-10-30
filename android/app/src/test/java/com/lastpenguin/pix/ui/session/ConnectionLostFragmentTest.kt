@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.fragment.app.testing.FragmentScenario
@@ -27,9 +27,10 @@ import org.robolectric.shadows.ShadowToast
 
 /*
  * Connection lost's render paths (R&S 6.6, FR-6.11; Testing Documentation 2.1.6), on the real Fragment.
- * Partitions: the screen as opened; Reconnect without a kept code (back to the camera) and with one (joins the
- * same code again, Reconnect disabled while connecting); the reconnect connecting (to Subject view), finding the
- * room gone (a toast and the camera), or failing otherwise (Reconnect enabled again); Leave.
+ * Partitions: the screen as opened; Reconnect without a kept code, as after an invitation (the session ended, back
+ * to the camera), and with one (joins the same code again, Reconnect disabled while connecting); the reconnect
+ * connecting (to Subject view), finding the room gone (a toast and the camera), or failing otherwise (Reconnect
+ * enabled again); Leave.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -81,13 +82,15 @@ class ConnectionLostFragmentTest {
     }
 
     @Test
-    fun reconnect_withoutAKeptCode_returnsToTheCamera() {
+    fun reconnect_withoutAKeptCode_saysTheSessionEnded_andReturnsToTheCamera() {
         launch()
         val nav = scenario!!.attachNav(R.id.connectionLostFragment)
 
         onScreen { binding, _ -> binding.primaryButton.performClick() }
         idle()
 
+        // An invitation's session, which has no code and which its photographer has ended (Design 2.4).
+        assertEquals(string(R.string.session_ended), ShadowToast.getTextOfLatestToast())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 

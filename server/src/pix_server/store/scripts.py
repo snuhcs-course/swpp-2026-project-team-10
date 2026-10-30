@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """Lua scripts that change session state inside Redis (Design Documentation 2.7).
 
 Redis runs a script as one step, so two workers cannot interleave inside a room transition. Every script gets the
@@ -7,7 +7,7 @@ current time from its caller, which lets the tests move a fake clock, and return
 The scripts avoid `cjson` and `unpack`, which the in-process Redis used by the tests does not provide.
 
 Keys: `session:<id>` (hash; `photographer_token` and `subject_token` hold the SHA-256 of each place's rejoin
-token, never the token), `code:<code>`, `conn:<id>` (hash), `conns:<worker>` (set), `worker:<worker>` (heartbeat
+token, never the token; an invitation's room has an empty `code` and names its `invitation`), `code:<code>`, `conn:<id>` (hash), `conns:<worker>` (set), `worker:<worker>` (heartbeat
 with a real expiry), `presence:<user>` (the signed-in user's connections), and the indexes `sessions`, `workers`,
 `deadlines` (sorted by the next time a session has to be looked at), and `expired` (recently expired codes, sorted
 by the time to forget them).
@@ -100,8 +100,9 @@ local function sweep()
       redis.call('ZREM', 'deadlines', sid)
     elseif s[1] and s[1] ~= '' and now >= tonumber(s[1]) then
       remove_session(sid)
-      -- Remembered for one more TTL, so a late join answers EXPIRED and the code is not handed out again.
-      redis.call('ZADD', 'expired', num(now + room_ttl), s[4])
+      -- Remembered for one more TTL, so a late join answers EXPIRED and the code is not handed out again. An
+      -- invitation's room has no code.
+      if s[4] ~= '' then redis.call('ZADD', 'expired', num(now + room_ttl), s[4]) end
       emit(s[3], 'error', 'EXPIRED')
     elseif s[2] and s[2] ~= '' and now >= tonumber(s[2]) + empty_ttl then
       remove_session(sid)
@@ -276,7 +277,10 @@ return {status, expected, target, target_worker, out}
 # "0" when it starts a new one. Returns {status, role, out}. The token decides the place. A socket that still holds it
 # is taken to be the same phone's old one, which the server would notice only once its pings go unanswered: it gives
 # the place up at once and keeps no session, so its later disconnect changes nothing. The other phone hears
-# `peer.rejoined` (an ICE restart is enough) or `peer.joined` (a new peer connection).
+# `peer.rejoined` (an ICE restart is enough) or, for a subject, `peer.joined` (a new peer connection). A photographer
+# without its peer connection hears `peer.joined` itself when the subject is there, because it starts the connection:
+# this is how it learns that the friend took the place an invitation opened before it did. A subject in its place
+# ends the room's wait for one, so the sweeper no longer expires it.
 REJOIN = (
     _PRELUDE
     + """
@@ -308,11 +312,71 @@ if status == 'OK' then
     redis.call('HSET', 'conn:' .. holder, 'session', '')
   end
   redis.call('HSET', 'session:' .. sid, seat, conn, 'empty_since', '')
+  if seat == 'subject' then redis.call('HSET', 'session:' .. sid, 'expires_at', '') end
   redis.call('HSET', 'conn:' .. conn, 'session', sid)
   schedule(sid)
-  emit(other, keep == '1' and 'peer.rejoined' or 'peer.joined')
+  if keep == '1' then
+    emit(other, 'peer.rejoined')
+  elseif seat == 'subject' then
+    emit(other, 'peer.joined')
+  elseif other ~= '' then
+    emit(conn, 'peer.joined')
+  end
 end
 return {status, role, out}
+"""
+)
+
+# ARGV[6..9]: new session id, the hash of the photographer's rejoin token, the invitation's id, and the time it
+# expires. Opens an invitation's room with nobody in it and no code (Design Documentation 2.6.6): the photographer
+# takes its place with `session.join`, the friend once it accepted, and the sweeper expires the room at that time
+# unless the friend has joined, which tells the photographer.
+INVITE = (
+    _PRELUDE
+    + """
+local sid = ARGV[6]
+sweep()
+redis.call('HSET', 'session:' .. sid, 'code', '', 'photographer', '', 'subject', '', 'expires_at', ARGV[9],
+  'empty_since', '', 'photographer_token', ARGV[7], 'subject_token', '', 'invitation', ARGV[8])
+redis.call('SADD', 'sessions', sid)
+schedule(sid)
+return out
+"""
+)
+
+# ARGV[6..8]: session id, the hash of the friend's rejoin token, and the time by which the friend has to take its
+# place. Returns {status, out}: OK, or GONE when the invitation's room has ended or already has a subject. The room's
+# expiry moves to that time if it is later, so a friend who accepts in the last second still has time to join.
+ACCEPT_INVITATION = (
+    _PRELUDE
+    + """
+local sid, token, deadline = ARGV[6], ARGV[7], tonumber(ARGV[8])
+sweep()
+local s = redis.call('HMGET', 'session:' .. sid, 'invitation', 'subject', 'expires_at')
+local status = 'GONE'
+if s[1] and s[1] ~= '' and s[2] == '' then
+  status = 'OK'
+  if s[3] ~= '' and tonumber(s[3]) > deadline then deadline = tonumber(s[3]) end
+  redis.call('HSET', 'session:' .. sid, 'subject_token', token, 'expires_at', num(deadline))
+  schedule(sid)
+end
+return {status, out}
+"""
+)
+
+# ARGV[6..7]: session id, and the error the photographer hears, or "" for none. Ends the room of an invitation that
+# nobody accepted: declined (DECLINED), or cancelled by the photographer, whose phone leaves it anyway.
+END_INVITATION = (
+    _PRELUDE
+    + """
+local sid, notice = ARGV[6], ARGV[7]
+sweep()
+local s = redis.call('HMGET', 'session:' .. sid, 'invitation', 'photographer', 'subject')
+if s[1] and s[1] ~= '' and s[3] == '' then
+  remove_session(sid)
+  if notice ~= '' then emit(s[2], 'error', notice) end
+end
+return out
 """
 )
 

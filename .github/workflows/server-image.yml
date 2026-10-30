@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 name: server-image
 
 on:
@@ -39,7 +39,7 @@ jobs:
       # runs docker compose needs them, so they go to $GITHUB_ENV; an export would last only for this step.
       - name: Prepare what deploy.sh would write
         run: |
-          mkdir -p "$RUNNER_TEMP/pix/state"
+          mkdir -p "$RUNNER_TEMP/pix/state" "$RUNNER_TEMP/pix/secrets"
           printf 'set $pix_app "app-blue:8000";\nset $pix_copy "blue";\n' > "$RUNNER_TEMP/pix/state/active.conf"
           echo "$GITHUB_SHA" > "$RUNNER_TEMP/pix/state/version"
           touch "$RUNNER_TEMP/pix/.env"
@@ -48,6 +48,7 @@ jobs:
             echo "PIX_HTTP_PORT=8080"
             echo "PIX_ENV_FILE=$RUNNER_TEMP/pix/.env"
             echo "PIX_STATE_DIR=$RUNNER_TEMP/pix/state"
+            echo "PIX_SECRETS_DIR=$RUNNER_TEMP/pix/secrets"
             echo "PIX_POSTGRES_DIR=$RUNNER_TEMP/pix/postgres"
             echo "PIX_DB_PASSWORD=ci-password"
             echo "PIX_JWT_SECRET=ci-jwt-secret-that-is-long-enough-for-hs256"
@@ -73,6 +74,9 @@ jobs:
           if docker compose -f server/deploy/docker-compose.yml logs nginx app-blue | grep -F 'ci.check'; then exit 1; fi
           # A WebSocket upgrade reaches the app; curl then waits for frames until its time limit.
           test "$(status -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' http://127.0.0.1:8080/ws)" = 101
+          # The page an invite link opens, for an invitation id only.
+          curl -fsS http://127.0.0.1:8080/i/inv_01JB2C3D4E5F6G7H8J9KAMNPQR | grep -F 'intent://invite/inv_01JB2C3D4E5F6G7H8J9KAMNPQR#Intent;scheme=pix;'
+          test "$(status http://127.0.0.1:8080/i/not-an-invitation)" = 404
           # FastAPI's documentation and the app's internal routes are not public.
           test "$(status http://127.0.0.1:8080/docs)" = 404
           test "$(status http://127.0.0.1:8080/openapi.json)" = 404

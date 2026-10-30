@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -26,6 +26,9 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
         // No pick callback: candidates cannot be selected until generation ends.
         val candidates = PoseCandidateAdapter()
         binding.candidateGrid.adapter = candidates
+        binding.candidateGrid.addItemDecoration(
+            CandidateGridFit(resources.getDimensionPixelSize(R.dimen.pose_card_margin)),
+        )
 
         binding.cancelButton.setOnClickListener { cancel() }
         // System back does the same as Cancel (R&S 6.9).
@@ -44,7 +47,8 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
     }
 
     private fun render(binding: FragmentGeneratingBinding, candidates: PoseCandidateAdapter, state: GenerationUiState) {
-        binding.sceneImage.setImageBitmap(state.scene)
+        binding.sceneImage.showScene(state.scene)
+        candidates.frameAspect = aspectOf(state.scene)
         candidates.submitList(state.slots())
         // Until the poses are there, the number of slots is not known; suggestions take the first seconds.
         binding.readyCount.text = when {

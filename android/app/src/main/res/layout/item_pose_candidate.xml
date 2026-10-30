@@ -6,9 +6,9 @@
     style="@style/Widget.Pix.PoseCard"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp">
+    android:layout_margin="@dimen/pose_card_margin">
 
-    <!-- The cell keeps the camera frame's 3:4 shape before its image arrives. -->
+    <!-- The cell has the scene photo's shape (PoseCandidateAdapter.frameAspect), also before its image arrives. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -18,7 +18,7 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:importantForAccessibility="no"
-            android:scaleType="centerCrop"
+            android:scaleType="fitCenter"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.PoseImage"
             app:layout_constraintDimensionRatio="3:4"
             app:layout_constraintEnd_toEndOf="parent"

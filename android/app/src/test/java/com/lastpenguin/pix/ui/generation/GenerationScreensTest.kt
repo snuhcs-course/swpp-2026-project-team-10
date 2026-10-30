@@ -1,10 +1,15 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
+import android.graphics.Bitmap
+import android.graphics.RectF
+import android.graphics.drawable.BitmapDrawable
 import android.view.View
+import android.widget.ImageView
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
@@ -24,6 +29,7 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
@@ -36,6 +42,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /*
@@ -50,7 +57,9 @@ import org.robolectric.annotation.GraphicsMode
  * the screen opens is the one shown; Try other poses (back to Generate poses), system back; in a session, the hint
  * that the subject sees the poses too, and the subject's pick that comes first, which opens Reference confirm with its
  * candidate (Design 2.6.5). Couldn't create poses: Try again, a rejected description with Edit description, Back to
- * camera.
+ * camera. The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1), the
+ * thumbnails, the slots, and the pages in that shape; the four slots of a 9:16 scene whole on screen, centered, and
+ * those of 3:4 and 1:1 as wide as half the screen as before; a candidate whose ratio the model rounded shown whole.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -63,8 +72,11 @@ class GenerationScreensTest {
         scenario?.close()
     }
 
-    private fun modules(): TestAppContainer =
-        TestAppContainer(camera = FakeCameraController().apply { frame = bitmap(300, 400) }).install()
+    /** The scene photo in each of the app's ratios: 3:4, 9:16, 1:1. */
+    private val scenes = listOf(bitmap(300, 400), bitmap(288, 512), bitmap(400, 400))
+
+    private fun modules(scene: Bitmap = bitmap(300, 400)): TestAppContainer =
+        TestAppContainer(camera = FakeCameraController().apply { frame = scene }).install()
 
     /** The scene photo taken and confirmed, so Generate poses has something to describe (DESCRIBING). */
     private fun describing(activity: FragmentActivity): GenerationViewModel =
@@ -94,6 +106,21 @@ class GenerationScreensTest {
             )
             assertEquals(string(R.string.description_counter, 0, 100), binding.descriptionCounter.text.toString())
             assertEquals(View.GONE, binding.descriptionError.visibility)
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun describe_thumbnailHasTheScenesShape() {
+        for (scene in scenes) {
+            modules(scene)
+            val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+            s.onFragment { fragment ->
+                val thumbnail = FragmentDescribePoseBinding.bind(fragment.requireView()).sceneImage
+                assertEquals(scene.aspect(), thumbnail.aspect(), 0.01f)
+                assertEquals(fragment.resources.displayMetrics.density * 72, thumbnail.height.toFloat(), 1f)
+            }
+            s.close()
         }
     }
 
@@ -289,6 +316,104 @@ class GenerationScreensTest {
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 
+    /** Generating poses for [scene] with its four slots planned and on screen, the first ones filled with [ready]. */
+    private fun generatingSlots(scene: Bitmap, vararg ready: Bitmap): FragmentScenario<GeneratingFragment> {
+        val modules = modules(scene)
+        val (s, _) = launchPrepared<GeneratingFragment>(R.id.generatingFragment) { generating(it) }
+        val run = modules.generator.runs.single()
+        run.plan(poses)
+        run.send(*ready.mapIndexed { i, image -> CandidateEvent.Ready("pose-${i + 1}", image) }.toTypedArray())
+        // The grid's adapter compares each new list off the main thread.
+        idleUntil {
+            var shown = false
+            s.onFragment { fragment ->
+                val slots = FragmentGeneratingBinding.bind(fragment.requireView()).candidateGrid.slots()
+                shown = slots.size == poses.size && slots.count { it.hasCandidate() } == ready.size
+            }
+            shown
+        }
+        return s
+    }
+
+    private fun RecyclerView.slots(): List<View> = (0 until childCount).map { getChildAt(it) }
+
+    /** Whether a slot shows its candidate; an empty one holds a drawable without a bitmap. */
+    private fun View.hasCandidate(): Boolean =
+        (findViewById<ImageView>(R.id.poseImage).drawable as? BitmapDrawable)?.bitmap != null
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun generating_thumbnailAndSlotsHaveTheScenesShape_inEachRatio() {
+        for (scene in scenes) {
+            val s = generatingSlots(scene)
+            s.onFragment { fragment ->
+                val binding = FragmentGeneratingBinding.bind(fragment.requireView())
+                assertEquals(scene.aspect(), binding.sceneImage.aspect(), 0.01f)
+                val slots = binding.candidateGrid.slots()
+                assertEquals(4, slots.size)
+                for (slot in slots) {
+                    assertEquals(
+                        scene.aspect(),
+                        slot.findViewById<View>(R.id.poseImage).aspect(),
+                        0.01f,
+                    )
+                }
+            }
+            s.close()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun generating_nineBySixteenScene_keepsAllFourSlotsOnScreen_centered() {
+        scenario = generatingSlots(bitmap(288, 512))
+
+        scenario!!.onFragment { fragment ->
+            val grid = FragmentGeneratingBinding.bind(fragment.requireView()).candidateGrid
+            val slots = grid.slots()
+            assertEquals(4, slots.size)
+            for (slot in slots) {
+                assertTrue(slot.left >= 0 && slot.top >= 0 && slot.right <= grid.width && slot.bottom <= grid.height)
+            }
+            // Narrower than half the screen, with as much room on the left as on the right.
+            val left = slots.minOf { it.left }
+            val right = grid.width - slots.maxOf { it.right }
+            assertTrue(left > fragment.resources.getDimensionPixelSize(R.dimen.pose_card_margin))
+            assertEquals(left.toFloat(), right.toFloat(), 1f)
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun generating_threeByFourAndSquareScenes_fillTheWidthAsBefore() {
+        for (scene in listOf(bitmap(300, 400), bitmap(400, 400))) {
+            val s = generatingSlots(scene)
+            s.onFragment { fragment ->
+                val grid = FragmentGeneratingBinding.bind(fragment.requireView()).candidateGrid
+                val margin = fragment.resources.getDimensionPixelSize(R.dimen.pose_card_margin)
+                val slots = grid.slots()
+                assertEquals(4, slots.size)
+                assertEquals(margin.toFloat(), slots.minOf { it.left }.toFloat(), 1f)
+                assertEquals((grid.width - margin).toFloat(), slots.maxOf { it.right }.toFloat(), 1f)
+                for (slot in slots) assertTrue(slot.bottom <= grid.height)
+            }
+            s.close()
+        }
+    }
+
+    @Test
+    fun generating_candidateWhoseRatioTheModelRounded_isShownWhole() {
+        // A model that has no 3:4 answers with its nearest size, here 2:3; the slot keeps the scene's shape.
+        scenario = generatingSlots(bitmap(300, 400), bitmap(200, 300))
+
+        scenario!!.onFragment { fragment ->
+            val image = FragmentGeneratingBinding.bind(fragment.requireView()).candidateGrid.slots().first()
+                .findViewById<ImageView>(R.id.poseImage)
+            assertEquals(0.75f, image.aspect(), 0.01f)
+            assertTrue(image.showsWholePicture())
+        }
+    }
+
     // ---- Pick a pose ------------------------------------------------------------
 
     /** A finished set: three ready, one failed (PICKING). */
@@ -344,6 +469,40 @@ class GenerationScreensTest {
                 GenerationUiState.Phase.IDLE,
                 it.requireActivity().viewModel<GenerationViewModel>().uiState.value.phase,
             )
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun pick_showsEachCandidateWholeInItsOwnShape() {
+        val images = listOf(bitmap(300, 400), bitmap(288, 512), bitmap(400, 400))
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) {
+            generating(it)
+            val run = modules.generator.runs.single()
+            run.plan(poses)
+            run.send(*images.mapIndexed { i, image -> CandidateEvent.Ready("pose-${i + 1}", image) }.toTypedArray())
+            run.send(CandidateEvent.Failed("pose-4", GenerationError.TIMEOUT))
+            run.finish()
+        }
+        scenario = s
+
+        for ((position, candidate) in images.withIndex()) {
+            s.onFragment {
+                FragmentPickPoseBinding.bind(it.requireView()).candidatePager.setCurrentItem(position, false)
+            }
+            idle()
+            s.onFragment { fragment ->
+                val pages = FragmentPickPoseBinding.bind(fragment.requireView()).candidatePager.getChildAt(0)
+                    as RecyclerView
+                val page = checkNotNull(pages.findViewHolderForAdapterPosition(position)).itemView
+                val image = page.findViewById<ImageView>(R.id.poseImage)
+                assertEquals(candidate.aspect(), image.aspect(), 0.01f)
+                // As large as the page allows: as wide or as tall as the page.
+                assertTrue(image.width <= page.width && image.height <= page.height)
+                assertTrue(image.width >= page.width - 1 || image.height >= page.height - 1)
+                assertTrue(image.showsWholePicture())
+            }
         }
     }
 
@@ -505,5 +664,18 @@ class GenerationScreensTest {
             )
         }
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    private fun Bitmap.aspect(): Float = width.toFloat() / height
+
+    private fun View.aspect(): Float = width.toFloat() / height
+
+    /** Whether the whole picture is inside the image's bounds, so none of it is cut off. */
+    private fun ImageView.showsWholePicture(): Boolean {
+        val picture = RectF(0f, 0f, drawable.intrinsicWidth.toFloat(), drawable.intrinsicHeight.toFloat())
+        imageMatrix.mapRect(picture)
+        picture.offset(paddingLeft.toFloat(), paddingTop.toFloat())
+        return picture.left >= -0.5f && picture.top >= -0.5f &&
+            picture.right <= width + 0.5f && picture.bottom <= height + 0.5f
     }
 }

@@ -1,7 +1,5 @@
 Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
 
-Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated here, shortened to the instruction; status checks are left out.
-
 ## *Pick a pose* one candidate at a time ([#114], [#108])
 
 **The pager (10/24)**
@@ -28,6 +26,15 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-26] "Document the tips as built, as compactly as possible." (The plan had a tip for each candidate on *Pick a pose*; the documents now follow the build.)
 - [Dongje, 10-26] "Check the Codex review on the PR, decide what to fix, and let me review the plan." / "Make the button position an A2 issue, with the camera screen's buttons and preview size; fix #2 too." (Fixed: the server cancels a dropped tip request, a tip names its guide, and numbers in words are refused; the request size stays, measured at 604 KB at most; the top bar went to [#136].)
 
+## Pose candidates in the scene photo's aspect ratio ([#150])
+
+- [Jaewan, 10-30] "Let's build issue #112. Tell me your plan and what I need to decide for you."
+- [Jaewan, 10-30] "do as you recommended, and only test with fakes no paid runs"
+- [Jaewan, 10-30] "commit and open the PR. also give me some screenshots of the new cases"
+- [Jaewan, 10-30] "The 'creating...' text in the 'Generating poses' screen is not vertically centered in each area. fix this"
+- [Jaewan, 10-30] "The 'creating...' text in the 'Generating poses' screen is not vertically centered in each area (in the screenshots). or are we missing a spinner here?"
+- [Jaewan, 10-30] "there are new changes in dev"
+
 ## Pose tips in Korean ([#156])
 
 - [Dongje, 10-30] "On a new branch: the pose tips are written only in English; when the app's language is Korean, the tip should be in Korean too. Create the issue, list the tasks, and go ahead on your own." (The app sends the screens' language from a resource that `values-ko` overrides; the server adds a Korean instruction with Korean examples, and the number check learns Korean counts, units, and degrees. Tried on the 16 trial pairs: every Korean sentence usable, the decisions within the spread of English's own rounds.)
@@ -39,4 +46,5 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 [#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
 [#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
+[#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
 [#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156

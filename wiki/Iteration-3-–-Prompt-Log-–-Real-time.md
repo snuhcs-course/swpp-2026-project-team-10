@@ -1,7 +1,5 @@
 Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
 
-Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated here, shortened to the instruction; status checks are left out.
-
 ## Sessions on different networks ([#117], PRs [#134], [#139])
 
 **The AWS server and the plan (10/25)**

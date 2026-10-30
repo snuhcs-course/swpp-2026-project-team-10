@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Generating poses: the space around each slot of the 2×2 grid (CandidateGridFit). -->
+    <dimen name="pose_card_margin">6dp</dimen>
     <!-- Pick a pose: how much of the next and the previous candidate shows at the sides, and the gap between them. -->
     <dimen name="pose_page_peek">28dp</dimen>
     <dimen name="pose_page_gap">12dp</dimen>

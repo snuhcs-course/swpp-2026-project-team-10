@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.DescriptionForm
+import com.lastpenguin.pix.ui.generation.showScene
 import kotlinx.coroutines.launch
 
 /**
@@ -100,7 +101,7 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
             backToSubject()
             return
         }
-        binding.sceneImage.setImageBitmap(ui.scene)
+        binding.sceneImage.showScene(ui.scene)
         binding.descriptionError.visibility = if (ui.rejected) View.VISIBLE else View.GONE
         val photographer = ui.photographerName
         val theirs = ui.writer == Role.PHOTOGRAPHER

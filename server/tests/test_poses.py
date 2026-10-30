@@ -1,9 +1,11 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
 # whitespace and line breaks, blank, 100 characters (after trimming) and 101. Scene: a JPEG within the contract, at
-# 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short. Image API: a candidate in JPEG, PNG,
+# 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short; its shape, which the candidate is asked
+# in: each of the app's ratios (3:4, 9:16, 1:1), as the phone sends it and a pixel off, either side of the shape halfway
+# between two ratios, and landscape. Image API: a candidate in JPEG, PNG,
 # or WEBP; a refusal (403) of a template and of a description, with one message for both; another failing status; an unreadable answer; no
 # answer in time; no key. Limits: each window full, and a request refused before the image API, which is not counted.
 # Selfie (FR-1.14): `selfie` true, false, left out, and not a boolean; with a template, refused.
@@ -179,6 +181,39 @@ def test_model_and_quality_come_from_settings(client, image_api, make_image, set
 def test_seed_is_folded_into_the_range_the_image_api_accepts(client, image_api, make_image, seed, sent):
     assert create_pose(client, make_image(), seed=seed).status_code == 200
     assert image_api.payloads[0]["seed"] == sent
+
+
+@pytest.mark.parametrize(
+    ("size", "ratio"),
+    [
+        # As the phone sends each frame: cut from its 960 × 720 or 1280 × 960 analysis image, then at most 1024 px.
+        ((720, 960), "3:4"),
+        ((576, 1024), "9:16"),
+        ((720, 720), "1:1"),
+        ((768, 1024), "3:4"),
+        ((1024, 1024), "1:1"),
+        # Rounded by a pixel.
+        ((271, 480), "9:16"),
+        ((481, 640), "3:4"),
+        ((721, 720), "1:1"),
+        # Not from the app, which takes portrait photos only.
+        ((1024, 768), "1:1"),
+    ],
+)
+def test_candidate_is_asked_in_the_ratio_of_the_scene(client, image_api, make_image, size, ratio):
+    assert create_pose(client, make_image(size=size)).status_code == 200
+    assert image_api.payloads[0]["aspect_ratio"] == ratio
+
+
+@pytest.mark.parametrize(
+    ("width", "ratio"),
+    # On a scene 1024 px tall, the shape halfway between 9:16 and 3:4, as many times wider than the one as narrower
+    # than the other, is sqrt(9/16 * 3/4) * 1024 = 665.1 px wide, and between 3:4 and 1:1 sqrt(3/4) * 1024 = 886.8 px.
+    [(665, "9:16"), (666, "3:4"), (886, "3:4"), (887, "1:1")],
+)
+def test_scene_between_two_ratios_gets_the_closer_one(client, image_api, make_image, width, ratio):
+    assert create_pose(client, make_image(size=(width, 1024))).status_code == 200
+    assert image_api.payloads[0]["aspect_ratio"] == ratio
 
 
 @pytest.mark.parametrize("image_format", ["PNG", "WEBP"])

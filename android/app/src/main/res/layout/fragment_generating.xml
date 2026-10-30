@@ -59,9 +59,10 @@
         android:gravity="center_vertical"
         android:padding="10dp">
 
+        <!-- 72 dp high and as wide as the photo's shape (showScene): 54 dp for 3:4, 9:16 narrower, 1:1 square. -->
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/sceneImage"
-            android:layout_width="56dp"
+            android:layout_width="54dp"
             android:layout_height="72dp"
             android:background="@color/pix_surface_2"
             android:contentDescription="@string/scene_photo_description"

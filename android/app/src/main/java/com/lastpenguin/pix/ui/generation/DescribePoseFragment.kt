@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -50,7 +50,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
             view.post { if (isAdded) backToCamera() }
             return
         }
-        binding.sceneImage.setImageBitmap(state.scene)
+        binding.sceneImage.showScene(state.scene)
         val form = DescriptionForm(
             binding,
             ideas = resources.getStringArray(R.array.pose_ideas).toList(),

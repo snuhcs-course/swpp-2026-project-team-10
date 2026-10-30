@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 """Try the pose tip prompt on scene photos and candidates made once (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY in server/.env:
@@ -11,11 +11,11 @@ It does not import pix_server. Run it through uv from server/ with OPENROUTER_AP
 
 `candidates` makes one candidate per scene, the way the app and the server do: the scene prepared like the app's
 (upright, long side 1024 px, JPEG 85, no EXIF), a pose the suggestion model chose for it (the n-th scene takes the
-n-th of the four, so the poses differ), and the server's pose prompt, model, 3:4 ratio, and 1K resolution. Each pair
-goes to scripts/out/tips/pairs/<scene>/ and is never made again: a scene that already has a candidate is skipped, so
-the image model is billed once per scene. Delete a pair's folder to make it again. `set` makes the four
-candidates of one scene, as the app gets them without a description, into pairs/<name>-1 to -4, also once, with a
-sheet (sets/<name>.png) to pick one.
+n-th of the four, so the poses differ), and the server's pose prompt, model, ratio (the app's frame closest to the
+scene's), and 1K resolution. Each pair goes to scripts/out/tips/pairs/<scene>/ and is never made again: a scene that
+already has a candidate is skipped, so the image model is billed once per scene. Delete a pair's folder to make it
+again. `set` makes the four candidates of one scene, as the app gets them without a description, into
+pairs/<name>-1 to -4, also once, with a sheet (sets/<name>.png) to pick one.
 
 `tips` sends every pair to the vision model with the server's tip prompt from src/pix_server/poses/prompts.toml, or
 the one in --prompt-file, the scene first and the candidate second, the candidate as the app would send it (long side
@@ -31,6 +31,7 @@ import base64
 import html
 import io
 import json
+import math
 import os
 import random
 import re
@@ -59,6 +60,8 @@ SCENE_LONG_SIDE = 1024
 CANDIDATE_LONG_SIDE = 768
 JPEG_QUALITY = 85
 CONCURRENCY = 4
+# The candidate's ratio, as the server's `ASPECT_RATIOS` in poses/generator.py: the app's frame closest to the scene's.
+ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
 TEXT_MAX_LENGTH = 140
 # A tip says how to hold the camera in words; a number, a unit, or a degree is hard to follow while shooting. The same
 # check as the server's `MEASURE` in poses/tips.py.
@@ -160,6 +163,12 @@ async def suggested_poses(client: httpx2.AsyncClient, scene: bytes, prompts: dic
     return (poses + defaults)[:4]
 
 
+def aspect_ratio(scene: bytes) -> str:
+    with Image.open(io.BytesIO(scene)) as image:
+        width, height = image.size
+    return min(ASPECT_RATIOS, key=lambda name: abs(math.log(width / height / ASPECT_RATIOS[name])))
+
+
 def prepared_scene(path: Path) -> bytes:
     with Image.open(path) as image:
         return jpeg(ImageOps.exif_transpose(image), SCENE_LONG_SIDE)
@@ -172,7 +181,7 @@ async def make_pair(client: httpx2.AsyncClient, name: str, scene: bytes, pose: s
         "model": model,
         "prompt": one_line(prompts["pose_prompt"]).replace("{pose}", pose),
         "input_references": [{"type": "image_url", "image_url": {"url": data_url(scene)}}],
-        "aspect_ratio": "3:4",
+        "aspect_ratio": aspect_ratio(scene),
         "resolution": "1K",
         "seed": random.randrange(2**31),
         **({"quality": quality} if quality else {}),

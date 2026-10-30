@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -381,6 +381,20 @@ class SessionViewModelTest {
         model.invite(friend)
         runCurrent()
         assertEquals(listOf("invite:u_2"), invitations.calls)
+    }
+
+    @Test
+    fun invite_aSessionStartedWhileItIsOnItsWay_cancelsTheInvitation_andKeepsTheSession() = runTest(dispatcher) {
+        val results = inviteResults()
+        model.invite(friend)
+        // *Use a room code* before the server answered the invitation.
+        model.startRoom()
+        runCurrent()
+
+        assertEquals(listOf("invite:u_2", "cancel:inv_1"), invitations.calls)
+        assertEquals(listOf(SessionEntry.NewRoom to Role.PHOTOGRAPHER), session.starts)
+        assertNull(model.invitation.value)
+        assertTrue(results.isEmpty())
     }
 
     @Test

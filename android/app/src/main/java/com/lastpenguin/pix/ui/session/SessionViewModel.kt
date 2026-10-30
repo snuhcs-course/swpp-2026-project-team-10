@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -136,6 +136,9 @@ class SessionViewModel(
     /** An invitation is on its way to the server, so a second tap sends none. */
     private var sendingInvite = false
 
+    /** Counts the sessions started here, so an invitation answered after another one started knows it came too late. */
+    private var started = 0
+
     /** Whether the current join is a *Reconnect*; decides what an `Ended` does with [lastCode]. */
     private var reconnecting = false
 
@@ -172,6 +175,7 @@ class SessionViewModel(
         if (isOpen(current)) return
         lastCode = null // This phone is the photographer now; a code it joined earlier is stale.
         role = Role.PHOTOGRAPHER
+        started++
         viewModelScope.launch { session.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER) }
     }
 
@@ -183,16 +187,23 @@ class SessionViewModel(
     /**
      * Photographer: *Invite* on Friends, or *Invite again* (FR-6.1–6.3). The server opens the session with this phone's
      * place, which it takes at once, waiting in `Inviting` for the friend. Ignored while a session is open or another
-     * invitation is on its way.
+     * invitation is on its way. A session started while it is on its way, as with *Use a room code*, keeps this phone,
+     * so the invitation is cancelled rather than left to a friend whose *Accept* would find nobody waiting.
      */
     fun invite(friend: PixUser) {
         if (sendingInvite || isOpen(state.value)) return
         sendingInvite = true
+        val startedBefore = started
         viewModelScope.launch {
             invitations.invite(friend.userId)
                 .onSuccess { sent ->
+                    if (started != startedBefore) {
+                        invitations.cancel(sent.id)
+                        return@onSuccess
+                    }
                     lastCode = null
                     role = Role.PHOTOGRAPHER
+                    started++
                     _invitation.value = sent
                     session.start(SessionEntry.Invite(sent.id, sent.place), Role.PHOTOGRAPHER)
                     _inviteResults.send(InviteResult.Sent)
@@ -237,6 +248,7 @@ class SessionViewModel(
         lastCode = null
         reconnecting = false
         role = Role.SUBJECT
+        started++
         viewModelScope.launch { session.start(SessionEntry.Invitation(invitationId, place), Role.SUBJECT) }
         return true
     }
@@ -262,6 +274,7 @@ class SessionViewModel(
         lastCode = code
         this.reconnecting = reconnecting
         role = Role.SUBJECT
+        started++
         viewModelScope.launch { session.start(entry, Role.SUBJECT) }
     }
 

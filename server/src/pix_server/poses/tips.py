@@ -51,20 +51,29 @@ ANSWER_SCHEMA = {
     "additionalProperties": False,
 }
 # A number, a unit, or a degree is hard to follow while shooting, so a sentence with one is not shown: digits, numbers
-# in words ("two steps"), "one" before a step or a unit, units, and degrees; in Korean, a count of steps ("한 걸음"),
-# units, and a degree in words ("십오 도").
+# in words ("two steps"), "one" before a step or a unit, units, and degrees; in Korean, a count of steps ("한 걸음",
+# "한두 걸음", "열한 걸음만"), units, and a degree in words ("십오 도로").
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
-KOREAN_COUNTS = "한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|스무"
-KOREAN_DEGREES = "[일이삼사오육칠팔구]?[십백][일이삼사오육칠팔구]?|[일이삼사오육칠팔구]"
+# Korean counts run their words together ("한두", "서너", "대여섯", "열한", "이십"). A step unit takes any ending
+# ("한 걸음만"); 발 and 보 count steps only after a native count and with a few endings, because "두 발로 서서" is about
+# feet and 이발 or 구보 are words of their own. A degree written with one Sino-Korean digit needs a space ("구 도"), so
+# 구도 (the composition) is not one.
+KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
+KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
+KOREAN_DIGIT = "[일이삼사오육칠팔구]"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
-    rf"|(?<![가-힣])({KOREAN_COUNTS})\s*(걸음|발짝|발자국|발|뼘|보)(?![가-힣])|미터|센티|센치|밀리|인치|피트"
-    rf"|(?<![가-힣])({KOREAN_DEGREES})\s*도(?![가-힣])",
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)|미터|센티|센치|밀리|인치|피트"
+    rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보)(만|씩|쯤|가량)?(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도(로|만|씩|쯤|가량|를|의|에)?(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도(?![가-힣])",
     re.IGNORECASE,
 )
+HANGUL = re.compile("[가-힣]")
+LATIN = re.compile("[A-Za-z]")
 
 
 @dataclass(frozen=True)
@@ -76,9 +85,9 @@ class PoseTip:
     angle: Angle
 
 
-def usable_tip(answer: str) -> PoseTip | None:
-    """The tip in the model's answer, or None when it cannot be shown. The height move compares where the phone was
-    for the scene with where it should be."""
+def usable_tip(answer: str, language: Language = "en") -> PoseTip | None:
+    """The tip in the model's answer, or None when it cannot be shown, also when its sentence is not in `language`. The
+    height move compares where the phone was for the scene with where it should be."""
     match = re.search(r"\{.*\}", answer, re.DOTALL)  # some models wrap the JSON in a code fence
     try:
         fields = json.loads(match.group(0) if match else answer)
@@ -91,6 +100,10 @@ def usable_tip(answer: str) -> PoseTip | None:
     if framing not in ("closer", "back", "keep"):
         return None
     if not 0 < len(text) <= TEXT_MAX_LENGTH or MEASURE.search(text):
+        return None
+    # A model can leave out the Korean instruction; a sentence in another language would not suit the screens.
+    in_language = HANGUL.search(text) and not LATIN.search(text) if language == "ko" else not HANGUL.search(text)
+    if not in_language:
         return None
     step = LEVELS.index(best) - LEVELS.index(now)
     height: Height = "raise" if step > 0 else "lower" if step < 0 else "keep"
@@ -154,7 +167,7 @@ class PoseTipper:
                 status = response.status_code
                 logger.warning("OpenRouter answered %s (%s) to a tip request", status, status_phrase(status))
                 raise ApiError(502, "UPSTREAM_ERROR", "The tip model failed")
-            tip = usable_tip(body["choices"][0]["message"]["content"] or "")
+            tip = usable_tip(body["choices"][0]["message"]["content"] or "", language)
         except (ValueError, LookupError, TypeError, AttributeError) as exc:
             logger.warning("OpenRouter answered %s with an unreadable body to a tip request", response.status_code)
             raise ApiError(502, "UPSTREAM_ERROR", "The tip model returned an unreadable answer") from exc

@@ -21,8 +21,9 @@ pairs/<name>-1 to -4, also once, with a sheet (sets/<name>.png) to pick one.
 the one in --prompt-file, the scene first and the candidate second, the candidate as the app would send it (long side
 768 px, JPEG 85), with the server's schema and reasoning effort (keep TIP_SCHEMA in step with poses/tips.py). It
 writes results.json, report.html, and contact sheets (sheet-<n>.png) to scripts/out/tips/runs/<timestamp>[-label]/,
-with the prompt it used; with --rounds, it also counts the pairs that got the same decisions every time. Every call
-is billed to the OpenRouter key, at a fraction of a cent.
+with the prompt it sent (the Korean instruction included) and the language; with --rounds, it also counts the pairs
+that got the same decisions every time. With --language ko, a sentence is checked against tip_korean's 80 characters
+and for being in Korean. Every call is billed to the OpenRouter key, at a fraction of a cent.
 """
 
 import argparse
@@ -63,20 +64,27 @@ CONCURRENCY = 4
 # The candidate's ratio, as the server's `ASPECT_RATIOS` in poses/generator.py: the app's frame closest to the scene's.
 ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
 TEXT_MAX_LENGTH = 140
+KOREAN_TEXT_MAX_LENGTH = 80  # what tip_korean asks for
 # A tip says how to hold the camera in words; a number, a unit, or a degree is hard to follow while shooting. The same
 # check as the server's `MEASURE` in poses/tips.py.
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
-KOREAN_COUNTS = "한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|스무"
-KOREAN_DEGREES = "[일이삼사오육칠팔구]?[십백][일이삼사오육칠팔구]?|[일이삼사오육칠팔구]"
+KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
+KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
+KOREAN_DIGIT = "[일이삼사오육칠팔구]"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
-    rf"|(?<![가-힣])({KOREAN_COUNTS})\s*(걸음|발짝|발자국|발|뼘|보)(?![가-힣])|미터|센티|센치|밀리|인치|피트"
-    rf"|(?<![가-힣])({KOREAN_DEGREES})\s*도(?![가-힣])",
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)|미터|센티|센치|밀리|인치|피트"
+    rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보)(만|씩|쯤|가량)?(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도(로|만|씩|쯤|가량|를|의|에)?(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도(?![가-힣])",
     re.IGNORECASE,
 )
+# The server refuses a sentence that is not in the language asked for, as poses/tips.py does.
+HANGUL = re.compile("[가-힣]")
+LATIN = re.compile("[A-Za-z]")
 
 # Where the photographer holds the camera, by their own posture, lowest first. The model places the camera of photo 1
 # and the best one for the pose, in the order of the schema, so it decides the shot and the pose first; the script
@@ -289,7 +297,7 @@ class Tip:
     flags: list[str] = field(default_factory=list)
 
 
-def check(tip: Tip) -> None:
+def check(tip: Tip, language: str) -> None:
     now, best = (tip.answer.get(key) for key in ("camera_now", "camera_best"))
     if now in LEVELS and best in LEVELS:
         step = LEVELS.index(best) - LEVELS.index(now)
@@ -297,10 +305,14 @@ def check(tip: Tip) -> None:
     text = tip.answer.get("text", "")
     if not ANGLE_WORDS.search(text):
         tip.flags.append("no angle in text")
-    if not 0 < len(text) <= TEXT_MAX_LENGTH:
+    if not 0 < len(text) <= (KOREAN_TEXT_MAX_LENGTH if language == "ko" else TEXT_MAX_LENGTH):
         tip.flags.append(f"text length {len(text)}")
     if MEASURE.search(text):
         tip.flags.append("number or unit")
+    if language == "ko" and (not HANGUL.search(text) or LATIN.search(text)):
+        tip.flags.append("not in Korean")
+    if language == "en" and HANGUL.search(text):
+        tip.flags.append("not in English")
 
 
 async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number: int, args) -> Tip:
@@ -330,7 +342,7 @@ async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number:
             usage = body.get("usage") or {}
             tip.cost = usage.get("cost")
             tip.reasoning_tokens = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
-            check(tip)
+            check(tip, args.language)
     except (httpx2.HTTPError, ValueError, KeyError, IndexError, TypeError) as error:
         tip.error = f"{type(error).__name__}: {error}"
     tip.seconds = time.perf_counter() - start
@@ -431,7 +443,9 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     out = OUT / "runs" / (f"{stamp}-{args.label}" if args.label else stamp)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
+    # What the model is sent, the Korean instruction included, so the run can be repeated from its folder.
+    sent = f"{prompt}\n\n{args.korean}" if args.korean else prompt
+    (out / "prompt.txt").write_text(sent + "\n", encoding="utf-8")
 
     gate = asyncio.Semaphore(CONCURRENCY)
 
@@ -441,11 +455,16 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
 
     jobs = [one(folder, number) for number in range(1, args.rounds + 1) for folder in folders]
     tips = sorted(await asyncio.gather(*jobs), key=lambda tip: (tip.scene, tip.round))
-    settings = {"model": VISION_MODEL, "reasoning": args.reasoning, "max_tokens": args.max_tokens}
-    record = {**settings, "prompt": prompt, "tips": [asdict(tip) for tip in tips]}
+    settings = {
+        "model": VISION_MODEL,
+        "reasoning": args.reasoning,
+        "max_tokens": args.max_tokens,
+        "language": args.language,
+    }
+    record = {**settings, "prompt": sent, "tips": [asdict(tip) for tip in tips]}
     (out / "results.json").write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
     write_sheets(out, tips)
-    write_report(out, prompt, tips)
+    write_report(out, sent, tips)
 
     seconds = sorted(tip.seconds for tip in tips if not tip.error)
     if seconds:

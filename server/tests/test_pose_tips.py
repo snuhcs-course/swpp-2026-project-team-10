@@ -9,8 +9,10 @@
 # in time, no connection, no key. The phone: staying connected, or dropping the request while the model works.
 # Limits: each window full, counted apart from poses and suggestions; refused input not counted; the session store
 # down. Privacy: neither the pose nor the answer nor the upstream body is logged. Language (FR-10.2): `ko`, `en`, left
-# out, and another value; a Korean sentence that is usable, one with words that only contain a count ("한쪽", "두 손"),
-# and one with a count of steps, with or without a space, a unit, or a degree in digits or in words.
+# out, and another value; a sentence in the language asked for, in the other one, or in both; a Korean sentence that is
+# usable, one with words that only contain a count ("한쪽", "두 손") or that look like one (구도, 두 발로, 이발), and
+# one with a count of steps, with or without a space, of words run together ("한두", "열한", "이십"), or with an ending
+# ("한 걸음만"), a unit, or a degree in digits or in words, with or without an ending.
 import asyncio
 import base64
 import json
@@ -33,6 +35,7 @@ ANSWER = {
     "framing": "closer",
     "text": "Zoom in or take a step closer, hold the phone at your waist and tilt it up a little - the legs look longer.",
 }
+KOREAN_TEXT = "줌을 당기거나 조금 다가가서 허리 높이에서 살짝 위로 기울이세요 - 다리가 길어 보여요."
 
 
 @pytest.fixture(autouse=True)
@@ -101,6 +104,8 @@ def test_tip_comes_from_the_model_for_the_scene_and_the_candidate(client, image_
 
 @pytest.mark.parametrize(("language", "korean"), [("ko", True), ("en", False), (None, False)])
 def test_language_says_whether_the_sentence_is_asked_in_korean(client, image_api, photos, language, korean):
+    if korean:
+        image_api.tips(ANSWER | {"text": KOREAN_TEXT})
     assert ask(client, photos, language=language).status_code == 200
     [payload] = image_api.tip_payloads
     texts = [part["text"] for part in payload["messages"][0]["content"] if part["type"] == "text"]
@@ -118,10 +123,11 @@ def test_language_the_app_does_not_have_is_refused_before_a_call(client, image_a
 @pytest.mark.parametrize(
     "text",
     [
-        "줌을 당기거나 조금 다가가서 허리 높이에서 살짝 위로 기울이세요 - 다리가 길어 보여요.",
+        KOREAN_TEXT,
         "한쪽 어깨가 보이게 가슴 높이에서 두 손으로 수평으로 드세요 - 몸의 비율이 그대로 보여요.",
+        "두 발로 단단히 서서 구도를 맞추고 가슴 높이에서 드세요 - 이발한 머리까지 깔끔하게 담겨요.",
     ],
-    ids=["usable", "words containing a count"],
+    ids=["usable", "words containing a count", "words that look like a count"],
 )
 def test_korean_sentence_is_shown(client, image_api, photos, text):
     image_api.tips(ANSWER | {"text": text})
@@ -139,6 +145,12 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "삼십 센티 낮춰서 드세요.",
         "십오 도 위로 기울이세요.",
         "15° 위로 기울이세요.",
+        "한두 걸음 다가가서 드세요.",
+        "열한 걸음 물러나서 드세요.",
+        "이십 걸음 뒤에서 드세요.",
+        "한 걸음만 다가가서 드세요.",
+        "한 발만 물러나서 드세요.",
+        "삼십 도로 기울이세요.",
     ],
     ids=[
         "count of steps",
@@ -147,11 +159,33 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "unit in words",
         "degrees in words",
         "degree sign",
+        "count of two words",
+        "count of ten and one",
+        "Sino-Korean count",
+        "count with an ending",
+        "native count of 발",
+        "degrees with an ending",
     ],
 )
 def test_korean_sentence_with_a_count_a_unit_or_a_degree_is_unusable(client, image_api, photos, text):
     image_api.tips(ANSWER | {"text": text})
     assert_error(ask(client, photos, language="ko"), 502, "UPSTREAM_ERROR")
+
+
+@pytest.mark.parametrize(
+    ("language", "text"),
+    [
+        ("ko", ANSWER["text"]),
+        ("ko", "가슴 높이에서 keep it level - 신체 비율이 유지돼요."),
+        ("en", "가슴 높이에서 수평으로 드세요 - 신체 비율이 유지돼요."),
+        ("en", "Hold the phone at your 가슴 and keep it level."),
+    ],
+    ids=["English asked in Korean", "both asked in Korean", "Korean asked in English", "both asked in English"],
+)
+def test_sentence_not_in_the_language_asked_for_is_unusable(client, image_api, photos, language, text):
+    # A model can leave out the Korean instruction, or answer in the language of a pose typed in Korean.
+    image_api.tips(ANSWER | {"text": text})
+    assert_error(ask(client, photos, language=language), 502, "UPSTREAM_ERROR")
 
 
 @pytest.mark.parametrize("framing", ["closer", "back", "keep"])

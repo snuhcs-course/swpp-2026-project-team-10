@@ -1,24 +1,35 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.NormalizedRect
+import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuide
+import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeGuideRepository
+import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideReference
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.PeerInfo
+import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.fakeGuide
+import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.ReferenceCorner
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -546,6 +557,125 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, flash = FlashMode.AUTO))
         runCurrent()
         assertEquals(FlashMode.AUTO, viewModel.uiState.value.flash)
+    }
+
+    // ---- Save guide (FR-6.16) and the photographer's set (FR-6.15), Iter3-P16 ---------------------------------------
+    // Partitions: Save guide with a guide (saved with the reference copy, the anchor and source its image carried, and
+    // the mirror's state; then filled), already saved, a store that fails, no guide; the set: none, GENERATING,
+    // PICKING, ended; Pick a pose opened by itself once per set.
+
+    private val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
+
+    private fun saving(store: SavedGuideStore = SavedGuideStore.InMemory()): SubjectViewModel =
+        SubjectViewModel(session, mirror, references, FakeRemoteVideo(), store)
+
+    /** The photographer's guide on the video, as the subject's syncer leaves it, with its reference copy. */
+    private fun guideOnVideo(): ReferenceGuide {
+        val guide = fakeGuide("g1").copy(anchor = box, source = GuideSource.GENERATED)
+        mirror.setGuide(guide)
+        mirror.update(final = true) { GuideState("g1", cx = 0.4f, cy = 0.6f, height = 0.8f) }
+        references.set(GuideReference("g1", fakeBitmap()))
+        return guide
+    }
+
+    @Test
+    fun saveGuide_keepsTheGuideAsThePhotographersPhoneDoes_andFillsTheButton() = runTest {
+        val store = SavedGuideStore.InMemory()
+        val model = saving(store)
+        val notices = mutableListOf<GuideSaveNotice>()
+        backgroundScope.launch { model.guideSaveNotices.collect { notices += it } }
+        connect()
+        guideOnVideo()
+        runCurrent()
+
+        model.onSaveGuide()
+        runCurrent()
+
+        val (saved, state) = store.load("g1").getOrThrow()
+        assertEquals(box, saved.anchor)
+        assertEquals(GuideSource.GENERATED, saved.source)
+        assertSame(references.reference.value?.photo, saved.reference)
+        assertEquals(0.4f, state.cx, 0f)
+        assertTrue(model.uiState.value.guideSaved)
+        assertFalse(model.uiState.value.savingGuide)
+        assertEquals(listOf(GuideSaveNotice.SAVED), notices)
+    }
+
+    @Test
+    fun saveGuide_whenAlreadySaved_saysSoAndKeepsOneCopy() = runTest {
+        val store = SavedGuideStore.InMemory()
+        val model = saving(store)
+        val notices = mutableListOf<GuideSaveNotice>()
+        backgroundScope.launch { model.guideSaveNotices.collect { notices += it } }
+        connect()
+        guideOnVideo()
+        runCurrent()
+        model.onSaveGuide()
+        runCurrent()
+
+        model.onSaveGuide()
+        runCurrent()
+
+        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.ALREADY_SAVED), notices)
+        assertEquals(1, store.saved.value.size)
+    }
+
+    @Test
+    fun saveGuide_aStoreThatFails_saysSo() = runTest {
+        val failing = object : SavedGuideStore by SavedGuideStore.InMemory() {
+            override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> =
+                Result.failure(IOException("Storage full"))
+        }
+        val model = saving(failing)
+        val notices = mutableListOf<GuideSaveNotice>()
+        backgroundScope.launch { model.guideSaveNotices.collect { notices += it } }
+        connect()
+        guideOnVideo()
+        runCurrent()
+
+        model.onSaveGuide()
+        runCurrent()
+
+        assertEquals(listOf(GuideSaveNotice.FAILED), notices)
+        assertFalse(model.uiState.value.guideSaved)
+        assertFalse(model.uiState.value.savingGuide)
+    }
+
+    @Test
+    fun saveGuide_withoutAGuide_doesNothing() = runTest {
+        val store = SavedGuideStore.InMemory()
+        val model = saving(store)
+        connect()
+        runCurrent()
+
+        model.onSaveGuide()
+        runCurrent()
+
+        assertTrue(store.saved.value.isEmpty())
+    }
+
+    @Test
+    fun thePhotographersSet_isShownWhileOpen_andPickAPoseOpensOncePerSet() = runTest {
+        val poses = PoseSyncer(session, FakePoseCandidateCodec(), dispatcher)
+        val model = SubjectViewModel(session, mirror, references, FakeRemoteVideo(), poses = poses)
+        connect()
+        poses.startAsReceiver(backgroundScope)
+        runCurrent()
+        assertNull(model.uiState.value.poseStep)
+
+        session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING))
+        runCurrent()
+        assertEquals("set1" to PoseSetStep.GENERATING, model.uiState.value.poseSetId to model.uiState.value.poseStep)
+        session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.PICKING))
+        runCurrent()
+        assertEquals(PoseSetStep.PICKING, model.uiState.value.poseStep)
+        assertTrue(model.claimPickOpening("set1"))
+        assertFalse(model.claimPickOpening("set1"))
+
+        session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED))
+        runCurrent()
+        assertNull(model.uiState.value.poseStep)
+        assertTrue("a new set opens again", model.claimPickOpening("set2"))
     }
 
     private companion object {

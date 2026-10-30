@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -19,7 +19,10 @@ import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.ConfirmShare
+import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SubjectGuideTarget
+import com.lastpenguin.pix.session.SubjectUse
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -41,6 +44,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -360,6 +364,118 @@ class ReferenceViewModelTest {
                 }
             }
             return Result.success(PoseTip("Hold the phone at your chest and keep it level."))
+        }
+    }
+
+    // ---- the Reference confirm on both phones (FR-6.15, Design 2.6.5) ------------------------------------------
+    // Partitions: a chosen pose's confirm shared from FINDING to READY and ended by Use this guide; Back, No person
+    // found, and an unusable photo close it, once; the subject's use of the outline on screen sets the guide once and
+    // keeps its tip; a use while finding, of another outline or confirm, or after the guide was used does nothing.
+    // Choose another photo and a photo from Add a pose guide need a Uri: ReferenceConfirmFragmentTest.
+
+    @Test
+    fun aChosenPose_isSharedFromFindingToReady_andUseThisGuideEndsIt() = runTest {
+        val confirms = FakeConfirms()
+        val model = withConfirms(confirms)
+        val guide = guide()
+
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        assertEquals(true, model.sharing.value)
+        maker.finish(Result.success(guide))
+        runCurrent()
+        model.onUseGuide()
+
+        assertEquals(listOf("open", "ready ${guide.id}", "used ${guide.id} PHOTOGRAPHER"), confirms.calls)
+        assertEquals(1, confirms.ids.size)
+        assertEquals(false, model.sharing.value)
+        assertSame(guide, guides.stored)
+    }
+
+    @Test
+    fun backNoPersonOrAnUnusablePhoto_closesTheSharedConfirm() = runTest {
+        val confirms = FakeConfirms()
+        val model = withConfirms(confirms)
+
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        model.onConfirmLeft()
+        maker.pending.clear()
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.failure(NoPersonFoundException()))
+        runCurrent()
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.failure(IOException("Unreadable photo")))
+        runCurrent()
+        model.onConfirmLeft()
+
+        assertEquals(listOf("open", "close", "open", "close", "open", "close"), confirms.calls)
+        assertEquals(3, confirms.ids.size)
+        assertEquals(false, model.sharing.value)
+    }
+
+    @Test
+    fun theSubjectsUseOfTheOutlineOnScreen_setsTheGuideOnce_andKeepsItsTip() = runTest {
+        val confirms = FakeConfirms()
+        val tipper = RecordingTipper(waits = true)
+        val tips = PoseTips(tipper, guides.guide, backgroundScope)
+        val model = ReferenceViewModel(maker, guides, tips = tips, confirms = confirms)
+        store.put("shared-reference", model)
+        val used = mutableListOf<Unit>()
+        backgroundScope.launch { model.usedBySubject.collect { used += it } }
+        val guide = guide()
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+        val id = confirms.ids.single()
+
+        // While the person is being found, and for another outline or confirm: nothing.
+        confirms.uses.emit(SubjectUse(id, guide.id))
+        runCurrent()
+        maker.finish(Result.success(guide))
+        runCurrent()
+        confirms.uses.emit(SubjectUse(id, "guide-other"))
+        confirms.uses.emit(SubjectUse("another", guide.id))
+        runCurrent()
+        assertNull(guides.stored)
+
+        confirms.uses.emit(SubjectUse(id, guide.id))
+        runCurrent()
+        model.onUseGuide()
+        model.onConfirmLeft()
+        confirms.uses.emit(SubjectUse(id, guide.id))
+        runCurrent()
+
+        assertSame(guide, guides.stored)
+        assertEquals(ReferenceUiState.Idle, model.uiState.value)
+        assertEquals(listOf("open", "ready ${guide.id}", "used ${guide.id} SUBJECT"), confirms.calls)
+        assertEquals(1, used.size)
+        assertTrue(tipper.cancelled.isEmpty())
+    }
+
+    private fun withConfirms(confirms: FakeConfirms): ReferenceViewModel =
+        ReferenceViewModel(maker, guides, confirms = confirms).also { store.put("shared-reference", it) }
+
+    /** Records what the confirm told the subject's phone; [uses] are the subject's, as the syncer passes them on. */
+    private class FakeConfirms : ConfirmShare {
+        override val uses = MutableSharedFlow<SubjectUse>()
+        val calls = mutableListOf<String>()
+        val ids = mutableSetOf<String>()
+
+        override fun open(confirmId: String) = record(confirmId, "open")
+
+        override fun finding(confirmId: String) = record(confirmId, "finding")
+
+        override fun ready(confirmId: String, guide: ReferenceGuide) = record(confirmId, "ready ${guide.id}")
+
+        override fun used(confirmId: String, guideId: String, by: Role) = record(confirmId, "used $guideId $by")
+
+        override fun close(confirmId: String) = record(confirmId, "close")
+
+        private fun record(confirmId: String, call: String) {
+            ids += confirmId
+            calls += call
         }
     }
 

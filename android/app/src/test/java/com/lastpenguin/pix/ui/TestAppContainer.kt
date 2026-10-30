@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -25,14 +25,18 @@ import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeGuideReferenceCodec
+import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
+import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -75,6 +79,20 @@ class TestAppContainer(
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
 
+    /** The photographer's candidates on the subject's phone; on the main thread, as the screens collect it. */
+    val poses = PoseSyncer(session, FakePoseCandidateCodec(), Dispatchers.Unconfined)
+
+    /** The photographer's Reference confirm on the subject's phone, the same way, with outlines a screen can draw. */
+    val confirms = ConfirmSyncer(
+        session,
+        FakeGuideImageCodec { id -> ScreenTestSupport.guide(withReference = false).copy(id = id) },
+        Dispatchers.Unconfined,
+    )
+
+    /** The photographer's Generate poses on the subject's phone, the same way, with a scene photo a screen can draw. */
+    val descriptions =
+        DescriptionSyncer(session, FakePoseCandidateCodec { ScreenTestSupport.bitmap(60, 80) }, Dispatchers.Unconfined)
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
@@ -93,6 +111,9 @@ class TestAppContainer(
         sessionManager = session,
         remoteVideo = video,
         guideSyncer = syncer,
+        poseSyncer = poses,
+        confirmSyncer = confirms,
+        descriptionSyncer = descriptions,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
     )

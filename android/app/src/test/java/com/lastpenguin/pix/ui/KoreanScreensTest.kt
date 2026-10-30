@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -30,10 +30,22 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.session.FakeGuideImageCodec
+import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.confirmBegin
+import com.lastpenguin.pix.session.confirmChunk
+import com.lastpenguin.pix.session.confirmEnd
+import com.lastpenguin.pix.session.fakeGuide
+import com.lastpenguin.pix.session.protocol.ConfirmStep
+import com.lastpenguin.pix.session.protocol.DescriptionStep
+import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.session.sceneBegin
+import com.lastpenguin.pix.session.sceneChunk
+import com.lastpenguin.pix.session.sceneEnd
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -62,8 +74,15 @@ import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
+import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
+import com.lastpenguin.pix.ui.session.SubjectDescribeFragment
 import com.lastpenguin.pix.ui.session.SubjectFragment
+import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
 import java.time.Duration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -78,10 +97,11 @@ import org.robolectric.annotation.GraphicsMode
  * Every screen in Korean (FR-10.2, Iter3-P7; Testing Documentation 2.1.6): the real Fragments on the fakes, with the
  * phone in Korean, at the Galaxy S22's app area of 360 x 705 dp. Each screen in the states that show its texts: Camera
  * without camera access, without a guide, with one, taking and reviewing the scene photo, and in a session; Add a pose
- * guide with a saved guide; Reference confirm with the person found; No person found; Generate poses; Generating poses
- * with a candidate ready; Pick a pose; Couldn't create poses, failed and refused; Friends signed out, and with a friend,
- * a request, and a sent request; Sent requests; Add a friend; Sign in; Sign up; Pix ID setup; Account; the room code;
- * Join with a code; Session not found; Subject view; Connection lost. On each, no visible text, hint, or content
+ * guide with a saved guide; Reference confirm with the person found, and with the subject's pick; No person found;
+ * Generate poses; Generating poses with a candidate ready; Pick a pose, alone and in a session; Couldn't create poses,
+ * failed and refused; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
+ * friend; Sign in; Sign up; Pix ID setup; Account; the room code; Join with a code; Session not found; Subject view,
+ * and while the photographer picks a pose, with a guide to save; the subject's Pick a pose; Connection lost. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
  * in a view that ellipsizes on purpose, and no line breaks inside a word. The text styles' font aliases: Pretendard in
@@ -103,9 +123,13 @@ class KoreanScreensTest {
     // The server's poses, in English like its suggestions and variations; Pick a pose reads them out to TalkBack.
     private val poses = listOf("Lean on the wall", "Walk toward the camera", "Sit on the step", "Wave")
 
+    // Where the subject's pose syncer runs, as the session would run it.
+    private val receiving = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     @After
     fun tearDown() {
         scenario?.close()
+        receiving.cancel()
     }
 
     // ---- Camera --------------------------------------------------------------------
@@ -181,6 +205,41 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun referenceConfirm_withTheSubjectsPick_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<ReferenceConfirmFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.referenceConfirmFragment)
+        }
+        scenario!!.onFragment {
+            it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(
+                bitmap(),
+                chosenBy = "Test Account 2",
+            )
+        }
+        idle()
+        modules.maker.finish(Result.success(guide()))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun referenceConfirm_ofAChosenPose_inASession_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<ReferenceConfirmFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.referenceConfirmFragment)
+        }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        scenario!!.onFragment {
+            it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(
+                bitmap(),
+                chosenBy = "Test Account 2",
+            )
+        }
+        idle()
+        modules.maker.finish(Result.success(guide()))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
     fun noPersonFound_isInKorean() {
         TestAppContainer().install()
         scenario = launchFragmentInContainer<NoPersonFoundFragment>(themeResId = R.style.Theme_Pix).also {
@@ -224,6 +283,18 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun describePoses_whileTheSubjectTypes_isInKorean() {
+        val modules = generationModules()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        scenario = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }.first
+        idle()
+        val id = modules.session.sent.filterIsInstance<SessionMessage.PoseDescription>().last().descriptionId
+        modules.session.deliver(SessionMessage.PoseDescriptionEdit(id, holding = true, text = "벽에 기대서 웃기"))
+        idle()
+        assertKorean(screen(), *people)
+    }
+
+    @Test
     fun generatingPoses_withACandidateReady_isInKorean() {
         val modules = generationModules()
         scenario = launchPrepared<GeneratingFragment>(R.id.generatingFragment) {
@@ -246,6 +317,16 @@ class KoreanScreensTest {
             )
         }.first
         assertKorean(screen(), *poses.toTypedArray())
+    }
+
+    @Test
+    fun pickAPose_inASession_isInKorean() {
+        val modules = generationModules()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        scenario = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) {
+            finished(modules, it, CandidateEvent.Ready("pose-1", bitmap()), CandidateEvent.Ready("pose-2", bitmap()))
+        }.first
+        assertKorean(screen(), *poses.toTypedArray(), *people)
     }
 
     private fun allFailed(error: GenerationError) {
@@ -380,6 +461,126 @@ class KoreanScreensTest {
         )
         // The "Connecting…" check runs every 500 ms on the main looper; let one more round see the session.
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    /** The photographer's set PICKING on the subject's phone, with two candidates. */
+    private fun photographerPicking(modules: TestAppContainer) {
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING))
+        idle()
+        for (poseId in listOf("pose-1", "pose-2")) {
+            val copy = checkNotNull(FakePoseCandidateCodec().encode(poseId, bitmap()))
+            modules.session.deliver(copy.begin("set1"))
+            for (i in copy.chunks.indices) modules.session.deliver(copy.chunk("set1", i))
+            modules.session.deliver(copy.end("set1"))
+            idle()
+        }
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.PICKING, listOf("pose-1", "pose-2")))
+        idle()
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whileThePhotographerPicksAPose_withAGuide_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectFragment)
+        }
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.mirror.setGuide(guide())
+        photographerPicking(modules)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    /** The photographer's Reference confirm READY on the subject's phone, with its outline. */
+    private fun photographerConfirming(modules: TestAppContainer) {
+        modules.confirms.startAsReceiver(receiving)
+        idle()
+        modules.session.deliver(SessionMessage.GuideConfirm("c1", ConfirmStep.READY, guideId = "g1"))
+        val image = FakeGuideImageCodec().encode(fakeGuide("g1"))
+        modules.session.deliver(image.confirmBegin("c1"))
+        for (i in image.chunks.indices) modules.session.deliver(image.confirmChunk("c1", i))
+        modules.session.deliver(image.confirmEnd("c1"))
+        idle()
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whileThePhotographerChecksTheGuide_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectFragment)
+        }
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerConfirming(modules)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    /** The photographer's Generate poses on the subject's phone, the photographer typing. */
+    private fun photographerDescribing(modules: TestAppContainer) {
+        modules.descriptions.startAsReceiver(receiving)
+        idle()
+        modules.session.deliver(
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "벽에 기대서 웃기", Role.PHOTOGRAPHER),
+        )
+        val copy = checkNotNull(FakePoseCandidateCodec().encode("d1", bitmap()))
+        modules.session.deliver(copy.sceneBegin("d1"))
+        for (i in copy.chunks.indices) modules.session.deliver(copy.sceneChunk("d1", i))
+        modules.session.deliver(copy.sceneEnd("d1"))
+        idle()
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whileThePhotographerDescribesAPose_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectFragment)
+        }
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerDescribing(modules)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun subjectsGeneratePoses_whileThePhotographerTypes_isInKorean() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerDescribing(modules)
+        scenario = launchFragmentInContainer<SubjectDescribeFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectDescribeFragment)
+        }
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun subjectsYourReference_isInKorean() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerConfirming(modules)
+        scenario = launchFragmentInContainer<SubjectConfirmFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectConfirmFragment)
+        }
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun subjectsPickAPose_isInKorean() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        photographerPicking(modules)
+        scenario = launchFragmentInContainer<SubjectPickPoseFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectPickPoseFragment)
+        }
         assertKorean(screen(), *people)
     }
 

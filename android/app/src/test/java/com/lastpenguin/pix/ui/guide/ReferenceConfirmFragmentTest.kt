@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.net.Uri
@@ -15,6 +15,8 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.ConfirmStep
+import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -40,7 +42,11 @@ import org.robolectric.shadows.ShadowToast
  * and Use this guide enabled, which puts the guide on the camera), no person found (to that screen), and a photo
  * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
  * gallery in its place, stops the ask for its tip. Opened from Subject view: the session ending goes back to Subject
- * view, which shows what ended it, and stops finding the person; opened from the camera, it stays.
+ * view, which shows what ended it, and stops finding the person; opened from the camera, it stays. A candidate the
+ * subject picked says whose pick it is under the title; this phone's own pick and an uploaded photo say nothing.
+ * In a session (FR-6.15, Design 2.6.5): a chosen pose's outline goes to the subject, with the hint, and Choose another
+ * photo keeps it there; a photo from Add a pose guide is not shared and has no hint; the subject's Use this guide that
+ * comes first puts the guide on the camera with a notice, as this phone's own tap.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -51,6 +57,85 @@ class ReferenceConfirmFragmentTest {
     @After
     fun tearDown() {
         scenario?.close()
+    }
+
+    /** This phone as the photographer of a connected session: the screen's SessionViewModel starts the senders. */
+    private fun inASession(modules: TestAppContainer) {
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+    }
+
+    private fun confirmSteps(modules: TestAppContainer) =
+        modules.session.sent.filterIsInstance<SessionMessage.GuideConfirm>()
+
+    private fun pickCandidate() {
+        scenario!!.onFragment { it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap()) }
+        idle()
+    }
+
+    @Test
+    fun inASession_aChosenPosesOutlineGoesToTheSubject_withTheHint_andAnotherPhotoKeepsItThere() {
+        val modules = launch()
+        inASession(modules)
+        pickCandidate()
+        assertEquals(string(R.string.reference_shared_hint, "Junhyeong"), onScreen { it.sharedHint.text.toString() })
+        assertTrue(onScreen { it.sharedHint.isShown })
+
+        val made = guide()
+        modules.maker.finish(Result.success(made))
+        idle()
+        pickPhoto()
+
+        val steps = confirmSteps(modules)
+        assertEquals(listOf(ConfirmStep.FINDING, ConfirmStep.READY, ConfirmStep.FINDING), steps.map { it.step })
+        assertEquals(made.id, steps[1].guideId)
+        assertEquals(1, steps.map { it.confirmId }.toSet().size)
+        val outline = modules.session.sent.filterIsInstance<SessionMessage.GuideConfirmImageBegin>().single()
+        assertEquals(made.id, outline.guideId)
+        assertTrue(onScreen { it.sharedHint.isShown })
+    }
+
+    @Test
+    fun inASession_aPhotoFromAddAPoseGuide_isNotShared_andHasNoHint() {
+        val modules = launch()
+        inASession(modules)
+
+        pickPhoto()
+        modules.maker.finish(Result.success(guide()))
+        idle()
+
+        assertTrue(confirmSteps(modules).isEmpty())
+        assertFalse(onScreen { it.sharedHint.isShown })
+    }
+
+    @Test
+    fun outsideASession_aChosenPoseHasNoHint() {
+        launch()
+        pickCandidate()
+
+        assertFalse(onScreen { it.sharedHint.isShown })
+    }
+
+    @Test
+    fun theSubjectsUseThisGuideComingFirst_putsTheGuideOnTheCamera_withANotice() {
+        val modules = launch()
+        inASession(modules)
+        pickCandidate()
+        val made = guide()
+        modules.maker.finish(Result.success(made))
+        idle()
+        val confirmId = confirmSteps(modules).first().confirmId
+
+        modules.session.deliver(SessionMessage.GuideConfirmUse(confirmId, made.id))
+        idle()
+
+        assertSame(made, modules.guides.guide.value)
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+        assertEquals(string(R.string.peer_used_guide, "Junhyeong"), ShadowToast.getTextOfLatestToast())
+        assertEquals(
+            SessionMessage.GuideConfirm(confirmId, ConfirmStep.USED, made.id, Role.SUBJECT),
+            confirmSteps(modules).last(),
+        )
     }
 
     private fun launch(): TestAppContainer {
@@ -87,6 +172,30 @@ class ReferenceConfirmFragmentTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         idle()
         return modules to controller
+    }
+
+    @Test
+    fun theSubjectsPick_saysWhoseItIs_andAPhotoAfterItDoesNot() {
+        launch()
+        scenario!!.onFragment {
+            it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap(), chosenBy = "Junhyeong")
+        }
+        idle()
+        assertTrue(onScreen { it.chosenByText.isShown })
+        assertEquals(string(R.string.peer_chose_this_pose, "Junhyeong"), onScreen { it.chosenByText.text.toString() })
+
+        pickPhoto()
+
+        assertFalse(onScreen { it.chosenByText.isShown })
+    }
+
+    @Test
+    fun thisPhonesOwnPick_saysNothingUnderTheTitle() {
+        launch()
+        scenario!!.onFragment { it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap()) }
+        idle()
+
+        assertFalse(onScreen { it.chosenByText.isShown })
     }
 
     @Test

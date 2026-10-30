@@ -200,11 +200,7 @@ class GuideSyncer(
     }
 
     private fun adopt(received: Received) {
-        val begin = received.begin
-        val guide = received.guide.copy(
-            anchor = begin.anchor?.takeIf(::usable),
-            source = begin.source ?: GuideSource.GALLERY,
-        )
+        val guide = received.placed
         // The subject has this image: the change that follows sends only its state, attributed to the subject.
         peerHas = guide.id
         attributedTo = Role.SUBJECT
@@ -258,7 +254,14 @@ class GuideSyncer(
         }
     }
 
-    private class Received(val begin: SessionMessage.GuideImageBegin, val guide: ReferenceGuide, val size: Int)
+    private class Received(val begin: SessionMessage.GuideImageBegin, val guide: ReferenceGuide, val size: Int) {
+        /**
+         * The guide with the `anchor` and `source` its image carried: where the photographer starts a guide from the
+         * subject, and what the subject's *Save guide* keeps (Design 2.5.1). A box that cannot place a guide is left out.
+         */
+        val placed: ReferenceGuide
+            get() = guide.copy(anchor = begin.anchor?.takeIf(::usable), source = begin.source ?: GuideSource.GALLERY)
+    }
 
     /**
      * The subject's side of one session. The photographer's guide and state are kept here as they arrive, and drawn
@@ -305,7 +308,7 @@ class GuideSyncer(
 
         suspend fun handle(message: SessionMessage) {
             images.handle(message)?.let { received ->
-                theirs = received.guide
+                theirs = received.placed
                 Timings.mark("guide.applied", "image ${received.guide.id} ${received.size} B")
                 if (offered == null) showTheirs()
                 return
@@ -424,7 +427,8 @@ class GuideSyncer(
     private suspend fun sendImage(guide: ReferenceGuide) {
         peerHas = guide.id
         val image = encoded[guide.id] ?: withContext(dispatcher) { codec.encode(guide) }.also { cache(it) }
-        session.send(image.begin())
+        // The anchor and source go along for the subject's *Save guide*; the state that follows places the guide.
+        session.send(image.begin(guide.anchor, guide.source))
         for (index in image.chunks.indices) session.send(image.chunk(index))
         session.send(image.end())
         Timings.mark("guide.sent", "image ${guide.id} ${image.bytes.size} B in ${image.chunks.size} chunks")

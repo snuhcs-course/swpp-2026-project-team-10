@@ -141,6 +141,19 @@
                 tools:text="0/100" />
         </LinearLayout>
 
+        <!-- In a session: "Junhyeong is typing…" while the other phone's field holds the description (FR-6.15). -->
+        <TextView
+            android:id="@+id/descriptionTyping"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:accessibilityLiveRegion="polite"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            android:textColor="@color/pix_accent"
+            android:visibility="gone"
+            tools:text="Junhyeong is typing…"
+            tools:visibility="visible" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -162,6 +175,18 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:minHeight="24dp" />
+
+        <!-- In a session: the other phone shows this step too, and either one can write and go on (FR-6.15). -->
+        <TextView
+            android:id="@+id/sharedHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            android:visibility="gone"
+            tools:text="Junhyeong sees this too and can write it with you."
+            tools:visibility="visible" />
 
         <!-- With an empty field this asks for suggested poses, as Skip does (US-5). -->
         <Button

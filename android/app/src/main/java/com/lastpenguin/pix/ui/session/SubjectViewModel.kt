@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -15,21 +15,35 @@ import com.lastpenguin.pix.guide.GuideGeometry
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.ConfirmEnd
+import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.DescriptionEnd
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.MirrorReference
+import com.lastpenguin.pix.session.PoseSetEnd
+import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.ReferenceCorner
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Subject view (R&S 6.6, FR-3.9, FR-6.6, FR-7.1–7.3). */
+/** Subject view (R&S 6.6, FR-3.9, FR-6.6, FR-6.15, FR-6.16, FR-7.1–7.3). */
 data class SubjectUiState(
     /** For "Dongje's camera"; arrives in `hello`. */
     val photographerName: String? = null,
@@ -70,6 +84,24 @@ data class SubjectUiState(
     val referenceExpanded: Boolean = false,
     /** The thumbnail's corner on this phone; never sent, so each phone keeps its own. */
     val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
+    /** Whether the guide on the video is among this phone's saved guides (FR-6.16): *Save guide* is filled then. */
+    val guideSaved: Boolean = false,
+    val savingGuide: Boolean = false,
+    /**
+     * The photographer's open set of candidates (Design 2.6.5): GENERATING while it is being created, PICKING while
+     * this phone can pick from it on *Pick a pose*; null when there is none.
+     */
+    val poseSetId: String? = null,
+    val poseStep: PoseSetStep? = null,
+    /** With PICKING: whether a candidate's copy is here to pick from; a set with none opens no *Pick a pose*. */
+    val posesReady: Boolean = false,
+    /**
+     * The photographer's open Reference confirm of the chosen pose (Design 2.6.5), which this phone shows on *Your
+     * reference*; null when there is none.
+     */
+    val confirmId: String? = null,
+    /** The photographer's open *Generate poses* (Design 2.6.5), which this phone shows too; null when there is none. */
+    val describeId: String? = null,
 ) {
     val canZoom: Boolean
         get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
@@ -84,18 +116,48 @@ data class SubjectUiState(
  *
  * Every control is a request to the photographer (AD-7): the screen shows the requested value at once, sends steps
  * at most every [SEND_INTERVAL_MS] and the final value right away ([StepSender]), and the photographer's echo in
- * `camera.state` or `guide.state` decides what stays once the gesture is over (Design 2.6.5).
- * Owner: Real-time (#8 live view, #10 remote zoom, #57 remote controls), with the guide from #9.
+ * `camera.state` or `guide.state` decides what stays once the gesture is over (Design 2.6.5). The guide on the video
+ * can be saved on this phone, and the photographer's Generate poses ([descriptions]), set of candidates ([poses]),
+ * and Reference confirm ([confirms]) show here while they are open.
+ * Owner: Real-time (#8 live view, #10 remote zoom, #57 remote controls), with the guide from #9; *Save guide*, the
+ * photographer's candidates, and their Reference confirm Iter3-P16.
  */
 class SubjectViewModel(
     private val session: SessionManager,
     private val mirror: GuideRepository,
     private val references: MirrorReference,
     val video: RemoteVideo,
+    private val savedGuides: SavedGuideStore = SavedGuideStore.InMemory(),
+    private val poses: PoseSyncer? = null,
+    private val confirms: ConfirmSyncer? = null,
+    private val descriptions: DescriptionSyncer? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubjectUiState())
     val uiState: StateFlow<SubjectUiState> = _uiState.asStateFlow()
+
+    private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
+
+    /** One notice per *Save guide* tap, as on the Camera screen; kept until the screen reads it. */
+    val guideSaveNotices: Flow<GuideSaveNotice> = _guideSaveNotices.receiveAsFlow()
+
+    /** Each of the photographer's sets that ended, for its notice while this screen is in front (Design 2.6.5). */
+    val poseSetEnds: Flow<PoseSetEnd> = poses?.ended ?: emptyFlow()
+
+    /** The last set whose *Pick a pose* this screen opened by itself, so it opens once per set. */
+    private var pickOpenedFor: String? = null
+
+    /** Each of the photographer's Reference confirms that ended, for its notice while this screen is in front. */
+    val confirmEnds: Flow<ConfirmEnd> = confirms?.ended ?: emptyFlow()
+
+    /** The last confirm whose *Your reference* this screen opened by itself, so it opens once per confirm. */
+    private var confirmOpenedFor: String? = null
+
+    /** Each of the photographer's Generate poses that ended, for its notice while this screen is in front. */
+    val describeEnds: Flow<DescriptionEnd> = descriptions?.ended ?: emptyFlow()
+
+    /** The last description whose *Generate poses* this screen opened by itself, so it opens once per description. */
+    private var describeOpenedFor: String? = null
 
     private val zoomSender = StepSender<Float>(viewModelScope, SEND_INTERVAL_MS) { ratio, final ->
         session.send(SessionMessage.ZoomSet(ratio, final))
@@ -202,6 +264,33 @@ class SubjectViewModel(
             }
         }
         viewModelScope.launch {
+            // A guide keeps its id on both phones and when it is saved, so the id tells whether it is saved here.
+            combine(mirror.guide, savedGuides.saved) { guide, saved ->
+                guide != null && saved.any { it.id == guide.id }
+            }
+                .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
+        }
+        poses?.let { syncer ->
+            viewModelScope.launch {
+                syncer.mirror.collect { set ->
+                    val ready = set?.ready?.isNotEmpty() == true
+                    _uiState.update { it.copy(poseSetId = set?.setId, poseStep = set?.step, posesReady = ready) }
+                }
+            }
+        }
+        confirms?.let { syncer ->
+            viewModelScope.launch {
+                syncer.mirror.collect { confirm -> _uiState.update { it.copy(confirmId = confirm?.confirmId) } }
+            }
+        }
+        descriptions?.let { syncer ->
+            viewModelScope.launch {
+                syncer.mirror.collect { description ->
+                    _uiState.update { it.copy(describeId = description?.descriptionId) }
+                }
+            }
+        }
+        viewModelScope.launch {
             mirror.state.collect { state ->
                 _uiState.update {
                     it.copy(
@@ -218,6 +307,68 @@ class SubjectViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * *Save guide* (FR-6.16): keeps the guide on the video on this phone, to use again from *Add a pose guide*, as the
+     * photographer's phone keeps it: the mask as received, the reference copy the thumbnail shows, the `anchor` and
+     * `source` its image carried, and the mirror's state (Design 2.6.5). Not saved twice; when
+     * [SavedGuideStore.MAX_SAVED] are saved, the store deletes the oldest and the notice says so.
+     */
+    fun onSaveGuide() {
+        val ui = _uiState.value
+        val guide = ui.guide ?: return
+        if (ui.savingGuide) return
+        // The store's own list, not only guideSaved, which follows it a moment later.
+        val before = savedGuides.saved.value
+        if (ui.guideSaved || before.any { it.id == guide.id }) {
+            _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
+            return
+        }
+        val full = before.size >= SavedGuideStore.MAX_SAVED
+        // Without a reference copy yet, the outline is the saved guide's thumbnail.
+        val kept = guide.copy(reference = ui.reference ?: guide.reference)
+        val state = mirror.state.value
+        _uiState.update { it.copy(savingGuide = true) }
+        viewModelScope.launch {
+            val notice = try {
+                savedGuides.save(kept, state).fold(
+                    onSuccess = { if (full) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
+                    onFailure = { GuideSaveNotice.FAILED },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                GuideSaveNotice.FAILED
+            } finally {
+                _uiState.update { it.copy(savingGuide = false) }
+            }
+            _guideSaveNotices.send(notice)
+        }
+    }
+
+    /**
+     * Whether Subject view should open *Pick a pose* by itself for [setId] now: once per set, so Back keeps it closed
+     * and the button opens it again (Design 2.6.5).
+     */
+    fun claimPickOpening(setId: String): Boolean {
+        if (pickOpenedFor == setId) return false
+        pickOpenedFor = setId
+        return true
+    }
+
+    /** Whether Subject view should open *Your reference* by itself for [confirmId] now: once per confirm, as a set. */
+    fun claimConfirmOpening(confirmId: String): Boolean {
+        if (confirmOpenedFor == confirmId) return false
+        confirmOpenedFor = confirmId
+        return true
+    }
+
+    /** Whether Subject view should open *Generate poses* by itself for [describeId] now: once per description. */
+    fun claimDescribeOpening(describeId: String): Boolean {
+        if (describeOpenedFor == describeId) return false
+        describeOpenedFor = describeId
+        return true
     }
 
     /** A tap on the reference thumbnail enlarges it or makes it small again (FR-3.9). */

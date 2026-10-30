@@ -158,6 +158,20 @@
     <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
     <string name="use_this_pose">이 포즈 사용</string>
     <string name="try_other_poses">다른 포즈 생성</string>
+    <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
+    <string name="pose_shared_hint">%1$s님도 이 포즈들을 보고 있어요. 먼저 고른 쪽으로 정해져요.</string>
+    <string name="peer_chose_this_pose">%1$s님이 이 포즈를 골랐어요</string>
+    <string name="peer_chose_pose">%1$s님이 포즈를 골랐어요</string>
+    <string name="peer_closed_poses">%1$s님이 포즈 고르기를 닫았어요</string>
+    <string name="pose_pick_failed">고른 포즈를 보내지 못했어요</string>
+    <string name="reference_shared_hint">%1$s님도 이 가이드를 보고 있어요. 먼저 사용한 쪽으로 정해져요.</string>
+    <string name="peer_used_guide">%1$s님이 이 가이드를 사용했어요</string>
+    <string name="peer_closed_reference">%1$s님이 참고 사진을 닫았어요</string>
+    <string name="guide_use_failed">선택을 보내지 못했어요</string>
+    <string name="describe_shared_hint">%1$s님도 이 화면을 보고 함께 쓸 수 있어요.</string>
+    <string name="peer_typing">%1$s님이 입력하고 있어요…</string>
+    <string name="peer_closed_describe">%1$s님이 포즈 생성을 닫았어요</string>
+    <string name="describe_go_failed">요청을 보내지 못했어요</string>
     <string name="generation_failed_title">포즈를 생성하지 못했어요</string>
     <string name="generation_failed_message">문제가 생겼거나 60초 넘게 걸렸어요. 사진은 그대로 있으니 다시 시도해 보세요.</string>
 
@@ -294,6 +308,10 @@
     <string name="peer_ended_session">%1$s님이 카메라 공유를 끝냈어요</string>
     <string name="peer_ended_session_unnamed">상대가 카메라 공유를 끝냈어요</string>
     <string name="camera_paused">상대 카메라가 잠시 중지됐어요.</string>
+    <string name="peer_creating_poses">%1$s님이 포즈를 만들고 있어요…</string>
+    <string name="peer_picking_pose">%1$s님이 포즈를 고르고 있어요…</string>
+    <string name="peer_checking_guide">%1$s님이 가이드를 확인하고 있어요…</string>
+    <string name="peer_describing_pose">%1$s님이 포즈를 설명하고 있어요…</string>
     <string name="session_ended">카메라 공유가 끝났어요.</string>
     <string name="connection_lost_title">연결이 끊겼어요</string>
     <string name="connection_lost_message">영상이 멈췄어요. 두 휴대폰의 인터넷 연결을 확인하고 다시 연결하세요.</string>

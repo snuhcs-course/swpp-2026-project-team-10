@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -271,8 +271,12 @@ fun fakeBitmap(): Bitmap {
 fun fakeGuide(id: String, aspect: Float = 0.5f): ReferenceGuide =
     ReferenceGuide(id, fakeBitmap(), fakeBitmap(), aspect, GuideSource.GALLERY)
 
-/** Encodes a guide as its id's bytes and decodes any bytes into a guide, with no graphics. */
-class FakeGuideImageCodec : GuideImageCodec {
+/**
+ * Encodes a guide as its id's bytes and decodes any bytes into a guide, with no graphics; a screen test that draws the
+ * decoded guide passes [decodeAs] with real bitmaps, which Robolectric's native graphics need.
+ */
+class FakeGuideImageCodec(private val decodeAs: (guideId: String) -> ReferenceGuide = { fakeGuide(it) }) :
+    GuideImageCodec {
     val encoded = mutableListOf<String>()
     val decoded = mutableListOf<String>()
     var decodes = true
@@ -297,7 +301,7 @@ class FakeGuideImageCodec : GuideImageCodec {
 
     override fun decode(guideId: String, format: String, bytes: ByteArray): ReferenceGuide? {
         decoded += guideId
-        return if (decodes && format == "fake") fakeGuide(guideId) else null
+        return if (decodes && format == "fake") decodeAs(guideId) else null
     }
 }
 
@@ -320,5 +324,32 @@ class FakeGuideReferenceCodec : GuideReferenceCodec {
         if (format != "fake") return null
         decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
         return fakeBitmap()
+    }
+}
+
+/**
+ * Encodes a candidate as its id's bytes and decodes any `fake` bytes, with no graphics; a screen test that draws the
+ * decoded image passes [decodeAs] with a real bitmap, as for [FakeGuideImageCodec].
+ */
+class FakePoseCandidateCodec(private val decodeAs: () -> Bitmap = { fakeBitmap() }) : PoseCandidateCodec {
+    val encoded = mutableListOf<String>()
+    val decoded = mutableListOf<String>()
+    var encodes = true
+    var decodes = true
+
+    /** Runs while a candidate is encoded, as the set could change on the photographer's phone meanwhile. */
+    var onEncode: (String) -> Unit = {}
+
+    override fun encode(poseId: String, image: Bitmap): EncodedPoseCandidate? {
+        if (!encodes) return null
+        encoded += poseId
+        onEncode(poseId)
+        return EncodedPoseCandidate(poseId, "fake", 6, 8, "candidate:$poseId".toByteArray() + ByteArray(20_000))
+    }
+
+    override fun decode(format: String, bytes: ByteArray): Bitmap? {
+        if (format != "fake" || !decodes) return null
+        decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
+        return decodeAs()
     }
 }

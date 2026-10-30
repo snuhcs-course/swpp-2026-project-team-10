@@ -621,7 +621,8 @@ class CameraXController(
 
     override fun setTorch(on: Boolean) {
         mainExecutor.execute {
-            if (on == torch) return@execute
+            // Asked again when the camera did not apply the last request, so a light left on can still be turned off.
+            if (on == torch && on == _state.value.torch) return@execute
             torch = on
             binding?.let(::applyTorch)
         }
@@ -629,9 +630,10 @@ class CameraXController(
 
     /**
      * The kept light on an open camera with a flash; a closed one gets it when it opens again. The state says it is on
-     * only once CameraX has applied it, so the scene photo is never taken before the light is on.
+     * only once CameraX has applied it, so the scene photo is never taken before the light is on. A request that fails
+     * on an open camera leaves the state as it was, and turning the light off is asked once more while [retry].
      */
-    private fun applyTorch(current: Binding) {
+    private fun applyTorch(current: Binding, retry: Boolean = true) {
         val camera = current.camera ?: return
         if (!current.open || current.failed || !camera.cameraInfo.hasFlashUnit()) return
         val on = torch
@@ -639,10 +641,13 @@ class CameraXController(
         try {
             val applied = camera.cameraControl.enableTorch(on)
             applied.addListener({
+                // A request dropped because the camera closed is answered by torchOff.
                 if (binding !== current || request != torchRequest || !current.open) return@addListener
-                // CameraX drops a request when the camera closes, and then the light is off until it opens again.
-                val lit = on && runCatching { applied.get() }.isSuccess
-                _state.update { it.copy(torch = lit) }
+                when {
+                    runCatching { applied.get() }.isSuccess -> _state.update { it.copy(torch = on) }
+                    !on && retry -> applyTorch(current, retry = false)
+                    else -> Log.w(TAG, "The camera did not turn the light ${if (on) "on" else "off"}")
+                }
             }, mainExecutor)
         } catch (error: Exception) {
             Log.w(TAG, "Torch request could not start", error)

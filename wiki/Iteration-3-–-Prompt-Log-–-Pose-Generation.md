@@ -53,7 +53,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-30] "Install it on the S22; I'll check it myself." (The debug build installed over the one on the phone.)
 - [Dongje, 10-31] "Check the Codex review and fix it, as before." (The button says the light is on only once the camera has it, and a scene shot before that waits for the light.)
 - [Dongje, 10-31] "Check the Codex review again and fix it; a new one came in." (An answer to the light that arrives after the camera closed is dropped.)
-- [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (A lens without a flash takes the scene without waiting for the light.)
+- [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (A lens without a flash takes the scene without waiting for the light. Eighth review: a shot waits until the light has been on for half a second, also right after it came on, and a light that does not go off is asked once more.)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110

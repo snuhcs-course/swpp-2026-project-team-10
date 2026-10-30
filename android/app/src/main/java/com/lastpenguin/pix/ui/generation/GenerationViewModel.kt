@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -132,6 +133,9 @@ class GenerationViewModel(
     /** Generate poses as [descriptions] knows it, while the phase is DESCRIBING; null otherwise. */
     private var descriptionId: String? = null
 
+    /** The camera has had the light on for [LIGHT_SETTLE_MS]: its exposure has followed the light. */
+    private val lightSettled = MutableStateFlow(false)
+
     init {
         // Only ever sets it: an answer read before the user agreed must not take that agreement back.
         viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
@@ -142,6 +146,15 @@ class GenerationViewModel(
             uiState.map { it.phase == GenerationUiState.Phase.FRAMING && it.light }
                 .distinctUntilChanged()
                 .collect(camera::setTorch)
+        }
+        viewModelScope.launch {
+            camera.state.map { it.torch }.distinctUntilChanged().collectLatest { on ->
+                lightSettled.value = false
+                if (on) {
+                    delay(LIGHT_SETTLE_MS)
+                    lightSettled.value = true
+                }
+            }
         }
     }
 
@@ -168,19 +181,16 @@ class GenerationViewModel(
     }
 
     /**
-     * The shutter during FRAMING: the camera's current frame becomes the photo to confirm. With the light chosen but not
-     * on yet, the frame waits until the camera has it on, then [LIGHT_SETTLE_MS] for a frame lit by it and for the
-     * exposure to follow, so the scene is not taken dark; after [LIGHT_WAIT_MS] without it, the frame is taken as it is.
+     * The shutter during FRAMING: the camera's current frame becomes the photo to confirm. With the light chosen, the
+     * frame waits until the camera has had it on for [LIGHT_SETTLE_MS], so the frame is lit by it and the exposure has
+     * followed, also when the shutter comes right after the light; after [LIGHT_WAIT_MS], the frame is taken as it is.
      * A lens without a flash, such as the front camera after a switch, never has the light, so nothing waits for it.
      */
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         shooting = viewModelScope.launch {
             val canLight = camera.capabilities.value?.hasFlash == true
-            if (_uiState.value.light && canLight && !camera.state.value.torch) {
-                val lit = withTimeoutOrNull(LIGHT_WAIT_MS) { camera.state.first { it.torch } }
-                if (lit != null) delay(LIGHT_SETTLE_MS)
-            }
+            if (_uiState.value.light && canLight) withTimeoutOrNull(LIGHT_WAIT_MS) { lightSettled.first { it } }
             // The camera the frame comes from, read with it: a selfie gets selfie poses (FR-1.14).
             val selfie = camera.facing.value == CameraFacing.FRONT
             val frame = camera.grabFrame()
@@ -510,8 +520,8 @@ class GenerationViewModel(
     companion object {
         private const val TAG = "PixPoses"
 
-        /** How long the scene photo waits for the light the user turned on (FR-4.1). */
-        const val LIGHT_WAIT_MS = 1_000L
+        /** How long the scene photo waits at most for the light the user turned on, and its exposure (FR-4.1). */
+        const val LIGHT_WAIT_MS = 1_500L
 
         /** How long after the light comes on the scene photo is taken: the camera's exposure follows it. */
         const val LIGHT_SETTLE_MS = 500L

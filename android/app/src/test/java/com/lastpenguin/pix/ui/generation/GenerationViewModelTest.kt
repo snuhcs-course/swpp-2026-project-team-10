@@ -137,6 +137,7 @@ class GenerationViewModelTest {
         assertTrue(camera.torchOn)
 
         // Off for Use this photo?, and on again for Shoot again, which keeps the choice.
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
         model.takeScene()
         runCurrent()
         assertFalse(camera.torchOn)
@@ -156,7 +157,7 @@ class GenerationViewModelTest {
         model.toggleLight()
         runCurrent()
         model.takeScene()
-        runCurrent()
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
         model.retakeScene()
         runCurrent()
         assertTrue(camera.torchOn)
@@ -200,6 +201,23 @@ class GenerationViewModelTest {
         assertEquals(0, camera.grabs)
         camera.state.value = camera.state.value.copy(torch = true)
         advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS - 1)
+        assertEquals(0, camera.grabs)
+        advanceTimeBy(2)
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
+    fun aShotRightAfterTheLightCameOn_waitsForTheRestOfTheExposure() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        assertTrue(camera.state.value.torch)
+        advanceTimeBy(200)
+
+        model.takeScene()
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS - 200 - 1)
         assertEquals(0, camera.grabs)
         advanceTimeBy(2)
 

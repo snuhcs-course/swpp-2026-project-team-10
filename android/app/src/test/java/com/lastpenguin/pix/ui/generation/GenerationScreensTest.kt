@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-24, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.View
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
@@ -136,7 +137,15 @@ class GenerationScreensTest {
         }
 
         run.plan(poses)
-        idle()
+        // The grid's ListAdapter diffs this second list on a background thread: wait for its result, not one loop.
+        idleUntil {
+            var count = 0
+            s.onFragment {
+                count =
+                    FragmentGeneratingBinding.bind(it.requireView()).candidateGrid.adapter?.itemCount ?: 0
+            }
+            count == 4
+        }
         s.onFragment { fragment ->
             val binding = FragmentGeneratingBinding.bind(fragment.requireView())
             assertEquals(4, binding.candidateGrid.adapter?.itemCount)

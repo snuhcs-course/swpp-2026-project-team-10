@@ -32,6 +32,7 @@ Prompts were given in Korean to Claude Code (Claude Opus 5.5) and are translated
 - [Dongje, 10-29] "You can use the S22." (The front camera's photo and scene photo compared with its preview on the phone, without sharing any screen that shows a face.)
 - [Dongje, 10-30] "Update dev, resolve the conflicts, then check the Codex review and fix it." (The invitations of #153 had taken the next revision numbers, so ours moved up. Two findings, both valid: `selfie` with a `templateId` is now refused, and a front camera that fails once open gives the rear camera back, as one that cannot be bound did.)
 - [Dongje, 10-30] "Mark it ready for review; one CI check failed, check it and fix it." (`server-test` failed only against Redis and PostgreSQL, in a test from #149 that read the connection count before the closed socket's own task had freed it; it now waits for the count, as the presence tests do.)
+- [Dongje, 10-30] "It failed again." (This time `android-test`, in a test from #133: the *Generating poses* grid's `ListAdapter` diffs its second list on a background thread, and the test checked the count after one run of the main looper. It now waits for the count with a new `ScreenTestSupport.idleUntil`.)
 
 [#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
 [#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132

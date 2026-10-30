@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -103,6 +103,11 @@ class CameraXController(
     private var retainedExposure = 0
     private var flash = FlashMode.OFF
 
+    // The light for the scene photo (setTorch). CameraX turns it off whenever the camera closes, so it is kept here;
+    // only the answer to the newest request since the camera opened is published.
+    private var torch = false
+    private var torchRequest = 0
+
     // Whether the bound lens has a flash; a separately exposed ultrawide may not.
     private var lensHasFlash = true
 
@@ -168,6 +173,7 @@ class CameraXController(
                     pendingZoom = null
                     pendingFinal = true
                     current.frames.clear()
+                    torchOff()
                     refreshStatus(current)
                 }
 
@@ -350,7 +356,9 @@ class CameraXController(
                     current.zoomRequestId++
                     current.requestedNative = null
                 }
+                val opened = open && !current.open
                 current.open = open
+                if (!open) torchOff()
                 // CameraX can wait for another camera client without attaching an error.
                 // Keep retry/settings guidance visible while waiting; a later OPEN recovers automatically.
                 current.failed = state.error != null || state.type == CameraXState.Type.PENDING_OPEN
@@ -362,6 +370,7 @@ class CameraXController(
                 }
                 restoreZoomIfNeeded(current)
                 restoreExposureIfNeeded(current)
+                if (opened && torch) applyTorch(current)
                 refreshStatus(current)
             }
         }
@@ -609,6 +618,51 @@ class CameraXController(
 
     /** The flash mode photos are taken with: the chosen one, or off on a lens without a flash. */
     private fun appliedFlash(): FlashMode = if (lensHasFlash) flash else FlashMode.OFF
+
+    override fun setTorch(on: Boolean) {
+        mainExecutor.execute {
+            // Asked again when the camera did not apply the last request, so a light left on can still be turned off.
+            if (on == torch && on == _state.value.torch) return@execute
+            torch = on
+            binding?.let(::applyTorch)
+        }
+    }
+
+    /**
+     * The kept light on an open camera with a flash; a closed one gets it when it opens again. The state says it is on
+     * only once CameraX has applied it, so the scene photo is never taken before the light is as chosen. A request that
+     * fails on an open camera leaves the state as it was and is asked once more while [retry]; [setTorch] asks again
+     * after that, because the kept light then still differs from the state.
+     */
+    private fun applyTorch(current: Binding, retry: Boolean = true) {
+        val camera = current.camera ?: return
+        if (!current.open || current.failed || !camera.cameraInfo.hasFlashUnit()) return
+        val on = torch
+        val request = ++torchRequest
+        try {
+            val applied = camera.cameraControl.enableTorch(on)
+            applied.addListener({
+                // A request dropped because the camera closed is answered by torchOff.
+                if (binding !== current || request != torchRequest || !current.open) return@addListener
+                when {
+                    runCatching { applied.get() }.isSuccess -> _state.update { it.copy(torch = on) }
+                    retry -> applyTorch(current, retry = false)
+                    else -> Log.w(TAG, "The camera did not turn the light ${if (on) "on" else "off"}")
+                }
+            }, mainExecutor)
+        } catch (error: Exception) {
+            Log.w(TAG, "Torch request could not start", error)
+        }
+    }
+
+    /**
+     * The camera closed, or the binding went: CameraX has turned the light off, and an answer still on its way is from
+     * before, so it must not say the light is on after the camera opens again.
+     */
+    private fun torchOff() {
+        torchRequest++
+        _state.update { it.copy(torch = false) }
+    }
 
     override fun setAspectRatio(ratio: AspectRatio) {
         mainExecutor.execute {
@@ -863,6 +917,7 @@ class CameraXController(
         val current = binding ?: return
         binding = null
         current.active = false
+        torchOff()
         publishStatus(if (preserveZoomPlan) CameraStatus.STARTING else CameraStatus.IDLE)
         if (!preserveZoomPlan) {
             _capabilities.value = null

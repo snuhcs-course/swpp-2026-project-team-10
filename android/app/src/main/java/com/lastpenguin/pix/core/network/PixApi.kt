@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -40,7 +40,8 @@ interface PixApi {
 
     /**
      * How to hold the phone for the candidate the user took (FR-4.10): `scene` as sent to [createPose], `candidate`,
-     * and the pose it was made with. `502 UPSTREAM_ERROR` also when the server could not use its model's answer.
+     * the pose it was made with, and the language the sentence is written in, `en` or `ko` (FR-10.2). `502
+     * UPSTREAM_ERROR` also when the server could not use its model's answer.
      */
     @Multipart
     @POST("api/v1/pose-tips")
@@ -48,6 +49,7 @@ interface PixApi {
         @Part scene: MultipartBody.Part,
         @Part candidate: MultipartBody.Part,
         @Part("pose") pose: RequestBody,
+        @Part("language") language: RequestBody,
     ): PoseTipDto
 }
 

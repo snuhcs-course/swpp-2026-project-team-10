@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -282,6 +282,7 @@ class CameraControlsViewModelTest {
             flashRequests += mode
             state.update { it.copy(flash = mode) }
         }
+        override fun setTorch(on: Boolean) = Unit
         override fun setAspectRatio(ratio: AspectRatio) {
             aspectRequests += ratio
             state.update { it.copy(aspect = ratio) }

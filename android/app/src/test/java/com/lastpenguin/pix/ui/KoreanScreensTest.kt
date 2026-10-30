@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -29,6 +29,8 @@ import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
+import com.lastpenguin.pix.generation.TipSource
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
@@ -101,7 +103,8 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * Every screen in Korean (FR-10.2, Iter3-P7; Testing Documentation 2.1.6): the real Fragments on the fakes, with the
  * phone in Korean, at the Galaxy S22's app area of 360 x 705 dp. Each screen in the states that show its texts: Camera
- * without camera access, without a guide, with one, taking and reviewing the scene photo, and in a session; Add a pose
+ * without camera access, without a guide, with one, with a generated guide's tip being asked for and with the longest
+ * Korean tip the server writes, taking and reviewing the scene photo, and in a session; Add a pose
  * guide with a saved guide; Reference confirm with the person found, and with the subject's pick; No person found;
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone and in a session; Couldn't create poses,
  * failed and refused; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
@@ -166,6 +169,22 @@ class KoreanScreensTest {
         val modules = camera()
         modules.guides.setGuide(guide())
         assertKorean(screen())
+    }
+
+    @Test
+    fun camera_withAGuidesTip_isInKorean() {
+        val modules = camera()
+        val guide = guide().copy(source = GuideSource.GENERATED)
+        modules.tips.prepare(guide, bitmap(), TipSource(bitmap(), "Walk past the railing"))
+        modules.guides.setGuide(guide)
+        assertKorean(screen())
+
+        // tip_korean's longest kind of sentence: a move, a height, an angle, and why, at the server's 80 characters.
+        val tip = "줌을 당기거나 조금 다가가서 쪼그려 앉아 상대 눈높이에 맞추고 폰을 수평으로 드세요 - 내려다보지 않아서 표정과 자세가 훨씬 자연스러워 보여요."
+        modules.tipper.requests.single().tip(tip)
+        val root = screen()
+        assertEquals(tip, FragmentCameraBinding.bind(root).tipText.text.toString())
+        assertKorean(root)
     }
 
     @Test

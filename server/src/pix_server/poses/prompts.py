@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 """The prompts for the image, suggestion, and tip models and the default poses, read from prompts.toml (Design
 Documentation 2.6.3)."""
 
@@ -39,6 +39,8 @@ class Prompts:
     suggestion: str
     variation: str
     tip: str
+    # Added after `tip` for a phone whose screens are in Korean (FR-10.2).
+    tip_korean: str
     default_poses: dict[str, DefaultPose]
     selfie: SelfiePrompts
 
@@ -70,6 +72,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         "suggestion_prompt",
         "variation_prompt",
         "tip_prompt",
+        "tip_korean",
         "default_poses",
         "selfie",
     }
@@ -79,6 +82,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
     suggestion = text(data, "suggestion_prompt", "")
     variation = with_placeholder(data, "variation_prompt", "", DESCRIPTION_PLACEHOLDER)
     tip = text(data, "tip_prompt", "")
+    tip_korean = text(data, "tip_korean", "")
     entries = data.get("default_poses")
     if not isinstance(entries, list) or len(entries) != POSE_COUNT:
         raise ValueError(f"{path.name}: exactly {POSE_COUNT} [[default_poses]] are needed")
@@ -96,7 +100,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         if len(default.pose) > DESCRIPTION_MAX_LENGTH:
             raise ValueError(f"{path.name}: {where}pose must be at most {DESCRIPTION_MAX_LENGTH} characters")
         poses[default.id] = default
-    return Prompts(pose, suggestion, variation, tip, poses, load_selfie(data.get("selfie"), path))
+    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, load_selfie(data.get("selfie"), path))
 
 
 def load_selfie(table: object, path: Path) -> SelfiePrompts:

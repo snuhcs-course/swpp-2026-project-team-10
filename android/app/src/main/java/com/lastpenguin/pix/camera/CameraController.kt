@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -45,6 +45,11 @@ data class CameraState(
     val exposure: Int = 0,
     val flash: FlashMode = FlashMode.OFF,
     val aspect: AspectRatio = AspectRatio.R4_3,
+    /**
+     * The phone's light ([CameraController.setTorch]) is on: true once the camera has applied it, false again when it
+     * goes off or the camera closes. Not echoed to the subject.
+     */
+    val torch: Boolean = false,
 )
 
 /**
@@ -73,7 +78,7 @@ interface CameraController {
 
     val capabilities: StateFlow<CameraCapabilities?>
 
-    /** Applied zoom, exposure, flash, and aspect ratio in one value. */
+    /** Applied zoom, exposure, flash, aspect ratio, and light in one value. */
     val state: StateFlow<CameraState>
 
     /** Zoom ratio actually applied, relative to the bound camera's main lens across any lens switch. */
@@ -114,6 +119,13 @@ interface CameraController {
 
     /** Ignored when [CameraCapabilities.hasFlash] is false (FR-1.12). */
     fun setFlash(mode: FlashMode)
+
+    /**
+     * Keeps the phone's light on, for the scene photo, which is a frame of the preview that the flash of a photo would
+     * not reach (FR-4.1). Kept across a rebind or a lens switch and applied again when the camera opens; nothing
+     * happens while the bound lens has no flash, such as the front camera. [CameraState.torch] says when it is on.
+     */
+    fun setTorch(on: Boolean)
 
     /** Rebinds the use cases with a viewport of [ratio], after any photo being saved (FR-1.13). */
     fun setAspectRatio(ratio: AspectRatio)

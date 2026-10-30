@@ -83,6 +83,8 @@
     <string name="flash_off">Flash off</string>
     <string name="flash_auto">Flash auto</string>
     <string name="flash_on">Flash on</string>
+    <string name="scene_light_off">Light off</string>
+    <string name="scene_light_on">Light on</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
     <string name="aspect_4_3" translatable="false">4:3</string>
     <string name="aspect_16_9" translatable="false">16:9</string>

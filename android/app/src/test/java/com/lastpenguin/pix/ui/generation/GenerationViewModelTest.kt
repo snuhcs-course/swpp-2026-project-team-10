@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -123,6 +123,173 @@ class GenerationViewModelTest {
         assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
         assertEquals(2, camera.grabs)
         assertTrue(generator.runs.isEmpty())
+    }
+
+    @Test
+    fun theLightIsOnOnlyWhileTheSceneIsFramedWithItTurnedOn() = runTest {
+        model.beginScene()
+        runCurrent()
+        assertFalse(camera.torchOn)
+
+        model.toggleLight()
+        runCurrent()
+        assertTrue(state.light)
+        assertTrue(camera.torchOn)
+
+        // Off for Use this photo?, and on again for Shoot again, which keeps the choice.
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
+        model.takeScene()
+        runCurrent()
+        assertFalse(camera.torchOn)
+        model.retakeScene()
+        runCurrent()
+        assertTrue(state.light)
+        assertTrue(camera.torchOn)
+
+        model.toggleLight()
+        runCurrent()
+        assertFalse(camera.torchOn)
+    }
+
+    @Test
+    fun theLightGoesOffWhenTheStepIsLeft_andStartsOffTheNextTime() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        model.takeScene()
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
+        model.retakeScene()
+        runCurrent()
+        assertTrue(camera.torchOn)
+
+        model.cancel()
+        runCurrent()
+        assertFalse(camera.torchOn)
+
+        model.beginScene()
+        runCurrent()
+        assertFalse(state.light)
+        assertFalse(camera.torchOn)
+    }
+
+    @Test
+    fun theLightButtonDoesNothingButWhileTheSceneIsFramed() = runTest {
+        model.toggleLight()
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+        model.toggleLight()
+        runCurrent()
+
+        assertFalse(state.light)
+        assertFalse(camera.torchOn)
+        model.useScene()
+        model.toggleLight()
+        runCurrent()
+        assertFalse(state.light)
+    }
+
+    @Test
+    fun aSceneShotBeforeTheLightIsOnWaitsForIt_andForTheExposureToFollow() = runTest {
+        camera.lightApplies = false
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+
+        model.takeScene()
+        runCurrent()
+        assertEquals(0, camera.grabs)
+        camera.state.value = camera.state.value.copy(torch = true)
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS - 1)
+        assertEquals(0, camera.grabs)
+        advanceTimeBy(2)
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
+    fun aShotRightAfterTheLightCameOn_waitsForTheRestOfTheExposure() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        assertTrue(camera.state.value.torch)
+        advanceTimeBy(200)
+
+        model.takeScene()
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS - 200 - 1)
+        assertEquals(0, camera.grabs)
+        advanceTimeBy(2)
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
+    fun aShotRightAfterTheLightWasTurnedOff_waitsUntilItIsOff_andForTheExposure() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
+        camera.lightApplies = false
+        model.toggleLight()
+        runCurrent()
+        assertTrue(camera.state.value.torch)
+
+        model.takeScene()
+        runCurrent()
+        assertEquals(0, camera.grabs)
+        camera.state.value = camera.state.value.copy(torch = false)
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS - 1)
+        assertEquals(0, camera.grabs)
+        advanceTimeBy(2)
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
+    fun aLightThatDoesNotComeOn_leavesTheSceneAsItIs_afterAWhile() = runTest {
+        camera.lightApplies = false
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+
+        model.takeScene()
+        advanceTimeBy(GenerationViewModel.LIGHT_WAIT_MS - 1)
+        assertEquals(0, camera.grabs)
+        advanceTimeBy(2)
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
+    fun aLensWithoutAFlash_takesTheSceneWithoutWaitingForTheLight() = runTest {
+        camera.lightApplies = false
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        // The light was turned on with the rear camera; the front one, switched to while framing, has no flash.
+        camera.capabilities.value = camera.capabilities.value?.copy(hasFlash = false)
+
+        model.takeScene()
+        runCurrent()
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
+    fun theLightGoesOffWithTheModel() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        assertTrue(camera.torchOn)
+
+        store.clear()
+
+        assertFalse(camera.torchOn)
     }
 
     @Test
@@ -1002,11 +1169,20 @@ class GenerationViewModelTest {
         var frame: Bitmap? = testBitmap()
         var grabs = 0
 
+        /** Whether the light is on, as the controller keeps it. */
+        var torchOn = false
+
+        /** False keeps [state]'s light off whatever is asked, like a camera that has not applied it yet. */
+        var lightApplies = true
+
         /** When set, the frame is given only after this completes. */
         var hold: CompletableDeferred<Unit>? = null
 
         override val status = MutableStateFlow(CameraStatus.READY)
-        override val capabilities = MutableStateFlow<CameraCapabilities?>(null)
+        override val capabilities =
+            MutableStateFlow<CameraCapabilities?>(
+                CameraCapabilities(minZoom = 1f, maxZoom = 1f, zoomStops = listOf(1f), hasFlash = true),
+            )
         override val zoom = MutableStateFlow(1f)
         override val state = MutableStateFlow(CameraState(zoom = 1f))
 
@@ -1019,6 +1195,11 @@ class GenerationViewModelTest {
         override fun setExposure(index: Int) = Unit
 
         override fun setFlash(mode: FlashMode) = Unit
+
+        override fun setTorch(on: Boolean) {
+            torchOn = on
+            if (lightApplies) state.value = state.value.copy(torch = on)
+        }
 
         override fun setAspectRatio(ratio: AspectRatio) = Unit
 

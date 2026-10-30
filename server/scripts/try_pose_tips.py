@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-31, reviewed by Jaewan Park and Dongje Park
 """Try the pose tip prompt on scene photos and candidates made once (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY in server/.env:
@@ -7,6 +7,7 @@ It does not import pix_server. Run it through uv from server/ with OPENROUTER_AP
     uv run --env-file .env scripts/try_pose_tips.py set scene.jpg --name k01
     uv run --env-file .env scripts/try_pose_tips.py tips
     uv run --env-file .env scripts/try_pose_tips.py tips --prompt-file scripts/out/tip_prompt.txt --label v2 --rounds 2
+    uv run --env-file .env scripts/try_pose_tips.py tips --language ko --label ko
 
 `candidates` makes one candidate per scene, the way the app and the server do: the scene prepared like the app's
 (upright, long side 1024 px, JPEG 85, no EXIF), a pose the suggestion model chose for it (the n-th scene takes the
@@ -20,8 +21,9 @@ pairs/<name>-1 to -4, also once, with a sheet (sets/<name>.png) to pick one.
 the one in --prompt-file, the scene first and the candidate second, the candidate as the app would send it (long side
 768 px, JPEG 85), with the server's schema and reasoning effort (keep TIP_SCHEMA in step with poses/tips.py). It
 writes results.json, report.html, and contact sheets (sheet-<n>.png) to scripts/out/tips/runs/<timestamp>[-label]/,
-with the prompt it used; with --rounds, it also counts the pairs that got the same decisions every time. Every call
-is billed to the OpenRouter key, at a fraction of a cent.
+with the prompt it sent (the Korean instruction included) and the language; with --rounds, it also counts the pairs
+that got the same decisions every time. With --language ko, a sentence is checked against tip_korean's 80 characters
+and for being in Korean. Every call is billed to the OpenRouter key, at a fraction of a cent.
 """
 
 import argparse
@@ -62,16 +64,50 @@ CONCURRENCY = 4
 # The candidate's ratio, as the server's `ASPECT_RATIOS` in poses/generator.py: the app's frame closest to the scene's.
 ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
 TEXT_MAX_LENGTH = 140
+KOREAN_TEXT_MAX_LENGTH = 80  # what tip_korean asks for
 # A tip says how to hold the camera in words; a number, a unit, or a degree is hard to follow while shooting. The same
 # check as the server's `MEASURE` in poses/tips.py.
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
-MEASURE = re.compile(
-    rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
-    r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b",
-    re.IGNORECASE,
+ENGLISH_MEASURES = (
+    rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b",
+    r"\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b",
 )
+# Korean, word by word. Every measure takes the same counts, COUNT: native ones, also run together ("한두", "서너",
+# "대여섯", "열한"), Sino-Korean numbers ("이십", "백이십", "수십"), 몇, 반, 수, and 영. Only a measure that is also an
+# ordinary word narrows its counts or endings, as its comment says.
+NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
+SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
+DIGIT = "[일이삼사오육칠팔구]"
+TENS = f"(?:{DIGIT}?[십백])+{DIGIT}?"
+COUNT = f"(?:{NATIVE}|(?:수|몇)?{SINO}|반|몇|수|영)"
+UNITS = "센티미터|밀리미터|미터|센티|센치|인치|피트"
+WORD_START = "(?<![가-힣])"
+WORD_END = "(?![가-힣])"
+# The particles after an amount, one after another ("쯤에서"), and those that only follow an amount ("만큼").
+PARTICLES = "(?:만|씩|쯤|가량|정도|만큼|까지|보다|부터|로|를|의|에|에서|은|는|이|가|도)*"
+AMOUNT_PARTICLES = "(?:만|씩|쯤|가량|정도|만큼)*"
+KOREAN_MEASURES = (
+    # Steps after a count, joined or not, whatever follows ("한 걸음", "두걸음만", "몇 걸음", "반 걸음").
+    rf"{WORD_START}{COUNT}\s*(?:걸음|발짝|발자국|뼘)",
+    # A unit at the start of a word, after a count or none, whatever follows ("미터보다", "몇 미터까지", "삼십센티만큼"),
+    # so 파라미터 is not one, and a word that only begins like one (미터기) is refused with it.
+    rf"{WORD_START}(?:{COUNT}\s*)?(?:{UNITS})",
+    # 밀리 only after a count, because "밀리지 않게" is a verb.
+    rf"{WORD_START}{COUNT}\s*밀리",
+    # 발 and 보 only after a count that is not also a word ("이 발" is this foot), with the particles of an amount
+    # ("한 발만큼"), because "두 발로 서서" is about feet and 이발 or 구보 are words of their own.
+    rf"{WORD_START}(?:{NATIVE}|반|몇)\s*[발보]{AMOUNT_PARTICLES}{WORD_END}",
+    # Degrees after a number with tens, whatever follows ("백이십 도만큼"); after one digit or zero, only with a space
+    # and particles ("구 도까지", "영 도로"), because 구도, 영도, and "이 도시" are words, though "이 도로" (this road) is
+    # refused with them.
+    rf"{WORD_START}{TENS}\s*도",
+    rf"{WORD_START}(?:영|{DIGIT})\s+도{PARTICLES}{WORD_END}",
+)
+MEASURE = re.compile("|".join(ENGLISH_MEASURES + KOREAN_MEASURES), re.IGNORECASE)
+# The server refuses a sentence with a letter not of the language asked for, or with none, as poses/tips.py does.
+SCRIPTS = {"en": re.compile("[A-Za-z]"), "ko": re.compile("[가-힣]")}
 
 # Where the photographer holds the camera, by their own posture, lowest first. The model places the camera of photo 1
 # and the best one for the pose, in the order of the schema, so it decides the shot and the pose first; the script
@@ -91,7 +127,7 @@ TIP_SCHEMA = {
     "required": ["shot", "pose", "camera_now", "camera_best", "angle", "framing", "text"],
     "additionalProperties": False,
 }
-ANGLE_WORDS = re.compile(r"\b(tilt|tilted|tilting|level|angle|straight)\b", re.IGNORECASE)
+ANGLE_WORDS = re.compile(r"\b(tilt|tilted|tilting|level|angle|straight)\b|기울|수평|똑바로|각도", re.IGNORECASE)
 
 
 def one_line(text: str) -> str:
@@ -284,7 +320,7 @@ class Tip:
     flags: list[str] = field(default_factory=list)
 
 
-def check(tip: Tip) -> None:
+def check(tip: Tip, language: str) -> None:
     now, best = (tip.answer.get(key) for key in ("camera_now", "camera_best"))
     if now in LEVELS and best in LEVELS:
         step = LEVELS.index(best) - LEVELS.index(now)
@@ -292,10 +328,13 @@ def check(tip: Tip) -> None:
     text = tip.answer.get("text", "")
     if not ANGLE_WORDS.search(text):
         tip.flags.append("no angle in text")
-    if not 0 < len(text) <= TEXT_MAX_LENGTH:
+    if not 0 < len(text) <= (KOREAN_TEXT_MAX_LENGTH if language == "ko" else TEXT_MAX_LENGTH):
         tip.flags.append(f"text length {len(text)}")
     if MEASURE.search(text):
         tip.flags.append("number or unit")
+    letters = [char for char in text if char.isalpha()]
+    if not letters or not all(SCRIPTS[language].fullmatch(char) for char in letters):
+        tip.flags.append("not in Korean" if language == "ko" else "not in English")
 
 
 async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number: int, args) -> Tip:
@@ -304,7 +343,10 @@ async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number:
     scene = (folder / "scene.jpg").read_bytes()
     with Image.open(folder / "candidate.jpg") as image:
         candidate = jpeg(image, CANDIDATE_LONG_SIDE)
+    # The server adds the Korean instruction right after the tip prompt when the phone's screens are in Korean.
+    korean = [{"type": "text", "text": args.korean}] if args.korean else []
     parts = [
+        *korean,
         {"type": "text", "text": "Photo 1, the scene:"},
         {"type": "image_url", "image_url": {"url": data_url(scene)}},
         {"type": "text", "text": f'Photo 2, the photo they want, with the pose "{pose}":'},
@@ -322,7 +364,7 @@ async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number:
             usage = body.get("usage") or {}
             tip.cost = usage.get("cost")
             tip.reasoning_tokens = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
-            check(tip)
+            check(tip, args.language)
     except (httpx2.HTTPError, ValueError, KeyError, IndexError, TypeError) as error:
         tip.error = f"{type(error).__name__}: {error}"
     tip.seconds = time.perf_counter() - start
@@ -414,6 +456,7 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
     prompt = one_line(
         args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else server_prompts()["tip_prompt"]
     )
+    args.korean = one_line(server_prompts()["tip_korean"]) if args.language == "ko" else None
     folders = sorted(folder for folder in PAIRS.glob("*") if (folder / "candidate.jpg").is_file())
     if args.only:
         folders = [folder for folder in folders if folder.name in args.only]
@@ -422,7 +465,9 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     out = OUT / "runs" / (f"{stamp}-{args.label}" if args.label else stamp)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "prompt.txt").write_text(prompt + "\n", encoding="utf-8")
+    # What the model is sent, the Korean instruction included, so the run can be repeated from its folder.
+    sent = f"{prompt}\n\n{args.korean}" if args.korean else prompt
+    (out / "prompt.txt").write_text(sent + "\n", encoding="utf-8")
 
     gate = asyncio.Semaphore(CONCURRENCY)
 
@@ -432,11 +477,16 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
 
     jobs = [one(folder, number) for number in range(1, args.rounds + 1) for folder in folders]
     tips = sorted(await asyncio.gather(*jobs), key=lambda tip: (tip.scene, tip.round))
-    settings = {"model": VISION_MODEL, "reasoning": args.reasoning, "max_tokens": args.max_tokens}
-    record = {**settings, "prompt": prompt, "tips": [asdict(tip) for tip in tips]}
+    settings = {
+        "model": VISION_MODEL,
+        "reasoning": args.reasoning,
+        "max_tokens": args.max_tokens,
+        "language": args.language,
+    }
+    record = {**settings, "prompt": sent, "tips": [asdict(tip) for tip in tips]}
     (out / "results.json").write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
     write_sheets(out, tips)
-    write_report(out, prompt, tips)
+    write_report(out, sent, tips)
 
     seconds = sorted(tip.seconds for tip in tips if not tip.error)
     if seconds:
@@ -484,6 +534,9 @@ def main() -> None:
     tips.add_argument("--prompt-file", type=Path, help="tip prompt (default: the server's)")
     tips.add_argument("--label", help="appended to the run folder's name")
     tips.add_argument("--rounds", type=int, default=1, help="calls per pair, to see the spread")
+    tips.add_argument(
+        "--language", default="en", choices=["en", "ko"], help="the sentence's language, as the app sends"
+    )
     tips.add_argument("--only", nargs="+", metavar="SCENE", help="only these pairs, by folder name")
     reasoning = ["minimal", "low", "medium", "high"]
     tips.add_argument("--reasoning", default="low", choices=reasoning, help="default: the server's")

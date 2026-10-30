@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -26,9 +26,14 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -58,6 +63,11 @@ data class GenerationUiState(
     val phase: Phase = Phase.IDLE,
     /** The shutter gave no photo; told on Camera until the next attempt. */
     val shotFailed: Boolean = false,
+    /**
+     * The phone's light is turned on for the scene photo, a frame of the preview that a photo's flash would not reach
+     * (FR-4.1). It is on only while the scene is framed, and stays chosen for *Shoot again*.
+     */
+    val light: Boolean = false,
     /**
      * Whose *Use this pose* took a candidate of this set (Design 2.6.5): this phone's, or in a session the subject's,
      * which Pick a pose then goes on with as with its own. The first one decides; nothing is selected after it.
@@ -123,11 +133,36 @@ class GenerationViewModel(
     /** Generate poses as [descriptions] knows it, while the phase is DESCRIBING; null otherwise. */
     private var descriptionId: String? = null
 
+    /**
+     * The camera's light once it has held for [LIGHT_SETTLE_MS], so the exposure has followed it; null while it changes.
+     * The light the camera starts with counts at once.
+     */
+    private val settledLight = MutableStateFlow<Boolean?>(null)
+
     init {
         // Only ever sets it: an answer read before the user agreed must not take that agreement back.
         viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
         viewModelScope.launch { share.picks.collect(::onSubjectPick) }
         viewModelScope.launch { descriptions.requests.collect(::onSubjectRequest) }
+        // The camera keeps its light across rebinds, so it is turned off as soon as the scene is no longer framed.
+        viewModelScope.launch {
+            uiState.map { it.phase == GenerationUiState.Phase.FRAMING && it.light }
+                .distinctUntilChanged()
+                .collect(camera::setTorch)
+        }
+        viewModelScope.launch {
+            var first = true
+            camera.state.map { it.torch }.distinctUntilChanged().collectLatest { on ->
+                settledLight.value = null
+                if (!first) delay(LIGHT_SETTLE_MS)
+                first = false
+                settledLight.value = on
+            }
+        }
+    }
+
+    override fun onCleared() {
+        camera.setTorch(false)
     }
 
     /**
@@ -148,10 +183,19 @@ class GenerationViewModel(
         _uiState.value = GenerationUiState(phase = GenerationUiState.Phase.FRAMING)
     }
 
-    /** The shutter during FRAMING: the camera's current frame becomes the photo to confirm. */
+    /**
+     * The shutter during FRAMING: the camera's current frame becomes the photo to confirm. The frame waits until the
+     * camera's light is as chosen and has been for [LIGHT_SETTLE_MS], so the frame is lit, or not, as the user chose and
+     * the exposure has followed, also when the shutter comes right after the light button; after [LIGHT_WAIT_MS], the
+     * frame is taken as it is. A lens without a flash, such as the front camera after a switch, never has the light, so
+     * nothing waits for it to come on.
+     */
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         shooting = viewModelScope.launch {
+            val canLight = camera.capabilities.value?.hasFlash == true
+            val wanted = _uiState.value.light && canLight
+            withTimeoutOrNull(LIGHT_WAIT_MS) { settledLight.first { it == wanted } }
             // The camera the frame comes from, read with it: a selfie gets selfie poses (FR-1.14).
             val selfie = camera.facing.value == CameraFacing.FRONT
             val frame = camera.grabFrame()
@@ -174,12 +218,17 @@ class GenerationViewModel(
         }
     }
 
-    /** *Shoot again*: the photo is dropped and the live camera is shown again. */
+    /** *Shoot again*: the photo is dropped and the live camera is shown again, with the light as it was. */
     fun retakeScene() {
         _uiState.update {
             val reviewing = it.phase == GenerationUiState.Phase.REVIEWING
-            if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING) else it
+            if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING, light = it.light) else it
         }
+    }
+
+    /** The light button while the scene is framed (FR-4.1). */
+    fun toggleLight() {
+        _uiState.update { if (it.phase == GenerationUiState.Phase.FRAMING) it.copy(light = !it.light) else it }
     }
 
     /** *Use this photo*: Generate poses asks what to pose (FR-4.8). Still nothing is sent. */
@@ -473,7 +522,13 @@ class GenerationViewModel(
         }
     }
 
-    private companion object {
-        const val TAG = "PixPoses"
+    companion object {
+        private const val TAG = "PixPoses"
+
+        /** How long the scene photo waits at most for the light the user turned on, and its exposure (FR-4.1). */
+        const val LIGHT_WAIT_MS = 1_500L
+
+        /** How long after the light comes on the scene photo is taken: the camera's exposure follows it. */
+        const val LIGHT_SETTLE_MS = 500L
     }
 }

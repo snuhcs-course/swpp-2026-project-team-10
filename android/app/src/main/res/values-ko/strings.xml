@@ -81,6 +81,8 @@
     <string name="flash_off">플래시 끔</string>
     <string name="flash_auto">플래시 자동</string>
     <string name="flash_on">플래시 켬</string>
+    <string name="scene_light_off">조명 끔</string>
+    <string name="scene_light_on">조명 켬</string>
     <string name="aspect_ratio_description">화면 비율 %1$s</string>
     <string name="brightness">밝기</string>
     <string name="live_badge">실시간 · %1$s님과 연결됨</string>

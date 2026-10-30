@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -34,21 +34,24 @@ class InviteNotAcceptedFragment : Fragment(R.layout.fragment_failure) {
 
         binding.primaryButton.setText(R.string.invite_again)
         binding.primaryButton.isEnabled = friend != null
-        binding.primaryButton.setOnClickListener {
-            binding.primaryButton.isEnabled = false
-            friend?.let(sessionViewModel::invite)
-        }
+        binding.primaryButton.setOnClickListener { friend?.let(sessionViewModel::invite) }
         binding.secondaryButton.setText(R.string.back_to_camera)
         binding.secondaryButton.setOnClickListener { findNavController().popBackStack(R.id.cameraFragment, false) }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Disabled while the invitation is on its way, and enabled again when it ends, also when it was
+                // dropped with Pix in the background, which reports no result.
+                launch {
+                    sessionViewModel.sendingInvite.collect { sending ->
+                        binding.primaryButton.isEnabled = friend != null && !sending
+                    }
+                }
                 sessionViewModel.inviteResults.collect { result ->
                     when (result) {
                         InviteResult.Sent -> findNavController().navigate(R.id.action_inviteNotAccepted_to_inviteSent)
 
                         is InviteResult.Failed -> {
-                            binding.primaryButton.isEnabled = true
                             val message = if (result.error == AccountError.BUSY) {
                                 getString(R.string.invite_busy, result.friend.displayName)
                             } else {

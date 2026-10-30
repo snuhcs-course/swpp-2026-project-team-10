@@ -1,6 +1,7 @@
 // AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,18 +14,22 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowToast
 
 /*
  * Invite not accepted (R&S 6.5, FR-6.3; Testing Documentation 2.1.6), on the real Fragment. Partitions: the screen as
  * opened (the friend's name, Invite again, Back to camera); Invite again sent (Invite sent), refused because the friend
- * is in another session or for another reason (said, and Invite again enabled again); Back to camera.
+ * is in another session or for another reason (said, and Invite again enabled again), or dropped while Pix was in the
+ * background (Invite again enabled again on return); Back to camera.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -97,6 +102,37 @@ class InviteNotAcceptedFragmentTest {
         idle()
         assertEquals(string(R.string.offline_error), ShadowToast.getTextOfLatestToast())
         assertEquals(R.id.inviteNotAcceptedFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun inviteAgain_droppedWhilePixIsInTheBackground_canBeTappedOnReturn() {
+        val modules = TestAppContainer().install()
+        // A whole activity, so Pix can go to the background with the screen's view kept, as on a phone.
+        val controller = Robolectric.buildActivity(AppCompatActivity::class.java)
+            .apply { get().setTheme(R.style.Theme_Pix) }
+            .setup()
+        controller.get().inviteFromFriends(friend)
+        val screen = InviteNotAcceptedFragment()
+        controller.get().supportFragmentManager.beginTransaction().add(android.R.id.content, screen).commitNow()
+        idle()
+        val button = FragmentFailureBinding.bind(screen.requireView()).primaryButton
+        val answer = CompletableDeferred<Unit>()
+        modules.invitations.inviteGate = answer
+
+        button.performClick()
+        idle()
+        assertFalse(button.isEnabled)
+        controller.pause().stop()
+        idle()
+        // The answer comes with no screen to show Invite sent, so the invitation is cancelled and reports nothing.
+        answer.complete(Unit)
+        idle()
+        assertEquals(listOf("invite:u_2", "invite:u_2", "cancel:inv_1"), modules.invitations.calls)
+
+        controller.start().resume()
+        idle()
+        assertTrue(button.isEnabled)
+        controller.pause().stop().destroy()
     }
 
     @Test

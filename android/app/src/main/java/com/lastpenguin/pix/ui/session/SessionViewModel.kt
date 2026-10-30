@@ -142,8 +142,13 @@ class SessionViewModel(
      */
     val inviteResults: Flow<InviteResult> = _inviteResults.asSharedFlow()
 
-    /** An invitation is on its way to the server, so a second tap sends none. */
-    private var sendingInvite = false
+    private val _sendingInvite = MutableStateFlow(false)
+
+    /**
+     * An invitation is on its way to the server, so a second tap sends none, and *Invite again* waits. A state, not a
+     * result, so a screen that was stopped meanwhile still sees the request end, also one dropped unseen.
+     */
+    val sendingInvite: StateFlow<Boolean> = _sendingInvite.asStateFlow()
 
     /** Counts the sessions started here, so an invitation answered after another one started knows it came too late. */
     private var started = 0
@@ -201,8 +206,8 @@ class SessionViewModel(
      * whose screen has closed meanwhile ([inviteResults]).
      */
     fun invite(friend: PixUser) {
-        if (sendingInvite || isOpen(state.value)) return
-        sendingInvite = true
+        if (_sendingInvite.value || isOpen(state.value)) return
+        _sendingInvite.value = true
         val startedBefore = started
         viewModelScope.launch {
             invitations.invite(friend.userId)
@@ -222,7 +227,7 @@ class SessionViewModel(
                     val reason = (error as? AccountException)?.error ?: AccountError.UNKNOWN
                     _inviteResults.emit(InviteResult.Failed(friend, reason))
                 }
-            sendingInvite = false
+            _sendingInvite.value = false
         }
     }
 

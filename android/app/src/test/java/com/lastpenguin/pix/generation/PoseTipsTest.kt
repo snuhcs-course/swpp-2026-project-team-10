@@ -25,7 +25,8 @@ import org.junit.Test
 // prepared while the one on Camera keeps its tip, and while an older one is still being asked for. Discarding: the
 // prepared guide before it goes on Camera, the guide already on Camera, and an older guide. The screens' language
 // changing (FR-10.2): with the tip on Camera ready, with the one prepared still being asked for (its older answer
-// arriving late), and with only a guide that has no tip.
+// arriving late), and with only a guide that has no tip. A newer guide prepared, then discarded, while the tip on
+// Camera is still being asked for.
 @OptIn(ExperimentalCoroutinesApi::class)
 class PoseTipsTest {
     private val tipper = RecordingTipper()
@@ -272,6 +273,31 @@ class PoseTipsTest {
 
         assertEquals(emptyList<RecordingTipper.Request>(), tipper.requests)
         assertNull(tips.onCamera.value)
+    }
+
+    @Test
+    fun aNewerGuideKeepsTheAskForTheGuideOnCamera_soItsTipStillArrivesWhenTheNewerIsNotUsed() = runTest {
+        val tips = tips()
+        val current = guide("g1")
+        tips.prepare(current, candidate, TipSource(scene, POSE))
+        onCamera.value = current
+        runCurrent()
+        tipper.requests.single().answer(TEXT)
+        runCurrent()
+        language.value = KOREAN
+        runCurrent()
+        val again = tipper.requests.last()
+
+        val newer = guide("g2")
+        tips.prepare(newer, candidate, TipSource(scene, POSE))
+        runCurrent()
+        tips.discard(newer.id)
+        runCurrent()
+
+        assertFalse(again.cancelled)
+        again.answer(KOREAN_TEXT)
+        runCurrent()
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(KOREAN_TEXT))), tips.onCamera.value)
     }
 
     private class RecordingTipper : PoseTipper {

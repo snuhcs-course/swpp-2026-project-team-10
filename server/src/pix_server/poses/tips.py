@@ -61,18 +61,24 @@ NUMBER_WORDS = (
 )
 # Korean counts run their words together ("한두", "서너", "대여섯", "열한", "이십"). A step unit takes any ending
 # ("한 걸음만"); 발 and 보 count steps only after a native count and with a few endings, because "두 발로 서서" is about
-# feet and 이발 or 구보 are words of their own. A degree takes a few endings ("십오 도로"); written with one Sino-Korean
-# digit it needs a space ("구 도로"), so 구도 (the composition) is not one, though "이 도로" (this road) is refused too.
+# feet and 이발 or 구보 are words of their own. A unit counts as a word of its own, after a count or not, with a few
+# endings ("삼십 센티쯤", "몇 센티"), so 밀리지 or 파라미터 are not units. A degree takes a whole Sino-Korean number
+# ("백이십 도") and a few endings ("십오 도로"); written with one digit it needs a space ("구 도로"), so 구도 (the
+# composition) is not one, though "이 도로" (this road) is refused too.
 KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
 KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
 KOREAN_DIGIT = "[일이삼사오육칠팔구]"
+KOREAN_TENS = f"(?:{KOREAN_DIGIT}?[십백])+{KOREAN_DIGIT}?"
 DEGREE_ENDING = "(로|만|씩|쯤|가량|를|의|에)?"
+KOREAN_UNITS = "센티미터|밀리미터|미터|센티|센치|밀리|인치|피트"
+UNIT_ENDING = "(만|씩|쯤|가량|정도|를|을|의|에|로|으로|은|는|이|가|도)?"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
-    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)|미터|센티|센치|밀리|인치|피트"
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)"
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO}|반|몇)?\s*({KOREAN_UNITS}){UNIT_ENDING}(?![가-힣])"
     rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보)(만|씩|쯤|가량)?(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도{DEGREE_ENDING}(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_TENS}\s*도{DEGREE_ENDING}(?![가-힣])"
     rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{DEGREE_ENDING}(?![가-힣])",
     re.IGNORECASE,
 )

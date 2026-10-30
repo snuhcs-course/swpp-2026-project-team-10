@@ -36,8 +36,8 @@ data class GuideTip(val guideId: String, val state: TipState)
  * The tip for the guide on Camera (FR-4.10; Design 2.6.3, Pose tips). [prepare] asks for the tip of a guide made from
  * a candidate while the user looks at it on Reference confirm; when that guide goes on Camera, its tip comes with it,
  * and when another guide does, or none, there is no tip, so a guide from the gallery or a saved guide never has one,
- * even a saved copy of the guide on Camera, which keeps its id. Only the newest guide's tip is asked for, and
- * [discard] drops it when that guide is not used. A tip kept is asked again when the screens' language changes, so
+ * even a saved copy of the guide on Camera, which keeps its id. Only the newest guide's tip and the one on Camera are
+ * asked for, and [discard] drops the newest when that guide is not used. A tip kept is asked again when the screens' language changes, so
  * Camera never shows it in the language it had before (FR-10.2). Kept in memory only, like the candidates.
  * Owner: Pose tips.
  */
@@ -104,11 +104,15 @@ class PoseTips(
         }
     }
 
-    /** Asks for the tip of [guide], made from [candidate]; a tip still being asked for an older guide is dropped. */
+    /**
+     * Asks for the tip of [guide], made from [candidate]. A tip still being asked for an older guide is dropped, but not
+     * the one of the guide on Camera, which would stay *Preparing* if this guide is not used.
+     */
     fun prepare(guide: ReferenceGuide, candidate: Bitmap, source: TipSource) {
+        val onCamera = tips.value.onCamera
         synchronized(asking) {
-            asking.values.forEach(Job::cancel)
-            asking.clear()
+            val older = asking.keys.filter { it != onCamera }
+            older.forEach { id -> asking.remove(id)?.cancel() }
         }
         tips.update { it.copy(pending = guide.id).kept() }
         ask(guide.id, Asked(candidate, source, language.value))

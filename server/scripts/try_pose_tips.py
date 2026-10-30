@@ -73,13 +73,17 @@ NUMBER_WORDS = (
 KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
 KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
 KOREAN_DIGIT = "[일이삼사오육칠팔구]"
+KOREAN_TENS = f"(?:{KOREAN_DIGIT}?[십백])+{KOREAN_DIGIT}?"
 DEGREE_ENDING = "(로|만|씩|쯤|가량|를|의|에)?"
+KOREAN_UNITS = "센티미터|밀리미터|미터|센티|센치|밀리|인치|피트"
+UNIT_ENDING = "(만|씩|쯤|가량|정도|를|을|의|에|로|으로|은|는|이|가|도)?"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
-    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)|미터|센티|센치|밀리|인치|피트"
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)"
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO}|반|몇)?\s*({KOREAN_UNITS}){UNIT_ENDING}(?![가-힣])"
     rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보)(만|씩|쯤|가량)?(?![가-힣])"
-    rf"|(?<![가-힣]){KOREAN_DIGIT}?[십백]{KOREAN_DIGIT}?\s*도{DEGREE_ENDING}(?![가-힣])"
+    rf"|(?<![가-힣]){KOREAN_TENS}\s*도{DEGREE_ENDING}(?![가-힣])"
     rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{DEGREE_ENDING}(?![가-힣])",
     re.IGNORECASE,
 )

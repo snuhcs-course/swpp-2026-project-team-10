@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -23,7 +23,9 @@ import org.junit.Test
 // result: a tip, or a failure. The guide on Camera: the prepared one, another (from the gallery or saved), none, the
 // same id again after it was removed, and a saved copy with the same id in its place. Asking again: a newer guide
 // prepared while the one on Camera keeps its tip, and while an older one is still being asked for. Discarding: the
-// prepared guide before it goes on Camera, the guide already on Camera, and an older guide.
+// prepared guide before it goes on Camera, the guide already on Camera, and an older guide. The screens' language
+// changing (FR-10.2): with the tip on Camera ready, with the one prepared still being asked for (its older answer
+// arriving late), and with only a guide that has no tip.
 @OptIn(ExperimentalCoroutinesApi::class)
 class PoseTipsTest {
     private val tipper = RecordingTipper()
@@ -31,7 +33,9 @@ class PoseTipsTest {
     private val scene = testBitmap()
     private val candidate = testBitmap()
 
-    private fun TestScope.tips() = PoseTips(tipper, onCamera, backgroundScope)
+    private val language = MutableStateFlow(ENGLISH)
+
+    private fun TestScope.tips() = PoseTips(tipper, onCamera, backgroundScope, language)
 
     @Test
     fun aPreparedGuideBringsItsTipToCamera_preparingUntilItArrives() = runTest {
@@ -212,6 +216,64 @@ class PoseTipsTest {
     private fun guide(id: String, source: GuideSource = GuideSource.GENERATED) =
         ReferenceGuide(id = id, mask = testBitmap(), outline = testBitmap(), aspect = 0.5f, source = source)
 
+    @Test
+    fun theTipOnCameraIsAskedAgainWhenTheLanguageChanges() = runTest {
+        val tips = tips()
+        val guide = guide("g1")
+        tips.prepare(guide, candidate, TipSource(scene, POSE))
+        onCamera.value = guide
+        runCurrent()
+        tipper.requests.single().answer(TEXT)
+        runCurrent()
+
+        language.value = KOREAN
+        runCurrent()
+
+        assertEquals(GuideTip("g1", TipState.Preparing), tips.onCamera.value)
+        val again = tipper.requests.last()
+        assertEquals(2, tipper.requests.size)
+        assertSame(scene, again.scene)
+        assertSame(candidate, again.candidate)
+        assertEquals(POSE, again.pose)
+        again.answer(KOREAN_TEXT)
+        runCurrent()
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(KOREAN_TEXT))), tips.onCamera.value)
+    }
+
+    @Test
+    fun aTipStillBeingAskedForIsAskedAgain_andItsOlderAnswerIsDropped() = runTest {
+        val tips = tips()
+        val guide = guide("g1")
+        tips.prepare(guide, candidate, TipSource(scene, POSE))
+        runCurrent()
+        val first = tipper.requests.single()
+
+        language.value = KOREAN
+        runCurrent()
+        assertTrue(first.cancelled)
+        first.answer(TEXT)
+        onCamera.value = guide
+        runCurrent()
+        assertEquals(GuideTip("g1", TipState.Preparing), tips.onCamera.value)
+
+        tipper.requests.last().answer(KOREAN_TEXT)
+        runCurrent()
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(KOREAN_TEXT))), tips.onCamera.value)
+    }
+
+    @Test
+    fun aGuideWithoutATipAsksNothingWhenTheLanguageChanges() = runTest {
+        val tips = tips()
+        onCamera.value = guide("g1", GuideSource.GALLERY)
+        runCurrent()
+
+        language.value = KOREAN
+        runCurrent()
+
+        assertEquals(emptyList<RecordingTipper.Request>(), tipper.requests)
+        assertNull(tips.onCamera.value)
+    }
+
     private class RecordingTipper : PoseTipper {
         val requests = mutableListOf<Request>()
 
@@ -238,5 +300,6 @@ class PoseTipsTest {
     private companion object {
         const val POSE = "Walk slowly past the railing, look off into the distance"
         const val TEXT = "Zoom in or take a step closer, hold the phone at your chest and keep it level."
+        const val KOREAN_TEXT = "줌을 당기거나 조금 다가가서 가슴 높이에서 수평으로 드세요 - 신체 비율이 유지돼요."
     }
 }

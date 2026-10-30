@@ -76,8 +76,8 @@ MEASURE = re.compile(
     rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{DEGREE_ENDING}(?![가-힣])",
     re.IGNORECASE,
 )
-HANGUL = re.compile("[가-힣]")
-LATIN = re.compile("[A-Za-z]")
+# The letters of each language's sentence; digits and punctuation are not letters (Hangul jamo are not used).
+SCRIPTS: dict[Language, re.Pattern[str]] = {"en": re.compile("[A-Za-z]"), "ko": re.compile("[가-힣]")}
 
 
 @dataclass(frozen=True)
@@ -106,9 +106,10 @@ def usable_tip(answer: str, language: Language = "en") -> PoseTip | None:
     limit = KOREAN_TEXT_MAX_LENGTH if language == "ko" else TEXT_MAX_LENGTH
     if not 0 < len(text) <= limit or MEASURE.search(text):
         return None
-    # A model can leave out the Korean instruction; a sentence in another language would not suit the screens.
-    in_language = HANGUL.search(text) and not LATIN.search(text) if language == "ko" else not HANGUL.search(text)
-    if not in_language:
+    # A model can leave out the Korean instruction, or answer in the language of the photos or the pose: every letter
+    # must be of the screens' language, so a sentence in another script, or with no letters, is not shown.
+    letters = [char for char in text if char.isalpha()]
+    if not letters or not all(SCRIPTS[language].fullmatch(char) for char in letters):
         return None
     step = LEVELS.index(best) - LEVELS.index(now)
     height: Height = "raise" if step > 0 else "lower" if step < 0 else "keep"

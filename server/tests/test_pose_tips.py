@@ -9,7 +9,8 @@
 # in time, no connection, no key. The phone: staying connected, or dropping the request while the model works.
 # Limits: each window full, counted apart from poses and suggestions; refused input not counted; the session store
 # down. Privacy: neither the pose nor the answer nor the upstream body is logged. Language (FR-10.2): `ko`, `en`, left
-# out, and another value; a sentence in the language asked for, in the other one, or in both; a Korean sentence that is
+# out, and another value; a sentence in the language asked for, in the other one, in both, in another script (Japanese),
+# with one, or with no letters; a Korean sentence that is
 # usable, one with words that only contain a count ("한쪽", "두 손") or that look like one (구도, 두 발로, 이발), and
 # one with a count of steps, with or without a space, of words run together ("한두", "열한", "이십"), or with an ending
 # ("한 걸음만"), a unit, or a degree in digits or in words, of one digit or more, with or without an ending; a Korean
@@ -196,8 +197,19 @@ def test_korean_sentence_is_shown_up_to_eighty_characters(client, image_api, pho
         ("ko", "가슴 높이에서 keep it level - 신체 비율이 유지돼요."),
         ("en", "가슴 높이에서 수평으로 드세요 - 신체 비율이 유지돼요."),
         ("en", "Hold the phone at your 가슴 and keep it level."),
+        ("en", "胸の高さで水平に持ってください。"),
+        ("en", "... - !"),
+        ("ko", "가슴 높이에서 수평으로 드세요 - です."),
     ],
-    ids=["English asked in Korean", "both asked in Korean", "Korean asked in English", "both asked in English"],
+    ids=[
+        "English asked in Korean",
+        "both asked in Korean",
+        "Korean asked in English",
+        "both asked in English",
+        "another script asked in English",
+        "no letters",
+        "another script within Korean",
+    ],
 )
 def test_sentence_not_in_the_language_asked_for_is_unusable(client, image_api, photos, language, text):
     # A model can leave out the Korean instruction, or answer in the language of a pose typed in Korean.

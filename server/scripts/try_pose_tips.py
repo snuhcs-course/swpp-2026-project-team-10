@@ -83,9 +83,8 @@ MEASURE = re.compile(
     rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{DEGREE_ENDING}(?![가-힣])",
     re.IGNORECASE,
 )
-# The server refuses a sentence that is not in the language asked for, as poses/tips.py does.
-HANGUL = re.compile("[가-힣]")
-LATIN = re.compile("[A-Za-z]")
+# The server refuses a sentence with a letter not of the language asked for, or with none, as poses/tips.py does.
+SCRIPTS = {"en": re.compile("[A-Za-z]"), "ko": re.compile("[가-힣]")}
 
 # Where the photographer holds the camera, by their own posture, lowest first. The model places the camera of photo 1
 # and the best one for the pose, in the order of the schema, so it decides the shot and the pose first; the script
@@ -310,10 +309,9 @@ def check(tip: Tip, language: str) -> None:
         tip.flags.append(f"text length {len(text)}")
     if MEASURE.search(text):
         tip.flags.append("number or unit")
-    if language == "ko" and (not HANGUL.search(text) or LATIN.search(text)):
-        tip.flags.append("not in Korean")
-    if language == "en" and HANGUL.search(text):
-        tip.flags.append("not in English")
+    letters = [char for char in text if char.isalpha()]
+    if not letters or not all(SCRIPTS[language].fullmatch(char) for char in letters):
+        tip.flags.append("not in Korean" if language == "ko" else "not in English")
 
 
 async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number: int, args) -> Tip:

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -36,7 +37,8 @@ data class GuideTip(val guideId: String, val state: TipState)
  * a candidate while the user looks at it on Reference confirm; when that guide goes on Camera, its tip comes with it,
  * and when another guide does, or none, there is no tip, so a guide from the gallery or a saved guide never has one,
  * even a saved copy of the guide on Camera, which keeps its id. Only the newest guide's tip is asked for, and
- * [discard] drops it when that guide is not used. Kept in memory only, like the candidates.
+ * [discard] drops it when that guide is not used. A tip kept is asked again when the screens' language changes, so
+ * Camera never shows it in the language it had before (FR-10.2). Kept in memory only, like the candidates.
  * Owner: Pose tips.
  */
 class PoseTips(
@@ -44,18 +46,29 @@ class PoseTips(
     /** The guide on Camera (`GuideRepository.guide`). */
     guideOnCamera: StateFlow<ReferenceGuide?>,
     private val scope: CoroutineScope,
+    /** The screens' language ([screenLanguages]), which the tipper writes the tip in. */
+    private val language: StateFlow<String> = MutableStateFlow(ENGLISH),
 ) {
+    /** What a guide's tip was asked from, and in which language, so it can be asked again in another. */
+    private class Asked(val candidate: Bitmap, val source: TipSource, val language: String)
+
     /** The tips kept: the one of the guide on Camera and the one being prepared, by guide id. */
     private data class Tips(
         val onCamera: String? = null,
         val pending: String? = null,
         val states: Map<String, TipState> = emptyMap(),
+        val asked: Map<String, Asked> = emptyMap(),
     ) {
-        fun kept(): Tips = copy(states = states.filterKeys { it == onCamera || it == pending })
+        fun kept(): Tips {
+            val keep = { id: String -> id == onCamera || id == pending }
+            return copy(states = states.filterKeys(keep), asked = asked.filterKeys(keep))
+        }
     }
 
     private val tips = MutableStateFlow(Tips())
-    private var asking: Job? = null
+
+    /** The requests in flight by guide id; [prepare] runs on the main thread and a language change on [scope]. */
+    private val asking = mutableMapOf<String, Job>()
 
     /**
      * The tip of the guide on Camera, or null when it has none. It names its guide: this follows [guideOnCamera] on
@@ -77,7 +90,15 @@ class PoseTips(
                         onCamera = id,
                         pending = it.pending.takeIf { pending -> pending != id },
                         states = it.states.filterKeys { key -> key == it.pending },
+                        asked = it.asked.filterKeys { key -> key == it.pending },
                     )
+                }
+            }
+        }
+        scope.launch {
+            language.drop(1).collect { now ->
+                for ((id, asked) in tips.value.asked) {
+                    if (asked.language != now) ask(id, Asked(asked.candidate, asked.source, now))
                 }
             }
         }
@@ -85,16 +106,27 @@ class PoseTips(
 
     /** Asks for the tip of [guide], made from [candidate]; a tip still being asked for an older guide is dropped. */
     fun prepare(guide: ReferenceGuide, candidate: Bitmap, source: TipSource) {
-        asking?.cancel()
-        tips.update { it.copy(pending = guide.id, states = it.states + (guide.id to TipState.Preparing)).kept() }
-        asking = scope.launch {
-            val state = tipper.tip(source.scene, candidate, source.pose).fold(
+        synchronized(asking) {
+            asking.values.forEach(Job::cancel)
+            asking.clear()
+        }
+        tips.update { it.copy(pending = guide.id).kept() }
+        ask(guide.id, Asked(candidate, source, language.value))
+    }
+
+    private fun ask(guideId: String, asked: Asked) {
+        tips.update {
+            it.copy(states = it.states + (guideId to TipState.Preparing), asked = it.asked + (guideId to asked))
+        }
+        val job = scope.launch {
+            val state = tipper.tip(asked.source.scene, asked.candidate, asked.source.pose).fold(
                 onSuccess = { TipState.Ready(it) },
                 onFailure = { TipState.Failed },
             )
-            // A guide that left in the meantime, unused or replaced, keeps no tip.
-            tips.update { if (guide.id in it.states) it.copy(states = it.states + (guide.id to state)) else it }
+            // A guide that left in the meantime, unused or replaced, keeps no tip, and one asked again keeps the newer.
+            tips.update { if (it.asked[guideId] === asked) it.copy(states = it.states + (guideId to state)) else it }
         }
+        synchronized(asking) { asking.put(guideId, job) }?.cancel()
     }
 
     /**
@@ -107,6 +139,6 @@ class PoseTips(
             dropped = it.pending == guideId
             if (dropped) it.copy(pending = null).kept() else it
         }
-        if (dropped) asking?.cancel()
+        if (dropped) synchronized(asking) { asking.remove(guideId) }?.cancel()
     }
 }

@@ -37,7 +37,7 @@ import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseTipper
-import com.lastpenguin.pix.generation.screenLanguage
+import com.lastpenguin.pix.generation.screenLanguages
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -223,7 +223,9 @@ class AppContainer(
             )
             val referenceGuideMaker: ReferenceGuideMaker =
                 MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
-            val poseTipper: PoseTipper = RemotePoseTipper(pixApi, language = { screenLanguage(appContext.resources) })
+            // The tip is written in the screens' language, and asked again when it changes while Pix runs (FR-10.2).
+            val screenLanguage = screenLanguages(appContext)
+            val poseTipper: PoseTipper = RemotePoseTipper(pixApi, language = { screenLanguage.value })
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),
@@ -234,7 +236,7 @@ class AppContainer(
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
                 poseTipper = poseTipper,
-                poseTips = PoseTips(poseTipper, guideRepository.guide, appScope),
+                poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage),
                 generationConsent = DataStoreGenerationConsent(appContext),
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),

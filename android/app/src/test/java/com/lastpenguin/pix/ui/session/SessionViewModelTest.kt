@@ -27,6 +27,7 @@ import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -408,6 +409,31 @@ class SessionViewModelTest {
 
         assertEquals(listOf("invite:u_2", "cancel:inv_1"), invitations.calls)
         assertEquals(listOf(EndReason.CANCELLED), session.leaves)
+    }
+
+    @Test
+    fun cancelInvite_whileWaiting_leavesAtOnce_soARoomCanStartBeforeTheServerAnswers() = runTest(dispatcher) {
+        model.invite(friend)
+        runCurrent()
+        session.setState(SessionState.Inviting("inv_1"))
+        runCurrent()
+        val slow = CompletableDeferred<Unit>()
+        invitations.cancelGate = slow
+
+        model.cancelInvite()
+        runCurrent()
+        // The session is left while the server's answer is still on its way.
+        assertEquals(listOf(EndReason.CANCELLED), session.leaves)
+        session.setState(SessionState.Ended(EndReason.CANCELLED))
+        runCurrent()
+        // *Use a room code*, right after Friends opens.
+        model.startRoom()
+        runCurrent()
+        assertEquals(SessionEntry.NewRoom to Role.PHOTOGRAPHER, session.starts.last())
+
+        slow.complete(Unit)
+        runCurrent()
+        assertEquals(listOf("invite:u_2", "cancel:inv_1"), invitations.calls)
     }
 
     @Test

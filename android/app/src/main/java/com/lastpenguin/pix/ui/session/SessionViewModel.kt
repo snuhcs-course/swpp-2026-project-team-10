@@ -224,16 +224,18 @@ class SessionViewModel(
     }
 
     /**
-     * Photographer: *Cancel invite*, or *Invite sent* closed while waiting (FR-6.2). Cancelled on the server first, so
-     * the friend's *Invitation* says it is no longer available (FR-6.4); the session ends either way. Once the friend
-     * has accepted, the invitation is answered, so only the session ends, also while the phones are still connecting.
+     * Photographer: *Cancel invite*, or *Invite sent* closed while waiting (FR-6.2). The phone leaves the session at
+     * once, without waiting for the server's answer, so another flow such as *Use a room code* can start right away;
+     * the cancel goes to the server alongside, and the friend's *Invitation* says it is no longer available either way
+     * (FR-6.4). Once the friend has accepted, the invitation is answered, so only the session ends, also while the
+     * phones are still connecting.
      */
     fun cancelInvite() {
         val sent = _invitation.value ?: return
         when (state.value) {
-            is SessionState.Inviting -> viewModelScope.launch {
-                invitations.cancel(sent.id)
-                session.leave(EndReason.CANCELLED)
+            is SessionState.Inviting -> {
+                viewModelScope.launch { session.leave(EndReason.CANCELLED) }
+                viewModelScope.launch { invitations.cancel(sent.id) }
             }
 
             is SessionState.Connecting -> viewModelScope.launch { session.leave(EndReason.CANCELLED) }

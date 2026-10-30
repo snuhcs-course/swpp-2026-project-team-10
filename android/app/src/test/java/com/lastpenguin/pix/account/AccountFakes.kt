@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
 package com.lastpenguin.pix.account
 
 import android.content.Context
@@ -194,8 +194,9 @@ class FakeAccountApi : PixAccountApi {
 }
 
 /**
- * Answers with what a test sets, or with [failure]; every call is recorded by name. [acceptGate], when set, holds
- * `accept` until the test completes it, so a screen can be seen while the answer is on its way.
+ * Answers with what a test sets, or with [failure]; every call is recorded by name. [acceptGate] and [cancelGate], when
+ * set, hold `accept` and `cancel` until the test completes them, so what happens while the answer is on its way can be
+ * seen.
  */
 class FakeInvitationManager : InvitationManager {
     val calls = mutableListOf<String>()
@@ -211,6 +212,7 @@ class FakeInvitationManager : InvitationManager {
         OpenedInvitation("inv_1", PixUser("u_1", "test1", "Test Account 1"), InvitationStatus.PENDING, 1_030_000)
     var place = SessionPlace("s_1", "subject-token", emptyList())
     var acceptGate: CompletableDeferred<Unit>? = null
+    var cancelGate: CompletableDeferred<Unit>? = null
 
     private fun <T> answer(name: String, value: () -> T): Result<T> {
         calls += name
@@ -228,7 +230,10 @@ class FakeInvitationManager : InvitationManager {
 
     override suspend fun decline(invitationId: String) = answer("decline:$invitationId") {}
 
-    override suspend fun cancel(invitationId: String) = answer("cancel:$invitationId") {}
+    override suspend fun cancel(invitationId: String): Result<Unit> {
+        cancelGate?.await()
+        return answer("cancel:$invitationId") {}
+    }
 }
 
 /** An [AuthRepository] whose answers a test sets; it records the calls and signs in like the real one. */

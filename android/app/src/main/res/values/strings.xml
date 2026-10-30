@@ -34,6 +34,8 @@
     <string name="photo_storage_failed">Couldn\'t write the photo. Check available storage and try again.</string>
     <string name="photo_camera_closed">The camera closed before the photo was taken. Return to the camera and try again.</string>
     <string name="open_last_photo">Open last saved photo in gallery</string>
+    <string name="switch_to_front_camera">Switch to the front camera</string>
+    <string name="switch_to_rear_camera">Switch to the rear camera</string>
     <string name="gallery_unavailable">No app is available to open this photo.</string>
     <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
     <string name="hint_add_guide">Tap Guide to add a pose</string>
@@ -210,7 +212,8 @@
     <!-- "Online · @test2" under a friend's name (FR-5.9). -->
     <string name="friend_status" translatable="false">%1$s · \@%2$s</string>
     <string name="invite">Invite</string>
-    <string name="invite_not_yet">Invite %1$s. Not available yet</string>
+    <string name="invite_friend">Invite %1$s</string>
+    <string name="works_on_any_network">Works on Wi-Fi or cellular data</string>
     <string name="remove_friend_title">Remove %1$s?</string>
     <string name="remove_friend_message">You won\'t see each other in your friend lists. You can add each other again later.</string>
     <string name="remove_friend">Remove friend</string>
@@ -328,4 +331,33 @@
     <string name="connection_lost_title">Connection lost</string>
     <string name="connection_lost_message">Video stopped. Check both phones\' internet connection, then reconnect.</string>
     <string name="reconnect">Reconnect</string>
+
+    <!-- Invitations and their push notifications (R&S 6.5, 6.6; FR-5.7, FR-6.1–6.4, FR-6.9). -->
+    <string name="invite_busy">%1$s is in another session</string>
+    <string name="invite_waiting">Waiting for %1$s</string>
+    <string name="invite_sending">Sending the invitation…</string>
+    <string name="invite_waiting_body">%1$s gets a notification. The live view starts when they accept.</string>
+    <string name="invite_accepted_connecting">%1$s accepted · connecting…</string>
+    <string name="invite_link_hint">No notification? Send a link instead.</string>
+    <string name="share_invite_link">Share invite link</string>
+    <string name="copy_link">Copy link</string>
+    <string name="link_copied">Link copied</string>
+    <string name="invite_share_text">Let\'s shoot together in Pix. Open this link to see my camera live: %1$s</string>
+    <string name="cancel_invite">Cancel invite</string>
+    <string name="invite_not_accepted_title">Invite not accepted</string>
+    <string name="invite_not_accepted_message">%1$s declined or didn\'t answer within a minute.</string>
+    <string name="invite_again">Invite again</string>
+    <string name="invitation_title">%1$s wants to show you their camera</string>
+    <string name="invitation_body">You\'ll see the framing and pose guide live.</string>
+    <string name="invitation_loading">Opening the invitation…</string>
+    <string name="invitation_gone_title">This invitation is no longer available</string>
+    <string name="invitation_gone_message">Ask your friend to invite you again.</string>
+    <string name="invitation_sign_in">Sign in to Pix with the account your friend invited, then accept.</string>
+    <string name="invitation_failed_title">Couldn\'t open the invitation</string>
+    <string name="invitation_in_session">You\'re in another session. Leave it first, then accept.</string>
+    <string name="invitation_notification">%1$s invites you to shoot together</string>
+    <string name="friend_request_notification">%1$s sent you a friend request</string>
+    <string name="friend_request_notification_body">Open Friends to accept or decline.</string>
+    <string name="invitations_channel">Invitations</string>
+    <string name="friend_requests_channel">Friend requests</string>
 </resources>

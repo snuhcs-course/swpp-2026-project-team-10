@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-10-01, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 // Top-level build file. Module settings live in app/build.gradle.kts.
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.google.services) apply false
     alias(libs.plugins.spotless)
 }
 

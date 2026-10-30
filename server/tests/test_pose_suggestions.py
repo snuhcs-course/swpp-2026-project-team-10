@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
 # POST /pose-suggestions partitions (Testing Documentation 2.1.6). Scene: a JPEG within the contract, and one that is
 # not a JPEG, too large, or carries EXIF. The model's answer: four usable poses; JSON in a code fence; more than four;
 # a duplicate (in another case); a pose of 100 characters and one of 101; poses with line breaks; an item that is not
@@ -7,7 +7,8 @@
 # apart from pose requests; a refused scene not counted; the session store down. Privacy: no pose or body logged.
 # With a description: one in Korean with extra whitespace, of 100 characters and of 101, blank, and empty (asks for
 # suggestions); three usable variations, more than three, one equal to the description or to another, none, a failing
-# or slow model, no key; counted like suggestions; neither the description nor a variation logged.
+# or slow model, no key; counted like suggestions; neither the description nor a variation logged. Selfie (FR-1.14):
+# `selfie` true, false, left out, and not a boolean; with and without a description; a failing model with a selfie.
 import base64
 import json
 
@@ -34,8 +35,10 @@ def model_suggests(image_api):
     image_api.suggests(SUGGESTED)
 
 
-def suggest(client, image, description=None):
+def suggest(client, image, description=None, selfie=None):
     data = {} if description is None else {"description": description}
+    if selfie is not None:
+        data["selfie"] = selfie
     return client.post("/api/v1/pose-suggestions", files={"image": ("scene.jpg", image, "image/jpeg")}, data=data)
 
 
@@ -294,3 +297,29 @@ def test_description_and_variations_are_not_logged(client, image_api, make_image
     assert "variations usable" in caplog.text or "OpenRouter answered" in caplog.text
     assert "SECRET" not in caplog.text
     assert "빨간" not in caplog.text and "red door" not in caplog.text
+
+
+@pytest.mark.parametrize(("selfie", "prompt"), [("true", PROMPTS.selfie.suggestion), ("false", PROMPTS.suggestion)])
+def test_selfie_says_which_suggestion_prompt_the_model_gets(client, image_api, make_image, selfie, prompt):
+    assert suggest(client, make_image(), selfie=selfie).json() == {"poses": SUGGESTED}
+    [payload] = image_api.suggestion_payloads
+    text, _ = payload["messages"][0]["content"]
+    assert text == {"type": "text", "text": prompt}
+
+
+def test_failing_model_gives_the_selfie_default_poses_for_a_selfie(client, image_api, make_image):
+    image_api.suggestion_fails(502)
+    assert suggest(client, make_image(), selfie="true").json()["poses"] == list(PROMPTS.selfie.default_poses)
+
+
+def test_description_of_a_selfie_is_varied_with_the_selfie_prompt(client, image_api, make_image):
+    image_api.suggests(VARIATIONS)
+    assert suggest(client, make_image(), DESCRIPTION, selfie="true").json() == {"poses": [DESCRIPTION, *VARIATIONS]}
+    [payload] = image_api.suggestion_payloads
+    text, _ = payload["messages"][0]["content"]
+    assert text == {"type": "text", "text": variation_prompt(DESCRIPTION, selfie=True)}
+
+
+def test_selfie_that_is_not_a_boolean_is_invalid(client, image_api, make_image):
+    assert_error(suggest(client, make_image(), selfie="maybe"), 400, "INVALID_REQUEST")
+    assert image_api.suggestion_requests == []

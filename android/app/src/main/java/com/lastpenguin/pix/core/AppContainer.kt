@@ -13,10 +13,13 @@ import com.lastpenguin.pix.account.CredentialManagerGoogleIdTokens
 import com.lastpenguin.pix.account.DataStoreSignInStore
 import com.lastpenguin.pix.account.FriendsRepository
 import com.lastpenguin.pix.account.GoogleIdTokens
+import com.lastpenguin.pix.account.InvitationManager
 import com.lastpenguin.pix.account.OkHttpPresenceSockets
 import com.lastpenguin.pix.account.PresenceConnection
+import com.lastpenguin.pix.account.PushTokenRegistrar
 import com.lastpenguin.pix.account.RemoteAuthRepository
 import com.lastpenguin.pix.account.RemoteFriendsRepository
+import com.lastpenguin.pix.account.RemoteInvitationManager
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
@@ -42,6 +45,7 @@ import com.lastpenguin.pix.guide.OutlineExtractor
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.guide.SubjectSegmenter
+import com.lastpenguin.pix.push.FirebasePushTokens
 import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
@@ -111,6 +115,8 @@ class AppContainer(
     val authRepository: AuthRepository,
     val friendsRepository: FriendsRepository,
     val googleIdTokens: GoogleIdTokens,
+    // ---- Invitations and push (#119) --------------------------------------------
+    val invitationManager: InvitationManager,
     // ---- Session, guide sync, remote zoom (#8, #9, #10) -------------------------
     val sessionManager: SessionManager,
     /** The photographer's live video for the Subject view. */
@@ -125,6 +131,8 @@ class AppContainer(
     val remoteControlHandler: RemoteControlHandler,
     /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
     val mobileDataNotice: MobileDataNotice,
+    /** Registers this phone's push token; none in tests, which have no Firebase. */
+    val pushTokenRegistrar: PushTokenRegistrar? = null,
 ) {
     companion object {
         /** Like the session's socket, so the course's proxy never sees it idle. */
@@ -184,9 +192,16 @@ class AppContainer(
                 appScope,
             ).start()
 
+            // Pushes for invitations and friend requests reach this phone once someone signs in (Design 2.6.6).
+            val pushTokenRegistrar =
+                PushTokenRegistrar(accountApi, authRepository.state, FirebasePushTokens(), appScope).also { it.start() }
+
             val frameSource = CameraFrameSource()
             val rtcSessionManager = RtcSessionManager(
                 signaling = OkHttpSignalingClient(),
+                // A session's socket counts as signed in, so friends see "In a session" and an invitation to this
+                // phone is BUSY meanwhile (FR-6.9).
+                accessToken = authRepository::freshAccessToken,
                 // Loads the native WebRTC library on the first session, not at app start.
                 peers = WebRtcRuntime(appContext, frameSource, relayOnly = BuildConfig.RELAY_ONLY),
                 frameSource = frameSource,
@@ -223,6 +238,7 @@ class AppContainer(
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),
                 googleIdTokens = CredentialManagerGoogleIdTokens(BuildConfig.GOOGLE_SERVER_CLIENT_ID),
+                invitationManager = RemoteInvitationManager(accountApi),
                 sessionManager = rtcSessionManager,
                 remoteVideo = rtcSessionManager,
                 guideSyncer = guideSyncer,
@@ -236,6 +252,7 @@ class AppContainer(
                     attributeGuideChanges = guideSyncer::attribute,
                 ),
                 mobileDataNotice = DataStoreMobileDataNotice(appContext),
+                pushTokenRegistrar = pushTokenRegistrar,
             )
         }
     }

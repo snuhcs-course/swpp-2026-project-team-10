@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelStore
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
@@ -36,6 +37,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -558,6 +560,48 @@ class GenerationViewModelTest {
         assertEquals(SUGGESTED[1], source.pose)
     }
 
+    // Selfie mode (FR-1.14): a scene photo from the front camera is generated as a selfie, kept as one for Try again,
+    // and gets no tip; one from the rear camera is not a selfie.
+    @Test
+    fun aScenePhotoFromTheFrontCamera_isGeneratedAsASelfie_andAgainOnTryAgain() = runTest {
+        camera.facing.value = CameraFacing.FRONT
+        generateFromAPhoto()
+        assertTrue(state.selfie)
+        generator.runs.single().finish()
+        runCurrent()
+        // The user turned back to the rear camera meanwhile; the photo is still a selfie.
+        camera.facing.value = CameraFacing.BACK
+
+        model.retry()
+        runCurrent()
+
+        assertEquals(listOf(true, true), generator.runs.map { it.selfie })
+    }
+
+    @Test
+    fun aScenePhotoFromTheRearCamera_isNotASelfie() = runTest {
+        generateFromAPhoto()
+
+        assertFalse(state.selfie)
+        assertFalse(generator.runs.single().selfie)
+    }
+
+    @Test
+    fun aSelfiesCandidate_hasNoTipSource() = runTest {
+        camera.facing.value = CameraFacing.FRONT
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        run.plan()
+        run.send(ready("pose-1"))
+        run.finish()
+        runCurrent()
+
+        model.select("pose-1")
+
+        assertEquals("pose-1", state.selectedPoseId)
+        assertNull(state.tipSource)
+    }
+
     // ---- the set on the subject's phone (Design 2.6.5, Iter3-P16) -------------------------------------------------
     // Partitions: each phase change is told (a new set, each created candidate, Pick a pose with the pager's order, an
     // end without a choice from GENERATING, PICKING, or FAILED); the first choice wins (this phone's own, the
@@ -920,8 +964,13 @@ class GenerationViewModelTest {
     private class FakeGenerator : PoseGenerator {
         val runs = mutableListOf<Run>()
 
-        override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> {
-            val run = Run(scene, request, seed).also(runs::add)
+        override fun generate(
+            scene: Bitmap,
+            request: PoseRequest,
+            seed: Long,
+            selfie: Boolean,
+        ): Flow<GenerationEvent> {
+            val run = Run(scene, request, seed, selfie).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -932,7 +981,7 @@ class GenerationViewModelTest {
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest, val seed: Long) {
+        class Run(val scene: Bitmap, val request: PoseRequest, val seed: Long, val selfie: Boolean) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 
@@ -983,6 +1032,9 @@ class GenerationViewModelTest {
         }
 
         override fun setFrameSink(sink: FrameSink?) = Unit
+        override val facing = MutableStateFlow(CameraFacing.BACK)
+        override val hasFrontCamera: StateFlow<Boolean> = MutableStateFlow(true)
+        override fun setFacing(facing: CameraFacing) = Unit
     }
 
     private companion object {

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-04, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.ContentValues
@@ -16,7 +16,8 @@ import java.util.UUID
  * Owner: Camera/Overlay (#3).
  */
 class PhotoSaver(private val context: Context) {
-    fun outputOptions(): ImageCapture.OutputFileOptions {
+    /** [mirrored]: saved flipped left to right, as the front camera's preview shows the scene (FR-1.14). */
+    fun outputOptions(mirrored: Boolean = false): ImageCapture.OutputFileOptions {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "Pix_${timestamp}_${UUID.randomUUID()}.jpg")
@@ -29,6 +30,9 @@ class PhotoSaver(private val context: Context) {
             context.contentResolver,
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             values,
-        ).build()
+        )
+            // CameraX mirrors the front camera's preview but not its photos; the EXIF flip makes them match.
+            .setMetadata(ImageCapture.Metadata().apply { isReversedHorizontal = mirrored })
+            .build()
     }
 }

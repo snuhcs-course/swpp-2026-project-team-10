@@ -14,7 +14,7 @@
         android:id="@+id/topBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:minHeight="48dp"
+        android:minHeight="52dp"
         android:outlineProvider="none"
         android:paddingHorizontal="10dp"
         android:paddingVertical="0dp"
@@ -112,7 +112,7 @@
         android:id="@+id/previewContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="44dp"
+        android:layout_marginTop="48dp"
         android:layout_marginBottom="152dp"
         android:background="@color/pix_ground"
         android:splitMotionEvents="false"
@@ -575,7 +575,7 @@
         android:translationZ="1dp"
         android:paddingHorizontal="16dp"
         android:paddingTop="4dp"
-        android:paddingBottom="24dp"
+        android:paddingBottom="18dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -585,7 +585,7 @@
         <LinearLayout
             android:id="@+id/captureControls"
             android:layout_width="match_parent"
-            android:layout_height="84dp"
+            android:layout_height="88dp"
             android:baselineAligned="false"
             android:gravity="center_vertical">
 
@@ -609,12 +609,12 @@
                     tools:ignore="UselessParent">
 
                     <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:background="@drawable/bg_guide_button"
                         android:duplicateParentState="true"
                         android:importantForAccessibility="no"
-                        android:padding="9dp"
+                        android:padding="10dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_guide"
                         app:tint="@color/guide_button_icon" />
@@ -640,47 +640,79 @@
 
                 <ImageButton
                     android:id="@+id/shutterButton"
-                    android:layout_width="68dp"
-                    android:layout_height="68dp"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
                     android:layout_gravity="center"
                     android:background="@drawable/bg_shutter"
                     android:contentDescription="@string/shutter" />
             </FrameLayout>
 
-            <!-- A third of the row, as for Guide and the shutter, with the gallery button in its middle. -->
+            <!-- A third of the row, as for Guide and the shutter: the camera switch next to the shutter, then the
+                 gallery button; the gallery button alone keeps the middle on a phone without a front camera. -->
             <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 tools:ignore="UselessParent">
 
-                <!-- The last photo: a 36 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps; the
-                     thumbnail shows its pressed state. -->
-                <FrameLayout
-                    android:id="@+id/galleryButton"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:clickable="true"
-                    android:contentDescription="@string/open_last_photo"
-                    android:focusable="true">
+                    android:orientation="horizontal">
 
-                    <com.google.android.material.imageview.ShapeableImageView
-                        android:id="@+id/galleryThumbnail"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_gravity="center"
-                        android:background="@color/pix_glass"
-                        android:duplicateParentState="true"
-                        android:foreground="?attr/selectableItemBackground"
-                        android:importantForAccessibility="no"
-                        android:padding="1dp"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/gallery_placeholder"
-                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
-                        app:strokeColor="#80FFFFFF"
-                        app:strokeWidth="1.5dp" />
-                </FrameLayout>
+                    <!-- The camera switch (FR-1.14): a 40 dp glass circle in a 48 dp touch area (NFR-16). -->
+                    <FrameLayout
+                        android:id="@+id/switchCameraButton"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="4dp"
+                        android:clickable="true"
+                        android:contentDescription="@string/switch_to_front_camera"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_guide_button"
+                            android:duplicateParentState="true"
+                            android:importantForAccessibility="no"
+                            android:padding="9dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_switch_camera"
+                            app:tint="@color/guide_button_icon" />
+                    </FrameLayout>
+
+                    <!-- The last photo: a 40 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps; the
+                         thumbnail shows its pressed state. -->
+                    <FrameLayout
+                        android:id="@+id/galleryButton"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:clickable="true"
+                        android:contentDescription="@string/open_last_photo"
+                        android:focusable="true">
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/galleryThumbnail"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_gravity="center"
+                            android:background="@color/pix_glass"
+                            android:duplicateParentState="true"
+                            android:foreground="?attr/selectableItemBackground"
+                            android:importantForAccessibility="no"
+                            android:padding="1dp"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/gallery_placeholder"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
+                            app:strokeColor="#80FFFFFF"
+                            app:strokeWidth="1.5dp" />
+                    </FrameLayout>
+                </LinearLayout>
             </FrameLayout>
         </LinearLayout>
 
@@ -688,7 +720,7 @@
         <LinearLayout
             android:id="@+id/sceneReviewControls"
             android:layout_width="match_parent"
-            android:layout_height="84dp"
+            android:layout_height="88dp"
             android:gravity="center_vertical"
             android:visibility="gone"
             tools:ignore="ButtonStyle">

@@ -8,6 +8,7 @@ import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.account.FakeAuthRepository
 import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
+import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
@@ -78,6 +79,7 @@ class TestAppContainer(
     val auth = FakeAuthRepository()
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
+    val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
@@ -111,6 +113,7 @@ class TestAppContainer(
         authRepository = auth,
         friendsRepository = friends,
         googleIdTokens = FakeGoogleIdTokens(),
+        invitationManager = invitations,
         sessionManager = session,
         remoteVideo = video,
         guideSyncer = syncer,
@@ -150,8 +153,13 @@ class TestAppContainer(
     class ScriptedPoseGenerator : PoseGenerator {
         val runs = mutableListOf<Run>()
 
-        override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> {
-            val run = Run(scene, request).also(runs::add)
+        override fun generate(
+            scene: Bitmap,
+            request: PoseRequest,
+            seed: Long,
+            selfie: Boolean,
+        ): Flow<GenerationEvent> {
+            val run = Run(scene, request, selfie).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -162,7 +170,7 @@ class TestAppContainer(
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest) {
+        class Run(val scene: Bitmap, val request: PoseRequest, val selfie: Boolean = false) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 

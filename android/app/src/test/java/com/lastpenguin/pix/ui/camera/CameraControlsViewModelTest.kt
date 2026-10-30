@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelStore
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
@@ -23,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -289,6 +291,9 @@ class CameraControlsViewModelTest {
         override suspend fun takePhoto(): Result<Uri> = awaitCancellation()
         override suspend fun grabFrame(): Result<Bitmap> = Result.failure(UnsupportedOperationException())
         override fun setFrameSink(sink: FrameSink?) = Unit
+        override val facing: StateFlow<CameraFacing> = MutableStateFlow(CameraFacing.BACK)
+        override val hasFrontCamera: StateFlow<Boolean> = MutableStateFlow(false)
+        override fun setFacing(facing: CameraFacing) = Unit
     }
 
     private companion object {

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.view.LayoutInflater
@@ -44,6 +44,10 @@ class FriendsScreenTest {
         val actions = object : FriendsScreen.Actions {
             override fun signIn() {
                 taps += "signIn"
+            }
+
+            override fun invite(friend: Friend) {
+                taps += "invite:${friend.userId}"
             }
 
             override fun choosePixId() {
@@ -133,6 +137,7 @@ class FriendsScreenTest {
         screen.render(FriendsUiState(AuthState.SignedIn(account)))
 
         assertTrue(binding.emptyCard.shown && binding.addFriendButton.shown)
+        assertFalse(binding.networkNote.shown)
         assertFalse(binding.promptCard.shown)
         assertEquals("My Pix ID: test1", binding.myPixIdText.text.toString())
         binding.myPixIdText.performClick()
@@ -140,7 +145,7 @@ class FriendsScreenTest {
     }
 
     @Test
-    fun friends_showTheirNamePixIdAndStatus() {
+    fun friends_showTheirNamePixIdStatusAndInvite_whichEveryFriendGetsEvenOffline() {
         val (binding, screen) = screen()
         val friends = listOf(
             testAccount2,
@@ -153,8 +158,14 @@ class FriendsScreenTest {
         assertFalse(binding.emptyCard.shown)
         val statuses = (0 until 3).map { binding.friendsList.getChildAt(it).findText(R.id.statusText) }
         assertEquals(listOf("Online · @test2", "Offline · @test4", "In a session · @test3"), statuses)
-        val invite = binding.friendsList.getChildAt(0).findViewById<Button>(R.id.inviteButton)
-        assertFalse(invite.isEnabled)
+        // A friend in Pix's background or with Pix closed still gets the push (FR-6.1); one in a session is BUSY on
+        // the server, which says so (FR-6.9).
+        val invites = (0 until 3).map { binding.friendsList.getChildAt(it).findViewById<Button>(R.id.inviteButton) }
+        assertTrue(invites.all { it.isEnabled })
+        assertEquals("Invite Test Account 4", invites[1].contentDescription)
+        invites[1].performClick()
+        assertEquals(listOf("invite:u_4"), taps)
+        assertTrue(binding.networkNote.shown)
     }
 
     @Test

@@ -252,7 +252,15 @@ class GenerationScreensTest {
         }
 
         run.plan(poses)
-        idle()
+        // The grid's ListAdapter diffs this second list on a background thread: wait for its result, not one loop.
+        idleUntil {
+            var count = 0
+            s.onFragment {
+                count =
+                    FragmentGeneratingBinding.bind(it.requireView()).candidateGrid.adapter?.itemCount ?: 0
+            }
+            count == 4
+        }
         s.onFragment { fragment ->
             val binding = FragmentGeneratingBinding.bind(fragment.requireView())
             assertEquals(4, binding.candidateGrid.adapter?.itemCount)

@@ -104,7 +104,7 @@ class CameraXController(
     private var flash = FlashMode.OFF
 
     // The light for the scene photo (setTorch). CameraX turns it off whenever the camera closes, so it is kept here;
-    // only the newest request's answer is published.
+    // only the answer to the newest request since the camera opened is published.
     private var torch = false
     private var torchRequest = 0
 
@@ -173,7 +173,7 @@ class CameraXController(
                     pendingZoom = null
                     pendingFinal = true
                     current.frames.clear()
-                    _state.update { it.copy(torch = false) }
+                    torchOff()
                     refreshStatus(current)
                 }
 
@@ -358,7 +358,7 @@ class CameraXController(
                 }
                 val opened = open && !current.open
                 current.open = open
-                if (!open) _state.update { it.copy(torch = false) }
+                if (!open) torchOff()
                 // CameraX can wait for another camera client without attaching an error.
                 // Keep retry/settings guidance visible while waiting; a later OPEN recovers automatically.
                 current.failed = state.error != null || state.type == CameraXState.Type.PENDING_OPEN
@@ -639,7 +639,7 @@ class CameraXController(
         try {
             val applied = camera.cameraControl.enableTorch(on)
             applied.addListener({
-                if (binding !== current || request != torchRequest) return@addListener
+                if (binding !== current || request != torchRequest || !current.open) return@addListener
                 // CameraX drops a request when the camera closes, and then the light is off until it opens again.
                 val lit = on && runCatching { applied.get() }.isSuccess
                 _state.update { it.copy(torch = lit) }
@@ -647,6 +647,15 @@ class CameraXController(
         } catch (error: Exception) {
             Log.w(TAG, "Torch request could not start", error)
         }
+    }
+
+    /**
+     * The camera closed, or the binding went: CameraX has turned the light off, and an answer still on its way is from
+     * before, so it must not say the light is on after the camera opens again.
+     */
+    private fun torchOff() {
+        torchRequest++
+        _state.update { it.copy(torch = false) }
     }
 
     override fun setAspectRatio(ratio: AspectRatio) {
@@ -902,7 +911,7 @@ class CameraXController(
         val current = binding ?: return
         binding = null
         current.active = false
-        _state.update { it.copy(torch = false) }
+        torchOff()
         publishStatus(if (preserveZoomPlan) CameraStatus.STARTING else CameraStatus.IDLE)
         if (!preserveZoomPlan) {
             _capabilities.value = null

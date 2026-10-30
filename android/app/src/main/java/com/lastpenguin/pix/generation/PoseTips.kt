@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -87,7 +86,8 @@ class PoseTips(
             // Each guide put on Camera, not each id: a saved guide keeps the id of the guide it was saved from.
             guideOnCamera.distinctUntilChanged { old, new -> old === new }.collect { guide ->
                 val id = guide?.id
-                // Only the guide the tip was prepared for brings one; the one on Camera before loses its own.
+                // Only the guide the tip was prepared for brings one; the one on Camera before loses its own, and its
+                // request, which could no longer be shown, is cancelled.
                 synchronized(asking) {
                     tips.update {
                         Tips(
@@ -97,11 +97,14 @@ class PoseTips(
                             asked = it.asked.filterKeys { key -> key == it.pending },
                         )
                     }
+                    val kept = tips.value.asked.keys
+                    asking.keys.filter { it !in kept }.forEach { key -> asking.remove(key)?.cancel() }
                 }
             }
         }
         scope.launch {
-            language.drop(1).collect { now ->
+            // From the first value: the language may have changed before this collects, after a tip was asked.
+            language.collect { now ->
                 synchronized(asking) {
                     for ((id, asked) in tips.value.asked) {
                         // Checked again right before it is asked: a guide dropped since the change began stays dropped.

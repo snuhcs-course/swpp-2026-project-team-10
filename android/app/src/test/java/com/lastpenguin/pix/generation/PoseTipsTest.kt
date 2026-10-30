@@ -27,8 +27,9 @@ import org.junit.Test
 // prepared while the one on Camera keeps its tip, and while an older one is still being asked for. Discarding: the
 // prepared guide before it goes on Camera, the guide already on Camera, and an older guide. The screens' language
 // changing (FR-10.2): with the tip on Camera ready, with the one prepared still being asked for (its older answer
-// arriving late), and with only a guide that has no tip. A newer guide prepared, then discarded, while the tip on
-// Camera is still being asked for, and a guide discarded while a language change asks the others again.
+// arriving late), and with only a guide that has no tip; the language changed before the changes are watched. A newer
+// guide prepared, then discarded, while the tip on Camera is still being asked for, then put on Camera instead (the
+// older request cancelled), and a guide discarded while a language change asks the others again.
 @OptIn(ExperimentalCoroutinesApi::class)
 class PoseTipsTest {
     private val tipper = RecordingTipper()
@@ -300,6 +301,50 @@ class PoseTipsTest {
         again.answer(KOREAN_TEXT)
         runCurrent()
         assertEquals(GuideTip("g1", TipState.Ready(PoseTip(KOREAN_TEXT))), tips.onCamera.value)
+    }
+
+    @Test
+    fun aLanguageChangedBeforeTheChangesAreWatched_isTheOneTheTipIsKeptIn() = runTest {
+        val tips = tips()
+        val guide = guide("g1")
+        tips.prepare(guide, candidate, TipSource(scene, POSE))
+        // Before PoseTips has run at all: its watch of the language starts on this value.
+        language.value = KOREAN
+        onCamera.value = guide
+        runCurrent()
+        tipper.requests.last().answer(KOREAN_TEXT)
+        runCurrent()
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(KOREAN_TEXT))), tips.onCamera.value)
+
+        language.value = ENGLISH
+        runCurrent()
+
+        assertEquals(GuideTip("g1", TipState.Preparing), tips.onCamera.value)
+    }
+
+    @Test
+    fun aTipAskedAgainIsCancelledWhenItsGuideLeavesCamera() = runTest {
+        val tips = tips()
+        val current = guide("g1")
+        tips.prepare(current, candidate, TipSource(scene, POSE))
+        onCamera.value = current
+        runCurrent()
+        tipper.requests.single().answer(TEXT)
+        runCurrent()
+        language.value = KOREAN
+        runCurrent()
+        val again = tipper.requests.last()
+        val newer = guide("g2")
+        tips.prepare(newer, candidate, TipSource(scene, "Sit on the step"))
+        runCurrent()
+        assertFalse(again.cancelled)
+
+        onCamera.value = newer
+        runCurrent()
+
+        assertTrue(again.cancelled)
+        assertFalse(tipper.requests.last().cancelled)
+        assertEquals(GuideTip("g2", TipState.Preparing), tips.onCamera.value)
     }
 
     @Test

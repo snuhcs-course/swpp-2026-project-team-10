@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.app.Application
@@ -23,6 +23,19 @@ import org.robolectric.Shadows.shadowOf
 object ScreenTestSupport {
     /** Runs the main looper: ViewModel coroutines on Dispatchers.Main and the posted UI work. */
     fun idle() = shadowOf(Looper.getMainLooper()).idle()
+
+    /**
+     * Runs the main looper until [done], for work that finishes on another thread and posts its result, such as a
+     * `ListAdapter` diffing a new list after its first one. Gives up after [timeoutMs]; the caller then asserts.
+     */
+    fun idleUntil(timeoutMs: Long = 2_000, done: () -> Boolean) {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000
+        idle()
+        while (!done() && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+            idle()
+        }
+    }
 
     fun string(id: Int, vararg args: Any): String =
         ApplicationProvider.getApplicationContext<Application>().getString(id, *args)

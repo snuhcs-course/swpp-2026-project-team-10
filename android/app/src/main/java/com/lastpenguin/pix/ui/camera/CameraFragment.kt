@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -47,6 +47,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
@@ -207,6 +208,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { openLastPhoto() }
+        // Selfie mode (FR-1.14): the last frame stays up while the other camera opens, as for a ratio change.
+        controls.switchCameraButton.setOnClickListener {
+            previewHold?.hold()
+            viewModel.onSwitchCamera()
+        }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         controls.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
@@ -637,6 +643,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
+        // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
+        controls.switchCameraButton.isVisible = state.canSwitchCamera
+        controls.switchCameraButton.isEnabled = granted && !state.isSaving
+        controls.switchCameraButton.contentDescription = getString(
+            if (state.facing == CameraFacing.BACK) R.string.switch_to_front_camera else R.string.switch_to_rear_camera,
+        )
 
         renderCameraSettings(controls, state, ready)
 

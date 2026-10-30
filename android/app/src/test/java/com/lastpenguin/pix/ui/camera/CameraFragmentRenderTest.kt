@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -15,6 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
@@ -45,7 +46,8 @@ import org.robolectric.annotation.GraphicsMode
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
  * camera status STARTING, READY; a guide added, hidden, removed by the shutter's end of edit mode; a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
- * scene photo step framing and reviewing; a session connected and a peer leaving.
+ * scene photo step framing and reviewing; a session connected and a peer leaving; the camera switch on a phone with
+ * and without a front camera, while the scene photo is framed, and in a session (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -395,6 +397,59 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
             assertEquals(View.VISIBLE, controls.cameraSettings.visibility)
         }
+    }
+
+    // ---- Selfie mode (FR-1.14) -------------------------------------------------------------
+
+    @Test
+    fun cameraSwitch_withAFrontCamera_switchesAndNamesTheOtherCamera() {
+        val camera = FakeCameraController()
+        launch(camera)
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.switchCameraButton.visibility)
+            assertEquals(string(R.string.switch_to_front_camera), controls.switchCameraButton.contentDescription)
+            controls.switchCameraButton.performClick()
+        }
+        idle()
+
+        assertEquals(listOf(CameraFacing.FRONT), camera.facingRequests)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.switch_to_rear_camera), controls.switchCameraButton.contentDescription)
+        }
+    }
+
+    @Test
+    fun cameraSwitch_withoutAFrontCamera_isHidden() {
+        launch(FakeCameraController().apply { hasFrontCamera.value = false })
+
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.switchCameraButton.visibility)
+            assertEquals(View.VISIBLE, controls.galleryButton.visibility)
+        }
+    }
+
+    @Test
+    fun cameraSwitch_staysWhileTheScenePhotoIsFramed() {
+        launch()
+
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.switchCameraButton.visibility)
+            assertEquals(View.INVISIBLE, controls.galleryButton.visibility)
+        }
+    }
+
+    @Test
+    fun cameraSwitch_staysInASession() {
+        val modules = launch()
+
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.switchCameraButton.visibility) }
     }
 
     // ---- A session on the photographer's phone -----------------------------------------

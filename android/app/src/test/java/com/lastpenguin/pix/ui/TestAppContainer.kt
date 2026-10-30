@@ -150,8 +150,13 @@ class TestAppContainer(
     class ScriptedPoseGenerator : PoseGenerator {
         val runs = mutableListOf<Run>()
 
-        override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> {
-            val run = Run(scene, request).also(runs::add)
+        override fun generate(
+            scene: Bitmap,
+            request: PoseRequest,
+            seed: Long,
+            selfie: Boolean,
+        ): Flow<GenerationEvent> {
+            val run = Run(scene, request, selfie).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -162,7 +167,7 @@ class TestAppContainer(
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest) {
+        class Run(val scene: Bitmap, val request: PoseRequest, val selfie: Boolean = false) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 

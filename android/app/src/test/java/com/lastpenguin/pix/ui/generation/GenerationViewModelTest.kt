@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -22,6 +22,11 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.SUGGESTED
 import com.lastpenguin.pix.generation.planned
 import com.lastpenguin.pix.generation.testBitmap
+import com.lastpenguin.pix.session.DescriptionRequest
+import com.lastpenguin.pix.session.DescriptionShare
+import com.lastpenguin.pix.session.PoseShare
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SubjectPick
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -29,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -55,6 +61,8 @@ class GenerationViewModelTest {
     private val generator = FakeGenerator()
     private val camera = FakeCamera()
     private val consent = FakeConsent()
+    private val share = RecordingShare()
+    private val descriptions = RecordingDescriptions()
     private lateinit var model: GenerationViewModel
 
     private val state get() = model.uiState.value
@@ -62,7 +70,7 @@ class GenerationViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        model = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        model = GenerationViewModel(generator, camera, consent, LIMIT_MS, share, descriptions)
         store.put("generation", model)
     }
 
@@ -550,6 +558,120 @@ class GenerationViewModelTest {
         assertEquals(SUGGESTED[1], source.pose)
     }
 
+    // ---- the set on the subject's phone (Design 2.6.5, Iter3-P16) -------------------------------------------------
+    // Partitions: each phase change is told (a new set, each created candidate, Pick a pose with the pager's order, an
+    // end without a choice from GENERATING, PICKING, or FAILED); the first choice wins (this phone's own, the
+    // subject's pick of this set); a pick is ignored for another set, while generating, for a candidate that failed,
+    // and after a choice; a new set gets a new id.
+
+    @Test
+    fun eachPhaseOfTheSetIsToldToTheSubjectsPhone() = runTest {
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        run.plan()
+        run.send(ready("pose-3"), failed("pose-2"), ready("pose-1"))
+        run.finish()
+        runCurrent()
+
+        val set = share.opened.single()
+        assertEquals(
+            listOf("open $set", "candidate pose-3", "candidate pose-1", "picking pose-1,pose-3"),
+            share.calls,
+        )
+    }
+
+    @Test
+    fun aSetThatEndsWithoutAChoiceIsClosed() = runTest {
+        generateFromAPhoto()
+        model.cancel()
+        generateFromAPhoto()
+        generator.runs.last().finish()
+        runCurrent()
+        model.describeAgain()
+        model.suggestPoses()
+        runCurrent()
+        generator.runs.last().plan()
+        generator.runs.last().send(ready("pose-1"))
+        generator.runs.last().finish()
+        runCurrent()
+        model.describeAgain()
+
+        val (first, second, third) = share.opened
+        assertEquals(
+            listOf("close $first", "close $second", "close $third"),
+            share.calls.filter {
+                it.startsWith("close")
+            },
+        )
+        assertEquals(3, share.opened.toSet().size)
+    }
+
+    @Test
+    fun usingAPoseChoosesItHereAndNothingElseCanBeChosen() = runTest {
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        val second = ready("pose-2")
+        run.plan()
+        run.send(ready("pose-1"), second)
+        run.finish()
+        runCurrent()
+        model.select("pose-2")
+
+        val use = model.usePose()
+
+        assertSame(second.image, use?.image)
+        assertEquals(SUGGESTED[1], use?.tipSource?.pose)
+        assertEquals(Role.PHOTOGRAPHER, state.chosenBy)
+        assertEquals("chosen pose-2 by PHOTOGRAPHER", share.calls.last())
+        assertNull("one choice per set", model.usePose())
+        model.select("pose-1")
+        assertEquals("pose-2", state.selectedPoseId)
+        share.pick(SubjectPick(share.opened.single(), "pose-1"))
+        runCurrent()
+        assertEquals(Role.PHOTOGRAPHER, state.chosenBy)
+        assertEquals(1, share.calls.count { it.startsWith("chosen") })
+    }
+
+    @Test
+    fun theSubjectsPickThatComesFirstIsTheChoice() = runTest {
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        run.plan()
+        run.send(ready("pose-1"), ready("pose-2"))
+        run.finish()
+        runCurrent()
+        model.select("pose-1")
+
+        share.pick(SubjectPick(share.opened.single(), "pose-2"))
+        runCurrent()
+
+        assertEquals("pose-2", state.selectedPoseId)
+        assertEquals(Role.SUBJECT, state.chosenBy)
+        assertEquals("chosen pose-2 by SUBJECT", share.calls.last())
+        assertNull("this phone's tap comes second", model.usePose())
+    }
+
+    @Test
+    fun aPickForAnotherSetWhileGeneratingOrOfAFailedCandidateIsIgnored() = runTest {
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        val set = share.opened.single()
+        run.plan()
+        run.send(ready("pose-1"), failed("pose-2"))
+        runCurrent()
+        share.pick(SubjectPick(set, "pose-1"))
+        runCurrent()
+        run.finish()
+        runCurrent()
+
+        share.pick(SubjectPick("another set", "pose-1"))
+        share.pick(SubjectPick(set, "pose-2"))
+        runCurrent()
+
+        assertNull(state.chosenBy)
+        assertTrue(share.calls.none { it.startsWith("chosen") })
+    }
+
     @Test
     fun consentIsNeededUntilItIsGivenAndIsThenStored() = runTest {
         // Before the stored answer has loaded, the notice is still required.
@@ -591,6 +713,130 @@ class GenerationViewModelTest {
         assertTrue(consent.given)
     }
 
+    // ---- Generate poses on both phones (FR-6.15, Design 2.6.5) ---------------------------------------------------
+    // Partitions: the description shared from its opening to its end (a set started, Cancel), opened again with its text
+    // and whether it was rejected; this phone's field holding it while focused; the subject's edit taken while this
+    // phone's field is free and dropped while it holds it or for another description; this phone's typing and start
+    // refused while the subject's field holds it; the subject's Generate 4 poses with its text and Skip, dropped while
+    // this phone's field holds it; a dropped link freeing the subject's field.
+
+    @Test
+    fun generatePoses_isSharedFromItsOpeningToTheSetItStarts() = runTest {
+        describeAPhoto()
+        assertTrue(model.onDescriptionFocus(true))
+        model.onDescriptionChanged("wave")
+        model.onDescriptionFocus(false)
+        model.generate("wave")
+        runCurrent()
+
+        assertEquals(
+            listOf("open ''", "update '' PHOTOGRAPHER", "update 'wave' PHOTOGRAPHER", "update 'wave' null", "started"),
+            descriptions.calls,
+        )
+        assertEquals(1, descriptions.ids.toSet().size)
+    }
+
+    @Test
+    fun aRejectedDescription_opensAgainWithItsText_andCancelClosesIt() = runTest {
+        describeAPhoto()
+        model.onDescriptionChanged("피 흘리는 모습")
+        model.generate("피 흘리는 모습")
+        runCurrent()
+        val run = generator.runs.single()
+        run.plan(List(4) { "피 흘리는 모습" })
+        run.send(*(1..4).map { failed("pose-$it", GenerationError.REJECTED) }.toTypedArray())
+        run.finish()
+        runCurrent()
+
+        model.describeAgain()
+        model.cancel()
+
+        assertEquals("open '피 흘리는 모습' rejected", descriptions.calls[descriptions.calls.size - 2])
+        assertEquals("closed", descriptions.calls.last())
+        assertEquals(2, descriptions.ids.toSet().size)
+    }
+
+    @Test
+    fun theSubjectsField_holdsTheDescriptionOnlyWhileThisPhonesDoesNot() = runTest {
+        describeAPhoto()
+        val id = descriptions.ids.single()
+        model.onDescriptionFocus(true)
+
+        descriptions.request(DescriptionRequest.Edit(id, holding = true, text = "jump"))
+        runCurrent()
+        assertEquals(Role.PHOTOGRAPHER, state.descriptionWriter)
+        assertEquals("", state.description)
+
+        model.onDescriptionFocus(false)
+        descriptions.request(DescriptionRequest.Edit(id, holding = true, text = "jump"))
+        descriptions.request(DescriptionRequest.Edit("another", holding = true, text = "other"))
+        runCurrent()
+        assertEquals(Role.SUBJECT, state.descriptionWriter)
+        assertEquals("jump", state.description)
+
+        // This phone's field and buttons wait meanwhile.
+        assertFalse(model.onDescriptionFocus(true))
+        model.onDescriptionChanged("mine")
+        model.generate("mine")
+        model.suggestPoses()
+        runCurrent()
+        assertEquals(Role.SUBJECT, state.descriptionWriter)
+        assertEquals("jump", state.description)
+        assertTrue(generator.runs.isEmpty())
+
+        descriptions.request(DescriptionRequest.Edit(id, holding = false, text = "jump high"))
+        runCurrent()
+        assertNull(state.descriptionWriter)
+        assertEquals("jump high", state.description)
+        assertEquals("update 'jump high' null", descriptions.calls.last())
+    }
+
+    @Test
+    fun theSubjectsGenerate_startsTheSetWithItsText_andItsSkipAsksForSuggestions() = runTest {
+        describeAPhoto()
+        descriptions.request(DescriptionRequest.Edit(descriptions.ids.last(), holding = true, text = "jump"))
+        descriptions.request(DescriptionRequest.Go(descriptions.ids.last(), "jump high", suggest = false))
+        runCurrent()
+        assertEquals(PoseRequest.Described("jump high"), generator.runs.single().request)
+        assertEquals("jump high", state.description)
+        assertEquals("started", descriptions.calls.last())
+
+        model.cancel()
+        describeAPhoto()
+        model.onDescriptionChanged("lean")
+        descriptions.request(DescriptionRequest.Go(descriptions.ids.last(), "stale", suggest = true))
+        runCurrent()
+        assertEquals(PoseRequest.Suggested, generator.runs.last().request)
+        assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
+    }
+
+    @Test
+    fun theSubjectsGenerate_isDroppedWhileThisPhonesFieldHoldsTheDescription_orForAnotherOne() = runTest {
+        describeAPhoto()
+        model.onDescriptionFocus(true)
+
+        descriptions.request(DescriptionRequest.Go(descriptions.ids.single(), "jump", suggest = false))
+        descriptions.request(DescriptionRequest.Go("another", "jump", suggest = true))
+        runCurrent()
+
+        assertTrue(generator.runs.isEmpty())
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+    }
+
+    @Test
+    fun aDroppedLink_freesTheSubjectsField() = runTest {
+        describeAPhoto()
+        descriptions.request(DescriptionRequest.Edit(descriptions.ids.single(), holding = true, text = "jump"))
+        runCurrent()
+
+        descriptions.request(DescriptionRequest.Gone)
+        runCurrent()
+
+        assertNull(state.descriptionWriter)
+        assertEquals("jump", state.description)
+        assertTrue(model.onDescriptionFocus(true))
+    }
+
     /** *Generate poses here*, the shutter, and *Use this photo*: Generate poses is shown. */
     private fun TestScope.describeAPhoto() {
         model.beginScene()
@@ -611,6 +857,64 @@ class GenerationViewModelTest {
 
     private fun failed(poseId: String, error: GenerationError = GenerationError.SERVER) =
         CandidateEvent.Failed(poseId, error)
+
+    /** Records what the ViewModel tells the subject's Generate poses, and passes on the requests a test sends. */
+    private class RecordingDescriptions : DescriptionShare {
+        val calls = mutableListOf<String>()
+        val ids = mutableListOf<String>()
+        private val sent = MutableSharedFlow<DescriptionRequest>(extraBufferCapacity = 8)
+        override val requests: Flow<DescriptionRequest> = sent
+
+        fun request(request: DescriptionRequest) = check(sent.tryEmit(request))
+
+        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean) {
+            ids += descriptionId
+            calls += "open '$text'" + if (rejected) " rejected" else ""
+        }
+
+        override fun update(descriptionId: String, text: String, writer: Role?) {
+            check(descriptionId == ids.last())
+            calls += "update '$text' $writer"
+        }
+
+        override fun end(descriptionId: String, started: Boolean) {
+            check(descriptionId == ids.last())
+            calls += if (started) "started" else "closed"
+        }
+    }
+
+    /** Records what the ViewModel tells the subject's phone, and passes on the picks a test sends. */
+    private class RecordingShare : PoseShare {
+        val calls = mutableListOf<String>()
+        val opened = mutableListOf<String>()
+        private val sentPicks = MutableSharedFlow<SubjectPick>(extraBufferCapacity = 8)
+        override val picks: Flow<SubjectPick> = sentPicks
+
+        fun pick(pick: SubjectPick) = check(sentPicks.tryEmit(pick))
+
+        override fun open(setId: String) {
+            opened += setId
+            calls += "open $setId"
+        }
+
+        override fun candidate(setId: String, poseId: String, image: Bitmap) {
+            check(setId == opened.last())
+            calls += "candidate $poseId"
+        }
+
+        override fun picking(setId: String, poseIds: List<String>) {
+            check(setId == opened.last())
+            calls += "picking ${poseIds.joinToString(",")}"
+        }
+
+        override fun chosen(setId: String, poseId: String, by: Role) {
+            calls += "chosen $poseId by $by"
+        }
+
+        override fun close(setId: String) {
+            calls += "close $setId"
+        }
+    }
 
     /** Each call to generate is a [Run] the test feeds with events. */
     private class FakeGenerator : PoseGenerator {

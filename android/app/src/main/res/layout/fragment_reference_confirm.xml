@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Reference confirm (R&S 6.2). -->
+<!-- Reference confirm (R&S 6.2), and the subject's Your reference (R&S 6.6). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -21,13 +21,30 @@
             style="@style/Widget.Pix.Header.Back"
             android:contentDescription="@string/back" />
 
-        <TextView
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:accessibilityHeading="true"
-            android:text="@string/reference_title"
-            android:textAppearance="@style/TextAppearance.Pix.Header" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/reference_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+            <!-- "Junhyeong chose this pose" when the subject's pick brought the candidate here (FR-6.15). -->
+            <TextView
+                android:id="@+id/chosenByText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                android:visibility="gone"
+                tools:text="Junhyeong chose this pose"
+                tools:visibility="visible" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- The outline over a neutral background (FR-2.3). Dark, so the light stroke stands out as it does on the camera. -->
@@ -74,6 +91,18 @@
                 tools:visibility="visible" />
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
+
+    <!-- In a session: the other phone shows this outline too, and the first Use this guide decides (FR-6.15). -->
+    <TextView
+        android:id="@+id/sharedHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+        android:visibility="gone"
+        tools:text="Junhyeong sees this guide too. The first to use it decides."
+        tools:visibility="visible" />
 
     <Button
         android:id="@+id/useGuideButton"

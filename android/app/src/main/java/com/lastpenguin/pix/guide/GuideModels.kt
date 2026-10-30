@@ -22,8 +22,8 @@ data class ReferenceGuide(
     val aspect: Float,
     val source: GuideSource,
     /**
-     * The mask's box in the reference photo, where a new guide starts (FR-3.1). null on the subject, whose guide
-     * takes its place from the photographer's `guide.state`.
+     * The mask's box in the reference photo, where a new guide starts (FR-3.1). The subject's mirror gets it with the
+     * image for its *Save guide* (FR-6.16), but places the guide from the photographer's `guide.state`.
      */
     val anchor: NormalizedRect? = null,
     /**

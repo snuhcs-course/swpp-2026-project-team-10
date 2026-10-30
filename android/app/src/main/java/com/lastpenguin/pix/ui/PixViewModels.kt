@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -14,6 +14,9 @@ import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.InvitationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.session.SubjectConfirmViewModel
+import com.lastpenguin.pix.ui.session.SubjectDescribeViewModel
+import com.lastpenguin.pix.ui.session.SubjectPickViewModel
 import com.lastpenguin.pix.ui.session.SubjectViewModel
 
 /**
@@ -40,10 +43,17 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseTips,
                 container.guideSyncer,
+                container.confirmSyncer,
             )
         }
         initializer {
-            GenerationViewModel(container.poseGenerator, container.cameraController, container.generationConsent)
+            GenerationViewModel(
+                container.poseGenerator,
+                container.cameraController,
+                container.generationConsent,
+                share = container.poseSyncer,
+                descriptions = container.descriptionSyncer,
+            )
         }
         initializer {
             SessionViewModel(
@@ -53,6 +63,9 @@ object PixViewModels {
                 container.remoteControlHandler,
                 container.mobileDataNotice,
                 container.invitationManager,
+                container.poseSyncer,
+                container.confirmSyncer,
+                container.descriptionSyncer,
             )
         }
         initializer { InvitationViewModel(container.invitationManager, container.authRepository) }
@@ -62,8 +75,15 @@ object PixViewModels {
                 container.mirrorGuideRepository,
                 container.mirrorReference,
                 container.remoteVideo,
+                container.savedGuideStore,
+                container.poseSyncer,
+                container.confirmSyncer,
+                container.descriptionSyncer,
             )
         }
+        initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }
+        initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
+        initializer { SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer) }
         initializer { AccountViewModel(container.authRepository, container.googleIdTokens) }
         initializer { FriendsViewModel(container.authRepository, container.friendsRepository) }
     }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -13,10 +13,13 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentInvitation
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.MobileDataNotice
+import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
@@ -73,8 +76,9 @@ sealed interface InviteResult {
  * the session screens and the Camera screen's live badge (activity scope).
  *
  * On the photographer's phone, camera frames go to the session from the moment a subject starts connecting,
- * and the camera's capabilities are sent once the data channels are up. Guide sync (#9) and remote zoom (#10)
- * hook in at the same place.
+ * and the camera's capabilities are sent once the data channels are up. Guide sync (#9), remote zoom (#10), and the
+ * photographer's Generate poses, candidates, and Reference confirm on the subject's screens of the same steps
+ * (Iter3-P16) hook in at the same place.
  *
  * Owner: Real-time (#8), with guide sync (#9) and remote zoom (#10).
  */
@@ -85,6 +89,9 @@ class SessionViewModel(
     private val remoteControl: RemoteControlHandler,
     private val mobileDataNotice: MobileDataNotice,
     private val invitations: InvitationManager,
+    private val poseSyncer: PoseSyncer? = null,
+    private val confirmSyncer: ConfirmSyncer? = null,
+    private val descriptionSyncer: DescriptionSyncer? = null,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -300,7 +307,14 @@ class SessionViewModel(
         // keeps listening while the link reconnects, so the guide stays.
         val receivingNow = role == Role.SUBJECT && inSession
         if (receivingNow && receiverJob == null) {
-            receiverJob = viewModelScope.launch { coroutineScope { guideSyncer.startAsReceiver(this) } }
+            receiverJob = viewModelScope.launch {
+                coroutineScope {
+                    guideSyncer.startAsReceiver(this)
+                    poseSyncer?.startAsReceiver(this)
+                    confirmSyncer?.startAsReceiver(this)
+                    descriptionSyncer?.startAsReceiver(this)
+                }
+            }
         }
         if (!receivingNow && receiverJob != null) {
             receiverJob?.cancel()
@@ -308,7 +322,8 @@ class SessionViewModel(
         }
 
         // Stopped while reconnecting and started again at Connected, so the subject gets the capabilities, the
-        // camera's state, and the guide again, whatever a drop lost (Design 2.6.7).
+        // camera's state, the guide, Generate poses, the pose set, and the Reference confirm again, whatever a drop
+        // lost (Design 2.6.7).
         val liveNow = connected?.role == Role.PHOTOGRAPHER
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {
@@ -340,6 +355,9 @@ class SessionViewModel(
                         }
                     }
                     guideSyncer.startAsSender(this)
+                    poseSyncer?.startAsSender(this)
+                    confirmSyncer?.startAsSender(this)
+                    descriptionSyncer?.startAsSender(this)
                 }
             }
         }

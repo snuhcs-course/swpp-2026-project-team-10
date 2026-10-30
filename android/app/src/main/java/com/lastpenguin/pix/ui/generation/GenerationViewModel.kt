@@ -29,6 +29,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -58,6 +60,11 @@ data class GenerationUiState(
     val phase: Phase = Phase.IDLE,
     /** The shutter gave no photo; told on Camera until the next attempt. */
     val shotFailed: Boolean = false,
+    /**
+     * The phone's light is turned on for the scene photo, a frame of the preview that a photo's flash would not reach
+     * (FR-4.1). It is on only while the scene is framed, and stays chosen for *Shoot again*.
+     */
+    val light: Boolean = false,
     /**
      * Whose *Use this pose* took a candidate of this set (Design 2.6.5): this phone's, or in a session the subject's,
      * which Pick a pose then goes on with as with its own. The first one decides; nothing is selected after it.
@@ -128,6 +135,16 @@ class GenerationViewModel(
         viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
         viewModelScope.launch { share.picks.collect(::onSubjectPick) }
         viewModelScope.launch { descriptions.requests.collect(::onSubjectRequest) }
+        // The camera keeps its light across rebinds, so it is turned off as soon as the scene is no longer framed.
+        viewModelScope.launch {
+            uiState.map { it.phase == GenerationUiState.Phase.FRAMING && it.light }
+                .distinctUntilChanged()
+                .collect(camera::setTorch)
+        }
+    }
+
+    override fun onCleared() {
+        camera.setTorch(false)
     }
 
     /**
@@ -174,12 +191,17 @@ class GenerationViewModel(
         }
     }
 
-    /** *Shoot again*: the photo is dropped and the live camera is shown again. */
+    /** *Shoot again*: the photo is dropped and the live camera is shown again, with the light as it was. */
     fun retakeScene() {
         _uiState.update {
             val reviewing = it.phase == GenerationUiState.Phase.REVIEWING
-            if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING) else it
+            if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING, light = it.light) else it
         }
+    }
+
+    /** The light button while the scene is framed (FR-4.1). */
+    fun toggleLight() {
+        _uiState.update { if (it.phase == GenerationUiState.Phase.FRAMING) it.copy(light = !it.light) else it }
     }
 
     /** *Use this photo*: Generate poses asks what to pose (FR-4.8). Still nothing is sent. */

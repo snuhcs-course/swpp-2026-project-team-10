@@ -38,6 +38,13 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 ## Pose tips in Korean ([#156])
 
 - [Dongje, 10-30] "On a new branch: the pose tips are written only in English; when the app's language is Korean, the tip should be in Korean too. Create the issue, list the tasks, and go ahead on your own." (The app sends the screens' language from a resource that `values-ko` overrides; the server adds a Korean instruction with Korean examples, and the number check learns Korean counts, units, and degrees. Tried on the 16 trial pairs: every Korean sentence usable, the decisions within the spread of English's own rounds.)
+- [Dongje, 10-30] "Commit, push, and open the PR." / "Update dev, resolve the conflicts, then check the Codex review." (Four findings, all taken.)
+- [Dongje, 10-30] "Fix it as recommended, commit and push, then reply and resolve." (A sentence not in the language asked for is refused; Korean counts run together or with an ending are caught; the trial script records the Korean instruction and checks 80 characters.)
+- [Dongje, 10-30] "Check the new Codex review." / "Go ahead that way." (A Korean sentence over 80 characters is refused; a one-digit degree with an ending is caught.)
+
+## A light for the scene photo ([#158])
+
+- [Dongje, 10-30] "One more thing to build, without a new branch or PR: add an issue and make it a bug fix. Before generating poses, the flash cannot be turned on while taking the photo (there is no button), so that button has to be added." (The scene photo is a frame of the preview, which a photo's flash would not reach, so the flash button turns the phone's light on while the scene is framed.)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
@@ -48,3 +55,4 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
 [#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
 [#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156
+[#158]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/158

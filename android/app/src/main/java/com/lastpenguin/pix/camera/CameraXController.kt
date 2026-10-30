@@ -103,6 +103,9 @@ class CameraXController(
     private var retainedExposure = 0
     private var flash = FlashMode.OFF
 
+    // The light for the scene photo (setTorch). CameraX turns it off whenever the camera closes, so it is kept here.
+    private var torch = false
+
     // Whether the bound lens has a flash; a separately exposed ultrawide may not.
     private var lensHasFlash = true
 
@@ -350,6 +353,7 @@ class CameraXController(
                     current.zoomRequestId++
                     current.requestedNative = null
                 }
+                val opened = open && !current.open
                 current.open = open
                 // CameraX can wait for another camera client without attaching an error.
                 // Keep retry/settings guidance visible while waiting; a later OPEN recovers automatically.
@@ -362,6 +366,7 @@ class CameraXController(
                 }
                 restoreZoomIfNeeded(current)
                 restoreExposureIfNeeded(current)
+                if (opened && torch) applyTorch(current)
                 refreshStatus(current)
             }
         }
@@ -609,6 +614,25 @@ class CameraXController(
 
     /** The flash mode photos are taken with: the chosen one, or off on a lens without a flash. */
     private fun appliedFlash(): FlashMode = if (lensHasFlash) flash else FlashMode.OFF
+
+    override fun setTorch(on: Boolean) {
+        mainExecutor.execute {
+            if (on == torch) return@execute
+            torch = on
+            binding?.let(::applyTorch)
+        }
+    }
+
+    /** The kept light on an open camera with a flash; a closed one gets it when it opens again. */
+    private fun applyTorch(current: Binding) {
+        val camera = current.camera ?: return
+        if (!current.open || current.failed || !camera.cameraInfo.hasFlashUnit()) return
+        try {
+            camera.cameraControl.enableTorch(torch)
+        } catch (error: Exception) {
+            Log.w(TAG, "Torch request could not start", error)
+        }
+    }
 
     override fun setAspectRatio(ratio: AspectRatio) {
         mainExecutor.execute {

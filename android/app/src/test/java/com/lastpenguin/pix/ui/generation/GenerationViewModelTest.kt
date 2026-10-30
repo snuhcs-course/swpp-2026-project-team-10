@@ -126,6 +126,81 @@ class GenerationViewModelTest {
     }
 
     @Test
+    fun theLightIsOnOnlyWhileTheSceneIsFramedWithItTurnedOn() = runTest {
+        model.beginScene()
+        runCurrent()
+        assertFalse(camera.torchOn)
+
+        model.toggleLight()
+        runCurrent()
+        assertTrue(state.light)
+        assertTrue(camera.torchOn)
+
+        // Off for Use this photo?, and on again for Shoot again, which keeps the choice.
+        model.takeScene()
+        runCurrent()
+        assertFalse(camera.torchOn)
+        model.retakeScene()
+        runCurrent()
+        assertTrue(state.light)
+        assertTrue(camera.torchOn)
+
+        model.toggleLight()
+        runCurrent()
+        assertFalse(camera.torchOn)
+    }
+
+    @Test
+    fun theLightGoesOffWhenTheStepIsLeft_andStartsOffTheNextTime() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        model.takeScene()
+        runCurrent()
+        model.retakeScene()
+        runCurrent()
+        assertTrue(camera.torchOn)
+
+        model.cancel()
+        runCurrent()
+        assertFalse(camera.torchOn)
+
+        model.beginScene()
+        runCurrent()
+        assertFalse(state.light)
+        assertFalse(camera.torchOn)
+    }
+
+    @Test
+    fun theLightButtonDoesNothingButWhileTheSceneIsFramed() = runTest {
+        model.toggleLight()
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+        model.toggleLight()
+        runCurrent()
+
+        assertFalse(state.light)
+        assertFalse(camera.torchOn)
+        model.useScene()
+        model.toggleLight()
+        runCurrent()
+        assertFalse(state.light)
+    }
+
+    @Test
+    fun theLightGoesOffWithTheModel() = runTest {
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        assertTrue(camera.torchOn)
+
+        store.clear()
+
+        assertFalse(camera.torchOn)
+    }
+
+    @Test
     fun aShutterWithoutAFrameIsToldAndCanBeRepeated() = runTest {
         camera.frame = null
         model.beginScene()
@@ -1002,6 +1077,9 @@ class GenerationViewModelTest {
         var frame: Bitmap? = testBitmap()
         var grabs = 0
 
+        /** Whether the light is on, as the controller keeps it. */
+        var torchOn = false
+
         /** When set, the frame is given only after this completes. */
         var hold: CompletableDeferred<Unit>? = null
 
@@ -1019,6 +1097,10 @@ class GenerationViewModelTest {
         override fun setExposure(index: Int) = Unit
 
         override fun setFlash(mode: FlashMode) = Unit
+
+        override fun setTorch(on: Boolean) {
+            torchOn = on
+        }
 
         override fun setAspectRatio(ratio: AspectRatio) = Unit
 

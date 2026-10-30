@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -169,7 +169,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.brightnessSlider,
             { formatEv(sliderIndex(it)) },
         ) { value, _ -> viewModel.onExposureChange(sliderIndex(value)) }
-        controls.flashButton.setOnClickListener { viewModel.onFlashTap() }
+        // While the scene photo is taken, the flash button turns the phone's light on and off instead (FR-4.1).
+        controls.flashButton.setOnClickListener {
+            if (isScenePhotoActive()) generationViewModel.toggleLight() else viewModel.onFlashTap()
+        }
         controls.aspectButton.setOnClickListener {
             previewHold?.hold()
             viewModel.onAspectTap()
@@ -677,7 +680,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         renderReference(controls, state)
         renderTip(controls, state)
-        renderScenePhoto(controls, generationViewModel.uiState.value)
+        renderScenePhoto(controls, generationViewModel.uiState.value, state, ready)
     }
 
     /**
@@ -751,7 +754,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
      * shutter, then the photo with *Use this photo* and *Shoot again*. Applied last, over the camera's own controls,
      * so that the step shows only what it needs.
      */
-    private fun renderScenePhoto(controls: FragmentCameraBinding, scene: GenerationUiState) {
+    private fun renderScenePhoto(
+        controls: FragmentCameraBinding,
+        scene: GenerationUiState,
+        camera: CameraUiState,
+        ready: Boolean,
+    ) {
         val reviewing = scene.phase == GenerationUiState.Phase.REVIEWING
         val active = isScenePhotoActive(scene)
         sceneBack?.isEnabled = active
@@ -767,9 +775,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.sceneStill.setImageBitmap(if (reviewing) scene.scene else null)
         // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
         controls.zoomReadout.isInvisible = reviewing
-        // The scene photo is a frame of the live preview: flash, ratio, and brightness do not apply to it.
+        // The scene photo is a frame of the live preview: a photo's flash, the ratio, and brightness do not apply to it.
+        // While the scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1).
         if (active) {
-            controls.cameraSettings.isVisible = false
+            val light = !reviewing && camera.hasFlash
+            controls.cameraSettings.isVisible = light
+            controls.aspectButton.isVisible = false
+            controls.flashButton.isVisible = light
+            controls.flashButton.isEnabled = ready
+            controls.flashButton.setIconResource(if (scene.light) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+            controls.flashButton.contentDescription =
+                getString(if (scene.light) R.string.scene_light_on else R.string.scene_light_off)
             controls.brightnessButton.isVisible = false
             controls.brightnessPanel.isVisible = false
         }
@@ -797,6 +813,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /** Flash, aspect ratio, and brightness (FR-1.11–1.13). */
     private fun renderCameraSettings(controls: FragmentCameraBinding, state: CameraUiState, ready: Boolean) {
         controls.cameraSettings.isVisible = true
+        controls.aspectButton.isVisible = true
         controls.flashButton.isVisible = state.hasFlash
         controls.flashButton.isEnabled = ready
         controls.flashButton.setIconResource(

@@ -83,9 +83,9 @@ STEP_ENDINGS = "(?:만|씩|쯤|가량|정도|만큼)*"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
-    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)"
+    rf"|(?<![가-힣])({KOREAN_COUNT})\s*(걸음|발짝|발자국|뼘)"
     rf"|(?<![가-힣])({KOREAN_UNITS})|(?<![가-힣])({KOREAN_COUNT})\s*({KOREAN_UNITS}|밀리)"
-    rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보){STEP_ENDINGS}(?![가-힣])"
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|반|몇)\s*(발|보){STEP_ENDINGS}(?![가-힣])"
     rf"|(?<![가-힣]){KOREAN_TENS}\s*도"
     rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{KOREAN_ENDINGS}(?![가-힣])",
     re.IGNORECASE,

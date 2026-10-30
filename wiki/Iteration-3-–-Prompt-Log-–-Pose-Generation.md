@@ -45,6 +45,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-30] "Check the new Codex review." / "Fix it as recommended, commit and push, then reply and resolve." (Fourth review: a Korean unit counts only as a word of its own, a degree may have three digits, and a newer guide no longer cancels the tip of the guide on Camera.)
 - [Dongje, 10-31] "Check the Codex review and fix it, as before." (Fifth review: a unit, or a degree of a whole number, is refused whatever ending follows, and `PoseTips` asks or drops a tip one change at a time, so a discarded guide is never asked again.)
 - [Dongje, 10-31] "Check the Codex review again and fix it; a new one came in." (Sixth review: `PoseTips` follows the language from its first value and cancels the request of a guide that leaves Camera.)
+- [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (Seventh review: 몇 and 반 count before a step.)
 
 ## A light for the scene photo ([#158])
 
@@ -52,6 +53,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-30] "Install it on the S22; I'll check it myself." (The debug build installed over the one on the phone.)
 - [Dongje, 10-31] "Check the Codex review and fix it, as before." (The button says the light is on only once the camera has it, and a scene shot before that waits for the light.)
 - [Dongje, 10-31] "Check the Codex review again and fix it; a new one came in." (An answer to the light that arrives after the camera closed is dropped.)
+- [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (A lens without a flash takes the scene without waiting for the light.)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110

@@ -12,9 +12,10 @@
 # out, and another value; a sentence in the language asked for, in the other one, in both, in another script (Japanese),
 # with one, or with no letters; a Korean sentence that is usable, one with words that only contain a count ("한쪽", "두 손")
 # or that look like one (구도, 두 발로, 두 발을, 이발, 이 도시) or a unit (밀리지), and one with a count of steps, with or
-# without a space, of words run together ("한두", "열한", "이십"), or with an ending ("한 걸음만", "한 발만큼"), a unit,
-# or a degree in digits or in words, of one digit or more, with or without an ending, a unit with any ending, after a
-# count or not, 밀리 after a count, and degrees of three digits; a Korean sentence of 80 characters and of 81.
+# without a space, of words run together ("한두", "열한", "이십"), of 몇 or 반 ("몇 걸음", "반 걸음", "반 발"), or with an
+# ending ("한 걸음만", "한 발만큼"), a unit, or a degree in digits or in words, of one digit or more, with or without an
+# ending, a unit with any ending, after a count or not, 밀리 after a count, and degrees of three digits; a Korean
+# sentence of 80 characters and of 81.
 import asyncio
 import base64
 import json
@@ -173,6 +174,9 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "삼십 도만큼 기울이세요.",
         "오 도까지 기울이세요.",
         "한 발만큼 다가가세요.",
+        "몇 걸음 뒤로 물러나세요.",
+        "반 걸음 다가가세요.",
+        "반 발 물러나세요.",
     ],
     ids=[
         "count of steps",
@@ -199,6 +203,9 @@ def test_korean_sentence_is_shown(client, image_api, photos, text):
         "degrees with another ending",
         "one digit of degrees with another ending",
         "native count of 발 with another ending",
+        "몇 before a step",
+        "반 before a step",
+        "반 before 발",
     ],
 )
 def test_korean_sentence_with_a_count_a_unit_or_a_degree_is_unusable(client, image_api, photos, text):

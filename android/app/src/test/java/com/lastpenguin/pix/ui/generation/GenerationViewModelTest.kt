@@ -224,6 +224,22 @@ class GenerationViewModelTest {
     }
 
     @Test
+    fun aLensWithoutAFlash_takesTheSceneWithoutWaitingForTheLight() = runTest {
+        camera.lightApplies = false
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        // The light was turned on with the rear camera; the front one, switched to while framing, has no flash.
+        camera.capabilities.value = camera.capabilities.value?.copy(hasFlash = false)
+
+        model.takeScene()
+        runCurrent()
+
+        assertEquals(1, camera.grabs)
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+    }
+
+    @Test
     fun theLightGoesOffWithTheModel() = runTest {
         model.beginScene()
         model.toggleLight()
@@ -1122,7 +1138,10 @@ class GenerationViewModelTest {
         var hold: CompletableDeferred<Unit>? = null
 
         override val status = MutableStateFlow(CameraStatus.READY)
-        override val capabilities = MutableStateFlow<CameraCapabilities?>(null)
+        override val capabilities =
+            MutableStateFlow<CameraCapabilities?>(
+                CameraCapabilities(minZoom = 1f, maxZoom = 1f, zoomStops = listOf(1f), hasFlash = true),
+            )
         override val zoom = MutableStateFlow(1f)
         override val state = MutableStateFlow(CameraState(zoom = 1f))
 

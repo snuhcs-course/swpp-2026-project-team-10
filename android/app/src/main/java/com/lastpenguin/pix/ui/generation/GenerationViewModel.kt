@@ -171,11 +171,13 @@ class GenerationViewModel(
      * The shutter during FRAMING: the camera's current frame becomes the photo to confirm. With the light chosen but not
      * on yet, the frame waits until the camera has it on, then [LIGHT_SETTLE_MS] for a frame lit by it and for the
      * exposure to follow, so the scene is not taken dark; after [LIGHT_WAIT_MS] without it, the frame is taken as it is.
+     * A lens without a flash, such as the front camera after a switch, never has the light, so nothing waits for it.
      */
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         shooting = viewModelScope.launch {
-            if (_uiState.value.light && !camera.state.value.torch) {
+            val canLight = camera.capabilities.value?.hasFlash == true
+            if (_uiState.value.light && canLight && !camera.state.value.torch) {
                 val lit = withTimeoutOrNull(LIGHT_WAIT_MS) { camera.state.first { it.torch } }
                 if (lit != null) delay(LIGHT_SETTLE_MS)
             }

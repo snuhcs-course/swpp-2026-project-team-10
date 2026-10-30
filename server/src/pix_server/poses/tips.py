@@ -59,13 +59,14 @@ ANSWER_SCHEMA = {
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
-# Korean counts run their words together ("한두", "서너", "대여섯", "열한", "이십"). A step unit takes any ending
-# ("한 걸음만"); 발 and 보 count steps only after a native count and with the endings of an amount ("한 발만큼"), because
-# "두 발로 서서" is about feet and 이발 or 구보 are words of their own. A unit at the start of a word, after a count or
-# not, takes any ending ("몇 미터까지", "삼십센티만큼"), so 파라미터 is not one, and a word that only begins like one
-# (미터기) is refused with it; 밀리 is one only after a count, because "밀리지 않게" is a verb. A degree of a whole
-# Sino-Korean number takes any ending ("백이십 도만큼"); written with one digit it needs a space and takes only
-# particles ("구 도까지"), so 구도 (the composition) or "이 도시" (this city) are not one, though "이 도로" (this road) is.
+# Korean counts run their words together ("한두", "서너", "대여섯", "열한", "이십"), and 몇 and 반 count too ("몇 걸음",
+# "반 걸음"). A step unit takes any ending ("한 걸음만"); 발 and 보 count steps only after a native count, 반, or 몇,
+# and with the endings of an amount ("한 발만큼"), because "두 발로 서서" is about feet and 이발 or 구보 are words of
+# their own. A unit at the start of a word, after a count or not, takes any ending ("몇 미터까지", "삼십센티만큼"), so
+# 파라미터 is not one, and a word that only begins like one (미터기) is refused with it; 밀리 is one only after a count,
+# because "밀리지 않게" is a verb. A degree of a whole Sino-Korean number takes any ending ("백이십 도만큼"); written
+# with one digit it needs a space and takes only particles ("구 도까지"), so 구도 (the composition) or "이 도시" (this
+# city) are not one, though "이 도로" (this road) is.
 KOREAN_NATIVE = "(?:한|두|세|서|석|네|너|덧|댓|대|다섯|여섯|일곱|여덟|아홉|열|스무|스물)+"
 KOREAN_SINO = "(?:일|이|삼|사|오|육|칠|팔|구|십|백)+"
 KOREAN_DIGIT = "[일이삼사오육칠팔구]"
@@ -79,9 +80,9 @@ STEP_ENDINGS = "(?:만|씩|쯤|가량|정도|만큼)*"
 MEASURE = re.compile(
     rf"\d|°|\b({NUMBER_WORDS})\b|\bone\s+(steps?|paces?|meters?|metres?|foot|feet|inch(es)?|degrees?)\b"
     r"|\b(meters?|metres?|cm|centimet\w*|inch(es)?|feet|foot|degrees?)\b"
-    rf"|(?<![가-힣])({KOREAN_NATIVE}|{KOREAN_SINO})\s*(걸음|발짝|발자국|뼘)"
+    rf"|(?<![가-힣])({KOREAN_COUNT})\s*(걸음|발짝|발자국|뼘)"
     rf"|(?<![가-힣])({KOREAN_UNITS})|(?<![가-힣])({KOREAN_COUNT})\s*({KOREAN_UNITS}|밀리)"
-    rf"|(?<![가-힣]){KOREAN_NATIVE}\s*(발|보){STEP_ENDINGS}(?![가-힣])"
+    rf"|(?<![가-힣])({KOREAN_NATIVE}|반|몇)\s*(발|보){STEP_ENDINGS}(?![가-힣])"
     rf"|(?<![가-힣]){KOREAN_TENS}\s*도"
     rf"|(?<![가-힣]){KOREAN_DIGIT}\s+도{KOREAN_ENDINGS}(?![가-힣])",
     re.IGNORECASE,

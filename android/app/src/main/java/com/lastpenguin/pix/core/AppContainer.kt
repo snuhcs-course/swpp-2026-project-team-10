@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -49,6 +49,7 @@ import com.lastpenguin.pix.guide.SubjectSegmenter
 import com.lastpenguin.pix.push.FirebasePushTokens
 import com.lastpenguin.pix.session.CameraFrameSource
 import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.ContentPhotoReader
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.GuideSyncer
@@ -58,6 +59,7 @@ import com.lastpenguin.pix.session.MaskGuideImageCodec
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.OkHttpSignalingClient
+import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.RemoteVideo
@@ -129,6 +131,8 @@ class AppContainer(
     val confirmSyncer: ConfirmSyncer,
     /** The photographer's *Generate poses* on the subject's, where both write the description (FR-6.15, Design 2.6.5). */
     val descriptionSyncer: DescriptionSyncer,
+    /** Each photo taken in a session, for the subject's "Pix" album (FR-6.14, Design 2.6.5). */
+    val photoSyncer: PhotoSyncer,
     val remoteControlHandler: RemoteControlHandler,
     /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
     val mobileDataNotice: MobileDataNotice,
@@ -248,6 +252,12 @@ class AppContainer(
                 poseSyncer = PoseSyncer(rtcSessionManager, JpegPoseCandidateCodec()),
                 confirmSyncer = ConfirmSyncer(rtcSessionManager, MaskGuideImageCodec()),
                 descriptionSyncer = DescriptionSyncer(rtcSessionManager, JpegPoseCandidateCodec()),
+                photoSyncer = PhotoSyncer(
+                    rtcSessionManager,
+                    ContentPhotoReader(appContext.contentResolver),
+                    PhotoSaver(appContext),
+                    File(appContext.cacheDir, "session-photos"),
+                ),
                 remoteControlHandler = RemoteControlHandler(
                     rtcSessionManager,
                     cameraController,

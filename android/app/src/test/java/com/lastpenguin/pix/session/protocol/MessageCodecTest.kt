@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -74,6 +74,12 @@ class MessageCodecTest {
             SessionMessage.PoseSceneEnd("d1", 3735928559L),
             SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "벽에 기대기"),
             SessionMessage.PoseDescriptionGo("d1", "", suggest = true),
+            SessionMessage.PhotoBegin("p1", "jpeg", 4_718_592, 525, 1_759_212_499_870L),
+            SessionMessage.PhotoChunk("p1", 0, "/9j/4AAQSkZJRgABAQ"),
+            SessionMessage.PhotoEnd("p1", 3735928559L),
+            SessionMessage.PhotoAck("p1", 48),
+            SessionMessage.PhotoSaved("p1", ok = true),
+            SessionMessage.PhotoSaved("p1", ok = false, reason = PhotoRefusal.STORAGE),
             SessionMessage.Leave(EndReason.LEFT),
             SessionMessage.Ping(1_759_212_360_000L),
             SessionMessage.Pong(1_759_212_360_000L),

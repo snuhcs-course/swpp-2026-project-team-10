@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.session.PhotoShare
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -142,6 +143,43 @@ class CameraViewModelTest {
         assertNull(model.uiState.value.captureNotice)
         camera.capture.complete(Result.failure(IOException("Storage still full")))
         runCurrent()
+    }
+
+    @Test
+    fun aSavedPhotoIsSharedWithTheMomentOfTheShutter() = runTest {
+        val shared = mutableListOf<Pair<Uri, Long>>()
+        val share = object : PhotoShare {
+            override fun taken(uri: Uri, takenAt: Long) {
+                shared += uri to takenAt
+            }
+        }
+        val sharing = CameraViewModel(camera, guides, photos = share, clock = { 1_000 })
+        val photo = Uri.parse("content://media/external/images/media/1")
+
+        sharing.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo))
+        runCurrent()
+
+        assertEquals(listOf(photo to 1_000L), shared)
+    }
+
+    @Test
+    fun aPhotoThatFailedIsNotShared() = runTest {
+        val shared = mutableListOf<Uri>()
+        val share = object : PhotoShare {
+            override fun taken(uri: Uri, takenAt: Long) {
+                shared += uri
+            }
+        }
+        val sharing = CameraViewModel(camera, guides, photos = share)
+
+        sharing.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.failure(IOException("Storage full")))
+        runCurrent()
+
+        assertTrue(shared.isEmpty())
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -10,6 +10,7 @@ import com.lastpenguin.pix.session.signaling.IceServer
 import com.lastpenguin.pix.session.signaling.SessionDescription
 import com.lastpenguin.pix.session.signaling.SignalMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -26,6 +27,12 @@ import org.webrtc.VideoSink
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RtcSessionManagerTest {
+
+    /** Above the channel's backpressure limit. */
+    private val backpressureFull = 300L * 1024
+
+    /** Where a bulk message starts to wait (Design 2.8). */
+    private val bulkLimit = 64L * 1024
 
     private val signaling = FakeSignalingClient()
     private val peers = FakePeerFactory()
@@ -521,6 +528,93 @@ class RtcSessionManagerTest {
         runCurrent()
         assertTrue("guide.clear" in peer.sentTypes())
         manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a bulk message goes below 64 KiB and waits at it`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        peer.buffered = bulkLimit - 1
+        launch { assertTrue(manager.sendBulk(SessionMessage.PhotoEnd("p1", 1))) }
+        runCurrent()
+        assertTrue("photo.end" in peer.sentTypes())
+
+        peer.buffered = bulkLimit
+        launch { assertTrue(manager.sendBulk(SessionMessage.PhotoAck("p1", 1))) }
+        runCurrent()
+        assertFalse("photo.ack" in peer.sentTypes())
+
+        peer.buffered = 0
+        peer.push(PeerEvent.BufferedAmount(Channel.RELIABLE, 0))
+        runCurrent()
+        assertTrue("photo.ack" in peer.sentTypes())
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a control message sent while a bulk message waits goes first`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        peer.buffered = backpressureFull
+        launch { manager.sendBulk(SessionMessage.PhotoEnd("p1", 1)) }
+        runCurrent()
+        manager.send(SessionMessage.GuideClear)
+        runCurrent()
+
+        peer.buffered = 0
+        peer.push(PeerEvent.BufferedAmount(Channel.RELIABLE, 0))
+        runCurrent()
+
+        val types = peer.sentTypes()
+        assertTrue(types.indexOf("guide.clear") in 0 until types.indexOf("photo.end"))
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a bulk message waits for the queue to empty, whatever the buffer says`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        peer.buffered = backpressureFull
+        manager.send(SessionMessage.GuideClear)
+        runCurrent()
+        peer.buffered = 0
+        launch { manager.sendBulk(SessionMessage.PhotoEnd("p1", 1)) }
+        runCurrent()
+        assertFalse("photo.end" in peer.sentTypes())
+
+        peer.push(PeerEvent.BufferedAmount(Channel.RELIABLE, 0))
+        runCurrent()
+        assertTrue("photo.end" in peer.sentTypes())
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a bulk message waits through a reconnect and goes once the link is back`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        val sent = async { manager.sendBulk(SessionMessage.PhotoEnd("p1", 1)) }
+        runCurrent()
+        assertFalse("photo.end" in peer.sentTypes())
+
+        peer.push(PeerEvent.Link(LinkState.CONNECTED))
+        runCurrent()
+
+        assertTrue(sent.await())
+        assertTrue("photo.end" in peer.sentTypes())
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a bulk message returns false once the session is over`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        peer.buffered = backpressureFull
+        val waiting = async { manager.sendBulk(SessionMessage.PhotoEnd("p1", 1)) }
+        runCurrent()
+
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+
+        assertFalse(waiting.await())
+        assertFalse(manager.sendBulk(SessionMessage.PhotoEnd("p1", 1)))
+        assertFalse("photo.end" in peer.sentTypes())
     }
 
     @Test

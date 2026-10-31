@@ -12,6 +12,7 @@ import com.lastpenguin.pix.ui.account.FriendsViewModel
 import com.lastpenguin.pix.ui.camera.CameraViewModel
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
+import com.lastpenguin.pix.ui.session.InvitationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.SubjectConfirmViewModel
 import com.lastpenguin.pix.ui.session.SubjectDescribeViewModel
@@ -62,12 +63,14 @@ object PixViewModels {
                 container.guideSyncer,
                 container.remoteControlHandler,
                 container.mobileDataNotice,
+                container.invitationManager,
                 container.poseSyncer,
                 container.confirmSyncer,
                 container.descriptionSyncer,
                 container.photoSyncer,
             )
         }
+        initializer { InvitationViewModel(container.invitationManager, container.authRepository) }
         initializer {
             SubjectViewModel(
                 container.sessionManager,

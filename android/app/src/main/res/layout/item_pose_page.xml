@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One candidate on Pick a pose (R&S 6.3): as large as the page allows, in the camera frame's 3:4. -->
+<!-- One candidate on Pick a pose (R&S 6.3): as large as the page allows, in its own shape (PosePageAdapter). -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -12,7 +12,7 @@
         android:layout_height="0dp"
         android:background="@color/pix_surface"
         android:focusable="true"
-        android:scaleType="centerCrop"
+        android:scaleType="fitCenter"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintDimensionRatio="3:4"
         app:layout_constraintEnd_toEndOf="parent"

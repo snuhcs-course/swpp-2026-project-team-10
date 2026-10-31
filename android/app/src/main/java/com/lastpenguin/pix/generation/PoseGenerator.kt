@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -12,7 +12,8 @@ interface PoseGenerator {
     /**
      * Emits [GenerationEvent.Planned] with the [POSE_COUNT] poses of [request] (for [PoseRequest.Suggested] once the
      * server has chosen them), then one [CandidateEvent] per pose as each finishes. Throws when the poses cannot be
-     * had, for example offline. Cancel the collector to cancel the requests.
+     * had, for example offline. Cancel the collector to cancel the requests. [selfie]: the scene is a selfie from the
+     * front camera, which gets selfie poses and prompts (FR-1.14).
      */
-    fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent>
+    fun generate(scene: Bitmap, request: PoseRequest, seed: Long, selfie: Boolean = false): Flow<GenerationEvent>
 }

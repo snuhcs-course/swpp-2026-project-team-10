@@ -52,8 +52,10 @@ internal fun signalingUrl(serverUrl: String): String =
  * Every signaling and WebRTC callback hops onto one serial scope, so the fields below are only touched there
  * (Design 2.8, Concurrency). A link that drops while connected puts both phones in `Reconnecting` for up to 10 s:
  * each takes its place on the server again over a new socket with its rejoin token, and the photographer restarts ICE
- * on the same peer connection (Design 2.6.7). After that, or when the subject leaves, the photographer keeps the room
- * and goes back to `Waiting(code)`, so the subject's *Reconnect* can take its place again (FR-6.10 to FR-6.12).
+ * on the same peer connection (Design 2.6.7). After that, or when the subject leaves, the photographer keeps a room
+ * code's room and goes back to `Waiting(code)`, so the subject's *Reconnect* can take its place again (FR-6.10 to
+ * FR-6.12); an invitation's session has no code to wait with, so it ends. An invitation's two phones take the places
+ * the server opened over REST with `session.join`, the photographer waiting in `Inviting` (Design 2.6.6).
  * Owner: Real-time (#8).
  */
 class RtcSessionManager(
@@ -70,6 +72,8 @@ class RtcSessionManager(
     private val haveGuideId: () -> String? = { null },
     /** Subject: the guide whose reference photo this phone already holds, sent in `hello` (FR-3.9). */
     private val haveReferenceId: () -> String? = { null },
+    /** The signed-in user's access token for each socket, or null when nobody is signed in (Design 2.5.2). */
+    private val accessToken: suspend () -> String? = { null },
 ) : SessionManager, RemoteVideo {
 
     private val serial = dispatcher.limitedParallelism(1)
@@ -124,6 +128,9 @@ class RtcSessionManager(
     /** Subject: the ticket this *Reconnect* uses, kept for another try if it fails before the server refuses it. */
     private var ticket: LostSession? = null
 
+    /** Photographer: ends an invitation nobody joined, should the server's own expiry never arrive. */
+    private var inviteTimeout: Job? = null
+
     // ---- Peer connection fields, reset for every connection attempt -----------
     @Volatile
     private var peer: PeerConnectionClient? = null
@@ -169,8 +176,8 @@ class RtcSessionManager(
             return@withContext
         }
         val valid = when (entry) {
-            SessionEntry.NewRoom -> role == Role.PHOTOGRAPHER
-            is SessionEntry.RoomCode, is SessionEntry.Rejoin -> role == Role.SUBJECT
+            SessionEntry.NewRoom, is SessionEntry.Invite -> role == Role.PHOTOGRAPHER
+            is SessionEntry.RoomCode, is SessionEntry.Rejoin, is SessionEntry.Invitation -> role == Role.SUBJECT
         }
         if (!valid) {
             Log.w(TAG, "start ignored: $entry does not fit the role $role")
@@ -182,34 +189,48 @@ class RtcSessionManager(
         val ticket = lost?.takeIf { entry is SessionEntry.Rejoin && it.code == entry.code }
         this@RtcSessionManager.ticket = ticket
         lost = null
+        // An invitation's place, opened by the server over REST; the phone takes it as a Reconnect takes its own.
+        val place = when (entry) {
+            is SessionEntry.Invite -> entry.place
+            is SessionEntry.Invitation -> entry.place
+            else -> null
+        }
         code = when (entry) {
-            SessionEntry.NewRoom -> null
             is SessionEntry.RoomCode -> entry.code
             is SessionEntry.Rejoin -> entry.code
+            else -> null
         }
         greeting = when {
             ticket != null -> SignalMessage.SessionJoin(ticket.sessionId, rejoin = false, rejoinToken = ticket.token)
+            place != null -> SignalMessage.SessionJoin(place.sessionId, rejoin = false, rejoinToken = place.rejoinToken)
             entry is SessionEntry.RoomCode -> SignalMessage.RoomJoin(entry.code)
             entry is SessionEntry.Rejoin -> SignalMessage.RoomJoin(entry.code)
             else -> SignalMessage.RoomCreate
         }
-        sessionId = null
-        iceServers = ticket?.iceServers ?: emptyList()
-        rejoinToken = ticket?.token
+        // Known from the start for an invitation, so a socket that drops before its answer takes the place again.
+        sessionId = place?.sessionId
+        iceServers = ticket?.iceServers ?: place?.iceServers ?: emptyList()
+        rejoinToken = ticket?.token ?: place?.rejoinToken
         reopened = false
         joined = false
         rejoining = false
         socketFailures = 0
         _peerCapabilities.value = null
         _peerCamera.value = null
-        // The photographer stays Idle until the code arrives; the subject is connecting from the first moment.
-        _state.value = if (role == Role.SUBJECT) SessionState.Connecting(null) else SessionState.Idle
+        // The photographer stays Idle until the code arrives, or waits for the friend of an invitation; the subject is
+        // connecting from the first moment.
+        _state.value = when {
+            role == Role.SUBJECT -> SessionState.Connecting(null)
+            entry is SessionEntry.Invite -> SessionState.Inviting(entry.invitationId)
+            else -> SessionState.Idle
+        }
+        if (entry is SessionEntry.Invite) startInviteTimeout()
         Timings.mark("session.start", role.name)
         val url = signalingUrl(serverUrl)
         signalingJob = scope.launch {
             try {
                 signaling.events
-                    .onSubscription { signaling.connect(url) }
+                    .onSubscription { signaling.connect(url, accessToken()) }
                     .collect { event -> onSignal(event) }
             } catch (e: CancellationException) {
                 throw e
@@ -321,13 +342,20 @@ class RtcSessionManager(
         }
     }
 
-    /** Subject: its place in the session, from `room.join` or a Reconnect's `session.join`. */
+    /**
+     * Its place in the session: the subject's from `room.join` or a `session.join` (a Reconnect's, or an invitation's),
+     * or an invitation's photographer's, which waits in `Inviting` for the friend's `peer.joined`.
+     */
     private fun onJoined(message: SignalMessage.SessionJoined) {
         sessionId = message.sessionId
-        // A Reconnect's answer has neither; the credentials and the token from the first join still hold.
+        // A `session.join`'s answer has neither; the credentials and the token this phone got first still hold.
         iceServers = message.iceServers.ifEmpty { iceServers }
         rejoinToken = message.rejoinToken ?: rejoinToken
         joined = true
+        if (role == Role.PHOTOGRAPHER) {
+            Timings.mark("invitation.joined")
+            return
+        }
         _state.value = SessionState.Connecting(message.sessionId)
         Timings.mark("room.joined")
         openPeer()
@@ -348,7 +376,8 @@ class RtcSessionManager(
         rejoining = false
         val state = _state.value
         val inSession = state is SessionState.Connected || state is SessionState.Reconnecting
-        if (rejoinToken != null && (inSession || state is SessionState.Waiting)) {
+        val waiting = state is SessionState.Waiting || state is SessionState.Inviting
+        if (rejoinToken != null && (inSession || waiting)) {
             // A dropped socket, or a server that restarted: the place waits for this phone on the server (Design 2.6.7).
             // The tries while reconnecting do not count, so a session back or given up starts again at 1 s instead of
             // leaving the room off the server for 30 s after the network returned.
@@ -378,7 +407,7 @@ class RtcSessionManager(
         socketRetry = scope.launch {
             delay(delayMs)
             reopened = true
-            signaling.connect(signalingUrl(serverUrl))
+            signaling.connect(signalingUrl(serverUrl), accessToken())
         }
     }
 
@@ -395,10 +424,18 @@ class RtcSessionManager(
         }
         when (error.code) {
             // FULL means the photographer already has a subject, and FORBIDDEN that a Reconnect's place went to
-            // another subject; "Session not found" is the closest screen.
-            "NOT_FOUND", "FULL", "FORBIDDEN" -> if (role == Role.SUBJECT) end(EndReason.NOT_FOUND)
+            // another subject; "Session not found" is the closest screen. An invitation whose session is gone before
+            // its photographer took its place was not accepted in time.
+            "NOT_FOUND", "FULL", "FORBIDDEN" -> when {
+                role == Role.SUBJECT -> end(EndReason.NOT_FOUND)
+                _state.value is SessionState.Inviting -> end(EndReason.EXPIRED)
+            }
 
+            // A room nobody joined in time: a room code's, or an invitation's after 60 s (Design 2.6.6).
             "EXPIRED" -> end(EndReason.EXPIRED)
+
+            // The friend declined the invitation; the server has ended its session.
+            "DECLINED" -> end(EndReason.DECLINED)
 
             // Too many wrong codes from this phone's network address (Design 2.5.2, NFR-15); Join says so.
             "RATE_LIMITED" -> if (role == Role.SUBJECT) end(EndReason.RATE_LIMITED)
@@ -428,6 +465,9 @@ class RtcSessionManager(
                 null -> Unit
             }
 
+            // The invitation's session ended while this phone's socket was away.
+            is SessionState.Inviting -> end(EndReason.EXPIRED)
+
             else -> end(EndReason.ERROR)
         }
     }
@@ -436,6 +476,8 @@ class RtcSessionManager(
 
     private fun onPeerJoined() {
         if (role != Role.PHOTOGRAPHER) return
+        inviteTimeout?.cancel()
+        inviteTimeout = null
         closePeer()
         _state.value = SessionState.Connecting(sessionId)
         Timings.mark("peer.joined")
@@ -875,7 +917,7 @@ class RtcSessionManager(
                     }
                     closePeer()
                 }
-                if (active) _state.value = SessionState.Waiting(checkNotNull(code))
+                withoutSubject(if (onPurpose) EndReason.PEER_LEFT else EndReason.CONNECTION_LOST)
             }
 
             Role.SUBJECT -> end(if (onPurpose) EndReason.PEER_LEFT else EndReason.CONNECTION_LOST)
@@ -890,7 +932,7 @@ class RtcSessionManager(
             Role.PHOTOGRAPHER -> {
                 notifyPeerGone(EndReason.CONNECTION_LOST)
                 closePeer()
-                if (active) _state.value = SessionState.Waiting(checkNotNull(code))
+                withoutSubject(EndReason.CONNECTION_LOST)
             }
 
             Role.SUBJECT -> end(EndReason.CONNECTION_LOST)
@@ -905,6 +947,34 @@ class RtcSessionManager(
             Role.PHOTOGRAPHER -> onLinkLost()
             Role.SUBJECT -> end(EndReason.ERROR)
             null -> Unit
+        }
+    }
+
+    /**
+     * The photographer without a subject: a room code's room waits for one again with the same code (FR-6.10); an
+     * invitation's session has no code anyone could join, so it leaves the server and ends (Design 2.4).
+     */
+    private fun withoutSubject(reason: EndReason) {
+        if (!active) return
+        val waitingCode = code
+        if (waitingCode != null) {
+            _state.value = SessionState.Waiting(waitingCode)
+            return
+        }
+        signaling.send(SignalMessage.Leave)
+        end(reason)
+    }
+
+    /** An invitation still waiting after the server's 60 s and the friend's time to join has expired (Design 2.6.6). */
+    private fun startInviteTimeout() {
+        inviteTimeout?.cancel()
+        inviteTimeout = scope.launch {
+            delay(INVITE_TIMEOUT_MS)
+            if (_state.value is SessionState.Inviting) {
+                Log.w(TAG, "No answer to the invitation after ${INVITE_TIMEOUT_MS / 1000} s")
+                signaling.send(SignalMessage.Leave)
+                end(EndReason.EXPIRED)
+            }
         }
     }
 
@@ -972,6 +1042,8 @@ class RtcSessionManager(
             else -> null
         }
         ticket = null
+        inviteTimeout?.cancel()
+        inviteTimeout = null
         closePeer()
         signalingJob?.cancel()
         signalingJob = null
@@ -998,6 +1070,9 @@ class RtcSessionManager(
     private companion object {
         const val TAG = "PixSession"
         const val CONNECT_TIMEOUT_MS = 15_000L
+
+        /** The server's 60 s for an answer, its 15 s for an accepting friend to join, and a margin (Design 2.6.6). */
+        const val INVITE_TIMEOUT_MS = 80_000L
 
         /** How long a restart waits for the answer to the last offer, about ten round trips through the server. */
         const val ANSWER_WAIT_MS = 2_000L

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.app.Application
@@ -11,18 +11,35 @@ import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.ui.session.SessionViewModel
+import kotlinx.coroutines.launch
 import org.robolectric.Shadows.shadowOf
 
 /** Shared helpers of the screen tests: the main looper, strings, a guide with real bitmaps, and a NavController. */
 object ScreenTestSupport {
     /** Runs the main looper: ViewModel coroutines on Dispatchers.Main and the posted UI work. */
     fun idle() = shadowOf(Looper.getMainLooper()).idle()
+
+    /**
+     * Runs the main looper until [done], for work that finishes on another thread and posts its result, such as a
+     * `ListAdapter` diffing a new list after its first one. Gives up after [timeoutMs]; the caller then asserts.
+     */
+    fun idleUntil(timeoutMs: Long = 2_000, done: () -> Boolean) {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000
+        idle()
+        while (!done() && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+            idle()
+        }
+    }
 
     fun string(id: Int, vararg args: Any): String =
         ApplicationProvider.getApplicationContext<Application>().getString(id, *args)
@@ -73,7 +90,8 @@ object ScreenTestSupport {
         scenario.onFragment { fragment ->
             val activity = fragment.requireActivity()
             nav.setGraph(R.navigation.nav_graph)
-            nav.setCurrentDestination(destination)
+            // The arguments go to the destination too, which refuses to open without a required one.
+            nav.setCurrentDestination(destination, args ?: Bundle())
             Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
             prepare(activity)
         }
@@ -86,4 +104,16 @@ object ScreenTestSupport {
     /** The activity-scoped ViewModel of [activity], the one its screens share. */
     inline fun <reified VM : androidx.lifecycle.ViewModel> FragmentActivity.viewModel(): VM =
         androidx.lifecycle.ViewModelProvider(this, PixViewModels.Factory)[VM::class.java]
+
+    /**
+     * *Invite* on Friends, which takes the result while the invitation is on its way and then goes, as for *Invite
+     * sent*: an invitation answered with no such screen open is cancelled (`SessionViewModel.inviteResults`).
+     */
+    fun FragmentActivity.inviteFromFriends(friend: PixUser) {
+        val sessionViewModel = viewModel<SessionViewModel>()
+        val friends = lifecycleScope.launch { sessionViewModel.inviteResults.collect {} }
+        sessionViewModel.invite(friend)
+        idle()
+        friends.cancel()
+    }
 }

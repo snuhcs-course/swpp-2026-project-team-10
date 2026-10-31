@@ -4,14 +4,14 @@
 Partitions:
 - invite: a friend, offline or online; someone who is not a friend, an unknown user, oneself; a friend in a session
   (BUSY, nothing saved); a caller signed out or without a Pix ID; the session store down (nothing saved)
-- open: pending; 29 s, 30 s, and 31 s after it was sent; answered; unknown; without a sign-in
+- open: pending; 59 s, 60 s, and 61 s after it was sent; answered; unknown; without a sign-in
 - answer: accept, decline, or cancel by the one who may (the friend, the friend, the photographer), or by anyone else;
-  after an earlier answer; accepting at 29 s, 30 s, and 31 s; accepting once the room has ended; declining while the
+  after an earlier answer; accepting at 59 s, 60 s, and 61 s; accepting once the room has ended; declining while the
   session store is down
 - the session: the photographer takes its place before or after the friend; a friend who accepts in the last second
   still has time to join, and one who never joins lets the room expire; a decline or the expiry tells a waiting
   photographer; a cancel frees the photographer's socket
-- the push: to each of the friend's phones, with the data the app needs, at high priority, for the invitation's 30 s;
+- the push: to each of the friend's phones, with the data the app needs, at high priority, for the invitation's 60 s;
   not to the photographer; a device FCM no longer knows is removed; FCM failing leaves the invitation working
 - the link: an invitation id gives the page that opens Pix and names nobody; anything else is not found
 """
@@ -112,7 +112,7 @@ def test_inviting_a_friend_answers_with_the_link_and_the_photographers_place(cli
     assert INVITATION_ID.fullmatch(invitation["id"])
     assert invitation["to"] == public(junhyeong_user)
     assert invitation["status"] == "PENDING"
-    assert invitation["expiresAt"] == (clock.now + 30) * 1000
+    assert invitation["expiresAt"] == (clock.now + 60) * 1000
     assert invitation["link"] == f"http://testserver/i/{invitation['id']}"
     assert invitation["iceServers"] == turn_api.servers
     with client.websocket_connect("/ws", headers=dongje) as photographer:
@@ -186,7 +186,7 @@ def test_inviting_while_the_session_store_is_down_saves_nothing(client, friends,
 # --- open ----------------------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("seconds", "status"), [(29, "PENDING"), (30, "EXPIRED"), (31, "EXPIRED")])
+@pytest.mark.parametrize(("seconds", "status"), [(59, "PENDING"), (60, "EXPIRED"), (61, "EXPIRED")])
 def test_opening_shows_who_invites_without_a_sign_in_until_it_expires(client, clock, friends, seconds, status):
     (_, dongje_user), _ = friends
     invitation = sent(client, friends)
@@ -208,7 +208,7 @@ def test_opening_an_unknown_invitation_is_not_found(client):
 # --- answer --------------------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("seconds", "status"), [(29, 200), (30, 410), (31, 410)])
+@pytest.mark.parametrize(("seconds", "status"), [(59, 200), (60, 410), (61, 410)])
 def test_accepting_works_until_the_invitation_expires(client, clock, friends, turn_api, seconds, status):
     (_, _), (junhyeong, _) = friends
     invitation = sent(client, friends)
@@ -227,7 +227,7 @@ def test_accepting_works_until_the_invitation_expires(client, clock, friends, tu
 
 
 @pytest.mark.parametrize("action", ["decline", "cancel"])
-@pytest.mark.parametrize(("seconds", "status"), [(29, 204), (30, 410)])
+@pytest.mark.parametrize(("seconds", "status"), [(59, 204), (60, 410)])
 def test_declining_and_cancelling_work_until_the_invitation_expires(client, clock, friends, action, seconds, status):
     """Unlike an accept, neither needs the room, so only the invitation's own expiry refuses them."""
     (dongje, _), (junhyeong, _) = friends
@@ -351,7 +351,7 @@ def test_an_unanswered_invitation_expires_and_tells_the_photographer(client, clo
     invitation = sent(client, friends)
     with client.websocket_connect("/ws", headers=dongje) as photographer:
         take_place(photographer, invitation)
-        clock.advance(30)
+        clock.advance(60)
         assert photographer.receive_json() == {
             "type": "error",
             "code": "EXPIRED",
@@ -379,7 +379,7 @@ def test_a_friend_who_accepts_in_the_last_second_still_has_time_to_join(client, 
         client.websocket_connect("/ws", headers=junhyeong) as subject,
     ):
         take_place(photographer, invitation)
-        clock.advance(29)
+        clock.advance(59)
         place = accepted(client, friends, invitation)
         clock.advance(14)
         time.sleep(0.05)  # A few sweeps, which leave the room alone.
@@ -395,7 +395,7 @@ def test_a_friend_who_accepts_and_never_joins_lets_the_room_expire(client, clock
     invitation = sent(client, friends)
     with client.websocket_connect("/ws", headers=dongje) as photographer:
         take_place(photographer, invitation)
-        clock.advance(29)
+        clock.advance(59)
         accepted(client, friends, invitation)
         clock.advance(15)
         assert photographer.receive_json()["code"] == "EXPIRED"
@@ -419,7 +419,7 @@ def test_the_invitation_is_pushed_to_each_of_the_friends_phones(client, friends,
             "fromName": "Dongje",
             "expiresAt": str(invitation["expiresAt"]),
         }
-        assert push["android"] == {"priority": "HIGH", "ttl": "30s"}
+        assert push["android"] == {"priority": "HIGH", "ttl": "60s"}
         assert push["authorization"] == "Bearer test-fcm-access"
         assert push["url"] == "https://fcm.googleapis.com/v1/projects/pix-test/messages:send"
     assert len(fcm_api.token_requests) == 1

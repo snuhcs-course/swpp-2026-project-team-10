@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.core.network
 
+import com.lastpenguin.pix.session.signaling.IceServer
 import kotlinx.serialization.Serializable
 
 // REST payloads (Design 2.5.3). Field names match the server's JSON.
@@ -136,3 +137,35 @@ data class SentRequestDto(
 /** `POST /friend-requests/{id}/accept`. */
 @Serializable
 data class AcceptedRequestDto(val friend: FriendDto)
+
+/** `POST /devices`: this phone's FCM token for the sign-in; [platform] is always `android`. */
+@Serializable
+data class DeviceBody(val fcmToken: String, val platform: String)
+
+@Serializable
+data class InviteBody(val friendId: String)
+
+/** `POST /invitations` (Design 2.5.3): the invitation and the photographer's place in the session it opened. */
+@Serializable
+data class SentInvitationDto(
+    val id: String,
+    val to: UserDto,
+    val status: String,
+    val expiresAt: Long,
+    val link: String,
+    val sessionId: String,
+    val rejoinToken: String,
+    val iceServers: List<IceServer> = emptyList(),
+)
+
+/** `GET /invitations/{id}`, which needs no sign-in: who invites, and the invitation's status. */
+@Serializable
+data class OpenedInvitationDto(val id: String, val from: UserDto, val status: String, val expiresAt: Long)
+
+/** `POST /invitations/{id}/accept`: the friend's place in the session. */
+@Serializable
+data class SessionPlaceDto(
+    val sessionId: String,
+    val rejoinToken: String,
+    val iceServers: List<IceServer> = emptyList(),
+)

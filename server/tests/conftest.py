@@ -341,7 +341,7 @@ def settings(database_url, fcm_key):
         turn_api_token="test-turn-token",
         turn_ttl_seconds=14400,
         turn_timeout_seconds=3,
-        invitation_ttl_seconds=30,
+        invitation_ttl_seconds=60,
         invitation_join_seconds=15,
         fcm_credentials_file=fcm_key.path,
         fcm_timeout_seconds=5,

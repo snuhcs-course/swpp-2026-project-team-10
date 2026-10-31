@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.DialogInterface
@@ -74,8 +74,8 @@ class RoomCodeSheet : BottomSheetDialogFragment() {
 
             is SessionState.Connecting -> binding.statusText.setText(R.string.friend_joined_connecting)
 
-            // The sheet closed at Connected, before any drop could happen.
-            is SessionState.Reconnecting -> Unit
+            // The sheet closed at Connected, before any drop could happen; an invitation has its own sheet.
+            is SessionState.Reconnecting, is SessionState.Inviting -> Unit
 
             is SessionState.Connected -> {
                 dismissedForConnection = true

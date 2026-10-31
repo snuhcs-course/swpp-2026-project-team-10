@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -15,6 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
@@ -45,7 +46,9 @@ import org.robolectric.annotation.GraphicsMode
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
  * camera status STARTING, READY; a guide added, hidden, removed by the shutter's end of edit mode; a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
- * scene photo step framing and reviewing; a session connected and a peer leaving.
+ * scene photo step framing and reviewing, and its light (FR-4.1) turned on and off, and on a camera without a flash;
+ * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, while the
+ * scene photo is framed, and in a session (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -348,7 +351,7 @@ class CameraFragmentRenderTest {
     // ---- The scene photo for poses ----------------------------------------------
 
     @Test
-    fun scenePhoto_hidesTheGuideAndTheSettingsWhileFraming_andShowsReviewAfterTheShutter() {
+    fun scenePhoto_hidesTheGuideAndTheSettingsButTheLightWhileFraming_andShowsReviewAfterTheShutter() {
         val camera = FakeCameraController(hasFlash = true).apply { frame = bitmap(300, 400) }
         val modules = launch(camera)
         modules.guides.setGuide(guide())
@@ -360,7 +363,11 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.sceneTitle.visibility)
             assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
-            assertEquals(View.GONE, controls.cameraSettings.visibility)
+            // The flash button stays, as the light for the scene photo; the ratio and brightness go.
+            assertEquals(View.VISIBLE, controls.flashButton.visibility)
+            assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
+            assertEquals(View.GONE, controls.aspectButton.visibility)
+            assertEquals(View.GONE, controls.brightnessButton.visibility)
             assertEquals(View.GONE, controls.guideOverlay.visibility)
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)
@@ -378,6 +385,7 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.captureControls.visibility)
             assertEquals(View.INVISIBLE, controls.zoomReadout.visibility)
             assertEquals(View.GONE, controls.captureStatus.visibility)
+            assertEquals(View.GONE, controls.cameraSettings.visibility)
             controls.shootAgainButton.performClick()
         }
         idle()
@@ -394,7 +402,113 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.guideOverlay.visibility)
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
             assertEquals(View.VISIBLE, controls.cameraSettings.visibility)
+            assertEquals(View.VISIBLE, controls.aspectButton.visibility)
+            assertEquals(string(R.string.flash_off), controls.flashButton.contentDescription)
         }
+    }
+
+    @Test
+    fun scenePhoto_flashButtonTurnsTheLightOnAndOff_withoutChangingThePhotosFlash() {
+        val camera = FakeCameraController(hasFlash = true).apply { frame = bitmap(300, 400) }
+        launch(camera)
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+
+        onScreen { controls, _ -> controls.flashButton.performClick() }
+        idle()
+        assertTrue(camera.torchOn)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_light_on), controls.flashButton.contentDescription)
+            controls.flashButton.performClick()
+        }
+        idle()
+
+        assertFalse(camera.torchOn)
+        assertEquals(listOf(true, false), camera.torchRequests.dropWhile { !it })
+        assertEquals(emptyList<FlashMode>(), camera.flashRequests)
+    }
+
+    @Test
+    fun scenePhoto_theLightButtonSaysOnOnlyOnceTheCameraHasTheLightOn() {
+        val camera = FakeCameraController(hasFlash = true).apply { applies = false }
+        launch(camera)
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+
+        onScreen { controls, _ -> controls.flashButton.performClick() }
+        idle()
+        assertTrue(camera.torchOn)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
+        }
+
+        camera.state.value = camera.state.value.copy(torch = true)
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_light_on), controls.flashButton.contentDescription)
+        }
+    }
+
+    @Test
+    fun scenePhoto_onACameraWithoutAFlash_hasNoLightButton() {
+        launch(FakeCameraController(hasFlash = false))
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.cameraSettings.visibility) }
+    }
+
+    // ---- Selfie mode (FR-1.14) -------------------------------------------------------------
+
+    @Test
+    fun cameraSwitch_withAFrontCamera_switchesAndNamesTheOtherCamera() {
+        val camera = FakeCameraController()
+        launch(camera)
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.switchCameraButton.visibility)
+            assertEquals(string(R.string.switch_to_front_camera), controls.switchCameraButton.contentDescription)
+            controls.switchCameraButton.performClick()
+        }
+        idle()
+
+        assertEquals(listOf(CameraFacing.FRONT), camera.facingRequests)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.switch_to_rear_camera), controls.switchCameraButton.contentDescription)
+        }
+    }
+
+    @Test
+    fun cameraSwitch_withoutAFrontCamera_isHidden() {
+        launch(FakeCameraController().apply { hasFrontCamera.value = false })
+
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.switchCameraButton.visibility)
+            assertEquals(View.VISIBLE, controls.galleryButton.visibility)
+        }
+    }
+
+    @Test
+    fun cameraSwitch_staysWhileTheScenePhotoIsFramed() {
+        launch()
+
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.switchCameraButton.visibility)
+            assertEquals(View.INVISIBLE, controls.galleryButton.visibility)
+        }
+    }
+
+    @Test
+    fun cameraSwitch_staysInASession() {
+        val modules = launch()
+
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.switchCameraButton.visibility) }
     }
 
     // ---- A session on the photographer's phone -----------------------------------------

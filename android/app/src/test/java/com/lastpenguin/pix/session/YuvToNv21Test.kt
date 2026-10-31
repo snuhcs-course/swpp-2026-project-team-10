@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import java.nio.ByteBuffer
@@ -58,6 +58,40 @@ class YuvToNv21Test {
             v = YuvPlane(view(interleaved, 1), rowStride = 6, pixelStride = 2),
         )
         assertArrayEquals(expected, out)
+    }
+
+    // The front camera's mirror (FR-1.14): rows in reverse for a frame turned a quarter, each row in reverse for one
+    // that is not, with every V and U pair kept together; twice gives the frame back.
+    @Test
+    fun `mirror by rows reverses the luma rows and the chroma rows`() {
+        val nv21 = expected.copyOf()
+
+        YuvToNv21.mirror(nv21, width, height, rows = true)
+
+        val lumaRows = (3 downTo 0).flatMap { row -> luma.slice(row * width until (row + 1) * width) }
+        val chromaRows = byteArrayOf(-4, 104, -5, 105, -6, 106, -1, 101, -2, 102, -3, 103)
+        assertArrayEquals(lumaRows.toByteArray() + chromaRows, nv21)
+    }
+
+    @Test
+    fun `mirror by columns reverses each row and keeps each V and U pair`() {
+        val nv21 = expected.copyOf()
+
+        YuvToNv21.mirror(nv21, width, height, rows = false)
+
+        val lumaRows = (0 until height).flatMap { row -> luma.slice(row * width until (row + 1) * width).reversed() }
+        val chromaRows = byteArrayOf(-3, 103, -2, 102, -1, 101, -6, 106, -5, 105, -4, 104)
+        assertArrayEquals(lumaRows.toByteArray() + chromaRows, nv21)
+    }
+
+    @Test
+    fun `mirroring twice gives the frame back`() {
+        for (rows in listOf(true, false)) {
+            val nv21 = expected.copyOf()
+            YuvToNv21.mirror(nv21, width, height, rows)
+            YuvToNv21.mirror(nv21, width, height, rows)
+            assertArrayEquals("rows=$rows", expected, nv21)
+        }
     }
 
     private fun convert(y: YuvPlane, u: YuvPlane, v: YuvPlane): ByteArray {

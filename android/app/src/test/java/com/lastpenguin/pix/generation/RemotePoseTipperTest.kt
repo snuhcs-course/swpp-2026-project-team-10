@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -31,7 +31,8 @@ import retrofit2.HttpException
 import retrofit2.Response
 
 // Partitions (Testing Documentation 2.1.6). Answer: a tip, one with spaces around it, a blank one, a failing status,
-// no connection, no answer in time. The caller cancelled.
+// no connection, no answer in time. The caller cancelled. Language: none given (English), Korean, and a language that
+// changes between two tips.
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemotePoseTipperTest {
     private val api = FakeApi()
@@ -39,8 +40,9 @@ class RemotePoseTipperTest {
     private val scene = testBitmap()
     private val candidate = testBitmap()
 
-    private fun TestScope.tipper() = RemotePoseTipper(
+    private fun TestScope.tipper(language: () -> String = { ENGLISH }) = RemotePoseTipper(
         api,
+        language = language,
         timeoutMs = RemotePoseTipper.TIMEOUT_MS,
         images = images,
         imageDispatcher = StandardTestDispatcher(testScheduler),
@@ -60,6 +62,28 @@ class RemotePoseTipperTest {
         assertArrayEquals(CANDIDATE_JPEG, request.candidate)
         assertEquals("form-data; name=\"candidate\"; filename=\"candidate.jpg\"", request.candidateDisposition)
         assertEquals(POSE, request.pose)
+        assertEquals("en", request.language)
+    }
+
+    @Test
+    fun theTipIsAskedForInTheLanguageOfTheScreens_readForEachTip() = runTest {
+        var language = KOREAN
+        val tipper = tipper { language }
+
+        tipper.tip(scene, candidate, POSE)
+        language = ENGLISH
+        tipper.tip(scene, candidate, POSE)
+
+        assertEquals(listOf("ko", "en"), api.requests.map { it.language })
+    }
+
+    @Test
+    fun withoutALanguage_theTipIsAskedForInEnglish() = runTest {
+        val tipper = RemotePoseTipper(api, images = images, imageDispatcher = StandardTestDispatcher(testScheduler))
+
+        tipper.tip(scene, candidate, POSE)
+
+        assertEquals("en", api.requests.single().language)
     }
 
     @Test
@@ -113,6 +137,7 @@ class RemotePoseTipperTest {
         val candidate: ByteArray,
         val candidateDisposition: String?,
         val pose: String,
+        val language: String,
     )
 
     private class FakeApi : PixApi {
@@ -123,6 +148,7 @@ class RemotePoseTipperTest {
             scene: MultipartBody.Part,
             candidate: MultipartBody.Part,
             pose: RequestBody,
+            language: RequestBody,
         ): PoseTipDto {
             requests += Request(
                 scene = scene.bytes(),
@@ -131,17 +157,22 @@ class RemotePoseTipperTest {
                 candidate = candidate.bytes(),
                 candidateDisposition = candidate.headers?.get("Content-Disposition"),
                 pose = pose.text(),
+                language = language.text(),
             )
             return answer()
         }
 
-        override suspend fun suggestPoses(image: MultipartBody.Part, description: RequestBody?): PoseSuggestionsDto =
-            error("A tip never asks for poses")
+        override suspend fun suggestPoses(
+            image: MultipartBody.Part,
+            description: RequestBody?,
+            selfie: RequestBody?,
+        ): PoseSuggestionsDto = error("A tip never asks for poses")
 
         override suspend fun createPose(
             image: MultipartBody.Part,
             description: RequestBody,
             seed: RequestBody,
+            selfie: RequestBody?,
         ): PoseResponseDto = error("A tip never asks for a candidate")
 
         private fun MultipartBody.Part.bytes(): ByteArray = Buffer().also(body::writeTo).readByteArray()

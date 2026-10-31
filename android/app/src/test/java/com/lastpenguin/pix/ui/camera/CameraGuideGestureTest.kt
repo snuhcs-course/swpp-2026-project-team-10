@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelStore
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
@@ -21,6 +22,7 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -252,11 +254,15 @@ class CameraGuideGestureTest {
         override fun setExposure(index: Int) = Unit
 
         override fun setFlash(mode: FlashMode) = Unit
+        override fun setTorch(on: Boolean) = Unit
 
         override fun setAspectRatio(ratio: AspectRatio) = Unit
         override suspend fun takePhoto(): Result<Uri> = error("Guide gestures must not capture photos")
         override suspend fun grabFrame(): Result<Bitmap> = error("Guide gestures must not capture frames")
         override fun setFrameSink(sink: FrameSink?) = Unit
+        override val facing: StateFlow<CameraFacing> = MutableStateFlow(CameraFacing.BACK)
+        override val hasFrontCamera: StateFlow<Boolean> = MutableStateFlow(false)
+        override fun setFacing(facing: CameraFacing) = Unit
     }
 
     private companion object {

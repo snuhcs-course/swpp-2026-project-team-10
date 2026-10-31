@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
@@ -65,6 +66,49 @@ class CameraViewModelTest {
     fun teardown() {
         store.clear()
         Dispatchers.resetMain()
+    }
+
+    // Selfie mode (FR-1.14): the switch goes to the front camera and back; a phone without a front camera has no
+    // switch, and a photo being saved holds it.
+    @Test
+    fun switchCamera_goesToTheFrontCameraAndBack() = runTest {
+        runCurrent()
+        assertTrue(model.uiState.value.canSwitchCamera)
+
+        model.onSwitchCamera()
+        runCurrent()
+        assertEquals(CameraFacing.FRONT, model.uiState.value.facing)
+
+        model.onSwitchCamera()
+        runCurrent()
+        assertEquals(CameraFacing.BACK, model.uiState.value.facing)
+        assertEquals(listOf(CameraFacing.FRONT, CameraFacing.BACK), camera.facingRequests)
+    }
+
+    @Test
+    fun switchCamera_withoutAFrontCamera_doesNothing() = runTest {
+        camera.hasFrontCamera.value = false
+        runCurrent()
+        assertFalse(model.uiState.value.canSwitchCamera)
+
+        model.onSwitchCamera()
+        runCurrent()
+
+        assertTrue(camera.facingRequests.isEmpty())
+        assertEquals(CameraFacing.BACK, model.uiState.value.facing)
+    }
+
+    @Test
+    fun switchCamera_whileAPhotoIsSaved_doesNothing() = runTest {
+        runCurrent()
+        model.onShutter()
+        runCurrent()
+        assertTrue(model.uiState.value.isSaving)
+
+        model.onSwitchCamera()
+        runCurrent()
+
+        assertTrue(camera.facingRequests.isEmpty())
     }
 
     @Test
@@ -319,6 +363,7 @@ class CameraViewModelTest {
         override fun setFocusPoint(x: Float, y: Float) = Unit
         override fun setExposure(index: Int) = Unit
         override fun setFlash(mode: FlashMode) = Unit
+        override fun setTorch(on: Boolean) = Unit
         override fun setAspectRatio(ratio: AspectRatio) = Unit
         override suspend fun takePhoto(): Result<Uri> {
             captureCount++
@@ -327,6 +372,13 @@ class CameraViewModelTest {
         }
         override suspend fun grabFrame(): Result<Bitmap> = Result.failure(IllegalStateException("No frame"))
         override fun setFrameSink(sink: FrameSink?) = Unit
+        override val facing = MutableStateFlow(CameraFacing.BACK)
+        override val hasFrontCamera = MutableStateFlow(true)
+        val facingRequests = mutableListOf<CameraFacing>()
+        override fun setFacing(facing: CameraFacing) {
+            facingRequests += facing
+            this.facing.value = facing
+        }
     }
 
     @Test

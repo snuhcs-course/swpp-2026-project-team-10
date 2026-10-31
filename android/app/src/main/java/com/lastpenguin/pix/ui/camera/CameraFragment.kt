@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -47,6 +47,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
@@ -168,7 +169,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.brightnessSlider,
             { formatEv(sliderIndex(it)) },
         ) { value, _ -> viewModel.onExposureChange(sliderIndex(value)) }
-        controls.flashButton.setOnClickListener { viewModel.onFlashTap() }
+        // While the scene photo is taken, the flash button turns the phone's light on and off instead (FR-4.1).
+        controls.flashButton.setOnClickListener {
+            if (isScenePhotoActive()) generationViewModel.toggleLight() else viewModel.onFlashTap()
+        }
         controls.aspectButton.setOnClickListener {
             previewHold?.hold()
             viewModel.onAspectTap()
@@ -207,6 +211,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { openLastPhoto() }
+        // Selfie mode (FR-1.14): the last frame stays up while the other camera opens, as for a ratio change.
+        controls.switchCameraButton.setOnClickListener {
+            previewHold?.hold()
+            viewModel.onSwitchCamera()
+        }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
         controls.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         controls.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
@@ -649,6 +658,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
+        // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
+        controls.switchCameraButton.isVisible = state.canSwitchCamera
+        controls.switchCameraButton.isEnabled = granted && !state.isSaving
+        controls.switchCameraButton.contentDescription = getString(
+            if (state.facing == CameraFacing.BACK) R.string.switch_to_front_camera else R.string.switch_to_rear_camera,
+        )
 
         renderCameraSettings(controls, state, ready)
 
@@ -677,7 +692,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         renderReference(controls, state)
         renderTip(controls, state)
-        renderScenePhoto(controls, generationViewModel.uiState.value)
+        renderScenePhoto(controls, generationViewModel.uiState.value, state, ready)
     }
 
     /**
@@ -751,7 +766,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
      * shutter, then the photo with *Use this photo* and *Shoot again*. Applied last, over the camera's own controls,
      * so that the step shows only what it needs.
      */
-    private fun renderScenePhoto(controls: FragmentCameraBinding, scene: GenerationUiState) {
+    private fun renderScenePhoto(
+        controls: FragmentCameraBinding,
+        scene: GenerationUiState,
+        camera: CameraUiState,
+        ready: Boolean,
+    ) {
         val reviewing = scene.phase == GenerationUiState.Phase.REVIEWING
         val active = isScenePhotoActive(scene)
         sceneBack?.isEnabled = active
@@ -767,9 +787,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.sceneStill.setImageBitmap(if (reviewing) scene.scene else null)
         // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
         controls.zoomReadout.isInvisible = reviewing
-        // The scene photo is a frame of the live preview: flash, ratio, and brightness do not apply to it.
+        // The scene photo is a frame of the live preview: a photo's flash, the ratio, and brightness do not apply to it.
+        // While the scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1). It says on
+        // only once the camera has the light on, so it never claims a light that is not.
         if (active) {
-            controls.cameraSettings.isVisible = false
+            val light = !reviewing && camera.hasFlash
+            controls.cameraSettings.isVisible = light
+            controls.aspectButton.isVisible = false
+            controls.flashButton.isVisible = light
+            controls.flashButton.isEnabled = ready
+            controls.flashButton.setIconResource(if (camera.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+            controls.flashButton.contentDescription =
+                getString(if (camera.torch) R.string.scene_light_on else R.string.scene_light_off)
             controls.brightnessButton.isVisible = false
             controls.brightnessPanel.isVisible = false
         }
@@ -797,6 +826,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /** Flash, aspect ratio, and brightness (FR-1.11–1.13). */
     private fun renderCameraSettings(controls: FragmentCameraBinding, state: CameraUiState, ready: Boolean) {
         controls.cameraSettings.isVisible = true
+        controls.aspectButton.isVisible = true
         controls.flashButton.isVisible = state.hasFlash
         controls.flashButton.isEnabled = ready
         controls.flashButton.setIconResource(

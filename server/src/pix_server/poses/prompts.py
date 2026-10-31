@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 """The prompts for the image, suggestion, and tip models and the default poses, read from prompts.toml (Design
 Documentation 2.6.3)."""
 
@@ -24,12 +24,25 @@ class DefaultPose:
 
 
 @dataclass(frozen=True)
+class SelfiePrompts:
+    """The prompts for a scene photo that is a selfie (FR-1.14), and the poses that stand in for the suggestions."""
+
+    pose: str
+    suggestion: str
+    variation: str
+    default_poses: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Prompts:
     pose: str
     suggestion: str
     variation: str
     tip: str
+    # Added after `tip` for a phone whose screens are in Korean (FR-10.2).
+    tip_korean: str
     default_poses: dict[str, DefaultPose]
+    selfie: SelfiePrompts
 
 
 def one_line(text: str) -> str:
@@ -46,19 +59,30 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
             raise ValueError(f"{path.name}: {where}{key} must be a non-empty string")
         return one_line(value)
 
+    def with_placeholder(table: dict, key: str, where: str, placeholder: str) -> str:
+        prompt = text(table, key, where)
+        if prompt.count(placeholder) != 1:
+            raise ValueError(f"{path.name}: {where}{key} must hold {placeholder} exactly once")
+        return prompt
+
     with path.open("rb") as file:
         data = tomllib.load(file)
-    unknown = set(data) - {"pose_prompt", "suggestion_prompt", "variation_prompt", "tip_prompt", "default_poses"}
+    unknown = set(data) - {
+        "pose_prompt",
+        "suggestion_prompt",
+        "variation_prompt",
+        "tip_prompt",
+        "tip_korean",
+        "default_poses",
+        "selfie",
+    }
     if unknown:
         raise ValueError(f"{path.name}: unknown keys {', '.join(sorted(unknown))}")
-    pose = text(data, "pose_prompt", "")
-    if pose.count(PLACEHOLDER) != 1:
-        raise ValueError(f"{path.name}: pose_prompt must hold {PLACEHOLDER} exactly once")
+    pose = with_placeholder(data, "pose_prompt", "", PLACEHOLDER)
     suggestion = text(data, "suggestion_prompt", "")
-    variation = text(data, "variation_prompt", "")
-    if variation.count(DESCRIPTION_PLACEHOLDER) != 1:
-        raise ValueError(f"{path.name}: variation_prompt must hold {DESCRIPTION_PLACEHOLDER} exactly once")
+    variation = with_placeholder(data, "variation_prompt", "", DESCRIPTION_PLACEHOLDER)
     tip = text(data, "tip_prompt", "")
+    tip_korean = text(data, "tip_korean", "")
     entries = data.get("default_poses")
     if not isinstance(entries, list) or len(entries) != POSE_COUNT:
         raise ValueError(f"{path.name}: exactly {POSE_COUNT} [[default_poses]] are needed")
@@ -76,7 +100,44 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         if len(default.pose) > DESCRIPTION_MAX_LENGTH:
             raise ValueError(f"{path.name}: {where}pose must be at most {DESCRIPTION_MAX_LENGTH} characters")
         poses[default.id] = default
-    return Prompts(pose, suggestion, variation, tip, poses)
+    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, load_selfie(data.get("selfie"), path))
+
+
+def load_selfie(table: object, path: Path) -> SelfiePrompts:
+    """The [selfie] table of the prompts file: the three prompts and POSE_COUNT default poses, each a different string
+    of at most DESCRIPTION_MAX_LENGTH characters. Raises ValueError like load_prompts."""
+    if not isinstance(table, dict):
+        raise ValueError(f"{path.name}: a [selfie] table is needed")
+    unknown = set(table) - {"pose_prompt", "suggestion_prompt", "variation_prompt", "default_poses"}
+    if unknown:
+        raise ValueError(f"{path.name}: selfie: unknown keys {', '.join(sorted(unknown))}")
+
+    def prompt(key: str, placeholder: str | None = None) -> str:
+        value = table.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{path.name}: selfie.{key} must be a non-empty string")
+        if placeholder is not None and value.count(placeholder) != 1:
+            raise ValueError(f"{path.name}: selfie.{key} must hold {placeholder} exactly once")
+        return one_line(value)
+
+    pose = prompt("pose_prompt", PLACEHOLDER)
+    suggestion = prompt("suggestion_prompt")
+    variation = prompt("variation_prompt", DESCRIPTION_PLACEHOLDER)
+    entries = table.get("default_poses")
+    if not isinstance(entries, list) or len(entries) != POSE_COUNT:
+        raise ValueError(f"{path.name}: selfie.default_poses must be a list of {POSE_COUNT} poses")
+    defaults: list[str] = []
+    for number, entry in enumerate(entries, 1):
+        where = f"{path.name}: selfie.default_poses #{number}"
+        default = one_line(entry) if isinstance(entry, str) else ""
+        if not default:
+            raise ValueError(f"{where} must be a non-empty string")
+        if len(default) > DESCRIPTION_MAX_LENGTH:
+            raise ValueError(f"{where} must be at most {DESCRIPTION_MAX_LENGTH} characters")
+        if default.casefold() in {kept.casefold() for kept in defaults}:
+            raise ValueError(f"{where} repeats another pose")
+        defaults.append(default)
+    return SelfiePrompts(pose, suggestion, variation, tuple(defaults))
 
 
 PROMPTS = load_prompts()
@@ -95,11 +156,14 @@ def checked_pose(pose: str, field: str = "description") -> str:
     return text
 
 
-def pose_prompt(pose: str) -> str:
-    """The image prompt for a pose (checked_pose)."""
-    return PROMPTS.pose.replace(PLACEHOLDER, checked_pose(pose))
+def pose_prompt(pose: str, selfie: bool = False) -> str:
+    """The image prompt for a pose (checked_pose), the selfie one for a selfie's scene (FR-1.14)."""
+    template = PROMPTS.selfie.pose if selfie else PROMPTS.pose
+    return template.replace(PLACEHOLDER, checked_pose(pose))
 
 
-def variation_prompt(description: str) -> str:
-    """The suggestion model's prompt for three variations of a description (checked_pose)."""
-    return PROMPTS.variation.replace(DESCRIPTION_PLACEHOLDER, checked_pose(description))
+def variation_prompt(description: str, selfie: bool = False) -> str:
+    """The suggestion model's prompt for three variations of a description (checked_pose), for a selfie's scene or
+    another."""
+    template = PROMPTS.selfie.variation if selfie else PROMPTS.variation
+    return template.replace(DESCRIPTION_PLACEHOLDER, checked_pose(description))

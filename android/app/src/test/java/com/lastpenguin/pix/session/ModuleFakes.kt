@@ -8,6 +8,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
@@ -169,6 +170,13 @@ class FakeCameraController(
     val exposureRequests = mutableListOf<Int>()
     val flashRequests = mutableListOf<FlashMode>()
 
+    /**
+     * Each light request, and the light kept, flash or not, like the controller's; [state]'s `torch` follows at once on
+     * a camera with a flash that [applies].
+     */
+    val torchRequests = mutableListOf<Boolean>()
+    var torchOn = false
+
     override fun setExposure(index: Int) {
         exposureRequests += index
         val range = _capabilities.value?.exposureRange ?: 0..0
@@ -180,7 +188,25 @@ class FakeCameraController(
         if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(flash = mode)
     }
 
+    override fun setTorch(on: Boolean) {
+        torchRequests += on
+        torchOn = on
+        if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(torch = on)
+    }
+
     override fun setAspectRatio(ratio: AspectRatio) = Unit
+
+    /** The camera chosen (FR-1.14); a phone with a front camera unless a test says otherwise. */
+    override val facing = MutableStateFlow(CameraFacing.BACK)
+    override val hasFrontCamera = MutableStateFlow(true)
+
+    /** Every camera asked for, in order. */
+    val facingRequests = mutableListOf<CameraFacing>()
+
+    override fun setFacing(facing: CameraFacing) {
+        facingRequests += facing
+        if (facing == CameraFacing.BACK || hasFrontCamera.value) this.facing.value = facing
+    }
 
     /** When set, [takePhoto] saves to it; otherwise saving fails, as it does without a camera. */
     var photo: Uri? = null

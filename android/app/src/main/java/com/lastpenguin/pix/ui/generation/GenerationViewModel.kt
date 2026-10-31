@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationConsent
@@ -25,9 +26,14 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -36,6 +42,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 data class GenerationUiState(
     /** The photo the user took and confirmed; kept for *Try again* and *Try other poses*. */
     val scene: Bitmap? = null,
+    /** The scene photo is a selfie from the front camera: the server makes selfie poses of it (FR-1.14). */
+    val selfie: Boolean = false,
     /** What the set was asked for; *Try again* asks for it again. */
     val request: PoseRequest? = null,
     /** The description field's text on Generate poses, kept for *Try other poses* and when the service rejects it. */
@@ -56,6 +64,11 @@ data class GenerationUiState(
     /** The shutter gave no photo; told on Camera until the next attempt. */
     val shotFailed: Boolean = false,
     /**
+     * The phone's light is turned on for the scene photo, a frame of the preview that a photo's flash would not reach
+     * (FR-4.1). It is on only while the scene is framed, and stays chosen for *Shoot again*.
+     */
+    val light: Boolean = false,
+    /**
      * Whose *Use this pose* took a candidate of this set (Design 2.6.5): this phone's, or in a session the subject's,
      * which Pick a pose then goes on with as with its own. The first one decides; nothing is selected after it.
      */
@@ -74,9 +87,13 @@ data class GenerationUiState(
     val selectedImage: Bitmap?
         get() = (candidates[selectedPoseId] as? CandidateEvent.Ready)?.image
 
-    /** What the selected candidate's tip is asked from: the scene and the pose it was made with (FR-4.10). */
+    /**
+     * What the selected candidate's tip is asked from: the scene and the pose it was made with (FR-4.10). None for a
+     * selfie: the tip tells a photographer standing in front of the person how to hold the phone.
+     */
     val tipSource: TipSource?
         get() {
+            if (selfie) return null
             val pose = poses.firstOrNull { it.id == selectedPoseId } ?: return null
             return scene?.let { TipSource(it, pose.text) }
         }
@@ -116,11 +133,36 @@ class GenerationViewModel(
     /** Generate poses as [descriptions] knows it, while the phase is DESCRIBING; null otherwise. */
     private var descriptionId: String? = null
 
+    /**
+     * The camera's light once it has held for [LIGHT_SETTLE_MS], so the exposure has followed it; null while it changes.
+     * The light the camera starts with counts at once.
+     */
+    private val settledLight = MutableStateFlow<Boolean?>(null)
+
     init {
         // Only ever sets it: an answer read before the user agreed must not take that agreement back.
         viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
         viewModelScope.launch { share.picks.collect(::onSubjectPick) }
         viewModelScope.launch { descriptions.requests.collect(::onSubjectRequest) }
+        // The camera keeps its light across rebinds, so it is turned off as soon as the scene is no longer framed.
+        viewModelScope.launch {
+            uiState.map { it.phase == GenerationUiState.Phase.FRAMING && it.light }
+                .distinctUntilChanged()
+                .collect(camera::setTorch)
+        }
+        viewModelScope.launch {
+            var first = true
+            camera.state.map { it.torch }.distinctUntilChanged().collectLatest { on ->
+                settledLight.value = null
+                if (!first) delay(LIGHT_SETTLE_MS)
+                first = false
+                settledLight.value = on
+            }
+        }
+    }
+
+    override fun onCleared() {
+        camera.setTorch(false)
     }
 
     /**
@@ -141,10 +183,21 @@ class GenerationViewModel(
         _uiState.value = GenerationUiState(phase = GenerationUiState.Phase.FRAMING)
     }
 
-    /** The shutter during FRAMING: the camera's current frame becomes the photo to confirm. */
+    /**
+     * The shutter during FRAMING: the camera's current frame becomes the photo to confirm. The frame waits until the
+     * camera's light is as chosen and has been for [LIGHT_SETTLE_MS], so the frame is lit, or not, as the user chose and
+     * the exposure has followed, also when the shutter comes right after the light button; after [LIGHT_WAIT_MS], the
+     * frame is taken as it is. A lens without a flash, such as the front camera after a switch, never has the light, so
+     * nothing waits for it to come on.
+     */
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         shooting = viewModelScope.launch {
+            val canLight = camera.capabilities.value?.hasFlash == true
+            val wanted = _uiState.value.light && canLight
+            withTimeoutOrNull(LIGHT_WAIT_MS) { settledLight.first { it == wanted } }
+            // The camera the frame comes from, read with it: a selfie gets selfie poses (FR-1.14).
+            val selfie = camera.facing.value == CameraFacing.FRONT
             val frame = camera.grabFrame()
             frame.exceptionOrNull()?.let { Log.w(TAG, "No scene photo: $it") }
             _uiState.update { state ->
@@ -154,6 +207,7 @@ class GenerationViewModel(
 
                     frame.isSuccess -> state.copy(
                         scene = frame.getOrNull(),
+                        selfie = selfie,
                         phase = GenerationUiState.Phase.REVIEWING,
                         shotFailed = false,
                     )
@@ -164,12 +218,17 @@ class GenerationViewModel(
         }
     }
 
-    /** *Shoot again*: the photo is dropped and the live camera is shown again. */
+    /** *Shoot again*: the photo is dropped and the live camera is shown again, with the light as it was. */
     fun retakeScene() {
         _uiState.update {
             val reviewing = it.phase == GenerationUiState.Phase.REVIEWING
-            if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING) else it
+            if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING, light = it.light) else it
         }
+    }
+
+    /** The light button while the scene is framed (FR-4.1). */
+    fun toggleLight() {
+        _uiState.update { if (it.phase == GenerationUiState.Phase.FRAMING) it.copy(light = !it.light) else it }
     }
 
     /** *Use this photo*: Generate poses asks what to pose (FR-4.8). Still nothing is sent. */
@@ -278,14 +337,14 @@ class GenerationViewModel(
     fun generate(description: String) {
         val state = _uiState.value
         if (!state.canStart || state.scene == null) return
-        start(state.scene, PoseRequest.of(description), description)
+        start(state.scene, state.selfie, PoseRequest.of(description), description)
     }
 
     /** *Skip, suggest poses for me*: the server chooses four poses for the scene (FR-4.4). */
     fun suggestPoses() {
         val state = _uiState.value
         if (!state.canStart || state.scene == null) return
-        start(state.scene, PoseRequest.Suggested, state.description)
+        start(state.scene, state.selfie, PoseRequest.Suggested, state.description)
     }
 
     /** Generate poses can start a set: not while the subject's field holds the description (Design 2.6.5). */
@@ -319,10 +378,12 @@ class GenerationViewModel(
      */
     fun retry() {
         val state = _uiState.value
-        if (state.scene != null && state.request != null) start(state.scene, state.request, state.description)
+        if (state.scene != null && state.request != null) {
+            start(state.scene, state.selfie, state.request, state.description)
+        }
     }
 
-    private fun start(scene: Bitmap, request: PoseRequest, description: String) {
+    private fun start(scene: Bitmap, selfie: Boolean, request: PoseRequest, description: String) {
         generating?.cancel()
         endDescription(started = true)
         closeSet()
@@ -331,11 +392,12 @@ class GenerationViewModel(
         share.open(id)
         _uiState.value = GenerationUiState(
             scene = scene,
+            selfie = selfie,
             request = request,
             description = description,
             phase = GenerationUiState.Phase.GENERATING,
         )
-        generating = viewModelScope.launch { generate(id, scene, request) }
+        generating = viewModelScope.launch { generate(id, scene, selfie, request) }
     }
 
     /** The open set ends without a choice, for the subject's *Pick a pose* too; one that was chosen stays chosen. */
@@ -399,11 +461,14 @@ class GenerationViewModel(
      * rejected every pose of a description (US-5). One limit covers the whole run, the suggestions included, so
      * Generating poses never lasts longer than the 60 s it says (NFR-4).
      */
-    private suspend fun generate(id: String, scene: Bitmap, request: PoseRequest) {
-        Timings.mark("pose.start", if (request is PoseRequest.Suggested) "suggested" else "described")
+    private suspend fun generate(id: String, scene: Bitmap, selfie: Boolean, request: PoseRequest) {
+        Timings.mark(
+            "pose.start",
+            (if (request is PoseRequest.Suggested) "suggested" else "described") + if (selfie) " selfie" else "",
+        )
         val inTime = withTimeoutOrNull(limitMs) {
             try {
-                generator.generate(scene, request, Random.nextLong()).collect { event -> receive(id, event) }
+                generator.generate(scene, request, Random.nextLong(), selfie).collect { event -> receive(id, event) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -457,7 +522,13 @@ class GenerationViewModel(
         }
     }
 
-    private companion object {
-        const val TAG = "PixPoses"
+    companion object {
+        private const val TAG = "PixPoses"
+
+        /** How long the scene photo waits at most for the light the user turned on, and its exposure (FR-4.1). */
+        const val LIGHT_WAIT_MS = 1_500L
+
+        /** How long after the light comes on the scene photo is taken: the camera's exposure follows it. */
+        const val LIGHT_SETTLE_MS = 500L
     }
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -17,11 +17,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * [PoseTipper] through the Pix server's `POST /pose-tips` (Design 2.5.3, 2.6.3): the scene as `POST /poses` got it,
- * the candidate at a long side of 768 px, and the pose.
+ * the candidate at a long side of 768 px, the pose, and the language the screens show at the time of the call.
  * Owner: Pose tips.
  */
 class RemotePoseTipper(
     private val api: PixApi,
+    /** `en` or `ko` ([screenLanguage]), read for each tip, so a language changed while Pix runs is followed. */
+    private val language: () -> String = { ENGLISH },
     private val timeoutMs: Long = TIMEOUT_MS,
     private val images: PoseImageCodec = AndroidPoseImageCodec,
     /** Image encoding runs here, off the main thread (Design 2.8, Concurrency). */
@@ -38,6 +40,7 @@ class RemotePoseTipper(
                     MultipartBody.Part.createFormData("scene", "scene.jpg", scenePhoto.toRequestBody(JPEG)),
                     MultipartBody.Part.createFormData("candidate", "candidate.jpg", candidatePhoto.toRequestBody(JPEG)),
                     pose.toRequestBody(TEXT),
+                    language().toRequestBody(TEXT),
                 )
             } ?: throw SocketTimeoutException("The server gave no tip within $timeoutMs ms")
             if (answer.text.isBlank()) throw IOException("The server gave an empty tip")

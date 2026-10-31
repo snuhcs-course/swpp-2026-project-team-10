@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -17,27 +17,31 @@ interface PixApi {
 
     /**
      * Four poses for the scene: suggested ones when [description] is null (FR-4.4), or the description followed by
-     * three variations of it, so that the four candidates differ (FR-4.8). A null part is left out of the request.
+     * three variations of it, so that the four candidates differ (FR-4.8). [selfie] is `true` for a selfie's scene,
+     * which gets selfie poses (FR-1.14). A null part is left out of the request.
      */
     @Multipart
     @POST("api/v1/pose-suggestions")
     suspend fun suggestPoses(
         @Part image: MultipartBody.Part,
         @Part("description") description: RequestBody?,
+        @Part("selfie") selfie: RequestBody?,
     ): PoseSuggestionsDto
 
-    /** One candidate per call; the app sends one call per pose of the set in parallel. */
+    /** One candidate per call; the app sends one call per pose of the set in parallel. [selfie] as above. */
     @Multipart
     @POST("api/v1/poses")
     suspend fun createPose(
         @Part image: MultipartBody.Part,
         @Part("description") description: RequestBody,
         @Part("seed") seed: RequestBody,
+        @Part("selfie") selfie: RequestBody?,
     ): PoseResponseDto
 
     /**
      * How to hold the phone for the candidate the user took (FR-4.10): `scene` as sent to [createPose], `candidate`,
-     * and the pose it was made with. `502 UPSTREAM_ERROR` also when the server could not use its model's answer.
+     * the pose it was made with, and the language the sentence is written in, `en` or `ko` (FR-10.2). `502
+     * UPSTREAM_ERROR` also when the server could not use its model's answer.
      */
     @Multipart
     @POST("api/v1/pose-tips")
@@ -45,6 +49,7 @@ interface PixApi {
         @Part scene: MultipartBody.Part,
         @Part candidate: MultipartBody.Part,
         @Part("pose") pose: RequestBody,
+        @Part("language") language: RequestBody,
     ): PoseTipDto
 }
 
@@ -132,4 +137,27 @@ interface PixAccountApi {
     /** `204` also for someone who is not a friend (FR-5.10). */
     @DELETE("api/v1/friends/{userId}")
     suspend fun removeFriend(@Path("userId") userId: String)
+
+    /** This phone's FCM token for the sign-in, so its pushes reach this phone (Design 2.6.6). */
+    @POST("api/v1/devices")
+    suspend fun registerDevice(@Body body: DeviceBody)
+
+    /** `403 NOT_FRIENDS`, `409 BUSY` (FR-6.1, FR-6.9). */
+    @POST("api/v1/invitations")
+    suspend fun invite(@Body body: InviteBody): SentInvitationDto
+
+    /** Needs no sign-in, so a link opens it on any phone (FR-6.4); `404 NOT_FOUND`. */
+    @GET("api/v1/invitations/{id}")
+    suspend fun invitation(@Path("id") invitationId: String): OpenedInvitationDto
+
+    /** The friend; `404 NOT_FOUND` for someone else's invitation, `410 INVITATION_GONE` once answered or expired. */
+    @POST("api/v1/invitations/{id}/accept")
+    suspend fun acceptInvitation(@Path("id") invitationId: String): SessionPlaceDto
+
+    @POST("api/v1/invitations/{id}/decline")
+    suspend fun declineInvitation(@Path("id") invitationId: String)
+
+    /** The photographer. */
+    @POST("api/v1/invitations/{id}/cancel")
+    suspend fun cancelInvitation(@Path("id") invitationId: String)
 }

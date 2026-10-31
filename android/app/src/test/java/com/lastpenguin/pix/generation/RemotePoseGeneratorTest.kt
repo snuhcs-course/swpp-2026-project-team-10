@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -39,7 +39,8 @@ import retrofit2.Response
 // than four, some blank, none, a failing status, no connection, no answer in time. Variations of a description: three,
 // more, fewer, blank, none, a failing status, no connection, no answer in time, and slower than the description's own
 // request. Each pose: an image, each failing status, no connection, no answer in time, an answer that is not an
-// image. The collector cancelled.
+// image. The collector cancelled. Selfie (FR-1.14): a selfie's scene, with suggestions and with a description, and
+// another scene.
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemotePoseGeneratorTest {
     private val api = FakeApi()
@@ -200,6 +201,30 @@ class RemotePoseGeneratorTest {
     }
 
     @Test
+    fun aSelfiesSuggestionsAndPoses_saySelfie() = runTest {
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7, selfie = true).toList()
+
+        assertEquals(listOf("true"), api.suggestionSelfies)
+        assertEquals(List(POSE_COUNT) { "true" }, api.poseSelfies)
+    }
+
+    @Test
+    fun aSelfiesDescriptionAndVariations_saySelfie() = runTest {
+        generator().generate(testBitmap(), PoseRequest.Described(DESCRIPTION), seed = 7, selfie = true).toList()
+
+        assertEquals(listOf("true"), api.suggestionSelfies)
+        assertEquals(List(POSE_COUNT) { "true" }, api.poseSelfies)
+    }
+
+    @Test
+    fun anotherScene_leavesSelfieOut() = runTest {
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7).toList()
+
+        assertEquals(listOf<String?>(null), api.suggestionSelfies)
+        assertEquals(List<String?>(POSE_COUNT) { null }, api.poseSelfies)
+    }
+
+    @Test
     fun theSetSeedGivesEachPoseItsOwnSeed() = runTest {
         val generator = generator()
         val request = PoseRequest.Described(DESCRIPTION)
@@ -314,6 +339,10 @@ class RemotePoseGeneratorTest {
             PoseSuggestionsDto(if (description == null) SUGGESTED else listOf(description) + VARIATIONS)
         }
         val suggestionDescriptions = mutableListOf<String?>()
+
+        /** The `selfie` part of each request, suggestions first in [suggestionSelfies], then poses; null when left out. */
+        val suggestionSelfies = mutableListOf<String?>()
+        val poseSelfies = mutableListOf<String?>()
         var suggestionDescriptionType: String? = null
         var suggestionImage: ByteArray? = null
         val requests = mutableListOf<Request>()
@@ -322,9 +351,14 @@ class RemotePoseGeneratorTest {
         val answers = mutableMapOf<String, suspend () -> PoseResponseDto>()
         val cancelled = mutableListOf<String>()
 
-        override suspend fun suggestPoses(image: MultipartBody.Part, description: RequestBody?): PoseSuggestionsDto {
+        override suspend fun suggestPoses(
+            image: MultipartBody.Part,
+            description: RequestBody?,
+            selfie: RequestBody?,
+        ): PoseSuggestionsDto {
             val text = description?.text()
             suggestionDescriptions += text
+            suggestionSelfies += selfie?.text()
             suggestionDescriptionType = description?.contentType()?.toString()
             suggestionImage = Buffer().also(image.body::writeTo).readByteArray()
             return suggestions(text)
@@ -334,8 +368,10 @@ class RemotePoseGeneratorTest {
             image: MultipartBody.Part,
             description: RequestBody,
             seed: RequestBody,
+            selfie: RequestBody?,
         ): PoseResponseDto {
             val text = description.text()
+            poseSelfies += selfie?.text()
             requests += Request(
                 description = text,
                 descriptionType = description.contentType()?.toString(),
@@ -356,6 +392,7 @@ class RemotePoseGeneratorTest {
             scene: MultipartBody.Part,
             candidate: MultipartBody.Part,
             pose: RequestBody,
+            language: RequestBody,
         ): PoseTipDto = error("Pose generation never asks for a tip")
 
         private fun RequestBody.text(): String = Buffer().also(::writeTo).readUtf8()

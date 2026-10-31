@@ -8,6 +8,7 @@ import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.account.FakeAuthRepository
 import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
+import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
@@ -39,6 +40,7 @@ import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
+import com.lastpenguin.pix.session.fakeBitmap
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -61,6 +63,8 @@ class TestAppContainer(
     val session: FakeSessionManager = FakeSessionManager(),
     frameAspect: () -> Float = { camera.state.value.aspect.frameAspect },
     val saved: SavedGuideStore = SavedGuideStore.InMemory(),
+    /** What the photographer's candidates decode to on the subject's phone; a test that draws one gives a real one. */
+    candidateImage: () -> Bitmap = { fakeBitmap() },
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -77,12 +81,13 @@ class TestAppContainer(
     val auth = FakeAuthRepository()
     val video = FakeRemoteVideo()
     val friends = FakeFriendsRepository()
+    val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
 
     /** The photographer's candidates on the subject's phone; on the main thread, as the screens collect it. */
-    val poses = PoseSyncer(session, FakePoseCandidateCodec(), Dispatchers.Unconfined)
+    val poses = PoseSyncer(session, FakePoseCandidateCodec(candidateImage), Dispatchers.Unconfined)
 
     /** The photographer's Reference confirm on the subject's phone, the same way, with outlines a screen can draw. */
     val confirms = ConfirmSyncer(
@@ -119,6 +124,7 @@ class TestAppContainer(
         authRepository = auth,
         friendsRepository = friends,
         googleIdTokens = FakeGoogleIdTokens(),
+        invitationManager = invitations,
         sessionManager = session,
         remoteVideo = video,
         guideSyncer = syncer,
@@ -159,8 +165,13 @@ class TestAppContainer(
     class ScriptedPoseGenerator : PoseGenerator {
         val runs = mutableListOf<Run>()
 
-        override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> {
-            val run = Run(scene, request).also(runs::add)
+        override fun generate(
+            scene: Bitmap,
+            request: PoseRequest,
+            seed: Long,
+            selfie: Boolean,
+        ): Flow<GenerationEvent> {
+            val run = Run(scene, request, selfie).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -171,7 +182,7 @@ class TestAppContainer(
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest) {
+        class Run(val scene: Bitmap, val request: PoseRequest, val selfie: Boolean = false) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 

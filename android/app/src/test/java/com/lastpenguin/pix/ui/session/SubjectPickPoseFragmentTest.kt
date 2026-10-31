@@ -1,12 +1,14 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
 import android.view.View
+import android.widget.ImageView
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
@@ -36,6 +38,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowToast
 
@@ -46,7 +49,7 @@ import org.robolectric.shadows.ShadowToast
  * choice or close (a notice and back to Subject view), by this phone's own pick (back without a notice), and an end
  * kept from an earlier set (nothing); a pick no step answers in 5 s (a notice, and it can be tapped again); Back
  * (Subject view, the set kept); the link reconnecting (the candidates kept, Use this pose waiting until it is back);
- * the session ending (back to Subject view, which shows what ended it).
+ * the session ending (back to Subject view, which shows what ended it); a 9:16 candidate in its own shape (FR-4.3).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,8 +64,8 @@ class SubjectPickPoseFragmentTest {
     }
 
     /** A subject's phone whose syncer has the photographer's set1, PICKING with pose-1 and pose-2. */
-    private fun picking(): TestAppContainer {
-        val modules = TestAppContainer().install()
+    private fun picking(modules: TestAppContainer = TestAppContainer()): TestAppContainer {
+        modules.install()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         modules.poses.startAsReceiver(receiving)
         idle()
@@ -129,6 +132,24 @@ class SubjectPickPoseFragmentTest {
             assertEquals(View.GONE, binding.tryOtherButton.visibility)
             assertEquals(string(R.string.pose_shared_hint, "Dongje"), binding.sharedHint.text.toString())
             assertTrue(binding.usePoseButton.isEnabled)
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun aNineBySixteenCandidate_showsWholeInItsOwnShape() {
+        // The subject's phone has no scene photo; the page takes the shape of the copy it received.
+        picking(TestAppContainer(candidateImage = { bitmap(288, 512) }))
+        launch()
+
+        onScreen { binding ->
+            val pages = binding.candidatePager.getChildAt(0) as RecyclerView
+            val page = checkNotNull(pages.findViewHolderForAdapterPosition(0)).itemView
+            val image = page.findViewById<ImageView>(R.id.poseImage)
+            assertEquals(288f / 512, image.width.toFloat() / image.height, 0.01f)
+            // As large as the page allows: as wide or as tall as the page.
+            assertTrue(image.width <= page.width && image.height <= page.height)
+            assertTrue(image.width >= page.width - 1 || image.height >= page.height - 1)
         }
     }
 

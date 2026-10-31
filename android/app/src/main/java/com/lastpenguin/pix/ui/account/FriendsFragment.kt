@@ -1,14 +1,17 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.IdRes
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -24,13 +27,16 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.Friend
 import com.lastpenguin.pix.account.FriendRequest
+import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.databinding.FragmentFriendsBinding
 import com.lastpenguin.pix.databinding.ItemFriendBinding
 import com.lastpenguin.pix.databinding.ItemFriendRequestBinding
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.session.InviteResult
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.launch
 
@@ -72,6 +78,11 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
                 override fun decline(request: FriendRequest) = viewModel.decline(request)
 
                 override fun remove(friend: Friend) = confirmRemove(friend)
+
+                override fun invite(friend: Friend) {
+                    if (findNavController().currentDestination?.id != R.id.friendsFragment) return
+                    sessionViewModel.invite(PixUser(friend.userId, friend.pixId, friend.displayName))
+                }
             },
         )
         binding.backButton.setOnClickListener { findNavController().popBackStack() }
@@ -80,6 +91,12 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(screen::render) }
                 launch { viewModel.keepRefreshing() }
+                launch { sessionViewModel.inviteResults.collect(::onInviteResult) }
+                launch {
+                    viewModel.uiState.collect { state ->
+                        if (state.auth is AuthState.SignedIn) askForNotifications()
+                    }
+                }
                 launch {
                     viewModel.events.collect { event ->
                         val message = when (event) {
@@ -91,6 +108,41 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
                 }
             }
         }
+    }
+
+    /** *Invite* went out: Invite sent; or a friend in another session (FR-6.9), or another failure, said here. */
+    private fun onInviteResult(result: InviteResult) {
+        when (result) {
+            InviteResult.Sent -> navigate(R.id.action_friends_to_inviteSent)
+
+            is InviteResult.Failed -> {
+                val message = if (result.error == AccountError.BUSY) {
+                    getString(R.string.invite_busy, result.friend.displayName)
+                } else {
+                    requireContext().accountMessage(result.error)
+                }
+                Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /**
+     * Invitations and friend requests arrive as notifications (Design 2.6.6), which Android 13 and later show only
+     * with the person's consent: asked once per run, here, where the person signed in to use friends.
+     */
+    private fun askForNotifications() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || notificationsAsked) return
+        notificationsAsked = true
+        val granted = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    private companion object {
+        /** Asked in this run of Pix; Android itself stops showing the question after two refusals. */
+        var notificationsAsked = false
     }
 
     /** Navigates only from this screen, so a second tap during the transition does nothing. */
@@ -135,6 +187,7 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
         fun accept(request: FriendRequest)
         fun decline(request: FriendRequest)
         fun remove(friend: Friend)
+        fun invite(friend: Friend)
     }
 
     private val context = binding.root.context
@@ -194,6 +247,7 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
         renderRequests(requests, state.answering)
         renderFriends(friends)
         binding.emptyCard.isVisible = pixId != null && friends.isEmpty()
+        binding.networkNote.isVisible = friends.isNotEmpty()
     }
 
     private fun renderRequests(requests: List<FriendRequest>, answering: Set<String>) {
@@ -234,7 +288,8 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
                 row.statusText,
                 ColorStateList.valueOf(ContextCompat.getColor(context, color)),
             )
-            row.inviteButton.contentDescription = context.getString(R.string.invite_not_yet, friend.displayName)
+            row.inviteButton.contentDescription = context.getString(R.string.invite_friend, friend.displayName)
+            row.inviteButton.setOnClickListener { actions.invite(friend) }
             row.root.setOnLongClickListener {
                 actions.remove(friend)
                 true

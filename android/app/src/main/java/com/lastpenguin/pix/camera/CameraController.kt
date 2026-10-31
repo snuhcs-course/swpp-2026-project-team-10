@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -15,7 +15,13 @@ enum class AspectRatio { R4_3, R16_9, R1_1 }
 /** FR-1.12. */
 enum class FlashMode { OFF, AUTO, ON }
 
-/** Supported zoom in primary-rear-camera units (1x). Sent to the subject in `camera.capabilities`. */
+/** The camera that takes the photos: the rear one, or the front one for a selfie (FR-1.14). */
+enum class CameraFacing { BACK, FRONT }
+
+/**
+ * Supported zoom in units of the bound camera's main lens (1x): the primary rear camera's, or the front camera's own in
+ * selfie mode. Sent to the subject in `camera.capabilities`.
+ */
 @Serializable
 data class CameraCapabilities(
     val minZoom: Float,
@@ -39,6 +45,11 @@ data class CameraState(
     val exposure: Int = 0,
     val flash: FlashMode = FlashMode.OFF,
     val aspect: AspectRatio = AspectRatio.R4_3,
+    /**
+     * The phone's light ([CameraController.setTorch]) is on: true once the camera has applied it, false again when it
+     * goes off or the camera closes. Not echoed to the subject.
+     */
+    val torch: Boolean = false,
 )
 
 /**
@@ -47,7 +58,11 @@ data class CameraState(
  * Do not retain the ImageProxy or its planes, or perform blocking network work here.
  */
 fun interface FrameSink {
-    fun onFrame(image: ImageProxy)
+    /**
+     * [mirrored] is true for the front camera's frames: the camera gives them as it sees the scene, and the receiver
+     * flips the upright frame left to right, so it shows what the photographer's mirrored preview shows (FR-1.14).
+     */
+    fun onFrame(image: ImageProxy, mirrored: Boolean)
 }
 
 /** READY requires an open camera and its first analysis frame. IDLE means no active lifecycle owner. */
@@ -63,14 +78,31 @@ interface CameraController {
 
     val capabilities: StateFlow<CameraCapabilities?>
 
-    /** Applied zoom, exposure, flash, and aspect ratio in one value. */
+    /** Applied zoom, exposure, flash, aspect ratio, and light in one value. */
     val state: StateFlow<CameraState>
 
-    /** Zoom ratio actually applied, relative to the primary rear camera across any lens switch. */
+    /** Zoom ratio actually applied, relative to the bound camera's main lens across any lens switch. */
     val zoom: StateFlow<Float>
+
+    /**
+     * The camera chosen (FR-1.14). The front camera is a mirror everywhere: its preview, its photos, its scene photos
+     * for poses, and the frames a session streams all show the scene flipped left to right, so a guide placed on the
+     * preview lines up with each of them. It has no ultrawide.
+     */
+    val facing: StateFlow<CameraFacing>
+
+    /** Whether the phone has a front camera to switch to; false until the cameras are known. */
+    val hasFrontCamera: StateFlow<Boolean>
 
     /** Binds Preview, ImageCapture, and ImageAnalysis with one viewport of the chosen aspect ratio (AD-10). */
     fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider)
+
+    /**
+     * Rebinds with the camera [facing], after any photo being saved (FR-1.14). Zoom and brightness start again at 1x
+     * and 0 on the new camera; the aspect ratio and the flash mode stay, and the flash returns with the rear camera.
+     * Ignored for a camera the phone does not have.
+     */
+    fun setFacing(facing: CameraFacing)
 
     /**
      * Primary-relative ratio, clamped to [CameraCapabilities.minZoom, CameraCapabilities.maxZoom]; only the newest
@@ -87,6 +119,13 @@ interface CameraController {
 
     /** Ignored when [CameraCapabilities.hasFlash] is false (FR-1.12). */
     fun setFlash(mode: FlashMode)
+
+    /**
+     * Keeps the phone's light on, for the scene photo, which is a frame of the preview that the flash of a photo would
+     * not reach (FR-4.1). Kept across a rebind or a lens switch and applied again when the camera opens; nothing
+     * happens while the bound lens has no flash, such as the front camera. [CameraState.torch] says when it is on.
+     */
+    fun setTorch(on: Boolean)
 
     /** Rebinds the use cases with a viewport of [ratio], after any photo being saved (FR-1.13). */
     fun setAspectRatio(ratio: AspectRatio)

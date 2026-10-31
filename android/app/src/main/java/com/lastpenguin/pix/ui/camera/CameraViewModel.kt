@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
@@ -105,8 +106,14 @@ data class CameraUiState(
     /** False hides the flash button (FR-1.12). */
     val hasFlash: Boolean = false,
     val flash: FlashMode = FlashMode.OFF,
+    /** The phone's light for the scene photo is on, as the camera applied it (FR-4.1). */
+    val torch: Boolean = false,
     /** The frame's shape (FR-1.13, AD-10): the preview, the grid, the guide, and the saved photo follow it. */
     val aspect: AspectRatio = AspectRatio.R4_3,
+    /** The camera in use (FR-1.14); the front one is selfie mode. */
+    val facing: CameraFacing = CameraFacing.BACK,
+    /** False hides the camera switch: the phone has no front camera, or the cameras are not known yet. */
+    val canSwitchCamera: Boolean = false,
     val supportsFocusPoint: Boolean = false,
     val isSaving: Boolean = false,
     /** "Saved without the guide" for [CameraViewModel.NOTICE_MS], or why the last photo failed until the next one. */
@@ -188,7 +195,9 @@ class CameraViewModel(
         }
         viewModelScope.launch {
             camera.state.collect { state ->
-                _uiState.update { it.copy(exposure = state.exposure, flash = state.flash, aspect = state.aspect) }
+                _uiState.update {
+                    it.copy(exposure = state.exposure, flash = state.flash, aspect = state.aspect, torch = state.torch)
+                }
             }
         }
         viewModelScope.launch {
@@ -197,6 +206,15 @@ class CameraViewModel(
             camera.state.map { it.aspect }.distinctUntilChanged().drop(1).collect {
                 guides.update(final = true) { state -> state }
             }
+        }
+        viewModelScope.launch {
+            camera.facing.collect { facing ->
+                pendingZoomStep = null
+                _uiState.update { it.copy(facing = facing) }
+            }
+        }
+        viewModelScope.launch {
+            camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
         }
         viewModelScope.launch {
             camera.zoom.collect { zoom ->
@@ -363,6 +381,16 @@ class CameraViewModel(
                 FlashMode.ON -> FlashMode.OFF
             },
         )
+    }
+
+    /**
+     * The camera switch (FR-1.14): the front camera for a selfie, or the rear one again, with or without a session. The
+     * choice lasts while the app runs; Pix opens with the rear camera.
+     */
+    fun onSwitchCamera() {
+        val state = _uiState.value
+        if (state.isSaving || !state.canSwitchCamera) return
+        camera.setFacing(if (state.facing == CameraFacing.BACK) CameraFacing.FRONT else CameraFacing.BACK)
     }
 
     /** The ratio button cycles 4:3, 16:9, 1:1 (FR-1.13), and the choice is kept for the next time. */

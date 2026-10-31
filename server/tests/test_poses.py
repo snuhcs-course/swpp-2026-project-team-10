@@ -1,11 +1,14 @@
-# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
 # whitespace and line breaks, blank, 100 characters (after trimming) and 101. Scene: a JPEG within the contract, at
-# 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short. Image API: a candidate in JPEG, PNG,
+# 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short; its shape, which the candidate is asked
+# in: each of the app's ratios (3:4, 9:16, 1:1), as the phone sends it and a pixel off, either side of the shape halfway
+# between two ratios, and landscape. Image API: a candidate in JPEG, PNG,
 # or WEBP; a refusal (403) of a template and of a description, with one message for both; another failing status; an unreadable answer; no
 # answer in time; no key. Limits: each window full, and a request refused before the image API, which is not counted.
+# Selfie (FR-1.14): `selfie` true, false, left out, and not a boolean; with a template, refused.
 import asyncio
 import base64
 import io
@@ -19,16 +22,18 @@ from starlette.formparsers import MultiPartParser
 
 from pix_server.main import MAX_REQUEST_BYTES
 from pix_server.poses.limiter import PoseLimiter
-from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH
+from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH, pose_prompt
 from pix_server.store import Window
 
 
-def create_pose(client, image, template_id="wave", seed="1829304756", description=None):
+def create_pose(client, image, template_id="wave", seed="1829304756", description=None, selfie=None):
     data = {"seed": seed}
     if template_id is not None:
         data["templateId"] = template_id
     if description is not None:
         data["description"] = description
+    if selfie is not None:
+        data["selfie"] = selfie
     return client.post("/api/v1/poses", files={"image": ("scene.jpg", image, "image/jpeg")}, data=data)
 
 
@@ -176,6 +181,39 @@ def test_model_and_quality_come_from_settings(client, image_api, make_image, set
 def test_seed_is_folded_into_the_range_the_image_api_accepts(client, image_api, make_image, seed, sent):
     assert create_pose(client, make_image(), seed=seed).status_code == 200
     assert image_api.payloads[0]["seed"] == sent
+
+
+@pytest.mark.parametrize(
+    ("size", "ratio"),
+    [
+        # As the phone sends each frame: cut from its 960 × 720 or 1280 × 960 analysis image, then at most 1024 px.
+        ((720, 960), "3:4"),
+        ((576, 1024), "9:16"),
+        ((720, 720), "1:1"),
+        ((768, 1024), "3:4"),
+        ((1024, 1024), "1:1"),
+        # Rounded by a pixel.
+        ((271, 480), "9:16"),
+        ((481, 640), "3:4"),
+        ((721, 720), "1:1"),
+        # Not from the app, which takes portrait photos only.
+        ((1024, 768), "1:1"),
+    ],
+)
+def test_candidate_is_asked_in_the_ratio_of_the_scene(client, image_api, make_image, size, ratio):
+    assert create_pose(client, make_image(size=size)).status_code == 200
+    assert image_api.payloads[0]["aspect_ratio"] == ratio
+
+
+@pytest.mark.parametrize(
+    ("width", "ratio"),
+    # On a scene 1024 px tall, the shape halfway between 9:16 and 3:4, as many times wider than the one as narrower
+    # than the other, is sqrt(9/16 * 3/4) * 1024 = 665.1 px wide, and between 3:4 and 1:1 sqrt(3/4) * 1024 = 886.8 px.
+    [(665, "9:16"), (666, "3:4"), (886, "3:4"), (887, "1:1")],
+)
+def test_scene_between_two_ratios_gets_the_closer_one(client, image_api, make_image, width, ratio):
+    assert create_pose(client, make_image(size=(width, 1024))).status_code == 200
+    assert image_api.payloads[0]["aspect_ratio"] == ratio
 
 
 @pytest.mark.parametrize("image_format", ["PNG", "WEBP"])
@@ -432,3 +470,26 @@ def test_description_is_not_logged(client, image_api, make_image, caplog, status
     assert "OpenRouter" in caplog.text
     assert "SECRET" not in caplog.text
     assert "벽에" not in caplog.text
+
+
+@pytest.mark.parametrize(("selfie", "is_selfie"), [("true", True), ("false", False), (None, False)])
+def test_selfie_says_which_pose_prompt_the_image_api_gets(client, image_api, make_image, selfie, is_selfie):
+    response = create_pose(client, make_image(), template_id=None, description="윙크하며 브이", selfie=selfie)
+
+    assert response.status_code == 200
+    [payload] = image_api.payloads
+    assert payload["prompt"] == pose_prompt("윙크하며 브이", selfie=is_selfie)
+
+
+def test_selfie_with_a_template_is_invalid(client, image_api, make_image):
+    response = create_pose(client, make_image(), template_id="wave", selfie="true")
+
+    assert "selfie" in assert_error(response, 400, "INVALID_REQUEST")
+    assert image_api.requests == []
+
+
+def test_selfie_that_is_not_a_boolean_is_invalid(client, image_api, make_image):
+    response = create_pose(client, make_image(), template_id=None, description="wink", selfie="maybe")
+
+    assert_error(response, 400, "INVALID_REQUEST")
+    assert image_api.requests == []

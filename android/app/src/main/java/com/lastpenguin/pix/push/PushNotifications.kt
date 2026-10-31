@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-31, reviewed by Jaewan Park
 package com.lastpenguin.pix.push
 
 import android.Manifest
@@ -58,7 +58,7 @@ object PushNotifications {
         val left = (data["expiresAt"]?.toLongOrNull() ?: return null) - now
         if (left <= 0) return null
         val notification = NotificationCompat.Builder(context, INVITATIONS)
-            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.invitation_notification, name))
             .setContentText(context.getString(R.string.invitation_body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -75,7 +75,7 @@ object PushNotifications {
         val requestId = data["requestId"] ?: return null
         val name = data["fromName"] ?: return null
         val notification = NotificationCompat.Builder(context, FRIEND_REQUESTS)
-            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.friend_request_notification, name))
             .setContentText(context.getString(R.string.friend_request_notification_body))
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)

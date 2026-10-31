@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon for notifications: the small cut of the logo (branding/pix-symbol-small.svg), the P with its hexagon opening and no blade gaps, which close up at 24 dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group
+        android:scaleX="0.0980392"
+        android:scaleY="0.0980392"
+        android:translateX="-0.54902"
+        android:translateY="-0.54902">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M58 96 A70 70 0 1 1 102 160.99 L102 188 L60 230 L58 230 Z M154 111.01 L128 126.02 L102 111.01 L102 80.99 L128 65.98 L154 80.99 Z" />
+    </group>
+</vector>

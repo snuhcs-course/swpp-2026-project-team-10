@@ -34,5 +34,6 @@
     <!-- The horizon bar when level (FR-1.10, Design 2.6.2). -->
     <color name="camera_level_aligned">#D4AC24</color>
 
-    <color name="ic_launcher_background">#16171A</color>
+    <!-- The app icon's tile: paper, under the ink-and-sun shutter P (branding/pix-app-icon.svg). -->
+    <color name="ic_launcher_background">#F4F4F2</color>
 </resources>

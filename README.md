@@ -1,4 +1,20 @@
-# Pix
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/png/pix-horizontal-on-dark.png">
+    <img alt="Pix" src="branding/png/pix-horizontal.png" width="320">
+  </picture>
+</p>
+
+<p align="center"><strong>Get the portrait you have in mind, together.</strong></p>
+
+<p align="center">
+  <a href="https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications">Requirements and Specifications</a> ·
+  <a href="https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation">Design Documentation</a> ·
+  <a href="https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation">Testing Documentation</a> ·
+  <a href="https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki">Wiki</a>
+</p>
+
+---
 
 Pix is an Android camera app that helps two people get the portrait one of them has in mind. When friends photograph each other, the person in the photo usually knows the pose and framing they want, but only the photographer sees the screen. Pix gives both people the same view: the photographer puts a pose guide on the camera, and the friend's phone shows the live camera with the same guide and can adjust the shot. The photographer takes the photo, and it is saved at full quality without the guide.
 
@@ -170,6 +186,7 @@ At the close of Iteration 2: 756 app tests and 431 server tests, app line covera
 | `android/` | The Android app (open this folder in Android Studio) |
 | `server/` | The Pix server, its tests, the deploy files for the course servers, and tools for testing with one phone |
 | `wiki/` | The source of the GitHub wiki, published on every push to `dev` |
+| `branding/` | The logo: SVG masters of every version, PNG exports, and the usage guide |
 | `.github/` | CI workflows and the pull request template |
 
 Branches: `main` holds the stable version and `dev` is the integration branch. Each task is a branch from `dev` that returns through a reviewed, squash-merged pull request. `iteration-N-demo` holds the code shown in that iteration's demo, and at the end of an iteration `dev` is merged into `main`.

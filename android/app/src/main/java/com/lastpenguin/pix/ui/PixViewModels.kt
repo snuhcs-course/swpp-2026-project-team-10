@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -33,6 +33,7 @@ object PixViewModels {
                 container.cameraSettings,
                 container.savedGuideStore,
                 container.poseTips.onCamera,
+                container.photoSyncer,
             )
         }
         initializer {
@@ -64,6 +65,7 @@ object PixViewModels {
                 container.poseSyncer,
                 container.confirmSyncer,
                 container.descriptionSyncer,
+                container.photoSyncer,
             )
         }
         initializer {

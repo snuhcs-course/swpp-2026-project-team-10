@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -43,6 +43,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -60,7 +61,8 @@ import org.robolectric.annotation.GraphicsMode
  * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
  * together, Use this photo) and system back during the scene photo step; End session; the gallery button with and
  * without an app to open the photo; each capture failure's message; the subject's zoom, brightness, flash, and guide
- * moves as notices, a lost connection, and the live view on mobile data (FR-6.13); the zoom accessibility actions
+ * moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view on mobile data (FR-6.13); the
+ * zoom accessibility actions
  * and a tap on the readout through the quick steps (0.6×, 1×, 2×, back to 0.6×), by touch and by TalkBack; the
  * reference thumbnail's tap, drag,
  * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button; the preview's stream state;
@@ -223,6 +225,21 @@ class CameraFragmentInteractionTest {
     }
 
     // ---- Session ---------------------------------------------------------------------
+
+    @Test
+    fun aPhotoThatIsNotSent_isANotice() {
+        val modules = launch()
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.photos.taken(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.session_photo_not_sent, "Junhyeong"), controls.noticeText.text.toString())
+        }
+    }
 
     @Test
     fun liveViewOnMobileData_isANotice() {

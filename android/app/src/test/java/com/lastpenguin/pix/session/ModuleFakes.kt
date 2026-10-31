@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -18,6 +18,7 @@ import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +59,15 @@ class FakeSessionManager : SessionManager {
 
     override fun send(message: SessionMessage) {
         sent += message
+    }
+
+    /** Set to hold [sendBulk] as a full channel or a reconnect would; what it completes with is what it returns. */
+    var bulkGate: CompletableDeferred<Boolean>? = null
+
+    override suspend fun sendBulk(message: SessionMessage): Boolean {
+        val open = bulkGate?.await() ?: true
+        if (open) sent += message
+        return open
     }
 
     override fun videoSink(): FrameSink = frameSink

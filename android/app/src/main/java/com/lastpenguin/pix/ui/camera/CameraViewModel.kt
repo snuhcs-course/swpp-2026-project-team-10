@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.PhotoShare
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -144,6 +145,9 @@ class CameraViewModel(
     private val savedGuides: SavedGuideStore = SavedGuideStore.InMemory(),
     /** The tip of the guide on the camera (`PoseTips.onCamera`, FR-4.10). */
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
+    /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
+    private val photos: PhotoShare = PhotoShare.None,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
@@ -273,11 +277,13 @@ class CameraViewModel(
         // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
         _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false) }
+        val takenAt = clock()
         viewModelScope.launch {
             try {
                 camera.takePhoto().fold(
                     onSuccess = { uri ->
                         _uiState.update { it.copy(lastPhoto = uri, captureNotice = CaptureNotice.SAVED) }
+                        photos.taken(uri, takenAt)
                         // Only a confirmation (FR-1.6): it goes by itself, while a failure stays until the next photo.
                         savedNoticeJob = viewModelScope.launch {
                             delay(NOTICE_MS)

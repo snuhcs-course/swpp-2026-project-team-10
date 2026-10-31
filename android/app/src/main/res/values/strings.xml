@@ -90,6 +90,10 @@
     <string name="end_session">End session</string>
     <string name="peer_left">%1$s left</string>
     <string name="peer_disconnected">%1$s disconnected</string>
+    <string name="session_photo_saved">Photo saved to your Pix album</string>
+    <string name="session_photo_save_failed">Couldn\'t save %1$s\'s photo</string>
+    <string name="session_photo_not_sent">Couldn\'t send a photo to %1$s</string>
+    <string name="session_photos_not_sent">Couldn\'t send %1$d photos to %2$s</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
     <string name="remote_guide_notice">%1$s set a pose guide</string>

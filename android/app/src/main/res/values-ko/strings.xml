@@ -85,6 +85,10 @@
     <string name="end_session">공유 종료</string>
     <string name="peer_left">%1$s님이 나갔어요</string>
     <string name="peer_disconnected">%1$s님의 연결이 끊겼어요</string>
+    <string name="session_photo_saved">사진을 Pix 앨범에 저장했어요</string>
+    <string name="session_photo_save_failed">%1$s님의 사진을 저장하지 못했어요</string>
+    <string name="session_photo_not_sent">%1$s님에게 사진을 보내지 못했어요</string>
+    <string name="session_photos_not_sent">%2$s님에게 사진 %1$d장을 보내지 못했어요</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>

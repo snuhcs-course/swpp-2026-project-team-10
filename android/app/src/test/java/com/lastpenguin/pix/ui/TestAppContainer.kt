@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -36,8 +36,10 @@ import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.MobileDataNotice
+import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
+import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -93,6 +95,15 @@ class TestAppContainer(
     val descriptions =
         DescriptionSyncer(session, FakePoseCandidateCodec { ScreenTestSupport.bitmap(60, 80) }, Dispatchers.Unconfined)
 
+    /** The session's photos, the same way; a screen test sends none. */
+    val photos = PhotoSyncer(
+        session,
+        { null },
+        { _, _, _ -> Result.failure(IOException("No album in a screen test")) },
+        File(System.getProperty("java.io.tmpdir"), "pix-session-photos"),
+        Dispatchers.Unconfined,
+    )
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
@@ -114,6 +125,7 @@ class TestAppContainer(
         poseSyncer = poses,
         confirmSyncer = confirms,
         descriptionSyncer = descriptions,
+        photoSyncer = photos,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
     )

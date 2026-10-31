@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -14,6 +14,7 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.MobileDataNotice
+import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -22,6 +23,7 @@ import com.lastpenguin.pix.session.SessionEntry
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.camera.CameraViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -33,6 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Short notices for the photographer's camera screen. */
@@ -56,14 +59,25 @@ sealed interface SessionNotice {
     data class RemoteGuide(val name: String) : SessionNotice
 }
 
+/** The subject's toast about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
+sealed interface PhotoNotice {
+    data object Saved : PhotoNotice
+
+    /** "Couldn't save Dongje's photo". */
+    data class SaveFailed(val name: String) : PhotoNotice
+}
+
+/** Photos of a session with [name] that did not reach the subject's album (FR-6.14). */
+data class PhotosNotSent(val name: String, val count: Int)
+
 /**
  * Starts, joins, and ends a room-code session (R&S 6.7, Design 2.4). Shared by the session screens
  * and the Camera screen's live badge (activity scope).
  *
  * On the photographer's phone, camera frames go to the session from the moment a subject starts connecting,
- * and the camera's capabilities are sent once the data channels are up. Guide sync (#9), remote zoom (#10), and the
+ * and the camera's capabilities are sent once the data channels are up. Guide sync (#9), remote zoom (#10), the
  * photographer's Generate poses, candidates, and Reference confirm on the subject's screens of the same steps
- * (Iter3-P16) hook in at the same place.
+ * (Iter3-P16), and the session's photos (Iter3-P17) hook in at the same place.
  *
  * Owner: Real-time (#8), with guide sync (#9) and remote zoom (#10).
  */
@@ -76,6 +90,7 @@ class SessionViewModel(
     private val poseSyncer: PoseSyncer? = null,
     private val confirmSyncer: ConfirmSyncer? = null,
     private val descriptionSyncer: DescriptionSyncer? = null,
+    private val photoSyncer: PhotoSyncer? = null,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -87,6 +102,16 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    private val _photoNotices = MutableSharedFlow<PhotoNotice>(extraBufferCapacity = 16)
+
+    /** Subject: shown by MainActivity, because Subject view may be under another step of the session. */
+    val photoNotices: SharedFlow<PhotoNotice> = _photoNotices.asSharedFlow()
+
+    private val _photosNotSent = MutableStateFlow<PhotosNotSent?>(null)
+
+    /** Photographer: kept until the Camera screen shows it, which may be in front of it only later. */
+    val photosNotSent: StateFlow<PhotosNotSent?> = _photosNotSent.asStateFlow()
 
     /** Subject: each guide from this phone that did not reach the photographer, for "Couldn't send the guide". */
     val guideOfferFailed: Flow<String> = guideSyncer.offerFailed
@@ -119,6 +144,7 @@ class SessionViewModel(
     private var streaming = false
     private var connectedJob: Job? = null
     private var receiverJob: Job? = null
+    private var photoJob: Job? = null
     private var backgroundJob: Job? = null
 
     /** The whole app in the background: the camera is released by its lifecycle, so the video pauses. */
@@ -211,12 +237,37 @@ class SessionViewModel(
                     poseSyncer?.startAsReceiver(this)
                     confirmSyncer?.startAsReceiver(this)
                     descriptionSyncer?.startAsReceiver(this)
+                    photoSyncer?.startAsReceiver(this)
+                    launch { photoSyncer?.received?.collect(::onPhotoReceived) }
                 }
             }
         }
         if (!receivingNow && receiverJob != null) {
             receiverJob?.cancel()
             receiverJob = null
+        }
+
+        // Unlike the rest it runs through a reconnect, because a photo goes on from where it was (Design 2.6.7).
+        val sendingPhotos = role == Role.PHOTOGRAPHER && inSession
+        if (sendingPhotos && photoJob == null) {
+            photoJob = viewModelScope.launch {
+                coroutineScope {
+                    photoSyncer?.startAsSender(this)
+                    launch { photoSyncer?.sendFailed?.collect { addPhotosNotSent(1) } }
+                }
+            }
+        }
+        if (!sendingPhotos && photoJob != null) {
+            photoJob?.cancel()
+            photoJob = null
+            val dropped = photoSyncer?.drop() ?: 0
+            // After the end's own notice, which this one would replace at once.
+            if (dropped > 0) {
+                viewModelScope.launch {
+                    delay(CameraViewModel.NOTICE_MS)
+                    addPhotosNotSent(dropped)
+                }
+            }
         }
 
         // Stopped while reconnecting and started again at Connected, so the subject gets the capabilities, the
@@ -282,6 +333,21 @@ class SessionViewModel(
     }
 
     private fun isLive(state: SessionState) = state is SessionState.Connected || state is SessionState.Reconnecting
+
+    private fun onPhotoReceived(saved: Boolean) {
+        val name = peerName ?: return
+        _photoNotices.tryEmit(if (saved) PhotoNotice.Saved else PhotoNotice.SaveFailed(name))
+    }
+
+    private fun addPhotosNotSent(count: Int) {
+        val name = peerName ?: return
+        _photosNotSent.update { PhotosNotSent(name, (it?.count ?: 0) + count) }
+    }
+
+    /** The Camera screen said so; until then the count waits for it (FR-6.14). */
+    fun photosNotSentShown() {
+        _photosNotSent.value = null
+    }
 
     /**
      * What an end does with the kept code (#81): *Connection lost* keeps it for *Reconnect*; an unknown or expired

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -34,6 +34,13 @@ interface SessionManager {
 
     /** Sent on the realtime or reliable data channel as listed in Design 2.5.1. */
     fun send(message: SessionMessage)
+
+    /**
+     * Sends one chunk of something large on the reliable channel, behind every other reliable message: it waits until
+     * none is queued and the channel's buffer is low, and through a reconnect (Design 2.8, Backpressure). False once
+     * the session is over, when nothing was sent.
+     */
+    suspend fun sendBulk(message: SessionMessage): Boolean
 
     /** Photographer: pass to CameraController.setFrameSink while connected. */
     fun videoSink(): FrameSink

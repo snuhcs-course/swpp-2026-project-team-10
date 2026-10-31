@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -28,7 +28,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.webrtc.EglBase
@@ -152,6 +155,9 @@ class RtcSessionManager(
     private val lastSeq = HashMap<String, Long>()
     private val reliableQueue = ArrayDeque<String>()
 
+    /** Counts the changes of the reliable channel's buffer, each a chance for [sendBulk] to go on. */
+    private val bulkTicks = MutableStateFlow(0L)
+
     /** Renderers from the Subject view; guarded by itself, because the view attaches from the main thread. */
     private val sinks = LinkedHashSet<VideoSink>()
 
@@ -216,6 +222,30 @@ class RtcSessionManager(
 
     override fun send(message: SessionMessage) {
         scope.launch { sendNow(message) }
+    }
+
+    override suspend fun sendBulk(message: SessionMessage): Boolean {
+        while (true) {
+            val seen = bulkTicks.value to _state.value
+            withContext(serial) { trySendBulk(message) }?.let { return it }
+            combine(bulkTicks, _state) { tick, state -> tick to state }.first { it != seen }
+        }
+    }
+
+    /** null while the message has to wait; false once the session is over. */
+    private fun trySendBulk(message: SessionMessage): Boolean? = when (_state.value) {
+        is SessionState.Connected -> {
+            val client = peer
+            when {
+                client == null -> false
+                reliableQueue.isNotEmpty() || client.bufferedAmount(Channel.RELIABLE) >= BULK_BYTES -> null
+                else -> client.send(Channel.RELIABLE, codec.encode(message))
+            }
+        }
+
+        is SessionState.Reconnecting -> null
+
+        else -> false
     }
 
     override fun videoSink(): FrameSink = frameSource
@@ -633,7 +663,10 @@ class RtcSessionManager(
 
             is PeerEvent.Message -> onPeerMessage(event.text)
 
-            is PeerEvent.BufferedAmount -> if (event.channel == Channel.RELIABLE) drainReliable()
+            is PeerEvent.BufferedAmount -> if (event.channel == Channel.RELIABLE) {
+                drainReliable()
+                bulkTicks.update { it + 1 }
+            }
         }
     }
 
@@ -982,5 +1015,8 @@ class RtcSessionManager(
         const val PING_INTERVAL_MS = 2_000L
         const val LEAVE_FLUSH_MS = 150L
         const val BACKPRESSURE_BYTES = 256L * 1024
+
+        /** A bulk chunk waits below this, so that a control message sent next waits for this much at most. */
+        const val BULK_BYTES = 64L * 1024
     }
 }

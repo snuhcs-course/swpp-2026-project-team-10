@@ -279,6 +279,30 @@ The kickoff on 2026-10-25 replaced that day's standup ([[Team Meetings|Team-Meet
 
 </details>
 
+<details>
+<summary><b>2026-10-29 (Thu)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter3-P12: selfie mode, PR opened ([#152]) | Address the review on [#152] and merge it | – |
+| 박재완 | The AWS server now deploys from GitHub Actions ([#150]); approved [#149] | Iter3-P8: candidates in the scene photo's ratio ([#112]); review [#151] | – |
+| 조성민 | Merged reconnection after a short drop ([#149]); invitations and friend requests as push notifications on the server ([#153]); opened the app side ([#154]) | Test invitations on two phones and merge [#154] | – |
+| 한준형 | Iter3-P16: the guide and pose steps shared on both phones; opened [#151] and addressed the review | Merge [#151]; then photos saved on both phones ([#121]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-30 (Fri)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged selfie mode ([#152]); pose tips in Korean and a light while taking the scene photo, PR opened ([#157]); reviewed the user test questions and format | Run the user test; address the review on [#157] and merge it | – |
+| 박재완 | Approved [#151]; pose candidates now follow the scene photo's ratio ([#155]); prepared the user test planned for the weekend (10/31–11/1) | Run the user test | – |
+| 조성민 | Merged inviting a friend to shoot together ([#154]); reviewed the user test questions and format | Run the user test | – |
+| 한준형 | Merged the shared steps ([#151]); started photos saved on both phones ([#121]); reviewed the user test questions and format | Run the user test; open the PR for [#121] | – |
+
+</details>
+
 [#5]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/5
 [#6]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/6
 [#11]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/11
@@ -372,3 +396,11 @@ The kickoff on 2026-10-25 replaced that day's standup ([[Team Meetings|Team-Meet
 [#145]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/145
 [#146]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/146
 [#147]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/147
+[#149]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/149
+[#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
+[#151]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/151
+[#152]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/152
+[#153]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/153
+[#154]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/154
+[#155]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/155
+[#157]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/157

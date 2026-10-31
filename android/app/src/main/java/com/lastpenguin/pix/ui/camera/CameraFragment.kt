@@ -289,14 +289,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 }
                 launch {
                     sessionViewModel.photosNotSent.collect { notSent ->
-                        if (notSent == null) return@collect
                         val text = if (notSent.count == 1) {
                             getString(R.string.session_photo_not_sent, notSent.name)
                         } else {
                             getString(R.string.session_photos_not_sent, notSent.count, notSent.name)
                         }
                         showNotice(controls, text)
-                        sessionViewModel.photosNotSentShown()
+                        // Each for its full time: the next would replace this one before it can be read.
+                        delay(CameraViewModel.NOTICE_MS)
                     }
                 }
                 launch {

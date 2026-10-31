@@ -6,6 +6,7 @@ import android.app.Application
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Looper
 import android.provider.Settings
 import android.view.MotionEvent
 import android.view.View
@@ -17,6 +18,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.PreviewView
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.MutableLiveData
@@ -44,6 +46,7 @@ import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -239,6 +242,24 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ ->
             assertEquals(string(R.string.session_photo_not_sent, "Junhyeong"), controls.noticeText.text.toString())
         }
+    }
+
+    @Test
+    fun twoPhotosNotSent_eachGetTheirFullTime() {
+        val modules = launch()
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        idle()
+        val photo = Uri.parse("content://media/external/images/media/1")
+
+        modules.photos.taken(photo, takenAt = 1)
+        modules.photos.taken(photo, takenAt = 2)
+        idle()
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertTrue(controls.noticeText.isVisible) }
+
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertFalse(controls.noticeText.isVisible) }
     }
 
     @Test

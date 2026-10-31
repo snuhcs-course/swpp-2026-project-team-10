@@ -15,6 +15,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -41,7 +44,8 @@ import org.robolectric.RobolectricTestRunner
  * Photographer, failures (fault injection): a photo that cannot be opened or read, one the subject refuses, one with
  * no answer for 30 s (just before and just after), and `sendBulk` saying the session is over; each is one `sendFailed`,
  * and the next photo goes on.
- * Photographer, the session's end: every unconfirmed photo counted once, the one going included; a confirmed one not.
+ * Photographer, the session's end: every unconfirmed photo counted once, the one going included; a confirmed one not;
+ * failures nothing read counted too. No failure is lost, however many come before they are read.
  * Subject, one photo (state-based): saved once with its `takenAt`, then its file gone; a `photo.ack` every 16 chunks.
  * Subject, what is refused (equivalence partitioning and boundary): a header of 0 B or over 40 MiB (at the limit read),
  * in another format, or with the wrong chunk count; a skipped index, data that is not Base64, a chunk or a photo larger
@@ -49,6 +53,7 @@ import org.robolectric.RobolectricTestRunner
  * Subject, failures (fault injection): an album or a folder that fails is STORAGE, and says so here.
  * Subject, the file: kept while the link reconnects, dropped at another `photo.begin`, a stale chunk ignored, removed
  * when the session ends, and an old one removed when a session starts; a photo already saved answered, not saved again.
+ * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -379,6 +384,34 @@ class PhotoSyncerTest {
         assertEquals(0, syncer.drop())
     }
 
+    @Test
+    fun `no failure is lost while nothing reads them`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+
+        repeat(20) { syncer.taken(uri("gone/$it"), takenAt = 1) }
+        runCurrent()
+
+        assertEquals(20, syncer.sendFailed.take(20).toList().size)
+        assertEquals(0, syncer.drop())
+    }
+
+    @Test
+    fun `failures nothing read count at the end of the session`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+
+        repeat(3) { syncer.taken(uri("gone/$it"), takenAt = 1) }
+        runCurrent()
+
+        assertEquals(3, syncer.drop())
+        assertEquals(0, syncer.drop())
+    }
+
     // ---- Subject ----------------------------------------------------------------------------------------------
 
     /** A subject's syncer running until the returned job is cancelled, as the session's end does. */
@@ -456,6 +489,37 @@ class PhotoSyncerTest {
         assertEquals(SessionMessage.PhotoSaved("p1", ok = true), answers.single())
         assertEquals(listOf(true), received)
         assertTrue(partFiles().isEmpty())
+    }
+
+    @Test
+    fun `no saved photo is lost while nothing reads them`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        repeat(20) { deliverWhole("p$it", jpeg(10)) }
+
+        assertEquals(List(20) { true }, syncer.received.take(20).toList())
+    }
+
+    @Test
+    fun `what an earlier session left unread does not reach the next one`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        val job = Job()
+        syncer.startAsReceiver(CoroutineScope(backgroundScope.coroutineContext + job))
+        runCurrent()
+        deliverWhole("p1", jpeg(10))
+        job.cancel()
+        runCurrent()
+
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+        albumFails = true
+        deliverWhole("p2", jpeg(10))
+
+        assertEquals(false, syncer.received.first())
     }
 
     @Test

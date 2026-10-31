@@ -41,6 +41,7 @@ import java.util.zip.CRC32
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -70,7 +71,8 @@ import org.junit.runner.RunWith
  * before a screen shows it (dropped, not remembered, said in the next session), and a short drop (still pending).
  * Reconnecting (Design 2.6.7): the photographer's frames go on, and its capabilities go again once connected.
  * Session photos (Design 2.6.5, 2.6.7): one not sent waits for the Camera screen; those going when the session ends are
- * said after the end's own notice; a drop keeps one going; the subject's saved or failed photo is a notice.
+ * said after the end's own notice, under that session's name; a drop keeps one going; the subject's saved or failed
+ * photo is a notice, which waits for the activity.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -159,9 +161,15 @@ class SessionViewModelTest {
         photos.taken(photoUri, takenAt = 1)
         runCurrent()
 
-        assertEquals(PhotosNotSent("Junhyeong", 1), photoModel.photosNotSent.value)
-        photoModel.photosNotSentShown()
-        assertNull(photoModel.photosNotSent.value)
+        // Nothing has read it yet: it waits, as it does while the Camera screen is not in front.
+        assertEquals(PhotosNotSent("Junhyeong", 1), photoModel.photosNotSent.first())
+    }
+
+    /** What the Camera screen would read, from now on. */
+    private fun TestScope.notSent(model: SessionViewModel): List<PhotosNotSent> {
+        val read = mutableListOf<PhotosNotSent>()
+        backgroundScope.launch { model.photosNotSent.collect { read += it } }
+        return read
     }
 
     @Test
@@ -169,6 +177,7 @@ class SessionViewModelTest {
         val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte())
         val reader = PhotoReader { PhotoContent(bytes.size.toLong(), ByteArrayInputStream(bytes)) }
         val (photoModel, photos) = withPhotos(reader, noAlbum)
+        val notSent = notSent(photoModel)
         photoModel.startRoom()
         session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         runCurrent()
@@ -180,11 +189,33 @@ class SessionViewModelTest {
         runCurrent()
         advanceTimeBy(CameraViewModel.NOTICE_MS - 1)
         runCurrent()
-        assertNull(photoModel.photosNotSent.value)
+        assertTrue(notSent.isEmpty())
 
         advanceTimeBy(1)
         runCurrent()
-        assertEquals(PhotosNotSent("Junhyeong", 2), photoModel.photosNotSent.value)
+        assertEquals(listOf(PhotosNotSent("Junhyeong", 2)), notSent)
+    }
+
+    @Test
+    fun photosOfAnEndedSession_keepItsNameWhenAnotherSessionStartsDuringTheWait() = runTest(dispatcher) {
+        val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte())
+        val reader = PhotoReader { PhotoContent(bytes.size.toLong(), ByteArrayInputStream(bytes)) }
+        val (photoModel, photos) = withPhotos(reader, noAlbum)
+        val notSent = notSent(photoModel)
+        photoModel.startRoom()
+        session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        runCurrent()
+        photos.taken(photoUri, takenAt = 1)
+        runCurrent()
+
+        session.setState(SessionState.Idle)
+        runCurrent()
+        session.setState(SessionState.Connected("s2", PeerInfo("Mina"), Role.PHOTOGRAPHER))
+        runCurrent()
+        advanceTimeBy(CameraViewModel.NOTICE_MS)
+        runCurrent()
+
+        assertEquals(listOf(PhotosNotSent("Junhyeong", 1)), notSent)
     }
 
     @Test
@@ -192,6 +223,7 @@ class SessionViewModelTest {
         val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte())
         val reader = PhotoReader { PhotoContent(bytes.size.toLong(), ByteArrayInputStream(bytes)) }
         val (photoModel, photos) = withPhotos(reader, noAlbum)
+        val notSent = notSent(photoModel)
         photoModel.startRoom()
         session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         runCurrent()
@@ -207,7 +239,7 @@ class SessionViewModelTest {
         advanceTimeBy(CameraViewModel.NOTICE_MS)
         runCurrent()
 
-        assertNull(photoModel.photosNotSent.value)
+        assertTrue(notSent.isEmpty())
     }
 
     @Test
@@ -228,6 +260,18 @@ class SessionViewModelTest {
         deliverPhoto("p2")
 
         assertEquals(listOf(PhotoNotice.Saved, PhotoNotice.SaveFailed("Dongje")), notices)
+    }
+
+    @Test
+    fun aNoticeNobodyReadsYet_waitsForTheActivity() = runTest(dispatcher) {
+        val (photoModel, _) = withPhotos(album = { _, _, _ -> Result.success(photoUri) })
+        photoModel.joinRoom("123456")
+        session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        runCurrent()
+
+        deliverPhoto("p1")
+
+        assertEquals(PhotoNotice.Saved, photoModel.photoNotices.first())
     }
 
     private fun TestScope.deliverPhoto(id: String) {

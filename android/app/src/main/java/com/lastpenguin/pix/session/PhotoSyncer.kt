@@ -22,10 +22,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -96,10 +95,10 @@ class PhotoSyncer(
     /** The photos taken in this session that are not yet confirmed or given up, the one going included. */
     private val unconfirmed = AtomicInteger(0)
 
-    private val _sendFailed = MutableSharedFlow<Unit>(extraBufferCapacity = SIGNALS)
+    private val _sendFailed = Channel<Unit>(Channel.UNLIMITED)
 
-    /** A photo of this session that will not reach the subject's album; the session goes on. */
-    val sendFailed: Flow<Unit> = _sendFailed.asSharedFlow()
+    /** One for each photo of this session that will not reach the subject's album; none is lost unread. */
+    val sendFailed: Flow<Unit> = _sendFailed.receiveAsFlow()
 
     override fun taken(uri: Uri, takenAt: Long) {
         val state = session.state.value
@@ -131,7 +130,7 @@ class PhotoSyncer(
                     false
                 }
                 unconfirmed.updateAndGet { maxOf(it - 1, 0) }
-                if (!sent) _sendFailed.tryEmit(Unit)
+                if (!sent) _sendFailed.trySend(Unit)
                 progress.value = null
             }
         }
@@ -141,11 +140,13 @@ class PhotoSyncer(
         progress.update { current -> if (current?.photoId == photoId) change(current) else current }
     }
 
-    /** The session ended: what is not confirmed stays here. Returns how many photos that is. */
+    /** The session ended: what is not confirmed stays here. Returns how many photos that is, failures unread included. */
     fun drop(): Int {
         while (queue.tryReceive().isSuccess) Unit
         progress.value = null
-        return unconfirmed.getAndSet(0)
+        var unread = 0
+        while (_sendFailed.tryReceive().isSuccess) unread++
+        return unconfirmed.getAndSet(0) + unread
     }
 
     private suspend fun send(photo: Outgoing): Boolean {
@@ -219,15 +220,17 @@ class PhotoSyncer(
     /** This session's saved photos, so that one cannot be saved twice. */
     private val saved = HashSet<String>()
 
-    private val _received = MutableSharedFlow<Boolean>(extraBufferCapacity = SIGNALS)
+    private val _received = Channel<Boolean>(Channel.UNLIMITED)
 
     /** True when a photo reached this phone's album, false when it could not be saved. */
-    val received: Flow<Boolean> = _received.asSharedFlow()
+    val received: Flow<Boolean> = _received.receiveAsFlow()
 
     fun startAsReceiver(scope: CoroutineScope) {
         scope.launch(dispatcher) {
             clearParts()
             saved.clear()
+            // What an earlier session left unread is not about this one's photographer.
+            while (_received.tryReceive().isSuccess) Unit
             try {
                 session.incoming.collect { message ->
                     when (message) {
@@ -319,7 +322,7 @@ class PhotoSyncer(
     /** Tells the photographer, and this phone's person, how the photo ended: saved, or [refusal]. */
     private fun answer(photoId: String, refusal: PhotoRefusal?) {
         session.send(SessionMessage.PhotoSaved(photoId, ok = refusal == null, reason = refusal))
-        _received.tryEmit(refusal == null)
+        _received.trySend(refusal == null)
     }
 
     private fun abandon() {
@@ -349,7 +352,6 @@ class PhotoSyncer(
 
         private const val FORMAT = "jpeg"
         private const val PART_SUFFIX = ".part"
-        private const val SIGNALS = 16
         private const val JPEG_0 = 0xFF.toByte()
         private const val JPEG_1 = 0xD8.toByte()
         private const val TAG = "PixPhotoSync"

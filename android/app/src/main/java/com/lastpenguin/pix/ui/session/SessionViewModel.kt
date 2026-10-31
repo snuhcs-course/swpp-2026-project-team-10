@@ -31,6 +31,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.CameraViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -41,7 +42,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /** Short notices for the photographer's camera screen. */
@@ -117,15 +118,18 @@ class SessionViewModel(
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
 
-    private val _photoNotices = MutableSharedFlow<PhotoNotice>(extraBufferCapacity = 16)
+    private val _photoNotices = Channel<PhotoNotice>(Channel.UNLIMITED)
 
-    /** Subject: shown by MainActivity, because Subject view may be under another step of the session. */
-    val photoNotices: SharedFlow<PhotoNotice> = _photoNotices.asSharedFlow()
+    /**
+     * Subject: shown by MainActivity, because Subject view may be under another step of the session. Each waits to be
+     * read, so one that comes while the activity is stopped is shown when it starts again.
+     */
+    val photoNotices: Flow<PhotoNotice> = _photoNotices.receiveAsFlow()
 
-    private val _photosNotSent = MutableStateFlow<PhotosNotSent?>(null)
+    private val _photosNotSent = Channel<PhotosNotSent>(Channel.UNLIMITED)
 
-    /** Photographer: kept until the Camera screen shows it, which may be in front of it only later. */
-    val photosNotSent: StateFlow<PhotosNotSent?> = _photosNotSent.asStateFlow()
+    /** Photographer: each waits for the Camera screen to read it, which may be in front only later. */
+    val photosNotSent: Flow<PhotosNotSent> = _photosNotSent.receiveAsFlow()
 
     /** Subject: each guide from this phone that did not reach the photographer, for "Couldn't send the guide". */
     val guideOfferFailed: Flow<String> = guideSyncer.offerFailed
@@ -365,7 +369,11 @@ class SessionViewModel(
             photoJob = viewModelScope.launch {
                 coroutineScope {
                     photoSyncer?.startAsSender(this)
-                    launch { photoSyncer?.sendFailed?.collect { addPhotosNotSent(1) } }
+                    launch {
+                        photoSyncer?.sendFailed?.collect {
+                            peerName?.let { name -> _photosNotSent.trySend(PhotosNotSent(name, 1)) }
+                        }
+                    }
                 }
             }
         }
@@ -373,11 +381,12 @@ class SessionViewModel(
             photoJob?.cancel()
             photoJob = null
             val dropped = photoSyncer?.drop() ?: 0
-            // After the end's own notice, which this one would replace at once.
-            if (dropped > 0) {
+            // The name now, since another session may start during the wait for the end's own notice to be read.
+            val name = peerName
+            if (dropped > 0 && name != null) {
                 viewModelScope.launch {
                     delay(CameraViewModel.NOTICE_MS)
-                    addPhotosNotSent(dropped)
+                    _photosNotSent.trySend(PhotosNotSent(name, dropped))
                 }
             }
         }
@@ -448,17 +457,7 @@ class SessionViewModel(
 
     private fun onPhotoReceived(saved: Boolean) {
         val name = peerName ?: return
-        _photoNotices.tryEmit(if (saved) PhotoNotice.Saved else PhotoNotice.SaveFailed(name))
-    }
-
-    private fun addPhotosNotSent(count: Int) {
-        val name = peerName ?: return
-        _photosNotSent.update { PhotosNotSent(name, (it?.count ?: 0) + count) }
-    }
-
-    /** The Camera screen said so; until then the count waits for it (FR-6.14). */
-    fun photosNotSentShown() {
-        _photosNotSent.value = null
+        _photoNotices.trySend(if (saved) PhotoNotice.Saved else PhotoNotice.SaveFailed(name))
     }
 
     /** A room waits, an invitation waits, or a session runs: no other session can start on this phone. */

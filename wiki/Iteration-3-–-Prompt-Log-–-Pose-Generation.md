@@ -57,10 +57,18 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (A lens without a flash takes the scene without waiting for the light. Eighth review: a shot waits until the light has been on for half a second, also right after it came on, and a light that does not go off is asked once more.)
 - [Dongje, 10-31] "The reviews keep coming: while fixing them, structure the code so that edge cases are as unlikely as possible." (A shot waits until the light is as chosen, on or off, for half a second; a failed light request is asked once more either way.)
 
+**Prompt history (11/02)**
+
+- [Dongje, 11-02] "I'll build [#124]. Start with the UI: think of about three options, generate images, and get them reviewed." (Three mockups rendered from the app's own tokens: a list under the field, chips under tabs, a sheet from the field.)
+- [Dongje, 11-02] "Make the list like B, but change Used before to All like A, and stop showing the Ideas." / "Take the header itself from A: Used before, (All)(With)." (B's chips with a ✕ under A's header; the idea chips gone.)
+- [Dongje, 11-02] Two choices from the Design's open items: the friend by Pix account, so a room code's session has no friend history, and both phones record every set that starts. "Go ahead as is." (The design as presented, kept in the wiki with the PR.)
+- [Dongje, 11-02] "Update dev and merge, then continue." (The branch cut from dev with #157 merged.)
+
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
 [#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
 [#115]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/115
+[#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124
 [#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
 [#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136

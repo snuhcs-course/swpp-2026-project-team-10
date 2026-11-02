@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -31,12 +31,22 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** What the Camera screen tells the subject's phone about its photos (FR-6.14), the photographer's side of [PhotoSyncer]. */
 interface PhotoShare {
-    /** The photo [uri], taken at [takenAt], is saved here; outside a session this does nothing. */
-    fun taken(uri: Uri, takenAt: Long)
+    /** The shutter was pressed: the id of the session the photo belongs to, or null outside a session. */
+    fun shutter(): String?
+
+    /** The photo of [sessionId], from [shutter], taken at [takenAt], is saved here as [uri]. */
+    fun taken(sessionId: String, uri: Uri, takenAt: Long)
+
+    /** The photo of [sessionId] could not be saved, so there is nothing to send. */
+    fun notTaken(sessionId: String)
 
     /** For a phone with nothing to share, such as the ViewModel's tests. */
     object None : PhotoShare {
-        override fun taken(uri: Uri, takenAt: Long) = Unit
+        override fun shutter(): String? = null
+
+        override fun taken(sessionId: String, uri: Uri, takenAt: Long) = Unit
+
+        override fun notTaken(sessionId: String) = Unit
     }
 }
 
@@ -92,7 +102,7 @@ class PhotoSyncer(
     private val queue = Channel<Outgoing>(Channel.UNLIMITED)
     private val progress = MutableStateFlow<Progress?>(null)
 
-    /** The photos taken in this session that are not yet confirmed or given up, the one going included. */
+    /** The photos of this session not yet confirmed or given up, from the shutter on, the one going included. */
     private val unconfirmed = AtomicInteger(0)
 
     private val _sendFailed = Channel<Unit>(Channel.UNLIMITED)
@@ -100,11 +110,24 @@ class PhotoSyncer(
     /** One for each photo of this session that will not reach the subject's album; none is lost unread. */
     val sendFailed: Flow<Unit> = _sendFailed.receiveAsFlow()
 
-    override fun taken(uri: Uri, takenAt: Long) {
-        val state = session.state.value
-        if (state !is SessionState.Connected && state !is SessionState.Reconnecting) return
-        unconfirmed.incrementAndGet()
-        queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt))
+    override fun shutter(): String? = currentSession()?.also { unconfirmed.incrementAndGet() }
+
+    /**
+     * Saving takes seconds, so another session may run by now: a photo goes only to the session of its shutter. One
+     * whose session ended meanwhile was counted when it ended, by [drop].
+     */
+    override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
+        if (currentSession() == sessionId) queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt))
+    }
+
+    override fun notTaken(sessionId: String) {
+        if (currentSession() == sessionId) unconfirmed.updateAndGet { maxOf(it - 1, 0) }
+    }
+
+    private fun currentSession(): String? = when (val state = session.state.value) {
+        is SessionState.Connected -> state.sessionId
+        is SessionState.Reconnecting -> state.sessionId
+        else -> null
     }
 
     fun startAsSender(scope: CoroutineScope) {
@@ -231,8 +254,20 @@ class PhotoSyncer(
             saved.clear()
             // What an earlier session left unread is not about this one's photographer.
             while (_received.tryReceive().isSuccess) Unit
-            try {
+            // Files and the album take their time, and a reader of incoming that waits costs every reader its messages
+            // once the buffer is full. The window keeps this queue short.
+            val photoMessages = Channel<SessionMessage>(Channel.UNLIMITED)
+            launch {
                 session.incoming.collect { message ->
+                    if (message is SessionMessage.PhotoBegin || message is SessionMessage.PhotoChunk ||
+                        message is SessionMessage.PhotoEnd
+                    ) {
+                        photoMessages.trySend(message)
+                    }
+                }
+            }
+            try {
+                for (message in photoMessages) {
                     when (message) {
                         is SessionMessage.PhotoBegin -> onBegin(message)
                         is SessionMessage.PhotoChunk -> onChunk(message)

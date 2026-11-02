@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -37,6 +37,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.session.shoot
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
@@ -236,7 +237,7 @@ class CameraFragmentInteractionTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         idle()
 
-        modules.photos.taken(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
+        modules.photos.shoot(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
         idle()
 
         onScreen { controls, _ ->
@@ -252,8 +253,8 @@ class CameraFragmentInteractionTest {
         idle()
         val photo = Uri.parse("content://media/external/images/media/1")
 
-        modules.photos.taken(photo, takenAt = 1)
-        modules.photos.taken(photo, takenAt = 2)
+        modules.photos.shoot(photo, takenAt = 1)
+        modules.photos.shoot(photo, takenAt = 2)
         idle()
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertTrue(controls.noticeText.isVisible) }

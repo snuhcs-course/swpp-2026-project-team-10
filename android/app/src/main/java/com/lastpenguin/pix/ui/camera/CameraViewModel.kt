@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -296,12 +296,14 @@ class CameraViewModel(
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
         _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false) }
         val takenAt = clock()
+        // Now, not once it is saved: the photo belongs to the session running at the shutter.
+        val sessionId = photos.shutter()
         viewModelScope.launch {
             try {
                 camera.takePhoto().fold(
                     onSuccess = { uri ->
                         _uiState.update { it.copy(lastPhoto = uri, captureNotice = CaptureNotice.SAVED) }
-                        photos.taken(uri, takenAt)
+                        sessionId?.let { photos.taken(it, uri, takenAt) }
                         // Only a confirmation (FR-1.6): it goes by itself, while a failure stays until the next photo.
                         savedNoticeJob = viewModelScope.launch {
                             delay(NOTICE_MS)
@@ -310,12 +312,14 @@ class CameraViewModel(
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
+                        sessionId?.let(photos::notTaken)
                         _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
                     },
                 )
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
+                sessionId?.let(photos::notTaken)
                 _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
             } finally {
                 _uiState.update { it.copy(isSaving = false) }

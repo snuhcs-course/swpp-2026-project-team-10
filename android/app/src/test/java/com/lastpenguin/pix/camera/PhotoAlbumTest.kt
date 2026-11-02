@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.content.ContentProvider
@@ -28,7 +28,8 @@ import org.robolectric.Robolectric
  * The subject's "Pix" album (FR-6.14, Design 2.6.5), through a small provider in place of MediaStore.
  * The row (state-based): inserted pending, in Pictures/Pix, named after `takenAt` and the photo, with `DATE_TAKEN`, then
  * the bytes, then no longer pending.
- * Failures (fault injection): no row, no stream, and a refused insert are failures, not crashes, and leave no row.
+ * Failures (fault injection): no row, no stream, a refused insert, and a row that stays pending are failures, not
+ * crashes, and leave no row; a cleanup that fails too keeps the first failure.
  */
 @RunWith(AndroidJUnit4::class)
 class PhotoAlbumTest {
@@ -44,6 +45,8 @@ class PhotoAlbumTest {
         var out: File? = null
         var refuseRow = false
         var throwOnInsert = false
+        var published = 1
+        var throwOnDelete = false
 
         override fun onCreate() = true
 
@@ -61,10 +64,11 @@ class PhotoAlbumTest {
 
         override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?): Int {
             updates += ContentValues(values)
-            return 1
+            return published
         }
 
         override fun delete(uri: Uri, selection: String?, args: Array<out String>?): Int {
+            if (throwOnDelete) throw IllegalStateException("The provider is gone")
             deleted += uri
             return 1
         }
@@ -129,6 +133,28 @@ class PhotoAlbumTest {
         val result = album().save(photo, "p1", takenAt = 1)
 
         assertFalse(result.isSuccess)
+    }
+
+    @Test
+    fun `a row that stays pending is a failure and is removed`() {
+        store.out = folder.newFile("row.jpg")
+        store.published = 0
+
+        val result = album().save(photo, "p1", takenAt = 1)
+
+        assertFalse(result.isSuccess)
+        assertEquals(1, store.deleted.size)
+    }
+
+    @Test
+    fun `a cleanup that fails keeps the save's own failure`() {
+        store.out = null
+        store.throwOnDelete = true
+
+        val result = album().save(photo, "p1", takenAt = 1)
+
+        assertFalse(result.isSuccess)
+        assertTrue(result.exceptionOrNull() !is IllegalStateException)
     }
 
     @Test

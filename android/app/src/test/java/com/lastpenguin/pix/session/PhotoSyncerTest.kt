@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.net.Uri
@@ -10,23 +10,31 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.Base64
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.zip.CRC32
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -39,6 +47,9 @@ import org.robolectric.RobolectricTestRunner
  * ModuleFakes.kt, a fake reader and album, and Robolectric only for `Uri`.
  * Photographer, one photo (state-based): begin, then the chunks in order, then the end; the next photo only after
  * `photo.saved`; nothing outside a session.
+ * Photographer, the shutter (state-based): a photo belongs to the session at its shutter, so another session never gets
+ * it, one that ended during the save counts it once, a reconnect keeps it, and one that could not be saved is not
+ * counted.
  * Photographer, the limits (boundary): 0 B, one chunk, one byte more, 40 MiB, one byte more; 32 chunks past the last
  * `photo.ack` and one more; a chunk that waits in `sendBulk` goes once.
  * Photographer, failures (fault injection): a photo that cannot be opened or read, one the subject refuses, one with
@@ -54,6 +65,7 @@ import org.robolectric.RobolectricTestRunner
  * Subject, the file: kept while the link reconnects, dropped at another `photo.begin`, a stale chunk ignored, removed
  * when the session ends, and an old one removed when a session starts; a photo already saved answered, not saved again.
  * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
+ * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -135,7 +147,7 @@ class PhotoSyncerTest {
         val (syncer, failed) = sender()
         val size = 2 * PhotoSyncer.CHUNK_BYTES + 1
 
-        syncer.taken(photo("1", size), takenAt = 1_000)
+        syncer.shoot(photo("1", size), takenAt = 1_000)
         runCurrent()
 
         val begin = begins.single()
@@ -157,8 +169,8 @@ class PhotoSyncerTest {
     @Test
     fun `the next photo goes only after the last one is saved, in the order they were taken`() = runTest {
         val (syncer, _) = sender()
-        syncer.taken(photo("1", 10), takenAt = 1)
-        syncer.taken(photo("2", 10), takenAt = 2)
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("2", 10), takenAt = 2)
         runCurrent()
         assertEquals(listOf(1L), begins.map { it.takenAt })
 
@@ -173,10 +185,67 @@ class PhotoSyncerTest {
         syncer.startAsSender(backgroundScope)
         session.setState(SessionState.Waiting("123456"))
 
-        syncer.taken(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("1", 10), takenAt = 1)
         runCurrent()
 
         assertTrue(begins.isEmpty())
+        assertEquals(0, syncer.drop())
+    }
+
+    @Test
+    fun `a shutter outside a session belongs to none`() = runTest {
+        val syncer = syncer()
+        assertNull(syncer.shutter())
+        assertEquals(0, syncer.drop())
+    }
+
+    @Test
+    fun `a photo goes only to the session of its shutter`() = runTest {
+        val (syncer, failed) = sender()
+        val shot = checkNotNull(syncer.shutter())
+
+        // Saving takes seconds: another subject connects before the photo is saved.
+        session.setState(SessionState.Connected("s_2", PeerInfo("Mina", null), Role.PHOTOGRAPHER))
+        syncer.taken(shot, photo("1", 10), takenAt = 1)
+        runCurrent()
+
+        assertTrue(begins.isEmpty())
+        assertEquals(0, failed())
+    }
+
+    @Test
+    fun `a photo whose session ends during the save is counted, not lost`() = runTest {
+        val (syncer, _) = sender()
+        val shot = checkNotNull(syncer.shutter())
+
+        session.setState(SessionState.Idle)
+        assertEquals(1, syncer.drop())
+        syncer.taken(shot, photo("1", 10), takenAt = 1)
+        runCurrent()
+
+        assertTrue(begins.isEmpty())
+        assertEquals(0, syncer.drop())
+    }
+
+    @Test
+    fun `a reconnect during the save keeps the photo in its session`() = runTest {
+        val (syncer, _) = sender()
+        val shot = checkNotNull(syncer.shutter())
+
+        session.setState(SessionState.Reconnecting("s_1", since = 0))
+        syncer.taken(shot, photo("1", 10), takenAt = 1)
+        runCurrent()
+
+        assertEquals(1, begins.size)
+    }
+
+    @Test
+    fun `a photo that could not be saved is not counted`() = runTest {
+        val (syncer, _) = sender()
+        val shot = checkNotNull(syncer.shutter())
+
+        syncer.notTaken(shot)
+
         assertEquals(0, syncer.drop())
     }
 
@@ -186,7 +255,7 @@ class PhotoSyncerTest {
         session.setState(SessionState.Reconnecting("s_1", since = 0))
         session.bulkGate = CompletableDeferred()
 
-        syncer.taken(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("1", 10), takenAt = 1)
         runCurrent()
         assertTrue(begins.isEmpty())
 
@@ -198,12 +267,12 @@ class PhotoSyncerTest {
     @Test
     fun `one chunk fits exactly and one byte more is two`() = runTest {
         val (syncer, _) = sender()
-        syncer.taken(photo("1", PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        syncer.shoot(photo("1", PhotoSyncer.CHUNK_BYTES), takenAt = 1)
         runCurrent()
         assertEquals(1, begins[0].chunks)
 
         deliverSaved(begins[0].photoId)
-        syncer.taken(photo("2", PhotoSyncer.CHUNK_BYTES + 1), takenAt = 2)
+        syncer.shoot(photo("2", PhotoSyncer.CHUNK_BYTES + 1), takenAt = 2)
         runCurrent()
         assertEquals(2, begins[1].chunks)
     }
@@ -215,9 +284,9 @@ class PhotoSyncerTest {
         photos[uri("over")] = PhotoContent(PhotoSyncer.MAX_PHOTO_BYTES + 1, ByteArrayInputStream(ByteArray(0)))
         photos[uri("limit")] = PhotoContent(PhotoSyncer.MAX_PHOTO_BYTES, endlessJpeg())
 
-        syncer.taken(uri("empty"), takenAt = 1)
-        syncer.taken(uri("over"), takenAt = 2)
-        syncer.taken(uri("limit"), takenAt = 3)
+        syncer.shoot(uri("empty"), takenAt = 1)
+        syncer.shoot(uri("over"), takenAt = 2)
+        syncer.shoot(uri("limit"), takenAt = 3)
         runCurrent()
 
         assertEquals(2, failed())
@@ -232,7 +301,7 @@ class PhotoSyncerTest {
     fun `at most 32 chunks go past the last ack`() = runTest {
         val (syncer, _) = sender()
         val extra = 10
-        syncer.taken(photo("1", (PhotoSyncer.WINDOW_CHUNKS + extra) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        syncer.shoot(photo("1", (PhotoSyncer.WINDOW_CHUNKS + extra) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
         runCurrent()
         assertEquals(PhotoSyncer.WINDOW_CHUNKS, chunks.size)
 
@@ -249,7 +318,7 @@ class PhotoSyncerTest {
     @Test
     fun `an ack of another photo moves nothing`() = runTest {
         val (syncer, _) = sender()
-        syncer.taken(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 1) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        syncer.shoot(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 1) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
         runCurrent()
 
         session.deliver(SessionMessage.PhotoAck("another", next = 16))
@@ -261,7 +330,7 @@ class PhotoSyncerTest {
     @Test
     fun `a chunk that waits in sendBulk goes once, and the rest follow`() = runTest {
         val (syncer, _) = sender()
-        syncer.taken(photo("1", 3 * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        syncer.shoot(photo("1", 3 * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
         val gate = CompletableDeferred<Boolean>()
         session.bulkGate = gate
         runCurrent()
@@ -278,8 +347,8 @@ class PhotoSyncerTest {
     @Test
     fun `a photo that cannot be opened is given up and the next one goes`() = runTest {
         val (syncer, failed) = sender()
-        syncer.taken(uri("gone"), takenAt = 1)
-        syncer.taken(photo("2", 10), takenAt = 2)
+        syncer.shoot(uri("gone"), takenAt = 1)
+        syncer.shoot(photo("2", 10), takenAt = 2)
         runCurrent()
 
         assertEquals(1, failed())
@@ -296,7 +365,7 @@ class PhotoSyncerTest {
             },
         )
 
-        syncer.taken(uri("1"), takenAt = 1)
+        syncer.shoot(uri("1"), takenAt = 1)
         runCurrent()
 
         assertEquals(1, failed())
@@ -308,7 +377,7 @@ class PhotoSyncerTest {
         val (syncer, failed) = sender()
         photos[uri("1")] = PhotoContent(10, ByteArrayInputStream(ByteArray(0)))
 
-        syncer.taken(uri("1"), takenAt = 1)
+        syncer.shoot(uri("1"), takenAt = 1)
         runCurrent()
 
         assertEquals(1, failed())
@@ -318,8 +387,8 @@ class PhotoSyncerTest {
     @Test
     fun `a photo the subject refuses stops at once and the next one goes`() = runTest {
         val (syncer, failed) = sender()
-        syncer.taken(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 5) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
-        syncer.taken(photo("2", 10), takenAt = 2)
+        syncer.shoot(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 5) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        syncer.shoot(photo("2", 10), takenAt = 2)
         runCurrent()
 
         deliverSaved(begins[0].photoId, ok = false, reason = PhotoRefusal.STORAGE)
@@ -333,7 +402,7 @@ class PhotoSyncerTest {
     @Test
     fun `no answer gives the photo up after 30 s and not before`() = runTest {
         val (syncer, failed) = sender()
-        syncer.taken(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("1", 10), takenAt = 1)
         runCurrent()
 
         advanceTimeBy(PhotoSyncer.STALL_MS - 1)
@@ -348,7 +417,7 @@ class PhotoSyncerTest {
     @Test
     fun `no ack gives the photo up after 30 s`() = runTest {
         val (syncer, failed) = sender()
-        syncer.taken(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 1) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        syncer.shoot(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 1) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
 
         advanceTimeBy(PhotoSyncer.STALL_MS + 1)
         runCurrent()
@@ -362,7 +431,7 @@ class PhotoSyncerTest {
         val (syncer, failed) = sender()
         session.bulkGate = CompletableDeferred(false)
 
-        syncer.taken(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("1", 10), takenAt = 1)
         runCurrent()
 
         assertEquals(1, failed())
@@ -371,13 +440,13 @@ class PhotoSyncerTest {
     @Test
     fun `the end of a session counts each unconfirmed photo once, the one going included`() = runTest {
         val (syncer, _) = sender()
-        syncer.taken(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("1", 10), takenAt = 1)
         runCurrent()
         deliverSaved(begins[0].photoId)
         runCurrent()
-        syncer.taken(photo("2", 10), takenAt = 2)
-        syncer.taken(photo("3", 10), takenAt = 3)
-        syncer.taken(photo("4", 10), takenAt = 4)
+        syncer.shoot(photo("2", 10), takenAt = 2)
+        syncer.shoot(photo("3", 10), takenAt = 3)
+        syncer.shoot(photo("4", 10), takenAt = 4)
         runCurrent()
 
         assertEquals(3, syncer.drop())
@@ -391,7 +460,7 @@ class PhotoSyncerTest {
         syncer.startAsSender(backgroundScope)
         runCurrent()
 
-        repeat(20) { syncer.taken(uri("gone/$it"), takenAt = 1) }
+        repeat(20) { syncer.shoot(uri("gone/$it"), takenAt = 1) }
         runCurrent()
 
         assertEquals(20, syncer.sendFailed.take(20).toList().size)
@@ -405,7 +474,7 @@ class PhotoSyncerTest {
         syncer.startAsSender(backgroundScope)
         runCurrent()
 
-        repeat(3) { syncer.taken(uri("gone/$it"), takenAt = 1) }
+        repeat(3) { syncer.shoot(uri("gone/$it"), takenAt = 1) }
         runCurrent()
 
         assertEquals(3, syncer.drop())
@@ -520,6 +589,36 @@ class PhotoSyncerTest {
         deliverWhole("p2", jpeg(10))
 
         assertEquals(false, syncer.received.first())
+    }
+
+    @Test
+    fun `a slow save does not hold up the session's other messages`() = runBlocking {
+        val saving = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val slow = PhotoAlbum { _, photoId, _ ->
+            saving.countDown()
+            release.await(10, TimeUnit.SECONDS)
+            Result.success(uri("saved/$photoId"))
+        }
+        val scope = CoroutineScope(Dispatchers.IO + Job())
+        connectedAs(Role.SUBJECT)
+        PhotoSyncer(session, reader, slow, parts, Dispatchers.IO).startAsReceiver(scope)
+        withTimeout(5_000) { while (!session.hasReaders) delay(5) }
+        val bytes = jpeg(10)
+
+        session.deliver(SessionMessage.PhotoBegin("p1", "jpeg", 10, 1, 1))
+        session.deliver(SessionMessage.PhotoChunk("p1", 0, Base64.getEncoder().encodeToString(bytes)))
+        session.deliver(SessionMessage.PhotoEnd("p1", CRC32().apply { update(bytes) }.value))
+        assertTrue(saving.await(5, TimeUnit.SECONDS))
+
+        // More than the 64 that incoming holds; `deliver` fails on one that does not fit.
+        repeat(100) {
+            session.deliver(SessionMessage.GuideClear)
+            delay(1)
+        }
+
+        release.countDown()
+        scope.cancel()
     }
 
     @Test

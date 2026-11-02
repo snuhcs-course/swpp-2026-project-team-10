@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
@@ -371,7 +372,7 @@ class SessionViewModel(
                     photoSyncer?.startAsSender(this)
                     launch {
                         photoSyncer?.sendFailed?.collect {
-                            peerName?.let { name -> _photosNotSent.trySend(PhotosNotSent(name, 1)) }
+                            sessionPeer()?.let { name -> _photosNotSent.trySend(PhotosNotSent(name, 1)) }
                         }
                     }
                 }
@@ -455,9 +456,21 @@ class SessionViewModel(
 
     private fun isLive(state: SessionState) = state is SessionState.Connected || state is SessionState.Reconnecting
 
-    private fun onPhotoReceived(saved: Boolean) {
-        val name = peerName ?: return
-        _photoNotices.trySend(if (saved) PhotoNotice.Saved else PhotoNotice.SaveFailed(name))
+    private suspend fun onPhotoReceived(saved: Boolean) {
+        if (saved) {
+            _photoNotices.trySend(PhotoNotice.Saved)
+        } else {
+            sessionPeer()?.let { name -> _photoNotices.trySend(PhotoNotice.SaveFailed(name)) }
+        }
+    }
+
+    /**
+     * The other phone's name, for a photo of this session: a small one can come before this phone's state collector
+     * has seen Connected, so [peerName] may be missing or still the last session's.
+     */
+    private suspend fun sessionPeer(): String? {
+        val state = session.state.first { it !is SessionState.Connecting }
+        return (state as? SessionState.Connected)?.peer?.displayName ?: peerName
     }
 
     /** A room waits, an invitation waits, or a session runs: no other session can start on this phone. */

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -32,6 +32,7 @@ import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.session.shoot
 import com.lastpenguin.pix.ui.camera.CameraViewModel
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -72,7 +73,8 @@ import org.junit.runner.RunWith
  * Reconnecting (Design 2.6.7): the photographer's frames go on, and its capabilities go again once connected.
  * Session photos (Design 2.6.5, 2.6.7): one not sent waits for the Camera screen; those going when the session ends are
  * said after the end's own notice, under that session's name; a drop keeps one going; the subject's saved or failed
- * photo is a notice, which waits for the activity.
+ * photo is a notice, which waits for the activity; one saved before this phone has seen Connected is noticed at once,
+ * and one that failed then waits for that session's name.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -158,7 +160,7 @@ class SessionViewModelTest {
         session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         runCurrent()
 
-        photos.taken(photoUri, takenAt = 1)
+        photos.shoot(photoUri, takenAt = 1)
         runCurrent()
 
         // Nothing has read it yet: it waits, as it does while the Camera screen is not in front.
@@ -181,8 +183,8 @@ class SessionViewModelTest {
         photoModel.startRoom()
         session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         runCurrent()
-        photos.taken(photoUri, takenAt = 1)
-        photos.taken(photoUri, takenAt = 2)
+        photos.shoot(photoUri, takenAt = 1)
+        photos.shoot(photoUri, takenAt = 2)
         runCurrent()
 
         session.setState(SessionState.Idle)
@@ -205,7 +207,7 @@ class SessionViewModelTest {
         photoModel.startRoom()
         session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         runCurrent()
-        photos.taken(photoUri, takenAt = 1)
+        photos.shoot(photoUri, takenAt = 1)
         runCurrent()
 
         session.setState(SessionState.Idle)
@@ -227,7 +229,7 @@ class SessionViewModelTest {
         photoModel.startRoom()
         session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
         runCurrent()
-        photos.taken(photoUri, takenAt = 1)
+        photos.shoot(photoUri, takenAt = 1)
         runCurrent()
         val photoId = session.sent.filterIsInstance<SessionMessage.PhotoBegin>().single().photoId
 
@@ -272,6 +274,35 @@ class SessionViewModelTest {
         deliverPhoto("p1")
 
         assertEquals(PhotoNotice.Saved, photoModel.photoNotices.first())
+    }
+
+    @Test
+    fun aSavedPhoto_isNoticedBeforeThisPhoneHasSeenConnected() = runTest(dispatcher) {
+        val (photoModel, _) = withPhotos(album = { _, _, _ -> Result.success(photoUri) })
+        photoModel.joinRoom("123456")
+        session.setState(SessionState.Connecting("s1"))
+        runCurrent()
+
+        deliverPhoto("p1")
+
+        assertEquals(PhotoNotice.Saved, photoModel.photoNotices.first())
+    }
+
+    @Test
+    fun aFailedPhoto_waitsForThePeersNameOfThisSession() = runTest(dispatcher) {
+        val (photoModel, _) = withPhotos(album = noAlbum)
+        val notices = mutableListOf<PhotoNotice>()
+        backgroundScope.launch { photoModel.photoNotices.collect { notices += it } }
+        photoModel.joinRoom("123456")
+        session.setState(SessionState.Connecting("s1"))
+        runCurrent()
+
+        deliverPhoto("p1")
+        assertTrue(notices.isEmpty())
+
+        session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        runCurrent()
+        assertEquals(listOf(PhotoNotice.SaveFailed("Dongje")), notices)
     }
 
     private fun TestScope.deliverPhoto(id: String) {

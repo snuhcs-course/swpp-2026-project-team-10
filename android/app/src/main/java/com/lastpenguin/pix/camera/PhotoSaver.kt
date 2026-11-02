@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.ContentValues
@@ -6,6 +6,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.camera.core.ImageCapture
 import java.io.File
 import java.io.IOException
@@ -61,12 +62,23 @@ class PhotoSaver(private val context: Context) : PhotoAlbum {
             row = inserted
             val output = resolver.openOutputStream(inserted) ?: throw IOException("The gallery gave no stream")
             output.use { sink -> file.inputStream().use { it.copyTo(sink) } }
-            resolver.update(inserted, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+            val published = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
+            // A row still pending is not in the gallery, and the provider can decline without throwing.
+            if (resolver.update(inserted, published, null, null) != 1) throw IOException("The gallery kept it pending")
             Result.success(inserted)
         } catch (error: Exception) {
             // A full disk or a refused row is a message on the phone, not a crash.
-            row?.let { resolver.delete(it, null, null) }
+            row?.let(::removeRow)
             Result.failure(error)
+        }
+    }
+
+    /** After a failed save, whose failure is the one to report: a row that stays is not worth another. */
+    private fun removeRow(row: Uri) {
+        try {
+            context.contentResolver.delete(row, null, null)
+        } catch (error: Exception) {
+            Log.w(TAG, "The failed photo's row stays", error)
         }
     }
 
@@ -76,6 +88,7 @@ class PhotoSaver(private val context: Context) : PhotoAlbum {
     }
 
     private companion object {
+        const val TAG = "PixPhotoSaver"
         const val MIME_TYPE = "image/jpeg"
         val ALBUM_PATH = "${Environment.DIRECTORY_PICTURES}/Pix"
     }

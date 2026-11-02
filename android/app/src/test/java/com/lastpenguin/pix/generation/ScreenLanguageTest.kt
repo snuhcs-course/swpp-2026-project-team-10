@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.generation
 
 import android.app.Application
@@ -15,7 +15,8 @@ import org.robolectric.annotation.Config
 /*
  * The language the screens show, for the pose tip (FR-10.2; Testing Documentation 2.1.6), from the resources Android
  * picks for the phone's language: none named (English), English, Korean, Korean of a region, and a language Pix does
- * not have, whose screens are in English. While Pix runs: changed to Korean, then to a language Pix does not have.
+ * not have, whose screens are in English. While Pix runs: changed to Korean, then to a language Pix does not have; and
+ * Pix's own language, which on Android 10–12 reaches an activity's resources only (`follow`).
  */
 @RunWith(AndroidJUnit4::class)
 class ScreenLanguageTest {
@@ -43,13 +44,28 @@ class ScreenLanguageTest {
     @Test
     fun aLanguageChangedWhilePixRuns_isFollowed() {
         val app = ApplicationProvider.getApplicationContext<Application>()
-        val languages = screenLanguages(app)
-        assertEquals("en", languages.value)
+        val languages = ScreenLanguages(app)
+        assertEquals("en", languages.current.value)
 
         app.onConfigurationChanged(Configuration(app.resources.configuration).apply { setLocale(Locale.KOREAN) })
-        assertEquals("ko", languages.value)
+        assertEquals("ko", languages.current.value)
 
         app.onConfigurationChanged(Configuration(app.resources.configuration).apply { setLocale(Locale.JAPANESE) })
-        assertEquals("en", languages.value)
+        assertEquals("en", languages.current.value)
+    }
+
+    @Test
+    fun pixsOwnLanguage_inAnActivitysResources_isFollowed() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val languages = ScreenLanguages(app)
+        val korean = app.createConfigurationContext(
+            Configuration(app.resources.configuration).apply { setLocale(Locale.KOREAN) },
+        )
+
+        languages.follow(korean.resources)
+        assertEquals("ko", languages.current.value)
+
+        languages.follow(app.resources)
+        assertEquals("en", languages.current.value)
     }
 }

@@ -19,6 +19,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,7 +34,7 @@ import org.robolectric.shadows.ShadowDialog
  * Settings on the real screen (FR-10.1–10.4, FR-3.10, FR-4.2), with the settings in memory behind the ViewModel.
  * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, signed out);
  * each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
- * the dialog cancelled; the agreement withdrawn, and the row without one; the account signed in and signed out;
+ * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the account signed in and signed out;
  * notifications, How to use Pix, and About Pix opened.
  */
 @RunWith(AndroidJUnit4::class)
@@ -156,6 +157,25 @@ class SettingsFragmentTest {
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
             assertFalse(binding.consentRow.root.isClickable)
+        }
+    }
+
+    @Test
+    fun theAgreementRow_followsTheStoredAnswer_whenItLoadsAfterTheScreenOpens() {
+        // Android may restore Pix straight to Settings, before DataStore has read the agreement.
+        val modules = TestAppContainer().apply { consent.gate = CompletableDeferred() }
+        launch(modules)
+        onScreen { binding ->
+            assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
+            assertFalse(binding.consentRow.root.isClickable)
+        }
+
+        modules.consent.gate!!.complete(Unit)
+        idle()
+
+        onScreen { binding ->
+            assertEquals(string(R.string.settings_consent_given), binding.consentRow.settingValue.text.toString())
+            assertTrue(binding.consentRow.root.isClickable)
         }
     }
 

@@ -952,7 +952,24 @@ class GenerationViewModelTest {
         runCurrent()
 
         assertTrue(slow.needsConsent)
+        assertFalse(slow.consentGiven.value)
         assertFalse(consent.given)
+    }
+
+    @Test
+    fun consentGiven_followsTheStoredAnswerOnceItLoads() = runTest {
+        consent.given = true
+        consent.hold = CompletableDeferred()
+        val slow = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        store.put("slow", slow)
+        runCurrent()
+        assertFalse(slow.consentGiven.value)
+
+        consent.hold?.complete(Unit)
+        runCurrent()
+
+        assertTrue(slow.consentGiven.value)
+        assertFalse(slow.needsConsent)
     }
 
     // ---- Generate poses on both phones (FR-6.15, Design 2.6.5) ---------------------------------------------------

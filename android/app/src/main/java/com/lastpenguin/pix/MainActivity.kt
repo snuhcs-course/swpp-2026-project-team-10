@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix
 
 import android.content.Intent
@@ -25,6 +25,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // On Android 10–12 Pix's own language reaches this activity only, so the server's text follows it from here.
+        (application as PixApplication).container.screenLanguages?.follow(resources)
         // A link that starts Pix opens below, over Camera, not through the navigation graph, which opens it alone when
         // another app, such as a browser, starts Pix in its own task: *Back to camera* would then find no Camera.
         val link = intent.data

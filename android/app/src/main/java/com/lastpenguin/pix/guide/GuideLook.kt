@@ -6,10 +6,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** The guide line's color in the settings (FR-3.10). White is the line of FR-2.2; black stands out on bright scenes. */
-enum class GuideColor(val argb: Int) {
+/**
+ * The guide line's color in the settings (FR-3.10). White is the line of FR-2.2; black stands out on bright scenes, and
+ * is [dark]: on the app's dark surfaces, such as Reference confirm's card, it needs a light backing to be seen.
+ */
+enum class GuideColor(val argb: Int, val dark: Boolean = false) {
     WHITE(0xFFFFFFFF.toInt()),
-    BLACK(0xFF141414.toInt()),
+    BLACK(0xFF141414.toInt(), dark = true),
     YELLOW(0xFFF2C14E.toInt()),
     MINT(0xFF5EEAD4.toInt()),
     PINK(0xFFFF8FB1.toInt()),

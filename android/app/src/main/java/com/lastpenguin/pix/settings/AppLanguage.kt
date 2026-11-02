@@ -14,7 +14,7 @@ enum class Language(val tag: String?) {
 /**
  * Pix's own language, chosen on the settings screen (FR-10.2). Android keeps it as the per-app language: from Android
  * 13 the system, before that AppCompat's `AppLocalesMetadataHolderService` in the manifest. Choosing one recreates the
- * activity in it, with its back stack, and `screenLanguages` sees the change.
+ * activity in it, with its back stack, and `ScreenLanguages` follows the change.
  * Owner: Settings (#123).
  */
 interface AppLanguage {

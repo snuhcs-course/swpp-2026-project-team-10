@@ -125,7 +125,13 @@ class GenerationViewModel(
     private var generating: Job? = null
     private var shooting: Job? = null
 
-    private var consentGiven = false
+    private val _consentGiven = MutableStateFlow(false)
+
+    /**
+     * Whether the user agreed that the scene photo goes to an external AI service (FR-4.2): false until the stored
+     * answer has loaded, so the settings screen follows it rather than reading it once.
+     */
+    val consentGiven: StateFlow<Boolean> = _consentGiven.asStateFlow()
 
     /** The user agreed or withdrew on this run, which the stored answer, if it comes later, must not undo. */
     private var consentDecided = false
@@ -145,7 +151,7 @@ class GenerationViewModel(
     init {
         // Only ever sets it, and only before the user decides: an answer read before they agreed or withdrew must not
         // undo that.
-        viewModelScope.launch { if (consent.isGiven() && !consentDecided) consentGiven = true }
+        viewModelScope.launch { if (consent.isGiven() && !consentDecided) _consentGiven.value = true }
         viewModelScope.launch { share.picks.collect(::onSubjectPick) }
         viewModelScope.launch { descriptions.requests.collect(::onSubjectRequest) }
         // The camera keeps its light across rebinds, so it is turned off as soon as the scene is no longer framed.
@@ -173,18 +179,18 @@ class GenerationViewModel(
      * True until the user has agreed that the scene photo goes to an external AI service (FR-4.2). Read on the tap,
      * so it also holds while the stored answer is still loading: without consent nothing is sent.
      */
-    val needsConsent: Boolean get() = !consentGiven
+    val needsConsent: Boolean get() = !_consentGiven.value
 
     /** The user agreed to the notice; it is not shown again. */
     fun onConsentGiven() {
-        consentGiven = true
+        _consentGiven.value = true
         consentDecided = true
         viewModelScope.launch { consent.give() }
     }
 
     /** Settings took the agreement back (FR-4.2): the notice is shown again before the next scene photo is sent. */
     fun withdrawConsent() {
-        consentGiven = false
+        _consentGiven.value = false
         consentDecided = true
         viewModelScope.launch { consent.withdraw() }
     }

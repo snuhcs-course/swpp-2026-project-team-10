@@ -1,27 +1,34 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
 package com.lastpenguin.pix
 
+import android.app.Application
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
+import com.lastpenguin.pix.generation.ScreenLanguages
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.TestAppContainer
+import java.util.Locale
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.android.controller.ActivityController
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /*
  * How a link opens its screen (Design 2.6.6), on the real activity and navigation graph. Partitions: a link that starts
  * Pix in another app's task, such as a browser's, or in a task of its own, such as a notification's (its screen over
  * Camera either way, so Decline returns to Camera); a link while Pix runs (on top of what is shown); the activity
- * recreated after a link started it (the link not opened again).
+ * recreated after a link started it (the link not opened again). The screens' language for the server's text taken
+ * from the activity (FR-10.2).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -54,6 +61,24 @@ class MainActivityTest {
     private fun ActivityController<MainActivity>.shown(): FragmentFailureBinding {
         val navHost = get().supportFragmentManager.findFragmentById(R.id.navHost) as NavHostFragment
         return FragmentFailureBinding.bind(navHost.childFragmentManager.primaryNavigationFragment!!.requireView())
+    }
+
+    @Test
+    @Config(qualifiers = "ko")
+    fun theActivitysLanguage_becomesTheScreensLanguage() {
+        // As on Android 10–12, where Pix's own language reaches the activity but not the application's resources.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val english = app.createConfigurationContext(
+            Configuration(app.resources.configuration).apply { setLocale(Locale.ENGLISH) },
+        )
+        val languages = ScreenLanguages(english)
+        assertEquals("en", languages.current.value)
+
+        TestAppContainer(screenLanguages = languages).install()
+        controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        idle()
+
+        assertEquals("ko", languages.current.value)
     }
 
     @Test

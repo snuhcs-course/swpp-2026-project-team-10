@@ -20,6 +20,7 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.ScreenLanguages
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -67,6 +68,8 @@ class TestAppContainer(
     val saved: SavedGuideStore = SavedGuideStore.InMemory(),
     /** What the photographer's candidates decode to on the subject's phone; a test that draws one gives a real one. */
     candidateImage: () -> Bitmap = { fakeBitmap() },
+    /** The screens' language for the server's text; none unless a test checks it. */
+    val screenLanguages: ScreenLanguages? = null,
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -140,6 +143,7 @@ class TestAppContainer(
         mobileDataNotice = mobileData,
         appSettings = appSettings,
         appLanguage = language,
+        screenLanguages = screenLanguages,
     )
 
     /** Installs the container in the test's [PixApplication]; call before the screen is launched. */
@@ -236,7 +240,13 @@ class TestAppContainer(
     class IdleConsent : GenerationConsent {
         var given = true
 
-        override suspend fun isGiven(): Boolean = given
+        /** When set, the stored answer is handed over only after this completes, as a slow DataStore read. */
+        var gate: CompletableDeferred<Unit>? = null
+
+        override suspend fun isGiven(): Boolean {
+            gate?.await()
+            return given
+        }
 
         override suspend fun give() {
             given = true

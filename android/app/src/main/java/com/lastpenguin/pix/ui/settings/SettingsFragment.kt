@@ -78,6 +78,8 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
                 launch { viewModel.guideLook.collect { renderLook(binding, it) } }
                 launch { viewModel.showLatency.collect { binding.latencySwitch.isChecked = it } }
                 launch { viewModel.account.collect { renderAccount(binding.accountRow, it) } }
+                // Followed, not read once: Android may restore Pix straight to this screen before the answer loads.
+                launch { generationViewModel.consentGiven.collect { renderConsent(binding.consentRow, it) } }
             }
         }
     }
@@ -88,7 +90,6 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         val binding = binding ?: return
         renderLanguage(binding.languageRow)
         renderNotifications(binding.notificationsRow)
-        renderConsent(binding.consentRow)
     }
 
     override fun onDestroyView() {
@@ -166,8 +167,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
 
     // ---- AI consent (FR-4.2) ------------------------------------------------------------------------------------
 
-    private fun renderConsent(row: ItemSettingRowBinding) {
-        val given = !generationViewModel.needsConsent
+    private fun renderConsent(row: ItemSettingRowBinding, given: Boolean) {
         row.settingValue.setText(if (given) R.string.settings_consent_given else R.string.settings_consent_not_given)
         // Only an agreement can be taken back; without one, Pix asks before it sends anything.
         row.settingChevron.isVisible = given
@@ -180,10 +180,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             .setTitle(R.string.settings_withdraw_title)
             .setMessage(R.string.settings_withdraw_message)
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.settings_withdraw) { _, _ ->
-                generationViewModel.withdrawConsent()
-                binding?.let { renderConsent(it.consentRow) }
-            }
+            .setPositiveButton(R.string.settings_withdraw) { _, _ -> generationViewModel.withdrawConsent() }
             .show()
     }
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reference confirm's card behind a dark guide line (FR-3.10): a light neutral, with the card's corners, so a black
+     outline stays as visible as a white one on the dark card (FR-2.3). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="24dp" />
+    <solid android:color="@color/pix_text_muted" />
+</shape>

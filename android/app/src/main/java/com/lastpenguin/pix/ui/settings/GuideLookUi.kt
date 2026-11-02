@@ -4,6 +4,8 @@ package com.lastpenguin.pix.ui.settings
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.widget.ImageView
+import androidx.core.content.ContextCompat
+import com.lastpenguin.pix.R
 import com.lastpenguin.pix.guide.GuideLook
 import com.lastpenguin.pix.guide.GuideOutlines
 import com.lastpenguin.pix.guide.GuideOverlayView
@@ -31,7 +33,10 @@ internal suspend fun GuideOverlayView.followLook(
     }
 }
 
-/** Keeps [this] image showing the outline of the guide of [guides] in [look]; nothing while there is none. */
+/**
+ * Keeps [this] image showing the outline of the guide of [guides] in [look]; nothing while there is none. A dark line
+ * gets a light backing (`GuideColor.dark`), since the image sits on Reference confirm's dark card.
+ */
 internal suspend fun ImageView.showOutline(
     look: Flow<GuideLook>,
     guides: Flow<ReferenceGuide?>,
@@ -40,6 +45,7 @@ internal suspend fun ImageView.showOutline(
     combine(guides.distinctUntilChanged { old, new -> old === new }, look, ::Pair).collectLatest { (guide, look) ->
         val color = look.color.argb
         if (color == Color.WHITE) clearColorFilter() else setColorFilter(color, PorterDuff.Mode.SRC_IN)
+        background = if (look.color.dark) ContextCompat.getDrawable(context, R.drawable.bg_outline_light) else null
         if (guide == null) return@collectLatest
         setImageBitmap(guide.outline)
         val outline = outlines.outline(guide, look.thickness)

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -38,6 +38,7 @@ from pix_server.errors import (
 from pix_server.invitations.push import PushSender, load_service_account
 from pix_server.invitations.router import pages as invitation_pages
 from pix_server.invitations.router import router as invitations_router
+from pix_server.poses.description_filter import DescriptionFilter
 from pix_server.poses.generator import PoseGenerator
 from pix_server.poses.limiter import PoseLimiter
 from pix_server.poses.router import router as poses_router
@@ -103,10 +104,10 @@ def create_app(
     google: GoogleVerifier | None = None,
     password_hasher: PasswordHasher | None = None,
 ) -> FastAPI:
-    """`image_api` replaces the network connection to OpenRouter, for the image and suggestion models, `turn_api` the
-    one to Cloudflare's TURN API, `fcm_api` the one to Google's token endpoint and FCM, `redis` opens the session
-    store, `google` verifies Google ID tokens, and `password_hasher` sets the cost of argon2id; tests pass fakes or
-    cheaper ones. `clock` is wall-clock time, because every worker compares it with times other workers stored."""
+    """`image_api` replaces the network connection to OpenRouter, for the image, suggestion, tip, and filter models,
+    `turn_api` the one to Cloudflare's TURN API, `fcm_api` the one to Google's token endpoint and FCM, `redis` opens the
+    session store, `google` verifies Google ID tokens, and `password_hasher` sets the cost of argon2id; tests pass fakes
+    or cheaper ones. `clock` is wall-clock time, because every worker compares it with times other workers stored."""
     config = settings if settings is not None else Settings()
 
     @asynccontextmanager
@@ -134,6 +135,7 @@ def create_app(
                 app.state.pose_generator = PoseGenerator(config, http)
                 app.state.pose_suggester = PoseSuggester(config, http)
                 app.state.pose_tipper = PoseTipper(config, http)
+                app.state.description_filter = DescriptionFilter(config, http)
                 app.state.google = google or GoogleTokenVerifier(config.google_client_id, google_http, clock)
                 account = load_service_account(config.fcm_credentials_file)
                 app.state.push = PushSender(account, fcm_http, clock, config.fcm_timeout_seconds)

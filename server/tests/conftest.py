@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 import asyncio
 import base64
 import io
@@ -68,20 +68,25 @@ class ImageApi:
     """Stands in for OpenRouter. The Image API records each request in `requests` and answers with `status` and
     `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
     `suggestion_status` and `suggestion_body` after `suggestion_delay`, except tip requests (the `tip` schema), which
-    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. `cancelled` is set when a call is
+    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. The Decisions API, the description
+    filter's, records its requests in `filter_requests` and answers with `filter_status` and `filter_body` after
+    `filter_delay`, by default probabilities that let every description through. `cancelled` is set when a call is
     cancelled while it waits for its answer."""
 
     def __init__(self) -> None:
         self.requests: list[httpx2.Request] = []
         self.suggestion_requests: list[httpx2.Request] = []
         self.tip_requests: list[httpx2.Request] = []
+        self.filter_requests: list[httpx2.Request] = []
         self.delay = 0.0
         self.suggestion_delay = 0.0
         self.tip_delay = 0.0
+        self.filter_delay = 0.0
         self.cancelled = asyncio.Event()
         self.returns(encode_image())
         self.suggests(SUGGESTED_POSES)
         self.tips(TIP)
+        self.judges(malicious=0.02, injection=0.02)
 
     def returns(self, image: bytes) -> None:
         self.status = 200
@@ -115,6 +120,27 @@ class ImageApi:
         self.tip_status = status
         self.tip_body = {"error": {"code": status, "message": message}}
 
+    def judges(self, malicious: float, injection: float) -> None:
+        """The filter's probability of yes for each question, in the Decisions API's shape."""
+        self.filter_status = 200
+        self.filter_body: object = {
+            "id": "gen-dec-test",
+            "model": "typesafe/jev-1.14-20261014",
+            "answers": {
+                "malicious": {"type": "noul", "noul": malicious},
+                "injection": {"type": "noul", "noul": injection},
+            },
+            "usage": {"input_tokens": 300, "output_tokens": 0, "cost": 0.00003},
+        }
+
+    def filter_fails(self, status: int, message: str = "Provider returned error") -> None:
+        self.filter_status = status
+        self.filter_body = {"error": {"code": status, "message": message}}
+
+    @property
+    def filter_payloads(self) -> list[dict]:
+        return [json.loads(request.content) for request in self.filter_requests]
+
     @property
     def payloads(self) -> list[dict]:
         return [json.loads(request.content) for request in self.requests]
@@ -128,6 +154,10 @@ class ImageApi:
         return [json.loads(request.content) for request in self.tip_requests]
 
     async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/api/alpha/decisions":
+            self.filter_requests.append(request)
+            await self.wait(self.filter_delay)
+            return httpx2.Response(self.filter_status, json=self.filter_body)
         schema = json.loads(request.content or b"{}").get("response_format", {}).get("json_schema", {})
         if request.url.path == "/api/v1/chat/completions" and schema.get("name") == "tip":
             self.tip_requests.append(request)
@@ -335,6 +365,9 @@ def settings(database_url, fcm_key):
         tip_timeout_seconds=10,
         tip_rate_limit=20,
         tip_global_limit=1000,
+        filter_model="perplexity/pplx-decider-v1.2",
+        filter_cutoff=0.7,
+        filter_timeout_seconds=2,
         join_failure_limit=10,
         join_failure_window_seconds=600,
         turn_key_id="test-turn-key",

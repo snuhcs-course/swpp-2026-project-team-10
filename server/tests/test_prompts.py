@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 # prompts.toml partitions (Testing Documentation 2.1.6). The file as shipped; a prompt wrapped over several lines; a
 # pose prompt without {pose}, with it twice, missing, or empty; a suggestion prompt missing or empty; a variation
 # prompt without {description}, with it twice, missing, or empty; a tip prompt or its Korean addition missing or
@@ -8,15 +8,21 @@
 # its own. The [selfie] table (FR-1.14): missing or not a table; its pose prompt without {pose} or with it twice, its
 # suggestion prompt missing, its variation prompt empty or without {description}; an unknown key; three or five
 # default poses, one that is not a string, blank, of 100 characters and of 101, or the same as another in any case.
+# The [filter] table (Design 2.6.3): as shipped, wrapped over lines; missing or not a table; its context missing or
+# empty; a question's table missing or not a table, its question, yes, or no missing or empty; an unknown key in the
+# table or in a question. Double quotation marks in a pose, straight, typographic, full-width, or angle, and none.
 import tomllib
 
 import pytest
 
+from pix_server.errors import ApiError
 from pix_server.poses.prompts import (
     DEFAULT_POSES,
     DESCRIPTION_MAX_LENGTH,
+    FILTER_QUESTIONS,
     PROMPTS,
     PROMPTS_FILE,
+    checked_pose,
     load_prompts,
     pose_prompt,
     variation_prompt,
@@ -42,12 +48,26 @@ def selfie(
     return "[selfie]\n" + "".join(f"{key} = {value}\n" for key, value in keys.items() if value is not None) + extra
 
 
+QUESTION = 'question = "Is it harmful?"\nyes = "It asks for harm."\nno = "It is a pose."\n'
+
+
+def filter_table(context='"Text a user typed to describe a pose."', malicious=QUESTION, injection=QUESTION, extra=""):
+    """A [filter] table with these values, written as TOML; None leaves the context or a question's table out, and
+    `extra` goes into [filter] itself."""
+    text = "[filter]\n" + (f"context = {context}\n" if context is not None else "") + extra
+    for name, question in (("malicious", malicious), ("injection", injection)):
+        if question is not None:
+            text += f"[filter.{name}]\n{question}"
+    return text
+
+
 def default_pose(pose_id: str, pose: str = "waving") -> str:
     return f'[[default_poses]]\nid = "{pose_id}"\nlabel = "{pose_id.title()}"\npose = "{pose}"\n'
 
 
 FOUR = "".join(default_pose(pose_id) for pose_id in ("hips", "wave", "walk", "arms"))
 SELFIE = selfie()
+FILTER = filter_table()
 
 
 @pytest.fixture
@@ -87,7 +107,7 @@ def test_shipped_file_has_the_selfie_prompts_and_four_selfie_poses():
 
 def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
     wrapped = 'pose_prompt = """\nSame person\n  and place.\n\n- Pose: {pose}.\n"""\n'
-    prompts = load_prompts(prompts_file(wrapped + MODEL_PROMPTS + FOUR + SELFIE))
+    prompts = load_prompts(prompts_file(wrapped + MODEL_PROMPTS + FOUR + SELFIE + FILTER))
     assert prompts.pose == "Same person and place. - Pose: {pose}."
 
 
@@ -165,7 +185,7 @@ def test_default_pose_mistake_is_refused(prompts_file, poses, named):
 
 def test_default_pose_of_the_longest_length_is_accepted(prompts_file):
     longest = FOUR.replace('pose = "waving"', f'pose = "{"a" * DESCRIPTION_MAX_LENGTH}"', 1)
-    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + longest + SELFIE))
+    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + longest + SELFIE + FILTER))
     assert len(prompts.default_poses["hips"].pose) == DESCRIPTION_MAX_LENGTH
 
 
@@ -220,8 +240,96 @@ def test_selfie_that_is_not_a_table_is_refused(prompts_file):
 def test_selfie_default_pose_of_the_longest_length_is_accepted(prompts_file):
     longest = "a" * DESCRIPTION_MAX_LENGTH
     table = selfie(poses=f'["smile", "V sign", "chin", "{longest}"]')
-    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + table))
+    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + table + FILTER))
     assert prompts.selfie.default_poses[3] == longest
+
+
+def test_shipped_file_has_the_two_filter_questions_as_the_decisions_api_takes_them():
+    questions = load_prompts(PROMPTS_FILE).filter_questions
+    assert questions == PROMPTS.filter_questions
+    assert tuple(questions) == FILTER_QUESTIONS == ("malicious", "injection")
+    context = "The state holds `description`, text a user typed into a photo app to describe a pose."
+    for question in questions.values():
+        assert question["type"] == "noul"
+        assert question["instructions"].startswith(context)
+        assert set(question["criteria"]) == {"true", "false"}
+        for text in (question["instructions"], *question["criteria"].values()):
+            assert "\n" not in text and "  " not in text
+    assert "nudity" in questions["malicious"]["criteria"]["true"]
+    assert "quotation mark" in questions["injection"]["criteria"]["true"]
+
+
+def test_filter_question_is_the_context_and_the_question_on_one_line(prompts_file):
+    table = filter_table(
+        context='"""\nA user\n  typed this.\n"""', malicious='question = "Harmful?"\nyes = "Yes."\nno = "No."\n'
+    )
+    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + SELFIE + table))
+    assert prompts.filter_questions["malicious"] == {
+        "type": "noul",
+        "instructions": "A user typed this. Harmful?",
+        "criteria": {"true": "Yes.", "false": "No."},
+    }
+
+
+@pytest.mark.parametrize(
+    ("table", "named"),
+    [
+        ("", r"a \[filter\] table is needed"),
+        (filter_table(context=None), "filter.context must be a non-empty string"),
+        (filter_table(context='" "'), "filter.context must be a non-empty string"),
+        (filter_table(injection=None), r"a \[filter.injection\] table is needed"),
+        (filter_table(malicious=None, extra='malicious = "Harmful?"\n'), r"a \[filter.malicious\] table is needed"),
+        (filter_table(malicious='yes = "Yes."\nno = "No."\n'), "filter.malicious.question must be"),
+        (filter_table(injection='question = "Tricky?"\nyes = ""\nno = "No."\n'), "filter.injection.yes must be"),
+        (filter_table(malicious='question = "Harmful?"\nyes = "Yes."\n'), "filter.malicious.no must be"),
+        (filter_table(extra='violence = "Violent?"\n'), "filter: unknown keys violence"),
+        (filter_table(malicious=QUESTION + 'maybe = "Unsure."\n'), "filter.malicious: unknown keys maybe"),
+    ],
+    ids=[
+        "no table",
+        "no context",
+        "empty context",
+        "no question table",
+        "question not a table",
+        "no question",
+        "empty yes",
+        "no no",
+        "unknown key in the table",
+        "unknown key in a question",
+    ],
+)
+def test_filter_mistake_is_refused_with_its_name(prompts_file, table, named):
+    with pytest.raises(ValueError, match=named):
+        load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + SELFIE + table))
+
+
+def test_filter_that_is_not_a_table_is_refused(prompts_file):
+    with pytest.raises(ValueError, match=r"a \[filter\] table is needed"):
+        load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + 'filter = "x"\n' + FOUR + SELFIE))
+
+
+@pytest.mark.parametrize(
+    "quoted",
+    ['say "cheese"', "say “cheese”", "say ＂cheese＂", "say «cheese»", "say „cheese‟", 'say "cheese″'],
+    ids=["straight", "typographic", "full-width", "angle", "low and reversed", "straight and double prime"],
+)
+def test_double_quotation_marks_in_a_pose_reach_the_prompts_as_single_ones(quoted):
+    assert checked_pose(quoted) == "say 'cheese'"
+    assert "say 'cheese'" in pose_prompt(quoted)
+    assert "say 'cheese'" in pose_prompt(quoted, selfie=True)
+    assert "say 'cheese'" in variation_prompt(quoted)
+    assert 'cheese"' not in pose_prompt(quoted)
+
+
+def test_pose_without_double_quotation_marks_reaches_the_prompts_as_written():
+    assert checked_pose("엄지 척, it's fine") == "엄지 척, it's fine"
+
+
+def test_quotation_marks_do_not_change_the_length_a_pose_is_checked_at():
+    longest = '"' * DESCRIPTION_MAX_LENGTH
+    assert checked_pose(longest) == "'" * DESCRIPTION_MAX_LENGTH
+    with pytest.raises(ApiError):
+        checked_pose(longest + '"')
 
 
 def test_file_that_is_not_toml_is_refused(prompts_file):

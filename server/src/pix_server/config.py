@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 """Environment configuration for the Pix server."""
 
 from typing import Literal
@@ -65,6 +65,16 @@ class Settings(BaseSettings):
     # Tip requests, counted apart from poses and suggestions in windows of the same lengths.
     tip_rate_limit: PositiveInt = 20
     tip_global_limit: PositiveInt = 1000
+    # An OpenRouter decision model; it judges every description and pose before the other models read it (Design
+    # Documentation 2.6.3).
+    filter_model: str = "typesafe/jev-1.14"
+    # A description is refused when the probability that it asks for harmful content, or that it tries to manipulate
+    # the models, reaches this; at 0.7 Jev 1.14 refused no harmless description and caught every harmful one on
+    # 2026-11-02, also in Korean.
+    filter_cutoff: float = Field(default=0.7, gt=0, le=1)
+    # After this the description goes through unjudged, so a slow filter never holds up a pose; Jev answered within
+    # 0.5 s on 2026-11-02.
+    filter_timeout_seconds: PositiveFloat = 2
 
     # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
     # leaves the window, so codes cannot be guessed. High, because phones on one Wi-Fi or carrier address share it,

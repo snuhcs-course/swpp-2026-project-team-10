@@ -51,6 +51,16 @@
             </intent-filter>
         </service>
 
+        <!-- Keeps the language chosen on Settings on Android 10–12 (FR-10.2); from Android 13 the system keeps it. -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
+
         <!-- A phone gets an FCM token only once someone signs in (PushTokenRegistrar), and Firebase sends no analytics. -->
         <meta-data
             android:name="firebase_messaging_auto_init_enabled"

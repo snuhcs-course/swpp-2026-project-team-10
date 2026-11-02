@@ -366,4 +366,56 @@
     <string name="friend_request_notification_body">Open Friends to accept or decline.</string>
     <string name="invitations_channel">Invitations</string>
     <string name="friend_requests_channel">Friend requests</string>
+
+    <!-- Settings, How to use Pix, About Pix (R&S 6.10; FR-10.1–10.5, FR-3.10, FR-4.2) -->
+    <string name="settings">Settings</string>
+    <string name="settings_section_guide">Guide</string>
+    <string name="settings_guide_color">Color</string>
+    <string name="settings_guide_thickness">Thickness</string>
+    <string name="guide_color_white">White</string>
+    <string name="guide_color_black">Black</string>
+    <string name="guide_color_yellow">Yellow</string>
+    <string name="guide_color_mint">Mint</string>
+    <string name="guide_color_pink">Pink</string>
+    <string name="guide_thickness_thin">Thin</string>
+    <string name="guide_thickness_normal">Normal</string>
+    <string name="guide_thickness_thick">Thick</string>
+    <string name="settings_latency">Show the delay</string>
+    <string name="settings_latency_body">While you shoot together, both phones show how far the live view lags.</string>
+    <string name="settings_section_general">General</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_phone">Phone\'s language</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_on">On</string>
+    <string name="settings_off">Off</string>
+    <string name="settings_section_privacy">Privacy</string>
+    <string name="settings_ai_consent">AI pose generation</string>
+    <string name="settings_consent_given">Agreed</string>
+    <string name="settings_consent_not_given">Not agreed</string>
+    <string name="settings_consent_body">A scene photo goes to the AI service only after you agree. If you withdraw, Pix asks again before the next one.</string>
+    <string name="settings_withdraw_title">Withdraw your agreement?</string>
+    <string name="settings_withdraw_message">Pix will ask again before it sends the next scene photo for poses.</string>
+    <string name="settings_withdraw">Withdraw</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_account">Pix account</string>
+    <string name="settings_signed_out">Not signed in</string>
+    <string name="settings_section_help">Help</string>
+    <string name="settings_how_to">How to use Pix</string>
+    <string name="settings_about">About Pix</string>
+    <string name="settings_version">Version %1$s</string>
+    <!-- The latency indicator on Camera and Subject view (FR-10.3). -->
+    <string name="latency_value">Delay %1$d ms</string>
+    <string name="latency_unknown">Delay –</string>
+    <string name="help_title">How to use Pix</string>
+    <string name="help_guide_title">Add a pose guide</string>
+    <string name="help_guide_body">Tap Guide and pick a photo of a person. Their outline appears on the camera: drag it to move it, pinch to resize it, and line the person up with it.</string>
+    <string name="help_poses_title">Generate poses</string>
+    <string name="help_poses_body">Tap Guide › Generate poses here and take a photo of the scene. AI makes four poses for that person in that place; the one you pick becomes the guide.</string>
+    <string name="help_together_title">Shoot together</string>
+    <string name="help_together_body">Invite a friend from Shoot together, or give them a room code. Their phone shows your camera live, with the same guide.</string>
+    <string name="help_remote_title">From the subject\'s phone</string>
+    <string name="help_remote_body">The person in the photo can zoom, change the brightness and the flash, and move the guide from their own phone. Only the photographer takes the photo.</string>
+    <string name="about_title">About Pix</string>
+    <string name="about_version">Version</string>
+    <string name="about_licenses">Open-source licenses</string>
 </resources>

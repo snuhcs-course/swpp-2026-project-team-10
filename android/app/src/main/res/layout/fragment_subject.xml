@@ -36,6 +36,19 @@
             app:layout_constraintTop_toTopOf="parent"
             tools:visibility="visible" />
 
+        <!-- The latency indicator, when Settings turns it on (FR-10.3). -->
+        <TextView
+            android:id="@+id/latencyChip"
+            style="@style/Widget.Pix.Chip.Small"
+            android:layout_marginEnd="8dp"
+            android:visibility="gone"
+            app:drawableStartCompat="@drawable/ic_status_dot"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/leaveButton"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="@string/latency_value"
+            tools:visibility="visible" />
+
         <Button
             android:id="@+id/leaveButton"
             style="@style/Widget.Pix.Button.Glass"

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -41,6 +41,8 @@ import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.fakeBitmap
+import com.lastpenguin.pix.settings.AppLanguage
+import com.lastpenguin.pix.settings.AppSettings
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -83,6 +85,8 @@ class TestAppContainer(
     val friends = FakeFriendsRepository()
     val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
+    val appSettings = AppSettings.InMemory()
+    val language = AppLanguage.InMemory()
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
 
@@ -134,6 +138,8 @@ class TestAppContainer(
         photoSyncer = photos,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
+        appSettings = appSettings,
+        appLanguage = language,
     )
 
     /** Installs the container in the test's [PixApplication]; call before the screen is launched. */
@@ -234,6 +240,10 @@ class TestAppContainer(
 
         override suspend fun give() {
             given = true
+        }
+
+        override suspend fun withdraw() {
+            given = false
         }
     }
 }

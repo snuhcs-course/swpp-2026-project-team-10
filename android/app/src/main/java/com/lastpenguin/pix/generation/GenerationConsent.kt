@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.generation
 
 import android.content.Context
@@ -17,6 +17,9 @@ interface GenerationConsent {
     suspend fun isGiven(): Boolean
 
     suspend fun give()
+
+    /** Takes the agreement back from the settings screen: the notice is shown again before the next scene photo. */
+    suspend fun withdraw()
 }
 
 private val Context.poseGenerationStore by preferencesDataStore(name = "pose_generation")
@@ -38,6 +41,14 @@ class DataStoreGenerationConsent(context: Context) : GenerationConsent {
             store.edit { it[GIVEN] = true }
         } catch (error: IOException) {
             Log.w(TAG, "Could not save the consent", error)
+        }
+    }
+
+    override suspend fun withdraw() {
+        try {
+            store.edit { it[GIVEN] = false }
+        } catch (error: IOException) {
+            Log.w(TAG, "Could not withdraw the consent", error)
         }
     }
 

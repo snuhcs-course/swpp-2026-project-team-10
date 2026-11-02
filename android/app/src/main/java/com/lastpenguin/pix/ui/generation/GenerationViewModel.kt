@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -127,6 +127,9 @@ class GenerationViewModel(
 
     private var consentGiven = false
 
+    /** The user agreed or withdrew on this run, which the stored answer, if it comes later, must not undo. */
+    private var consentDecided = false
+
     /** The set being generated or picked from, as [share] knows it; null between sets. */
     private var setId: String? = null
 
@@ -140,8 +143,9 @@ class GenerationViewModel(
     private val settledLight = MutableStateFlow<Boolean?>(null)
 
     init {
-        // Only ever sets it: an answer read before the user agreed must not take that agreement back.
-        viewModelScope.launch { if (consent.isGiven()) consentGiven = true }
+        // Only ever sets it, and only before the user decides: an answer read before they agreed or withdrew must not
+        // undo that.
+        viewModelScope.launch { if (consent.isGiven() && !consentDecided) consentGiven = true }
         viewModelScope.launch { share.picks.collect(::onSubjectPick) }
         viewModelScope.launch { descriptions.requests.collect(::onSubjectRequest) }
         // The camera keeps its light across rebinds, so it is turned off as soon as the scene is no longer framed.
@@ -174,7 +178,15 @@ class GenerationViewModel(
     /** The user agreed to the notice; it is not shown again. */
     fun onConsentGiven() {
         consentGiven = true
+        consentDecided = true
         viewModelScope.launch { consent.give() }
+    }
+
+    /** Settings took the agreement back (FR-4.2): the notice is shown again before the next scene photo is sent. */
+    fun withdrawConsent() {
+        consentGiven = false
+        consentDecided = true
+        viewModelScope.launch { consent.withdraw() }
     }
 
     /** *Generate poses here*: the Camera screen now takes the scene photo (FR-4.1). Nothing is sent yet. */

@@ -111,6 +111,9 @@ class SessionViewModel(
 
     val state: StateFlow<SessionState> = session.state
 
+    /** The link's delay for the latency indicator (FR-10.3); null until measured and while reconnecting. */
+    val latencyMs: StateFlow<Int?> = session.latencyMs
+
     private val _transitions = MutableSharedFlow<SessionState>(extraBufferCapacity = 16)
 
     /** Every state change from the moment a screen subscribes, for one-shot navigation. Screens draw from [state]. */

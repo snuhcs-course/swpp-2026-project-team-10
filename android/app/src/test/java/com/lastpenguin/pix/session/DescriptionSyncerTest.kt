@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.DescriptionStep
@@ -122,6 +122,23 @@ class DescriptionSyncerTest {
             sentOrder(),
         )
         assertEquals(listOf("d1"), codec.encoded)
+    }
+
+    @Test
+    fun `a set's start carries the description it was made from, for the subject's history`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+
+        syncer.open("d1", fakeBitmap(), "wave", rejected = false)
+        runCurrent()
+        syncer.update("d1", "wave  hello", null)
+        runCurrent()
+        syncer.end("d1", started = true, text = "wave hello")
+        runCurrent()
+
+        assertEquals(listOf("OPEN wave", "scene", "OPEN wave  hello", "STARTED wave hello"), sentOrder())
     }
 
     @Test
@@ -275,6 +292,31 @@ class DescriptionSyncerTest {
         assertNull(syncer.mirror.value)
         assertEquals(listOf(DescriptionEnd("d1", started = true), DescriptionEnd("d2", started = false)), ends)
     }
+
+    @Test
+    fun `the subject keeps the description a set started from, from the start or its copy, not a close or a blank`() =
+        runTest {
+            val syncer = open()
+            val started = mutableListOf<String>()
+            backgroundScope.launch { syncer.started.collect { started += it } }
+            runCurrent()
+
+            deliver(DescriptionStep.STARTED, text = "wave hello")
+            runCurrent()
+            // A photographer of an older version sends no text with the start: the copy's text stands in.
+            deliver(DescriptionStep.OPEN, "jump", id = "d2")
+            deliver(DescriptionStep.STARTED, id = "d2")
+            runCurrent()
+            deliver(DescriptionStep.OPEN, "lean", id = "d3")
+            deliver(DescriptionStep.CLOSED, id = "d3")
+            runCurrent()
+            // Suggested poses: a set without a description.
+            deliver(DescriptionStep.OPEN, "", id = "d4")
+            deliver(DescriptionStep.STARTED, id = "d4")
+            runCurrent()
+
+            assertEquals(listOf("wave hello", "jump"), started)
+        }
 
     @Test
     fun `another description's start replaces it, and another one's end drops it without a notice`() = runTest {

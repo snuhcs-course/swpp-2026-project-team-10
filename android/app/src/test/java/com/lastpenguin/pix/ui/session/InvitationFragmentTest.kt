@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.core.os.bundleOf
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
@@ -94,7 +95,11 @@ class InvitationFragmentTest {
         onScreen { binding -> binding.primaryButton.performClick() }
         idle()
         assertEquals(
-            SessionEntry.Invitation("inv_1", modules.invitations.place) to Role.SUBJECT,
+            SessionEntry.Invitation(
+                "inv_1",
+                modules.invitations.place,
+                SessionPartner(modules.invitations.opened.from.userId, modules.invitations.opened.from.displayName),
+            ) to Role.SUBJECT,
             modules.session.starts.single(),
         )
         assertEquals(R.id.invitationFragment, nav.currentDestination?.id)

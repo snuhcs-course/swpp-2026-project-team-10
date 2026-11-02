@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -1096,10 +1096,13 @@ class RtcSessionManagerTest {
 
     private fun photographerPlace() = SessionPlace("s_1", "photographer-token", relay)
 
+    /** The friend on the other phone of an invitation's session, as the account knows them (FR-4.11). */
+    private val friend = SessionPartner("u_2", "Junhyeong")
+
     /** Photographer: an invitation was sent and this phone took the place it opened; the friend has not come yet. */
     private suspend fun TestScope.invitingPhotographer(): RtcSessionManager {
         val manager = manager()
-        manager.start(SessionEntry.Invite("inv_1", photographerPlace()), Role.PHOTOGRAPHER)
+        manager.start(SessionEntry.Invite("inv_1", photographerPlace(), friend), Role.PHOTOGRAPHER)
         runCurrent()
         signaling.push(SignalEvent.Opened)
         signaling.receive(SignalMessage.SessionJoined("s_1", Role.PHOTOGRAPHER))
@@ -1110,7 +1113,7 @@ class RtcSessionManagerTest {
     @Test
     fun `an invitation's photographer takes its place and waits in Inviting until the friend comes`() = runTest {
         val manager = manager()
-        manager.start(SessionEntry.Invite("inv_1", photographerPlace()), Role.PHOTOGRAPHER)
+        manager.start(SessionEntry.Invite("inv_1", photographerPlace(), friend), Role.PHOTOGRAPHER)
         runCurrent()
         assertEquals(SessionState.Inviting("inv_1"), manager.state.value)
         signaling.push(SignalEvent.Opened)
@@ -1135,14 +1138,21 @@ class RtcSessionManagerTest {
         peer.open()
         peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
         runCurrent()
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        // The invitation's friend is the session's, where a room code's session has none (FR-4.11).
+        assertEquals(
+            SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER, friend),
+            manager.state.value,
+        )
         manager.leave()
     }
 
     @Test
     fun `an invitation's friend takes the place accepting gave it and answers the offer`() = runTest {
         val manager = manager()
-        manager.start(SessionEntry.Invitation("inv_1", SessionPlace("s_1", "subject-token", relay)), Role.SUBJECT)
+        manager.start(
+            SessionEntry.Invitation("inv_1", SessionPlace("s_1", "subject-token", relay), friend),
+            Role.SUBJECT,
+        )
         runCurrent()
         assertEquals(SessionState.Connecting(null), manager.state.value)
         signaling.push(SignalEvent.Opened)
@@ -1165,8 +1175,8 @@ class RtcSessionManagerTest {
     @Test
     fun `an invitation's entries fit only their own role`() = runTest {
         val manager = manager()
-        manager.start(SessionEntry.Invite("inv_1", photographerPlace()), Role.SUBJECT)
-        manager.start(SessionEntry.Invitation("inv_1", photographerPlace()), Role.PHOTOGRAPHER)
+        manager.start(SessionEntry.Invite("inv_1", photographerPlace(), friend), Role.SUBJECT)
+        manager.start(SessionEntry.Invitation("inv_1", photographerPlace(), friend), Role.PHOTOGRAPHER)
         runCurrent()
         assertEquals(SessionState.Idle, manager.state.value)
         assertTrue(signaling.connectedUrls.isEmpty())
@@ -1188,7 +1198,7 @@ class RtcSessionManagerTest {
         assertEquals(SessionState.Ended(EndReason.EXPIRED), manager.state.value)
 
         // The session expired before this phone's session.join reached the server.
-        manager.start(SessionEntry.Invite("inv_2", photographerPlace()), Role.PHOTOGRAPHER)
+        manager.start(SessionEntry.Invite("inv_2", photographerPlace(), friend), Role.PHOTOGRAPHER)
         runCurrent()
         signaling.push(SignalEvent.Opened)
         signaling.receive(SignalMessage.ServerError("NOT_FOUND"))
@@ -1220,7 +1230,10 @@ class RtcSessionManagerTest {
         runCurrent()
         advanceTimeBy(81_000)
         runCurrent()
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        assertEquals(
+            SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER, friend),
+            manager.state.value,
+        )
         assertFalse(SignalMessage.Leave in signaling.sent)
         manager.leave()
     }

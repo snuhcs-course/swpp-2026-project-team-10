@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -101,6 +101,9 @@ class RtcSessionManager(
     private var active = false
     private var role: Role? = null
     private var code: String? = null
+
+    /** The friend of an invitation's session, for `Connected` (FR-4.11); null in a room code's. */
+    private var partner: SessionPartner? = null
     private var sessionId: String? = null
     private var iceServers: List<IceServer> = emptyList()
     private var signalingJob: Job? = null
@@ -198,6 +201,11 @@ class RtcSessionManager(
         code = when (entry) {
             is SessionEntry.RoomCode -> entry.code
             is SessionEntry.Rejoin -> entry.code
+            else -> null
+        }
+        partner = when (entry) {
+            is SessionEntry.Invite -> entry.partner
+            is SessionEntry.Invitation -> entry.partner
             else -> null
         }
         greeting = when {
@@ -733,7 +741,7 @@ class RtcSessionManager(
         if (_state.value !is SessionState.Connecting || openChannels.size != 2) return
         connectTimeout?.cancel()
         connectTimeout = null
-        _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role))
+        _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.connected")
         pingJob?.cancel()
         pingJob = scope.launch {
@@ -782,7 +790,7 @@ class RtcSessionManager(
         if (Channel.RELIABLE !in openChannels) return
         reconnectBudget?.cancel()
         reconnectBudget = null
-        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role))
+        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.reconnected", "${clock() - state.since} ms")
     }
 
@@ -1052,6 +1060,7 @@ class RtcSessionManager(
         signaling.close()
         role = null
         code = null
+        partner = null
         sessionId = null
         rejoinToken = null
         greeting = null

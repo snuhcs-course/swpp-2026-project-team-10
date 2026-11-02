@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.protocol.DescriptionStep
@@ -32,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -48,7 +50,8 @@ import org.robolectric.shadows.ShadowToast
  * The subject's Generate poses (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's
  * description delivered to the container's DescriptionSyncer. Partitions: the scene photo, the text, and the hint as on
  * the photographer's phone; the photographer typing (the field, the chips, and the buttons wait, saying who types) and
- * done; this phone's typing sent while it holds the field and given back when it ends; a chip sent at once; Generate 4
+ * done; this phone's typing sent while it holds the field and given back when it ends; a description used before sent
+ * at once from its chip, and the switch to the ones used with the photographer in an invitation's session; Generate 4
  * poses and Skip sent and waiting; the description's end by a set started (back to Subject view without a notice), by
  * the photographer's close (a notice), and an end kept from an earlier description (nothing); a go no end answers in
  * 5 s (a notice); Back (Subject view, the description kept); the link reconnecting (everything waits); the session
@@ -66,10 +69,19 @@ class SubjectDescribeFragmentTest {
         receiving.cancel()
     }
 
-    /** A subject's phone whose syncer has the photographer's d1 with [text], typed by [writer], and its photo. */
-    private fun describing(text: String = "wave", writer: Role? = null): TestAppContainer {
+    /**
+     * A subject's phone whose syncer has the photographer's d1 with [text], typed by [writer], and its photo, with
+     * one description used before on this phone, and the photographer as the friend [partner] when the session is an
+     * invitation's.
+     */
+    private fun describing(
+        text: String = "wave",
+        writer: Role? = null,
+        partner: SessionPartner? = null,
+    ): TestAppContainer {
         val modules = TestAppContainer().install()
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        runBlocking { modules.history.record("lean on the wall", Role.SUBJECT, null) }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT, partner))
         modules.descriptions.startAsReceiver(receiving)
         idle()
         step(modules, DescriptionStep.OPEN, text, writer)
@@ -144,7 +156,7 @@ class SubjectDescribeFragmentTest {
 
         onScreen { binding ->
             assertFalse(binding.descriptionInput.isEnabled)
-            assertFalse(binding.ideaChips.getChildAt(0).isEnabled)
+            assertFalse(binding.historyChips.getChildAt(0).isEnabled)
             assertFalse(binding.generateButton.isEnabled)
             assertFalse(binding.suggestButton.isEnabled)
             assertEquals(string(R.string.peer_typing, "Dongje"), binding.descriptionTyping.text.toString())
@@ -185,11 +197,30 @@ class SubjectDescribeFragmentTest {
     }
 
     @Test
+    fun theDescriptionsUsedBefore_switchToTheOnesWithThePhotographer_inAnInvitationsSession() {
+        describing(partner = SessionPartner("u_1", "Dongje"))
+        launch()
+
+        onScreen { binding ->
+            assertEquals(View.VISIBLE, binding.historyFilter.visibility)
+            assertEquals(string(R.string.history_with, "Dongje"), binding.historyWithPartner.text.toString())
+            assertEquals(1, binding.historyChips.childCount)
+
+            binding.historyWithPartner.performClick()
+
+            // The one description used before was not used with Dongje.
+            assertEquals(0, binding.historyChips.childCount)
+            assertEquals(View.VISIBLE, binding.historyEmpty.visibility)
+            assertEquals(string(R.string.history_empty_with, "Dongje"), binding.historyEmpty.text.toString())
+        }
+    }
+
+    @Test
     fun aChip_isSentAtOnce() {
         val modules = describing()
         launch()
 
-        onScreen { it.ideaChips.getChildAt(0).performClick() }
+        onScreen { it.historyChips.getChildAt(0).performClick() }
         idle()
 
         val idea = onScreen { it.descriptionInput.text.toString() }

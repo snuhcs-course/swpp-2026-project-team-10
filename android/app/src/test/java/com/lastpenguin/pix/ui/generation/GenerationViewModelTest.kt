@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -20,6 +20,8 @@ import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.GenerationEvent
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
+import com.lastpenguin.pix.generation.PromptEntry
+import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.SUGGESTED
 import com.lastpenguin.pix.generation.planned
 import com.lastpenguin.pix.generation.testBitmap
@@ -27,6 +29,7 @@ import com.lastpenguin.pix.session.DescriptionRequest
 import com.lastpenguin.pix.session.DescriptionShare
 import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SubjectPick
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -65,6 +68,8 @@ class GenerationViewModelTest {
     private val consent = FakeConsent()
     private val share = RecordingShare()
     private val descriptions = RecordingDescriptions()
+    private val history = PromptHistory.InMemory { 1_000 }
+    private var partner: SessionPartner? = null
     private lateinit var model: GenerationViewModel
 
     private val state get() = model.uiState.value
@@ -72,7 +77,7 @@ class GenerationViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        model = GenerationViewModel(generator, camera, consent, LIMIT_MS, share, descriptions)
+        model = GenerationViewModel(generator, camera, consent, LIMIT_MS, share, descriptions, history) { partner }
         store.put("generation", model)
     }
 
@@ -941,7 +946,13 @@ class GenerationViewModelTest {
         runCurrent()
 
         assertEquals(
-            listOf("open ''", "update '' PHOTOGRAPHER", "update 'wave' PHOTOGRAPHER", "update 'wave' null", "started"),
+            listOf(
+                "open ''",
+                "update '' PHOTOGRAPHER",
+                "update 'wave' PHOTOGRAPHER",
+                "update 'wave' null",
+                "started 'wave'",
+            ),
             descriptions.calls,
         )
         assertEquals(1, descriptions.ids.toSet().size)
@@ -1010,7 +1021,7 @@ class GenerationViewModelTest {
         runCurrent()
         assertEquals(PoseRequest.Described("jump high"), generator.runs.single().request)
         assertEquals("jump high", state.description)
-        assertEquals("started", descriptions.calls.last())
+        assertEquals("started 'jump high'", descriptions.calls.last())
 
         model.cancel()
         describeAPhoto()
@@ -1019,6 +1030,48 @@ class GenerationViewModelTest {
         runCurrent()
         assertEquals(PoseRequest.Suggested, generator.runs.last().request)
         assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
+    }
+
+    @Test
+    fun aSetMadeFromADescription_isKeptAsUsedBefore_withTheSessionsFriend() = runTest {
+        describeAPhoto()
+        model.generate("  Wave  hello ")
+        runCurrent()
+        assertEquals(listOf(PromptEntry("Wave hello", 1_000, Role.PHOTOGRAPHER)), history.entries.value)
+
+        partner = SessionPartner("u_2", "Junhyeong")
+        model.cancel()
+        describeAPhoto()
+        model.generate("Jump")
+        runCurrent()
+        assertEquals(
+            listOf("Jump" to setOf("u_2"), "Wave hello" to emptySet()),
+            history.entries.value.map { it.text to it.partners },
+        )
+    }
+
+    @Test
+    fun suggestedPoses_fromSkipOrABlankDescription_areNotKeptAsUsedBefore() = runTest {
+        describeAPhoto()
+        model.suggestPoses()
+        runCurrent()
+        model.cancel()
+        describeAPhoto()
+        model.generate(" \n ")
+        runCurrent()
+
+        assertEquals(2, generator.runs.size)
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
+    }
+
+    @Test
+    fun theSubjectsGenerate_isKeptAsUsedBeforeOnThisPhoneToo() = runTest {
+        describeAPhoto()
+        descriptions.request(DescriptionRequest.Edit(descriptions.ids.last(), holding = true, text = "jump"))
+        descriptions.request(DescriptionRequest.Go(descriptions.ids.last(), "jump high", suggest = false))
+        runCurrent()
+
+        assertEquals(listOf(PromptEntry("jump high", 1_000, Role.PHOTOGRAPHER)), history.entries.value)
     }
 
     @Test
@@ -1088,9 +1141,9 @@ class GenerationViewModelTest {
             calls += "update '$text' $writer"
         }
 
-        override fun end(descriptionId: String, started: Boolean) {
+        override fun end(descriptionId: String, started: Boolean, text: String) {
             check(descriptionId == ids.last())
-            calls += if (started) "started" else "closed"
+            calls += if (started) "started '$text'" else "closed"
         }
     }
 

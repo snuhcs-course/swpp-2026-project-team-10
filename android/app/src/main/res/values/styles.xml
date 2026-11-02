@@ -278,6 +278,12 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label.Bold</item>
     </style>
 
+    <!-- The switch in a section's header, such as All / With <name> over the descriptions used before (FR-4.11). -->
+    <style name="Widget.Pix.Button.Segment.Small">
+        <item name="android:minHeight">32dp</item>
+        <item name="cornerRadius">14dp</item>
+    </style>
+
     <!-- Sliders: a thin track and a round thumb, like the zoom and opacity controls of a camera. -->
     <style name="Widget.Pix.Slider" parent="Widget.Material3.Slider">
         <item name="trackHeight">4dp</item>
@@ -366,8 +372,9 @@
         <item name="android:textCursorDrawable">@null</item>
     </style>
 
-    <!-- An idea chip on Generate poses (FR-4.8): a short pose that fills the description field when tapped. -->
-    <style name="Widget.Pix.IdeaChip" parent="Widget.Material3.Chip.Suggestion">
+    <!-- A description used before, on Generate poses (FR-4.11): it fills the description field when tapped, and its
+         ✕ removes it from the history. -->
+    <style name="Widget.Pix.HistoryChip" parent="Widget.Material3.Chip.Suggestion">
         <item name="chipBackgroundColor">@color/pix_surface_2</item>
         <item name="chipStrokeColor">@color/pix_outline</item>
         <item name="chipStrokeWidth">1dp</item>
@@ -375,6 +382,10 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
         <item name="android:textColor">@color/pix_text_soft</item>
         <item name="rippleColor">#14FFFFFF</item>
+        <item name="closeIconVisible">true</item>
+        <item name="closeIcon">@drawable/ic_close</item>
+        <item name="closeIconTint">@color/pix_text_muted</item>
+        <item name="closeIconSize">16dp</item>
     </style>
 
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">

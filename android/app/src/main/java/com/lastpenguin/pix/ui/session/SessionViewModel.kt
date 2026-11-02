@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -26,6 +26,7 @@ import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
 import com.lastpenguin.pix.session.SessionManager
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -251,7 +252,8 @@ class SessionViewModel(
                     role = Role.PHOTOGRAPHER
                     started++
                     _invitation.value = sent
-                    session.start(SessionEntry.Invite(sent.id, sent.place), Role.PHOTOGRAPHER)
+                    val partner = SessionPartner(friend.userId, friend.displayName)
+                    session.start(SessionEntry.Invite(sent.id, sent.place, partner), Role.PHOTOGRAPHER)
                     _inviteResults.emit(InviteResult.Sent)
                 }
                 .onFailure { error ->
@@ -291,13 +293,13 @@ class SessionViewModel(
      * Subject: *Accept* on Invitation gave this phone its place, which the session takes now (FR-6.1). False, with
      * nothing changed, while another session is open here, which the session would keep instead.
      */
-    fun joinInvitation(invitationId: String, place: SessionPlace): Boolean {
+    fun joinInvitation(invitationId: String, place: SessionPlace, partner: SessionPartner): Boolean {
         if (busy) return false
         lastCode = null
         reconnecting = false
         role = Role.SUBJECT
         started++
-        viewModelScope.launch { session.start(SessionEntry.Invitation(invitationId, place), Role.SUBJECT) }
+        viewModelScope.launch { session.start(SessionEntry.Invitation(invitationId, place, partner), Role.SUBJECT) }
         return true
     }
 

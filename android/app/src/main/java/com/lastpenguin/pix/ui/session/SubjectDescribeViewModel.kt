@@ -1,13 +1,16 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.generation.PromptEntry
+import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.session.DescriptionEnd
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionManager
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +37,8 @@ data class SubjectDescribeUiState(
     /** The link is reconnecting (Design 2.6.7): the field and the buttons wait. */
     val reconnecting: Boolean = false,
     val photographerName: String? = null,
+    /** The photographer by account, in an invitation's session, for the history with them (FR-4.11); else null. */
+    val partner: SessionPartner? = null,
 )
 
 /**
@@ -45,10 +50,14 @@ data class SubjectDescribeUiState(
 class SubjectDescribeViewModel(
     private val session: SessionManager,
     private val descriptions: DescriptionSyncer,
+    private val history: PromptHistory = PromptHistory.InMemory(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubjectDescribeUiState())
     val uiState: StateFlow<SubjectDescribeUiState> = _uiState.asStateFlow()
+
+    /** This phone's descriptions used before, newest first (FR-4.11). */
+    val usedBefore: StateFlow<List<PromptEntry>> = history.entries
 
     /** Each description that ended while this screen was in front, for its notice (Design 2.6.5). */
     val ended: Flow<DescriptionEnd> = descriptions.ended
@@ -65,7 +74,8 @@ class SubjectDescribeViewModel(
                 Triple(description, going, state)
             }.collect { (description, going, state) ->
                 _uiState.update { ui ->
-                    val name = (state as? SessionState.Connected)?.peer?.displayName ?: ui.photographerName
+                    val connected = state as? SessionState.Connected
+                    val name = connected?.peer?.displayName ?: ui.photographerName
                     when {
                         ui.gone -> ui
 
@@ -84,11 +94,17 @@ class SubjectDescribeViewModel(
                             waiting = going == description.descriptionId,
                             reconnecting = state is SessionState.Reconnecting,
                             photographerName = name,
+                            partner = connected?.partner ?: ui.partner,
                         )
                     }
                 }
             }
         }
+    }
+
+    /** ✕ on a description used before: it leaves this phone's history (FR-4.11). */
+    fun forget(text: String) {
+        viewModelScope.launch { history.delete(text) }
     }
 
     /** The field took focus, which holds the description while the photographer's does not, or lost it, with [text]. */

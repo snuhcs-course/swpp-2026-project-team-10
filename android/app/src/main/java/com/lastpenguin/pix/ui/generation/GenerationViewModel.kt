@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -15,12 +15,15 @@ import com.lastpenguin.pix.generation.GenerationEvent
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
+import com.lastpenguin.pix.generation.PromptEntry
+import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.session.DescriptionRequest
 import com.lastpenguin.pix.session.DescriptionShare
 import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SubjectPick
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
@@ -107,8 +110,9 @@ data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
  * generation screens (activity scope). In a session, Generate poses goes to the subject's phone through
  * [descriptions], where either phone writes the description, one at a time, and starts the set; each set goes to the
  * subject's *Pick a pose* through [share], and the subject's first pick of it counts as a *Use this pose* (Design
- * 2.6.5).
- * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16.
+ * 2.6.5). Each set made from a description, by either phone, goes into this phone's [history] as the photographer's,
+ * with the session's friend from [partner] (FR-4.11).
+ * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16; the history Iter3-P24.
  */
 class GenerationViewModel(
     private val generator: PoseGenerator,
@@ -117,10 +121,15 @@ class GenerationViewModel(
     private val limitMs: Long = RemotePoseGenerator.TIMEOUT_MS,
     private val share: PoseShare = PoseShare.None,
     private val descriptions: DescriptionShare = DescriptionShare.None,
+    private val history: PromptHistory = PromptHistory.InMemory(),
+    private val partner: () -> SessionPartner? = { null },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GenerationUiState())
     val uiState: StateFlow<GenerationUiState> = _uiState.asStateFlow()
+
+    /** The descriptions used before, newest first, for Generate poses (FR-4.10). */
+    val usedBefore: StateFlow<List<PromptEntry>> = history.entries
 
     private var generating: Job? = null
     private var shooting: Job? = null
@@ -324,10 +333,18 @@ class GenerationViewModel(
         }
     }
 
-    /** Generate poses ended: a set [started] from it, or it closed, also on the subject's phone. */
-    private fun endDescription(started: Boolean) {
-        descriptionId?.let { descriptions.end(it, started) }
+    /**
+     * Generate poses ended: a set [started] from it, with the description [text] its request has, or it closed, also
+     * on the subject's phone.
+     */
+    private fun endDescription(started: Boolean, text: String = "") {
+        descriptionId?.let { descriptions.end(it, started, text) }
         descriptionId = null
+    }
+
+    /** ✕ on a description used before: it leaves the history (FR-4.11). */
+    fun forget(text: String) {
+        viewModelScope.launch { history.delete(text) }
     }
 
     /**
@@ -385,7 +402,13 @@ class GenerationViewModel(
 
     private fun start(scene: Bitmap, selfie: Boolean, request: PoseRequest, description: String) {
         generating?.cancel()
-        endDescription(started = true)
+        val described = (request as? PoseRequest.Described)?.text.orEmpty()
+        endDescription(started = true, text = described)
+        // Kept once the set starts, whichever phone wrote it; suggested poses have no description to keep.
+        if (described.isNotEmpty()) {
+            val partner = partner()
+            viewModelScope.launch { history.record(described, Role.PHOTOGRAPHER, partner?.userId) }
+        }
         closeSet()
         val id = UUID.randomUUID().toString()
         setId = id

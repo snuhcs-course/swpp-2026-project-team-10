@@ -7,7 +7,12 @@
   "flow2_pose_generation": {
     "notes": [
       "Refused description → “"
-    ]
+    ],
+    "texts": {
+      "Leaning on the railing by the river": "강가 난간에 기대기",
+      "Sitting on the steps with a coffee": "계단에 앉아 커피 들기",
+      "Crouching next to the dog": "강아지 옆에 쪼그려 앉기"
+    }
   },
   "flow3_add_friend": {
     "keep": [
@@ -42,6 +47,11 @@
   "flow5_friend": {
     "keep": [
       "Pix"
-    ]
+    ],
+    "texts": {
+      "Jumping with both arms up": "두 팔 들고 점프하기",
+      "Sitting on the steps with a coffee": "계단에 앉아 커피 들기",
+      "Walking away, looking back": "걸어가며 뒤돌아보기"
+    }
   }
 }

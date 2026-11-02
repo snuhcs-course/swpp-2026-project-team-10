@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -27,6 +27,7 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.TipSource
@@ -37,6 +38,7 @@ import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.confirmBegin
 import com.lastpenguin.pix.session.confirmChunk
@@ -314,6 +316,24 @@ class KoreanScreensTest {
         idle()
         val id = modules.session.sent.filterIsInstance<SessionMessage.PoseDescription>().last().descriptionId
         modules.session.deliver(SessionMessage.PoseDescriptionEdit(id, holding = true, text = "벽에 기대서 웃기"))
+        idle()
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun describePoses_withDescriptionsUsedBefore_inAnInvitationsSession_isInKorean() {
+        val modules = generationModules()
+        runBlocking {
+            modules.history.record("벽에 기대서 웃기", Role.PHOTOGRAPHER, null)
+            modules.history.record("두 팔 들고 점프하기", Role.PHOTOGRAPHER, "u_2")
+        }
+        val friend = SessionPartner("u_2", "Test Account 2")
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER, friend))
+        scenario = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }.first
+        idle()
+        assertKorean(screen(), *people)
+
+        scenario!!.onFragment { FragmentDescribePoseBinding.bind(it.requireView()).historyWithPartner.performClick() }
         idle()
         assertKorean(screen(), *people)
     }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -924,6 +924,54 @@ class GenerationViewModelTest {
         assertTrue(consent.given)
     }
 
+    @Test
+    fun consentWithdrawnInTheSettingsIsAskedAgain() = runTest {
+        consent.given = true
+        val later = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        store.put("later", later)
+        runCurrent()
+
+        later.withdrawConsent()
+        assertTrue(later.needsConsent)
+        runCurrent()
+        assertFalse(consent.given)
+    }
+
+    @Test
+    fun consentWithdrawnWhileTheStoredAnswerLoadsStaysWithdrawn() = runTest {
+        consent.given = true
+        consent.hold = CompletableDeferred()
+        val slow = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        store.put("slow", slow)
+        runCurrent()
+
+        slow.withdrawConsent()
+        runCurrent()
+        // The agreement read before the user withdrew arrives only now.
+        consent.hold?.complete(Unit)
+        runCurrent()
+
+        assertTrue(slow.needsConsent)
+        assertFalse(slow.consentGiven.value)
+        assertFalse(consent.given)
+    }
+
+    @Test
+    fun consentGiven_followsTheStoredAnswerOnceItLoads() = runTest {
+        consent.given = true
+        consent.hold = CompletableDeferred()
+        val slow = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        store.put("slow", slow)
+        runCurrent()
+        assertFalse(slow.consentGiven.value)
+
+        consent.hold?.complete(Unit)
+        runCurrent()
+
+        assertTrue(slow.consentGiven.value)
+        assertFalse(slow.needsConsent)
+    }
+
     // ---- Generate poses on both phones (FR-6.15, Design 2.6.5) ---------------------------------------------------
     // Partitions: the description shared from its opening to its end (a set started, Cancel), opened again with its text
     // and whether it was rejected; this phone's field holding it while focused; the subject's edit taken while this
@@ -1236,6 +1284,10 @@ class GenerationViewModelTest {
 
         override suspend fun give() {
             given = true
+        }
+
+        override suspend fun withdraw() {
+            given = false
         }
     }
 }

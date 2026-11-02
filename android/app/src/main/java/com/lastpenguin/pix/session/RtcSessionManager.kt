@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.session.signaling.IceCandidate
 import com.lastpenguin.pix.session.signaling.IceServer
 import com.lastpenguin.pix.session.signaling.SignalMessage
 import java.util.EnumSet
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -94,12 +95,18 @@ class RtcSessionManager(
     private val _path = MutableStateFlow<IcePath?>(null)
     override val path: StateFlow<IcePath?> = _path.asStateFlow()
 
+    private val _latencyMs = MutableStateFlow<Int?>(null)
+    override val latencyMs: StateFlow<Int?> = _latencyMs.asStateFlow()
+
     override val eglContext: EglBase.Context
         get() = peers.eglContext
 
     // ---- Session fields, touched only on the serial scope ---------------------
     private var active = false
     private var role: Role? = null
+
+    /** The last round trips of this phone's pings, newest last, for [latencyMs]. */
+    private val roundTrips = ArrayDeque<Long>()
     private var code: String? = null
     private var sessionId: String? = null
     private var iceServers: List<IceServer> = emptyList()
@@ -755,6 +762,7 @@ class RtcSessionManager(
         val since = clock()
         _state.value = SessionState.Reconnecting(id, since)
         Timings.mark("session.reconnecting")
+        clearLatency()
         reconnectBudget?.cancel()
         reconnectBudget = scope.launch {
             delay(RECONNECT_BUDGET_MS)
@@ -831,7 +839,11 @@ class RtcSessionManager(
                 sendNow(SessionMessage.Pong(message.ts))
             }
 
-            is SessionMessage.Pong -> Timings.mark("rtt", "${clock() - message.ts} ms ts=${message.ts}")
+            is SessionMessage.Pong -> {
+                val roundTrip = clock() - message.ts
+                Timings.mark("rtt", "$roundTrip ms ts=${message.ts}")
+                onRoundTrip(roundTrip)
+            }
 
             is SessionMessage.Leave -> {
                 _incoming.tryEmit(message)
@@ -994,6 +1006,19 @@ class RtcSessionManager(
         }
     }
 
+    /** A pong's round trip, counted only while connected: one from before a drop says nothing about the new link. */
+    private fun onRoundTrip(roundTrip: Long) {
+        if (_state.value !is SessionState.Connected || roundTrip < 0) return
+        roundTrips.addLast(roundTrip)
+        while (roundTrips.size > LATENCY_SAMPLES) roundTrips.removeFirst()
+        _latencyMs.value = (roundTrips.average() / 2).roundToInt()
+    }
+
+    private fun clearLatency() {
+        roundTrips.clear()
+        _latencyMs.value = null
+    }
+
     private fun closePeer() {
         val client = peer ?: return
         peer = null
@@ -1020,6 +1045,7 @@ class RtcSessionManager(
         lastSeq.clear()
         reliableQueue.clear()
         _path.value = null
+        clearLatency()
         client.close()
     }
 
@@ -1088,6 +1114,9 @@ class RtcSessionManager(
         /** The answers to `session.join` that mean the place is gone. */
         val REJOIN_REFUSALS = setOf("NOT_FOUND", "FORBIDDEN")
         const val PING_INTERVAL_MS = 2_000L
+
+        /** Pings averaged for [latencyMs]: 6 s of them, so one slow answer does not make the number jump. */
+        const val LATENCY_SAMPLES = 3
         const val LEAVE_FLUSH_MS = 150L
         const val BACKPRESSURE_BYTES = 256L * 1024
 

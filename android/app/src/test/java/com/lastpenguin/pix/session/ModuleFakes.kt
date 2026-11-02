@@ -53,6 +53,9 @@ class FakeSessionManager : SessionManager {
     private val _path = MutableStateFlow<IcePath?>(null)
     override val path: StateFlow<IcePath?> = _path.asStateFlow()
 
+    private val _latencyMs = MutableStateFlow<Int?>(null)
+    override val latencyMs: StateFlow<Int?> = _latencyMs.asStateFlow()
+
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
 
@@ -95,6 +98,11 @@ class FakeSessionManager : SessionManager {
     /** The link's statistics read a new candidate pair, or none. */
     fun setPath(path: IcePath?) {
         _path.value = path
+    }
+
+    /** The pings measured a new delay, or none. */
+    fun setLatency(ms: Int?) {
+        _latencyMs.value = ms
     }
 
     /** The session kept a `camera.state` whose `incoming` emission this screen did not see. */

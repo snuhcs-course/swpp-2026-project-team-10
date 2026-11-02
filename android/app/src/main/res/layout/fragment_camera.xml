@@ -71,14 +71,38 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_goneMarginStart="0dp" />
 
+        <!-- The latency indicator during a session, when Settings turns it on (FR-10.3). -->
+        <TextView
+            android:id="@+id/latencyChip"
+            style="@style/Widget.Pix.Chip.Small"
+            android:layout_marginEnd="8dp"
+            android:accessibilityLiveRegion="none"
+            android:visibility="gone"
+            app:drawableStartCompat="@drawable/ic_status_dot"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/topBarActions"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="@string/latency_value"
+            tools:visibility="visible" />
+
         <LinearLayout
             android:id="@+id/topBarActions"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:gravity="center_vertical"
             tools:ignore="ButtonOrder"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Settings (FR-10.1); like Shoot together, not during a session or the scene photo. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/settingsButton"
+                style="@style/Widget.Pix.Button.Icon.TopBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/settings"
+                app:icon="@drawable/ic_settings" />
 
             <Button
                 android:id="@+id/shootTogetherButton"

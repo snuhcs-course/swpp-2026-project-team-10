@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -37,7 +37,7 @@ import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseTipper
-import com.lastpenguin.pix.generation.screenLanguages
+import com.lastpenguin.pix.generation.ScreenLanguages
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -70,6 +70,10 @@ import com.lastpenguin.pix.session.WebRtcRuntime
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.signalingUrl
+import com.lastpenguin.pix.settings.AndroidAppLanguage
+import com.lastpenguin.pix.settings.AppLanguage
+import com.lastpenguin.pix.settings.AppSettings
+import com.lastpenguin.pix.settings.DataStoreAppSettings
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -136,6 +140,13 @@ class AppContainer(
     val remoteControlHandler: RemoteControlHandler,
     /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
     val mobileDataNotice: MobileDataNotice,
+    // ---- Settings (#123) ---------------------------------------------------------
+    /** The guide's look and the latency indicator from the settings screen (FR-10.1). */
+    val appSettings: AppSettings,
+    /** Pix's own language, which Android keeps (FR-10.2). */
+    val appLanguage: AppLanguage,
+    /** The screens' language for the text the server writes (FR-10.2); none in tests, whose tips stay in English. */
+    val screenLanguages: ScreenLanguages? = null,
     /** Registers this phone's push token; none in tests, which have no Firebase. */
     val pushTokenRegistrar: PushTokenRegistrar? = null,
 ) {
@@ -228,7 +239,8 @@ class AppContainer(
             val referenceGuideMaker: ReferenceGuideMaker =
                 MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
             // The tip is written in the screens' language, and asked again when it changes while Pix runs (FR-10.2).
-            val screenLanguage = screenLanguages(appContext)
+            val screenLanguages = ScreenLanguages(appContext)
+            val screenLanguage = screenLanguages.current
             val poseTipper: PoseTipper = RemotePoseTipper(pixApi, language = { screenLanguage.value })
             return AppContainer(
                 cameraController = cameraController,
@@ -265,6 +277,9 @@ class AppContainer(
                     attributeGuideChanges = guideSyncer::attribute,
                 ),
                 mobileDataNotice = DataStoreMobileDataNotice(appContext),
+                appSettings = DataStoreAppSettings(appContext, appScope),
+                appLanguage = AndroidAppLanguage(),
+                screenLanguages = screenLanguages,
                 pushTokenRegistrar = pushTokenRegistrar,
             )
         }

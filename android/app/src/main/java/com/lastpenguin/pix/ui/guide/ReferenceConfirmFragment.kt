@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -19,7 +19,10 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.showOutline
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +36,7 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
     private val viewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
 
     /** *Choose another photo*; closing the picker keeps the current result. */
     private val pickPhoto = registerPhotoPicker { uri -> uri?.let(viewModel::onPhotoPicked) }
@@ -57,6 +61,11 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect { state -> render(binding, state) } }
+                // The outline alone, in the settings' color and thickness (FR-2.3, FR-3.10).
+                launch {
+                    val guides = viewModel.uiState.map { (it as? ReferenceUiState.Ready)?.guide }
+                    binding.referenceImage.showOutline(settingsViewModel.guideLook, guides)
+                }
                 launch {
                     viewModel.chosenBy.collect { name ->
                         binding.chosenByText.isVisible = name != null
@@ -104,8 +113,6 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             0,
         )
         binding.useGuideButton.isEnabled = ready != null
-        // The outline alone, over the card's neutral background (FR-2.3); the reference's pixels are not shown.
-        if (ready != null) binding.referenceImage.setImageBitmap(ready.guide.outline)
 
         when (state) {
             ReferenceUiState.NoPersonFound -> findNavController().navigate(

@@ -30,6 +30,12 @@ interface SessionManager {
      */
     val path: StateFlow<IcePath?>
 
+    /**
+     * The link's delay in milliseconds, half the round trip of the `ping` both phones send every 2 s, averaged over the
+     * last three, for the latency indicator (FR-10.3). null until the first answer, while reconnecting, and after the end.
+     */
+    val latencyMs: StateFlow<Int?>
+
     suspend fun start(entry: SessionEntry, role: Role)
 
     /** Sent on the realtime or reliable data channel as listed in Design 2.5.1. */

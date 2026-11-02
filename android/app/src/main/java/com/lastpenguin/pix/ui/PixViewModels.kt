@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -18,6 +18,7 @@ import com.lastpenguin.pix.ui.session.SubjectConfirmViewModel
 import com.lastpenguin.pix.ui.session.SubjectDescribeViewModel
 import com.lastpenguin.pix.ui.session.SubjectPickViewModel
 import com.lastpenguin.pix.ui.session.SubjectViewModel
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
 
 /**
  * Creates every ViewModel with its modules from [AppContainer].
@@ -88,6 +89,7 @@ object PixViewModels {
         initializer { SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer) }
         initializer { AccountViewModel(container.authRepository, container.googleIdTokens) }
         initializer { FriendsViewModel(container.authRepository, container.friendsRepository) }
+        initializer { SettingsViewModel(container.appSettings, container.appLanguage, container.authRepository) }
     }
 
     private val CreationExtras.container: AppContainer

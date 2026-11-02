@@ -1,10 +1,13 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
@@ -30,6 +33,9 @@ class GuideOverlayView @JvmOverloads constructor(
     private var guide: ReferenceGuide? = null
     private var state = GuideState()
     private var bitmap: Bitmap? = null
+
+    /** The guide's outline at the settings' thickness, drawn instead of [ReferenceGuide.outline] while it is that guide's. */
+    private var restyled: Pair<ReferenceGuide, Bitmap>? = null
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private var ownsTouch = false
     private var gesture: TouchGesture? = null
@@ -63,6 +69,30 @@ class GuideOverlayView @JvmOverloads constructor(
      * and [final] is true when the gesture ends.
      */
     var onGesture: ((dx: Float, dy: Float, scale: Float, final: Boolean) -> Unit)? = null
+
+    /**
+     * The line's color from the settings (FR-3.10). The outline is drawn white, so another color tints it, and the
+     * opacity still applies.
+     */
+    var lineColor: Int = Color.WHITE
+        set(value) {
+            if (field == value) return
+            field = value
+            paint.colorFilter = if (value == Color.WHITE) null else PorterDuffColorFilter(value, PorterDuff.Mode.SRC_IN)
+            postInvalidateOnAnimation()
+        }
+
+    /**
+     * Draws [outline] for [guide] instead of its own outline: the same mask traced at the settings' thickness
+     * ([GuideOutlines]). Ignored for any other guide, so a late result never draws over a newer guide.
+     */
+    fun restyle(guide: ReferenceGuide?, outline: Bitmap?) {
+        val next = if (guide != null && outline != null) guide to outline else null
+        if (restyled?.first === next?.first && restyled?.second === next?.second) return
+        restyled = next
+        updateDrawing()
+        postInvalidateOnAnimation()
+    }
 
     /** Shows [guide] at [state]; null hides it. */
     fun render(guide: ReferenceGuide?, state: GuideState) {
@@ -240,7 +270,7 @@ class GuideOverlayView @JvmOverloads constructor(
         guideBounds.set(left, top, right, bottom)
         paint.alpha = (state.opacity.coerceIn(0f, 1f) * 255f).roundToInt()
         // The guide is an outline only; the reference's pixels are never drawn (FR-2.2, AD-15).
-        bitmap = guide.outline
+        bitmap = restyled?.takeIf { it.first === guide }?.second ?: guide.outline
     }
 
     override fun onDraw(canvas: Canvas) {

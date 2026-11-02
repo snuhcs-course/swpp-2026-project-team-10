@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -85,6 +85,9 @@ import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
 import com.lastpenguin.pix.ui.session.SubjectDescribeFragment
 import com.lastpenguin.pix.ui.session.SubjectFragment
 import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
+import com.lastpenguin.pix.ui.settings.AboutFragment
+import com.lastpenguin.pix.ui.settings.HelpFragment
+import com.lastpenguin.pix.ui.settings.SettingsFragment
 import java.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -109,7 +112,8 @@ import org.robolectric.annotation.GraphicsMode
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone and in a session; Couldn't create poses,
  * failed and refused; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
  * friend; Sign in; Sign up; Pix ID setup; Account; the room code; Join with a code; Session not found; Subject view,
- * and while the photographer picks a pose, with a guide to save; the subject's Pick a pose; Connection lost. On each, no visible text, hint, or content
+ * and while the photographer picks a pose, with a guide to save; the subject's Pick a pose; Connection lost; Camera in a
+ * session with the delay shown; Settings, signed in; How to use Pix; About Pix. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
  * in a view that ellipsizes on purpose, and no line breaks inside a word. The text styles' font aliases: Pretendard in
@@ -202,6 +206,16 @@ class KoreanScreensTest {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun camera_inASessionWithTheDelay_isInKorean() {
+        val modules = camera()
+        runBlocking { modules.appSettings.setShowLatency(true) }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        modules.session.setLatency(120)
+        // "ms" is how Korean writes milliseconds too.
+        assertKorean(screen(), *people, "ms")
     }
 
     // ---- Pose guide ------------------------------------------------------------------
@@ -654,6 +668,32 @@ class KoreanScreensTest {
         TestAppContainer().install()
         scenario = launchFragmentInContainer<ConnectionLostFragment>(themeResId = R.style.Theme_Pix)
         assertKorean(screen())
+    }
+
+    // ---- Settings ---------------------------------------------------------------------------
+
+    @Test
+    fun settings_isInKorean() {
+        val modules = TestAppContainer().install()
+        modules.auth.signInAs(account)
+        scenario = launchFragmentInContainer<SettingsFragment>(themeResId = R.style.Theme_Pix)
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun howToUse_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchFragmentInContainer<HelpFragment>(themeResId = R.style.Theme_Pix)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun about_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchFragmentInContainer<AboutFragment>(themeResId = R.style.Theme_Pix)
+        // The libraries' and licenses' own names, which are not translated.
+        val names = AboutFragment.LIBRARIES.flatMap { listOf(it.name, it.license) }
+        assertKorean(screen(), *names.toTypedArray())
     }
 
     // ---- Fonts ------------------------------------------------------------------------------

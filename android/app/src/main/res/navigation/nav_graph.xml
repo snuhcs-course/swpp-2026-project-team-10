@@ -24,7 +24,40 @@
         <action
             android:id="@+id/action_camera_to_describePose"
             app:destination="@id/describePoseFragment" />
+        <action
+            android:id="@+id/action_camera_to_settings"
+            app:destination="@id/settingsFragment" />
     </fragment>
+
+    <!-- Settings, How to use Pix, and About Pix (FR-10.1, FR-10.4, R&S 6.10) -->
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.lastpenguin.pix.ui.settings.SettingsFragment"
+        android:label="Settings">
+        <action
+            android:id="@+id/action_settings_to_help"
+            app:destination="@id/helpFragment" />
+        <action
+            android:id="@+id/action_settings_to_about"
+            app:destination="@id/aboutFragment" />
+        <action
+            android:id="@+id/action_settings_to_account"
+            app:destination="@id/accountSheet" />
+        <!-- Signed out, Pix account opens Friends, which offers signing in (FR-5.1). -->
+        <action
+            android:id="@+id/action_settings_to_friends"
+            app:destination="@id/friendsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/helpFragment"
+        android:name="com.lastpenguin.pix.ui.settings.HelpFragment"
+        android:label="How to use Pix" />
+
+    <fragment
+        android:id="@+id/aboutFragment"
+        android:name="com.lastpenguin.pix.ui.settings.AboutFragment"
+        android:label="About Pix" />
 
     <!-- Flow 1: Add a pose guide -->
     <dialog

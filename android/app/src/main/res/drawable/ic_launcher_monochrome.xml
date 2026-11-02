@@ -1,32 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app icon as one color, for themed icons on Android 13+. -->
+<!-- The app icon in one color for themed icons (Android 13+): the blades only, the aperture left open. The system tints it. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#4DFFFFFF"
-        android:pathData="M41,72C41,64.8 46.8,60 54,60C61.2,60 67,64.8 67,72Z" />
-    <path
-        android:fillColor="#4DFFFFFF"
-        android:pathData="M47,47a7,7 0 1,0 14,0a7,7 0 1,0 -14,0"
-        android:strokeWidth="3"
-        android:strokeColor="#FFFFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M41,72C41,64.8 46.8,60 54,60C61.2,60 67,64.8 67,72"
-        android:strokeWidth="3"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M31,43V37a6,6 0 0,1 6,-6h6M65,31h6a6,6 0 0,1 6,6v6M77,65v6a6,6 0 0,1 -6,6h-6M43,77h-6a6,6 0 0,1 -6,-6v-6"
-        android:strokeWidth="4"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M66.25,39a2.75,2.75 0 1,0 5.5,0a2.75,2.75 0 1,0 -5.5,0" />
+    <group
+        android:scaleX="0.2025"
+        android:scaleY="0.2025"
+        android:translateX="28.08"
+        android:translateY="28.08">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M146 76.37 L84.72 40.99 A70 70 0 0 1 146 28.35 Z M120 70.6 L58 106.39 L58 96 A70 70 0 0 1 78.42 46.59 Z M102 90.23 L102 188 L60 230 L58 230 L58 115.63 Z M110 115.63 L171.28 151.01 A70 70 0 0 1 110 163.65 Z M136 121.4 L197.28 86.02 A70 70 0 0 1 177.58 145.41 Z M154 101.77 L154 31.01 A70 70 0 0 1 195.58 77.77 Z" />
+    </group>
 </vector>

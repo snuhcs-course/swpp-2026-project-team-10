@@ -176,6 +176,21 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Sungmin, 10-30] "A new review came in on [#154]. Fix it." (Codex's fourth finding: *Invite* tapped and Friends left for Camera before the server answered still started the invitation, but no screen took the result, so *Invite sent* never opened and an unseen `Inviting` session kept *Use a room code* from starting. The results now go through a `SharedFlow`, and an invitation answered while no screen collects them is cancelled. The first test passed the old code, since the fake answered before the screen's collector had gone; the fake's `invite` can now be held, as `accept` and `cancel` could. The screen tests that invite take the result through a new `ScreenTestSupport.inviteFromFriends`. Without the fix the new test fails; 1226 unit tests passed.)
 - [Sungmin, 10-30] "There's a new review. Fix it, then commit and push." (Codex's fifth finding followed from the fourth: *Invite again* disabled itself when tapped and came back only on a failure, so an invitation dropped while Pix was in the background, which reports nothing, left it disabled. `SessionViewModel.sendingInvite` is now a state the screen follows. `FragmentScenario` destroys the view when it stops a screen, which would have hidden the bug, so the new test stops a whole activity; it fails on the old screen. 1227 unit tests passed.)
 
+## Session photos on both phones ([#121], PR [#159])
+
+**The spec (10/30)**
+
+- [Joonhyung, 10-30] "Now I am going to build P17. Check the tasks and review the requirements for writing the spec." (The issue is short, but ten points were open, each with a recommendation. The two that mattered: nobody knew how large a photo is, since `CameraXController` allows high-resolution modes, and with one reliable queue every control message would wait behind hundreds of chunks. FR-6.14's "by default" promised a setting nobody had planned, and NFR-13 did not mention the photos.)
+- [Joonhyung, 10-30] "Write the P17 spec with the recommended choices, before creating the branch or changing any code." (The saved JPEG itself goes in chunks, one photo at a time, behind every other reliable message; a short drop pauses it, and the next chunk follows; a session that ends drops what is left and says "Couldn't send"; the subject writes to a file in the cache and saves it through a pending MediaStore row.)
+
+**The build (10/30 – 10/31)**
+
+- [Joonhyung, 10-30] "Yes, start." (No phone was connected, so the photo sizes stayed unmeasured and the 40 MiB limit an assumption. Flows 4 and 5 gained the notices as note boxes, then R&S, Design, Testing, and the code. Reading the receive path showed a gap in the spec: the message buffers on the receiving phone hold 256 and 64 messages and drop what does not fit, silently, so a photo could break on any phone slower than the link. `photo.ack` now keeps at most 32 chunks unacknowledged. `sendBulk` replaced the spec's `awaitBulkRoom`, which left a race between the check and the send, and `PhotoSyncer` runs for the whole session, because a sender stopped at `Reconnecting` would miss a `photo.saved` that came meanwhile. Rereading the code found `InputStream.readNBytes`, which needs API 33 in an app with `minSdk` 29, a toast shown twice for a photo sent twice, and a refused MediaStore insert that would have crashed the app. A bug put into each of eleven places made its test fail; 1179 unit tests passed. On two emulators a photo arrived with the same md5, and force-stopping the subject gave "Couldn't send a photo to Phone S" about 4 s after "Phone S disconnected".)
+
+**The PR ([#159], 10/31)**
+
+- [Joonhyung, 10-31] "First put everything together, the screenshots of the tests you ran included, commit it, and open the PR." / "Continue from where it stopped." (The first run had logged the photographer's notices as text, so it had to be repeated with screenshots, and the emulators were stopped partway. `dev` had brought [#152], [#154], [#155], and [#157], with 19 conflicts: the revision rows moved to R&S 2.19, Design 2.23, and Testing 2.25, the script to IT-20, and `MainActivityTest` had come from both sides, so the toast's test became `MainActivityPhotoToastTest`. 1320 unit tests passed. The run was repeated on the merged build as one script, with the emulators alone on the Mac: a burst that follows the camera, and frames recorded from the shutter on, because a toast is gone before a log line can be read. Six photos arrived in the order taken, each with the same md5. Two boards were drawn, but Claude in Chrome was not connected and the built-in browser not signed in, so the PR opened with a place marked for each.)
+
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
 [#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
@@ -195,3 +210,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 [#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
 [#154]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/154
 [#152]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/152
+[#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
+[#159]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/159
+[#155]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/155
+[#157]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/157

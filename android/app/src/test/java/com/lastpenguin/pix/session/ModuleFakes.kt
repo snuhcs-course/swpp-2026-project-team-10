@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -19,6 +19,7 @@ import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.EglBase
 import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
+
+/** The shutter and the saved photo at once, as the Camera screen does when the save takes no time. */
+fun PhotoShare.shoot(uri: Uri, takenAt: Long) {
+    shutter()?.let { taken(it, uri, takenAt) }
+}
 
 /** A session that records what is sent and lets a test deliver incoming messages. */
 class FakeSessionManager : SessionManager {
@@ -59,6 +65,18 @@ class FakeSessionManager : SessionManager {
 
     override fun send(message: SessionMessage) {
         sent += message
+    }
+
+    /** Whether a reader listens, for a test on real threads that must not deliver into nothing. */
+    val hasReaders: Boolean get() = _incoming.subscriptionCount.value > 0
+
+    /** Set to hold [sendBulk] as a full channel or a reconnect would; what it completes with is what it returns. */
+    var bulkGate: CompletableDeferred<Boolean>? = null
+
+    override suspend fun sendBulk(message: SessionMessage): Boolean {
+        val open = bulkGate?.await() ?: true
+        if (open) sent += message
+        return open
     }
 
     override fun videoSink(): FrameSink = frameSink

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -242,6 +242,43 @@ sealed interface SessionMessage {
     data class PoseDescriptionGo(val descriptionId: String, val text: String, val suggest: Boolean) : SessionMessage
 
     /**
+     * A photo taken in a session, for the subject's "Pix" album (FR-6.14, Design 2.6.5): the JPEG as it was saved, of
+     * [bytes] in [chunks] chunks, taken at [takenAt].
+     */
+    @Serializable
+    @SerialName("photo.begin")
+    data class PhotoBegin(
+        val photoId: String,
+        val format: String,
+        val bytes: Long,
+        val chunks: Int,
+        val takenAt: Long,
+    ) : SessionMessage
+
+    /** [data] is Base64 of at most 12 KiB, as for the guide image; the chunks come in order, one photo at a time. */
+    @Serializable
+    @SerialName("photo.chunk")
+    data class PhotoChunk(val photoId: String, val index: Int, val data: String) : SessionMessage
+
+    @Serializable
+    @SerialName("photo.end")
+    data class PhotoEnd(val photoId: String, val crc32: Long) : SessionMessage
+
+    /** The subject expects the chunk [next] now, so the photographer may send on (Design 2.5.1). */
+    @Serializable
+    @SerialName("photo.ack")
+    data class PhotoAck(val photoId: String, val next: Int) : SessionMessage
+
+    /** Whether the photo is in the subject's album; without it, [reason] says why not. */
+    @Serializable
+    @SerialName("photo.saved")
+    data class PhotoSaved(
+        val photoId: String,
+        val ok: Boolean,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val reason: PhotoRefusal? = null,
+    ) : SessionMessage
+
+    /**
      * Where the photographer's Reference confirm [confirmId] of a pose chosen in a session is (Design 2.5.1, 2.6.5,
      * Iter3-P16): the subject's *Your reference* follows it. [guideId] names the outline on screen, with READY, and the
      * guide used, with USED and [by] whose *Use this guide* it was. A confirm ends once, with USED or CLOSED.
@@ -352,6 +389,10 @@ sealed interface SessionMessage {
  */
 @Serializable
 enum class PoseSetStep { GENERATING, PICKING, CHOSEN, CLOSED }
+
+/** Why a session photo is not in the subject's album (Design 2.5.1, `photo.saved`). */
+@Serializable
+enum class PhotoRefusal { TOO_LARGE, BROKEN, STORAGE }
 
 /**
  * The steps of the photographer's *Generate poses* in a session (Design 2.6.5): OPEN while the description is written,

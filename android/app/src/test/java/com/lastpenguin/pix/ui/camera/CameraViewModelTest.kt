@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.session.PhotoShare
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -142,6 +143,66 @@ class CameraViewModelTest {
         assertNull(model.uiState.value.captureNotice)
         camera.capture.complete(Result.failure(IOException("Storage still full")))
         runCurrent()
+    }
+
+    @Test
+    fun aSavedPhotoIsSharedWithTheMomentOfTheShutter() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share, clock = { 1_000 })
+        val photo = Uri.parse("content://media/external/images/media/1")
+
+        sharing.onShutter()
+        runCurrent()
+        // Asked at the shutter, not once it is saved: the session may have changed by then.
+        share.session = "another"
+        camera.capture.complete(Result.success(photo))
+        runCurrent()
+
+        assertEquals(listOf(Triple("s1", photo, 1_000L)), share.shared)
+    }
+
+    /** A session s1 until a test changes it. */
+    private class RecordingShare : PhotoShare {
+        var session: String? = "s1"
+        val shared = mutableListOf<Triple<String, Uri, Long>>()
+        val failed = mutableListOf<String>()
+
+        override fun shutter() = session
+
+        override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
+            shared += Triple(sessionId, uri, takenAt)
+        }
+
+        override fun notTaken(sessionId: String) {
+            failed += sessionId
+        }
+    }
+
+    @Test
+    fun aPhotoOutsideASessionIsNotShared() = runTest {
+        val share = RecordingShare().apply { session = null }
+        val sharing = CameraViewModel(camera, guides, photos = share)
+
+        sharing.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+
+        assertTrue(share.shared.isEmpty())
+    }
+
+    @Test
+    fun aPhotoThatFailedIsNotShared() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share)
+
+        sharing.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.failure(IOException("Storage full")))
+        runCurrent()
+
+        assertTrue(share.shared.isEmpty())
+        assertEquals(listOf("s1"), share.failed)
     }
 
     @Test

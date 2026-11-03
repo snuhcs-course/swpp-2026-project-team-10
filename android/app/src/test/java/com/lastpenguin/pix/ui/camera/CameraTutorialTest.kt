@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -30,7 +30,6 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.tutorialOver
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
-import com.lastpenguin.pix.ui.settings.RECHECK_MS
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.util.concurrent.TimeUnit
 import org.junit.After
@@ -251,20 +250,6 @@ class CameraTutorialTest {
         }
     }
 
-    @Test
-    fun anotherScreenInFront_thenClosed_showsTheTips() {
-        launch()
-        nav.setCurrentDestination(R.id.settingsFragment)
-        previewStreamsAndItsMomentPasses()
-        assertNull(tips())
-
-        // Nothing the tips wait for changes when the screen in front closes; they check again on their own.
-        nav.setCurrentDestination(R.id.cameraFragment)
-        waitMs(RECHECK_MS)
-
-        assertOnTutorial(TutorialScreen.CAMERA)
-    }
-
     // ---- The guide's tips -----------------------------------------------------------------
 
     private fun guideOn(modules: TestAppContainer) {
@@ -290,34 +275,6 @@ class CameraTutorialTest {
 
         waitMs(1)
         assertOnTutorial(TutorialScreen.GUIDE_ON_CAMERA)
-    }
-
-    @Test
-    fun aHiddenGuide_holdsTheGuidesTips_untilItShows() {
-        val modules = launch(seen = setOf(TutorialScreen.CAMERA))
-        guideOn(modules)
-        modules.guides.update(final = true) { it.copy(visible = false) }
-        idle()
-        previewStreamsAndItsMomentPasses()
-        waitMs(TutorialFragment.AFTER_PICTURE_MS)
-        assertOnCamera()
-
-        modules.guides.update(final = true) { it.copy(visible = true) }
-        idle()
-        waitMs(TutorialFragment.AFTER_PICTURE_MS)
-        assertOnTutorial(TutorialScreen.GUIDE_ON_CAMERA)
-    }
-
-    @Test
-    fun theGuideHiddenDuringThePreviewsMoment_holdsTheGuidesTips() {
-        val modules = launch(seen = setOf(TutorialScreen.CAMERA))
-        guideOn(modules)
-        previewStreams()
-        waitMs(TutorialFragment.AFTER_PICTURE_MS - 1)
-        modules.guides.update(final = true) { it.copy(visible = false) }
-        idle()
-        waitMs(TutorialFragment.AFTER_PICTURE_MS)
-        assertOnCamera()
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -22,11 +22,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
 import androidx.core.widget.TextViewCompat
 import com.lastpenguin.pix.R
-import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
 
 /** Where a caption goes beside the control it points at. */
 enum class CaptionSide { ABOVE, BELOW, START, END }
@@ -39,8 +37,8 @@ enum class CaptionAlign { CENTER, START, END }
 
 /**
  * The first-use tutorial over a live screen (FR-10.4, Design 2.6.8): the screen dimmed, a dashed ring around each
- * control it explains, cut out of the dimming so the control shows, and beside each ring its caption with a curled
- * dashed arrow, as real text that TalkBack reads, Korean included. [locate] says where the controls are in this view, or null
+ * control it explains, cut out of the dimming so the control shows, and beside each ring its caption with a dashed
+ * arrow, as real text that TalkBack reads, Korean included. [locate] says where the controls are in this view, or null
  * for one the screen does not show, which then gets no ring or caption; the screen calls [refresh] as they move.
  * Each caption goes on its side of the control, farther away or on another side when it would cover another
  * caption, ring, or the title, and stays inside the system bars; *Got it* takes the first free place of a few.
@@ -89,7 +87,7 @@ class CoachMarkLayout @JvmOverloads constructor(
         color = ink
         strokeWidth = 1.8f * density
         strokeCap = Paint.Cap.ROUND
-        pathEffect = DashPathEffect(floatArrayOf(3.5f * density, 3.5f * density), 0f)
+        pathEffect = DashPathEffect(floatArrayOf(4.5f * density, 5.5f * density), 0f)
     }
     private val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink }
 
@@ -373,8 +371,7 @@ class CoachMarkLayout @JvmOverloads constructor(
     /** The strip the arrow from [spot] to [ring] runs through, which no other caption may cover. */
     private fun corridor(side: CaptionSide, align: CaptionAlign, ring: RectF, spot: RectF): RectF {
         val course = course(side, align, ring, spot)
-        // Wide enough for the curl, which reaches its diameter out to one side.
-        val half = (2 * CURL_RADIUS_DP + 2) * density
+        val half = 6 * density
         val xs = listOf(course.start.x, course.end.x)
         val strip = RectF(
             xs.min() - half,
@@ -410,10 +407,7 @@ class CoachMarkLayout @JvmOverloads constructor(
             ?: candidates.first()
     }
 
-    /**
-     * A dashed arrow from the caption to its ring, and its head: a gentle bend with one curl in its middle, a loop on
-     * the bend's outer side that runs back over itself, as a hand would draw it. An arrow too short for a curl only bends.
-     */
+    /** A dashed arrow from the caption to its ring, and its head. */
     private fun arrow(mark: Placed, align: CaptionAlign): Pair<Path, Path> {
         val spot = RectF(
             mark.caption.left.toFloat(),
@@ -431,48 +425,11 @@ class CoachMarkLayout @JvmOverloads constructor(
             (start.x + end.x) / 2 + (end.y - start.y) / length * bend,
             (start.y + end.y) / 2 - (end.x - start.x) / length * bend,
         )
-        fun at(t: Float) = PointF(
-            (1 - t) * (1 - t) * start.x + 2 * (1 - t) * t * control.x + t * t * end.x,
-            (1 - t) * (1 - t) * start.y + 2 * (1 - t) * t * control.y + t * t * end.y,
-        )
-        val path = Path().apply { moveTo(start.x, start.y) }
-        val radius = min(CURL_RADIUS_DP * density, length * 0.3f)
-        if (length < CURL_MIN_LENGTH_DP * density) {
-            path.quadTo(control.x, control.y, end.x, end.y)
-            return path to arrowHead(control, end)
+        val path = Path().apply {
+            moveTo(start.x, start.y)
+            quadTo(control.x, control.y, end.x, end.y)
         }
-        // The curl: a prolate cycloid over the curve, which turns once while the curve goes on a little, so it crosses
-        // itself. Its window is centered on the middle, and the curve is drawn as short lines.
-        val window = CURL_ADVANCE * radius / length
-        val from = 0.5f - window / 2
-        val steps = 72
-        var last = start
-        for (i in 1..steps) {
-            val t = i.toFloat() / steps
-            var p = at(t)
-            if (t > from && t < from + window) {
-                val phase = (t - from) / window * 2 * Math.PI.toFloat()
-                val ahead = at(min(t + 0.01f, 1f))
-                val behind = at(max(t - 0.01f, 0f))
-                val dl = max(hypot(ahead.x - behind.x, ahead.y - behind.y), 1e-3f)
-                val tx = (ahead.x - behind.x) / dl
-                val ty = (ahead.y - behind.y) / dl
-                // The normal toward the bend's outer side.
-                val mid = at(0.5f)
-                val chordX = (start.x + end.x) / 2
-                val chordY = (start.y + end.y) / 2
-                val outward = if ((-ty) * (mid.x - chordX) + tx * (mid.y - chordY) >= 0) 1f else -1f
-                val nx = -ty * outward
-                val ny = tx * outward
-                // Ahead first, then over the top and back, so the way down crosses the way up.
-                val along = sin(phase) * radius
-                val side = (1 - cos(phase)) * radius
-                p = PointF(p.x + tx * along + nx * side, p.y + ty * along + ny * side)
-            }
-            path.lineTo(p.x, p.y)
-            if (i < steps) last = p
-        }
-        return path to arrowHead(last, end)
+        return path to arrowHead(control, end)
     }
 
     private fun arrowHead(from: PointF, tip: PointF): Path {
@@ -532,13 +489,6 @@ class CoachMarkLayout @JvmOverloads constructor(
     }
 
     private companion object {
-        /** The curl's radius at most, and the shortest arrow that gets one. */
-        private const val CURL_RADIUS_DP = 13f
-        private const val CURL_MIN_LENGTH_DP = 40f
-
-        /** How far the curve goes on during the curl, in radii: less than 2π, so the loop runs back over itself. */
-        private const val CURL_ADVANCE = 1.8f
-
         /** The dimming's alpha: 80 %. */
         const val SCRIM_ALPHA = 204
         const val MAX_STEPS = 24

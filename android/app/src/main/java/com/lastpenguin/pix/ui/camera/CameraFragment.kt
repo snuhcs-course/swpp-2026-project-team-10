@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -258,7 +258,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     ) { _, _, _ -> }.collect { renderLatency(controls) }
                 }
                 // Camera's tutorial tips once the preview really shows, so nothing comes before it (FR-1.1, FR-10.4);
-                // READY has no picture yet. Camera's own outside a session, and the guide's once a visible guide is on, whose ring needs it; neither
+                // READY has no picture yet. Camera's own outside a session, and the guide's once a guide is on; neither
                 // during the scene photo or under another screen, such as a link's, which opens over Camera at a start.
                 launch {
                     val tips = combine(
@@ -268,7 +268,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             streaming && !isScenePhotoActive(scene)
                         },
                         sessionViewModel.state.map { it is SessionState.Idle || it is SessionState.Ended },
-                        viewModel.uiState.map { it.guide != null && it.guideState.visible },
+                        viewModel.uiState.map { it.guide != null },
                     ) { camera, guide, showing, alone, guided ->
                         when {
                             !showing -> null
@@ -279,10 +279,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     }
                     showTutorialWhenDue(tips, TutorialFragment.AFTER_PICTURE_MS) { screen ->
                         findNavController().currentDestination?.id == R.id.cameraFragment && !isScenePhotoActive() &&
-                            (
-                                screen != TutorialScreen.GUIDE_ON_CAMERA ||
-                                    viewModel.uiState.value.let { it.guide != null && it.guideState.visible }
-                                )
+                            (screen != TutorialScreen.GUIDE_ON_CAMERA || viewModel.uiState.value.guide != null)
                     }
                 }
                 // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).

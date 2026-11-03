@@ -31,7 +31,7 @@ enum class CaptionSide { ABOVE, BELOW, START, END }
 
 /**
  * Where a caption above or below a control lines up with it: centered, or at its start or end, for a control as wide as
- * the screen, whose arrow then comes down the screen's edge to the control's side, past the controls above it.
+ * the screen, whose arrow then comes straight down near that end.
  */
 enum class CaptionAlign { CENTER, START, END }
 
@@ -48,8 +48,13 @@ class CoachMarkLayout @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : FrameLayout(context, attrs) {
 
-    /** One control to explain: its caption and where that goes. */
-    data class Mark(val caption: CharSequence, val side: CaptionSide, val align: CaptionAlign = CaptionAlign.CENTER)
+    /** One control to explain: its caption, where that goes, and whether its arrow may pass over other controls. */
+    data class Mark(
+        val caption: CharSequence,
+        val side: CaptionSide,
+        val align: CaptionAlign = CaptionAlign.CENTER,
+        val overControls: Boolean = false,
+    )
 
     /** A mark as placed: the ring around its control and its caption's side, both in this view. */
     data class Placed(val ring: RectF, val round: Boolean, val caption: TextView, val side: CaptionSide)
@@ -185,7 +190,8 @@ class CoachMarkLayout @JvmOverloads constructor(
                 val otherRings = rings.filterIndexed { other, it -> other != index && it != null }.map { it!!.first }
                 val otherArrows = previous.filterIndexed { other, it -> other != index && it != null }
                     .map { it!!.corridor }
-                val option = bestOption(mark, index, ring, safe, ringRects + texts + otherArrows, texts + otherRings)
+                val crossed = if (mark.overControls) texts else texts + otherRings
+                val option = bestOption(mark, index, ring, safe, ringRects + texts + otherArrows, crossed)
                 next[index] = option
                 texts += option.spot
             }
@@ -328,28 +334,21 @@ class CoachMarkLayout @JvmOverloads constructor(
         }
     }
 
-    /** Where the arrow from a caption at [spot] to [ring] starts, ends, and, for one along the edge, runs down. */
-    private class Course(val start: PointF, val end: PointF, val edgeX: Float?)
+    /** Where the arrow from a caption at [spot] to [ring] starts and ends. */
+    private class Course(val start: PointF, val end: PointF)
 
     private fun course(side: CaptionSide, align: CaptionAlign, ring: RectF, spot: RectF): Course {
         val near = 4 * density
         val vertical = side == CaptionSide.ABOVE || side == CaptionSide.BELOW
         val down = side == CaptionSide.ABOVE
         if (vertical && align != CaptionAlign.CENTER) {
-            val atEnd = align == CaptionAlign.END
-            val edgeX = if (atEnd) {
-                min(width - 6 * density, ring.right + 8 * density)
-            } else {
-                max(6 * density, ring.left - 8 * density)
-            }
-            val start = PointF(
-                if (atEnd) spot.right - 14 * density else spot.left + 14 * density,
-                if (down) spot.bottom + near else spot.top - near,
-            )
+            // Straight down (or up) to the control near its aligned end.
+            val inset = min(ring.width() / 2, 28 * density)
+            val x = (if (align == CaptionAlign.END) ring.right - inset else ring.left + inset)
+                .coerceIn(spot.left + 12 * density, max(spot.left, spot.right - 12 * density))
             return Course(
-                start,
-                PointF(if (atEnd) ring.right + near / 2 else ring.left - near / 2, ring.centerY()),
-                edgeX,
+                PointF(x, if (down) spot.bottom + near else spot.top - near),
+                PointF(x, if (down) ring.top - near else ring.bottom + near),
             )
         }
         val startX = ring.centerX().coerceIn(spot.left + 12 * density, max(spot.left, spot.right - 12 * density))
@@ -366,15 +365,14 @@ class CoachMarkLayout @JvmOverloads constructor(
             CaptionSide.START -> PointF(ring.left - near, ring.centerY())
             CaptionSide.END -> PointF(ring.right + near, ring.centerY())
         }
-        return Course(start, end, null)
+        return Course(start, end)
     }
 
     /** The strip the arrow from [spot] to [ring] runs through, which no other caption may cover. */
     private fun corridor(side: CaptionSide, align: CaptionAlign, ring: RectF, spot: RectF): RectF {
         val course = course(side, align, ring, spot)
-        // One along the screen's edge runs close beside the controls it passes, down the edge.
-        val half = (if (course.edgeX != null) 2 else 6) * density
-        val xs = course.edgeX?.let { listOf(it) } ?: listOf(course.start.x, course.end.x)
+        val half = 6 * density
+        val xs = listOf(course.start.x, course.end.x)
         val strip = RectF(
             xs.min() - half,
             min(course.start.y, course.end.y),
@@ -409,7 +407,7 @@ class CoachMarkLayout @JvmOverloads constructor(
             ?: candidates.first()
     }
 
-    /** A dashed arrow from the caption to its ring, and its head; along the screen's edge for an edge-aligned one. */
+    /** A dashed arrow from the caption to its ring, and its head. */
     private fun arrow(mark: Placed, align: CaptionAlign): Pair<Path, Path> {
         val spot = RectF(
             mark.caption.left.toFloat(),
@@ -420,21 +418,16 @@ class CoachMarkLayout @JvmOverloads constructor(
         val course = course(mark.side, align, mark.ring, spot)
         val start = course.start
         val end = course.end
-        val path = Path().apply { moveTo(start.x, start.y) }
-        val control: PointF
-        val edgeX = course.edgeX
-        if (edgeX != null) {
-            control = PointF(edgeX, end.y)
-            path.cubicTo(edgeX, start.y + (end.y - start.y) * 0.35f, control.x, control.y, end.x, end.y)
-        } else {
-            // A gentle bend: the middle pushed sideways by a sixth of the length.
-            val length = max(hypot(end.x - start.x, end.y - start.y), 1f)
-            val bend = length / 6
-            control = PointF(
-                (start.x + end.x) / 2 + (end.y - start.y) / length * bend,
-                (start.y + end.y) / 2 - (end.x - start.x) / length * bend,
-            )
-            path.quadTo(control.x, control.y, end.x, end.y)
+        // A gentle bend: the middle pushed sideways by a sixth of the length.
+        val length = max(hypot(end.x - start.x, end.y - start.y), 1f)
+        val bend = length / 6
+        val control = PointF(
+            (start.x + end.x) / 2 + (end.y - start.y) / length * bend,
+            (start.y + end.y) / 2 - (end.x - start.x) / length * bend,
+        )
+        val path = Path().apply {
+            moveTo(start.x, start.y)
+            quadTo(control.x, control.y, end.x, end.y)
         }
         return path to arrowHead(control, end)
     }

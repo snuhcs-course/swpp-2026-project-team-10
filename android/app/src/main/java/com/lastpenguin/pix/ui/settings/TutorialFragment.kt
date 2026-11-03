@@ -27,13 +27,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 
 /**
- * One control a screen's tips point at: what it does, where the caption goes, and where the control is on screen in the
- * screen's view, or null while the screen does not show it.
+ * One control a screen's tips point at: what it does, where the caption goes, whether its arrow may pass over the
+ * screen's other controls, and where the control is on screen in the screen's view, or null while it is not shown.
  */
 internal class TutorialTip(
     @param:StringRes val caption: Int,
     val side: CaptionSide,
     val align: CaptionAlign = CaptionAlign.CENTER,
+    val overControls: Boolean = false,
     val locate: (root: View) -> Rect?,
 )
 
@@ -94,12 +95,14 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
                 R.string.tutorial_generate,
                 CaptionSide.ABOVE,
                 CaptionAlign.END,
+                overControls = true,
                 locate = control(R.id.generateButton),
             ),
             TutorialTip(
                 R.string.tutorial_saved,
                 CaptionSide.ABOVE,
                 CaptionAlign.START,
+                overControls = true,
                 locate = controls(R.id.savedGuidesTitle, R.id.savedGuidesScroll),
             ),
         ),
@@ -173,7 +176,7 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
         val screenView = requireParentFragment().requireView()
         layout.show(
             tips.title?.let(::getString),
-            tips.tips.map { CoachMarkLayout.Mark(getString(it.caption), it.side, it.align) },
+            tips.tips.map { CoachMarkLayout.Mark(getString(it.caption), it.side, it.align, it.overControls) },
         )
         layout.locate = {
             val at = IntArray(2).also(layout::getLocationOnScreen)

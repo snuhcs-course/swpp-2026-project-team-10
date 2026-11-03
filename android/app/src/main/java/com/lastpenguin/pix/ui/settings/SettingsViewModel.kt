@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import androidx.lifecycle.ViewModel
@@ -11,7 +11,10 @@ import com.lastpenguin.pix.guide.GuideThickness
 import com.lastpenguin.pix.settings.AppLanguage
 import com.lastpenguin.pix.settings.AppSettings
 import com.lastpenguin.pix.settings.Language
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -43,6 +46,19 @@ class SettingsViewModel(
 
     fun setShowLatency(show: Boolean) {
         viewModelScope.launch { settings.setShowLatency(show) }
+    }
+
+    /** Set at once: the stored answer comes back later, and Camera, shown again, must not open the tutorial twice. */
+    private val tutorialClosed = MutableStateFlow(false)
+
+    /** Whether the first-use tutorial still has to run; false until the stored answer is read (FR-10.4). */
+    val tutorialDue: Flow<Boolean> =
+        combine(settings.tutorialSeen, tutorialClosed) { seen, closed -> seen == false && !closed }
+
+    /** The tutorial closed, by its last slide, *Skip*, or Back: it does not come by itself again. */
+    fun tutorialFinished() {
+        tutorialClosed.value = true
+        viewModelScope.launch { settings.setTutorialSeen() }
     }
 
     /** Pix's own language (FR-10.2), read each time, since Android keeps it. */

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.os.Bundle
@@ -10,7 +10,7 @@ import com.lastpenguin.pix.databinding.FragmentHelpBinding
 
 /**
  * How to use Pix, from Settings (FR-10.4): adding a guide, generating poses, shooting together, and what the subject's
- * phone controls. The first-use tutorial comes in its own pull request (#123).
+ * phone controls. The first-use tutorial, [TutorialFragment], shows the same things on the screens themselves.
  * Owner: Settings (#123).
  */
 class HelpFragment : Fragment(R.layout.fragment_help) {

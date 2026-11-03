@@ -88,6 +88,7 @@ import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
 import com.lastpenguin.pix.ui.settings.AboutFragment
 import com.lastpenguin.pix.ui.settings.HelpFragment
 import com.lastpenguin.pix.ui.settings.SettingsFragment
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -684,6 +685,13 @@ class KoreanScreensTest {
     fun howToUse_isInKorean() {
         TestAppContainer().install()
         scenario = launchFragmentInContainer<HelpFragment>(themeResId = R.style.Theme_Pix)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun tutorial_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchFragmentInContainer<TutorialFragment>(themeResId = R.style.Theme_Pix)
         assertKorean(screen())
     }
 

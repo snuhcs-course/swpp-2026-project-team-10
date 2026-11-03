@@ -77,6 +77,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 11-03] "commit and push this and create the PR. the description should be concise and in simple technical english. also create a new issue as Iter3-A7 and link it"
 - [Jaewan, 11-03] "can you try the test again? just for one image"
 - [Jaewan, 11-03] "wouldn't this be filtered by jev for 'does it try to manipulate the models'"
+- [Jaewan, 11-03] "can we also update the design documentation's system architecture part to contain this decision model filter layer?"
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110

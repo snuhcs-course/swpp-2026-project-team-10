@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.settings
 
 import androidx.test.core.app.ApplicationProvider
@@ -33,21 +33,43 @@ class DataStoreAppSettingsTest {
         val settings = DataStoreAppSettings(ApplicationProvider.getApplicationContext(), scope)
         assertEquals(GuideLook(GuideColor.WHITE, GuideThickness.NORMAL), settings.guideLook.value)
         assertFalse(settings.showLatency.value)
-        assertEquals(false, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.filterNotNull().first() })
+        assertEquals(
+            emptySet<TutorialScreen>(),
+            withTimeout(TIMEOUT_MS) {
+                settings.tutorialSeen.filterNotNull().first()
+            },
+        )
 
         settings.setGuideColor(GuideColor.BLACK)
         settings.setGuideThickness(GuideThickness.THICK)
         settings.setShowLatency(true)
-        settings.setTutorialSeen()
+        // Each screen's tips on their own: the second keeps the first.
+        settings.setTutorialSeen(setOf(TutorialScreen.CAMERA))
+        settings.setTutorialSeen(setOf(TutorialScreen.SUBJECT_VIEW))
+        val seen = setOf(TutorialScreen.CAMERA, TutorialScreen.SUBJECT_VIEW)
         val chosen = GuideLook(GuideColor.BLACK, GuideThickness.THICK)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { settings.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { settings.showLatency.first { it } })
-        assertEquals(true, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.first { it == true } })
+        assertEquals(seen, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.first { it == seen } })
 
         val restarted = DataStoreAppSettings(ApplicationProvider.getApplicationContext(), scope)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { restarted.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { restarted.showLatency.first { it } })
-        assertEquals(true, withTimeout(TIMEOUT_MS) { restarted.tutorialSeen.first { it == true } })
+        assertEquals(seen, withTimeout(TIMEOUT_MS) { restarted.tutorialSeen.first { it == seen } })
+
+        // Show the tutorial again: every screen's tips due again, also after a restart.
+        restarted.resetTutorial()
+        assertEquals(
+            emptySet<TutorialScreen>(),
+            withTimeout(TIMEOUT_MS) {
+                restarted.tutorialSeen.first {
+                    it ==
+                        emptySet<TutorialScreen>()
+                }
+            },
+        )
+        val again = DataStoreAppSettings(ApplicationProvider.getApplicationContext(), scope)
+        assertEquals(emptySet<TutorialScreen>(), withTimeout(TIMEOUT_MS) { again.tutorialSeen.filterNotNull().first() })
         scope.cancel()
     }
 

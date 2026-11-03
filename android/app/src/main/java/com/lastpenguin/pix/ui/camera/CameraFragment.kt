@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -58,14 +58,17 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import com.lastpenguin.pix.ui.settings.followLook
 import com.lastpenguin.pix.ui.settings.renderLatency
+import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -254,24 +257,32 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         sessionViewModel.latencyMs,
                     ) { _, _, _ -> }.collect { renderLatency(controls) }
                 }
-                // Once the preview really shows: nothing comes before it (FR-1.1, FR-10.4), and READY is too early,
-                // since leaving the camera then releases it before its first frame. Not over a session, or a link's
-                // screen, which opens over Camera at a first start.
+                // Camera's tutorial tips once the preview really shows, so nothing comes before it (FR-1.1, FR-10.4);
+                // READY has no picture yet. Camera's own outside a session, and the guide's once a visible guide is on, whose ring needs it; neither
+                // during the scene photo or under another screen, such as a link's, which opens over Camera at a start.
                 launch {
-                    combine(
-                        settingsViewModel.tutorialDue,
-                        previewStreaming,
-                        sessionViewModel.state,
-                    ) { due, streaming, session ->
-                        due && streaming && (session is SessionState.Idle || session is SessionState.Ended)
-                    }.collectLatest { open ->
-                        if (open) {
-                            delay(TUTORIAL_AFTER_PREVIEW_MS)
-                            val nav = findNavController()
-                            if (nav.currentDestination?.id == R.id.cameraFragment && !isScenePhotoActive()) {
-                                nav.navigate(R.id.action_camera_to_tutorial)
-                            }
+                    val tips = combine(
+                        settingsViewModel.tutorialDue(TutorialScreen.CAMERA),
+                        settingsViewModel.tutorialDue(TutorialScreen.GUIDE_ON_CAMERA),
+                        combine(previewStreaming, generationViewModel.uiState) { streaming, scene ->
+                            streaming && !isScenePhotoActive(scene)
+                        },
+                        sessionViewModel.state.map { it is SessionState.Idle || it is SessionState.Ended },
+                        viewModel.uiState.map { it.guide != null && it.guideState.visible },
+                    ) { camera, guide, showing, alone, guided ->
+                        when {
+                            !showing -> null
+                            camera && alone -> TutorialScreen.CAMERA
+                            guide && guided -> TutorialScreen.GUIDE_ON_CAMERA
+                            else -> null
                         }
+                    }
+                    showTutorialWhenDue(tips, TutorialFragment.AFTER_PICTURE_MS) { screen ->
+                        findNavController().currentDestination?.id == R.id.cameraFragment && !isScenePhotoActive() &&
+                            (
+                                screen != TutorialScreen.GUIDE_ON_CAMERA ||
+                                    viewModel.uiState.value.let { it.guide != null && it.guideState.visible }
+                                )
                     }
                 }
                 // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).
@@ -1123,8 +1134,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     companion object {
-        /** A moment of the camera itself before the first-use tutorial covers it. */
-        const val TUTORIAL_AFTER_PREVIEW_MS = 800L
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
         private const val STILL_TIMEOUT_MS = 2_000L
         private const val FOCUS_RING_START_SCALE = 1.25f

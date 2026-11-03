@@ -1,10 +1,11 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.app.Application
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Looper
+import android.view.View
 import androidx.annotation.IdRes
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
@@ -19,11 +20,17 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.settings.CoachMarkLayout
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import kotlinx.coroutines.launch
 import org.robolectric.Shadows.shadowOf
 
-/** Shared helpers of the screen tests: the main looper, strings, a guide with real bitmaps, and a NavController. */
+/**
+ * Shared helpers of the screen tests: the main looper, strings, a guide with real bitmaps, a NavController, and the
+ * tutorial's tips over a screen.
+ */
 object ScreenTestSupport {
     /** Runs the main looper: ViewModel coroutines on Dispatchers.Main and the posted UI work. */
     fun idle() = shadowOf(Looper.getMainLooper()).idle()
@@ -46,6 +53,17 @@ object ScreenTestSupport {
 
     fun bitmap(width: Int = 40, height: Int = 80): Bitmap =
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+    /** The screen whose tutorial tips are over [host], or null with none there (FR-10.4). */
+    fun tutorialOver(host: Fragment): TutorialScreen? = TutorialFragment.over(host)?.screen
+
+    /** The tips' layer over [host], with its rings and captions, or null with none there. */
+    fun tipsOver(host: Fragment): CoachMarkLayout? = TutorialFragment.over(host)?.view as? CoachMarkLayout
+
+    /** Taps *Got it* on the tips over [host]. */
+    fun closeTips(host: Fragment) {
+        checkNotNull(tipsOver(host)).findViewById<View>(R.id.gotItButton).performClick()
+    }
 
     fun guide(withReference: Boolean = true) = ReferenceGuide(
         id = "guide-1",

@@ -46,6 +46,7 @@ import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.settings.AppLanguage
 import com.lastpenguin.pix.settings.AppSettings
+import com.lastpenguin.pix.settings.TutorialScreen
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -72,8 +73,8 @@ class TestAppContainer(
     candidateImage: () -> Bitmap = { fakeBitmap() },
     /** The screens' language for the server's text; none unless a test checks it. */
     val screenLanguages: ScreenLanguages? = null,
-    /** Whether the first-use tutorial was seen; yes unless a test is about it, so a screen test stays on its screen. */
-    tutorialSeen: Boolean? = true,
+    /** The tutorial's slides seen; all unless a test is about them, so a screen test has no slide over its screen. */
+    tutorialSeen: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()

@@ -55,6 +55,7 @@ Rules and pitfalls for working in `android/`. What the code does and why is in [
 - `CameraCompositionView` draws only inside the fit-centered frame and is non-clickable, so gestures pass through; its `CameraLevelMonitor` is view-scoped, started on resume and stopped on pause.
 - `DialogFragment.onDismiss` also runs when a configuration change (the language, the font size) recreates the activity: a sheet that cancels work when it closes checks `activity?.isChangingConfigurations` first (`RoomCodeSheet`, `AddGuideSheet`).
 - The account screens keep their views in classes apart from the fragments (`FriendsScreen`, `SignInForm`, …), so Robolectric tests drive the real layouts.
+- The tutorial's tips (FR-10.4, Design 2.6.8) are a `TutorialFragment` dialog among their screen's child fragments, shown through `showTutorialWhenDue`; never make it a navigation destination, which would close a sheet under it, stop the camera, and pause a session's video. `TUTORIAL_TIPS` finds each control by its view id, so renaming or removing one silently drops its ring; `TutorialLayoutTest` counts the rings per screen. A screen test's `TestAppContainer` has every screen's tips seen unless it sets `tutorialSeen`, so no tips cover the screen under test.
 
 ## Testing
 

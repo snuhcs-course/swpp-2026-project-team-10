@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
@@ -15,27 +15,32 @@ import com.lastpenguin.pix.guide.GuideColor
 import com.lastpenguin.pix.guide.GuideLook
 import com.lastpenguin.pix.guide.GuideThickness
 import com.lastpenguin.pix.settings.Language
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
+import com.lastpenguin.pix.ui.ScreenTestSupport.tutorialOver
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import org.robolectric.shadows.ShadowToast
 
 /*
  * Settings on the real screen (FR-10.1–10.4, FR-3.10, FR-4.2), with the settings in memory behind the ViewModel.
  * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, signed out);
  * each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the account signed in and signed out;
- * notifications, How to use Pix, the tutorial, and About Pix opened.
+ * notifications, How to use Pix, and About Pix opened; *Show the tutorial again*, which makes every screen's tips due
+ * again and says so.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -224,21 +229,30 @@ class SettingsFragmentTest {
     }
 
     @Test
-    fun howToUse_theTutorial_andAbout_open() {
+    fun howToUse_andAbout_open() {
         launch()
 
         onScreen { it.helpRow.root.performClick() }
         assertEquals(R.id.helpFragment, nav.currentDestination?.id)
 
         nav.popBackStack()
+        onScreen { it.aboutRow.root.performClick() }
+        assertEquals(R.id.aboutFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun showTheTutorialAgain_makesEveryScreenShowItsTipsAgain_andSaysSo() {
+        val modules = launch()
+
         onScreen { binding ->
             assertEquals(string(R.string.settings_tutorial), binding.tutorialRow.settingTitle.text.toString())
             binding.tutorialRow.root.performClick()
         }
-        assertEquals(R.id.tutorialFragment, nav.currentDestination?.id)
 
-        nav.popBackStack()
-        onScreen { it.aboutRow.root.performClick() }
-        assertEquals(R.id.aboutFragment, nav.currentDestination?.id)
+        assertEquals(emptySet<TutorialScreen>(), modules.appSettings.tutorialSeen.value)
+        assertEquals(string(R.string.settings_tutorial_reset), ShadowToast.getTextOfLatestToast())
+        // Nothing opens over Settings: each screen shows its own tips the next time it opens.
+        scenario!!.onFragment { assertNull(tutorialOver(it)) }
+        assertEquals(R.id.settingsFragment, nav.currentDestination?.id)
     }
 }

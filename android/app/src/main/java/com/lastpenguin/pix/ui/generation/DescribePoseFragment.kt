@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -289,7 +289,7 @@ class DescriptionForm(
         binding.descriptionTyping.isVisible = typing != null
         if (typing != null) binding.descriptionTyping.text = context.getString(R.string.peer_typing, typing)
         binding.sharedHint.isVisible = sharedWith != null
-        if (sharedWith != null) binding.sharedHint.text = context.getString(R.string.describe_shared_hint, sharedWith)
+        if (sharedWith != null) binding.sharedHint.text = context.getString(R.string.shared_hint, sharedWith)
     }
 
     private fun renderCounter() {

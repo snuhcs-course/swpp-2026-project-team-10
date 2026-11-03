@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -86,7 +86,7 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         }
         val name = ui.photographerName
         binding.sharedHint.isVisible = name != null
-        if (name != null) binding.sharedHint.text = getString(R.string.reference_shared_hint, name)
+        if (name != null) binding.sharedHint.text = getString(R.string.shared_hint, name)
         // As on the photographer's phone: the progress while their phone finds the person, then the outline alone.
         val guide = ui.guide
         binding.referenceProgress.isVisible = guide == null

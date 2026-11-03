@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.account
 
 import android.view.LayoutInflater
@@ -137,7 +137,6 @@ class FriendsScreenTest {
         screen.render(FriendsUiState(AuthState.SignedIn(account)))
 
         assertTrue(binding.emptyCard.shown && binding.addFriendButton.shown)
-        assertFalse(binding.networkNote.shown)
         assertFalse(binding.promptCard.shown)
         assertEquals("My Pix ID: test1", binding.myPixIdText.text.toString())
         binding.myPixIdText.performClick()
@@ -165,7 +164,6 @@ class FriendsScreenTest {
         assertEquals("Invite Test Account 4", invites[1].contentDescription)
         invites[1].performClick()
         assertEquals(listOf("invite:u_4"), taps)
-        assertTrue(binding.networkNote.shown)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -278,7 +278,7 @@ class GenerationScreensTest {
         s.onFragment { fragment ->
             val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
             assertTrue(binding.sharedHint.isShown)
-            assertEquals(string(R.string.describe_shared_hint, "Junhyeong"), binding.sharedHint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Junhyeong"), binding.sharedHint.text.toString())
             binding.descriptionInput.requestFocus()
             binding.descriptionInput.setText("wave")
         }
@@ -624,7 +624,7 @@ class GenerationScreensTest {
         s.onFragment {
             val hint = FragmentPickPoseBinding.bind(it.requireView()).sharedHint
             assertTrue(hint.isShown)
-            assertEquals(string(R.string.pose_shared_hint, "Junhyeong"), hint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Junhyeong"), hint.text.toString())
         }
     }
 

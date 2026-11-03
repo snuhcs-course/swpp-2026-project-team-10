@@ -79,7 +79,8 @@
             android:id="@+id/liveView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center" />
+            android:layout_gravity="center"
+            android:contentDescription="@string/subject_video_description" />
 
         <!-- The same 3×3 grid as the photographer's preview, over the same fitted image; no level bar here. -->
         <com.lastpenguin.pix.ui.camera.CameraCompositionView
@@ -290,7 +291,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
             <!-- The Camera screen's Guide button: the guide chosen here goes to the photographer (FR-6.15). -->
@@ -372,18 +372,6 @@
                     android:textColor="@color/pix_text_soft" />
             </LinearLayout>
         </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            app:drawableStartCompat="@drawable/ic_zoom_small"
-            android:drawablePadding="8dp"
-            app:drawableTint="@color/pix_text_muted"
-            android:gravity="center"
-            android:text="@string/subject_caption"
-            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
-            android:textColor="@color/pix_text_soft" />
 
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

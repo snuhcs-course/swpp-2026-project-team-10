@@ -27,26 +27,13 @@
                 style="@style/Widget.Pix.Header.Back"
                 android:contentDescription="@string/cancel" />
 
-            <LinearLayout
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:accessibilityHeading="true"
-                    android:text="@string/describe_title"
-                    android:textAppearance="@style/TextAppearance.Pix.Header" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/describe_body"
-                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-            </LinearLayout>
+                android:accessibilityHeading="true"
+                android:text="@string/describe_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
         </LinearLayout>
 
         <!-- The scene photo the poses are made from. -->

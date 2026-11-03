@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -673,15 +673,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isActivated = state.guide != null
         controls.guideButton.contentDescription =
             getString(if (state.guide == null) R.string.guide_add_description else R.string.guide_change_description)
+        // The tutorial shows how to add a guide and move it (FR-10.4), so the chip says only what the screen does not:
+        // that the guide is hidden, and that a pinch zooms again once edit mode is off.
         when {
-            state.guide == null ->
-                showHint(controls.hintText, R.string.hint_add_guide, R.drawable.ic_target_small, R.color.pix_accent)
+            state.guide == null || state.guideEditing -> showHint(controls.hintText, null)
 
             !state.guideState.visible ->
                 showHint(controls.hintText, R.string.hint_guide_hidden, R.drawable.ic_visibility_off_small)
-
-            state.guideEditing ->
-                showHint(controls.hintText, R.string.hint_edit_guide, R.drawable.ic_move_small, R.color.pix_guide)
 
             else -> showHint(controls.hintText, R.string.hint_pinch_zoom, R.drawable.ic_zoom_small)
         }
@@ -784,7 +782,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The scene photo frames a new scene, which an earlier guide's reference is not part of.
         val reference = state.guide?.reference?.takeUnless { isScenePhotoActive() }
         // The enlarged photo reaches under the chips: the hint steps aside, and a capture status stays on top.
-        controls.hintText.isInvisible = reference != null && state.referenceExpanded
+        controls.hintText.isInvisible =
+            controls.hintText.text.isNullOrEmpty() || (reference != null && state.referenceExpanded)
         controls.referenceThumbnail.showReference(reference) { photo ->
             if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) {
                 null
@@ -865,7 +864,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         if (!active) return
 
         controls.sceneTitle.setText(if (reviewing) R.string.scene_review_title else R.string.scene_title)
-        showHint(controls.hintText, if (reviewing) R.string.scene_review_body else R.string.scene_body)
+        showHint(controls.hintText, if (reviewing) R.string.scene_review_body else null)
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false
@@ -1021,11 +1020,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */
     private fun showHint(
         chip: TextView,
-        @StringRes text: Int,
+        @StringRes text: Int?,
         @DrawableRes icon: Int = 0,
         @ColorRes tint: Int = R.color.pix_text,
     ) {
-        chip.setText(text)
+        if (text == null) chip.text = null else chip.setText(text)
+        chip.isInvisible = text == null
         setChipIcon(chip, icon)
         TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(requireContext().getColor(tint)))
     }

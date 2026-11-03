@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -32,6 +32,7 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import java.time.Duration
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -46,7 +47,8 @@ import org.robolectric.annotation.GraphicsMode
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
  * camera status STARTING, READY; a guide added, hidden, removed by the shutter's end of edit mode; a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
- * scene photo step framing and reviewing, and its light (FR-4.1) turned on and off, and on a camera without a flash;
+ * scene photo step framing and reviewing, its review while the phone looks for a person and without one (FR-4.13), and
+ * its light (FR-4.1) turned on and off, and on a camera without a flash;
  * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, while the
  * scene photo is framed, and in a session (FR-1.14).
  */
@@ -405,6 +407,55 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.aspectButton.visibility)
             assertEquals(string(R.string.flash_off), controls.flashButton.contentDescription)
         }
+    }
+
+    @Test
+    fun scenePhoto_withoutAPerson_saysSoAndCannotBeUsed_untilAnotherIsShot() {
+        val modules = launch(FakeCameraController().apply { frame = bitmap(300, 400) })
+        modules.persons.found = false
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+
+        // The phone found no one (FR-4.13): only Shoot again helps.
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_no_person_title), controls.sceneTitle.text.toString())
+            assertEquals(string(R.string.scene_no_person_body), controls.hintText.text.toString())
+            assertEquals(View.VISIBLE, controls.sceneStill.visibility)
+            assertFalse(controls.usePhotoButton.isEnabled)
+            assertTrue(controls.shootAgainButton.isEnabled)
+            controls.shootAgainButton.performClick()
+        }
+        idle()
+
+        modules.persons.found = true
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
+            assertEquals(string(R.string.scene_review_body), controls.hintText.text.toString())
+            assertTrue(controls.usePhotoButton.isEnabled)
+        }
+        assertEquals(2, modules.persons.checked.size)
+    }
+
+    @Test
+    fun scenePhoto_whileThePhoneLooksForAPerson_cannotBeUsedYet() {
+        val modules = launch(FakeCameraController().apply { frame = bitmap(300, 400) })
+        val gate = CompletableDeferred<Unit>().also { modules.persons.gate = it }
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
+            assertFalse(controls.usePhotoButton.isEnabled)
+        }
+        gate.complete(Unit)
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.usePhotoButton.isEnabled) }
     }
 
     @Test

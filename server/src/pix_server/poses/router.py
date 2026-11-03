@@ -14,6 +14,7 @@ from pix_server.errors import ApiError
 from pix_server.poses.description_filter import DescriptionFilter
 from pix_server.poses.generator import PoseGenerator, aspect_ratio, check_scene
 from pix_server.poses.limiter import Kind, PoseLimiter
+from pix_server.poses.person_check import PersonCheck
 from pix_server.poses.prompts import DEFAULT_POSES, checked_pose, pose_prompt
 from pix_server.poses.suggester import PoseSuggester
 from pix_server.poses.tips import Angle, Framing, Height, Language, Level, PoseTipper
@@ -64,6 +65,21 @@ async def judge(request: Request, text: str, field: str = "description") -> None
     2.6.3). It runs after `count`, so a refused request uses up its window like any other that reached a model."""
     description_filter: DescriptionFilter = request.app.state.description_filter
     await description_filter.check(text, field)
+
+
+async def check_pose(request: Request, scene: bytes, description: str | None) -> None:
+    """Before the image model: the description filter judges a description (FR-4.12) while the person check looks at
+    the scene (FR-4.13), at the same time, so the two add only the slower one's time (Design Documentation 2.6.3). A
+    refused description answers 422 REJECTED even when the scene shows no person too, and otherwise a scene without a
+    person answers 422 NO_PERSON. Like `judge`, it runs after `count`."""
+    person_check: PersonCheck = request.app.state.person_check
+    checks = [person_check.check(scene)]
+    if description is not None:
+        checks.insert(0, judge(request, description))
+    # Each check fails open by itself, so an exception here is a refusal, or a bug that must not pass silently.
+    for outcome in await asyncio.gather(*checks, return_exceptions=True):
+        if isinstance(outcome, BaseException):
+            raise outcome
 
 
 async def while_connected(request: Request, work: Coroutine[Any, Any, T]) -> T:
@@ -139,9 +155,8 @@ async def create_pose(
     scene = await image.read()
     ratio = aspect_ratio(check_scene(scene))
     await count(request, "poses")
-    if description is not None:
-        # A template is the server's own text, so only a description is judged.
-        await judge(request, description)
+    # Every scene is checked for a person; a template is the server's own text, so only a description is judged.
+    await check_pose(request, scene, description)
 
     generator: PoseGenerator = request.app.state.pose_generator
     # The image API does not bill a generation it could not deliver. A refusal keeps the generator's own message: the

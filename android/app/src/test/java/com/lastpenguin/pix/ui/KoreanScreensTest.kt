@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -107,10 +107,11 @@ import org.robolectric.annotation.GraphicsMode
  * Every screen in Korean (FR-10.2, Iter3-P7; Testing Documentation 2.1.6): the real Fragments on the fakes, with the
  * phone in Korean, at the Galaxy S22's app area of 360 x 705 dp. Each screen in the states that show its texts: Camera
  * without camera access, without a guide, with one, with a generated guide's tip being asked for and with the longest
- * Korean tip the server writes, taking and reviewing the scene photo, and in a session; Add a pose
+ * Korean tip the server writes, taking and reviewing the scene photo, a scene photo without a person, and in a
+ * session; Add a pose
  * guide with a saved guide; Reference confirm with the person found, and with the subject's pick; No person found;
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone and in a session; Couldn't create poses,
- * failed and refused; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
+ * failed, refused, and without a person; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
  * friend; Sign in; Sign up; Pix ID setup; Account; the room code; Join with a code; Session not found; Subject view,
  * and while the photographer picks a pose, with a guide to save; the subject's Pick a pose; Connection lost; Camera in a
  * session with the delay shown; Settings, signed in; How to use Pix; About Pix. On each, no visible text, hint, or content
@@ -197,6 +198,16 @@ class KoreanScreensTest {
         scenario!!.onFragment { it.requireActivity().viewModel<GenerationViewModel>().beginScene() }
         assertKorean(screen())
 
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).shutterButton.performClick() }
+        assertKorean(screen())
+    }
+
+    @Test
+    fun camera_aScenePhotoWithoutAPerson_isInKorean() {
+        val modules = camera()
+        modules.persons.found = false
+        scenario!!.onFragment { it.requireActivity().viewModel<GenerationViewModel>().beginScene() }
+        idle()
         scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).shutterButton.performClick() }
         assertKorean(screen())
     }
@@ -384,6 +395,12 @@ class KoreanScreensTest {
     @Test
     fun couldntCreatePoses_refused_isInKorean() {
         allFailed(GenerationError.REJECTED)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun couldntCreatePoses_noPerson_isInKorean() {
+        allFailed(GenerationError.NO_PERSON)
         assertKorean(screen())
     }
 

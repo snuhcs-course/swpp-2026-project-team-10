@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -12,6 +12,7 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.GenerationEvent
+import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
@@ -50,6 +51,13 @@ data class GenerationUiState(
     val description: String = "",
     /** The service rejected every pose of the description: Couldn't create poses and Generate poses say so (US-5). */
     val descriptionRejected: Boolean = false,
+    /** The phone is looking for a person in the scene photo (FR-4.13); *Use this photo* waits for it. */
+    val checkingPerson: Boolean = false,
+    /**
+     * No one was found in the scene photo, so no pose can be made of it: by the phone, on the photo's review (FR-4.13),
+     * or by the server for every pose of the set, on Couldn't create poses. Only another photo helps.
+     */
+    val noPerson: Boolean = false,
     /**
      * In a session, whose field holds the description on Generate poses (Design 2.6.5): this phone's while it types,
      * the subject's while theirs does, then nobody; the other phone's field waits meanwhile.
@@ -114,6 +122,7 @@ class GenerationViewModel(
     private val generator: PoseGenerator,
     private val camera: CameraController,
     private val consent: GenerationConsent,
+    private val persons: PersonDetector,
     private val limitMs: Long = RemotePoseGenerator.TIMEOUT_MS,
     private val share: PoseShare = PoseShare.None,
     private val descriptions: DescriptionShare = DescriptionShare.None,
@@ -124,6 +133,7 @@ class GenerationViewModel(
 
     private var generating: Job? = null
     private var shooting: Job? = null
+    private var checking: Job? = null
 
     private val _consentGiven = MutableStateFlow(false)
 
@@ -228,16 +238,44 @@ class GenerationViewModel(
                         selfie = selfie,
                         phase = GenerationUiState.Phase.REVIEWING,
                         shotFailed = false,
+                        checkingPerson = true,
                     )
 
                     else -> state.copy(shotFailed = true)
                 }
+            }
+            val scene = _uiState.value.scene
+            if (_uiState.value.phase == GenerationUiState.Phase.REVIEWING && scene != null) checkPerson(scene)
+        }
+    }
+
+    /**
+     * Looks for a person in the photo under review (FR-4.13), on the phone; a check that fails lets the photo go on,
+     * since the server checks it again before its image model (Design 2.6.3).
+     */
+    private fun checkPerson(scene: Bitmap) {
+        checking?.cancel()
+        checking = viewModelScope.launch {
+            val found = try {
+                persons.findsPerson(scene)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w(TAG, "No person check: $error")
+                true
+            }
+            Timings.mark("pose.person", if (found) "found" else "none")
+            _uiState.update {
+                // Shoot again or Cancel while the check ran: the photo it looked at is gone.
+                if (it.phase != GenerationUiState.Phase.REVIEWING || it.scene !== scene) return@update it
+                it.copy(checkingPerson = false, noPerson = !found)
             }
         }
     }
 
     /** *Shoot again*: the photo is dropped and the live camera is shown again, with the light as it was. */
     fun retakeScene() {
+        checking?.cancel()
         _uiState.update {
             val reviewing = it.phase == GenerationUiState.Phase.REVIEWING
             if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING, light = it.light) else it
@@ -249,12 +287,18 @@ class GenerationViewModel(
         _uiState.update { if (it.phase == GenerationUiState.Phase.FRAMING) it.copy(light = !it.light) else it }
     }
 
-    /** *Use this photo*: Generate poses asks what to pose (FR-4.8). Still nothing is sent. */
-    fun useScene() {
+    /**
+     * *Use this photo*: Generate poses asks what to pose (FR-4.8). Still nothing is sent. Not before the phone has
+     * found a person in the photo (FR-4.13). Returns whether Generate poses opens.
+     */
+    fun useScene(): Boolean {
         val state = _uiState.value
-        if (state.phase != GenerationUiState.Phase.REVIEWING || state.scene == null) return
+        val usable = state.phase == GenerationUiState.Phase.REVIEWING && state.scene != null &&
+            !state.checkingPerson && !state.noPerson
+        if (!usable) return false
         _uiState.update { it.copy(phase = GenerationUiState.Phase.DESCRIBING) }
         openDescription()
+        return true
     }
 
     /** Generate poses opened: the subject's phone shows it too, with the scene photo and the text kept (FR-6.15). */
@@ -431,6 +475,8 @@ class GenerationViewModel(
     fun cancel() {
         shooting?.cancel()
         shooting = null
+        checking?.cancel()
+        checking = null
         generating?.cancel()
         generating = null
         endDescription(started = false)
@@ -497,13 +543,15 @@ class GenerationViewModel(
         if (inTime == null) stopUnanswered()
         val state = _uiState.value
         Timings.mark("pose.done", "${state.readyCount} of ${state.poses.size} ready")
-        val rejected = request is PoseRequest.Described && state.poses.isNotEmpty() &&
-            state.poses.all { (state.candidates[it.id] as? CandidateEvent.Failed)?.error == GenerationError.REJECTED }
+        fun failedAll(error: GenerationError) = state.poses.isNotEmpty() &&
+            state.poses.all { (state.candidates[it.id] as? CandidateEvent.Failed)?.error == error }
+        val rejected = request is PoseRequest.Described && failedAll(GenerationError.REJECTED)
+        val noPerson = failedAll(GenerationError.NO_PERSON)
         _uiState.update {
             if (it.readyCount > 0) {
                 it.copy(phase = GenerationUiState.Phase.PICKING)
             } else {
-                it.copy(phase = GenerationUiState.Phase.FAILED, descriptionRejected = rejected)
+                it.copy(phase = GenerationUiState.Phase.FAILED, descriptionRejected = rejected, noPerson = noPerson)
             }
         }
         val ended = _uiState.value

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -63,7 +63,8 @@ import org.robolectric.annotation.GraphicsMode
  * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4,
  * FR-1.5, FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the
  * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
- * together, Use this photo) and system back during the scene photo step; End session; the gallery button with and
+ * together, Use this photo, which opens nothing for a photo without a person) and system back during the scene photo
+ * step; End session; the gallery button with and
  * without an app to open the photo; each capture failure's message; the subject's zoom, brightness, flash, and guide
  * moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view on mobile data (FR-6.13); the
  * zoom accessibility actions
@@ -209,6 +210,31 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
         assertEquals(GenerationUiState.Phase.DESCRIBING, generation.uiState.value.phase)
+    }
+
+    @Test
+    fun scenePhoto_withoutAPerson_useThisPhotoStaysOnCamera() {
+        val modules = launch(
+            FakeCameraController().apply {
+                frame =
+                    Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+            },
+        )
+        modules.persons.found = false
+        val nav = scenario!!.attachNav(R.id.cameraFragment)
+        val generation = generation()
+
+        generation.beginScene()
+        idle()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+        // Even a click that reaches the disabled button opens nothing and sends nothing (FR-4.13).
+        onScreen { controls, _ -> controls.usePhotoButton.performClick() }
+        idle()
+
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+        assertEquals(GenerationUiState.Phase.REVIEWING, generation.uiState.value.phase)
+        assertTrue(modules.generator.runs.isEmpty())
     }
 
     @Test

@@ -134,6 +134,8 @@
     <string name="use_this_photo">이 사진 사용</string>
     <string name="shoot_again">다시 촬영</string>
     <string name="scene_shot_failed">사진을 촬영하지 못했어요. 다시 시도하세요.</string>
+    <string name="scene_no_person_title">사진에 사람이 없어요</string>
+    <string name="scene_no_person_body">포즈를 만들려면 사람이 필요해요. 인물이 나오게 다시 찍으세요.</string>
     <string name="your_photo">촬영한 사진</string>
     <string name="describe_title">포즈 생성</string>
     <string name="describe_body">원하는 포즈를 적거나, 이 장소에 어울리는 포즈 4개를 추천받으세요</string>
@@ -141,6 +143,7 @@
     <string name="describe_hint">예: 벽에 기대고 한 손은 주머니에</string>
     <string name="description_refused">지난 요청이 거절됐어요. 설명이나 사진을 바꿔 다시 시도하세요.</string>
     <string name="description_rejected_message">AI 서비스가 이 사진으로 “%1$s” 포즈를 생성하지 않았어요. 설명을 바꾸거나, 카메라로 돌아가 다른 사진을 찍으세요.</string>
+    <string name="generation_no_person_message">AI 서비스가 이 사진에서 사람을 찾지 못했어요. 인물이 나오게 사진을 다시 찍으세요.</string>
     <string name="edit_description">설명 수정</string>
     <string name="ideas_label">추천 포즈</string>
     <string name="generate_four_poses">포즈 4개 생성</string>

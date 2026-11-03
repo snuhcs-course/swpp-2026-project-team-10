@@ -1,6 +1,6 @@
 # AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
-"""The prompts for the image, suggestion, and tip models, the description filter's questions, and the default poses,
-read from prompts.toml (Design Documentation 2.6.3)."""
+"""The prompts for the image, suggestion, and tip models, the description filter's and the person check's questions, and
+the default poses, read from prompts.toml (Design Documentation 2.6.3)."""
 
 import tomllib
 from dataclasses import dataclass
@@ -15,6 +15,8 @@ DESCRIPTION_MAX_LENGTH = 100  # the app's field stops at the same length (FR-4.8
 POSE_COUNT = 4  # candidates per set, so poses per suggestion (FR-4.3)
 # The description filter's yes/no questions, by the names its answers come back under.
 FILTER_QUESTIONS = ("malicious", "injection")
+# The person check's yes/no question, by the name its answer comes back under (FR-4.13).
+PERSON_QUESTION = "person"
 # Double quotation marks, typographic and full-width ones included. In a prompt each becomes a single one, so the user's
 # words cannot close the quotation marks they are placed in.
 QUOTES = str.maketrans(dict.fromkeys('"“”„‟″＂«»', "'"))
@@ -50,6 +52,8 @@ class Prompts:
     selfie: SelfiePrompts
     # The description filter's questions, as the Decisions API takes them: {name: {type, instructions, criteria}}.
     filter_questions: dict[str, dict]
+    # The person check's question, as the Decisions API takes it: {PERSON_QUESTION: {type, instructions}}.
+    person_question: dict[str, dict]
 
 
 def one_line(text: str) -> str:
@@ -83,6 +87,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         "default_poses",
         "selfie",
         "filter",
+        "person",
     }
     if unknown:
         raise ValueError(f"{path.name}: unknown keys {', '.join(sorted(unknown))}")
@@ -109,7 +114,9 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
             raise ValueError(f"{path.name}: {where}pose must be at most {DESCRIPTION_MAX_LENGTH} characters")
         poses[default.id] = default
     selfie = load_selfie(data.get("selfie"), path)
-    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, selfie, load_filter(data.get("filter"), path))
+    filter_questions = load_filter(data.get("filter"), path)
+    person = load_person(data.get("person"), path)
+    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, selfie, filter_questions, person)
 
 
 def load_selfie(table: object, path: Path) -> SelfiePrompts:
@@ -181,6 +188,21 @@ def load_filter(table: object, path: Path) -> dict[str, dict]:
             "criteria": {"true": text(question, "yes", where), "false": text(question, "no", where)},
         }
     return questions
+
+
+def load_person(table: object, path: Path) -> dict[str, dict]:
+    """The [person] table of the prompts file: the yes/no question the decision model answers about the scene photo,
+    which the request's `state` holds as `photo`, as the Decisions API takes it. Raises ValueError like
+    load_prompts."""
+    if not isinstance(table, dict):
+        raise ValueError(f"{path.name}: a [person] table is needed")
+    unknown = set(table) - {"question"}
+    if unknown:
+        raise ValueError(f"{path.name}: person: unknown keys {', '.join(sorted(unknown))}")
+    question = table.get("question")
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError(f"{path.name}: person.question must be a non-empty string")
+    return {PERSON_QUESTION: {"type": "noul", "instructions": one_line(question)}}
 
 
 PROMPTS = load_prompts()

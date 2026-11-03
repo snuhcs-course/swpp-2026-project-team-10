@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -25,6 +25,7 @@ import com.lastpenguin.pix.generation.planned
 import com.lastpenguin.pix.generation.testBitmap
 import com.lastpenguin.pix.session.DescriptionRequest
 import com.lastpenguin.pix.session.DescriptionShare
+import com.lastpenguin.pix.session.FakePersonDetector
 import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SubjectPick
@@ -63,6 +64,7 @@ class GenerationViewModelTest {
     private val generator = FakeGenerator()
     private val camera = FakeCamera()
     private val consent = FakeConsent()
+    private val persons = FakePersonDetector()
     private val share = RecordingShare()
     private val descriptions = RecordingDescriptions()
     private lateinit var model: GenerationViewModel
@@ -72,7 +74,7 @@ class GenerationViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        model = GenerationViewModel(generator, camera, consent, LIMIT_MS, share, descriptions)
+        model = GenerationViewModel(generator, camera, consent, persons, LIMIT_MS, share, descriptions)
         store.put("generation", model)
     }
 
@@ -123,6 +125,86 @@ class GenerationViewModelTest {
         assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
         assertEquals(2, camera.grabs)
         assertTrue(generator.runs.isEmpty())
+    }
+
+    @Test
+    fun thePhotoCanBeUsedOnlyOnceThePhoneHasFoundAPersonInIt() = runTest {
+        val gate = CompletableDeferred<Unit>().also { persons.gate = it }
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+
+        // Use this photo waits for the check of this photo (FR-4.13).
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertTrue(state.checkingPerson)
+        assertSame(camera.frame, persons.checked.single())
+        assertFalse(model.useScene())
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(GenerationUiState(scene = camera.frame, phase = GenerationUiState.Phase.REVIEWING), state)
+        assertTrue(model.useScene())
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+    }
+
+    @Test
+    fun aPhotoWithoutAPersonIsNotUsed_andShootAgainTakesAnother() = runTest {
+        persons.found = false
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+
+        assertTrue(state.noPerson)
+        assertFalse(state.checkingPerson)
+        assertFalse(model.useScene())
+        runCurrent()
+        // Nothing is sent, and the subject's phone is not shown Generate poses either.
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertTrue(generator.runs.isEmpty())
+        assertTrue(descriptions.calls.isEmpty())
+
+        model.retakeScene()
+        assertEquals(GenerationUiState(phase = GenerationUiState.Phase.FRAMING), state)
+        persons.found = true
+        model.takeScene()
+        runCurrent()
+        assertFalse(state.noPerson)
+        assertTrue(model.useScene())
+    }
+
+    @Test
+    fun aPersonCheckThatFailsLetsThePhotoGoOn() = runTest {
+        // The server checks the photo again before its image model (Design 2.6.3).
+        persons.failure = IllegalStateException("The model could not be loaded")
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+
+        assertFalse(state.checkingPerson)
+        assertFalse(state.noPerson)
+        assertTrue(model.useScene())
+    }
+
+    @Test
+    fun theCheckOfAPhotoThatIsGoneChangesNothing() = runTest {
+        persons.found = false
+        persons.gate = CompletableDeferred()
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+        model.retakeScene()
+        persons.gate?.complete(Unit)
+        runCurrent()
+        assertEquals(GenerationUiState(phase = GenerationUiState.Phase.FRAMING), state)
+
+        persons.gate = CompletableDeferred()
+        model.takeScene()
+        runCurrent()
+        model.cancel()
+        persons.gate?.complete(Unit)
+        runCurrent()
+        assertEquals(GenerationUiState(), state)
     }
 
     @Test
@@ -456,6 +538,42 @@ class GenerationViewModelTest {
         // The next set clears the message.
         model.generate("Wave")
         assertFalse(state.descriptionRejected)
+    }
+
+    @Test
+    fun aSetInWhichTheServerFoundNoOneFailsSayingSo() = runTest {
+        describeAPhoto()
+        model.generate("Wave")
+        runCurrent()
+        val run = generator.runs.single()
+
+        run.plan(List(4) { "Wave" })
+        run.send(*(1..4).map { failed("pose-$it", GenerationError.NO_PERSON) }.toTypedArray())
+        run.finish()
+        runCurrent()
+        // Couldn't create poses asks for another photo (FR-4.13), not another description.
+        assertEquals(GenerationUiState.Phase.FAILED, state.phase)
+        assertTrue(state.noPerson)
+        assertFalse(state.descriptionRejected)
+
+        // Shoot again: the camera takes a new photo, with nothing kept from this one.
+        model.beginScene()
+        assertEquals(GenerationUiState(phase = GenerationUiState.Phase.FRAMING), state)
+    }
+
+    @Test
+    fun aSetInWhichOnlySomePosesFoundNoOneFailsLikeAnyOther() = runTest {
+        generateFromAPhoto()
+        val run = generator.runs.single()
+
+        run.plan()
+        run.send(failed("pose-1", GenerationError.TIMEOUT))
+        run.send(*(2..4).map { failed("pose-$it", GenerationError.NO_PERSON) }.toTypedArray())
+        run.finish()
+        runCurrent()
+
+        assertEquals(GenerationUiState.Phase.FAILED, state.phase)
+        assertFalse(state.noPerson)
     }
 
     @Test
@@ -899,7 +1017,7 @@ class GenerationViewModelTest {
     @Test
     fun consentGivenEarlierIsNotAskedAgain() = runTest {
         consent.given = true
-        val later = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        val later = GenerationViewModel(generator, camera, consent, persons, LIMIT_MS)
         store.put("later", later)
 
         runCurrent()
@@ -910,7 +1028,7 @@ class GenerationViewModelTest {
     @Test
     fun consentGivenWhileTheStoredAnswerLoadsIsKept() = runTest {
         consent.hold = CompletableDeferred()
-        val slow = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        val slow = GenerationViewModel(generator, camera, consent, persons, LIMIT_MS)
         store.put("slow", slow)
         runCurrent()
 
@@ -927,7 +1045,7 @@ class GenerationViewModelTest {
     @Test
     fun consentWithdrawnInTheSettingsIsAskedAgain() = runTest {
         consent.given = true
-        val later = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        val later = GenerationViewModel(generator, camera, consent, persons, LIMIT_MS)
         store.put("later", later)
         runCurrent()
 
@@ -941,7 +1059,7 @@ class GenerationViewModelTest {
     fun consentWithdrawnWhileTheStoredAnswerLoadsStaysWithdrawn() = runTest {
         consent.given = true
         consent.hold = CompletableDeferred()
-        val slow = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        val slow = GenerationViewModel(generator, camera, consent, persons, LIMIT_MS)
         store.put("slow", slow)
         runCurrent()
 
@@ -960,7 +1078,7 @@ class GenerationViewModelTest {
     fun consentGiven_followsTheStoredAnswerOnceItLoads() = runTest {
         consent.given = true
         consent.hold = CompletableDeferred()
-        val slow = GenerationViewModel(generator, camera, consent, LIMIT_MS)
+        val slow = GenerationViewModel(generator, camera, consent, persons, LIMIT_MS)
         store.put("slow", slow)
         runCurrent()
         assertFalse(slow.consentGiven.value)

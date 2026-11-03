@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One description used before on Generate poses (FR-4.11): a tap fills the field, and its ✕ removes it. A long one
+     is cut short with an ellipsis at the width of the Galaxy S22's content. -->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.Pix.HistoryChip"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:maxWidth="320dp"
+    tools:text="Leaning on the railing by the river" />

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.res.ColorStateList
@@ -17,6 +17,7 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.account.accountMessage
@@ -63,7 +64,8 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
     }
 
     private fun join(accepted: InvitationEvent.Accepted) {
-        if (sessionViewModel.joinInvitation(accepted.invitationId, accepted.place)) {
+        val partner = SessionPartner(accepted.from.userId, accepted.from.displayName)
+        if (sessionViewModel.joinInvitation(accepted.invitationId, accepted.place, partner)) {
             viewModel.joining = true
             return
         }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -28,6 +28,7 @@ import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeGuide
@@ -552,6 +553,9 @@ class SessionViewModelTest {
 
     private val friend = PixUser("u_2", "test2", "Test Account 2")
 
+    /** The same friend as the session carries them (FR-4.11). */
+    private val partner = SessionPartner(friend.userId, friend.displayName)
+
     /** Friends, open while the invitation is on its way, as it sent it: it takes what each *Invite* did. */
     private fun TestScope.inviteResults(): MutableList<InviteResult> {
         val results = mutableListOf<InviteResult>()
@@ -566,7 +570,10 @@ class SessionViewModelTest {
         runCurrent()
 
         assertEquals(listOf("invite:u_2"), invitations.calls)
-        assertEquals(SessionEntry.Invite("inv_1", invitations.sent.place) to Role.PHOTOGRAPHER, session.starts.single())
+        assertEquals(
+            SessionEntry.Invite("inv_1", invitations.sent.place, partner) to Role.PHOTOGRAPHER,
+            session.starts.single(),
+        )
         assertEquals(invitations.sent, model.invitation.value)
         assertEquals(listOf<InviteResult>(InviteResult.Sent), results)
     }
@@ -622,7 +629,10 @@ class SessionViewModelTest {
         inviteResults()
         model.invite(friend)
         runCurrent()
-        assertEquals(SessionEntry.Invite("inv_1", invitations.sent.place) to Role.PHOTOGRAPHER, session.starts.single())
+        assertEquals(
+            SessionEntry.Invite("inv_1", invitations.sent.place, partner) to Role.PHOTOGRAPHER,
+            session.starts.single(),
+        )
     }
 
     @Test
@@ -704,10 +714,10 @@ class SessionViewModelTest {
         model.joinRoom(CODE)
         runCurrent()
         val place = SessionPlace("s_1", "subject-token", emptyList())
-        assertTrue(model.joinInvitation("inv_1", place))
+        assertTrue(model.joinInvitation("inv_1", place, partner))
         runCurrent()
 
-        assertEquals(SessionEntry.Invitation("inv_1", place) to Role.SUBJECT, session.starts.last())
+        assertEquals(SessionEntry.Invitation("inv_1", place, partner) to Role.SUBJECT, session.starts.last())
         assertNull(model.lastCode)
     }
 
@@ -727,7 +737,7 @@ class SessionViewModelTest {
             runCurrent()
 
             assertTrue(open.toString(), model.busy)
-            assertFalse(open.toString(), model.joinInvitation("inv_1", place))
+            assertFalse(open.toString(), model.joinInvitation("inv_1", place, partner))
         }
         runCurrent()
 

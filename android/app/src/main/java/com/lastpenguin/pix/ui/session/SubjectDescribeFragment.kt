@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -23,6 +23,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.DescriptionForm
 import com.lastpenguin.pix.ui.generation.showScene
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -45,13 +46,13 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
         val ui = viewModel.uiState.value
         val form = DescriptionForm(
             binding,
-            ideas = resources.getStringArray(R.array.pose_ideas).toList(),
             text = ui.text,
             rejected = ui.rejected,
             onTextChanged = viewModel::onTextChanged,
             onGenerate = { text -> viewModel.go(text, suggest = false) },
             onSuggest = { viewModel.go(input.text.toString(), suggest = true) },
             onFocusChanged = { focused -> viewModel.onFocus(focused, input.text.toString()) },
+            onForget = viewModel::forget,
         )
         this.form = form
         // Back and Cancel leave the photographer's description as it is; Subject view opens it again.
@@ -60,7 +61,13 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { viewModel.uiState.collect { ui -> render(binding, form, ui) } }
+                launch {
+                    combine(viewModel.uiState, viewModel.usedBefore, ::Pair).collect { (ui, used) ->
+                        render(binding, form, ui)
+                        // This phone's descriptions used before, with the photographer as the friend (FR-4.11).
+                        form.showHistory(used, ui.partner)
+                    }
+                }
                 launch {
                     viewModel.ended.collect { end ->
                         // Only this screen's description: an end kept from an earlier one says nothing about it.

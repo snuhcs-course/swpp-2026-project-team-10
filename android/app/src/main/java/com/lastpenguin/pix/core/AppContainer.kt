@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -31,13 +31,16 @@ import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixApi
 import com.lastpenguin.pix.core.network.PixAuthApi
 import com.lastpenguin.pix.generation.DataStoreGenerationConsent
+import com.lastpenguin.pix.generation.DataStorePromptHistory
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseTipper
 import com.lastpenguin.pix.generation.ScreenLanguages
+import com.lastpenguin.pix.generation.followSubjectSets
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -66,6 +69,7 @@ import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
+import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.WebRtcRuntime
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
@@ -118,6 +122,8 @@ class AppContainer(
     /** The tip of the guide on Camera, asked for with [poseTipper]. */
     val poseTips: PoseTips,
     val generationConsent: GenerationConsent,
+    /** The descriptions used before, on this phone only (FR-4.11, NFR-13). */
+    val promptHistory: PromptHistory,
     // ---- Accounts and friends (#54) ---------------------------------------------
     val authRepository: AuthRepository,
     val friendsRepository: FriendsRepository,
@@ -242,6 +248,11 @@ class AppContainer(
             val screenLanguages = ScreenLanguages(appContext)
             val screenLanguage = screenLanguages.current
             val poseTipper: PoseTipper = RemotePoseTipper(pixApi, language = { screenLanguage.value })
+            val descriptionSyncer = DescriptionSyncer(rtcSessionManager, JpegPoseCandidateCodec())
+            // As the subject, each set the photographer starts is this phone's history too (FR-4.11), whichever
+            // screen is in front.
+            val promptHistory = DataStorePromptHistory(appContext, appScope)
+            promptHistory.followSubjectSets(descriptionSyncer.started, appScope)
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),
@@ -254,6 +265,7 @@ class AppContainer(
                 poseTipper = poseTipper,
                 poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage),
                 generationConsent = DataStoreGenerationConsent(appContext),
+                promptHistory = promptHistory,
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),
                 googleIdTokens = CredentialManagerGoogleIdTokens(BuildConfig.GOOGLE_SERVER_CLIENT_ID),
@@ -263,7 +275,7 @@ class AppContainer(
                 guideSyncer = guideSyncer,
                 poseSyncer = PoseSyncer(rtcSessionManager, JpegPoseCandidateCodec()),
                 confirmSyncer = ConfirmSyncer(rtcSessionManager, MaskGuideImageCodec()),
-                descriptionSyncer = DescriptionSyncer(rtcSessionManager, JpegPoseCandidateCodec()),
+                descriptionSyncer = descriptionSyncer,
                 photoSyncer = PhotoSyncer(
                     rtcSessionManager,
                     ContentPhotoReader(appContext.contentResolver),

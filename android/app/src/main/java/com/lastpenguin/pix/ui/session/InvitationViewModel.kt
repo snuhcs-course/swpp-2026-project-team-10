@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModel
@@ -10,6 +10,7 @@ import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.InvitationManager
 import com.lastpenguin.pix.account.InvitationStatus
 import com.lastpenguin.pix.account.OpenedInvitation
+import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.session.SessionPlace
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -37,8 +38,8 @@ sealed interface InvitationUiState {
 }
 
 sealed interface InvitationEvent {
-    /** The friend's place, which the session takes next. */
-    data class Accepted(val invitationId: String, val place: SessionPlace) : InvitationEvent
+    /** The friend's place, which the session takes next, and the friend who invited ([from]). */
+    data class Accepted(val invitationId: String, val place: SessionPlace, val from: PixUser) : InvitationEvent
 
     data object Declined : InvitationEvent
 
@@ -89,11 +90,12 @@ class InvitationViewModel(private val invitations: InvitationManager, private va
     fun accept() {
         val id = invitationId ?: return
         val current = _uiState.value as? InvitationUiState.Open ?: return
+        val from = opened?.from ?: return
         if (current.answering) return
         _uiState.value = current.copy(answering = true)
         viewModelScope.launch {
             invitations.accept(id)
-                .onSuccess { place -> _events.send(InvitationEvent.Accepted(id, place)) }
+                .onSuccess { place -> _events.send(InvitationEvent.Accepted(id, place, from)) }
                 .onFailure { error -> answerFailed(current, error) }
         }
     }

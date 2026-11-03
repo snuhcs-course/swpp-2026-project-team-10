@@ -413,7 +413,7 @@
     <string name="tutorial_describe">원하는 포즈를 적어요</string>
     <string name="tutorial_suggest">비워 두면 AI가 제안해요</string>
     <string name="tutorial_friend_title">친구 폰에서는</string>
-    <string name="tutorial_friend_zoom">두 손가락으로 사진사의 카메라를 확대해요</string>
+    <string name="tutorial_friend_zoom">두 손가락으로 찍는 사람의 카메라를 확대해요</string>
     <string name="tutorial_friend_brightness">밝기를 조절해요</string>
     <string name="tutorial_friend_move">가이드를 직접 옮겨요</string>
     <string name="tutorial_friend_guide">내 폰에서 가이드를 골라요</string>

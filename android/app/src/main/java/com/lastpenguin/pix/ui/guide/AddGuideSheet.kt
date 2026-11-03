@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Jaewan Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -17,16 +17,16 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
-import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import kotlinx.coroutines.launch
 
 /**
- * Add a pose guide, or Replace the pose guide with one on the camera (R&S 6.2), with the saved guides (FR-3.8).
- * Opened from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and *Generate poses here* waits
- * for the shared steps (FR-6.15, Design 2.6.5).
- * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9.
+ * Add a pose guide, or Replace the pose guide with one on the camera (R&S 6.2): *My library* first, with *Add photo*
+ * and the newest saved guides (FR-3.8, FR-3.11), then *Generate poses here*. Opened from Subject view
+ * ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and *Generate poses here* waits for the shared steps
+ * (FR-6.15, Design 2.6.5).
+ * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170.
  */
 class AddGuideSheet : BottomSheetDialogFragment() {
 
@@ -56,14 +56,20 @@ class AddGuideSheet : BottomSheetDialogFragment() {
             binding.cancelButton.setText(R.string.keep_current_guide)
         }
 
-        binding.uploadButton.setOnClickListener { pickPhoto() }
+        binding.addPhotoTile.setOnClickListener { pickPhoto() }
+        binding.libraryAllButton.setOnClickListener { findNavController().navigate(R.id.action_addGuide_to_library) }
         binding.generateButton.setOnClickListener {
             if (generationViewModel.needsConsent) showConsentNotice() else takeScenePhoto()
         }
         binding.cancelButton.setOnClickListener { dismiss() }
 
-        val savedGuides =
-            SavedGuideList(binding, onUse = { referenceViewModel.onUseSaved(it.id) }, onDelete = ::confirmDelete)
+        val savedGuides = SavedGuideList(
+            binding,
+            showThumbnail = { image, guide ->
+                image.showThumbnail(guide, referenceViewModel, viewLifecycleOwner.lifecycleScope)
+            },
+            onUse = { referenceViewModel.onUseSaved(it.id) },
+        )
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { referenceViewModel.savedGuides.collect(savedGuides::render) }
@@ -92,16 +98,6 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     override fun onDismiss(dialog: DialogInterface) {
         if (activity?.isChangingConfigurations != true) referenceViewModel.cancelOpening()
         super.onDismiss(dialog)
-    }
-
-    /** A saved guide is deleted only after asking (FR-3.8); the guide on the camera, if it is that one, stays. */
-    private fun confirmDelete(guide: SavedGuide) {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.delete_saved_guide_title)
-            .setMessage(R.string.delete_saved_guide_message)
-            .setPositiveButton(R.string.delete) { _, _ -> referenceViewModel.onDeleteSaved(guide.id) }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     /** Asked before the first request only (FR-4.2). *Not now* sends nothing and leaves this sheet open. */

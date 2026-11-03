@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -32,8 +32,9 @@ import kotlinx.serialization.json.Json
  * mask: the first read replaces it with `mask.png`, so none of the reference's pixels stay in the mask's place. A
  * guide is written to a hidden folder and renamed into place, so a half-written one is never listed; a folder that
  * cannot be read back is deleted. The list is ordered by an increasing number kept in `meta.json`, not by the clock.
- * Nothing goes to MediaStore.
- * Owner: Guide controls (#58); the mask (#113).
+ * Listing a guide reads only its `meta.json`; its images are read when it is used or its thumbnail shown, so a full
+ * library starts as fast as an empty one (FR-3.11). Nothing goes to MediaStore.
+ * Owner: Guide controls (#58); the mask (#113); the library (#170).
  */
 class FileSavedGuideStore(
     private val directory: File,
@@ -97,6 +98,17 @@ class FileSavedGuideStore(
         return Result.success(guide to meta.state)
     }
 
+    override suspend fun thumbnail(id: String): Bitmap? {
+        // The reference, or else the mask, whose outline stands in for a guide saved without one.
+        val (reference, mask) = locked { entries ->
+            if (entries.none { it.saved.id == id }) return@locked null
+            val folder = File(directory, id)
+            val reference = decode(File(folder, REFERENCE))
+            reference to (if (reference == null) readMask(folder) else null)
+        } ?: return null
+        return withContext(compute) { (reference ?: mask?.let { outline(it) })?.let { thumbnail(it) } }
+    }
+
     override suspend fun delete(id: String) {
         locked { entries ->
             if (entries.none { it.saved.id == id }) return@locked
@@ -139,7 +151,7 @@ class FileSavedGuideStore(
             unfinished.deleteRecursively()
             throw error
         }
-        return Entry(SavedGuide(guide.id, meta.savedAt, thumbnail(guide.reference ?: guide.outline)), meta)
+        return Entry(SavedGuide(guide.id, meta.savedAt, guide.source), meta)
     }
 
     /**
@@ -162,7 +174,10 @@ class FileSavedGuideStore(
         return read.take(SavedGuideStore.MAX_SAVED)
     }
 
-    /** The folder's guide, or null when its `meta.json` or images cannot be used; an old cutout is migrated first. */
+    /**
+     * The folder's guide, or null when its `meta.json` cannot be used or it has no mask; an old cutout is migrated
+     * first. The images are not decoded here: one that cannot be read fails the guide's use, with a message.
+     */
     private fun read(folder: File): Entry? {
         migrate(folder)
         val meta = try {
@@ -178,10 +193,8 @@ class FileSavedGuideStore(
             Log.w(TAG, "Saved guide ${folder.name} has values that cannot place a guide")
             return null
         }
-        val mask = readMask(folder) ?: return null
-        // A guide saved without its reference, such as one the subject's phone received, shows its outline.
-        val source = decode(File(folder, REFERENCE)) ?: outline(mask)
-        return Entry(SavedGuide(folder.name, meta.savedAt, thumbnail(source)), meta)
+        if (!File(folder, MASK).isFile) return null
+        return Entry(SavedGuide(folder.name, meta.savedAt, meta.source), meta)
     }
 
     /**
@@ -281,19 +294,15 @@ class FileSavedGuideStore(
         const val MAX_MASK_HEIGHT = 720
         const val QUALITY = 90
 
-        /**
-         * The thumbnails on Add a pose guide: the item's 3:4 at its size on a 3x screen (84 × 112 dp), so a photo of
-         * any shape stays sharp; twenty of them take under 7 MB in memory.
-         */
-        const val THUMBNAIL_WIDTH = 252
-        const val THUMBNAIL_HEIGHT = 336
-
         /** The UUIDs that `MlKitReferenceGuideMaker` gives, which also name the folders. */
         val ID = Regex("[A-Za-z0-9-]{1,64}")
 
         val json = Json { ignoreUnknownKeys = true }
 
-        /** The middle of [source] cut to 3:4, at most [THUMBNAIL_WIDTH] × [THUMBNAIL_HEIGHT]. */
+        /**
+         * The middle of [source] cut to 3:4, at most [SavedGuideStore.THUMBNAIL_WIDTH] ×
+         * [SavedGuideStore.THUMBNAIL_HEIGHT].
+         */
         fun thumbnail(source: Bitmap): Bitmap {
             val (width, height) = if (source.width * 4 > source.height * 3) {
                 maxOf(1, source.height * 3 / 4) to source.height
@@ -307,7 +316,11 @@ class FileSavedGuideStore(
                 width,
                 height,
             )
-            return if (height <= THUMBNAIL_HEIGHT) cropped else cropped.scale(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
+            return if (height <= SavedGuideStore.THUMBNAIL_HEIGHT) {
+                cropped
+            } else {
+                cropped.scale(SavedGuideStore.THUMBNAIL_WIDTH, SavedGuideStore.THUMBNAIL_HEIGHT)
+            }
         }
 
         @Suppress("DEPRECATION")

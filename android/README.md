@@ -45,7 +45,7 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 | `camera/CameraController.kt` | Camera interface, `CameraCapabilities`, `CameraState`, `AspectRatio`, `FlashMode`, `FrameSink` | 2.1, 2.3 |
 | `guide/GuideModels.kt` | `ReferenceGuide`, `GuideState`, `NormalizedRect`, `GuideSource` | 2.3 |
 | `guide/GuideRepository.kt`, `guide/ReferenceGuideMaker.kt` | Guide store and reference-to-guide interfaces | 2.1 |
-| `guide/SavedGuideStore.kt` | Saved guides on the phone: `SavedGuideStore`, `SavedGuide`, and `SavedGuideStore.InMemory` for tests | 2.1, 2.3 |
+| `guide/SavedGuideStore.kt` | Saved guides on the phone, the library: `SavedGuideStore` (with `thumbnail`, read when a cell shows), `SavedGuide` (with its source), and `SavedGuideStore.InMemory` for tests | 2.1, 2.3 |
 | `generation/GenerationModels.kt`, `generation/PoseGenerator.kt` | Pose requests, planned poses, generation and candidate events, generator interface | 2.1, 2.3 |
 | `generation/PoseTipper.kt` | How to hold the phone for a generated pose: `PoseTipper`, `PoseTip` | 2.1, 2.6.3 |
 | `session/SessionModels.kt`, `session/SessionManager.kt` | Roles, entries, session states, session interface | 2.1, 2.3, 2.4 |
@@ -62,7 +62,8 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Screen (R&S 6) | Class in `ui/` | ViewModel |
 |---|---|---|
 | Camera, Camera + guide, Photo saved, live light, Scene photo, Scene photo · Review | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel`, `SettingsViewModel` |
-| Add a pose guide (bottom sheet) with the saved guides, Consent notice | `guide/AddGuideSheet` | `ReferenceViewModel`, `GenerationViewModel` |
+| Add a pose guide (bottom sheet) with *My library*, Consent notice | `guide/AddGuideSheet`, `guide/SavedGuideList` | `ReferenceViewModel`, `GenerationViewModel` |
+| Library | `guide/LibraryFragment`, `guide/LibraryAdapter` | `ReferenceViewModel` |
 | Reference confirm, No person found | `guide/ReferenceConfirmFragment`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` |
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` |
 | Friends, Friends (signed out) | `account/FriendsFragment` | `FriendsViewModel`, `SessionViewModel` |

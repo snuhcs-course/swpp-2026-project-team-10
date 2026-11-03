@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One saved guide in the library (FR-3.11): its thumbnail at 3:4 and the icon of its kind, a photo or an AI pose. -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="4dp">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/thumbnail"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/pix_surface_2"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:padding="0.5dp"
+        android:scaleType="centerCrop"
+        app:layout_constraintDimensionRatio="3:4"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
+        app:strokeColor="@color/pix_glass_stroke"
+        app:strokeWidth="1dp" />
+
+    <ImageView
+        android:id="@+id/kindIcon"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_margin="8dp"
+        android:background="@drawable/bg_kind_badge"
+        android:importantForAccessibility="no"
+        android:padding="6dp"
+        app:layout_constraintBottom_toBottomOf="@id/thumbnail"
+        app:layout_constraintStart_toStartOf="@id/thumbnail"
+        app:tint="@color/pix_text" />
+</androidx.constraintlayout.widget.ConstraintLayout>

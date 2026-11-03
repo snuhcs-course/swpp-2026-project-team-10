@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Add photo, the first cell of My library (FR-3.11): an empty tile with a dashed edge. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="12dp" />
+    <stroke
+        android:width="1.5dp"
+        android:color="@color/pix_glass_stroke"
+        android:dashWidth="6dp"
+        android:dashGap="4dp" />
+</shape>

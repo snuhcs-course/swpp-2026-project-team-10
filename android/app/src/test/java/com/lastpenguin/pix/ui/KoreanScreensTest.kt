@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -72,6 +72,7 @@ import com.lastpenguin.pix.ui.generation.GenerationFailedFragment
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.PickPoseFragment
 import com.lastpenguin.pix.ui.guide.AddGuideSheet
+import com.lastpenguin.pix.ui.guide.LibraryFragment
 import com.lastpenguin.pix.ui.guide.NoPersonFoundFragment
 import com.lastpenguin.pix.ui.guide.ReferenceConfirmFragment
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
@@ -228,6 +229,24 @@ class KoreanScreensTest {
         val modules = TestAppContainer().install()
         runBlocking { modules.saved.save(guide(), GuideState(guideId = "guide-1")) }
         scenario = launchFragment<AddGuideSheet>(themeResId = R.style.Theme_Pix)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun library_withBothKinds_isInKorean() {
+        val modules = TestAppContainer().install()
+        runBlocking {
+            modules.saved.save(guide(), GuideState(guideId = "guide-1"))
+            modules.saved.save(guide().copy(id = "guide-2", source = GuideSource.GENERATED), GuideState())
+        }
+        scenario = launchPrepared<LibraryFragment>(R.id.libraryFragment) {}.first
+        assertKorean(screen())
+    }
+
+    @Test
+    fun library_empty_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchPrepared<LibraryFragment>(R.id.libraryFragment) {}.first
         assertKorean(screen())
     }
 

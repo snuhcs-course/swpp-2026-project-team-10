@@ -33,7 +33,20 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-30] "It failed again." (This time `android-test`, in a test from #133: the *Generating poses* grid's `ListAdapter` diffs its second list on a background thread, and the test checked the count after one run of the main looper. It now waits for the count with a new `ScreenTestSupport.idleUntil`.)
 - [Dongje, 10-30] "Update dev and resolve the conflicts." ([#151] had come in: the generation ViewModel keeps both its set id and the selfie flag, both sides' tests stay, the revision rows and the selfie script move after #151's (IT-18), and Flows 4 and 5 are #151's drawings with the new top bar and bottom row.)
 
+## The guide library ([#170])
+
+- [Sungmin, 11-03] "Pull dev again. I want to build the guide library in this iteration, so I need to post issues: work out how many and how, and write them so I can paste them." (Two: the library itself, [#170], and saving a generated pose with a heart, [#171], which can slip to Iteration 4 without breaking the library. The filters became the guide's source, a photo or an AI pose, because situations need a guide saved with one; search, situations, and memos wait for Iteration 4.)
+- [Sungmin, 11-03] "Are editing a guide in the library, editing the image, or cropping only the photo out of a screenshot separate issues?" (Yes, in Iteration 4, as two: cropping before the person is cut out, and editing the outline after, which share no code.)
+- [Sungmin, 11-03] "Fill in the issue numbers yourself, after checking." / "No, check the open issues." (No open issue overlapped, but the open PR [#168] of [#123] rewrites the same sheet and the Flow 1 and 2 wireframes, so both issues depend on it; the due date moved to 11/05, the day of the integration.)
+- [Sungmin, 11-03] "New code was merged into dev; pull it again. I'll build #170 first: plan how, concretely. Don't start yet." (The plan found that a hundred saved guides would keep about 34 MB of thumbnails in memory and decode every reference at a start, so the thumbnails are read only when a cell shows.)
+- [Sungmin, 11-03] "Do it all as you recommend, make the branch, and start." (`SavedGuide` names its source and holds no bitmap; `SavedGuideStore.thumbnail` and a cache in `ReferenceViewModel`; *My library* on the sheet and `LibraryFragment`. A separate thumbnail file was planned, but the saved reference is already at most 512 px, so it is read directly. The sheet was changed before [#168] was merged, and its wireframes waited for it; once it was merged, the work was moved onto it and Flows 1 and 2 and the tutorial's guide slide were drawn on its sheet.)
+- [Sungmin, 11-03] "Can't you check it on the emulator? Show me with screenshots that it works, then commit, push, and open the PR." (The emulator cannot run the segmentation, so five saved guides, three photos and two AI poses, were written into the app's `guides/` folder as a guide saved before the update would be; the tutorial slide, *My library*, the library and its filters, a delete, a guide put on the camera, the library after a restart in Korean, and *Add photo*'s picker were captured. A first run of the mutation script that was stopped kept running beside the second and left one line of `LibraryFragment` deleted; a test failed on it, and the line was put back.)
+
 [#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
 [#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
 [#151]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/151
+[#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
+[#168]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/168
+[#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
+[#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171

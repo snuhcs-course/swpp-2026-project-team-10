@@ -51,18 +51,28 @@
     <!-- Saved guides (FR-3.8): the button on the guide's panel and its notices. -->
     <string name="save_guide">Save guide</string>
     <string name="guide_saved">Guide saved</string>
-    <string name="guide_saved_notice">Guide saved. Use it again from Guide.</string>
+    <string name="guide_saved_notice">Guide saved to My library.</string>
     <string name="guide_saved_oldest_removed_notice">Guide saved. The oldest saved guide was removed to keep %1$d.</string>
     <string name="guide_already_saved_notice">This guide is already saved. Find it under Guide.</string>
     <string name="guide_save_failed_notice">Couldn\'t save the guide. Check the phone\'s storage.</string>
-    <string name="saved_guides_title">Saved guides</string>
-    <string name="saved_guide_description">Saved guide from %1$s</string>
     <string name="delete_saved_guide">Delete saved guide</string>
-    <string name="delete_saved_guide_description">Delete the saved guide from %1$s</string>
     <string name="delete_saved_guide_title">Delete this saved guide?</string>
     <string name="delete_saved_guide_message">It is removed from this phone. A guide on the camera stays there.</string>
     <string name="delete">Delete</string>
     <string name="saved_guide_open_failed">Couldn\'t open the saved guide.</string>
+    <!-- The library (FR-3.11, R&S 6.2): every saved guide, filtered by kind. -->
+    <string name="my_library">My library</string>
+    <string name="library_title">Library</string>
+    <string name="library_title_description">Library, saved guides: %1$d</string>
+    <string name="library_all">All %1$d</string>
+    <string name="library_photos">Photos %1$d</string>
+    <string name="library_generated">AI poses %1$d</string>
+    <string name="library_empty">No saved guides yet</string>
+    <string name="library_empty_body">Save a guide on the camera, or add a photo.</string>
+    <string name="library_empty_filter">No guides of this kind yet</string>
+    <string name="add_photo">Add photo</string>
+    <string name="saved_photo_guide_description">Photo guide saved %1$s</string>
+    <string name="saved_pose_guide_description">AI pose guide saved %1$s</string>
     <string name="guide_offer_failed">Couldn\'t send the guide</string>
     <string name="reference_photo">Reference photo</string>
     <string name="enlarge_reference">Enlarge</string>
@@ -108,7 +118,6 @@
     <string name="add_guide_title">Add a pose guide</string>
     <string name="replace_guide_title">Replace the pose guide?</string>
     <string name="keep_current_guide">Keep the current guide</string>
-    <string name="upload_reference">Upload a reference</string>
     <string name="generate_poses">Generate poses here</string>
     <string name="reference_title">Your reference</string>
     <string name="reference_preview_description">The person from the reference photo</string>
@@ -413,7 +422,7 @@
     <string name="tutorial_switch">Change to the front camera</string>
     <string name="tutorial_upload">Pix traces the person in your photo</string>
     <string name="tutorial_generate">AI makes four poses for this place</string>
-    <string name="tutorial_saved">Use a saved guide again</string>
+    <string name="tutorial_saved">Saved guides wait in My library</string>
     <string name="tutorial_move">Drag to move, pinch to resize</string>
     <string name="tutorial_edit">The guide moves only while this is on</string>
     <string name="tutorial_fade">Fade it or hide it</string>

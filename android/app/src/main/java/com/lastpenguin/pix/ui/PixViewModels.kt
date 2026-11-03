@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.ui.account.AccountViewModel
 import com.lastpenguin.pix.ui.account.FriendsViewModel
 import com.lastpenguin.pix.ui.camera.CameraViewModel
@@ -57,7 +58,7 @@ object PixViewModels {
                 share = container.poseSyncer,
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,
-                partner = { (container.sessionManager.state.value as? SessionState.Connected)?.partner },
+                partner = { container.sessionManager.state.value.partner },
             )
         }
         initializer {

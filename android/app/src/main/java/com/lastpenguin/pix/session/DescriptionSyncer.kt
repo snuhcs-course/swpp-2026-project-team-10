@@ -371,7 +371,7 @@ class DescriptionSyncer(
                         // with STARTED, and the copy's last text stands in. The friend is read here, not where the
                         // history records it, because the link can drop between the two.
                         val text = message.text ?: current.text
-                        val partner = (session.state.value as? SessionState.Connected)?.partner
+                        val partner = session.state.value.partner
                         if (text.isNotBlank()) _started.tryEmit(StartedDescription(text, partner))
                     }
                 }

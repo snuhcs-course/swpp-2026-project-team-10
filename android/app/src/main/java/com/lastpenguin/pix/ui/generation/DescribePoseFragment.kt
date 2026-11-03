@@ -26,6 +26,7 @@ import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.flow.combine
@@ -84,8 +85,8 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
                         val subject = connected?.peer?.displayName
                         val typing = subject.takeIf { generation.descriptionWriter == Role.SUBJECT }
                         form.showShared(generation.description, typing, subject)
-                        // The descriptions used before, with the friend of an invitation's session (FR-4.11).
-                        form.showHistory(used, connected?.partner)
+                        // The descriptions used before, with the friend of an invitation's session, also while it reconnects (FR-4.11).
+                        form.showHistory(used, session.partner)
                         // The subject's Generate 4 poses or Skip came first: it goes on as this phone's own.
                         toGenerating()
                     }

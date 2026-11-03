@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.signaling.IceServer
@@ -83,9 +83,17 @@ sealed interface SessionState {
 
     /**
      * Both phones: the link dropped while connected, and the session tries to restore it for up to 10 s from [since],
-     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11).
+     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11). [partner] stays the friend of `Connected`.
      */
-    data class Reconnecting(val sessionId: String, val since: Long) : SessionState
+    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
 
     data class Ended(val reason: EndReason) : SessionState
 }
+
+/** The friend of an invitation's session while it is connected or reconnecting (FR-4.11); null otherwise. */
+val SessionState.partner: SessionPartner?
+    get() = when (this) {
+        is SessionState.Connected -> partner
+        is SessionState.Reconnecting -> partner
+        else -> null
+    }

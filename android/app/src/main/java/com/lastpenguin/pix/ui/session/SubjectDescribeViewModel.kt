@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -12,6 +12,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.partner
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,7 +95,7 @@ class SubjectDescribeViewModel(
                             waiting = going == description.descriptionId,
                             reconnecting = state is SessionState.Reconnecting,
                             photographerName = name,
-                            partner = connected?.partner ?: ui.partner,
+                            partner = state.partner ?: ui.partner,
                         )
                     }
                 }

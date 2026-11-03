@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -52,7 +52,8 @@ import org.robolectric.annotation.GraphicsMode
  * The four generation screens (R&S 6.3, FR-4.4–4.8, US-5; Testing Documentation 2.1.6) on the real Fragments,
  * with the shared GenerationViewModel put in the right phase before each screen's view is created. Generate poses: opens with the scene and the
  * descriptions used before, newest first (FR-4.11; none hides them; a chip fills the field, and its ✕ drops it; in an
- * invitation's session, the switch to the ones used with the friend), Generate 4 poses and Skip start a run and open
+ * invitation's session, the switch to the ones used with the friend, kept while the link reconnects, for a set started
+ * meanwhile), Generate 4 poses and Skip start a run and open
  * Generating poses, Cancel; in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
  * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
@@ -179,6 +180,30 @@ class GenerationScreensTest {
             assertTrue(binding.historyWithPartner.isSelected)
             assertEquals(listOf("Jump"), binding.chipTexts())
         }
+    }
+
+    @Test
+    fun describe_aSetStartedWhileTheLinkReconnects_keepsTheFriend() {
+        val modules = modules()
+        usedBefore(modules)
+        val friend = SessionPartner("u_2", "Junhyeong")
+        modules.session.setState(SessionState.Reconnecting("s_1", 0L, friend))
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        idle()
+
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            assertEquals(View.VISIBLE, binding.historyFilter.visibility)
+            binding.descriptionInput.setText("Lean on the wall")
+            binding.generateButton.performClick()
+        }
+        idle()
+
+        assertEquals(
+            listOf("Lean on the wall" to setOf("u_2"), "Wave" to emptySet(), "Jump" to setOf("u_2")),
+            modules.history.entries.value.map { it.text to it.partners },
+        )
     }
 
     @Test

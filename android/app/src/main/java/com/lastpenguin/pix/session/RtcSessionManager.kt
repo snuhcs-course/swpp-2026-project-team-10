@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -768,7 +768,7 @@ class RtcSessionManager(
     private fun startReconnecting() {
         val id = sessionId ?: return
         val since = clock()
-        _state.value = SessionState.Reconnecting(id, since)
+        _state.value = SessionState.Reconnecting(id, since, partner)
         Timings.mark("session.reconnecting")
         clearLatency()
         reconnectBudget?.cancel()

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -1191,6 +1191,10 @@ class RtcSessionManagerTest {
             SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER, friend),
             manager.state.value,
         )
+        // The friend stays through a dropped link, for a set started meanwhile (FR-4.11).
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        assertEquals(SessionState.Reconnecting("s_1", 0L, friend), manager.state.value)
         manager.leave()
     }
 

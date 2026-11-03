@@ -85,7 +85,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 11-02] "Make the list like B, but change Used before to All like A, and stop showing the Ideas." / "Take the header itself from A: Used before, (All)(With)." (B's chips with a ✕ under A's header; the idea chips gone.)
 - [Dongje, 11-02] Two choices from the Design's open items: the friend by Pix account, so a room code's session has no friend history, and both phones record every set that starts. "Go ahead as is." (The design as presented, kept in the wiki with the PR.)
 - [Dongje, 11-02] "Update dev and merge, then continue." (The branch cut from dev with #157 merged.)
-- [Dongje, 11-03] "Update dev and merge, then get Codex reviews and fix them as before; one is already up." (First review: an empty text in STARTED for suggested poses, the friend read where the start arrives, a failed read read again, the history out of backups, the chips built only for a change, a long name cut short.)
+- [Dongje, 11-03] "Update dev and merge, then get Codex reviews and fix them as before; one is already up." (First review: an empty text in STARTED for suggested poses, the friend read where the start arrives, a failed read read again, the history out of backups, the chips built only for a change, a long name cut short. Second review: the friend kept through Reconnecting.)
 
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110

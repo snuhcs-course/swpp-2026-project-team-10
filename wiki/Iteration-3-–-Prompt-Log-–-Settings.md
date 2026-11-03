@@ -1,0 +1,13 @@
+Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
+
+## The settings screen ([#123])
+
+- [Sungmin, 11-02] "I'll build only the settings screen of this issue and open a PR. First pull `dev` and make a new branch, then write a plan for the settings screen. Also think about what belongs on it and tell me first. Don't implement yet; start with the plan." (`dev` pulled, `feat/123-settings` made. #123 is assigned to Junhyeong, so the plan noted that the team should agree on who takes the settings screen. The plan: the rows the issue asks for, and notifications, withdrawing the AI agreement, the Pix account, and *About Pix*; no shutter-sound switch, since Korean phones always make the sound, and no grid switch, since the grid is a Must (FR-1.9); the latency from the `ping` both phones already send.)
+- [Sungmin, 11-02] "Add the extra rows, add black to the guide colors, and do the rest as you recommend." (`AppSettings` in DataStore, the gear on Camera hidden during a session and the scene photo, the guide's color as a filter and another thickness traced again from the mask, `SessionManager.latencyMs` from the pongs, and the agreement withdrawn through `GenerationViewModel`. Robolectric's Android 16 kept no per-app language, so the language goes through `AppLanguage`, with a fake in the tests. Each fix was checked by breaking it once. Flow 7 drawn, and the gear added to Flows 1, 2, and 4.)
+- [Sungmin, 11-02] "New code was merged into `dev`. Resolve the conflicts on this branch before the PR." ([#159] had come in. The branch had no commit yet, so it moved to `dev` and the work was applied on top; only AI markers and an import conflicted in the code. The revision rows went after #159's, and the settings test became IT-21; Flow 4 was rendered again from the merged drawing.)
+- [Sungmin, 11-02] "Commit and push it. Write the PR body here so I can paste it." (PR [#163].)
+- [Sungmin, 11-02] "The review of [#163] is in. Fix it, then commit and push." (Codex found three. The AI agreement's row was drawn once on resume, so Settings restored before the stored answer loaded said "Not agreed"; it now follows `GenerationViewModel.consentGiven`. On Android 10–12 AppCompat gives Pix's own language to the activity only, so pose tips stayed in the phone's language; `MainActivity` now hands its resources to `ScreenLanguages`. A black outline vanished on Reference confirm's dark card; it now lies on a light backing.)
+
+[#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
+[#159]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/159
+[#163]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/163

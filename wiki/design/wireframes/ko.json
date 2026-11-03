@@ -53,5 +53,24 @@
       "Sitting on the steps with a coffee": "계단에 앉아 커피 들기",
       "Walking away, looking back": "걸어가며 뒤돌아보기"
     }
+  },
+  "flow7_settings": {
+    "keep": [
+      "AndroidX (CameraX, Navigation, DataStore, Credentials)",
+      "Material Components for Android",
+      "Kotlin, kotlinx.coroutines, kotlinx.serialization",
+      "OkHttp, Retrofit",
+      "WebRTC",
+      "Firebase Cloud Messaging",
+      "ML Kit Subject Segmentation",
+      "Google Identity Services",
+      "Pretendard",
+      "Manrope",
+      "Apache License 2.0",
+      "BSD 3-Clause License",
+      "ML Kit Terms of Service",
+      "Google APIs Terms of Service",
+      "SIL Open Font License 1.1"
+    ]
   }
 }

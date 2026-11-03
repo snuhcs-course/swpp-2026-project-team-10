@@ -57,6 +57,28 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come." (A lens without a flash takes the scene without waiting for the light. Eighth review: a shot waits until the light has been on for half a second, also right after it came on, and a light that does not go off is asked once more.)
 - [Dongje, 10-31] "The reviews keep coming: while fixing them, structure the code so that edge cases are as unlikely as possible." (A shot waits until the light is as chosen, on or off, for half a second; a failed light request is asked once more either way.)
 
+## Description filter ([#166])
+
+- [Jaewan, 11-02] "prompts used in our app are currently recorded in `server/src/pix_server/poses/prompts.toml`. I recognize there are several linebreaks here, does the real used prompt also have linebreaks at long lines?"
+- [Jaewan, 11-02] "is the instructions safe from prompt injection or malicious inputs?"
+- [Jaewan, 11-02] "I think we should add two filters. One is checking if a human exists in the scene photo (using mlkit?), and rejecting if not. second is checking from prompt injection attempts or malicious inputs (using jev?). then after these two filters, the request sent to gemini should check for these two and if something's wrong it should output a refusal. and we should also update all other prompts to guard for prompt injection. what do you think about this flow?"
+- [Jaewan, 11-02] "jev is https://typesafe.ai/blog/introducing-system-one-models-and-jev this and the replicas of it, the decision models"
+- [Jaewan, 11-02] "There are other decision models available in openrouter, jev-like"
+- [Jaewan, 11-02] "no we do have jev (typesafe/jev-1.14). and what i mean by decision models is https://openrouter.ai/rankings/decisions these, the system one decision models like jev"
+- [Jaewan, 11-02] "I think the jev check shouldn't be too strict, just check for malicious inputs (plus prompt injection attempts) in the text. checking for the image is too much i think. also i don't think we should restrict the user from giving inputs outside 'Does the description only ask for a pose, gesture, gaze, or expression?' or 'Does it ask to change clothing, body, identity, or the place, or to add objects or people?', should we?"
+- [Jaewan, 11-02] "and these models should support korean. do they?"
+- [Jaewan, 11-02] "okay. overall i think we need to do some systematic tests for this pose generation flow (prompt injection guard, malicious input guard, following our base prompts's requirements, following the pose input specifics, or more?). how should we do this at a reliable scale? so that we can report this in our final presentation or report?"
+- [Jaewan, 11-02] "fyi i have $200 claude API credits I can use, so for example we can use LLM judges if you want"
+- [Jaewan, 11-02] "well first, can you search for whether jev or the variants are sufficiently good at korean? there should be some community reports"
+- [Jaewan, 11-02] "can you run some tests and give me the results?"
+- [Jaewan, 11-02] "yeah add this as a script. and i'll go with Jev 1.14 at 0.7 since it's mostly better than others, and vs pplx this is 'not too strict' (record this rationale at the design document as we did for the image model choice). Now before incorporating into the pose generation flow, can you summarize once more our planned filtering logic?"
+- [Jaewan, 11-03] "1. fail open 2. when is 422 rejected use now and what message does it give? 3. logging means sending requests twice on each call? 4. okay - give me the answers to 2 and 3 first"
+- [Jaewan, 11-03] "yeah 422 rejected is good. and for the gemini filter i think we only need it for `/pose-suggestions` since it is always called once. but the new `refuse` field shifting the outputs is slightly concerning. let's just not do this for now, just do the prompt hardening. i think all of this should be done in a new branch"
+- [Jaewan, 11-03] "commit and push this and create the PR. the description should be concise and in simple technical english. also create a new issue as Iter3-A7 and link it"
+- [Jaewan, 11-03] "can you try the test again? just for one image"
+- [Jaewan, 11-03] "wouldn't this be filtered by jev for 'does it try to manipulate the models'"
+- [Jaewan, 11-03] "can we also update the design documentation's system architecture part to contain this decision model filter layer?"
+
 **Prompt history (11/02)**
 
 - [Dongje, 11-02] "I'll build [#124]. Start with the UI: think of about three options, generate images, and get them reviewed." (Three mockups rendered from the app's own tokens: a list under the field, chips under tabs, a sheet from the field.)
@@ -75,3 +97,4 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 [#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
 [#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156
 [#158]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/158
+[#166]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/166

@@ -53,14 +53,15 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 | `session/signaling/SignalMessage.kt` | WebSocket signaling messages | 2.5.2 |
 | `core/network/PixApi.kt`, `core/network/ApiModels.kt` | REST API used by the app: `PixApi` (poses), `PixAuthApi` (sign-in), `PixAccountApi` (endpoints with a token) | 2.5.3 |
 | `account/AccountModels.kt`, `account/AuthRepository.kt`, `account/FriendsRepository.kt` | `Account`, `AuthState`, friends and requests, `AccountError`; the sign-in and friends interfaces | 2.1, 2.3 |
+| `settings/AppSettings.kt`, `settings/AppLanguage.kt`, `guide/GuideLook.kt` | The settings screen's choices: `AppSettings` (the guide's look, the latency indicator), `AppLanguage`, `GuideLook`, `GuideColor`, `GuideThickness`, each with an `InMemory` for tests | 2.1, 2.6.8 |
 
 ### Screens
 
-All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera. *Shoot together* opens Friends. Screens of one flow share a ViewModel (activity scope).
+All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera. *Shoot together* opens Friends, and the gear Settings. Screens of one flow share a ViewModel (activity scope).
 
 | Screen (R&S 6) | Class in `ui/` | ViewModel |
 |---|---|---|
-| Camera, Camera + guide, Photo saved, live light, Scene photo, Scene photo · Review | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel` |
+| Camera, Camera + guide, Photo saved, live light, Scene photo, Scene photo · Review | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel`, `SettingsViewModel` |
 | Add a pose guide (bottom sheet) with the saved guides, Consent notice | `guide/AddGuideSheet` | `ReferenceViewModel`, `GenerationViewModel` |
 | Reference confirm, No person found | `guide/ReferenceConfirmFragment`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` |
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` |
@@ -72,20 +73,22 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Invite sent (bottom sheet), Invite not accepted | `session/InviteSentSheet`, `InviteNotAcceptedFragment` | `SessionViewModel` |
 | Invitation (deep link `pix://invite/{invitationId}`) | `session/InvitationFragment` | `InvitationViewModel`, `SessionViewModel` |
 | Join with code, Session not found | `session/JoinCodeFragment`, `SessionNotFoundFragment` | `SessionViewModel` |
+| Settings, How to use Pix, About Pix | `settings/SettingsFragment`, `HelpFragment`, `AboutFragment` | `SettingsViewModel`, `GenerationViewModel` (the AI agreement) |
 | Subject view, the subject's Generate poses, Pick a pose, and Your reference, Connection lost | `session/SubjectFragment`, `SubjectDescribeFragment`, `SubjectPickPoseFragment`, `SubjectConfirmFragment`, `ConnectionLostFragment` | `SubjectViewModel`, `SubjectDescribeViewModel`, `SubjectPickViewModel`, `SubjectConfirmViewModel`, `SessionViewModel` |
 
 The failure screens share `fragment_failure.xml`.
 
 **Look.** Every screen uses the dark-only `Theme.Pix` (`res/values/themes.xml`). The design tokens are in `colors.xml`: the ground and surfaces, glass for controls over the preview, one accent (`#F2C14E`), the live color (`#36D399`), the guide color (`#5EEAD4`), and the danger color. Type and component styles are in `styles.xml`: `TextAppearance.Pix.*`, and `Widget.Pix.*` for primary, secondary, text, glass, icon, and segment buttons, chips, sliders, cards, sheets, and dialogs. Fonts are Manrope, DM Mono, and Pretendard in `res/font` (SIL OFL 1.1; licenses in `assets/licenses`); a text style names its weight's alias, `@font/pix_medium` to `pix_extrabold`, rather than a font file (Language). Icons are vector drawables in `res/drawable` (`ic_*`, with 16–20 dp `_small` versions for use beside text), and the app icon is the adaptive icon in `res/mipmap-anydpi`: the shutter P from [`branding/`](../branding/) on a paper tile (`ic_launcher_background`), with `ic_launcher_monochrome` for themed icons; notifications use `ic_notification`, the logo's small version. The team's UI mockups are the visual reference; where they differ from built behavior, the behavior wins, for example pinch zoom with a guide-edit mode toggle instead of zoom chips and the system number keyboard instead of an on-screen keypad.
 
-**Language.** English is in `res/values/strings.xml` and Korean in `res/values-ko/strings.xml`, under the same keys and in the same order (FR-10.2). The phone's language list picks the first of the two it holds; any other language gets English, and on Android 13+ *Settings › Apps › Pix › Language* chooses one for Pix alone. A new string gets its Korean in the same PR, or lint fails. Korean is in 해요체 (사진을 저장했어요); a name in a message takes 님 (`%1$s님이 나갔어요`) and a number takes 에, so no particle depends on how they end. Only strings without words (ratios, counters, `@%1$s`) are `translatable="false"`. Every text appearance sets `android:lineBreakWordStyle="phrase"`, so on Android 13 and later Korean lines break between words; Android 10–12 break them inside words. Manrope has no Hangul, so on a phone in Korean every screen is drawn in Pretendard, Latin letters included: `res/font` points the `pix_*` aliases to Manrope and `res/font-ko` to Pretendard. Text the server writes for a screen, so far the pose tip, is asked for in the screens' language: `screenLanguage` (`generation/ScreenLanguage.kt`) gives `ko` when `values-ko/bools.xml` sets `screens_in_korean`, and `en` otherwise.
+**Language.** English is in `res/values/strings.xml` and Korean in `res/values-ko/strings.xml`, under the same keys and in the same order (FR-10.2). The phone's language list picks the first of the two it holds; any other language gets English, and Pix's own *Settings › Language* chooses one for Pix alone, through `AppLanguage` (on Android 13+ also *Settings › Apps › Pix › Language*). A new string gets its Korean in the same PR, or lint fails. Korean is in 해요체 (사진을 저장했어요); a name in a message takes 님 (`%1$s님이 나갔어요`) and a number takes 에, so no particle depends on how they end. Only strings without words (ratios, counters, `@%1$s`) are `translatable="false"`. Every text appearance sets `android:lineBreakWordStyle="phrase"`, so on Android 13 and later Korean lines break between words; Android 10–12 break them inside words. Manrope has no Hangul, so on a phone in Korean every screen is drawn in Pretendard, Latin letters included: `res/font` points the `pix_*` aliases to Manrope and `res/font-ko` to Pretendard. Text the server writes for a screen, so far the pose tip, is asked for in the screens' language, which `ScreenLanguages` follows from the application and from `MainActivity` (on Android 10–12 only the activity gets Pix's own language): `screenLanguage` (`generation/ScreenLanguage.kt`) gives `ko` when `values-ko/bools.xml` sets `screens_in_korean`, and `en` otherwise.
 
 ### Module classes
 
 | Package | What is in it |
 |---|---|
 | `camera/` | `CameraXController` and `PhotoSaver` behind `CameraController`, the zoom plan, and the frame cache |
-| `guide/` | The guide store, geometry, and overlay; `MlKitReferenceGuideMaker` with `SubjectSegmenter` and `OutlineExtractor`; the saved guides on disk |
+| `guide/` | The guide store, geometry, and overlay; `MlKitReferenceGuideMaker` with `SubjectSegmenter` and `OutlineExtractor`; the saved guides on disk; `GuideOutlines`, the outline at another thickness |
+| `settings/` | `DataStoreAppSettings` behind `AppSettings`, and `AndroidAppLanguage` behind `AppLanguage` (`AppCompatDelegate`) |
 | `generation/` | `RemotePoseGenerator`, the scene photo codec, the consent flag, and the pose tips |
 | `session/` | `RtcSessionManager` with the signaling and peer-connection clients, `CameraFrameSource`, `GuideSyncer`, `DescriptionSyncer`, `PoseSyncer`, `ConfirmSyncer`, `PhotoSyncer`, `RemoteControlHandler`, and the message codec and channel routing under `protocol/` and `signaling/` |
 | `account/` | The tokens and their refresh, the REST repositories, presence, Google sign-in, invitations (`InvitationManager`), and the push token (`PushTokenRegistrar`) |

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -43,6 +43,9 @@ class RtcSessionManagerTest {
 
     private val incoming = mutableListOf<SessionMessage>()
 
+    /** The manager's clock; 0 unless a test moves it, as for the round trip of a ping. */
+    private var now = 0L
+
     private fun TestScope.manager(
         haveGuideId: () -> String? = { null },
         haveReferenceId: () -> String? = { null },
@@ -57,7 +60,7 @@ class RtcSessionManagerTest {
             serverUrl = "http://10.0.2.2:8000/",
             identity = SessionIdentity("Dongje", "0.1.0"),
             dispatcher = StandardTestDispatcher(testScheduler),
-            clock = { 0L },
+            clock = { now },
             haveGuideId = haveGuideId,
             haveReferenceId = haveReferenceId,
             accessToken = accessToken,
@@ -511,6 +514,51 @@ class RtcSessionManagerTest {
 
         assertEquals(SessionMessage.Pong(123), peer.sentMessages().last())
         assertEquals(Channel.REALTIME, peer.sent.last().first)
+        manager.leave(EndReason.LEFT)
+    }
+
+    // Partitions for the latency (FR-10.3): before any pong, one pong, more than three (only the last three count),
+    // a late pong while reconnecting, and the end of the session.
+    @Test
+    fun `the latency is half the average round trip of the last three pongs`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        assertNull(manager.latencyMs.value)
+        now = 1_000
+
+        fun pong(sentAt: Long) {
+            peer.deliver(otherPhone.encode(SessionMessage.Pong(sentAt)), Channel.REALTIME)
+            runCurrent()
+        }
+        pong(800)
+        assertEquals(100, manager.latencyMs.value)
+        pong(600)
+        pong(400)
+        assertEquals(200, manager.latencyMs.value)
+        // 400, 600, and 100 ms: the first, 200 ms, no longer counts.
+        pong(900)
+        assertEquals(183, manager.latencyMs.value)
+
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+        assertNull(manager.latencyMs.value)
+    }
+
+    @Test
+    fun `the latency is cleared while reconnecting, and a late pong does not count`() = runTest {
+        val (manager, peer) = connectedPhotographer(token = "photographer-token")
+        now = 1_000
+        peer.deliver(otherPhone.encode(SessionMessage.Pong(800)), Channel.REALTIME)
+        runCurrent()
+        assertEquals(100, manager.latencyMs.value)
+
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+        assertNull(manager.latencyMs.value)
+
+        peer.deliver(otherPhone.encode(SessionMessage.Pong(900)), Channel.REALTIME)
+        runCurrent()
+        assertNull(manager.latencyMs.value)
         manager.leave(EndReason.LEFT)
     }
 

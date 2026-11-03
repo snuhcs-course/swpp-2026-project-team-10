@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -21,6 +21,9 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.ConfirmStep
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.showOutline
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -35,6 +38,7 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
     private val viewModel: SubjectConfirmViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
@@ -47,6 +51,10 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect { ui -> render(binding, ui) } }
+                // The outline in this phone's own color and thickness (FR-3.10).
+                launch {
+                    binding.referenceImage.showOutline(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
+                }
                 launch {
                     viewModel.ended.collect { end ->
                         // Only this screen's confirm: an end kept from an earlier one says nothing about it.
@@ -91,7 +99,6 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             0,
             0,
         )
-        if (guide != null) binding.referenceImage.setImageBitmap(guide.outline)
         binding.useGuideButton.isEnabled = guide != null && !ui.waiting && !ui.reconnecting
     }
 

@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings, from the gear on Camera (FR-10.1, R&S 6.10): the guide's color and thickness with a preview (FR-3.10), the
+     latency indicator (FR-10.3), the language (FR-10.2), notifications, the AI consent (FR-4.2), the Pix account, how
+     to use Pix, and the app's version and licenses. Every choice applies at once and stays after a restart. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="56dp">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            style="@style/Widget.Pix.Header.Back"
+            android:contentDescription="@string/back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/settings"
+            android:textAppearance="@style/TextAppearance.Pix.Header" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/settingsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Guide (FR-3.10) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_section_guide"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_card"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <com.lastpenguin.pix.ui.settings.GuideLookPreview
+                    android:id="@+id/guidePreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="112dp"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_guide_color"
+                    android:textAppearance="@style/TextAppearance.Pix.Label" />
+
+                <LinearLayout
+                    android:id="@+id/colorRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal">
+
+                    <com.lastpenguin.pix.ui.settings.ColorSwatch
+                        android:id="@+id/colorWhite"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/guide_color_white" />
+
+                    <com.lastpenguin.pix.ui.settings.ColorSwatch
+                        android:id="@+id/colorBlack"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/guide_color_black" />
+
+                    <com.lastpenguin.pix.ui.settings.ColorSwatch
+                        android:id="@+id/colorYellow"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/guide_color_yellow" />
+
+                    <com.lastpenguin.pix.ui.settings.ColorSwatch
+                        android:id="@+id/colorMint"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/guide_color_mint" />
+
+                    <com.lastpenguin.pix.ui.settings.ColorSwatch
+                        android:id="@+id/colorPink"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/guide_color_pink" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/settings_guide_thickness"
+                    android:textAppearance="@style/TextAppearance.Pix.Label" />
+
+                <LinearLayout
+                    android:id="@+id/thicknessRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_segment_track"
+                    android:orientation="horizontal"
+                    android:padding="4dp">
+
+                    <Button
+                        android:id="@+id/thicknessThin"
+                        style="@style/Widget.Pix.Button.Segment"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/guide_thickness_thin" />
+
+                    <Button
+                        android:id="@+id/thicknessNormal"
+                        style="@style/Widget.Pix.Button.Segment"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/guide_thickness_normal" />
+
+                    <Button
+                        android:id="@+id/thicknessThick"
+                        style="@style/Widget.Pix.Button.Segment"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/guide_thickness_thick" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Shoot together (FR-10.3) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:accessibilityHeading="true"
+                android:text="@string/shoot_together"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <LinearLayout
+                android:id="@+id/latencyRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_card"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:paddingVertical="12dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_latency"
+                        android:textAppearance="@style/TextAppearance.Pix.BodyLarge" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_latency_body"
+                        android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/latencySwitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:contentDescription="@string/settings_latency" />
+            </LinearLayout>
+
+            <!-- General (FR-10.2) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_section_general"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_card"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <include
+                    android:id="@+id/languageRow"
+                    layout="@layout/item_setting_row" />
+
+                <include
+                    android:id="@+id/notificationsRow"
+                    layout="@layout/item_setting_row" />
+            </LinearLayout>
+
+            <!-- Privacy (FR-4.2) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_section_privacy"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_card"
+                android:orientation="vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="14dp">
+
+                <include
+                    android:id="@+id/consentRow"
+                    layout="@layout/item_setting_row" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:text="@string/settings_consent_body"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+            </LinearLayout>
+
+            <!-- Account (F5) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_section_account"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_card"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <include
+                    android:id="@+id/accountRow"
+                    layout="@layout/item_setting_row" />
+            </LinearLayout>
+
+            <!-- Help (FR-10.4) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_section_help"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_card"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <include
+                    android:id="@+id/helpRow"
+                    layout="@layout/item_setting_row" />
+
+                <include
+                    android:id="@+id/aboutRow"
+                    layout="@layout/item_setting_row" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

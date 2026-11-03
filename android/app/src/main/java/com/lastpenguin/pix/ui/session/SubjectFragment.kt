@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -47,9 +47,14 @@ import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
 import com.lastpenguin.pix.ui.camera.setReferenceActions
 import com.lastpenguin.pix.ui.camera.showReference
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.followLook
+import com.lastpenguin.pix.ui.settings.renderLatency
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
@@ -73,6 +78,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     private val viewModel: SubjectViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
     private var brightnessSlider: TrackedSliderController? = null
@@ -157,6 +163,14 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // The photographer's guide in this phone's own color and thickness (FR-3.10).
+                launch {
+                    binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
+                }
+                launch {
+                    combine(settingsViewModel.showLatency, sessionViewModel.state, sessionViewModel.latencyMs, ::Triple)
+                        .collect { (show, state, latency) -> binding.latencyChip.renderLatency(show, state, latency) }
+                }
                 launch {
                     viewModel.uiState.collect { ui ->
                         binding.liveDot.contentDescription = ui.photographerName

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -63,6 +63,9 @@ import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.followLook
+import com.lastpenguin.pix.ui.settings.renderLatency
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -70,6 +73,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -81,6 +85,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private val viewModel: CameraViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val generationViewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
+    private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private var binding: FragmentCameraBinding? = null
     private var sceneBack: OnBackPressedCallback? = null
     private var permissionRequested = false
@@ -201,6 +206,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.shootTogetherButton.setOnClickListener {
             findNavController().navigate(R.id.action_camera_to_friends)
         }
+        controls.settingsButton.setOnClickListener {
+            findNavController().navigate(R.id.action_camera_to_settings)
+        }
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
             if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
@@ -232,6 +240,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
+                // The guide in the settings' color and thickness (FR-3.10).
+                launch {
+                    controls.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
+                }
+                launch {
+                    combine(
+                        settingsViewModel.showLatency,
+                        sessionViewModel.state,
+                        sessionViewModel.latencyMs,
+                    ) { _, _, _ -> }.collect { renderLatency(controls) }
+                }
                 // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).
                 // While the link reconnects the light is off, and the session can still be ended (Design 2.6.7).
                 launch {
@@ -241,6 +260,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         renderLiveDot(controls, connected)
                         controls.endSessionButton.isVisible = live
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
+                        controls.settingsButton.isVisible = controls.shootTogetherButton.isVisible
                         view.keepScreenOn = live
                     }
                 }
@@ -693,6 +713,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         renderReference(controls, state)
         renderTip(controls, state)
         renderScenePhoto(controls, generationViewModel.uiState.value, state, ready)
+        renderLatency(controls)
     }
 
     /**
@@ -757,6 +778,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    /** The latency indicator (FR-10.3) in the top bar, except while the scene photo's title takes its place. */
+    private fun renderLatency(controls: FragmentCameraBinding) {
+        controls.latencyChip.renderLatency(
+            settingsViewModel.showLatency.value && !isScenePhotoActive(),
+            sessionViewModel.state.value,
+            sessionViewModel.latencyMs.value,
+        )
+    }
+
     /** Whether the scene photo for poses is being framed or reviewed; the top bar is its title then. */
     private fun isScenePhotoActive(scene: GenerationUiState = generationViewModel.uiState.value): Boolean =
         scene.phase == GenerationUiState.Phase.REVIEWING || scene.phase == GenerationUiState.Phase.FRAMING
@@ -780,6 +810,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val session = sessionViewModel.state.value
         controls.shootTogetherButton.isVisible =
             !active && session !is SessionState.Connected && session !is SessionState.Reconnecting
+        controls.settingsButton.isVisible = controls.shootTogetherButton.isVisible
         // Guide and the thumbnail keep their place, so the shutter stays where it is.
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active

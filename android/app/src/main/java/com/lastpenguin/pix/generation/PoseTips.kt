@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -46,7 +46,7 @@ class PoseTips(
     /** The guide on Camera (`GuideRepository.guide`). */
     guideOnCamera: StateFlow<ReferenceGuide?>,
     private val scope: CoroutineScope,
-    /** The screens' language ([screenLanguages]), which the tipper writes the tip in. */
+    /** The screens' language ([ScreenLanguages.current]), which the tipper writes the tip in. */
     private val language: StateFlow<String> = MutableStateFlow(ENGLISH),
 ) {
     /**

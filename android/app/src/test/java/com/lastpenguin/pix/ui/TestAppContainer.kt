@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -21,6 +21,7 @@ import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.PromptHistory
+import com.lastpenguin.pix.generation.ScreenLanguages
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -42,6 +43,8 @@ import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.fakeBitmap
+import com.lastpenguin.pix.settings.AppLanguage
+import com.lastpenguin.pix.settings.AppSettings
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -66,6 +69,8 @@ class TestAppContainer(
     val saved: SavedGuideStore = SavedGuideStore.InMemory(),
     /** What the photographer's candidates decode to on the subject's phone; a test that draws one gives a real one. */
     candidateImage: () -> Bitmap = { fakeBitmap() },
+    /** The screens' language for the server's text; none unless a test checks it. */
+    val screenLanguages: ScreenLanguages? = null,
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -87,6 +92,8 @@ class TestAppContainer(
     val friends = FakeFriendsRepository()
     val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
+    val appSettings = AppSettings.InMemory()
+    val language = AppLanguage.InMemory()
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
 
@@ -139,6 +146,9 @@ class TestAppContainer(
         photoSyncer = photos,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
+        appSettings = appSettings,
+        appLanguage = language,
+        screenLanguages = screenLanguages,
     )
 
     /** Installs the container in the test's [PixApplication]; call before the screen is launched. */
@@ -235,10 +245,20 @@ class TestAppContainer(
     class IdleConsent : GenerationConsent {
         var given = true
 
-        override suspend fun isGiven(): Boolean = given
+        /** When set, the stored answer is handed over only after this completes, as a slow DataStore read. */
+        var gate: CompletableDeferred<Unit>? = null
+
+        override suspend fun isGiven(): Boolean {
+            gate?.await()
+            return given
+        }
 
         override suspend fun give() {
             given = true
+        }
+
+        override suspend fun withdraw() {
+            given = false
         }
     }
 }

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-02, reviewed by Jaewan Park and Joonhyung Han
 """Render the drawings in wiki/design/ to the images the wiki pages show.
 
 Each drawing has one image in wiki/images/, named after it:
@@ -34,6 +34,11 @@ side by side when they fit and stack at the right when they do not, so the Korea
 own buttons' places. A sheet whose text sets its height, such as the room code's, flows the same way from the screen's
 bottom.
 
+The slides of the first-use tutorial, `tutorial/<name>.dc.html`, are drawn the same way, as a page of 360 x 705 dp with
+one screen in its card and the dimming, the rings, the arrows, and the captions over it; a caption is marked `data-ui`
+and is one of the English strings of `strings.xml`. Each becomes `<name>.webp` in the app, in `res/drawable-nodpi` and,
+in Korean, `res/drawable-ko-nodpi`, at the `scale` its `$preview` declares.
+
 Change the drawing, never the image alone, and render it in the same PR:
 
     python3 wiki/design/render.py                         every image
@@ -62,12 +67,15 @@ from PIL import Image
 DESIGN = Path(__file__).resolve().parent
 IMAGES = DESIGN.parent / "images"
 STRINGS = DESIGN.parent.parent / "android" / "app" / "src" / "main" / "res"
+SLIDES = STRINGS / "drawable-nodpi"
+SLIDES_KO = STRINGS / "drawable-ko-nodpi"
 KOREAN = DESIGN / "wireframes" / "ko.json"
 # The app's Korean font files, res/font/pretendard_<name>.otf, by the CSS weight each one is.
 PRETENDARD = {"medium": 500, "semibold": 600, "bold": 700, "extrabold": 800}
 # Twice the page's size: a screen is drawn at its real proportions, so its smallest text (11 sp, 5 px) needs it.
 WIREFRAME_SCALE = 2
 WIREFRAME_JPEG_QUALITY = 92
+SLIDE_WEBP_QUALITY = 88
 # Headless Chrome now and then hangs on a page; another try then works.
 CHROME_TIMEOUT_S = 120
 CHROME_TRIES = 3
@@ -283,7 +291,7 @@ def render_wireframe(source: Path, target: Path, korean: bool = False) -> None:
             chrome,
             "--headless",
             "--hide-scrollbars",
-            f"--force-device-scale-factor={WIREFRAME_SCALE}",
+            f"--force-device-scale-factor={preview.get('scale', WIREFRAME_SCALE)}",
             f"--window-size={preview['width']},{preview['height']}",
             # Time for the web fonts to load before the screenshot.
             "--virtual-time-budget=10000",
@@ -297,7 +305,11 @@ def render_wireframe(source: Path, target: Path, korean: bool = False) -> None:
             except subprocess.TimeoutExpired:
                 if attempt == CHROME_TRIES:
                     sys.exit(f"{source.name}: Chrome did not finish within {CHROME_TIMEOUT_S} s, {CHROME_TRIES} times")
-        Image.open(png).convert("RGB").save(target, "JPEG", quality=WIREFRAME_JPEG_QUALITY)
+        image = Image.open(png).convert("RGB")
+        if target.suffix == ".webp":
+            image.save(target, "WEBP", quality=SLIDE_WEBP_QUALITY, method=6)
+        else:
+            image.save(target, "JPEG", quality=WIREFRAME_JPEG_QUALITY)
 
 
 def drawings() -> dict[str, list[tuple[str, Callable[[Path], None]]]]:
@@ -312,6 +324,12 @@ def drawings() -> dict[str, list[tuple[str, Callable[[Path], None]]]]:
         found[name] = [
             (f"{name}.jpg", lambda target, flow=flow: render_wireframe(flow, target)),
             (f"{name}_ko.jpg", lambda target, flow=flow: render_wireframe(flow, target, korean=True)),
+        ]
+    for slide in sorted((DESIGN / "tutorial").glob("*.dc.html")):
+        name = slide.name.removesuffix(".dc.html")
+        found[name] = [
+            (str(SLIDES / f"{name}.webp"), lambda target, slide=slide: render_wireframe(slide, target)),
+            (str(SLIDES_KO / f"{name}.webp"), lambda target, slide=slide: render_wireframe(slide, target, korean=True)),
         ]
     return found
 
@@ -329,6 +347,7 @@ def main() -> None:
     for name in args.names or known:
         for image, render in known[name]:
             target = args.out / image
+            target.parent.mkdir(parents=True, exist_ok=True)
             render(target)
             print(os.path.relpath(target))
 

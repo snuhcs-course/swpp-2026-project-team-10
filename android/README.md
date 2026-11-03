@@ -73,7 +73,7 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Invite sent (bottom sheet), Invite not accepted | `session/InviteSentSheet`, `InviteNotAcceptedFragment` | `SessionViewModel` |
 | Invitation (deep link `pix://invite/{invitationId}`) | `session/InvitationFragment` | `InvitationViewModel`, `SessionViewModel` |
 | Join with code, Session not found | `session/JoinCodeFragment`, `SessionNotFoundFragment` | `SessionViewModel` |
-| Settings, How to use Pix, About Pix | `settings/SettingsFragment`, `HelpFragment`, `AboutFragment` | `SettingsViewModel`, `GenerationViewModel` (the AI agreement) |
+| Settings, How to use Pix, Tutorial, About Pix | `settings/SettingsFragment`, `HelpFragment`, `TutorialFragment`, `AboutFragment` | `SettingsViewModel`, `GenerationViewModel` (the AI agreement) |
 | Subject view, the subject's Generate poses, Pick a pose, and Your reference, Connection lost | `session/SubjectFragment`, `SubjectDescribeFragment`, `SubjectPickPoseFragment`, `SubjectConfirmFragment`, `ConnectionLostFragment` | `SubjectViewModel`, `SubjectDescribeViewModel`, `SubjectPickViewModel`, `SubjectConfirmViewModel`, `SessionViewModel` |
 
 The failure screens share `fragment_failure.xml`.

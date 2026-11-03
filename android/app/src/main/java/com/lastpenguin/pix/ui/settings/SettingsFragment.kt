@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -69,6 +69,9 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         binding.helpRow.settingTitle.setText(R.string.settings_how_to)
         binding.helpRow.settingValue.isVisible = false
         binding.helpRow.root.setOnClickListener { findNavController().navigate(R.id.action_settings_to_help) }
+        binding.tutorialRow.settingTitle.setText(R.string.settings_tutorial)
+        binding.tutorialRow.settingValue.isVisible = false
+        binding.tutorialRow.root.setOnClickListener { findNavController().navigate(R.id.action_settings_to_tutorial) }
         binding.aboutRow.settingTitle.setText(R.string.settings_about)
         binding.aboutRow.settingValue.text = getString(R.string.settings_version, BuildConfig.VERSION_NAME)
         binding.aboutRow.root.setOnClickListener { findNavController().navigate(R.id.action_settings_to_about) }

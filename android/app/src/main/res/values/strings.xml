@@ -418,4 +418,30 @@
     <string name="about_title">About Pix</string>
     <string name="about_version">Version</string>
     <string name="about_licenses">Open-source licenses</string>
+
+    <string name="settings_tutorial">Show the tutorial</string>
+    <string name="tutorial_skip">Skip</string>
+    <string name="tutorial_next">Next</string>
+    <string name="tutorial_start">Start</string>
+    <string name="tutorial_page">Slide %1$d of %2$d</string>
+    <string name="tutorial_settings">Change the language and the guide\'s look</string>
+    <string name="tutorial_together">Show a friend your camera live</string>
+    <string name="tutorial_guide">Add a photo or AI pose guide</string>
+    <string name="tutorial_shutter">Only the photo is saved, never the guide</string>
+    <string name="tutorial_switch">Change to the front camera</string>
+    <string name="tutorial_upload">Pix traces the person in your photo</string>
+    <string name="tutorial_generate">AI makes four poses for this place</string>
+    <string name="tutorial_saved">Use a saved guide again</string>
+    <string name="tutorial_move">Drag to move, pinch to resize</string>
+    <string name="tutorial_edit">The guide moves only while this is on</string>
+    <string name="tutorial_fade">Fade it or hide it</string>
+    <string name="tutorial_save">Save it to use again</string>
+    <string name="tutorial_scene">Poses start from this photo</string>
+    <string name="tutorial_describe">Write the pose you want</string>
+    <string name="tutorial_suggest">Or let AI suggest four</string>
+    <string name="tutorial_friend_title">On your friend\'s phone</string>
+    <string name="tutorial_friend_zoom">Pinch to zoom the photographer\'s camera</string>
+    <string name="tutorial_friend_brightness">Change the brightness</string>
+    <string name="tutorial_friend_move">Move the guide yourself</string>
+    <string name="tutorial_friend_guide">Choose a guide from this phone</string>
 </resources>

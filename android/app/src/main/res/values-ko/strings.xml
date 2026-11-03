@@ -405,4 +405,30 @@
     <string name="about_title">앱 정보</string>
     <string name="about_version">버전</string>
     <string name="about_licenses">오픈소스 라이선스</string>
+
+    <string name="settings_tutorial">튜토리얼 다시 보기</string>
+    <string name="tutorial_skip">건너뛰기</string>
+    <string name="tutorial_next">다음</string>
+    <string name="tutorial_start">시작하기</string>
+    <string name="tutorial_page">%2$d장 중 %1$d번째 슬라이드</string>
+    <string name="tutorial_settings">언어와 가이드 모양을 바꿔요</string>
+    <string name="tutorial_together">친구에게 카메라를 실시간으로 보여줘요</string>
+    <string name="tutorial_guide">사진이나 AI 포즈로 가이드를 더해요</string>
+    <string name="tutorial_shutter">가이드 없이 사진만 저장돼요</string>
+    <string name="tutorial_switch">전면 카메라로 바꿔요</string>
+    <string name="tutorial_upload">사진 속 사람의 윤곽을 따요</string>
+    <string name="tutorial_generate">이 장소에 맞는 포즈 4개를 AI가 만들어요</string>
+    <string name="tutorial_saved">저장한 가이드를 다시 써요</string>
+    <string name="tutorial_move">끌어서 옮기고, 두 손가락으로 크기 조절</string>
+    <string name="tutorial_edit">이 버튼이 켜져 있을 때만 가이드가 움직여요</string>
+    <string name="tutorial_fade">흐리게 하거나 숨길 수 있어요</string>
+    <string name="tutorial_save">저장해서 다시 써요</string>
+    <string name="tutorial_scene">이 사진으로 포즈를 만들어요</string>
+    <string name="tutorial_describe">원하는 포즈를 적어요</string>
+    <string name="tutorial_suggest">비워 두면 AI가 제안해요</string>
+    <string name="tutorial_friend_title">친구 폰에서는</string>
+    <string name="tutorial_friend_zoom">두 손가락으로 찍는 사람의 카메라를 확대해요</string>
+    <string name="tutorial_friend_brightness">밝기를 조절해요</string>
+    <string name="tutorial_friend_move">가이드를 직접 옮겨요</string>
+    <string name="tutorial_friend_guide">내 폰에서 가이드를 골라요</string>
 </resources>

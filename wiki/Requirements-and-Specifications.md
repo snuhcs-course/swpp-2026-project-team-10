@@ -43,6 +43,7 @@
 | 2.20 | 2026-11-02 | The settings screen (Iter3-P23, [#123]): Flow 7 drawn (6.10, Figure 7) and its row out of 6.8, which keeps the tutorial; the gear on Camera (6.2, Figures 1, 2, and 4); the guide's choices (FR-3.10), the gear (FR-10.1), the latency indicator as built (FR-10.3), and the notifications, the AI agreement withdrawn, the account, and *About Pix* (FR-10.5, FR-4.2, F10). |
 | 2.21 | 2026-11-02 | After Codex's review of PR #163: a black outline on *Reference confirm* lies on a light neutral background (FR-3.10). |
 | 2.22 | 2026-11-03 | The description filter (Iter3-A7, [#165]; FR-4.12): the server refuses a harmful or manipulative description or pose before any AI model reads it, shown like the AI service's own refusal (FR-4.7, US-5). |
+| 2.23 | 2026-11-03 | The first-use tutorial (Iter3-P23, [#123]): five slides of the app's screens with what each control does, a moment after the camera preview shows, so nothing comes before it (FR-1.1, FR-10.4); *Show the tutorial* on Settings; the row out of 6.8 (6.10, Figure 7). |
 
 Items marked **TBD** need a team decision.
 
@@ -318,7 +319,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-10.1 | A settings screen holds the language, the guide's color and thickness (FR-3.10), a latency indicator for sessions, and how-to-use help. It opens from a gear on Camera's top bar, which is hidden during a session and the scene photo (Iter3-P23). | Must | It 3 |
 | FR-10.2 | The UI is available in English and Korean. It follows the phone's language by default, and the settings screen can switch it. | Must | It 3 |
 | FR-10.3 | A setting shows a latency indicator on both phones during a session, with the live view's current delay. As built (Iter3-P23): the link's delay, half the round trip of the pings both phones send every 2 s, averaged over the last three, with a green, yellow, or red dot up to 150 ms, up to 300 ms, and above; the video's own delay is measured for NFR-5 as before. *Why:* it needs no new message, and both phones show the same number. | Should | It 3 |
-| FR-10.4 | A short tutorial runs the first time Pix opens. The settings screen can start it again and has a how-to-use help. | Should | It 3 |
+| FR-10.4 | A short tutorial runs the first time Pix opens: five slides of the app's screens, each with what its controls do, which run no camera, server, or session. It comes a moment after the camera preview shows and not during a session, and closing it counts as having seen it. The settings screen can start it again and has a how-to-use help. | Should | It 3 |
 | FR-10.5 | The settings screen shows whether Pix's notifications are on and opens the phone's notification settings for Pix; shows whether the AI agreement of FR-4.2 is given and withdraws it after a confirmation; shows the Pix ID and opens *Account*, or *Friends* when signed out; and shows the version and the open-source licenses (*About Pix*). (Added with Iter3-P23.) | Should | It 3 |
 
 ### 4.4 User stories and acceptance criteria
@@ -755,7 +756,6 @@ These screens follow from the requirements above but are not yet in the wirefram
 |---|---|---|
 | Camera permission denied | Explain why the camera is needed; *Open settings*. Built in Iteration 1; the wireframe is still to be drawn. | FR-1.2 |
 | Subject view, control blocked | Disabled remote controls with the reason. Could item, Iteration 3. | FR-7.5 |
-| First-use tutorial | The tutorial on first use, which Settings can start again. Iteration 3. The settings screen is drawn in Flow 7 (6.10). | FR-10.4 |
 | Show QR, Scan QR, Connected | The QR code and hotspot status; the scanner; both phones confirm with *Resume*. Iteration 3. | FR-9.1–9.4 |
 | Prompt history | Past descriptions on *Generate poses*, the toggle between all and with this person, and ✕ to delete. Iteration 3. | FR-4.11 |
 
@@ -772,7 +772,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 
 ![Wireflow 7: settings](images/flow7_settings.jpg)
 
-*Figure 7. Camera → Settings → Settings, scrolled to its end → How to use Pix, and → About Pix (Iter3-P23). The first-use tutorial and the row that starts it again come later (6.8).*
+*Figure 7. Camera → Settings → Settings, scrolled to its end → How to use Pix, → About Pix, and → the tutorial (Iter3-P23).*
 
 <details><summary>한국어</summary>
 
@@ -782,8 +782,9 @@ These screens follow from the requirements above but are not yet in the wirefram
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Settings** | Back and "Settings"; *Guide*: a preview of a person's outline in the chosen look over a sky-to-ground gradient, "Color" with five dots (white, black, yellow, mint, pink), the chosen one ringed, and "Thickness" with *Thin* · *Normal* · *Thick*; *Shoot together*: "Show the delay" with a switch, off by default; *General*: *Language* with the choice ("Phone's language", "English", or "한국어") and *Notifications* with "On" or "Off"; *Privacy*: *AI pose generation* with "Agreed" or "Not agreed" and a line on what agreeing means; *Account*: *Pix account* with the Pix ID or "Not signed in"; *Help*: *How to use Pix* and *About Pix* with "Version 0.1.0". | A color or a thickness → applied at once to the preview and to every guide on this phone (FR-3.10) · The switch or its row → the delay shows during sessions (FR-10.3) · *Language* → a choice of the phone's language, English, or 한국어; a new one redraws Pix in it, Settings still open (FR-10.2) · *Notifications* → the phone's notification settings for Pix · *AI pose generation*, when agreed → "Withdraw your agreement?" with *Withdraw* and *Cancel*; *Withdraw* → "Not agreed", and Pix asks again before the next scene photo (FR-4.2) · *Pix account* → *Account*, or *Friends* when signed out · *How to use Pix* → How to use Pix · *About Pix* → About Pix · Back → Camera. | Without an agreement, *AI pose generation* only says "Not agreed" and opens nothing. A choice that cannot be stored is kept until Pix closes. |
+| **Settings** | Back and "Settings"; *Guide*: a preview of a person's outline in the chosen look over a sky-to-ground gradient, "Color" with five dots (white, black, yellow, mint, pink), the chosen one ringed, and "Thickness" with *Thin* · *Normal* · *Thick*; *Shoot together*: "Show the delay" with a switch, off by default; *General*: *Language* with the choice ("Phone's language", "English", or "한국어") and *Notifications* with "On" or "Off"; *Privacy*: *AI pose generation* with "Agreed" or "Not agreed" and a line on what agreeing means; *Account*: *Pix account* with the Pix ID or "Not signed in"; *Help*: *How to use Pix*, *Show the tutorial*, and *About Pix* with "Version 0.1.0". | A color or a thickness → applied at once to the preview and to every guide on this phone (FR-3.10) · The switch or its row → the delay shows during sessions (FR-10.3) · *Language* → a choice of the phone's language, English, or 한국어; a new one redraws Pix in it, Settings still open (FR-10.2) · *Notifications* → the phone's notification settings for Pix · *AI pose generation*, when agreed → "Withdraw your agreement?" with *Withdraw* and *Cancel*; *Withdraw* → "Not agreed", and Pix asks again before the next scene photo (FR-4.2) · *Pix account* → *Account*, or *Friends* when signed out · *How to use Pix* → How to use Pix · *Show the tutorial* → Tutorial · *About Pix* → About Pix · Back → Camera. | Without an agreement, *AI pose generation* only says "Not agreed" and opens nothing. A choice that cannot be stored is kept until Pix closes. |
 | **How to use Pix** | Back and "How to use Pix"; four cards: *Add a pose guide*, *Generate poses*, *Shoot together*, and *From the subject's phone*, each with a few sentences. | Back → Settings. | — |
+| **Tutorial** | Five slides, each an app screen dimmed with its controls ringed and a short line pointing at each: Camera; *Add a pose guide*; the guide on Camera; *Generate poses*; and *Subject view*, titled "On your friend's phone". Below them *Skip*, a dot for each slide, and *Next*, or *Start* with no *Skip* on the last. | Swipe or *Next* → the next slide · *Start*, *Skip*, or Back → where it opened from, Camera on first use or Settings, and it does not come by itself again. | — |
 | **About Pix** | Back and "About Pix"; the version; *Open-source licenses*: each library and font in the app with its license. | Back → Settings. | — |
 | **Camera and Subject view, with the delay** | During a session with *Show the delay* on: "Delay 120 ms" in the top bar with a green, yellow, or red dot, and "Delay –" before the first number and while reconnecting; on Camera it gives way to the scene photo's title (not drawn). | — | — |
 

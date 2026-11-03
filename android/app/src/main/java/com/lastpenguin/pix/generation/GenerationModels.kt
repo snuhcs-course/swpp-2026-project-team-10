@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -32,7 +32,8 @@ sealed interface PoseRequest {
 /** One pose of a set: [id] names its slot (`pose-1` … `pose-4`), [text] is what the image model is asked for. */
 data class PlannedPose(val id: String, val text: String)
 
-enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, SERVER }
+/** Why a candidate failed (Design 2.5.3): [NO_PERSON] is the server finding no one in the scene photo (FR-4.13). */
+enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, NO_PERSON, SERVER }
 
 /** What a run reports: the poses of the set once, then one result per pose. */
 sealed interface GenerationEvent {

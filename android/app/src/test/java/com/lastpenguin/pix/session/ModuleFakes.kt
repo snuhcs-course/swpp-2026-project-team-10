@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -403,5 +404,22 @@ class FakePoseCandidateCodec(private val decodeAs: () -> Bitmap = { fakeBitmap()
         if (format != "fake" || !decodes) return null
         decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
         return decodeAs()
+    }
+}
+
+/**
+ * Finds a person in every scene photo unless a test sets [found]; with a [gate], the answer waits until the test
+ * completes it, and with [failure], the check throws it. Records the photos it looked at.
+ */
+class FakePersonDetector(var found: Boolean = true) : PersonDetector {
+    val checked = mutableListOf<Bitmap>()
+    var gate: CompletableDeferred<Unit>? = null
+    var failure: Exception? = null
+
+    override suspend fun findsPerson(scene: Bitmap): Boolean {
+        checked += scene
+        gate?.await()
+        failure?.let { throw it }
+        return found
     }
 }

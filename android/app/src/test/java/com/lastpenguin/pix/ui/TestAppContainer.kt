@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -33,6 +33,7 @@ import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakeGuideReferenceCodec
+import com.lastpenguin.pix.session.FakePersonDetector
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
@@ -86,6 +87,9 @@ class TestAppContainer(
     val history = PromptHistory.InMemory()
     val maker = ScriptedGuideMaker()
     val generator = ScriptedPoseGenerator()
+
+    /** Finds a person in every scene photo unless a test says otherwise (FR-4.13). */
+    val persons = FakePersonDetector()
     val tipper = ScriptedPoseTipper()
 
     val tips = PoseTips(tipper, guides.guide, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
@@ -131,6 +135,7 @@ class TestAppContainer(
         referenceGuideMaker = maker,
         savedGuideStore = saved,
         poseGenerator = generator,
+        personDetector = persons,
         poseTipper = tipper,
         poseTips = tips,
         generationConsent = consent,

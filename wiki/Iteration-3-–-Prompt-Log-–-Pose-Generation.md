@@ -78,6 +78,10 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 11-03] "can you try the test again? just for one image"
 - [Jaewan, 11-03] "wouldn't this be filtered by jev for 'does it try to manipulate the models'"
 - [Jaewan, 11-03] "can we also update the design documentation's system architecture part to contain this decision model filter layer?"
+- [Jaewan, 11-03] "Now let's do the mlkit human check part. also make the image edit model not generate if it doesn't detect a human in the scene photo"
+- [Jaewan, 11-03] "wait. first stop the emulator"
+- [Jaewan, 11-03] "now how much does it cost for one pose generation in total?"
+- [Jaewan, 11-03] "commit and push this and create the PR"
 
 **Prompt history (11/02)**
 

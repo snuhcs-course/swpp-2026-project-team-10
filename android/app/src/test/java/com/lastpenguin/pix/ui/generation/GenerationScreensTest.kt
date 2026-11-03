@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -62,7 +62,8 @@ import org.robolectric.annotation.GraphicsMode
  * pose, so Use this pose works at once and takes the pose swiped to (to Reference confirm); a pose selected before
  * the screen opens is the one shown; Try other poses (back to Generate poses), system back; in a session, the hint
  * that the subject sees the poses too, and the subject's pick that comes first, which opens Reference confirm with its
- * candidate (Design 2.6.5). Couldn't create poses: Try again, a rejected description with Edit description, Back to
+ * candidate (Design 2.6.5). Couldn't create poses: Try again, a rejected description with Edit description, a scene in
+ * which the server found no one with Shoot again (FR-4.13), Back to
  * camera. The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1), the
  * thumbnails, the slots, and the pages in that shape; the four slots of a 9:16 scene whole on screen, centered, and
  * those of 3:4 and 1:1 as wide as half the screen as before; a candidate whose ratio the model rounded shown whole.
@@ -749,6 +750,32 @@ class GenerationScreensTest {
             assertTrue(state.descriptionRejected)
         }
         assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun noPersonInThePhoto_offersToShootAgain() {
+        val modules = modules()
+        val (s, nav) = launchPrepared<GenerationFailedFragment>(R.id.generationFailedFragment) {
+            failed(modules, it, GenerationError.NO_PERSON)
+        }
+        scenario = s
+
+        s.onFragment { fragment ->
+            val binding = FragmentFailureBinding.bind(fragment.requireView())
+            assertEquals(string(R.string.generation_no_person_message), binding.failureMessage.text.toString())
+            assertEquals(string(R.string.shoot_again), binding.primaryButton.text.toString())
+            assertEquals(string(R.string.back_to_camera), binding.secondaryButton.text.toString())
+            binding.primaryButton.performClick()
+        }
+        idle()
+
+        // The camera takes a new scene photo; the old one and the set are gone.
+        s.onFragment {
+            val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
+            assertEquals(GenerationUiState(phase = GenerationUiState.Phase.FRAMING), state)
+        }
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+        assertEquals(1, modules.generator.runs.size)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -12,7 +12,7 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
 import com.lastpenguin.pix.ui.PixViewModels
 
-/** Couldn't create poses (R&S 6.3, FR-4.7, US-5). Owner: Server/AI/Sync (#7). */
+/** Couldn't create poses (R&S 6.3, FR-4.7, FR-4.13, US-5). Owner: Server/AI/Sync (#7). */
 class GenerationFailedFragment : Fragment(R.layout.fragment_failure) {
 
     private val viewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
@@ -31,7 +31,15 @@ class GenerationFailedFragment : Fragment(R.layout.fragment_failure) {
         binding.failurePhoto.isVisible = true
         binding.failurePhotoImage.setImageBitmap(scene)
 
-        if (state.descriptionRejected) {
+        if (state.noPerson) {
+            // The server found no one in the photo (FR-4.13): only another photo helps.
+            binding.failureMessage.setText(R.string.generation_no_person_message)
+            binding.primaryButton.setText(R.string.shoot_again)
+            binding.primaryButton.setOnClickListener {
+                viewModel.beginScene()
+                findNavController().popBackStack(R.id.cameraFragment, false)
+            }
+        } else if (state.descriptionRejected) {
             // The service refused the description: the same one again would be refused too (US-5).
             binding.failureMessage.text = getString(R.string.description_rejected_message, state.description.trim())
             binding.primaryButton.setText(R.string.edit_description)

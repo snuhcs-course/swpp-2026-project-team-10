@@ -132,6 +132,8 @@
     <string name="use_this_photo">Use this photo</string>
     <string name="shoot_again">Shoot again</string>
     <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>
+    <string name="scene_no_person_title">No one in this photo</string>
+    <string name="scene_no_person_body">Poses need a person. Frame them and shoot again.</string>
     <string name="your_photo">Your photo</string>
     <string name="describe_title">Generate poses</string>
     <string name="describe_label">Describe the pose</string>
@@ -139,6 +141,7 @@
     <string name="description_counter" translatable="false">%1$d/%2$d</string>
     <string name="description_refused">The last set was refused. Try a different description, or another photo.</string>
     <string name="description_rejected_message">The AI service would not create poses for “%1$s” with this photo. Try a different description, or go back to the camera and take another photo.</string>
+    <string name="generation_no_person_message">The AI service found no one in this photo. Take another photo with the person in it.</string>
     <string name="edit_description">Edit description</string>
     <!-- The descriptions used before on Generate poses (FR-4.11): the section, its All / With <name> switch, the line
          shown when nothing was used with that friend, and the ✕ of an entry, for TalkBack. -->

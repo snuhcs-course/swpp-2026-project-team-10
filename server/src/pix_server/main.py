@@ -41,6 +41,7 @@ from pix_server.invitations.router import router as invitations_router
 from pix_server.poses.description_filter import DescriptionFilter
 from pix_server.poses.generator import PoseGenerator
 from pix_server.poses.limiter import PoseLimiter
+from pix_server.poses.person_check import PersonCheck
 from pix_server.poses.router import router as poses_router
 from pix_server.poses.suggester import PoseSuggester
 from pix_server.poses.tips import PoseTipper
@@ -136,6 +137,7 @@ def create_app(
                 app.state.pose_suggester = PoseSuggester(config, http)
                 app.state.pose_tipper = PoseTipper(config, http)
                 app.state.description_filter = DescriptionFilter(config, http)
+                app.state.person_check = PersonCheck(config, http)
                 app.state.google = google or GoogleTokenVerifier(config.google_client_id, google_http, clock)
                 account = load_service_account(config.fcm_credentials_file)
                 app.state.push = PushSender(account, fcm_http, clock, config.fcm_timeout_seconds)

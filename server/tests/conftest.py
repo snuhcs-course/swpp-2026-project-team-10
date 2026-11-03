@@ -68,25 +68,29 @@ class ImageApi:
     """Stands in for OpenRouter. The Image API records each request in `requests` and answers with `status` and
     `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
     `suggestion_status` and `suggestion_body` after `suggestion_delay`, except tip requests (the `tip` schema), which
-    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. The Decisions API, the description
-    filter's, records its requests in `filter_requests` and answers with `filter_status` and `filter_body` after
-    `filter_delay`, by default probabilities that let every description through. `cancelled` is set when a call is
-    cancelled while it waits for its answer."""
+    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. The Decisions API records the
+    description filter's requests in `filter_requests` and answers with `filter_status` and `filter_body` after
+    `filter_delay`, by default probabilities that let every description through; the person check's (the `person`
+    question) go to `person_requests` and get `person_status` and `person_body` after `person_delay`, by default a
+    person found. `cancelled` is set when a call is cancelled while it waits for its answer."""
 
     def __init__(self) -> None:
         self.requests: list[httpx2.Request] = []
         self.suggestion_requests: list[httpx2.Request] = []
         self.tip_requests: list[httpx2.Request] = []
         self.filter_requests: list[httpx2.Request] = []
+        self.person_requests: list[httpx2.Request] = []
         self.delay = 0.0
         self.suggestion_delay = 0.0
         self.tip_delay = 0.0
         self.filter_delay = 0.0
+        self.person_delay = 0.0
         self.cancelled = asyncio.Event()
         self.returns(encode_image())
         self.suggests(SUGGESTED_POSES)
         self.tips(TIP)
         self.judges(malicious=0.02, injection=0.02)
+        self.sees(person=0.97)
 
     def returns(self, image: bytes) -> None:
         self.status = 200
@@ -137,6 +141,24 @@ class ImageApi:
         self.filter_status = status
         self.filter_body = {"error": {"code": status, "message": message}}
 
+    def sees(self, person: float) -> None:
+        """The person check's probability of yes, in the Decisions API's shape."""
+        self.person_status = 200
+        self.person_body: object = {
+            "id": "gen-dec-test",
+            "model": "typesafe/jev-1.14-20261014",
+            "answers": {"person": {"type": "noul", "noul": person}},
+            "usage": {"input_tokens": 1200, "output_tokens": 0, "cost": 0.0001},
+        }
+
+    def person_fails(self, status: int, message: str = "Provider returned error") -> None:
+        self.person_status = status
+        self.person_body = {"error": {"code": status, "message": message}}
+
+    @property
+    def person_payloads(self) -> list[dict]:
+        return [json.loads(request.content) for request in self.person_requests]
+
     @property
     def filter_payloads(self) -> list[dict]:
         return [json.loads(request.content) for request in self.filter_requests]
@@ -154,6 +176,10 @@ class ImageApi:
         return [json.loads(request.content) for request in self.tip_requests]
 
     async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/api/alpha/decisions" and "person" in json.loads(request.content)["questions"]:
+            self.person_requests.append(request)
+            await self.wait(self.person_delay)
+            return httpx2.Response(self.person_status, json=self.person_body)
         if request.url.path == "/api/alpha/decisions":
             self.filter_requests.append(request)
             await self.wait(self.filter_delay)

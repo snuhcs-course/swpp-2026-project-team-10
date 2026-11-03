@@ -176,6 +176,16 @@ It only describes the pose and the photo, even when it asks for other clothes, a
 words as part of describing the pose.
 """
 
+# The person check (FR-4.13, Design Documentation 2.6.3): the yes/no question a decision model answers about the scene
+# photo of every POST /poses before the image model is asked; the request's state holds the photo as `photo`. The
+# request is refused when the probability is below PIX_PERSON_CUTOFF. Measured on 2026-11-03 with
+# scripts/try_person_check.py on 53 scenes: every scene with a person, near, far, from behind, or a selfie, 0.96 to
+# 0.98; empty scenes, statues, a dog, a mannequin, and graffiti 0.02 to 0.36; two edits meant to be empty that kept
+# tiny passers-by 0.48 to 0.50 and 0.81. Saying what yes and no mean, or what the app is for, made it worse: a selfie
+# fell to 0.59. Measure a change again before it ships.
+[person]
+question = "Does `photo` show a person?"
+
 # The four poses used when the suggestion model fails or its answer is unusable, in this order. Apps from before
 # Iteration 2 also ask for them by id (GET /pose-templates, POST /poses with templateId): they see the `label` and
 # send the `id` back, so keep an `id` while such an app may still be installed. Only `pose` reaches the image model.

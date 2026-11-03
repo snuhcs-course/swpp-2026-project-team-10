@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.content.Context
 import android.util.Log
+import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -10,10 +11,11 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.lastpenguin.pix.session.Role
-import com.lastpenguin.pix.session.SessionPartner
+import com.lastpenguin.pix.session.StartedDescription
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -94,12 +97,12 @@ internal fun List<PromptEntry>.recording(text: String, role: Role, partnerId: St
 internal fun List<PromptEntry>.without(text: String): List<PromptEntry> = filter { it.text != text }
 
 /**
- * Subject: each set the photographer's phone started from a shared *Generate poses* ([started], its description) is
- * this phone's history too, with the session's friend from [partner] (Design 2.6.5). Followed on [scope] for the life
- * of the app, because the set can start while Subject view, not *Generate poses*, is in front.
+ * Subject: each set the photographer's phone started from a shared *Generate poses* ([started]: its description, and
+ * the session's friend as the start found it) is this phone's history too (Design 2.6.5). Followed on [scope] for the
+ * life of the app, because the set can start while Subject view, not *Generate poses*, is in front.
  */
-fun PromptHistory.followSubjectSets(started: Flow<String>, partner: () -> SessionPartner?, scope: CoroutineScope): Job =
-    scope.launch { started.collect { text -> record(text, Role.SUBJECT, partner()?.userId) } }
+fun PromptHistory.followSubjectSets(started: Flow<StartedDescription>, scope: CoroutineScope): Job =
+    scope.launch { started.collect { record(it.text, Role.SUBJECT, it.partner?.userId) } }
 
 private val Context.promptHistoryStore by preferencesDataStore(
     name = "prompt_history",
@@ -108,24 +111,31 @@ private val Context.promptHistoryStore by preferencesDataStore(
 )
 
 /**
- * Kept in Jetpack DataStore (Design 1.2), as one JSON list. A storage error leaves the entries as they were read last,
- * and a change that cannot be written is logged and lost.
+ * Kept in Jetpack DataStore (Design 1.2), as one JSON list, in `datastore/prompt_history.preferences_pb`, which
+ * `data_extraction_rules.xml` keeps out of backups and transfers (NFR-13). A read that fails shows the entries read
+ * last and is read again after [READ_RETRY_MS], so a change written meanwhile still shows; a change that cannot be
+ * written is logged and lost.
  */
 class DataStorePromptHistory(
-    context: Context,
+    private val store: DataStore<Preferences>,
     scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : PromptHistory {
 
-    private val store = context.applicationContext.promptHistoryStore
+    constructor(context: Context, scope: CoroutineScope, clock: () -> Long = System::currentTimeMillis) :
+        this(context.applicationContext.promptHistoryStore, scope, clock)
+
     private val json = Json { ignoreUnknownKeys = true }
 
     override val entries: StateFlow<List<PromptEntry>> = store.data
         .map(::read)
-        .catch { error ->
-            Log.w(TAG, "Could not read the prompt history", error)
-            emit(emptyList())
+        .retryWhen { error, _ ->
+            if (error !is IOException) throw error
+            Log.w(TAG, "Could not read the prompt history; reading it again", error)
+            delay(READ_RETRY_MS)
+            true
         }
+        .catch { error -> Log.e(TAG, "The prompt history can no longer be read", error) }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     override suspend fun record(text: String, role: Role, partnerId: String?) {
@@ -151,8 +161,9 @@ class DataStorePromptHistory(
     private fun read(preferences: Preferences): List<PromptEntry> =
         preferences[ENTRIES]?.let { runCatching { json.decodeFromString<List<PromptEntry>>(it) }.getOrNull() }.orEmpty()
 
-    private companion object {
-        const val TAG = "PixPoses"
+    companion object {
+        private const val TAG = "PixPoses"
+        const val READ_RETRY_MS = 1_000L
         val ENTRIES = stringPreferencesKey("entries")
     }
 }

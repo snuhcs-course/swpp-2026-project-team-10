@@ -197,11 +197,15 @@
                         android:layout_height="wrap_content"
                         android:text="@string/history_all" />
 
+                    <!-- A name may have 30 characters: cut short, so All stays on the screen beside it. -->
                     <Button
                         android:id="@+id/historyWithPartner"
                         style="@style/Widget.Pix.Button.Segment.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="160dp"
                         tools:text="With Junhyeong" />
                 </LinearLayout>
             </LinearLayout>

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -250,13 +250,9 @@ class AppContainer(
             val poseTipper: PoseTipper = RemotePoseTipper(pixApi, language = { screenLanguage.value })
             val descriptionSyncer = DescriptionSyncer(rtcSessionManager, JpegPoseCandidateCodec())
             // As the subject, each set the photographer starts is this phone's history too (FR-4.11), whichever
-            // screen is in front; the friend is the session's at that moment.
+            // screen is in front.
             val promptHistory = DataStorePromptHistory(appContext, appScope)
-            promptHistory.followSubjectSets(
-                descriptionSyncer.started,
-                partner = { (rtcSessionManager.state.value as? SessionState.Connected)?.partner },
-                scope = appScope,
-            )
+            promptHistory.followSubjectSets(descriptionSyncer.started, appScope)
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),

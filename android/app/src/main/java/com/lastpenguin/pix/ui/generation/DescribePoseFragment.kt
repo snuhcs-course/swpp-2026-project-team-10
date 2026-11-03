@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -212,6 +212,8 @@ class DescriptionForm(
      * puts the switch back on the whole history.
      */
     fun showHistory(entries: List<PromptEntry>, partner: SessionPartner?) {
+        // The screens call this with every state, most of them keystrokes: the chips are only built for a change.
+        if (entries == usedBefore && partner == this.partner) return
         usedBefore = entries
         if (this.partner?.userId != partner?.userId) showingAll = true
         this.partner = partner

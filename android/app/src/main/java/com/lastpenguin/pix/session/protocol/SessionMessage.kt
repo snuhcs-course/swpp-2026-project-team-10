@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -186,14 +186,15 @@ sealed interface SessionMessage {
      * The photographer's *Generate poses* [descriptionId] as the subject's copy follows it (Design 2.5.1, 2.6.5,
      * Iter3-P16): with OPEN, the description's [text], the phone whose field holds it ([writer]; null while nobody
      * types), and whether the service refused the last set's description ([rejected]). It ends once, with STARTED
-     * when a set starts from it, or CLOSED.
+     * when a set starts from it, or CLOSED. With STARTED, [text] is the set's description as its request has it,
+     * empty for suggested poses (FR-4.11); a photographer of an older version sends none, so it is null then.
      */
     @Serializable
     @SerialName("pose.description")
     data class PoseDescription(
         val descriptionId: String,
         val step: DescriptionStep,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val text: String = "",
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val text: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val writer: Role? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val rejected: Boolean = false,
     ) : SessionMessage

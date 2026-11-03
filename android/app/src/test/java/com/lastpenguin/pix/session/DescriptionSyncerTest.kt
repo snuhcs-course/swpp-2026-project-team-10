@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.DescriptionStep
@@ -46,14 +46,14 @@ class DescriptionSyncerTest {
 
     private fun TestScope.syncer() = DescriptionSyncer(session, codec, StandardTestDispatcher(testScheduler))
 
-    private fun connectedAs(role: Role) {
-        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role))
+    private fun connectedAs(role: Role, partner: SessionPartner? = null) {
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role, partner))
     }
 
     /** What went out, in order: descriptions by step, text, and writer, and the photo. */
     private fun sentOrder(): List<String> = session.sent.mapNotNull {
         when (it) {
-            is SessionMessage.PoseDescription -> listOfNotNull(it.step.name, it.text.ifEmpty { null }, it.writer?.name)
+            is SessionMessage.PoseDescription -> listOfNotNull(it.step.name, it.text?.ifEmpty { null }, it.writer?.name)
                 .joinToString(" ")
 
             is SessionMessage.PoseSceneBegin -> "scene"
@@ -62,7 +62,7 @@ class DescriptionSyncerTest {
         }
     }
 
-    private fun deliver(step: DescriptionStep, text: String = "", writer: Role? = null, id: String = "d1") {
+    private fun deliver(step: DescriptionStep, text: String? = null, writer: Role? = null, id: String = "d1") {
         session.deliver(SessionMessage.PoseDescription(id, step, text, writer))
     }
 
@@ -88,8 +88,8 @@ class DescriptionSyncerTest {
     }
 
     /** A subject's syncer holding d1 with its photo. */
-    private fun TestScope.open(): DescriptionSyncer {
-        connectedAs(Role.SUBJECT)
+    private fun TestScope.open(partner: SessionPartner? = null): DescriptionSyncer {
+        connectedAs(Role.SUBJECT, partner)
         val syncer = syncer()
         syncer.startAsReceiver(backgroundScope)
         runCurrent()
@@ -139,6 +139,16 @@ class DescriptionSyncerTest {
         runCurrent()
 
         assertEquals(listOf("OPEN wave", "scene", "OPEN wave  hello", "STARTED wave hello"), sentOrder())
+
+        // Skip after typing: the set has no description, and the start says so with an empty text.
+        syncer.open("d2", fakeBitmap(), "lean", rejected = false)
+        runCurrent()
+        syncer.end("d2", started = true, text = "")
+        runCurrent()
+        assertEquals(
+            SessionMessage.PoseDescription("d2", DescriptionStep.STARTED, ""),
+            session.sent.filterIsInstance<SessionMessage.PoseDescription>().last(),
+        )
     }
 
     @Test
@@ -294,10 +304,10 @@ class DescriptionSyncerTest {
     }
 
     @Test
-    fun `the subject keeps the description a set started from, from the start or its copy, not a close or a blank`() =
+    fun `the subject keeps a set's description, from the start or its copy, not a close or suggested poses`() =
         runTest {
             val syncer = open()
-            val started = mutableListOf<String>()
+            val started = mutableListOf<StartedDescription>()
             backgroundScope.launch { syncer.started.collect { started += it } }
             runCurrent()
 
@@ -310,13 +320,27 @@ class DescriptionSyncerTest {
             deliver(DescriptionStep.OPEN, "lean", id = "d3")
             deliver(DescriptionStep.CLOSED, id = "d3")
             runCurrent()
-            // Suggested poses: a set without a description.
-            deliver(DescriptionStep.OPEN, "", id = "d4")
-            deliver(DescriptionStep.STARTED, id = "d4")
+            // Skip after typing: suggested poses, so the start carries an empty text, not the typed one.
+            deliver(DescriptionStep.OPEN, "lean", id = "d4")
+            deliver(DescriptionStep.STARTED, text = "", id = "d4")
             runCurrent()
 
-            assertEquals(listOf("wave hello", "jump"), started)
+            assertEquals(listOf(StartedDescription("wave hello", null), StartedDescription("jump", null)), started)
         }
+
+    @Test
+    fun `a set started in an invitation's session carries the friend the start found`() = runTest {
+        val friend = SessionPartner("u_1", "Dongje")
+        val syncer = open(partner = friend)
+        val started = mutableListOf<StartedDescription>()
+        backgroundScope.launch { syncer.started.collect { started += it } }
+        runCurrent()
+
+        deliver(DescriptionStep.STARTED, text = "wave")
+        runCurrent()
+
+        assertEquals(listOf(StartedDescription("wave", friend)), started)
+    }
 
     @Test
     fun `another description's start replaces it, and another one's end drops it without a notice`() = runTest {

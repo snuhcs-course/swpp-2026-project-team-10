@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -25,8 +25,10 @@ import org.robolectric.annotation.GraphicsMode
  * Partitions for Generate poses' form (FR-4.8, FR-4.11, US-5), on the real layout. Field: empty, typed text, a kept
  * text, 100 characters (the longest) and 101 (cut to 100), Korean. The descriptions used before: none (the section
  * hidden); one chip each in their order, without the switch outside a session; a chip's tap on a field with text; its
- * ✕; in a session, the switch between all and the friend's, nothing used with the friend yet, and the friend gone. The
- * last description rejected or not. Buttons: Generate with text, with an empty field, and Skip.
+ * ✕; in a session, the switch between all and the friend's, nothing used with the friend yet, and the friend gone; the
+ * same history again (the chips kept as they are); a friend's name of 30 characters (cut short, both halves of the
+ * switch on the screen). The last description rejected or not. Buttons: Generate with text, with an empty field, and
+ * Skip.
  * In a session (FR-6.15): the other phone's text shown, but not over this field's typing; the field, the chips, and
  * the buttons waiting while the other person types or the link is paused, and the buttons while an answer is awaited;
  * the hint; Done and the buttons ending the typing; outside a session, nothing waits.
@@ -162,6 +164,35 @@ class DescriptionFormTest {
 
         assertEquals(listOf("Jump"), forgotten)
         assertEquals("", binding.descriptionInput.text.toString())
+    }
+
+    @Test
+    fun theSameHistoryAgain_keepsTheChipsAsTheyAre() {
+        val binding = form()
+        val entries = listOf(entry("Wave"), entry("Jump"))
+        shared.showHistory(entries, partner = null)
+        val chips = binding.chips()
+
+        shared.showHistory(entries.toList(), partner = null)
+
+        assertEquals(chips, binding.chips())
+    }
+
+    @Test
+    fun aLongFriendsName_isCutShort_soBothHalvesOfTheSwitchStayOnTheScreen() {
+        val binding = form()
+        shared.showHistory(listOf(entry("Wave")), SessionPartner("u_2", "가".repeat(30)))
+        val width = 360
+        binding.root.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(2_000, View.MeasureSpec.AT_MOST),
+        )
+        binding.root.layout(0, 0, width, binding.root.measuredHeight)
+
+        val density = binding.root.resources.displayMetrics.density
+        assertTrue(binding.historyWithPartner.width <= 160 * density)
+        assertTrue(binding.historyAll.width > 0)
+        assertTrue(binding.historyFilter.right <= (binding.historyFilter.parent as View).width)
     }
 
     @Test

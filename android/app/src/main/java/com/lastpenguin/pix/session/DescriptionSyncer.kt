@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -85,6 +85,12 @@ data class MirrorDescription(
 data class DescriptionEnd(val descriptionId: String, val started: Boolean)
 
 /**
+ * Subject: a set the photographer's phone started from a description, for the prompt history (FR-4.11): [text] as the
+ * set's request had it, and [partner], the friend of an invitation's session as it was when the set started.
+ */
+data class StartedDescription(val text: String, val partner: SessionPartner?)
+
+/**
  * Shows the photographer's *Generate poses* on the subject's *Generate poses* (Design 2.5.1: pose.description,
  * pose.scene.*, pose.description.edit, pose.description.go; Design 2.6.5, *Generate poses on both phones*). One field
  * at a time holds the description: the photographer's phone, the single source of truth (AD-7), decides whose.
@@ -121,7 +127,7 @@ class DescriptionSyncer(
     ) {
         /**
          * What the subject is told of it: writer and rejected only while it is open, and the text also with STARTED,
-         * as the set was asked for it, for the subject's prompt history (FR-4.11).
+         * as the set was asked for it and empty for suggested poses, for the subject's prompt history (FR-4.11).
          */
         val message: SessionMessage.PoseDescription
             get() = when (step) {
@@ -255,14 +261,14 @@ class DescriptionSyncer(
     /** Subject: each description that ended, for the notice; kept until a screen reads it. */
     val ended: Flow<DescriptionEnd> = endings.receiveAsFlow()
 
-    private val _started = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    private val _started = MutableSharedFlow<StartedDescription>(extraBufferCapacity = 16)
 
     /**
-     * Subject: the description of each set the photographer's phone started, as its request had it, for this phone's
-     * prompt history (FR-4.11); a set of suggested poses has none. Not kept: the history follows it for the life of
-     * the app.
+     * Subject: each set the photographer's phone started from a description, with the description as its request had
+     * it and the session's friend as the start found it, for this phone's prompt history (FR-4.11); a set of
+     * suggested poses is not reported. Not kept: the history follows it for the life of the app.
      */
-    val started: Flow<String> = _started.asSharedFlow()
+    val started: Flow<StartedDescription> = _started.asSharedFlow()
 
     private val failures = Channel<String>(Channel.BUFFERED)
 
@@ -345,7 +351,7 @@ class DescriptionSyncer(
                 if (current?.descriptionId != message.descriptionId) answer()
                 _mirror.value = MirrorDescription(
                     message.descriptionId,
-                    message.text,
+                    message.text.orEmpty(),
                     message.writer,
                     message.rejected,
                     current?.takeIf { it.descriptionId == message.descriptionId }?.scene,
@@ -360,11 +366,13 @@ class DescriptionSyncer(
                     _mirror.value = null
                     val started = message.step == DescriptionStep.STARTED
                     endings.trySend(DescriptionEnd(message.descriptionId, started))
-                    // A photographer of an older version sends no text with STARTED: the copy's last text stands in.
                     if (started) {
-                        message.text.ifEmpty {
-                            current.text
-                        }.takeIf { it.isNotBlank() }?.let(_started::tryEmit)
+                        // The set's text, empty for suggested poses; a photographer of an older version sends none
+                        // with STARTED, and the copy's last text stands in. The friend is read here, not where the
+                        // history records it, because the link can drop between the two.
+                        val text = message.text ?: current.text
+                        val partner = (session.state.value as? SessionState.Connected)?.partner
+                        if (text.isNotBlank()) _started.tryEmit(StartedDescription(text, partner))
                     }
                 }
 

@@ -1,6 +1,6 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
-"""The prompts for the image, suggestion, and tip models and the default poses, read from prompts.toml (Design
-Documentation 2.6.3)."""
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+"""The prompts for the image, suggestion, and tip models, the description filter's questions, and the default poses,
+read from prompts.toml (Design Documentation 2.6.3)."""
 
 import tomllib
 from dataclasses import dataclass
@@ -13,6 +13,11 @@ PLACEHOLDER = "{pose}"
 DESCRIPTION_PLACEHOLDER = "{description}"  # in the variation prompt
 DESCRIPTION_MAX_LENGTH = 100  # the app's field stops at the same length (FR-4.8)
 POSE_COUNT = 4  # candidates per set, so poses per suggestion (FR-4.3)
+# The description filter's yes/no questions, by the names its answers come back under.
+FILTER_QUESTIONS = ("malicious", "injection")
+# Double quotation marks, typographic and full-width ones included. In a prompt each becomes a single one, so the user's
+# words cannot close the quotation marks they are placed in.
+QUOTES = str.maketrans(dict.fromkeys('"“”„‟″＂«»', "'"))
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,8 @@ class Prompts:
     tip_korean: str
     default_poses: dict[str, DefaultPose]
     selfie: SelfiePrompts
+    # The description filter's questions, as the Decisions API takes them: {name: {type, instructions, criteria}}.
+    filter_questions: dict[str, dict]
 
 
 def one_line(text: str) -> str:
@@ -75,6 +82,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         "tip_korean",
         "default_poses",
         "selfie",
+        "filter",
     }
     if unknown:
         raise ValueError(f"{path.name}: unknown keys {', '.join(sorted(unknown))}")
@@ -100,7 +108,8 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         if len(default.pose) > DESCRIPTION_MAX_LENGTH:
             raise ValueError(f"{path.name}: {where}pose must be at most {DESCRIPTION_MAX_LENGTH} characters")
         poses[default.id] = default
-    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, load_selfie(data.get("selfie"), path))
+    selfie = load_selfie(data.get("selfie"), path)
+    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, selfie, load_filter(data.get("filter"), path))
 
 
 def load_selfie(table: object, path: Path) -> SelfiePrompts:
@@ -140,20 +149,55 @@ def load_selfie(table: object, path: Path) -> SelfiePrompts:
     return SelfiePrompts(pose, suggestion, variation, tuple(defaults))
 
 
+def load_filter(table: object, path: Path) -> dict[str, dict]:
+    """The [filter] table of the prompts file: the context and the FILTER_QUESTIONS, each with its question and what yes
+    and no mean, as the Decisions API takes them (each question's instructions are the context, a space, and the
+    question). Raises ValueError like load_prompts."""
+    if not isinstance(table, dict):
+        raise ValueError(f"{path.name}: a [filter] table is needed")
+    unknown = set(table) - {"context", *FILTER_QUESTIONS}
+    if unknown:
+        raise ValueError(f"{path.name}: filter: unknown keys {', '.join(sorted(unknown))}")
+
+    def text(source: dict, key: str, where: str) -> str:
+        value = source.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{path.name}: {where}.{key} must be a non-empty string")
+        return one_line(value)
+
+    context = text(table, "context", "filter")
+    questions = {}
+    for name in FILTER_QUESTIONS:
+        where = f"filter.{name}"
+        question = table.get(name)
+        if not isinstance(question, dict):
+            raise ValueError(f"{path.name}: a [{where}] table is needed")
+        unknown = set(question) - {"question", "yes", "no"}
+        if unknown:
+            raise ValueError(f"{path.name}: {where}: unknown keys {', '.join(sorted(unknown))}")
+        questions[name] = {
+            "type": "noul",
+            "instructions": f"{context} {text(question, 'question', where)}",
+            "criteria": {"true": text(question, "yes", where), "false": text(question, "no", where)},
+        }
+    return questions
+
+
 PROMPTS = load_prompts()
 DEFAULT_POSES = PROMPTS.default_poses
 
 
 def checked_pose(pose: str, field: str = "description") -> str:
     """A pose as a request sent it, a description, a suggestion, or a default pose, the way the prompts take it: runs
-    of whitespace, line breaks included, become one space, and a pose that is blank or longer than
-    DESCRIPTION_MAX_LENGTH characters is refused, naming the request's `field`."""
+    of whitespace, line breaks included, become one space, and double quotation marks single ones (QUOTES); a pose that
+    is blank or longer than DESCRIPTION_MAX_LENGTH characters is refused, naming the request's `field`. The description
+    filter judges the pose as sent, quotation marks and all, since closing them is a way to break out of a prompt."""
     text = one_line(pose)
     if not text:
         raise ApiError(400, "INVALID_REQUEST", f"{field}: must not be blank")
     if len(text) > DESCRIPTION_MAX_LENGTH:
         raise ApiError(400, "INVALID_REQUEST", f"{field}: at most {DESCRIPTION_MAX_LENGTH} characters")
-    return text
+    return text.translate(QUOTES)
 
 
 def pose_prompt(pose: str, selfie: bool = False) -> str:

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -11,6 +11,7 @@ from fastapi import APIRouter, Form, Request, UploadFile
 from pydantic import BaseModel
 
 from pix_server.errors import ApiError
+from pix_server.poses.description_filter import DescriptionFilter
 from pix_server.poses.generator import PoseGenerator, aspect_ratio, check_scene
 from pix_server.poses.limiter import Kind, PoseLimiter
 from pix_server.poses.prompts import DEFAULT_POSES, checked_pose, pose_prompt
@@ -58,6 +59,13 @@ async def count(request: Request, kind: Kind) -> None:
         raise ApiError(429, "RATE_LIMITED", "Pix has made as many poses as it can for today; try again later")
 
 
+async def judge(request: Request, text: str, field: str = "description") -> None:
+    """Refuses with 422 REJECTED a description or pose the filter judges harmful or manipulative (Design Documentation
+    2.6.3). It runs after `count`, so a refused request uses up its window like any other that reached a model."""
+    description_filter: DescriptionFilter = request.app.state.description_filter
+    await description_filter.check(text, field)
+
+
 async def while_connected(request: Request, work: Coroutine[Any, Any, T]) -> T:
     """Runs `work` while the phone stays connected. A phone that cancels closes its connection (Design Documentation
     2.6.3); cancelling `work` then closes ours to the model, so no answer is waited for that nobody will read."""
@@ -99,6 +107,7 @@ async def suggest_poses(
     suggester: PoseSuggester = request.app.state.pose_suggester
     if description is None:
         return PoseSuggestionsResponse(poses=await suggester.suggest(scene, selfie))
+    await judge(request, description)
     return PoseSuggestionsResponse(poses=await suggester.vary(scene, description, selfie))
 
 
@@ -130,6 +139,9 @@ async def create_pose(
     scene = await image.read()
     ratio = aspect_ratio(check_scene(scene))
     await count(request, "poses")
+    if description is not None:
+        # A template is the server's own text, so only a description is judged.
+        await judge(request, description)
 
     generator: PoseGenerator = request.app.state.pose_generator
     # The image API does not bill a generation it could not deliver. A refusal keeps the generator's own message: the
@@ -154,13 +166,14 @@ async def pose_tip(
 ) -> PoseTipResponse:
     """How to hold the phone for the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate,
     and the pose it was made with, the sentence in the language of the phone's screens (Design Documentation 2.6.3)."""
-    pose = checked_pose(pose, "pose")
+    prompted = checked_pose(pose, "pose")
     scene_bytes = await scene.read()
     check_scene(scene_bytes)
     candidate_bytes = await candidate.read()
     check_scene(candidate_bytes)
     await count(request, "tips")
+    await judge(request, pose, "pose")
     tipper: PoseTipper = request.app.state.pose_tipper
     # A tip the phone stopped waiting for, because the user took another candidate, is not waited for either.
-    tip = await while_connected(request, tipper.tip(scene_bytes, candidate_bytes, pose, language))
+    tip = await while_connected(request, tipper.tip(scene_bytes, candidate_bytes, prompted, language))
     return PoseTipResponse(text=tip.text, framing=tip.framing, hold=tip.hold, height=tip.height, angle=tip.angle)

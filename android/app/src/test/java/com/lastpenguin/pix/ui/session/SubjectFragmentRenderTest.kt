@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -139,6 +139,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.GONE, binding.editGuideButton.visibility)
             assertEquals(View.GONE, binding.flashButton.visibility)
             assertEquals(View.GONE, binding.brightnessButton.visibility)
+            // The tutorial shows the pinch (FR-10.4); TalkBack hears it from the video, which has no caption under it.
+            assertEquals(string(R.string.subject_video_description), binding.liveView.contentDescription.toString())
         }
     }
 

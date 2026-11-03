@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -299,7 +299,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     /**
      * Puts the video where previewArea says for [aspect], as on the Camera screen (R&S 6.2, 6.6), and the zoom row at
-     * the bottom of its image. The caption below gets a dark gradient while it lies over the video.
+     * the bottom of its image. The bottom panel gets a dark gradient while it lies over the video.
      */
     private fun layoutVideo(binding: FragmentSubjectBinding, aspect: AspectRatio) {
         val root = binding.root
@@ -325,7 +325,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         placeZoomRow(binding)
     }
 
-    /** The zoom row at the bottom of the video as it shows (1:1 inside the 4:3 area), above the slider and caption. */
+    /** The zoom row at the bottom of the video as it shows (1:1 inside the 4:3 area), above the slider and Guide. */
     private fun placeZoomRow(binding: FragmentSubjectBinding) {
         val area = videoArea
         if (area.bottom <= area.top) return
@@ -358,7 +358,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             corner = { viewModel.uiState.value.referenceCorner },
             moveTo = viewModel::setReferenceCorner,
         )
-        // The corners follow the video's size and the slider above the caption, known only after layout.
+        // The corners follow the video's size and the slider above Guide, known only after layout.
         val relayout = View.OnLayoutChangeListener {
                 _,
                 left,
@@ -397,7 +397,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
     }
 
-    /** Inside the video's margins and above the zoom row, the slider, and the caption. */
+    /** Inside the video's margins and above the zoom row, the slider, and Guide. */
     private fun referenceArea(binding: FragmentSubjectBinding): ReferenceArea {
         val margin = (REFERENCE_MARGIN_DP * resources.displayMetrics.density).roundToInt()
         val container = binding.videoContainer

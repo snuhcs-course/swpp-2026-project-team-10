@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -78,7 +78,7 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
                         subjectName(session).takeIf { sharing }
                     }.collect { name ->
                         binding.sharedHint.isVisible = name != null
-                        if (name != null) binding.sharedHint.text = getString(R.string.reference_shared_hint, name)
+                        if (name != null) binding.sharedHint.text = getString(R.string.shared_hint, name)
                     }
                 }
                 launch {

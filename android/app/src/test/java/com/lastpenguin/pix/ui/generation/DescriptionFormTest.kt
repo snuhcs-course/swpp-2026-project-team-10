@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -168,7 +168,7 @@ class DescriptionFormTest {
         assertFalse(binding.suggestButton.isEnabled)
         assertEquals(View.VISIBLE, binding.descriptionTyping.visibility)
         assertEquals("Dongje is typing…", binding.descriptionTyping.text.toString())
-        assertEquals("Dongje sees this too and can write it with you.", binding.sharedHint.text.toString())
+        assertEquals("Dongje sees this too", binding.sharedHint.text.toString())
 
         shared.showShared("jump high", typing = null, sharedWith = "Dongje")
 

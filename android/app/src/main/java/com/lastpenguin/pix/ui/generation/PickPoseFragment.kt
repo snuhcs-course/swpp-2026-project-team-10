@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Jaewan Park, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -59,7 +59,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
                     sessionViewModel.state.collect { session ->
                         val subject = subjectName(session)
                         binding.sharedHint.isVisible = subject != null
-                        if (subject != null) binding.sharedHint.text = getString(R.string.pose_shared_hint, subject)
+                        if (subject != null) binding.sharedHint.text = getString(R.string.shared_hint, subject)
                     }
                 }
             }

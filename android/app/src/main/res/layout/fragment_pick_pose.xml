@@ -21,26 +21,13 @@
             style="@style/Widget.Pix.Header.Back"
             android:contentDescription="@string/back" />
 
-        <LinearLayout
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:accessibilityHeading="true"
-                android:text="@string/pick_pose_title"
-                android:textAppearance="@style/TextAppearance.Pix.Header" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/pick_pose_body"
-                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-        </LinearLayout>
+            android:accessibilityHeading="true"
+            android:text="@string/pick_pose_title"
+            android:textAppearance="@style/TextAppearance.Pix.Header" />
     </LinearLayout>
 
     <!--

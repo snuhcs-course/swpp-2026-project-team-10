@@ -38,8 +38,6 @@
     <string name="switch_to_rear_camera">Switch to the rear camera</string>
     <string name="gallery_unavailable">No app is available to open this photo.</string>
     <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
-    <string name="hint_add_guide">Tap Guide to add a pose</string>
-    <string name="hint_edit_guide">Drag · pinch to resize</string>
     <string name="guide">Guide</string>
     <string name="guide_add_description">Add a pose guide</string>
     <string name="guide_change_description">Change the pose guide</string>
@@ -108,14 +106,10 @@
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>
-    <string name="add_guide_body">Pix cuts the person out of a photo and shows them on your camera, so you can frame the same pose.</string>
     <string name="replace_guide_title">Replace the pose guide?</string>
-    <string name="replace_guide_body">Choose a new reference, and its guide takes the place of the current one.</string>
     <string name="keep_current_guide">Keep the current guide</string>
     <string name="upload_reference">Upload a reference</string>
-    <string name="upload_reference_body">A photo from your gallery with one person in it</string>
     <string name="generate_poses">Generate poses here</string>
-    <string name="generate_poses_body">Four pose ideas for this scene, made by AI</string>
     <string name="reference_title">Your reference</string>
     <string name="reference_preview_description">The person from the reference photo</string>
     <string name="finding_person">Finding the person…</string>
@@ -133,7 +127,6 @@
     <string name="consent_agree">Agree and continue</string>
     <string name="not_now">Not now</string>
     <string name="scene_title">Take the scene photo</string>
-    <string name="scene_body">Frame the person and the place, then press the shutter.</string>
     <string name="scene_review_title">Use this photo?</string>
     <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="use_this_photo">Use this photo</string>
@@ -141,7 +134,6 @@
     <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>
     <string name="your_photo">Your photo</string>
     <string name="describe_title">Generate poses</string>
-    <string name="describe_body">Describe a pose, or let Pix suggest four for this place</string>
     <string name="describe_label">Describe the pose</string>
     <string name="describe_hint">e.g. Leaning on the wall, one hand in a pocket</string>
     <string name="description_counter" translatable="false">%1$d/%2$d</string>
@@ -168,22 +160,19 @@
     <string name="ready_count">%1$d of %2$d ready</string>
     <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
-    <string name="pick_pose_body">Swipe to see each pose</string>
     <string name="pose_page_counter" translatable="false">%1$d / %2$d</string>
     <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
     <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
-    <string name="pose_shared_hint">%1$s sees these poses too. The first to choose decides.</string>
+    <string name="shared_hint">%1$s sees this too</string>
     <string name="peer_chose_this_pose">%1$s chose this pose</string>
     <string name="peer_chose_pose">%1$s chose a pose</string>
     <string name="peer_closed_poses">%1$s closed the poses</string>
     <string name="pose_pick_failed">Couldn\'t send your pick</string>
-    <string name="reference_shared_hint">%1$s sees this guide too. The first to use it decides.</string>
     <string name="peer_used_guide">%1$s used this guide</string>
     <string name="peer_closed_reference">%1$s closed the reference</string>
     <string name="guide_use_failed">Couldn\'t send your choice</string>
-    <string name="describe_shared_hint">%1$s sees this too and can write it with you.</string>
     <string name="peer_typing">%1$s is typing…</string>
     <string name="peer_closed_describe">%1$s closed Generate poses</string>
     <string name="describe_go_failed">Couldn\'t send your request</string>
@@ -192,7 +181,6 @@
 
     <!-- Flow 3: Friends, Add a friend (R&S 6.4) -->
     <string name="friends_overline">Friends</string>
-    <string name="friends_subtitle">Invite a friend to see your camera live</string>
     <string name="account">Account</string>
     <string name="signed_out_title">Shoot with friends</string>
     <string name="signed_out_body">Sign in to add friends by their Pix ID and invite them to shoot together.</string>
@@ -219,7 +207,6 @@
     <string name="friend_status" translatable="false">%1$s · \@%2$s</string>
     <string name="invite">Invite</string>
     <string name="invite_friend">Invite %1$s</string>
-    <string name="works_on_any_network">Works on Wi-Fi or cellular data</string>
     <string name="remove_friend_title">Remove %1$s?</string>
     <string name="remove_friend_message">You won\'t see each other in your friend lists. You can add each other again later.</string>
     <string name="remove_friend">Remove friend</string>
@@ -227,7 +214,6 @@
     <!-- Sent requests, from "Sent requests · 2" on Friends (FR-5.16). -->
     <string name="sent_requests_count">Sent requests · %1$d</string>
     <string name="sent_requests_title">Sent requests</string>
-    <string name="sent_requests_subtitle">They become your friends once they accept</string>
     <string name="no_sent_requests_title">No sent requests</string>
     <string name="no_sent_requests_body">Requests you send stay here until they\'re answered</string>
     <string name="withdraw">Withdraw</string>
@@ -304,7 +290,7 @@
 
     <!-- Flow 6: Room code -->
     <string name="room_code_title">Your room code</string>
-    <string name="room_code_body">Ask your friend to open Pix, tap Shoot together › Use a room code, and join with this code.</string>
+    <string name="room_code_body">Your friend joins by entering this code in Pix.</string>
     <string name="room_code_placeholder" translatable="false">––– –––</string>
     <string name="getting_code">Getting a code…</string>
     <string name="waiting_for_friend">Waiting for your friend…</string>
@@ -313,7 +299,7 @@
     <string name="code_expiry">Expires in 10 min</string>
     <string name="join_instead">Join with a code instead</string>
     <string name="join_title">Join with a code</string>
-    <string name="join_body">Enter the 6-digit code shown on your friend\'s camera.</string>
+    <string name="join_body">Enter the code on your friend\'s screen.</string>
     <string name="room_code_label">Room code</string>
     <string name="join">Join</string>
     <string name="session_not_found_title">Session not found</string>
@@ -324,7 +310,7 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
-    <string name="subject_caption">Pinch the video to zoom the photographer\'s camera</string>
+    <string name="subject_video_description">Pinch the video to zoom the photographer\'s camera</string>
     <string name="peer_ended_session">%1$s ended the session</string>
     <!-- The same, when the session ended before the photographer's name arrived. -->
     <string name="peer_ended_session_unnamed">The photographer ended the session</string>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -130,7 +130,7 @@ class SubjectDescribeFragmentTest {
         onScreen { binding ->
             assertNotNull(binding.sceneImage.drawable)
             assertEquals("wave", binding.descriptionInput.text.toString())
-            assertEquals(string(R.string.describe_shared_hint, "Dongje"), binding.sharedHint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Dongje"), binding.sharedHint.text.toString())
             assertTrue(binding.descriptionInput.isEnabled)
             assertTrue(binding.generateButton.isEnabled)
             assertEquals(View.GONE, binding.descriptionTyping.visibility)

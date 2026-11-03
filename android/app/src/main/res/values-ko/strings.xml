@@ -37,8 +37,6 @@
     <string name="switch_to_rear_camera">후면 카메라로 전환</string>
     <string name="gallery_unavailable">이 사진을 열 수 있는 앱이 없어요.</string>
     <string name="photo_unavailable">이 사진은 더 이상 없어요. 사진을 새로 찍으세요.</string>
-    <string name="hint_add_guide">가이드를 눌러 포즈를 추가하세요</string>
-    <string name="hint_edit_guide">드래그해 옮기기 · 두 손가락으로 크기 조절</string>
     <string name="guide">가이드</string>
     <string name="guide_add_description">포즈 가이드 추가</string>
     <string name="guide_change_description">포즈 가이드 바꾸기</string>
@@ -103,14 +101,10 @@
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">포즈 가이드 추가</string>
-    <string name="add_guide_body">사진 속 인물만 따서 카메라 화면에 띄워 줘요. 보면서 같은 포즈로 찍어 보세요.</string>
     <string name="replace_guide_title">포즈 가이드를 바꿀까요?</string>
-    <string name="replace_guide_body">새 참고 사진을 고르면 그 가이드가 지금 가이드를 대신해요.</string>
     <string name="keep_current_guide">지금 가이드 유지</string>
     <string name="upload_reference">참고 사진 올리기</string>
-    <string name="upload_reference_body">갤러리에서 인물 한 명이 나온 사진 선택</string>
     <string name="generate_poses">AI로 포즈 생성</string>
-    <string name="generate_poses_body">AI가 지금 장소에 어울리는 포즈 4개를 추천해요</string>
     <string name="reference_title">참고 사진</string>
     <string name="reference_preview_description">참고 사진 속 인물</string>
     <string name="finding_person">인물을 인식하는 중…</string>
@@ -128,7 +122,6 @@
     <string name="consent_agree">동의하고 계속</string>
     <string name="not_now">나중에</string>
     <string name="scene_title">배경 사진 촬영</string>
-    <string name="scene_body">인물과 배경이 함께 나오게 구도를 잡고 셔터를 누르세요.</string>
     <string name="scene_review_title">이 사진을 사용할까요?</string>
     <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
     <string name="use_this_photo">이 사진 사용</string>
@@ -136,7 +129,6 @@
     <string name="scene_shot_failed">사진을 촬영하지 못했어요. 다시 시도하세요.</string>
     <string name="your_photo">촬영한 사진</string>
     <string name="describe_title">포즈 생성</string>
-    <string name="describe_body">원하는 포즈를 적거나, 이 장소에 어울리는 포즈 4개를 추천받으세요</string>
     <string name="describe_label">원하는 포즈</string>
     <string name="describe_hint">예: 벽에 기대고 한 손은 주머니에</string>
     <string name="description_refused">지난 요청이 거절됐어요. 설명이나 사진을 바꿔 다시 시도하세요.</string>
@@ -162,21 +154,18 @@
     <string name="ready_count">%2$d개 중 %1$d개 완료</string>
     <string name="generating_scene_caption">인물과 배경은 그대로 · 최대 60초</string>
     <string name="pick_pose_title">포즈 선택</string>
-    <string name="pick_pose_body">옆으로 넘겨 포즈를 하나씩 살펴보세요</string>
     <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
     <string name="use_this_pose">이 포즈 사용</string>
     <string name="try_other_poses">다른 포즈 생성</string>
     <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
-    <string name="pose_shared_hint">%1$s님도 이 포즈들을 보고 있어요. 먼저 고른 쪽으로 정해져요.</string>
+    <string name="shared_hint">%1$s님도 보고 있어요</string>
     <string name="peer_chose_this_pose">%1$s님이 이 포즈를 골랐어요</string>
     <string name="peer_chose_pose">%1$s님이 포즈를 골랐어요</string>
     <string name="peer_closed_poses">%1$s님이 포즈 고르기를 닫았어요</string>
     <string name="pose_pick_failed">고른 포즈를 보내지 못했어요</string>
-    <string name="reference_shared_hint">%1$s님도 이 가이드를 보고 있어요. 먼저 사용한 쪽으로 정해져요.</string>
     <string name="peer_used_guide">%1$s님이 이 가이드를 사용했어요</string>
     <string name="peer_closed_reference">%1$s님이 참고 사진을 닫았어요</string>
     <string name="guide_use_failed">선택을 보내지 못했어요</string>
-    <string name="describe_shared_hint">%1$s님도 이 화면을 보고 함께 쓸 수 있어요.</string>
     <string name="peer_typing">%1$s님이 입력하고 있어요…</string>
     <string name="peer_closed_describe">%1$s님이 포즈 생성을 닫았어요</string>
     <string name="describe_go_failed">요청을 보내지 못했어요</string>
@@ -185,7 +174,6 @@
 
     <!-- Flow 3: Friends, Add a friend (R&S 6.4) -->
     <string name="friends_overline">친구</string>
-    <string name="friends_subtitle">친구를 초대해 카메라를 실시간으로 공유하세요</string>
     <string name="account">계정</string>
     <string name="signed_out_title">친구와 카메라 공유</string>
     <string name="signed_out_body">로그인하면 Pix ID로 친구를 추가하고 카메라 공유에 초대할 수 있어요.</string>
@@ -209,7 +197,6 @@
     <string name="in_session">카메라 공유 중</string>
     <string name="invite">초대</string>
     <string name="invite_friend">%1$s님 초대</string>
-    <string name="works_on_any_network">와이파이와 모바일 데이터 모두에서 쓸 수 있어요</string>
     <string name="remove_friend_title">%1$s님을 친구에서 삭제할까요?</string>
     <string name="remove_friend_message">서로의 친구 목록에서 사라져요. 나중에 다시 추가할 수 있어요.</string>
     <string name="remove_friend">친구 삭제</string>
@@ -217,7 +204,6 @@
     <!-- Sent requests, from "Sent requests · 2" on Friends (FR-5.16). -->
     <string name="sent_requests_count">보낸 요청 · %1$d</string>
     <string name="sent_requests_title">보낸 요청</string>
-    <string name="sent_requests_subtitle">상대가 수락하면 친구가 돼요</string>
     <string name="no_sent_requests_title">보낸 요청이 없어요</string>
     <string name="no_sent_requests_body">보낸 요청은 답을 받을 때까지 여기에 있어요</string>
     <string name="withdraw">취소</string>
@@ -294,7 +280,7 @@
 
     <!-- Flow 6: Room code -->
     <string name="room_code_title">참여 코드</string>
-    <string name="room_code_body">친구가 Pix에서 카메라 공유 › 참여 코드 사용을 누르고 이 코드를 입력하면 돼요.</string>
+    <string name="room_code_body">친구가 Pix에서 이 코드를 입력하면 돼요.</string>
     <string name="getting_code">코드 받는 중…</string>
     <string name="waiting_for_friend">친구를 기다리는 중…</string>
     <string name="friend_joined_connecting">친구가 들어왔어요 · 연결 중…</string>
@@ -302,7 +288,7 @@
     <string name="code_expiry">10분 뒤 만료</string>
     <string name="join_instead">받은 코드로 참여하기</string>
     <string name="join_title">코드로 참여</string>
-    <string name="join_body">친구 화면에 표시된 6자리 코드를 입력하세요.</string>
+    <string name="join_body">친구 화면의 코드를 입력하세요.</string>
     <string name="room_code_label">참여 코드</string>
     <string name="join">참여</string>
     <string name="session_not_found_title">참여할 수 없는 코드예요</string>
@@ -313,7 +299,7 @@
     <string name="subject_title_placeholder">상대 카메라</string>
     <string name="leave">나가기</string>
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
-    <string name="subject_caption">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요</string>
+    <string name="subject_video_description">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요</string>
     <string name="peer_ended_session">%1$s님이 카메라 공유를 끝냈어요</string>
     <string name="peer_ended_session_unnamed">상대가 카메라 공유를 끝냈어요</string>
     <string name="camera_paused">상대 카메라가 잠시 중지됐어요.</string>

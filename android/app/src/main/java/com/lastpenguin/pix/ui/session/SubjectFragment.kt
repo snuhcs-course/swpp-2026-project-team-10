@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -241,7 +241,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         val poses = poseStatus(viewModel.uiState.value).takeIf { connected }
                         binding.connectingText.isVisible = !streaming || stalled || poses != null
                         binding.liveDot.isVisible = streaming && !stalled
-                        videoShowing.value = streaming && !stalled
+                        // Not while a pose step's text covers the video, which then is not what the tips show.
+                        videoShowing.value = streaming && !stalled && poses == null
                         binding.connectingText.text = when {
                             reconnecting -> getString(R.string.reconnecting)
                             !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)

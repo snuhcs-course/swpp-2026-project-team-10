@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -234,6 +234,9 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
     }
 }
 
+/** How often [showTutorialWhenDue] checks again whether tips that are due may show. */
+internal const val RECHECK_MS = 250L
+
 /** [screen]'s tips while they are due and [ready], for [showTutorialWhenDue]. */
 internal fun SettingsViewModel.tutorialFor(
     screen: TutorialScreen,
@@ -242,8 +245,9 @@ internal fun SettingsViewModel.tutorialFor(
 
 /**
  * Shows the tips [due] names over this screen (FR-10.4), [afterMs] after it named them, so the screen shows first, and
- * only if [canShow] still holds for them then. Collect it while the screen is started: tips still up when the screen
- * goes close with it, unseen.
+ * once [canShow] holds for them: while it does not, such as under a sheet the screen stays started below, they wait
+ * for it, checked every [RECHECK_MS], since nothing in [due] changes when that screen closes. Collect it while the
+ * screen is started: tips still up when the screen goes close with it, unseen.
  */
 internal suspend fun Fragment.showTutorialWhenDue(
     due: Flow<TutorialScreen?>,
@@ -253,7 +257,8 @@ internal suspend fun Fragment.showTutorialWhenDue(
     due.distinctUntilChanged().collectLatest { screen ->
         if (screen != null) {
             delay(afterMs)
-            if (canShow(screen)) TutorialFragment.show(this, screen)
+            while (!canShow(screen)) delay(RECHECK_MS)
+            TutorialFragment.show(this, screen)
         }
     }
 }

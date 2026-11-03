@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.os.Looper
@@ -20,6 +20,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.protocol.DescriptionStep
+import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.sceneBegin
 import com.lastpenguin.pix.session.sceneChunk
@@ -261,6 +262,41 @@ class TutorialOnScreensTest {
         waitMs(500 + TutorialFragment.AFTER_PICTURE_MS)
         assertEquals(TutorialScreen.SUBJECT_VIEW, tips())
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun subjectView_whileThePhotographerCreatesPoses_holdsItsTips_untilTheVideoShowsAgain() {
+        val modules = noneSeen()
+        subjectView(modules)
+        modules.poses.startAsReceiver(receiving)
+        // The photographer starts a set as the video comes, and its text covers the video.
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, emptyList()))
+        waitMs(600)
+        waitMs(TutorialFragment.AFTER_PICTURE_MS * 2)
+        assertNull(tips())
+
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, emptyList()))
+        modules.video.deliverFrame()
+        waitMs(600)
+        waitMs(TutorialFragment.AFTER_PICTURE_MS)
+        assertEquals(TutorialScreen.SUBJECT_VIEW, tips())
+    }
+
+    @Test
+    fun subjectView_withAnotherScreenInFront_thenClosed_showsItsTips() {
+        val modules = noneSeen()
+        val nav = subjectView(modules)
+        nav.navigate(R.id.action_subject_to_addGuide)
+        connect(modules)
+        waitMs(TutorialFragment.AFTER_PICTURE_MS)
+        assertNull(tips())
+
+        nav.popBackStack()
+        modules.video.deliverFrame()
+        waitMs(RECHECK_MS + 500)
+        assertEquals(TutorialScreen.SUBJECT_VIEW, tips())
     }
 
     @Test

@@ -72,6 +72,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -143,8 +144,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.bottomPanel.addOnLayoutChangeListener(placePreview)
         // The zoom row stays above the panels over the shutter as they open and close.
         controls.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(controls) }
+        val previewStreaming = MutableStateFlow(false)
         controls.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
             Timings.mark("preview.stream", state.name)
+            previewStreaming.value = state == PreviewView.StreamState.STREAMING
             if (state == PreviewView.StreamState.STREAMING && !previewLogged) {
                 previewLogged = true
                 Timings.mark("camera.preview")
@@ -250,6 +253,26 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         sessionViewModel.state,
                         sessionViewModel.latencyMs,
                     ) { _, _, _ -> }.collect { renderLatency(controls) }
+                }
+                // Once the preview really shows: nothing comes before it (FR-1.1, FR-10.4), and READY is too early,
+                // since leaving the camera then releases it before its first frame. Not over a session, or a link's
+                // screen, which opens over Camera at a first start.
+                launch {
+                    combine(
+                        settingsViewModel.tutorialDue,
+                        previewStreaming,
+                        sessionViewModel.state,
+                    ) { due, streaming, session ->
+                        due && streaming && (session is SessionState.Idle || session is SessionState.Ended)
+                    }.collectLatest { open ->
+                        if (open) {
+                            delay(TUTORIAL_AFTER_PREVIEW_MS)
+                            val nav = findNavController()
+                            if (nav.currentDestination?.id == R.id.cameraFragment && !isScenePhotoActive()) {
+                                nav.navigate(R.id.action_camera_to_tutorial)
+                            }
+                        }
+                    }
                 }
                 // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).
                 // While the link reconnects the light is off, and the session can still be ended (Design 2.6.7).
@@ -1082,6 +1105,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     companion object {
+        /** A moment of the camera itself before the first-use tutorial covers it. */
+        const val TUTORIAL_AFTER_PREVIEW_MS = 800L
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
         private const val STILL_TIMEOUT_MS = 2_000L
         private const val FOCUS_RING_START_SCALE = 1.25f

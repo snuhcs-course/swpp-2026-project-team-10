@@ -35,7 +35,7 @@ import org.robolectric.shadows.ShadowDialog
  * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, signed out);
  * each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the account signed in and signed out;
- * notifications, How to use Pix, and About Pix opened.
+ * notifications, How to use Pix, the tutorial, and About Pix opened.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -224,11 +224,18 @@ class SettingsFragmentTest {
     }
 
     @Test
-    fun howToUse_andAbout_open() {
+    fun howToUse_theTutorial_andAbout_open() {
         launch()
 
         onScreen { it.helpRow.root.performClick() }
         assertEquals(R.id.helpFragment, nav.currentDestination?.id)
+
+        nav.popBackStack()
+        onScreen { binding ->
+            assertEquals(string(R.string.settings_tutorial), binding.tutorialRow.settingTitle.text.toString())
+            binding.tutorialRow.root.performClick()
+        }
+        assertEquals(R.id.tutorialFragment, nav.currentDestination?.id)
 
         nav.popBackStack()
         onScreen { it.aboutRow.root.performClick() }

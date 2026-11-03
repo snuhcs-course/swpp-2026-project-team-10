@@ -309,6 +309,10 @@
                     layout="@layout/item_setting_row" />
 
                 <include
+                    android:id="@+id/tutorialRow"
+                    layout="@layout/item_setting_row" />
+
+                <include
                     android:id="@+id/aboutRow"
                     layout="@layout/item_setting_row" />
             </LinearLayout>

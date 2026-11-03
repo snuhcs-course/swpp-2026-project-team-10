@@ -71,6 +71,8 @@ class TestAppContainer(
     candidateImage: () -> Bitmap = { fakeBitmap() },
     /** The screens' language for the server's text; none unless a test checks it. */
     val screenLanguages: ScreenLanguages? = null,
+    /** Whether the first-use tutorial was seen; yes unless a test is about it, so a screen test stays on its screen. */
+    tutorialSeen: Boolean? = true,
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -92,7 +94,7 @@ class TestAppContainer(
     val friends = FakeFriendsRepository()
     val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
-    val appSettings = AppSettings.InMemory()
+    val appSettings = AppSettings.InMemory(tutorial = tutorialSeen)
     val language = AppLanguage.InMemory()
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)

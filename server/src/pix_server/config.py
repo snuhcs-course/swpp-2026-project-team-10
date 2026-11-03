@@ -75,6 +75,14 @@ class Settings(BaseSettings):
     # After this the description goes through unjudged, so a slow filter never holds up a pose; Jev answered within
     # 0.5 s on 2026-11-02.
     filter_timeout_seconds: PositiveFloat = 2
+    # An OpenRouter decision model that takes images; it checks that the scene photo of every pose request shows a
+    # person before the image model is asked (FR-4.13, Design Documentation 2.6.3).
+    person_model: str = "typesafe/jev-1.14"
+    # A pose request is refused when the probability that its scene shows a person is below this; Jev 1.14 gave every
+    # scene with a person 0.96 or more on 2026-11-03, and empty scenes, statues, a dog, and a mannequin 0.36 or less.
+    person_cutoff: float = Field(default=0.5, gt=0, le=1)
+    # After this the scene goes through unchecked; Jev answered in 0.7 s (median) and 2.7 s at most on 2026-11-03.
+    person_timeout_seconds: PositiveFloat = 3
 
     # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
     # leaves the window, so codes cannot be guessed. High, because phones on one Wi-Fi or carrier address share it,

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -166,6 +166,10 @@ dependencies {
 
     // Reference guide (#5): on-device person segmentation, model from Google Play services.
     implementation(libs.mlkit.subject.segmentation)
+
+    // The person check of the scene photo (Iter3-A7, FR-4.13): bundled models, so it works offline and at first use.
+    implementation(libs.mlkit.pose.detection)
+    implementation(libs.mlkit.face.detection)
 
     // Pose generation (#7): the remembered consent (FR-4.2), and candidate cells that keep the frame's 3:4 ratio.
     implementation(libs.androidx.datastore.preferences)

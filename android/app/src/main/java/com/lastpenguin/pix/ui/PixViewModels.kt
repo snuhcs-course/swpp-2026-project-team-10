@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -55,6 +55,7 @@ object PixViewModels {
                 container.poseGenerator,
                 container.cameraController,
                 container.generationConsent,
+                container.personDetector,
                 share = container.poseSyncer,
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,

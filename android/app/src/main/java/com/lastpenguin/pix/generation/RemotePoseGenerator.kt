@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -143,8 +143,9 @@ class RemotePoseGenerator(
                 throw error
             } catch (error: Exception) {
                 // The pose itself stays out of the log: it can be the user's own words.
-                Log.w(TAG, "${pose.id}: ${describe(error)}")
-                CandidateEvent.Failed(pose.id, errorOf(error))
+                val body = errorBody(error)
+                Log.w(TAG, "${pose.id}: ${describe(error, body)}")
+                CandidateEvent.Failed(pose.id, errorOf(error, body))
             }
         }
         return event ?: CandidateEvent.Failed(pose.id, GenerationError.TIMEOUT).also {
@@ -152,11 +153,14 @@ class RemotePoseGenerator(
         }
     }
 
-    /** The statuses of Design 2.5.3; anything else from the server, such as a rejected photo, is a server error. */
-    private fun errorOf(error: Exception): GenerationError = when (error) {
+    /**
+     * The statuses of Design 2.5.3, and for 422 its code: no person in the scene photo (FR-4.13), or a refused
+     * description. Anything else from the server, such as a rejected photo, is a server error.
+     */
+    private fun errorOf(error: Exception, body: ApiErrorBody?): GenerationError = when (error) {
         is HttpException -> when (error.code()) {
             429 -> GenerationError.RATE_LIMITED
-            422 -> GenerationError.REJECTED
+            422 -> if (body?.error?.code == NO_PERSON) GenerationError.NO_PERSON else GenerationError.REJECTED
             504 -> GenerationError.TIMEOUT
             else -> GenerationError.SERVER
         }
@@ -169,12 +173,16 @@ class RemotePoseGenerator(
         else -> GenerationError.SERVER
     }
 
-    /** For logcat: the status with the server's error code and message, which name a rejected photo's problem. */
-    private fun describe(error: Exception): String {
-        if (error !is HttpException) return error.toString()
-        val body = runCatching {
-            error.response()?.errorBody()?.string()?.let { errorJson.decodeFromString<ApiErrorBody>(it) }
+    /** The server's error body, read once, since a response body can be read only once; null if there is none. */
+    private fun errorBody(error: Exception): ApiErrorBody? = (error as? HttpException)?.let { http ->
+        runCatching {
+            http.response()?.errorBody()?.string()?.let { errorJson.decodeFromString<ApiErrorBody>(it) }
         }.getOrNull()
+    }
+
+    /** For logcat: the status with the server's error code and message, which name a rejected photo's problem. */
+    private fun describe(error: Exception, body: ApiErrorBody? = errorBody(error)): String {
+        if (error !is HttpException) return error.toString()
         return listOfNotNull("HTTP ${error.code()}", body?.error?.code, body?.error?.message).joinToString(" ")
     }
 
@@ -189,6 +197,9 @@ class RemotePoseGenerator(
         const val VARIATION_TIMEOUT_MS = 10_000L
 
         private const val TAG = "PixPoses"
+
+        /** The 422 code of a scene photo in which the server found no one (Design 2.5.3). */
+        private const val NO_PERSON = "NO_PERSON"
         private val JPEG = "image/jpeg".toMediaType()
         private val TEXT = "text/plain".toMediaType()
         private val errorJson = Json { ignoreUnknownKeys = true }

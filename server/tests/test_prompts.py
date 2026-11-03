@@ -10,7 +10,9 @@
 # default poses, one that is not a string, blank, of 100 characters and of 101, or the same as another in any case.
 # The [filter] table (Design 2.6.3): as shipped, wrapped over lines; missing or not a table; its context missing or
 # empty; a question's table missing or not a table, its question, yes, or no missing or empty; an unknown key in the
-# table or in a question. Double quotation marks in a pose, straight, typographic, full-width, or angle, and none.
+# table or in a question. The [person] table (FR-4.13): as shipped, wrapped over lines; missing or not a table; its
+# question missing or empty; an unknown key. Double quotation marks in a pose, straight, typographic, full-width, or
+# angle, and none.
 import tomllib
 
 import pytest
@@ -20,6 +22,7 @@ from pix_server.poses.prompts import (
     DEFAULT_POSES,
     DESCRIPTION_MAX_LENGTH,
     FILTER_QUESTIONS,
+    PERSON_QUESTION,
     PROMPTS,
     PROMPTS_FILE,
     checked_pose,
@@ -68,6 +71,7 @@ def default_pose(pose_id: str, pose: str = "waving") -> str:
 FOUR = "".join(default_pose(pose_id) for pose_id in ("hips", "wave", "walk", "arms"))
 SELFIE = selfie()
 FILTER = filter_table()
+PERSON = '[person]\nquestion = "Does `photo` show a person?"\n'
 
 
 @pytest.fixture
@@ -107,7 +111,7 @@ def test_shipped_file_has_the_selfie_prompts_and_four_selfie_poses():
 
 def test_prompt_wrapped_over_lines_is_sent_as_one_line(prompts_file):
     wrapped = 'pose_prompt = """\nSame person\n  and place.\n\n- Pose: {pose}.\n"""\n'
-    prompts = load_prompts(prompts_file(wrapped + MODEL_PROMPTS + FOUR + SELFIE + FILTER))
+    prompts = load_prompts(prompts_file(wrapped + MODEL_PROMPTS + FOUR + SELFIE + FILTER + PERSON))
     assert prompts.pose == "Same person and place. - Pose: {pose}."
 
 
@@ -185,7 +189,7 @@ def test_default_pose_mistake_is_refused(prompts_file, poses, named):
 
 def test_default_pose_of_the_longest_length_is_accepted(prompts_file):
     longest = FOUR.replace('pose = "waving"', f'pose = "{"a" * DESCRIPTION_MAX_LENGTH}"', 1)
-    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + longest + SELFIE + FILTER))
+    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + longest + SELFIE + FILTER + PERSON))
     assert len(prompts.default_poses["hips"].pose) == DESCRIPTION_MAX_LENGTH
 
 
@@ -240,7 +244,7 @@ def test_selfie_that_is_not_a_table_is_refused(prompts_file):
 def test_selfie_default_pose_of_the_longest_length_is_accepted(prompts_file):
     longest = "a" * DESCRIPTION_MAX_LENGTH
     table = selfie(poses=f'["smile", "V sign", "chin", "{longest}"]')
-    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + table + FILTER))
+    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + table + FILTER + PERSON))
     assert prompts.selfie.default_poses[3] == longest
 
 
@@ -263,7 +267,7 @@ def test_filter_question_is_the_context_and_the_question_on_one_line(prompts_fil
     table = filter_table(
         context='"""\nA user\n  typed this.\n"""', malicious='question = "Harmful?"\nyes = "Yes."\nno = "No."\n'
     )
-    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + SELFIE + table))
+    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + SELFIE + table + PERSON))
     assert prompts.filter_questions["malicious"] == {
         "type": "noul",
         "instructions": "A user typed this. Harmful?",
@@ -306,6 +310,37 @@ def test_filter_mistake_is_refused_with_its_name(prompts_file, table, named):
 def test_filter_that_is_not_a_table_is_refused(prompts_file):
     with pytest.raises(ValueError, match=r"a \[filter\] table is needed"):
         load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + 'filter = "x"\n' + FOUR + SELFIE))
+
+
+def test_shipped_file_has_the_person_question_as_the_decisions_api_takes_it():
+    question = load_prompts(PROMPTS_FILE).person_question
+    assert question == PROMPTS.person_question
+    assert question == {PERSON_QUESTION: {"type": "noul", "instructions": "Does `photo` show a person?"}}
+
+
+def test_person_question_wrapped_over_lines_is_sent_as_one_line(prompts_file):
+    table = '[person]\nquestion = """\nDoes `photo`\n  show a person?\n"""\n'
+    prompts = load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + FOUR + SELFIE + FILTER + table))
+    assert prompts.person_question == {"person": {"type": "noul", "instructions": "Does `photo` show a person?"}}
+
+
+@pytest.mark.parametrize(
+    ("table", "named"),
+    [
+        ("", r"a \[person\] table is needed"),
+        ('person = "Does `photo` show a person?"\n', r"a \[person\] table is needed"),
+        ("[person]\n", "person.question must be a non-empty string"),
+        ('[person]\nquestion = " "\n', "person.question must be a non-empty string"),
+        ("[person]\nquestion = 1\n", "person.question must be a non-empty string"),
+        (PERSON + 'yes = "A person is there."\n', "person: unknown keys yes"),
+    ],
+    ids=["no table", "not a table", "no question", "empty question", "question not a string", "unknown key"],
+)
+def test_person_mistake_is_refused_with_its_name(prompts_file, table, named):
+    # A bare key must come before the tables, as TOML reads it into the table above otherwise.
+    head, tables = (table, "") if not table.startswith("[") else ("", table)
+    with pytest.raises(ValueError, match=named):
+        load_prompts(prompts_file(POSE_PROMPT + MODEL_PROMPTS + head + FOUR + SELFIE + FILTER + tables))
 
 
 @pytest.mark.parametrize(

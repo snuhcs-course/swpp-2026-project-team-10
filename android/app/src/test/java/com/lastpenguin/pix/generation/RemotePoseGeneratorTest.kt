@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -282,6 +282,11 @@ class RemotePoseGeneratorTest {
 
         failsWith(GenerationError.RATE_LIMITED) { throw http(429, "RATE_LIMITED") }
         failsWith(GenerationError.REJECTED) { throw http(422, "REJECTED") }
+        // The server found no one in the scene photo (FR-4.13); a 422 without a readable code is a refusal.
+        failsWith(GenerationError.NO_PERSON) { throw http(422, "NO_PERSON") }
+        failsWith(GenerationError.REJECTED) {
+            throw HttpException(Response.error<PoseResponseDto>(422, "Unprocessable".toResponseBody(null)))
+        }
         failsWith(GenerationError.TIMEOUT) { throw http(504, "UPSTREAM_TIMEOUT") }
         failsWith(GenerationError.SERVER) { throw http(502, "UPSTREAM_ERROR") }
         // A photo or a description the server refuses is the app's mistake, not something the user can fix.

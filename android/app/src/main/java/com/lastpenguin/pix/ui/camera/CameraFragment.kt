@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -593,10 +593,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.shootAgainButton.setOnClickListener { generationViewModel.retakeScene() }
         controls.usePhotoButton.setOnClickListener {
             val navController = findNavController()
-            val reviewing = generationViewModel.uiState.value.phase == GenerationUiState.Phase.REVIEWING
-            if (reviewing && navController.currentDestination?.id == R.id.cameraFragment) {
-                // Generate poses asks what to pose before anything is sent (FR-4.8).
-                generationViewModel.useScene()
+            // Generate poses asks what to pose before anything is sent (FR-4.8), once a person is found (FR-4.13).
+            if (navController.currentDestination?.id == R.id.cameraFragment && generationViewModel.useScene()) {
                 navController.navigate(R.id.action_camera_to_describePose)
             }
         }
@@ -861,10 +859,30 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         controls.captureControls.isVisible = !reviewing
         controls.sceneReviewControls.isVisible = reviewing
+        // Not before the phone has found a person in the photo (FR-4.13).
+        controls.usePhotoButton.isEnabled = reviewing && !scene.checkingPerson && !scene.noPerson
         if (!active) return
 
-        controls.sceneTitle.setText(if (reviewing) R.string.scene_review_title else R.string.scene_title)
-        showHint(controls.hintText, if (reviewing) R.string.scene_review_body else null)
+        val noPerson = reviewing && scene.noPerson
+        controls.sceneTitle.setText(
+            when {
+                noPerson -> R.string.scene_no_person_title
+                reviewing -> R.string.scene_review_title
+                else -> R.string.scene_title
+            },
+        )
+        when {
+            noPerson -> showHint(
+                controls.hintText,
+                R.string.scene_no_person_body,
+                R.drawable.ic_alert_small,
+                R.color.pix_danger,
+            )
+
+            reviewing -> showHint(controls.hintText, R.string.scene_review_body)
+
+            else -> showHint(controls.hintText, null)
+        }
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false

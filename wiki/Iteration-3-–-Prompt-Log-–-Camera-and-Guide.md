@@ -42,6 +42,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Sungmin, 11-03] "Do it all as you recommend, make the branch, and start." (`SavedGuide` names its source and holds no bitmap; `SavedGuideStore.thumbnail` and a cache in `ReferenceViewModel`; *My library* on the sheet and `LibraryFragment`. A separate thumbnail file was planned, but the saved reference is already at most 512 px, so it is read directly. The sheet was changed before [#168] was merged, and its wireframes waited for it; once it was merged, the work was moved onto it and Flows 1 and 2 and the tutorial's guide slide were drawn on its sheet.)
 - [Sungmin, 11-03] "Can't you check it on the emulator? Show me with screenshots that it works, then commit, push, and open the PR." (The emulator cannot run the segmentation, so five saved guides, three photos and two AI poses, were written into the app's `guides/` folder as a guide saved before the update would be; the tutorial slide, *My library*, the library and its filters, a delete, a guide put on the camera, the library after a restart in Korean, and *Add photo*'s picker were captured. A first run of the mutation script that was stopped kept running beside the second and left one line of `LibraryFragment` deleted; a test failed on it, and the line was put back.)
 - [Sungmin, 11-03] "I meant the emulator screenshots in the PR body." (`gh` cannot upload an image and the Chrome extension was not connected, so the screenshots went into one commit on the branch, which the PR body shows them from, and out in the next, so the squash merge leaves them out.)
+- [Sungmin, 11-03] "PR #172 has a conflict now: resolve it, commit, and push." (dev was merged in, not rebased, after the person check, [#169]: its revision rows came first and the library's moved to Design 2.35, R&S 2.27, and Testing 2.37, its IT-25 kept that number and the library's became IT-26, both sides' additions to the same partition cells were kept, and Flow 2, which both changed, was rendered again from the merged drawing.)
 
 [#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
 [#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
@@ -49,5 +50,6 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 [#151]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/151
 [#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
 [#168]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/168
+[#169]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/169
 [#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
 [#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171

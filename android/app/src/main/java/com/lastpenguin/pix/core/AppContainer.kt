@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -33,12 +33,15 @@ import com.lastpenguin.pix.core.network.PixAuthApi
 import com.lastpenguin.pix.generation.DataStoreGenerationConsent
 import com.lastpenguin.pix.generation.DataStorePromptHistory
 import com.lastpenguin.pix.generation.GenerationConsent
+import com.lastpenguin.pix.generation.MlKitPersonSignals
+import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.RemotePoseTipper
+import com.lastpenguin.pix.generation.RuleBasedPersonDetector
 import com.lastpenguin.pix.generation.ScreenLanguages
 import com.lastpenguin.pix.generation.followSubjectSets
 import com.lastpenguin.pix.guide.FileSavedGuideStore
@@ -117,6 +120,8 @@ class AppContainer(
     val savedGuideStore: SavedGuideStore,
     // ---- Pose generation (#7) ---------------------------------------------------
     val poseGenerator: PoseGenerator,
+    /** Looks for a person in the scene photo before anything is sent (FR-4.13). */
+    val personDetector: PersonDetector,
     /** How to hold the phone for a generated pose (FR-4.10). */
     val poseTipper: PoseTipper,
     /** The tip of the guide on Camera, asked for with [poseTipper]. */
@@ -262,6 +267,7 @@ class AppContainer(
                 referenceGuideMaker = referenceGuideMaker,
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
+                personDetector = RuleBasedPersonDetector(MlKitPersonSignals()),
                 poseTipper = poseTipper,
                 poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage),
                 generationConsent = DataStoreGenerationConsent(appContext),

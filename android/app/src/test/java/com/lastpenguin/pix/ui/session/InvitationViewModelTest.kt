@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModelStore
@@ -114,7 +114,10 @@ class InvitationViewModelTest {
 
         invitations.acceptGate?.complete(Unit)
         runCurrent()
-        assertEquals(listOf<InvitationEvent>(InvitationEvent.Accepted("inv_1", invitations.place)), events)
+        assertEquals(
+            listOf<InvitationEvent>(InvitationEvent.Accepted("inv_1", invitations.place, invitations.opened.from)),
+            events,
+        )
         assertEquals(listOf("open:inv_1", "accept:inv_1"), invitations.calls)
     }
 

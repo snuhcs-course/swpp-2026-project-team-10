@@ -20,6 +20,7 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.ScreenLanguages
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -80,6 +81,9 @@ class TestAppContainer(
     val reference = MirrorReference()
     val settings = CameraSettings.InMemory()
     val consent = IdleConsent()
+
+    /** The descriptions used before; a test records the ones its screen should list. */
+    val history = PromptHistory.InMemory()
     val maker = ScriptedGuideMaker()
     val generator = ScriptedPoseGenerator()
     val tipper = ScriptedPoseTipper()
@@ -130,6 +134,7 @@ class TestAppContainer(
         poseTipper = tipper,
         poseTips = tips,
         generationConsent = consent,
+        promptHistory = history,
         authRepository = auth,
         friendsRepository = friends,
         googleIdTokens = FakeGoogleIdTokens(),

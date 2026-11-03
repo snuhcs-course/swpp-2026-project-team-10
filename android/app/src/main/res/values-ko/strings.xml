@@ -134,20 +134,16 @@
     <string name="description_refused">지난 요청이 거절됐어요. 설명이나 사진을 바꿔 다시 시도하세요.</string>
     <string name="description_rejected_message">AI 서비스가 이 사진으로 “%1$s” 포즈를 생성하지 않았어요. 설명을 바꾸거나, 카메라로 돌아가 다른 사진을 찍으세요.</string>
     <string name="edit_description">설명 수정</string>
-    <string name="ideas_label">추천 포즈</string>
+    <!-- The descriptions used before on Generate poses (FR-4.11): the section, its All / With <name> switch, the line
+         shown when nothing was used with that friend, and the ✕ of an entry, for TalkBack. -->
+    <string name="history_label">이전에 쓴 설명</string>
+    <string name="history_all">전체</string>
+    <string name="history_with">%1$s님과</string>
+    <string name="history_empty_with">%1$s님과 쓴 설명이 아직 없어요</string>
+    <string name="history_delete">“%1$s” 설명을 기록에서 지우기</string>
     <string name="generate_four_poses">포즈 4개 생성</string>
     <string name="skip_suggest_poses">건너뛰고 포즈 추천받기</string>
     <string name="choosing_poses">포즈 선택 중…</string>
-    <!-- Idea chips on Generate poses (FR-4.8). Each fills the description field, so keep them under 100 characters
-         and possible anywhere: the image model adds nothing to lean or sit on that the scene does not have. -->
-    <string-array name="pose_ideas">
-        <item>어깨 너머로 뒤돌아보기</item>
-        <item>웃으면서 카메라 쪽으로 걸어오기</item>
-        <item>주머니에 손 넣고 하늘 보기</item>
-        <item>팔짱 끼고 기대 서기</item>
-        <item>앉아서 무릎 끌어안기</item>
-        <item>두 팔 들고 점프하기</item>
-    </string-array>
     <string name="scene_photo_description">포즈를 생성할 배경 사진</string>
     <string name="creating_pose">생성 중…</string>
     <string name="pose_failed">생성하지 못함</string>

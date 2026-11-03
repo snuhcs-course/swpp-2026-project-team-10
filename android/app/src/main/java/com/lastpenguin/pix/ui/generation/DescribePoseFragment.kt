@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -22,16 +22,19 @@ import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
+import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks an idea chip, or lets the server suggest four
- * poses for the scene. Nothing is sent before *Generate 4 poses* or *Skip*. In a session the subject sees this step
+ * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks a description used before (FR-4.11), or lets the
+ * server suggest four poses for the scene. Nothing is sent before *Generate 4 poses* or *Skip*. In a session the subject sees this step
  * too: one field at a time holds the description, and the subject's *Generate 4 poses* or *Skip* goes on here like this
  * phone's own (Design 2.6.5).
  * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16.
@@ -53,7 +56,6 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
         binding.sceneImage.showScene(state.scene)
         val form = DescriptionForm(
             binding,
-            ideas = resources.getStringArray(R.array.pose_ideas).toList(),
             // After a recreation the field restores its own text; otherwise it shows what the ViewModel kept (US-5).
             text = if (savedInstanceState == null) state.description else null,
             rejected = state.descriptionRejected,
@@ -67,6 +69,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
                 toGenerating()
             },
             onFocusChanged = { focused -> viewModel.onDescriptionFocus(focused) },
+            onForget = viewModel::forget,
         )
         this.form = form
         binding.cancelButton.setOnClickListener { backToCamera() }
@@ -75,15 +78,18 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                combine(viewModel.uiState, sessionViewModel.state, ::Pair).collect { (generation, session) ->
-                    // In a session the subject writes the description too, one field at a time (FR-6.15).
-                    val subject = (session as? SessionState.Connected)
-                        ?.takeIf { it.role == Role.PHOTOGRAPHER }?.peer?.displayName
-                    val typing = subject.takeIf { generation.descriptionWriter == Role.SUBJECT }
-                    form.showShared(generation.description, typing, subject)
-                    // The subject's Generate 4 poses or Skip came first: it goes on as this phone's own.
-                    toGenerating()
-                }
+                combine(viewModel.uiState, sessionViewModel.state, viewModel.usedBefore, ::Triple)
+                    .collect { (generation, session, used) ->
+                        // In a session the subject writes the description too, one field at a time (FR-6.15).
+                        val connected = (session as? SessionState.Connected)?.takeIf { it.role == Role.PHOTOGRAPHER }
+                        val subject = connected?.peer?.displayName
+                        val typing = subject.takeIf { generation.descriptionWriter == Role.SUBJECT }
+                        form.showShared(generation.description, typing, subject)
+                        // The descriptions used before, with the friend of an invitation's session, also while it reconnects (FR-4.11).
+                        form.showHistory(used, session.partner)
+                        // The subject's Generate 4 poses or Skip came first: it goes on as this phone's own.
+                        toGenerating()
+                    }
             }
         }
     }
@@ -121,14 +127,15 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 }
 
 /**
- * The description field, its counter, the idea chips, and the two buttons of Generate poses (FR-4.8, US-5), on either
- * phone. Apart from the fragments, so the form can be tested on the real layout without a ViewModel or navigation.
+ * The description field, its counter, the descriptions used before (FR-4.11), and the two buttons of Generate poses
+ * (FR-4.8, US-5), on either phone. Apart from the fragments, so the form can be tested on the real layout without a
+ * ViewModel or navigation. [showHistory] lists the descriptions used before as chips, all of them or, through the
+ * switch, those used with the session's friend; a chip fills the field, and its ✕ asks [onForget] to drop it.
  * In a session, the field holds the description while it is focused (Design 2.6.5): Done, a closed keyboard, and
  * leaving the screen end that, and [showShared] shows what the other phone wrote and waits while it types.
  */
 class DescriptionForm(
     private val binding: FragmentDescribePoseBinding,
-    ideas: List<String>,
     /** The text to show, or null to keep what the field already holds. */
     text: String?,
     /** The service rejected the last description: say so under the field (US-5). */
@@ -138,6 +145,8 @@ class DescriptionForm(
     onSuggest: () -> Unit,
     /** The field took or lost focus. */
     onFocusChanged: (Boolean) -> Unit = {},
+    /** ✕ on a description used before: its text, which leaves the history (FR-4.11). */
+    private val onForget: (String) -> Unit = {},
 ) {
     private val input = binding.descriptionInput
 
@@ -146,6 +155,16 @@ class DescriptionForm(
 
     /** Whether the keyboard was shown at the last insets, so its closing can be told. */
     private var keyboardShown = false
+
+    /** The descriptions used before and the session's friend, as [showHistory] gave them last. */
+    private var usedBefore: List<PromptEntry> = emptyList()
+    private var partner: SessionPartner? = null
+
+    /** The switch: the whole history, or the one with [partner]. */
+    private var showingAll = true
+
+    /** The other person types, or the link is paused: the chips wait with the field. */
+    private var locked = false
 
     init {
         // One line of input, so Done closes the keyboard, shown wrapped over up to four lines.
@@ -170,18 +189,8 @@ class DescriptionForm(
             insets
         }
         binding.descriptionError.isVisible = rejected
-
-        val inflater = LayoutInflater.from(binding.root.context)
-        for (idea in ideas) {
-            val chip = inflater.inflate(R.layout.item_idea_chip, binding.ideaChips, false) as Chip
-            chip.text = idea
-            // The chip's text replaces the field's, which the user can then edit (US-5).
-            chip.setOnClickListener {
-                input.setText(idea)
-                input.setSelection(input.length())
-            }
-            binding.ideaChips.addView(chip)
-        }
+        binding.historyAll.setOnClickListener { showAll(true) }
+        binding.historyWithPartner.setOnClickListener { showAll(false) }
 
         binding.generateButton.setOnClickListener {
             stopTyping()
@@ -196,6 +205,58 @@ class DescriptionForm(
     /** The field no longer holds the description. */
     fun stopTyping() {
         if (input.hasFocus()) input.clearFocus()
+    }
+
+    /**
+     * The descriptions used before, newest first, and the friend of an invitation's session, or null (FR-4.11). The
+     * section is hidden while there are none, and the switch while there is no friend; a friend who changes, or goes,
+     * puts the switch back on the whole history.
+     */
+    fun showHistory(entries: List<PromptEntry>, partner: SessionPartner?) {
+        // The screens call this with every state, most of them keystrokes: the chips are only built for a change.
+        if (entries == usedBefore && partner == this.partner) return
+        usedBefore = entries
+        if (this.partner?.userId != partner?.userId) showingAll = true
+        this.partner = partner
+        renderHistory()
+    }
+
+    private fun showAll(all: Boolean) {
+        if (showingAll == all) return
+        showingAll = all
+        renderHistory()
+    }
+
+    private fun renderHistory() {
+        val context = binding.root.context
+        val partner = partner
+        binding.historySection.isVisible = usedBefore.isNotEmpty()
+        binding.historyFilter.isVisible = partner != null
+        if (partner != null) {
+            binding.historyWithPartner.text = context.getString(R.string.history_with, partner.displayName)
+            binding.historyEmpty.text = context.getString(R.string.history_empty_with, partner.displayName)
+        }
+        val withPartner = partner?.takeUnless { showingAll }
+        binding.historyAll.isSelected = withPartner == null
+        binding.historyWithPartner.isSelected = withPartner != null
+        val shown = if (withPartner == null) usedBefore else usedBefore.filter { withPartner.userId in it.partners }
+        val chips = binding.historyChips
+        chips.removeAllViews()
+        val inflater = LayoutInflater.from(context)
+        for (entry in shown) {
+            val chip = inflater.inflate(R.layout.item_history_chip, chips, false) as Chip
+            chip.text = entry.text
+            chip.isEnabled = !locked
+            // The chip's text replaces the field's, which the user can then edit (US-5).
+            chip.setOnClickListener {
+                input.setText(entry.text)
+                input.setSelection(input.length())
+            }
+            chip.closeIconContentDescription = context.getString(R.string.history_delete, entry.text)
+            chip.setOnCloseIconClickListener { onForget(entry.text) }
+            chips.addView(chip)
+        }
+        binding.historyEmpty.isVisible = shown.isEmpty() && usedBefore.isNotEmpty()
     }
 
     /**
@@ -221,7 +282,8 @@ class DescriptionForm(
             showing = false
         }
         input.isEnabled = !locked
-        binding.ideaChips.children.forEach { it.isEnabled = !locked }
+        this.locked = locked
+        binding.historyChips.children.forEach { it.isEnabled = !locked }
         binding.generateButton.isEnabled = !locked && !waiting
         binding.suggestButton.isEnabled = !locked && !waiting
         binding.descriptionTyping.isVisible = typing != null

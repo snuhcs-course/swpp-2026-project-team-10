@@ -41,6 +41,13 @@
         <item name="android:letterSpacing">0</item>
     </style>
 
+    <!-- A caption of the first-use tutorial over the dimmed screen (FR-10.4). -->
+    <style name="TextAppearance.Pix.Tutorial" parent="TextAppearance.Pix.Action">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:lineSpacingMultiplier">1.08</item>
+    </style>
+
     <style name="TextAppearance.Pix.Action.Small">
         <item name="android:textSize">14sp</item>
     </style>

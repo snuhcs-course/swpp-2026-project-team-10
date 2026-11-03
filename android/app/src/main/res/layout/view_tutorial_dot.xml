@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- A slide's dot; the row says which one is showing. -->
-<View xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="8dp"
-    android:layout_height="8dp"
-    android:layout_marginHorizontal="4dp"
-    android:background="@drawable/tutorial_dot"
-    android:importantForAccessibility="no" />

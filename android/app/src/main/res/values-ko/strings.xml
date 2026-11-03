@@ -392,10 +392,8 @@
     <string name="about_licenses">오픈소스 라이선스</string>
 
     <string name="settings_tutorial">튜토리얼 다시 보기</string>
-    <string name="tutorial_skip">건너뛰기</string>
-    <string name="tutorial_next">다음</string>
-    <string name="tutorial_start">시작하기</string>
-    <string name="tutorial_page">%2$d장 중 %1$d번째 슬라이드</string>
+    <string name="settings_tutorial_reset">화면마다 튜토리얼이 다시 나와요.</string>
+    <string name="tutorial_got_it">알겠어요</string>
     <string name="tutorial_settings">언어와 가이드 모양을 바꿔요</string>
     <string name="tutorial_together">친구에게 카메라를 실시간으로 보여줘요</string>
     <string name="tutorial_guide">사진이나 AI 포즈로 가이드를 더해요</string>
@@ -411,7 +409,7 @@
     <string name="tutorial_scene">이 사진으로 포즈를 만들어요</string>
     <string name="tutorial_describe">원하는 포즈를 적어요</string>
     <string name="tutorial_suggest">비워 두면 AI가 제안해요</string>
-    <string name="tutorial_friend_title">친구 폰에서는</string>
+    <string name="tutorial_friend_title">찍히는 사람이 되면</string>
     <string name="tutorial_friend_zoom">두 손가락으로 찍는 사람의 카메라를 확대해요</string>
     <string name="tutorial_friend_brightness">밝기를 조절해요</string>
     <string name="tutorial_friend_move">가이드를 직접 옮겨요</string>

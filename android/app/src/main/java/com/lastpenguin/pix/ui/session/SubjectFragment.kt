@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -28,6 +28,7 @@ import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
@@ -48,11 +49,15 @@ import com.lastpenguin.pix.ui.camera.previewAspect
 import com.lastpenguin.pix.ui.camera.setReferenceActions
 import com.lastpenguin.pix.ui.camera.showReference
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import com.lastpenguin.pix.ui.settings.followLook
 import com.lastpenguin.pix.ui.settings.renderLatency
+import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
+import com.lastpenguin.pix.ui.settings.tutorialFor
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -70,7 +75,8 @@ import org.webrtc.VideoSink
  * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
  * the photographer describes or creates poses, picks one, or checks its guide, the video says so, and their *Generate
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
- * System back asks first (R&S 6.9).
+ * System back asks first (R&S 6.9). The first time the video shows, the tutorial's tips of this screen come over it
+ * (FR-10.4).
  * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide*, the candidates, and the outline
  * Iter3-P16.
  */
@@ -91,6 +97,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     // Where the video is, and how much of it the top bar and the controls cover (previewArea).
     private var videoArea = PreviewArea(0f, 0f, 0f)
+
+    // Whether the photographer's video shows: connected, with frames coming.
+    private val videoShowing = MutableStateFlow(false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
@@ -209,6 +218,14 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         if (!ui.canZoom) pinchZoom?.finishInteraction()
                     }
                 }
+                // Its tutorial tips once the photographer's video shows, a moment later so the video comes first, and not
+                // under another screen (FR-10.4).
+                launch {
+                    showTutorialWhenDue(
+                        settingsViewModel.tutorialFor(TutorialScreen.SUBJECT_VIEW, videoShowing),
+                        TutorialFragment.AFTER_PICTURE_MS,
+                    ) { findNavController().currentDestination?.id == R.id.subjectFragment }
+                }
                 launch {
                     // "Connecting…" until the session is up and its first frame has arrived; "camera paused" only when
                     // frames stop after that (Design 2.8). A session is Connected before WebRTC delivers the first
@@ -224,6 +241,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         val poses = poseStatus(viewModel.uiState.value).takeIf { connected }
                         binding.connectingText.isVisible = !streaming || stalled || poses != null
                         binding.liveDot.isVisible = streaming && !stalled
+                        videoShowing.value = streaming && !stalled
                         binding.connectingText.text = when {
                             reconnecting -> getString(R.string.reconnecting)
                             !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)

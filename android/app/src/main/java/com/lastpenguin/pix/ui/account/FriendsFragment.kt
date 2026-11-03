@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.account
 
 import android.Manifest
@@ -247,7 +247,6 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
         renderRequests(requests, state.answering)
         renderFriends(friends)
         binding.emptyCard.isVisible = pixId != null && friends.isEmpty()
-        binding.networkNote.isVisible = friends.isNotEmpty()
     }
 
     private fun renderRequests(requests: List<FriendRequest>, answering: Set<String>) {

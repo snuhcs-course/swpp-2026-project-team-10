@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.net.Uri
@@ -78,7 +78,7 @@ class ReferenceConfirmFragmentTest {
         val modules = launch()
         inASession(modules)
         pickCandidate()
-        assertEquals(string(R.string.reference_shared_hint, "Junhyeong"), onScreen { it.sharedHint.text.toString() })
+        assertEquals(string(R.string.shared_hint, "Junhyeong"), onScreen { it.sharedHint.text.toString() })
         assertTrue(onScreen { it.sharedHint.isShown })
 
         val made = guide()

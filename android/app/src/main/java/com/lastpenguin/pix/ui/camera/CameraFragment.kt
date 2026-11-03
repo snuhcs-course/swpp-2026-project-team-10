@@ -72,6 +72,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -143,8 +144,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.bottomPanel.addOnLayoutChangeListener(placePreview)
         // The zoom row stays above the panels over the shutter as they open and close.
         controls.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(controls) }
+        val previewStreaming = MutableStateFlow(false)
         controls.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
             Timings.mark("preview.stream", state.name)
+            previewStreaming.value = state == PreviewView.StreamState.STREAMING
             if (state == PreviewView.StreamState.STREAMING && !previewLogged) {
                 previewLogged = true
                 Timings.mark("camera.preview")
@@ -250,6 +253,26 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         sessionViewModel.state,
                         sessionViewModel.latencyMs,
                     ) { _, _, _ -> }.collect { renderLatency(controls) }
+                }
+                // Once the preview really shows: nothing comes before it (FR-1.1, FR-10.4), and READY is too early,
+                // since leaving the camera then releases it before its first frame. Not over a session, or a link's
+                // screen, which opens over Camera at a first start.
+                launch {
+                    combine(
+                        settingsViewModel.tutorialDue,
+                        previewStreaming,
+                        sessionViewModel.state,
+                    ) { due, streaming, session ->
+                        due && streaming && (session is SessionState.Idle || session is SessionState.Ended)
+                    }.collectLatest { open ->
+                        if (open) {
+                            delay(TUTORIAL_AFTER_PREVIEW_MS)
+                            val nav = findNavController()
+                            if (nav.currentDestination?.id == R.id.cameraFragment && !isScenePhotoActive()) {
+                                nav.navigate(R.id.action_camera_to_tutorial)
+                            }
+                        }
+                    }
                 }
                 // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).
                 // While the link reconnects the light is off, and the session can still be ended (Design 2.6.7).
@@ -648,15 +671,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isActivated = state.guide != null
         controls.guideButton.contentDescription =
             getString(if (state.guide == null) R.string.guide_add_description else R.string.guide_change_description)
+        // The tutorial shows how to add a guide and move it (FR-10.4), so the chip says only what the screen does not:
+        // that the guide is hidden, and that a pinch zooms again once edit mode is off.
         when {
-            state.guide == null ->
-                showHint(controls.hintText, R.string.hint_add_guide, R.drawable.ic_target_small, R.color.pix_accent)
+            state.guide == null || state.guideEditing -> showHint(controls.hintText, null)
 
             !state.guideState.visible ->
                 showHint(controls.hintText, R.string.hint_guide_hidden, R.drawable.ic_visibility_off_small)
-
-            state.guideEditing ->
-                showHint(controls.hintText, R.string.hint_edit_guide, R.drawable.ic_move_small, R.color.pix_guide)
 
             else -> showHint(controls.hintText, R.string.hint_pinch_zoom, R.drawable.ic_zoom_small)
         }
@@ -759,7 +780,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The scene photo frames a new scene, which an earlier guide's reference is not part of.
         val reference = state.guide?.reference?.takeUnless { isScenePhotoActive() }
         // The enlarged photo reaches under the chips: the hint steps aside, and a capture status stays on top.
-        controls.hintText.isInvisible = reference != null && state.referenceExpanded
+        controls.hintText.isInvisible =
+            controls.hintText.text.isNullOrEmpty() || (reference != null && state.referenceExpanded)
         controls.referenceThumbnail.showReference(reference) { photo ->
             if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) {
                 null
@@ -859,7 +881,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
             reviewing -> showHint(controls.hintText, R.string.scene_review_body)
 
-            else -> showHint(controls.hintText, R.string.scene_body)
+            else -> showHint(controls.hintText, null)
         }
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
@@ -1016,11 +1038,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */
     private fun showHint(
         chip: TextView,
-        @StringRes text: Int,
+        @StringRes text: Int?,
         @DrawableRes icon: Int = 0,
         @ColorRes tint: Int = R.color.pix_text,
     ) {
-        chip.setText(text)
+        if (text == null) chip.text = null else chip.setText(text)
+        chip.isInvisible = text == null
         setChipIcon(chip, icon)
         TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(requireContext().getColor(tint)))
     }
@@ -1100,6 +1123,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     companion object {
+        /** A moment of the camera itself before the first-use tutorial covers it. */
+        const val TUTORIAL_AFTER_PREVIEW_MS = 800L
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
         private const val STILL_TIMEOUT_MS = 2_000L
         private const val FOCUS_RING_START_SCALE = 1.25f

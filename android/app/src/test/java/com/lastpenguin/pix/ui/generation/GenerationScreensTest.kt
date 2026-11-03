@@ -11,6 +11,7 @@ import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
@@ -23,6 +24,7 @@ import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
@@ -35,6 +37,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -48,7 +51,10 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The four generation screens (R&S 6.3, FR-4.4–4.8, US-5; Testing Documentation 2.1.6) on the real Fragments,
  * with the shared GenerationViewModel put in the right phase before each screen's view is created. Generate poses: opens with the scene and the
- * idea chips, Generate 4 poses and Skip start a run and open Generating poses, Cancel; in a session, the hint, this
+ * descriptions used before, newest first (FR-4.11; none hides them; a chip fills the field, and its ✕ drops it; in an
+ * invitation's session, the switch to the ones used with the friend, kept while the link reconnects, for a set started
+ * meanwhile), Generate 4 poses and Skip start a run and open
+ * Generating poses, Cancel; in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
  * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
@@ -92,22 +98,113 @@ class GenerationScreensTest {
 
     // ---- Generate poses ------------------------------------------------------------
 
+    /** Two descriptions used before: "Jump" with the friend u_2, then "Wave" alone, so "Wave" is the newer. */
+    private fun usedBefore(modules: TestAppContainer) = runBlocking {
+        modules.history.record("Jump", Role.PHOTOGRAPHER, "u_2")
+        modules.history.record("Wave", Role.PHOTOGRAPHER, null)
+    }
+
+    private fun FragmentDescribePoseBinding.chipTexts(): List<String> =
+        (0 until historyChips.childCount).map { (historyChips.getChildAt(it) as Chip).text.toString() }
+
     @Test
-    fun describe_opensWithTheSceneAndTheIdeas() {
-        modules()
+    fun describe_opensWithTheScene_andTheDescriptionsUsedBefore_newestFirst() {
+        val modules = modules()
+        usedBefore(modules)
         val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
         scenario = s
+        idle()
 
         s.onFragment { fragment ->
             val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
             assertNotNull(binding.sceneImage.drawable)
-            assertEquals(
-                fragment.resources.getStringArray(R.array.pose_ideas).size,
-                binding.ideaChips.childCount,
-            )
+            assertEquals(View.VISIBLE, binding.historySection.visibility)
+            assertEquals(View.GONE, binding.historyFilter.visibility)
+            assertEquals(listOf("Wave", "Jump"), binding.chipTexts())
             assertEquals(string(R.string.description_counter, 0, 100), binding.descriptionCounter.text.toString())
             assertEquals(View.GONE, binding.descriptionError.visibility)
         }
+    }
+
+    @Test
+    fun describe_withoutADescriptionUsedBefore_hasNoSuchSection() {
+        modules()
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        idle()
+
+        s.onFragment { fragment ->
+            assertEquals(View.GONE, FragmentDescribePoseBinding.bind(fragment.requireView()).historySection.visibility)
+        }
+    }
+
+    @Test
+    fun describe_aChipFillsTheField_andItsCloseDropsItFromTheHistory() {
+        val modules = modules()
+        usedBefore(modules)
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        idle()
+
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            (binding.historyChips.getChildAt(1) as Chip).performClick()
+            assertEquals("Jump", binding.descriptionInput.text.toString())
+            (binding.historyChips.getChildAt(0) as Chip).performCloseIconClick()
+        }
+        idle()
+
+        assertEquals(listOf("Jump"), modules.history.entries.value.map { it.text })
+        s.onFragment { fragment ->
+            assertEquals(listOf("Jump"), FragmentDescribePoseBinding.bind(fragment.requireView()).chipTexts())
+        }
+    }
+
+    @Test
+    fun describe_inAnInvitationsSession_switchesToTheDescriptionsUsedWithTheFriend() {
+        val modules = modules()
+        usedBefore(modules)
+        val friend = SessionPartner("u_2", "Junhyeong")
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER, friend))
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        idle()
+
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            assertEquals(View.VISIBLE, binding.historyFilter.visibility)
+            assertEquals(string(R.string.history_with, "Junhyeong"), binding.historyWithPartner.text.toString())
+            assertTrue(binding.historyAll.isSelected)
+
+            binding.historyWithPartner.performClick()
+
+            assertTrue(binding.historyWithPartner.isSelected)
+            assertEquals(listOf("Jump"), binding.chipTexts())
+        }
+    }
+
+    @Test
+    fun describe_aSetStartedWhileTheLinkReconnects_keepsTheFriend() {
+        val modules = modules()
+        usedBefore(modules)
+        val friend = SessionPartner("u_2", "Junhyeong")
+        modules.session.setState(SessionState.Reconnecting("s_1", 0L, friend))
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        idle()
+
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            assertEquals(View.VISIBLE, binding.historyFilter.visibility)
+            binding.descriptionInput.setText("Lean on the wall")
+            binding.generateButton.performClick()
+        }
+        idle()
+
+        assertEquals(
+            listOf("Lean on the wall" to setOf("u_2"), "Wave" to emptySet(), "Jump" to setOf("u_2")),
+            modules.history.entries.value.map { it.text to it.partners },
+        )
     }
 
     @Test
@@ -182,7 +279,7 @@ class GenerationScreensTest {
         s.onFragment { fragment ->
             val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
             assertTrue(binding.sharedHint.isShown)
-            assertEquals(string(R.string.describe_shared_hint, "Junhyeong"), binding.sharedHint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Junhyeong"), binding.sharedHint.text.toString())
             binding.descriptionInput.requestFocus()
             binding.descriptionInput.setText("wave")
         }
@@ -528,7 +625,7 @@ class GenerationScreensTest {
         s.onFragment {
             val hint = FragmentPickPoseBinding.bind(it.requireView()).sharedHint
             assertTrue(hint.isShown)
-            assertEquals(string(R.string.pose_shared_hint, "Junhyeong"), hint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Junhyeong"), hint.text.toString())
         }
     }
 

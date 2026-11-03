@@ -20,6 +20,7 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.ScreenLanguages
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -71,6 +72,8 @@ class TestAppContainer(
     candidateImage: () -> Bitmap = { fakeBitmap() },
     /** The screens' language for the server's text; none unless a test checks it. */
     val screenLanguages: ScreenLanguages? = null,
+    /** Whether the first-use tutorial was seen; yes unless a test is about it, so a screen test stays on its screen. */
+    tutorialSeen: Boolean? = true,
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -79,6 +82,9 @@ class TestAppContainer(
     val reference = MirrorReference()
     val settings = CameraSettings.InMemory()
     val consent = IdleConsent()
+
+    /** The descriptions used before; a test records the ones its screen should list. */
+    val history = PromptHistory.InMemory()
     val maker = ScriptedGuideMaker()
     val generator = ScriptedPoseGenerator()
 
@@ -92,7 +98,7 @@ class TestAppContainer(
     val friends = FakeFriendsRepository()
     val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
-    val appSettings = AppSettings.InMemory()
+    val appSettings = AppSettings.InMemory(tutorial = tutorialSeen)
     val language = AppLanguage.InMemory()
     val syncer =
         GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
@@ -133,6 +139,7 @@ class TestAppContainer(
         poseTipper = tipper,
         poseTips = tips,
         generationConsent = consent,
+        promptHistory = history,
         authRepository = auth,
         friendsRepository = friends,
         googleIdTokens = FakeGoogleIdTokens(),

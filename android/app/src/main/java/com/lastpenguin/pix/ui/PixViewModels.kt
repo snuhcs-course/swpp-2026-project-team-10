@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.core.AppContainer
+import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.ui.account.AccountViewModel
 import com.lastpenguin.pix.ui.account.FriendsViewModel
 import com.lastpenguin.pix.ui.camera.CameraViewModel
@@ -56,6 +58,8 @@ object PixViewModels {
                 container.personDetector,
                 share = container.poseSyncer,
                 descriptions = container.descriptionSyncer,
+                history = container.promptHistory,
+                partner = { container.sessionManager.state.value.partner },
             )
         }
         initializer {
@@ -87,7 +91,9 @@ object PixViewModels {
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }
         initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
-        initializer { SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer) }
+        initializer {
+            SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer, container.promptHistory)
+        }
         initializer { AccountViewModel(container.authRepository, container.googleIdTokens) }
         initializer { FriendsViewModel(container.authRepository, container.friendsRepository) }
         initializer { SettingsViewModel(container.appSettings, container.appLanguage, container.authRepository) }

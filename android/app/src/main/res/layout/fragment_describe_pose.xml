@@ -27,26 +27,13 @@
                 style="@style/Widget.Pix.Header.Back"
                 android:contentDescription="@string/cancel" />
 
-            <LinearLayout
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:accessibilityHeading="true"
-                    android:text="@string/describe_title"
-                    android:textAppearance="@style/TextAppearance.Pix.Header" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/describe_body"
-                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-            </LinearLayout>
+                android:accessibilityHeading="true"
+                android:text="@string/describe_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
         </LinearLayout>
 
         <!-- The scene photo the poses are made from. -->
@@ -155,21 +142,81 @@
             tools:text="Junhyeong is typing…"
             tools:visibility="visible" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/ideas_label"
-            android:textAppearance="@style/TextAppearance.Pix.Overline" />
-
-        <!-- The idea chips (R.array.pose_ideas); a tap fills the field, which can then be edited. -->
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/ideaChips"
+        <!-- The descriptions used before (FR-4.11), hidden while there are none: the header with, in a session with a
+             friend, the All / With <name> switch, then the entries as chips, newest first, each with a ✕. -->
+        <LinearLayout
+            android:id="@+id/historySection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            app:chipSpacingHorizontal="8dp"
-            app:chipSpacingVertical="0dp" />
+            android:layout_marginTop="16dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:accessibilityHeading="true"
+                    android:text="@string/history_label"
+                    android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+                <!-- The whole history, or the one with the session's friend; gone without a friend (a room code, or
+                     no session). The chosen half is selected. -->
+                <LinearLayout
+                    android:id="@+id/historyFilter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_segment_track"
+                    android:padding="2dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <Button
+                        android:id="@+id/historyAll"
+                        style="@style/Widget.Pix.Button.Segment.Small"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/history_all" />
+
+                    <!-- A name may have 30 characters: cut short, so All stays on the screen beside it. -->
+                    <Button
+                        android:id="@+id/historyWithPartner"
+                        style="@style/Widget.Pix.Button.Segment.Small"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="160dp"
+                        tools:text="With Junhyeong" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- One item_history_chip per entry shown; a tap fills the field, which can then be edited. -->
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/historyChips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="0dp" />
+
+            <!-- With the friend chosen and nothing used with them yet. -->
+            <TextView
+                android:id="@+id/historyEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                android:visibility="gone"
+                tools:text="Nothing used with Junhyeong yet"
+                tools:visibility="visible" />
+        </LinearLayout>
 
         <Space
             android:layout_width="match_parent"

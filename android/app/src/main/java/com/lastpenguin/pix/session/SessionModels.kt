@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.signaling.IceServer
@@ -22,12 +22,21 @@ sealed interface SessionEntry {
      */
     data class Rejoin(val code: String) : SessionEntry
 
-    /** Photographer: the place an invitation opened when it was sent (Design 2.6.6); `Inviting` until the friend comes. */
-    data class Invite(val invitationId: String, val place: SessionPlace) : SessionEntry
+    /**
+     * Photographer: the place an invitation opened when it was sent (Design 2.6.6); `Inviting` until the friend comes.
+     * [partner] is the friend invited.
+     */
+    data class Invite(val invitationId: String, val place: SessionPlace, val partner: SessionPartner) : SessionEntry
 
-    /** Subject: the place accepting an invitation gave this phone. */
-    data class Invitation(val invitationId: String, val place: SessionPlace) : SessionEntry
+    /** Subject: the place accepting an invitation gave this phone. [partner] is the friend who invited. */
+    data class Invitation(val invitationId: String, val place: SessionPlace, val partner: SessionPartner) : SessionEntry
 }
+
+/**
+ * The friend on the other phone of an invitation's session, by account (FR-4.11): [userId] names them in the prompt
+ * history, and [displayName] is their name as *Friends* shows it. A room code's session has none.
+ */
+data class SessionPartner(val userId: String, val displayName: String)
 
 /**
  * A place in a session that the server opened over REST, for an invitation (Design 2.6.6): taken with `session.join`,
@@ -64,13 +73,27 @@ sealed interface SessionState {
 
     data class Connecting(val sessionId: String?) : SessionState
 
-    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role) : SessionState
+    /** [partner] is the friend of an invitation's session (Design 2.6.6); null in a room code's. */
+    data class Connected(
+        val sessionId: String,
+        val peer: PeerInfo,
+        val role: Role,
+        val partner: SessionPartner? = null,
+    ) : SessionState
 
     /**
      * Both phones: the link dropped while connected, and the session tries to restore it for up to 10 s from [since],
-     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11).
+     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11). [partner] stays the friend of `Connected`.
      */
-    data class Reconnecting(val sessionId: String, val since: Long) : SessionState
+    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
 
     data class Ended(val reason: EndReason) : SessionState
 }
+
+/** The friend of an invitation's session while it is connected or reconnecting (FR-4.11); null otherwise. */
+val SessionState.partner: SessionPartner?
+    get() = when (this) {
+        is SessionState.Connected -> partner
+        is SessionState.Reconnecting -> partner
+        else -> null
+    }

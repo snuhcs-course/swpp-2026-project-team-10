@@ -1,7 +1,6 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
 package com.lastpenguin.pix.ui
 
-import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
@@ -45,18 +44,6 @@ class KoreanStringsTest {
             key != "app_name" && LETTER in text.replace("%%", "").replace(ARGUMENT, "")
         }
         assertEquals(emptyMap<String, String>(), worded)
-    }
-
-    @Test
-    fun koreanIdeaChips_matchTheEnglishOnes_andFitTheDescriptionField() {
-        val ideas = korean.arrays.getValue("pose_ideas")
-
-        assertEquals(english.arrays.getValue("pose_ideas").size, ideas.size)
-        assertEquals(ideas.size, ideas.toSet().size)
-        for (idea in ideas) {
-            assertTrue(idea, idea.isNotBlank())
-            assertTrue(idea, idea.codePointCount(0, idea.length) <= DESCRIPTION_MAX_LENGTH)
-        }
     }
 
     @Test

@@ -246,12 +246,14 @@
                 tools:text="@string/photo_saved"
                 tools:visibility="visible" />
 
+            <!-- What the screen does not show by itself: a hidden guide, or that a pinch zooms (Design 2.6.8). -->
             <TextView
                 android:id="@+id/hintText"
                 style="@style/Widget.Pix.Chip.Small"
-                app:drawableStartCompat="@drawable/ic_target_small"
-                app:drawableTint="@color/pix_accent"
-                android:text="@string/hint_add_guide" />
+                android:visibility="invisible"
+                tools:drawableStartCompat="@drawable/ic_zoom_small"
+                tools:text="@string/hint_pinch_zoom"
+                tools:visibility="visible" />
         </LinearLayout>
 
         <!-- A subject is watching this camera (FR-6.8): a blinking red light at the image's top right, placed in code. -->

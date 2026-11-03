@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Jaewan Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -109,7 +109,6 @@ class AddGuideSheetTest {
 
         onSheet { binding ->
             assertEquals(string(R.string.replace_guide_title), binding.titleText.text.toString())
-            assertEquals(string(R.string.replace_guide_body), binding.bodyText.text.toString())
             assertEquals(string(R.string.keep_current_guide), binding.cancelButton.text.toString())
         }
     }

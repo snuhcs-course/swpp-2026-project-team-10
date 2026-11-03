@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -85,7 +85,7 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         }
         val name = ui.photographerName
         binding.sharedHint.isVisible = name != null
-        if (name != null) binding.sharedHint.text = getString(R.string.pose_shared_hint, name)
+        if (name != null) binding.sharedHint.text = getString(R.string.shared_hint, name)
         val count = ui.candidates.size
         // No pose names travel; a screen reader says which of the candidates it is instead.
         val slots = ui.candidates.mapIndexed { index, (poseId, image) ->

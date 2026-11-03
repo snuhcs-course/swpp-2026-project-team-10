@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han and Jaewan Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -53,7 +53,6 @@ class AddGuideSheet : BottomSheetDialogFragment() {
         // The Guide button opens this sheet in both cases; with a guide on the camera it is the way to replace it.
         if (referenceViewModel.replacing) {
             binding.titleText.setText(R.string.replace_guide_title)
-            binding.bodyText.setText(R.string.replace_guide_body)
             binding.cancelButton.setText(R.string.keep_current_guide)
         }
 

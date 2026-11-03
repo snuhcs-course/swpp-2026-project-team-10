@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -14,8 +14,10 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -50,8 +52,11 @@ interface DescriptionShare {
     /** The description is now [text], with [writer]'s field holding it; null while nobody types. */
     fun update(descriptionId: String, text: String, writer: Role?)
 
-    /** A set started from the description ([started]), or Generate poses closed without one. */
-    fun end(descriptionId: String, started: Boolean)
+    /**
+     * A set started from the description ([started]), with the [text] it was asked with, as the set's request has
+     * it, or Generate poses closed without one.
+     */
+    fun end(descriptionId: String, started: Boolean, text: String = "")
 
     /** For a phone with nothing to share, such as the ViewModel's tests. */
     object None : DescriptionShare {
@@ -61,7 +66,7 @@ interface DescriptionShare {
 
         override fun update(descriptionId: String, text: String, writer: Role?) = Unit
 
-        override fun end(descriptionId: String, started: Boolean) = Unit
+        override fun end(descriptionId: String, started: Boolean, text: String) = Unit
     }
 }
 
@@ -80,6 +85,12 @@ data class MirrorDescription(
 data class DescriptionEnd(val descriptionId: String, val started: Boolean)
 
 /**
+ * Subject: a set the photographer's phone started from a description, for the prompt history (FR-4.11): [text] as the
+ * set's request had it, and [partner], the friend of an invitation's session as it was when the set started.
+ */
+data class StartedDescription(val text: String, val partner: SessionPartner?)
+
+/**
  * Shows the photographer's *Generate poses* on the subject's *Generate poses* (Design 2.5.1: pose.description,
  * pose.scene.*, pose.description.edit, pose.description.go; Design 2.6.5, *Generate poses on both phones*). One field
  * at a time holds the description: the photographer's phone, the single source of truth (AD-7), decides whose.
@@ -92,9 +103,9 @@ data class DescriptionEnd(val descriptionId: String, val started: Boolean)
  * field the subject held does not stay held; deciding is GenerationViewModel's.
  *
  * Subject ([startAsReceiver]): keeps the description in [mirror], in memory only, through a reconnect, and drops it at
- * its end, at another description, and when the session ends, saying in [ended] how it ended. [edit] sends the field's
- * text, and [go] sends *Generate 4 poses* or *Skip* and waits [GO_TIMEOUT_MS] for the description's end; otherwise
- * [goFailed].
+ * its end, at another description, and when the session ends, saying in [ended] how it ended and in [started] what
+ * description a set was made from, for the prompt history (FR-4.11). [edit] sends the field's text, and [go] sends
+ * *Generate 4 poses* or *Skip* and waits [GO_TIMEOUT_MS] for the description's end; otherwise [goFailed].
  * Owner: Shared steps (Iter3-P16).
  */
 class DescriptionSyncer(
@@ -114,12 +125,15 @@ class DescriptionSyncer(
         val writer: Role? = null,
         val rejected: Boolean = false,
     ) {
-        /** What the subject is told of it; text, writer, and rejected only while it is open. */
+        /**
+         * What the subject is told of it: writer and rejected only while it is open, and the text also with STARTED,
+         * as the set was asked for it and empty for suggested poses, for the subject's prompt history (FR-4.11).
+         */
         val message: SessionMessage.PoseDescription
-            get() = if (step == DescriptionStep.OPEN) {
-                SessionMessage.PoseDescription(descriptionId, step, text, writer, rejected)
-            } else {
-                SessionMessage.PoseDescription(descriptionId, step)
+            get() = when (step) {
+                DescriptionStep.OPEN -> SessionMessage.PoseDescription(descriptionId, step, text, writer, rejected)
+                DescriptionStep.STARTED -> SessionMessage.PoseDescription(descriptionId, step, text)
+                DescriptionStep.CLOSED -> SessionMessage.PoseDescription(descriptionId, step)
             }
     }
 
@@ -142,10 +156,14 @@ class DescriptionSyncer(
         }
     }
 
-    override fun end(descriptionId: String, started: Boolean) {
+    override fun end(descriptionId: String, started: Boolean, text: String) {
         shared.update { description ->
             if (description?.descriptionId == descriptionId && description.step == DescriptionStep.OPEN) {
-                SharedDescription(descriptionId, if (started) DescriptionStep.STARTED else DescriptionStep.CLOSED)
+                if (started) {
+                    SharedDescription(descriptionId, DescriptionStep.STARTED, text = text)
+                } else {
+                    SharedDescription(descriptionId, DescriptionStep.CLOSED)
+                }
             } else {
                 description
             }
@@ -243,6 +261,15 @@ class DescriptionSyncer(
     /** Subject: each description that ended, for the notice; kept until a screen reads it. */
     val ended: Flow<DescriptionEnd> = endings.receiveAsFlow()
 
+    private val _started = MutableSharedFlow<StartedDescription>(extraBufferCapacity = 16)
+
+    /**
+     * Subject: each set the photographer's phone started from a description, with the description as its request had
+     * it and the session's friend as the start found it, for this phone's prompt history (FR-4.11); a set of
+     * suggested poses is not reported. Not kept: the history follows it for the life of the app.
+     */
+    val started: Flow<StartedDescription> = _started.asSharedFlow()
+
     private val failures = Channel<String>(Channel.BUFFERED)
 
     /** Subject: each *Generate 4 poses* or *Skip* that no end answered within [GO_TIMEOUT_MS], or that was not sent. */
@@ -324,7 +351,7 @@ class DescriptionSyncer(
                 if (current?.descriptionId != message.descriptionId) answer()
                 _mirror.value = MirrorDescription(
                     message.descriptionId,
-                    message.text,
+                    message.text.orEmpty(),
                     message.writer,
                     message.rejected,
                     current?.takeIf { it.descriptionId == message.descriptionId }?.scene,
@@ -337,7 +364,16 @@ class DescriptionSyncer(
                 current.descriptionId == message.descriptionId -> {
                     answer()
                     _mirror.value = null
-                    endings.trySend(DescriptionEnd(message.descriptionId, message.step == DescriptionStep.STARTED))
+                    val started = message.step == DescriptionStep.STARTED
+                    endings.trySend(DescriptionEnd(message.descriptionId, started))
+                    if (started) {
+                        // The set's text, empty for suggested poses; a photographer of an older version sends none
+                        // with STARTED, and the copy's last text stands in. The friend is read here, not where the
+                        // history records it, because the link can drop between the two.
+                        val text = message.text ?: current.text
+                        val partner = session.state.value.partner
+                        if (text.isNotBlank()) _started.tryEmit(StartedDescription(text, partner))
+                    }
                 }
 
                 // The photographer tells only of its last description, so the one held here is over; how it ended is

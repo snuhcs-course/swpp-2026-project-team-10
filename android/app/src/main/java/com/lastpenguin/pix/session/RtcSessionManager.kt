@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -108,6 +108,9 @@ class RtcSessionManager(
     /** The last round trips of this phone's pings, newest last, for [latencyMs]. */
     private val roundTrips = ArrayDeque<Long>()
     private var code: String? = null
+
+    /** The friend of an invitation's session, for `Connected` (FR-4.11); null in a room code's. */
+    private var partner: SessionPartner? = null
     private var sessionId: String? = null
     private var iceServers: List<IceServer> = emptyList()
     private var signalingJob: Job? = null
@@ -205,6 +208,11 @@ class RtcSessionManager(
         code = when (entry) {
             is SessionEntry.RoomCode -> entry.code
             is SessionEntry.Rejoin -> entry.code
+            else -> null
+        }
+        partner = when (entry) {
+            is SessionEntry.Invite -> entry.partner
+            is SessionEntry.Invitation -> entry.partner
             else -> null
         }
         greeting = when {
@@ -740,7 +748,7 @@ class RtcSessionManager(
         if (_state.value !is SessionState.Connecting || openChannels.size != 2) return
         connectTimeout?.cancel()
         connectTimeout = null
-        _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role))
+        _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.connected")
         pingJob?.cancel()
         pingJob = scope.launch {
@@ -760,7 +768,7 @@ class RtcSessionManager(
     private fun startReconnecting() {
         val id = sessionId ?: return
         val since = clock()
-        _state.value = SessionState.Reconnecting(id, since)
+        _state.value = SessionState.Reconnecting(id, since, partner)
         Timings.mark("session.reconnecting")
         clearLatency()
         reconnectBudget?.cancel()
@@ -790,7 +798,7 @@ class RtcSessionManager(
         if (Channel.RELIABLE !in openChannels) return
         reconnectBudget?.cancel()
         reconnectBudget = null
-        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role))
+        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.reconnected", "${clock() - state.since} ms")
     }
 
@@ -1078,6 +1086,7 @@ class RtcSessionManager(
         signaling.close()
         role = null
         code = null
+        partner = null
         sessionId = null
         rejoinToken = null
         greeting = null

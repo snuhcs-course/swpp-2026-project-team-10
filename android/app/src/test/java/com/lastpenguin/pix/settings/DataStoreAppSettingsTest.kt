@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.settings
 
 import androidx.test.core.app.ApplicationProvider
@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -32,17 +33,21 @@ class DataStoreAppSettingsTest {
         val settings = DataStoreAppSettings(ApplicationProvider.getApplicationContext(), scope)
         assertEquals(GuideLook(GuideColor.WHITE, GuideThickness.NORMAL), settings.guideLook.value)
         assertFalse(settings.showLatency.value)
+        assertEquals(false, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.filterNotNull().first() })
 
         settings.setGuideColor(GuideColor.BLACK)
         settings.setGuideThickness(GuideThickness.THICK)
         settings.setShowLatency(true)
+        settings.setTutorialSeen()
         val chosen = GuideLook(GuideColor.BLACK, GuideThickness.THICK)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { settings.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { settings.showLatency.first { it } })
+        assertEquals(true, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.first { it == true } })
 
         val restarted = DataStoreAppSettings(ApplicationProvider.getApplicationContext(), scope)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { restarted.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { restarted.showLatency.first { it } })
+        assertEquals(true, withTimeout(TIMEOUT_MS) { restarted.tutorialSeen.first { it == true } })
         scope.cancel()
     }
 

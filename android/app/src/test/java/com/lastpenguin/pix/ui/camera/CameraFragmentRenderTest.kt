@@ -130,10 +130,10 @@ class CameraFragmentRenderTest {
             assertTrue(controls.shutterButton.isEnabled)
             assertEquals(string(R.string.zoom_ratio, "1.0"), controls.zoomReadout.text.toString())
             assertTrue(controls.zoomReadout.isEnabled)
-            // No guide yet: no guide controls, no edit-mode toggle, the hint says to add one.
+            // No guide yet: no guide controls, no edit-mode toggle, and no hint, since the tutorial shows Guide.
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)
-            assertEquals(string(R.string.hint_add_guide), controls.hintText.text.toString())
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             // No flash and no exposure range in the capabilities: both controls are hidden (FR-1.11, FR-1.12).
             assertEquals(View.GONE, controls.flashButton.visibility)
             assertEquals(View.GONE, controls.brightnessButton.visibility)
@@ -179,7 +179,8 @@ class CameraFragmentRenderTest {
             assertTrue(controls.guideOverlay.editable)
             assertTrue(controls.opacitySlider.isEnabled)
             assertEquals(string(R.string.guide_opacity_percent, 50), controls.opacityValue.text.toString())
-            assertEquals(string(R.string.hint_edit_guide), controls.hintText.text.toString())
+            // How to move it is the tutorial's (FR-10.4): edit mode shows no hint.
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             assertEquals(string(R.string.guide_change_description), controls.guideButton.contentDescription)
             assertTrue(controls.guideButton.isActivated)
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
@@ -199,6 +200,7 @@ class CameraFragmentRenderTest {
             assertFalse(controls.editGuideButton.isChecked)
             assertFalse(controls.guideOverlay.editable)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
+            assertEquals(View.VISIBLE, controls.hintText.visibility)
         }
     }
 
@@ -219,6 +221,7 @@ class CameraFragmentRenderTest {
             assertFalse(controls.editGuideButton.isEnabled)
             assertEquals(string(R.string.show_guide), controls.hideGuideButton.contentDescription)
             assertEquals(string(R.string.hint_guide_hidden), controls.hintText.text.toString())
+            assertEquals(View.VISIBLE, controls.hintText.visibility)
             // The reference stays in its corner while the guide is hidden (FR-3.9).
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
         }
@@ -245,7 +248,7 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)
             assertEquals(View.GONE, controls.referenceThumbnail.visibility)
-            assertEquals(string(R.string.hint_add_guide), controls.hintText.text.toString())
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             assertFalse(controls.guideButton.isActivated)
         }
     }
@@ -376,12 +379,16 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.referenceThumbnail.visibility)
             assertEquals(View.INVISIBLE, controls.guideButton.visibility)
             assertEquals(View.VISIBLE, controls.captureControls.visibility)
+            // Framing needs no words (FR-10.4); what is sent is said once the photo is shown (FR-4.2).
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             controls.shutterButton.performClick()
         }
         idle()
 
         onScreen { controls, _ ->
             assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
+            assertEquals(string(R.string.scene_review_body), controls.hintText.text.toString())
+            assertEquals(View.VISIBLE, controls.hintText.visibility)
             assertEquals(View.VISIBLE, controls.sceneStill.visibility)
             assertEquals(View.VISIBLE, controls.sceneReviewControls.visibility)
             assertEquals(View.GONE, controls.captureControls.visibility)

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -130,7 +130,7 @@ class SubjectPickPoseFragmentTest {
             assertEquals(2, binding.candidatePager.adapter?.itemCount)
             assertEquals("1 / 2", binding.pageCounter.text.toString())
             assertEquals(View.GONE, binding.tryOtherButton.visibility)
-            assertEquals(string(R.string.pose_shared_hint, "Dongje"), binding.sharedHint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Dongje"), binding.sharedHint.text.toString())
             assertTrue(binding.usePoseButton.isEnabled)
         }
     }

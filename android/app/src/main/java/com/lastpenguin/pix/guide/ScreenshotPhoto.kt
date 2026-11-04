@@ -2,6 +2,7 @@
 package com.lastpenguin.pix.guide
 
 import kotlin.math.abs
+import kotlin.math.max
 
 /** A pixel is the app's background within this of its color on each channel: JPEG's noise, not a photo's sky. */
 internal const val BACKGROUND_TOLERANCE = 12
@@ -9,17 +10,23 @@ internal const val BACKGROUND_TOLERANCE = 12
 /** A row is blank when this much of it is the background; the rest is a JPEG's speck. */
 private const val BLANK_FRACTION = 0.99f
 
-/** An app's flat background fills at least this part of the rows; a story or a photo has none. */
+/** An app's flat background fills at least this part of the rows; a photo filling the screen has none. */
 private const val MIN_BACKGROUND_ROWS = 0.05f
 
+/** A margin's column has its color through this much of the block, so an icon over it, as Google Lens', is let by. */
+private const val MARGIN_FRACTION = 0.9f
+
 /**
- * The photo of a feed post in a phone's screenshot (FR-2.10, Design 2.6.1, step 1): a block of rows that fills the
- * width, between rows of the app's flat background, light or dark. [pixels] are [width]×[height] ARGB, row-major.
+ * The photo in a phone's screenshot (FR-2.10, Design 2.6.1, step 1), such as an Instagram post's, one opened in Google
+ * Images or Naver, or a post shared in a story. The photo is a block of rows between rows of the app's flat background,
+ * light or dark, without the margins of one color an image viewer centers it between; in a story's frame, it is the
+ * card of a shared post when there is one ([SharedPostCard]). [pixels] are [width]×[height] ARGB, row-major. The outer
+ * 2 % on each side, where a browser draws its scrollbar, does not decide whether a row is blank.
  * Null, and the image is used whole, for anything else: an image no taller than 1.9:1 (a camera's 16:9 photo is 1.78),
- * one without a flat background (a story), a block with a column of background in it (the app's margins beside a
- * photo, or a profile grid's spacing), one shorter than 2:1 or taller than 2:3 of the width (Instagram's posts are
- * 1.91:1 to 3:4, a story 9:16), or no block that stands out. The rows are the photo's exact edges; rows of a white sky within [BACKGROUND_TOLERANCE] of a white app count as
- * the app. Plain Kotlin on the phone, so the screenshot never leaves it (FR-2.6).
+ * one without a flat background, a photo narrower than 60 % of the screen, shorter than half its width or taller than
+ * twice it (a 9:16 story is 1.78), split by a column of background (a profile grid, photos side by side), or touching
+ * the screen's top or bottom, or no photo that stands out. Rows of a white sky within [BACKGROUND_TOLERANCE] of a white
+ * app count as the app. Plain Kotlin on the phone, so the screenshot never leaves it (FR-2.6).
  */
 internal fun findScreenshotPhoto(pixels: IntArray, width: Int, height: Int): PixelRect? {
     require(pixels.size >= width * height) { "${pixels.size} pixels for ${width}x$height" }
@@ -29,15 +36,20 @@ internal fun findScreenshotPhoto(pixels: IntArray, width: Int, height: Int): Pix
 
 private class Screenshot(private val pixels: IntArray, private val width: Int, private val height: Int) {
 
+    /** The outer 2 % on each side: a scrollbar there must not join the rows above a photo to it. */
+    private val edge = width / 50
+
     fun photo(): PixelRect? {
         val background = background() ?: return null
         val blank = BooleanArray(height) { y -> isBlank(y, background) }
-        val photos = blocks(blank).filter { isPhoto(it, background) }.sortedByDescending { it.bottom - it.top }
+        val photos = blocks(blank).mapNotNull { photoIn(it, background) }
+            .map { photo -> if (isStoryFrame(photo)) sharedPostIn(photo) ?: photo else photo }
+            .sortedByDescending { it.height }
         val largest = photos.firstOrNull() ?: return null
-        // Two posts of a similar size: which one was meant is not clear, so neither.
+        // Two photos of a similar size: which one was meant is not clear, so neither.
         val next = photos.getOrNull(1)
-        if (next != null && 5 * (next.bottom - next.top) >= 4 * (largest.bottom - largest.top)) return null
-        return PixelRect(0, largest.top, width, largest.bottom)
+        if (next != null && 5 * next.height >= 4 * largest.height) return null
+        return largest
     }
 
     /** The color most rows are filled with alone, or null when too few are. */
@@ -62,8 +74,8 @@ private class Screenshot(private val pixels: IntArray, private val width: Int, p
     private fun isBlank(y: Int, background: Int): Boolean {
         val row = y * width
         var same = 0
-        for (x in 0 until width) if (close(pixels[row + x], background)) same++
-        return same >= BLANK_FRACTION * width
+        for (x in edge until width - edge) if (close(pixels[row + x], background)) same++
+        return same >= BLANK_FRACTION * (width - 2 * edge)
     }
 
     /** The runs of rows that are not blank, bottom exclusive. */
@@ -82,32 +94,91 @@ private class Screenshot(private val pixels: IntArray, private val width: Int, p
         return blocks
     }
 
-    /** A photo's place: 2:1 to 2:3 of the width, the background above and below, and nothing but photo across. */
-    private fun isPhoto(block: Rows, background: Int): Boolean {
-        val rows = block.bottom - block.top
-        if (2 * rows < width || 2 * rows > 3 * width) return false
-        if (block.top == 0 || block.bottom == height) return false
-        return !hasGap(block, background)
+    /**
+     * The photo in a block, between the margins a viewer centers it between; null when the block touches the screen's
+     * top or bottom, or is not one photo of a photo's size and shape.
+     */
+    private fun photoIn(block: Rows, background: Int): PixelRect? {
+        if (block.top == 0 || block.bottom == height) return null
+        val sides = sides(block)
+        val photo = PixelRect(sides.left, block.top, sides.right, block.bottom)
+        if (!hasPhotoShape(photo) || hasGap(photo, background, sides.margin)) return null
+        return photo
     }
 
     /**
-     * A column of background inside the block, away from its outer 2 %: the app's margins beside a photo that does not
-     * fill the width, or the space between a grid's photos.
+     * The photo's sides: inside margins of one color, trimmed from both sides at once while both are that color, since
+     * a viewer centers the photo. A flat area on one side only, such as a plain wall, is the photo's. A block that keeps
+     * its outer 2 % reaches the screen's side.
      */
-    private fun hasGap(block: Rows, background: Int): Boolean {
-        val margin = width / 50
+    private fun sides(block: Rows): Sides {
+        var left = edge
+        var right = width - edge
+        var margin: Int? = null
+        while (left < right) {
+            val color = columnColor(left, block) ?: break
+            val other = columnColor(right - 1, block) ?: break
+            if (!close(color, other) || (margin != null && !close(color, margin))) break
+            if (margin == null) margin = color
+            left++
+            right--
+        }
+        if (margin != null) {
+            while (left < right && isColor(columnColor(left, block), margin)) left++
+            while (right > left && isColor(columnColor(right - 1, block), margin)) right--
+        }
+        return Sides(if (left == edge) 0 else left, if (right == width - edge) width else right, margin)
+    }
+
+    /** The color column [x] has through [MARGIN_FRACTION] of the block's rows, or null when it has none. */
+    private fun columnColor(x: Int, block: Rows): Int? {
         val rows = block.bottom - block.top
-        return (margin until width - margin).any { x ->
+        val samples = listOf(block.top + rows / 4, block.top + rows / 2, block.top + rows * 3 / 4)
+        return samples.map { pixels[it * width + x] }.firstOrNull { color ->
             var same = 0
-            for (y in block.top until block.bottom) if (close(pixels[y * width + x], background)) same++
-            same >= BLANK_FRACTION * rows
+            for (y in block.top until block.bottom) if (close(pixels[y * width + x], color)) same++
+            same >= MARGIN_FRACTION * rows
         }
     }
 
+    /** At least 60 % of the screen's width, and half to twice as tall as wide: 1.91:1 up to a 9:16 story. */
+    private fun hasPhotoShape(photo: PixelRect): Boolean =
+        5 * photo.width >= 3 * width && 2 * photo.height >= photo.width && photo.height <= 2 * photo.width
+
+    /**
+     * A column of the background or of the margins' color through the photo's rows, in its middle three fifths: a
+     * grid's spacing or the space between photos side by side. A white wall at the photo's edge is not one.
+     */
+    private fun hasGap(photo: PixelRect, background: Int, margin: Int?): Boolean =
+        (photo.left + photo.width / 5 until photo.right - photo.width / 5).any { x ->
+            var same = 0
+            for (y in photo.top until photo.bottom) {
+                val pixel = pixels[y * width + x]
+                if (close(pixel, background) || isColor(pixel, margin)) same++
+            }
+            same >= BLANK_FRACTION * photo.height
+        }
+
+    /** The card of a post shared in a story's [frame], when it has a photo's size and shape. */
+    private fun sharedPostIn(frame: PixelRect): PixelRect? =
+        SharedPostCard(pixels, width, frame).find()?.takeIf(::hasPhotoShape)
+
+    /** A story's frame: the whole width, at least 1.7 times as tall. */
+    private fun isStoryFrame(photo: PixelRect): Boolean =
+        photo.left == 0 && photo.right == width && 10 * photo.height >= 17 * width
+
     private class Rows(val top: Int, val bottom: Int)
+
+    /** A photo's [left] and [right] sides, and the color of the margins trimmed beside it, if any. */
+    private class Sides(val left: Int, val right: Int, val margin: Int?)
 }
 
-private fun close(a: Int, b: Int): Boolean =
-    abs((a shr 16 and 0xFF) - (b shr 16 and 0xFF)) <= BACKGROUND_TOLERANCE &&
-        abs((a shr 8 and 0xFF) - (b shr 8 and 0xFF)) <= BACKGROUND_TOLERANCE &&
-        abs((a and 0xFF) - (b and 0xFF)) <= BACKGROUND_TOLERANCE
+private fun isColor(color: Int?, other: Int?): Boolean = color != null && other != null && close(color, other)
+
+private fun close(a: Int, b: Int): Boolean = colorStep(a, b) <= BACKGROUND_TOLERANCE
+
+/** The largest difference between two ARGB colors on a channel. */
+internal fun colorStep(a: Int, b: Int): Int = max(
+    abs((a shr 16 and 0xFF) - (b shr 16 and 0xFF)),
+    max(abs((a shr 8 and 0xFF) - (b shr 8 and 0xFF)), abs((a and 0xFF) - (b and 0xFF))),
+)

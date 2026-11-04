@@ -3,8 +3,8 @@ package com.lastpenguin.pix.guide
 
 /**
  * A phone's screenshot drawn in ARGB pixels for the screenshot cut (FR-2.10): the app's flat [background] with lines of
- * text and icons inside its 16 px margins, and photos of a scene whose colors change every pixel. Half a phone's size
- * by default (540 × 1170, 19.5:9). Real screenshots are never committed: they show other people's photos.
+ * text and icons inside its 16 px margins, and photos of a detailed scene. Half a phone's size by default (540 × 1170,
+ * 19.5:9). Real screenshots are never committed: they show other people's photos.
  */
 internal class FakeScreenshot(
     val width: Int = 540,
@@ -43,6 +43,32 @@ internal class FakeScreenshot(
         if (height - 40 > top + rows + 60 + TEXT_ROWS) text(height - 40)
     }
 
+    /**
+     * Google Images in Chrome, dark: the page's header right above the photo, the photo [rows] tall from [top] centered
+     * on a grey panel with [margin] on each side, Google Lens' icon over the panel, the title under it, and Chrome's
+     * scrollbar down the right edge. Make it with [VIEWER_PAGE] as the background.
+     */
+    fun viewer(rows: Int, margin: Int, top: Int = VIEWER_TOP) {
+        text(10)
+        text(56)
+        text(top - 50)
+        fill(0, top, width, top + rows, VIEWER_PANEL)
+        photo(top, rows, margin, width - margin)
+        fill(margin / 3, top + rows - 50, margin * 2 / 3, top + rows - 20, rgb(240, 240, 240))
+        text(top + rows + 30)
+        scrollbar()
+    }
+
+    /** A browser's scrollbar, 8 px wide (1.5 %, as Chrome's) inside the right edge's 2 %, from top to bottom. */
+    fun scrollbar() = fill(width - 9, 0, width - 1, height, rgb(81, 82, 86))
+
+    /** A blurred background from [top], [rows] tall, across the width: it changes by at most 1 from pixel to pixel. */
+    fun blur(top: Int, rows: Int) {
+        for (y in top until top + rows) {
+            for (x in 0 until width) pixels[y * width + x] = rgb(60 + y / 24, 70 + x / 24, 90 + (x + y) / 48)
+        }
+    }
+
     fun fill(left: Int, top: Int, right: Int, bottom: Int, color: Int) {
         for (y in top until bottom) {
             for (x in left until right) pixels[y * width + x] = color
@@ -57,16 +83,23 @@ internal class FakeScreenshot(
         /** Instagram's dark background. */
         val DARK = rgb(13, 16, 21)
 
+        /** Google Images' dark page, and the panel behind a photo, more than the tolerance apart. */
+        val VIEWER_PAGE = rgb(29, 29, 31)
+        val VIEWER_PANEL = rgb(43, 46, 53)
+
         const val POST_TOP = 170
+        const val VIEWER_TOP = 200
         const val TEXT_ROWS = 24
 
         fun rgb(red: Int, green: Int, blue: Int): Int = (0xFF shl 24) or (red shl 16) or (green shl 8) or blue
 
-        /** A scene's pixel: every channel 30–229, so never within the tolerance of white or of the dark background. */
-        fun scene(x: Int, y: Int): Int = rgb(
-            30 + (x * 7 + y * 3) % 200,
-            40 + (x * 3 + y * 5) % 180,
-            50 + (x + y * 2) % 160,
-        )
+        /**
+         * A scene's pixel, as detailed as a photo's: it changes from pixel to pixel, and every channel is 30–229, so
+         * never within the tolerance of white or of a dark background.
+         */
+        fun scene(x: Int, y: Int): Int {
+            val hash = (x * 73_856_093) xor (y * 19_349_663)
+            return rgb(30 + (hash ushr 4) % 200, 40 + (hash ushr 12) % 180, 50 + (hash ushr 20) % 160)
+        }
     }
 }

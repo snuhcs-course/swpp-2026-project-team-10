@@ -24,9 +24,9 @@ import org.robolectric.annotation.GraphicsMode
  * the thumbnail); a field with nothing in it (no person); the model not there (the failure passed on); a photo
  * that is not ARGB_8888 (converted); a large photo (shrunk to 1280 px, the thumbnail to 512 px).
  * A picked image (FR-2.10, step 1), read from a file: a screenshot of a feed post (cut, so the segmenter, the anchor,
- * and the thumbnail have the photo alone, and the guide keeps the screenshot and where the photo was), the same with
- * the whole image asked for (not cut), and a camera photo (not cut); a generated pose shaped like a screenshot is never
- * cut.
+ * and the thumbnail have the photo alone, and the guide keeps the screenshot and where the photo was), a screenshot of a
+ * photo centered in an image viewer (cut at its sides too), the same with the whole image asked for (not cut), and a
+ * camera photo (not cut); a generated pose shaped like a screenshot is never cut.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -140,6 +140,19 @@ class MlKitReferenceGuideMakerTest {
         val anchor = checkNotNull(guide.anchor)
         assertTrue("anchor $anchor", abs(anchor.centerY - 0.65f) < 0.05f)
         assertEquals(384 to 512, guide.reference!!.width to guide.reference!!.height)
+    }
+
+    @Test
+    fun aViewerScreenshot_isCutAtThePhotosSidesToo() = runBlocking {
+        val segmenter = FieldSegmenter(standing)
+        val screen = FakeScreenshot(background = FakeScreenshot.VIEWER_PAGE).apply { viewer(rows = 600, margin = 60) }
+        val bitmap = Bitmap.createBitmap(screen.pixels, screen.width, screen.height, Bitmap.Config.ARGB_8888)
+
+        val guide = maker(segmenter).make(file(bitmap)).getOrThrow()
+
+        // The photo, 420 × 600 from (60, 200), without the grey panel beside it or the page's header above.
+        assertEquals(420 to 600, segmenter.lastSize)
+        assertEquals(NormalizedRect(60f / 540, 200f / 1170, 480f / 540, 800f / 1170), checkNotNull(guide.crop).photo)
     }
 
     @Test

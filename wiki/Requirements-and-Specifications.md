@@ -51,6 +51,7 @@
 | 2.28 | 2026-11-04 | The guide library (Iter3-A8, [#170]): FR-3.8 revised (up to 100 guides, deleted in the library) and FR-3.11, the library; *My library* with *Add photo* in place of *Upload a reference* and the saved guides' row (FR-2.1, FR-6.15, US-1, US-3); the *Add a pose guide* row and a new *Library* row in 6.2, and the save notices on *Camera + guide*; the *Tutorial* row's tips on *Add a pose guide*, on *Add photo* and the saved guides (6.10); Flow 1 drawn with *My library* and the Library, and Flow 2's sheet with *My library* (Figures 1 and 2). |
 | 2.29 | 2026-11-04 | A generated pose saved with ♥ (Iter3-A9, [#171]): FR-4.14; the ♥ on *Pick a pose* in 6.3, and on both phones' *Pick a pose* in 6.5 and 6.6; FR-3.8 names the ♥ beside *Save guide*; Figures 2, 4, and 5 drawn with the ♥. |
 | 2.30 | 2026-11-04 | A screenshot cut to its photo (Iter3-A10, [#174]): FR-2.10; FR-2.3 and the F2 row with the cut; US-2's cases for a screenshot, *Use the whole image*, and a camera photo or a story; the *Reference confirm* row in 6.2; Figure 1 drawn with the cut. |
+| 2.31 | 2026-11-04 | Screenshots from other apps (Iter3-A11, [#177]): FR-2.10 revised, a photo centered between margins as in Google Images and Naver, and a story cut to its frame or to a shared post's card instead of used whole; US-2's cases. |
 
 Items marked **TBD** need a team decision.
 
@@ -204,7 +205,7 @@ Each requirement describes one behavior the app must show. User stories in 4.4 r
 | FR-2.7 | Closing the picker without choosing returns to the camera, and any existing guide stays unchanged. | Must | It 1 |
 | FR-2.8 | Dropped: a guide that keeps the reference's background (section 7). | — | Dropped |
 | FR-2.9 | The outline has smooth edges, and the arms and legs keep their real shape and length instead of coming out jagged, too thick, or too long. The same outline is built on the subject's phone from the received guide. | Must | It 2 |
-| FR-2.10 | A screenshot of a feed post, an image taller than 1.9:1 with one photo across its width between the app's flat background, light or dark, is cut to that photo on the phone before the person is separated, so the outline, where it starts (FR-3.1), the thumbnail on Camera (FR-3.9), and the photo saved with the guide (FR-3.8) are the post's alone. A camera photo, a story, a profile grid, and a screenshot in which no one photo stands out are used whole. *Reference confirm* shows the cut once: the whole screenshot, the photo framed while the rest dims, and the photo filling the card, which then goes small to a corner as the outline appears; with "Cut from a screenshot" and *Use the whole image*, which makes the guide again from the whole screenshot. | Should | It 3 |
+| FR-2.10 | A screenshot of a photo on an app's flat interface, an image taller than 1.9:1, is cut to that photo on the phone before the person is separated, so the outline, where it starts (FR-3.1), the thumbnail on Camera (FR-3.9), and the photo saved with the guide (FR-3.8) are the photo's alone. The photo can fill the width, as an Instagram post's does, or be centered between margins, as in Google Images or Naver's image search, light or dark (Iter3-A11). A story is cut to its frame, without the status bar and the reply field, and a post shared in it to the post's card, without the blurred copy around it; #174 used a story whole. A camera photo, a profile grid, photos side by side, and a screenshot in which no one photo stands out are used whole. *Reference confirm* shows the cut once: the whole screenshot, the photo framed while the rest dims, and the photo filling the card, which then goes small to a corner as the outline appears; with "Cut from a screenshot" and *Use the whole image*, which makes the guide again from the whole screenshot. | Should | It 3 |
 
 #### F3 · Guide overlay
 *Place the guide exactly where the person should stand.*
@@ -368,7 +369,8 @@ Each story lists its scenarios in Given-When-Then form. **Normal** is the expect
 | **Normal** | *Reference confirm* is showing | I tap *Use this guide* | The camera shows the guide over the live preview. |
 | **Normal** | I tapped *Guide › Add photo* | I choose a screenshot of an Instagram post, in light or dark mode | *Reference confirm* shows the screenshot cut to the post's photo, then the outline of the post's person only, with "Cut from a screenshot" and the photo small in a corner. After *Save guide*, the library shows only the post's photo. |
 | **Edge** | *Reference confirm* shows "Cut from a screenshot" | I tap *Use the whole image* | The guide is made again from the whole screenshot, and the chip goes. |
-| **Edge** | I tapped *Guide › Add photo* | I choose a camera photo or a screenshot of a story | It is used whole, with no cut. |
+| **Normal** | I tapped *Guide › Add photo* | I choose a screenshot of a photo opened in Google Images or Naver, or of an Instagram story | *Reference confirm* shows the photo alone: without the page's header or the margins beside it, and in a story without the progress bar, the reply field, or the blurred copy around a shared post. |
+| **Edge** | I tapped *Guide › Add photo* | I choose a camera photo | It is used whole, with no cut. |
 | **Failure** | I chose a photo with no person, such as a landscape | Processing finishes | *No person found* appears. *Choose another photo* reopens the picker, and *Back to camera* returns without a guide. |
 | **Edge** | The photo shows two people | Processing finishes | Both people are included in the guide. |
 | **Edge** | The photo picker is open and a guide was already set | I close the picker without choosing | I return to the camera, and the existing guide is unchanged. |
@@ -886,3 +888,4 @@ These screens follow from the requirements above but are not yet in the wirefram
 [#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
 [#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171
 [#174]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/174
+[#177]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/177

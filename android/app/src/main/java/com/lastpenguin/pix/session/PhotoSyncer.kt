@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -20,9 +20,12 @@ import java.util.zip.CRC32
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -31,7 +34,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** What the Camera screen tells the subject's phone about its photos (FR-6.14), the photographer's side of [PhotoSyncer]. */
 interface PhotoShare {
-    /** The shutter was pressed: the id of the session the photo belongs to, or null outside a session. */
+    /**
+     * The shutter was pressed: the id of the session the photo belongs to, or null outside a session. A connected
+     * subject hears of it at once (`photo.shutter`).
+     */
     fun shutter(): String?
 
     /** The photo of [sessionId], from [shutter], taken at [takenAt], is saved here as [uri]. */
@@ -81,7 +87,8 @@ class ContentPhotoReader(private val resolver: ContentResolver) : PhotoReader {
  * reach the album says so in [sendFailed], and the next one goes on. [drop] ends it all with the session.
  *
  * Subject ([startAsReceiver]): writes the chunks to one file in [partDir], not to memory, saves it to [album] at
- * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast.
+ * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, and [shutters]
+ * when each was taken, for Subject view's blink (Iter3-A12).
  * Owner: Shared steps (Iter3-P17).
  */
 class PhotoSyncer(
@@ -110,7 +117,10 @@ class PhotoSyncer(
     /** One for each photo of this session that will not reach the subject's album; none is lost unread. */
     val sendFailed: Flow<Unit> = _sendFailed.receiveAsFlow()
 
-    override fun shutter(): String? = currentSession()?.also { unconfirmed.incrementAndGet() }
+    override fun shutter(): String? = currentSession()?.also {
+        unconfirmed.incrementAndGet()
+        if (session.state.value is SessionState.Connected) session.send(SessionMessage.PhotoShutter)
+    }
 
     /**
      * Saving takes seconds, so another session may run by now: a photo goes only to the session of its shutter. One
@@ -248,6 +258,12 @@ class PhotoSyncer(
     /** True when a photo reached this phone's album, false when it could not be saved. */
     val received: Flow<Boolean> = _received.receiveAsFlow()
 
+    private val _shutters =
+        MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** Each `photo.shutter` while a screen listens; one that no screen saw is a moment gone, not kept for later. */
+    val shutters: Flow<Unit> = _shutters.asSharedFlow()
+
     fun startAsReceiver(scope: CoroutineScope) {
         scope.launch(dispatcher) {
             clearParts()
@@ -264,6 +280,7 @@ class PhotoSyncer(
                     ) {
                         photoMessages.trySend(message)
                     }
+                    if (message is SessionMessage.PhotoShutter) _shutters.tryEmit(Unit)
                 }
             }
             try {

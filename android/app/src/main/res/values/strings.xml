@@ -94,8 +94,9 @@
     <string name="scene_light_off">Light off</string>
     <string name="scene_light_on">Light on</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
-    <string name="aspect_4_3" translatable="false">4:3</string>
-    <string name="aspect_16_9" translatable="false">16:9</string>
+    <string name="aspect_ratios">Aspect ratios</string>
+    <string name="aspect_3_4" translatable="false">3:4</string>
+    <string name="aspect_9_16" translatable="false">9:16</string>
     <string name="aspect_1_1" translatable="false">1:1</string>
     <string name="brightness">Brightness</string>
     <string name="live_badge">Live · %1$s connected</string>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -12,6 +12,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.MutableLiveData
@@ -58,8 +59,10 @@ import org.robolectric.annotation.GraphicsMode
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
  * the top bar: no guide, a guide with a pose tip, and a session, at font scale 1 and 1.3, none overlapping. The camera
  * switch between the shutter and the gallery button (FR-1.14). A guide's
- * panel in the space below a 4:3 image. The frame held while the ratio changes, in its place and the old ratio's
- * area until the new one streams; a held 1:1 frame dimmed once. The zoom readout's tap
+ * panel in the space below a 4:3 image. The frame held while the ratio changes, moved with the scene into the new
+ * ratio's area as the camera rebinds (Iter3-A12; until then it kept its place and the old ratio's area until the new
+ * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
+ * The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
  */
 @RunWith(AndroidJUnit4::class)
@@ -226,27 +229,41 @@ class CameraLayoutTest {
         assertTrue(screen.controls.tipButtonFrame.isShown)
     }
 
+    /** What [view] draws, at its size. */
+    private fun drawn(view: View): Bitmap =
+        Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
+
     @Test
-    fun aHeldFrame_keepsItsPlace_whileANewRatioResizesThePreview() {
+    fun aHeldFrame_movesWithTheScene_toWhereTheNewRatioShowsIt() {
         val screen = camera()
-        val still = screen.controls.aspectStill
+        screen.streaming()
         val area = screen.controls.previewContainer
-        // The 4:3 preview's last frame, as PreviewHold puts it over the preview.
-        val frame = Bitmap.createBitmap(area.width, area.height, Bitmap.Config.ARGB_8888).apply {
-            eraseColor(Color.RED)
+        val still = screen.controls.aspectStill
+        // The preview's last frame, red, as PreviewHold takes it.
+        screen.fragment.previewFrame = {
+            Bitmap.createBitmap(area.width, area.height, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
         }
-        still.setImageBitmap(heldFrame(frame, AspectRatio.R4_3))
-        still.visibility = View.VISIBLE
 
+        // 4:3 to 16:9: the frame grows to 640 dp, and the scene a third larger with it, from edge to edge.
+        screen.controls.aspect916Option.performClick()
         screen.ratio(AspectRatio.R16_9)
-        assertTrue(still.height > frame.height)
-        val drawn = Bitmap.createBitmap(still.width, still.height, Bitmap.Config.ARGB_8888)
-        still.draw(Canvas(drawn))
+        assertEquals(640, area.box().height())
+        drawn(still).let {
+            assertEquals(Color.RED, it.getPixel(0, 0))
+            assertEquals(Color.RED, it.getPixel(it.width - 1, it.height - 1))
+        }
+        screen.rebind(CameraStatus.STARTING)
+        screen.rebind(CameraStatus.READY)
 
-        // Where it was: from the top of the taller area down to the old bottom, and nothing below.
-        assertEquals(Color.RED, drawn.getPixel(still.width / 2, 0))
-        assertEquals(Color.RED, drawn.getPixel(still.width / 2, frame.height - 1))
-        assertEquals(Color.TRANSPARENT, drawn.getPixel(still.width / 2, frame.height + 1))
+        // 16:9 to 1:1: three quarters as large, in the middle of the 4:3 area, with the ground at its sides.
+        screen.controls.aspect11Option.performClick()
+        screen.ratio(AspectRatio.R1_1)
+        assertEquals(480, area.box().height())
+        drawn(still).let {
+            val density = still.resources.displayMetrics.density
+            assertEquals(Color.RED, it.getPixel(it.width / 2, it.height / 2))
+            assertEquals(still.context.getColor(R.color.pix_ground), it.getPixel((20 * density).toInt(), it.height / 2))
+        }
     }
 
     /** A preview that streams and has a last frame to hold, which PreviewView has not without a surface. */
@@ -268,17 +285,17 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun aRatioChange_keepsTheHeldFramesPlace_untilTheNewRatioStreams() {
+    fun aRatioChange_takesTheNewRatiosArea_whileTheHeldFrameWaitsForItsStream() {
         val screen = camera()
         screen.ratio(AspectRatio.R16_9)
         screen.streaming()
 
-        // 16:9 to 1:1: the held 16:9 frame keeps its 640 dp, though 1:1 shows in the 480 dp 4:3 area.
-        screen.controls.aspectButton.performClick()
+        // 16:9 to 1:1: the 480 dp 4:3 area as the camera rebinds, the held frame in it until the new ratio streams.
+        screen.controls.aspect11Option.performClick()
         screen.ratio(AspectRatio.R1_1)
         screen.rebind(CameraStatus.STARTING)
         assertTrue(screen.controls.aspectStill.isShown)
-        assertEquals(640, screen.controls.previewContainer.box().height())
+        assertEquals(480, screen.controls.previewContainer.box().height())
 
         screen.rebind(CameraStatus.READY)
         assertFalse(screen.controls.aspectStill.isShown)
@@ -301,6 +318,29 @@ class CameraLayoutTest {
         screen.rebind(CameraStatus.READY)
         assertFalse(screen.controls.aspectStill.isShown)
         assertTrue(screen.controls.compositionOverlay.dimOutside)
+    }
+
+    @Test
+    fun theRatios_openUnderTheTopBar_inTheirShapes_eachTakingTapsOnAtLeast48dp() {
+        val screen = camera()
+        screen.controls.aspectButton.performClick()
+        idle()
+
+        val panel = screen.controls.aspectPanel.box()
+        assertTrue(panel.top >= screen.controls.topBar.box().bottom)
+        val options =
+            listOf(screen.controls.aspect916Option, screen.controls.aspect34Option, screen.controls.aspect11Option)
+        for (option in options) {
+            val box = option.box()
+            assertTrue(box.width() >= 48 && box.height() >= 48)
+            assertTrue(panel.contains(box))
+        }
+        // Left to right, the tallest first: 9:16, 3:4, 1:1, each drawn in its own shape around its label.
+        assertTrue(options.zipWithNext().all { (a, b) -> a.box().left < b.box().left })
+        val shapes = options.map { (it as ViewGroup).getChildAt(0) as TextView }
+        assertEquals(listOf("9:16", "3:4", "1:1"), shapes.map { it.text.toString() })
+        assertEquals(listOf(22 to 29, 22 to 25, 24 to 24), shapes.map { it.box().width() to it.box().height() })
+        for (shape in shapes) assertTrue(shape.paint.measureText(shape.text.toString()) <= shape.width)
     }
 
     // ---- The top bar ------------------------------------------------------------------------

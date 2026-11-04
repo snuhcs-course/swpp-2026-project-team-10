@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -70,7 +70,9 @@ import org.robolectric.annotation.GraphicsMode
  * zoom accessibility actions
  * and a tap on the readout through the quick steps (0.6×, 1×, 2×, back to 0.6×), by touch and by TalkBack; the
  * reference thumbnail's tap, drag,
- * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button; the preview's stream state;
+ * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button with its ratios (opened by the button,
+ * closed by a choice, the button, a touch elsewhere, and Back; the ratio the camera has changing nothing); the
+ * preview's stream state;
  * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap; its icon kept while other state changes.
  */
 @RunWith(AndroidJUnit4::class)
@@ -523,6 +525,8 @@ class CameraFragmentInteractionTest {
 
         onScreen { controls, _ -> controls.aspectButton.performClick() }
         idle()
+        onScreen { controls, _ -> controls.aspect916Option.performClick() }
+        idle()
         assertEquals(AspectRatio.R16_9, runBlocking { modules.settings.aspectRatio() })
 
         camera.state.value = camera.state.value.copy(aspect = AspectRatio.R1_1)
@@ -667,6 +671,58 @@ class CameraFragmentInteractionTest {
         touch(view, MotionEvent.ACTION_MOVE, Pointer(7, 100f, 200f), Pointer(31, spread, 200f))
         touch(view, MotionEvent.ACTION_POINTER_UP, Pointer(7, 100f, 200f), Pointer(31, spread, 200f), actionIndex = 1)
         touch(view, MotionEvent.ACTION_UP, Pointer(7, 100f, 200f))
+    }
+
+    /** A tap on [view] through the whole screen, from its root, as a finger would land on its middle. */
+    private fun FragmentCameraBinding.tapThroughRoot(view: View) {
+        val at = IntArray(2).also(view::getLocationInWindow)
+        val origin = IntArray(2).also(root::getLocationInWindow)
+        val x = at[0] - origin[0] + view.width / 2f
+        val y = at[1] - origin[1] + view.height / 2f
+        touch(root, MotionEvent.ACTION_DOWN, Pointer(0, x, y))
+        touch(root, MotionEvent.ACTION_UP, Pointer(0, x, y))
+    }
+
+    @Test
+    fun theRatioButton_opensTheRatios_andAChoiceTheButtonATouchElsewhereOrBackClosesThem() {
+        val modules = launch()
+        fun open() = onScreen { controls, _ -> controls.aspectPanel.isShown }
+        fun tap(view: (FragmentCameraBinding) -> View) {
+            onScreen { controls, _ -> controls.tapThroughRoot(view(controls)) }
+            idle()
+        }
+
+        // The button opens them, the camera's ratio chosen and each named for TalkBack.
+        tap { it.aspectButton }
+        assertTrue(open())
+        onScreen { controls, _ ->
+            assertTrue(controls.aspect34Option.isSelected)
+            assertFalse(controls.aspect916Option.isSelected)
+            assertEquals(string(R.string.aspect_ratio_description, "9:16"), controls.aspect916Option.contentDescription)
+        }
+
+        // The button again closes them, and does not open them again.
+        tap { it.aspectButton }
+        assertFalse(open())
+
+        // A touch on the preview closes them, and so does Back.
+        tap { it.aspectButton }
+        tap { it.previewView }
+        assertFalse(open())
+        tap { it.aspectButton }
+        scenario!!.onFragment { it.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        assertFalse(open())
+
+        // The ratio the camera has only closes them; a new one goes to the camera and is kept.
+        tap { it.aspectButton }
+        tap { it.aspect34Option }
+        assertFalse(open())
+        assertEquals(null, runBlocking { modules.settings.aspectRatio() })
+        tap { it.aspectButton }
+        tap { it.aspect11Option }
+        assertFalse(open())
+        assertEquals(AspectRatio.R1_1, runBlocking { modules.settings.aspectRatio() })
     }
 
     private fun touch(view: View, action: Int, vararg pointers: Pointer, actionIndex: Int = 0): Boolean {

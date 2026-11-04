@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -269,6 +269,15 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("photo.ack")
     data class PhotoAck(val photoId: String, val next: Int) : SessionMessage
+
+    /**
+     * The photographer pressed the shutter in a session (Design 2.5.1, Iter3-A12): the subject's video blinks then, as
+     * the photographer's preview does, and not seconds later with the photo's `photo.begin`. It goes on the realtime
+     * channel, since a blink that comes late shows a moment that has passed, and one lost shows none.
+     */
+    @Serializable
+    @SerialName("photo.shutter")
+    data object PhotoShutter : SessionMessage
 
     /** Whether the photo is in the subject's album; without it, [reason] says why not. */
     @Serializable

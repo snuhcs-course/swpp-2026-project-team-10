@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -42,8 +42,10 @@ import org.junit.Test
 /*
  * Partitions.
  * Flash: a phone with a flash (each of off, auto, on is followed by the next) and without one (the tap is ignored).
- * Aspect ratio: each ratio is followed by the next and saved; a tap while a photo is saved is ignored; a saved ratio
- * is restored at start, and none leaves the default; a ratio change re-clamps a guide and sends a final change.
+ * Aspect ratio (chosen from the ratios under the top bar since Iter3-A12; before, each tap moved to the next): each
+ * ratio chosen goes to the camera, is saved, and closes the ratios; the ratio the camera has only closes them; a choice
+ * while a photo is saved is ignored, and the shutter closes the ratios; a saved ratio is restored at start, and none
+ * leaves the default; a ratio change re-clamps a guide and sends a final change.
  * Exposure: an index inside the range, beyond each end (clamped), and a camera without compensation (ignored); the
  * brightness slider opens only with compensation.
  * Focus: a tap inside the frame on a ready camera that supports it; a camera that is not ready, a camera without a
@@ -101,26 +103,43 @@ class CameraControlsViewModelTest {
     }
 
     @Test
-    fun onAspectTap_eachRatio_movesToTheNextAndSavesIt() = runTest(dispatcher) {
+    fun onAspectChosen_eachRatio_goesToTheCameraIsSaved_andClosesTheRatios() = runTest(dispatcher) {
         start()
         runCurrent()
 
-        repeat(3) {
-            model.onAspectTap()
+        for (aspect in listOf(AspectRatio.R1_1, AspectRatio.R16_9, AspectRatio.R4_3)) {
+            model.setAspectsOpen(true)
+            model.onAspectChosen(aspect)
             runCurrent()
+            assertFalse(model.uiState.value.aspectsOpen)
         }
 
-        assertEquals(listOf(AspectRatio.R16_9, AspectRatio.R1_1, AspectRatio.R4_3), camera.aspectRequests)
+        assertEquals(listOf(AspectRatio.R1_1, AspectRatio.R16_9, AspectRatio.R4_3), camera.aspectRequests)
         assertEquals(AspectRatio.R4_3, settings.aspectRatio())
     }
 
     @Test
-    fun onAspectTap_whileAPhotoIsSaved_isIgnored() = runTest(dispatcher) {
+    fun onAspectChosen_theRatioTheCameraHas_onlyClosesTheRatios() = runTest(dispatcher) {
         start()
         runCurrent()
-        model.onShutter()
+        model.setAspectsOpen(true)
 
-        model.onAspectTap()
+        model.onAspectChosen(AspectRatio.R4_3)
+        runCurrent()
+
+        assertTrue(camera.aspectRequests.isEmpty())
+        assertFalse(model.uiState.value.aspectsOpen)
+    }
+
+    @Test
+    fun onAspectChosen_whileAPhotoIsSaved_isIgnored_andTheShutterClosesTheRatios() = runTest(dispatcher) {
+        start()
+        runCurrent()
+        model.setAspectsOpen(true)
+        model.onShutter()
+        assertFalse(model.uiState.value.aspectsOpen)
+
+        model.onAspectChosen(AspectRatio.R16_9)
         runCurrent()
 
         assertTrue(camera.aspectRequests.isEmpty())
@@ -156,12 +175,12 @@ class CameraControlsViewModelTest {
         runCurrent()
 
         // 4:3 → 16:9: the guide is a wider part of the narrower frame, so -.14 stays allowed.
-        model.onAspectTap()
+        model.onAspectChosen(AspectRatio.R16_9)
         runCurrent()
         assertEquals(-0.14f, guides.state.value.cx, EPSILON)
 
         // 16:9 → 1:1: height .7 at aspect .5 is only .35 of the frame's width, so the center moves in to -.105.
-        model.onAspectTap()
+        model.onAspectChosen(AspectRatio.R1_1)
         runCurrent()
 
         assertEquals(-0.105f, guides.state.value.cx, EPSILON)

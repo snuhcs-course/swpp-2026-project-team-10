@@ -1,11 +1,13 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
+import android.animation.ValueAnimator
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.core.animation.doOnEnd
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
@@ -29,8 +31,10 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
+import com.lastpenguin.pix.ui.camera.FramePlace
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
@@ -41,13 +45,13 @@ import com.lastpenguin.pix.ui.camera.ReferenceDragController
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
-import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
+import com.lastpenguin.pix.ui.camera.framePlace
+import com.lastpenguin.pix.ui.camera.lerp
 import com.lastpenguin.pix.ui.camera.placeReference
 import com.lastpenguin.pix.ui.camera.placeZoomRow
-import com.lastpenguin.pix.ui.camera.previewArea
-import com.lastpenguin.pix.ui.camera.previewAspect
 import com.lastpenguin.pix.ui.camera.setReferenceActions
 import com.lastpenguin.pix.ui.camera.showReference
+import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import com.lastpenguin.pix.ui.settings.followLook
@@ -55,7 +59,9 @@ import com.lastpenguin.pix.ui.settings.renderLatency
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
 import java.text.DecimalFormat
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -76,7 +82,8 @@ import org.webrtc.VideoSink
  * the photographer describes or creates poses, picks one, or checks its guide, the video says so, and their *Generate
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
  * System back asks first (R&S 6.9). The first time the video shows, the tutorial's tips of this screen come over it
- * (FR-10.4).
+ * (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as their frame does, and
+ * blinks at their shutter (Design 2.6.4).
  * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide*, the candidates, and the outline
  * Iter3-P16.
  */
@@ -98,6 +105,19 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     // Where the video is, and how much of it the top bar and the controls cover (previewArea).
     private var videoArea = PreviewArea(0f, 0f, 0f)
 
+    // Where the video shows and for which ratio; the photographer's new ratio moves it there (reshape).
+    private var shownAspect: AspectRatio? = null
+    private var shown: FramePlace? = null
+    private var move: ValueAnimator? = null
+
+    // From the photographer's new ratio while their video shows until a frame of that shape arrives: the video stays
+    // dimmed, and the grid and the guide wait for it.
+    private var reshaping = false
+    private var reshapeJob: Job? = null
+
+    // How dark the video is meant to be (renderVideo): fully before its first frame, dimmed under a text, else clear.
+    private var veil = 1f
+
     // Whether the photographer's video shows: connected, with frames coming.
     private val videoShowing = MutableStateFlow(false)
 
@@ -111,18 +131,17 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         live.init(viewModel.video.eglContext, null)
         live.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
         live.setEnableHardwareScaler(true)
-        val frames = FrameWatchdog(live)
+        veil = 1f
+        // The first frame and each new shape, at once rather than at the next check of the video.
+        val frames = FrameWatchdog(live) { view.post { if (this.view != null) onFrameShape(binding) } }
         viewModel.video.attach(frames)
         renderer = live
         watchdog = frames
-        binding.videoContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            binding.liveDot.placeIn(binding.videoContainer, viewModel.uiState.value.aspect.frameAspect)
-        }
         // The video's place follows the screen's height and the bars' (R&S 6.2, 6.6), known only after layout.
         val placeVideo = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
             if (bottom - top != oldBottom - oldTop) {
                 view.post {
-                    if (view.isAttachedToWindow) layoutVideo(binding, viewModel.uiState.value.aspect)
+                    if (view.isAttachedToWindow) placeVideo(binding)
                 }
             }
         }
@@ -185,14 +204,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.liveDot.contentDescription = ui.photographerName
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
-                        layoutVideo(binding, ui.aspect)
+                        reshape(binding, ui.aspect)
                         renderReference(binding, ui)
-                        binding.liveDot.placeIn(binding.videoContainer, ui.aspect.frameAspect)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.render(ui.guide, ui.guideState)
-                        binding.compositionOverlay.isVisible = ui.connected
+                        renderOverlays(binding, ui)
                         // Guide-edit mode (AD-17): the overlay owns the video's touches while on; the pinch zooms while off.
                         binding.guideOverlay.editable = ui.guideEditing
                         pinchZoom?.enabled = !ui.guideEditing
@@ -227,31 +245,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     ) { findNavController().currentDestination?.id == R.id.subjectFragment }
                 }
                 launch {
-                    // "Connecting…" until the session is up and its first frame has arrived; "camera paused" only when
-                    // frames stop after that (Design 2.8). A session is Connected before WebRTC delivers the first
-                    // frame, so counting the stall from the watchdog's creation showed "paused" before any video.
-                    // While the link reconnects, "Reconnecting…" over the last frame (Design 2.6.7). While the
-                    // photographer creates poses or picks one, its camera is off, and the text says why.
                     while (true) {
-                        val state = sessionViewModel.state.value
-                        val connected = state is SessionState.Connected
-                        val reconnecting = state is SessionState.Reconnecting
-                        val streaming = connected && frames.hasFrame()
-                        val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
-                        val poses = poseStatus(viewModel.uiState.value).takeIf { connected }
-                        binding.connectingText.isVisible = !streaming || stalled || poses != null
-                        binding.liveDot.isVisible = streaming && !stalled
-                        // Not while a pose step's text covers the video, which then is not what the tips show.
-                        videoShowing.value = streaming && !stalled && poses == null
-                        binding.connectingText.text = when {
-                            reconnecting -> getString(R.string.reconnecting)
-                            !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
-                            poses != null -> poses
-                            else -> getString(R.string.camera_paused)
-                        }
+                        renderVideo(binding)
                         delay(STALL_CHECK_MS)
                     }
                 }
+                // The photographer's shutter, when it is pressed rather than when the photo arrives (FR-1.5).
+                launch { sessionViewModel.shutters.collect { blinkVideo(binding.videoScrim) } }
                 launch {
                     sessionViewModel.transitions.collect { state -> onTransition(state) }
                 }
@@ -316,46 +316,183 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         super.onPause()
     }
 
-    /**
-     * Puts the video where previewArea says for [aspect], as on the Camera screen (R&S 6.2, 6.6), and the zoom row at
-     * the bottom of its image. The bottom panel gets a dark gradient while it lies over the video.
-     */
-    private fun layoutVideo(binding: FragmentSubjectBinding, aspect: AspectRatio) {
+    /** Where previewArea puts the photographer's image of [aspect] on this screen, as on theirs (R&S 6.2, 6.6). */
+    private fun placeFor(binding: FragmentSubjectBinding, aspect: AspectRatio): FramePlace? {
         val root = binding.root
-        if (root.width == 0 || root.height == 0) return
-        val area = previewArea(
+        if (root.width == 0 || root.height == 0) return null
+        return framePlace(
             root.width.toFloat(),
             root.height.toFloat(),
             binding.topBar.height - TOP_BAR_OVERHANG_DP * resources.displayMetrics.density,
             binding.bottomPanel.height.toFloat(),
-            aspect.previewAspect,
+            aspect,
         )
-        videoArea = area
+    }
+
+    /** After the screen or a bar changed size: the video in its ratio's place at once, a move ended. */
+    private fun placeVideo(binding: FragmentSubjectBinding) {
+        move?.end()
+        val aspect = shownAspect ?: viewModel.uiState.value.aspect
+        val place = placeFor(binding, aspect) ?: return
+        shownAspect = aspect
+        showPlace(binding, place)
+    }
+
+    /**
+     * Shows the video in [aspect]'s place. The photographer's new ratio while their video shows moves there in
+     * [Motion.MOVE_MS], as their own frame does (Design 2.6.4): the last frame keeps fitting the moving area, dimmed,
+     * and the grid and the guide wait until a frame of the new shape arrives or [RESHAPE_TIMEOUT_MS] has passed.
+     * Otherwise, and while animations are off, the video is there at once.
+     */
+    private fun reshape(binding: FragmentSubjectBinding, aspect: AspectRatio) {
+        if (aspect == shownAspect) return
+        val to = placeFor(binding, aspect) ?: return
+        move?.end()
+        val from = shown
+        shownAspect = aspect
+        val showing = sessionViewModel.state.value is SessionState.Connected && watchdog?.hasFrame() == true
+        if (from == null || !showing) {
+            showPlace(binding, to)
+            return
+        }
+        reshaping = true
+        reshapeJob?.cancel()
+        reshapeJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(RESHAPE_TIMEOUT_MS)
+            endReshape(binding)
+        }
+        renderVideo(binding)
+        if (Motion.on()) {
+            move = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = Motion.MOVE_MS
+                interpolator = Motion.STANDARD
+                addUpdateListener { step ->
+                    if (view != null) showPlace(binding, lerp(from, to, step.animatedValue as Float))
+                }
+                doOnEnd { if (move === it) move = null }
+                start()
+            }
+        } else {
+            showPlace(binding, to)
+        }
+        // A frame of the new shape that came first.
+        if (abs((watchdog?.shape ?: 0f) - aspect.frameAspect) < SHAPE_TOLERANCE) endReshape(binding)
+    }
+
+    /** The photographer's new shape came, or its time is up: the video clears, and the grid and the guide return. */
+    private fun endReshape(binding: FragmentSubjectBinding) {
+        if (!reshaping) return
+        reshaping = false
+        reshapeJob?.cancel()
+        reshapeJob = null
+        for (overlay in listOf(binding.guideOverlay, binding.compositionOverlay)) {
+            overlay.alpha = 0f
+            overlay.fadeTo(1f, Motion.FADE_MS)
+        }
+        renderOverlays(binding, viewModel.uiState.value)
+        renderVideo(binding)
+    }
+
+    /** The grid while connected and the guide, except while the photographer's new ratio comes. */
+    private fun renderOverlays(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.compositionOverlay.isVisible = ui.connected && !reshaping
+        binding.guideOverlay.isVisible = !reshaping
+    }
+
+    /** The first frame, or one of a new shape: the video shows at once, and a new ratio's wait ends with its shape. */
+    private fun onFrameShape(binding: FragmentSubjectBinding) {
+        val shape = watchdog?.shape ?: return
+        if (abs(shape - viewModel.uiState.value.aspect.frameAspect) < SHAPE_TOLERANCE) endReshape(binding)
+        renderVideo(binding)
+    }
+
+    /**
+     * Puts the video at [place] (R&S 6.2, 6.6): the area's margins, the live light, and the zoom row at the bottom of
+     * its image. The bottom panel gets a dark gradient while it lies over the video.
+     */
+    private fun showPlace(binding: FragmentSubjectBinding, place: FramePlace) {
+        shown = place
+        videoArea = place.area
         val container = binding.videoContainer
         val params = container.layoutParams as ViewGroup.MarginLayoutParams
-        val top = area.top.roundToInt()
-        val bottom = (root.height - area.bottom).roundToInt()
+        val top = place.area.top.roundToInt()
+        val bottom = (binding.root.height - place.area.bottom).roundToInt()
         if (params.topMargin != top || params.bottomMargin != bottom) {
             params.topMargin = top
             params.bottomMargin = bottom
             container.layoutParams = params
         }
-        binding.bottomPanel.setBackgroundResource(if (area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        binding.bottomPanel.setBackgroundResource(if (place.area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        binding.liveDot.placeAt(place.frame.copy(top = place.frame.top - place.area.top))
         placeZoomRow(binding)
     }
 
     /** The zoom row at the bottom of the video as it shows (1:1 inside the 4:3 area), above the slider and Guide. */
     private fun placeZoomRow(binding: FragmentSubjectBinding) {
-        val area = videoArea
+        val place = shown ?: return
+        val area = place.area
         if (area.bottom <= area.top) return
-        val frame = fitViewfinderFrame(
-            binding.root.width.toFloat(),
-            area.bottom - area.top,
-            viewModel.uiState.value.aspect.frameAspect,
-        )
-        val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
+        val imageBottom = minOf(place.frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
         placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin)
+    }
+
+    /**
+     * "Connecting…" until the session is up and its first frame has arrived; "camera paused" only when frames stop
+     * after that (Design 2.8). A session is Connected before WebRTC delivers the first frame, so counting the stall
+     * from the watchdog's creation showed "paused" before any video. While the link reconnects, "Reconnecting…" over
+     * the last frame (Design 2.6.7). While the photographer creates poses or picks one, its camera is off, and the
+     * text says why. The video is dark before its first frame and dims under any of these texts and while the
+     * photographer's new ratio comes (Design 2.6.4).
+     */
+    private fun renderVideo(binding: FragmentSubjectBinding) {
+        val frames = watchdog ?: return
+        val state = sessionViewModel.state.value
+        val connected = state is SessionState.Connected
+        val reconnecting = state is SessionState.Reconnecting
+        val streaming = connected && frames.hasFrame()
+        val stalled = streaming && frames.nanosSinceLastFrame() > STALL_NANOS
+        val poses = poseStatus(viewModel.uiState.value).takeIf { connected }
+        val text = !streaming || stalled || poses != null
+        binding.connectingText.isVisible = text
+        binding.liveDot.isVisible = streaming && !stalled
+        // Not while a pose step's text covers the video, which then is not what the tips show.
+        videoShowing.value = streaming && !stalled && poses == null
+        binding.connectingText.text = when {
+            reconnecting -> getString(R.string.reconnecting)
+            !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
+            poses != null -> poses
+            else -> getString(R.string.camera_paused)
+        }
+        veilVideo(
+            binding.videoScrim,
+            when {
+                !frames.hasFrame() -> 1f
+                text || reshaping -> VIDEO_DIM
+                else -> 0f
+            },
+        )
+    }
+
+    /** Takes the video's dim to [level]: it clears in [Motion.FADE_MS] and darkens in [Motion.DIM_MS]. */
+    private fun veilVideo(scrim: View, level: Float) {
+        if (level == veil) return
+        val clearing = level < veil
+        veil = level
+        if (level > 0f) scrim.isVisible = true
+        scrim.fadeTo(level, if (clearing) Motion.FADE_MS else Motion.DIM_MS) {
+            if (veil == 0f) scrim.isVisible = false
+        }
+    }
+
+    /** The photographer's shutter (photo.shutter): the video blinks as their preview does, unless it is dimmed. */
+    private fun blinkVideo(scrim: View) {
+        if (!Motion.on() || veil != 0f) return
+        scrim.alpha = 0f
+        scrim.isVisible = true
+        scrim.fadeTo(SHUTTER_DIM, Motion.BLINK_MS / 3) {
+            scrim.fadeTo(0f, Motion.BLINK_MS * 2 / 3) { if (veil == 0f) scrim.isVisible = false }
+        }
     }
 
     /**
@@ -426,6 +563,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onDestroyView() {
+        move?.let {
+            move = null
+            it.cancel()
+        }
+        shown = null
+        shownAspect = null
+        reshaping = false
         stopWatchingFront()
         referenceDrag = null
         pinchZoom?.finishInteraction()
@@ -674,14 +818,27 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         findNavController().popBackStack(R.id.cameraFragment, false)
     }
 
-    /** Passes frames to the renderer and remembers when the last one came, to detect a paused camera. */
-    private class FrameWatchdog(private val renderer: VideoSink) : VideoSink {
+    /**
+     * Passes frames to the renderer and remembers when the last one came, to detect a paused camera, and its shape. It
+     * runs on the renderer's thread and calls [onShape] there for the first frame and each new shape.
+     */
+    private class FrameWatchdog(private val renderer: VideoSink, private val onShape: () -> Unit) : VideoSink {
         @Volatile
         private var lastFrameNanos = 0L
 
+        /** The last frame's width / height as shown, its rotation applied; 0 before the first. */
+        @Volatile
+        var shape = 0f
+            private set
+
         override fun onFrame(frame: VideoFrame) {
+            val first = lastFrameNanos == 0L
             lastFrameNanos = System.nanoTime()
+            val next = if (frame.rotatedHeight > 0) frame.rotatedWidth.toFloat() / frame.rotatedHeight else 0f
+            val changed = next != shape
+            shape = next
             renderer.onFrame(frame)
+            if (first || changed) onShape()
         }
 
         /** Whether any frame has arrived since the screen opened. */
@@ -694,5 +851,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private companion object {
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
+        const val RESHAPE_TIMEOUT_MS = 2_000L
+
+        // Frames the encoder scales down keep their shape to within rounding.
+        const val SHAPE_TOLERANCE = 0.02f
+        const val VIDEO_DIM = 0.6f
+        const val SHUTTER_DIM = 0.5f
     }
 }

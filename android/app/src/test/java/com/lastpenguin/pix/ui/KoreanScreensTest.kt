@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -177,6 +177,13 @@ class KoreanScreensTest {
     @Test
     fun camera_withoutAGuide_isInKorean() {
         camera()
+        assertKorean(screen())
+    }
+
+    @Test
+    fun camera_withTheRatiosOpen_isInKorean() {
+        camera()
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).aspectButton.performClick() }
         assertKorean(screen())
     }
 

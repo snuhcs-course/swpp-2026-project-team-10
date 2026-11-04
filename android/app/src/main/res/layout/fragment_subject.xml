@@ -82,6 +82,15 @@
             android:layout_gravity="center"
             android:contentDescription="@string/subject_video_description" />
 
+        <!-- Darkens the video before its first frame, while a text covers it, while the photographer's new ratio comes,
+             and for a moment at their shutter (Design 2.6.4). A view over the renderer, whose surface takes no fade. -->
+        <View
+            android:id="@+id/videoScrim"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/pix_ground"
+            android:importantForAccessibility="no" />
+
         <!-- The same 3×3 grid as the photographer's preview, over the same fitted image; no level bar here. -->
         <com.lastpenguin.pix.ui.camera.CameraCompositionView
             android:id="@+id/compositionOverlay"

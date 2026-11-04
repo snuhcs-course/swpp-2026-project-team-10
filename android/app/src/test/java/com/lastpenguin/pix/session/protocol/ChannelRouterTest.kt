@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -56,6 +56,12 @@ class ChannelRouterTest {
         assertTrue(router.latestOnly(SessionMessage.GuideMove("g", 0.4f, 0.5f, 0.8f)))
         assertTrue(router.latestOnly(SessionMessage.ExposureSet(3)))
         assertFalse(router.latestOnly(SessionMessage.FlashSet(FlashMode.ON)))
+    }
+
+    @Test
+    fun `the shutter goes on the realtime channel, as a moment that is wrong late, and is never dropped as stale`() {
+        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.PhotoShutter))
+        assertFalse(router.latestOnly(SessionMessage.PhotoShutter))
     }
 
     @Test

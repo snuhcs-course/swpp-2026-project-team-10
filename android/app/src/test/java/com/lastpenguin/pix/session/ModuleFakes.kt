@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -284,18 +284,18 @@ class FakeRemoteVideo : RemoteVideo {
         sinks -= sink
     }
 
-    /** Delivers one frame to every attached sink, as the photographer's video would. */
-    fun deliverFrame() {
-        val frame = VideoFrame(FakeFrameBuffer, 0, 0L)
+    /** Delivers one frame, [width] by [height] as shown, to every attached sink, as the photographer's video would. */
+    fun deliverFrame(width: Int = 4, height: Int = 4) {
+        val frame = VideoFrame(FakeFrameBuffer(width, height), 0, 0L)
         sinks.toList().forEach { it.onFrame(frame) }
         frame.release()
     }
 
-    /** A 4×4 buffer that never touches native memory, so a frame can exist on the JVM. */
-    private object FakeFrameBuffer : VideoFrame.Buffer {
-        override fun getWidth(): Int = 4
+    /** A buffer that never touches native memory, so a frame can exist on the JVM. */
+    private class FakeFrameBuffer(private val width: Int, private val height: Int) : VideoFrame.Buffer {
+        override fun getWidth(): Int = width
 
-        override fun getHeight(): Int = 4
+        override fun getHeight(): Int = height
 
         override fun toI420(): VideoFrame.I420Buffer? = null
 

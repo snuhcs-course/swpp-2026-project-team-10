@@ -277,6 +277,33 @@
         <item name="android:textSize">12sp</item>
     </style>
 
+    <!-- A ratio in the ratios under the top bar (FR-1.13): a touch area as tall as the panel, sharing its width with the
+         other ratios, around the ratio's shape. Selection is View.isSelected. -->
+    <style name="Widget.Pix.AspectOption" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- The ratio's shape with its label inside, in its option's state; the size is the ratio's own. -->
+    <style name="Widget.Pix.AspectOption.Shape" parent="">
+        <item name="android:layout_gravity">center</item>
+        <item name="android:background">@drawable/bg_aspect_option</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Caption</item>
+        <item name="android:fontFamily">@font/pix_semibold</item>
+        <item name="fontFamily">@font/pix_semibold</item>
+        <item name="android:textColor">@color/aspect_option</item>
+        <item name="android:textSize">8sp</item>
+    </style>
+
     <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->
     <style name="Widget.Pix.Button.Segment" parent="Widget.Material3.Button.TextButton">
         <item name="android:minWidth">0dp</item>

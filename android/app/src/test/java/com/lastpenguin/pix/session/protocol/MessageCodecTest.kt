@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -78,6 +78,7 @@ class MessageCodecTest {
             SessionMessage.PhotoChunk("p1", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PhotoEnd("p1", 3735928559L),
             SessionMessage.PhotoAck("p1", 48),
+            SessionMessage.PhotoShutter,
             SessionMessage.PhotoSaved("p1", ok = true),
             SessionMessage.PhotoSaved("p1", ok = false, reason = PhotoRefusal.STORAGE),
             SessionMessage.Leave(EndReason.LEFT),

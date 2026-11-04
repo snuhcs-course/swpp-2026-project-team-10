@@ -126,6 +126,9 @@
     <string name="couldnt_use_photo">Couldn\'t use this photo. Try another one.</string>
     <string name="use_this_guide">Use this guide</string>
     <string name="choose_another_photo">Choose another photo</string>
+    <string name="cut_from_screenshot">Cut from a screenshot</string>
+    <string name="kept_photo_description">The photo kept from the screenshot</string>
+    <string name="use_whole_image">Use the whole image</string>
     <string name="no_person_title">No person found</string>
     <string name="no_person_message">Pick a photo where one person is clearly visible.</string>
 

@@ -31,3 +31,6 @@ server/pix.db
 # IDEs
 .idea/
 .vscode/
+
+# Real screenshots for checking the screenshot cut (#174); they show other people's photos
+.screenshots/

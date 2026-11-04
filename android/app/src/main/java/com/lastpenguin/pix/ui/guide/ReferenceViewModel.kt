@@ -60,7 +60,7 @@ enum class SavedGuideResult { USED, FAILED }
  * The Reference confirm of a pose chosen on Pick a pose is on the subject's phone too, through [confirms], and the
  * first *Use this guide* to reach this phone decides (Design 2.6.5, *Reference confirm on both phones*).
  * Owner: PM (#5); saved guides #58; pose tips; the guide from the subject Iter3-P9; the subject's pick and use
- * Iter3-P16; the library #170.
+ * Iter3-P16; the library #170; the screenshot's cut #174.
  */
 class ReferenceViewModel(
     private val maker: ReferenceGuideMaker,
@@ -75,6 +75,9 @@ class ReferenceViewModel(
     val uiState: StateFlow<ReferenceUiState> = _uiState.asStateFlow()
 
     private var making: Job? = null
+
+    /** The photo picked last, which *Use the whole image* makes the guide from again; null for a chosen pose. */
+    private var picked: Uri? = null
 
     /** The guide whose tip was asked for and that has not gone on the camera yet. */
     private var tipFor: String? = null
@@ -166,9 +169,20 @@ class ReferenceViewModel(
 
     /** A photo from the system photo picker; on a Reference confirm the subject shares, it stays shared. */
     fun onPhotoPicked(uri: Uri) {
+        picked = uri
         _chosenBy.value = null
         sharedId?.let(confirms::finding)
         make { maker.make(uri) }
+    }
+
+    /**
+     * *Use the whole image* on a screenshot cut to its photo (FR-2.10): the guide is made again from all of it, and a
+     * Reference confirm the subject shares stays shared, as with another photo.
+     */
+    fun onUseWholeImage() {
+        val uri = picked ?: return
+        sharedId?.let(confirms::finding)
+        make { maker.make(uri, wholeImage = true) }
     }
 
     /**
@@ -185,6 +199,7 @@ class ReferenceViewModel(
         saved: ReferenceGuide? = null,
     ) {
         _chosenBy.value = chosenBy
+        picked = null
         val id = UUID.randomUUID().toString()
         sharedId = id
         _sharing.value = true

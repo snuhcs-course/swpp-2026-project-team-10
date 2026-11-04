@@ -68,6 +68,14 @@
                 android:scaleType="fitCenter"
                 android:visibility="gone" />
 
+            <!-- A screenshot cut to its photo (FR-2.10): the cut, then the kept photo in the bottom right corner. -->
+            <com.lastpenguin.pix.ui.guide.ScreenshotCutView
+                android:id="@+id/screenshotCut"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/kept_photo_description"
+                android:visibility="gone" />
+
             <ProgressBar
                 android:id="@+id/referenceProgress"
                 android:layout_width="40dp"
@@ -76,19 +84,37 @@
                 android:indeterminateTint="@color/pix_accent"
                 android:visibility="gone" />
 
-            <!-- "Finding the person…" or "Person found". -->
-            <TextView
-                android:id="@+id/referenceStatus"
-                style="@style/Widget.Pix.Chip"
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_gravity="top|start"
                 android:layout_margin="14dp"
-                android:accessibilityLiveRegion="polite"
-                app:drawableTint="@color/pix_live"
-                android:text="@string/finding_person"
-                android:textColor="@color/pix_text"
-                android:visibility="invisible"
-                tools:drawableStartCompat="@drawable/ic_person_check_small"
-                tools:visibility="visible" />
+                android:orientation="vertical">
+
+                <!-- "Finding the person…" or "Person found". -->
+                <TextView
+                    android:id="@+id/referenceStatus"
+                    style="@style/Widget.Pix.Chip"
+                    android:accessibilityLiveRegion="polite"
+                    app:drawableTint="@color/pix_live"
+                    android:text="@string/finding_person"
+                    android:textColor="@color/pix_text"
+                    android:visibility="invisible"
+                    tools:drawableStartCompat="@drawable/ic_person_check_small"
+                    tools:visibility="visible" />
+
+                <!-- Only for a screenshot cut to its photo (FR-2.10). -->
+                <TextView
+                    android:id="@+id/cutChip"
+                    style="@style/Widget.Pix.Chip"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/cut_from_screenshot"
+                    android:textColor="@color/pix_text"
+                    android:visibility="gone"
+                    app:drawableStartCompat="@drawable/ic_crop_small"
+                    app:drawableTint="@color/pix_text"
+                    tools:visibility="visible" />
+            </LinearLayout>
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
 
@@ -102,6 +128,17 @@
         android:textAppearance="@style/TextAppearance.Pix.Body.Small"
         android:visibility="gone"
         tools:text="Junhyeong sees this guide too. The first to use it decides."
+        tools:visibility="visible" />
+
+    <!-- Makes the guide again from the whole screenshot (FR-2.10). -->
+    <Button
+        android:id="@+id/useWholeImageButton"
+        style="@style/Widget.Pix.Button.Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/use_whole_image"
+        android:visibility="gone"
         tools:visibility="visible" />
 
     <Button

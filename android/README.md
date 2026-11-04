@@ -64,7 +64,7 @@ All screens are in `res/navigation/nav_graph.xml`, and the app starts on Camera.
 | Camera, Camera + guide, Photo saved, live light, Scene photo, Scene photo · Review | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel`, `SettingsViewModel` |
 | Add a pose guide (bottom sheet) with *My library*, Consent notice | `guide/AddGuideSheet`, `guide/SavedGuideList` | `ReferenceViewModel`, `GenerationViewModel` |
 | Library | `guide/LibraryFragment`, `guide/LibraryAdapter` | `ReferenceViewModel` |
-| Reference confirm, No person found | `guide/ReferenceConfirmFragment`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` |
+| Reference confirm (with a screenshot's cut), No person found | `guide/ReferenceConfirmFragment`, `guide/ScreenshotCutView`, `guide/NoPersonFoundFragment` | `ReferenceViewModel` |
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel` |
 | Friends, Friends (signed out) | `account/FriendsFragment` | `FriendsViewModel`, `SessionViewModel` |
 | Add a friend, No user found | `account/AddFriendFragment` | `FriendsViewModel` |
@@ -88,7 +88,7 @@ The failure screens share `fragment_failure.xml`.
 | Package | What is in it |
 |---|---|
 | `camera/` | `CameraXController` and `PhotoSaver` behind `CameraController`, the zoom plan, and the frame cache |
-| `guide/` | The guide store, geometry, and overlay; `MlKitReferenceGuideMaker` with `SubjectSegmenter` and `OutlineExtractor`; the saved guides on disk; `GuideOutlines`, the outline at another thickness |
+| `guide/` | The guide store, geometry, and overlay; `MlKitReferenceGuideMaker` with `SubjectSegmenter` and `OutlineExtractor`, and `findScreenshotPhoto`, which cuts a screenshot of a feed post to its photo first; the saved guides on disk; `GuideOutlines`, the outline at another thickness |
 | `settings/` | `DataStoreAppSettings` behind `AppSettings`, and `AndroidAppLanguage` behind `AppLanguage` (`AppCompatDelegate`) |
 | `generation/` | `RemotePoseGenerator`, the scene photo codec, the consent flag, and the pose tips |
 | `session/` | `RtcSessionManager` with the signaling and peer-connection clients, `CameraFrameSource`, `GuideSyncer`, `DescriptionSyncer`, `PoseSyncer`, `ConfirmSyncer`, `PhotoSyncer`, `RemoteControlHandler`, and the message codec and channel routing under `protocol/` and `signaling/` |

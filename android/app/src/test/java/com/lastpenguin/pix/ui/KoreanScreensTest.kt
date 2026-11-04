@@ -33,6 +33,8 @@ import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.NormalizedRect
+import com.lastpenguin.pix.guide.PhotoCrop
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideImageCodec
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
@@ -116,7 +118,8 @@ import org.robolectric.annotation.GraphicsMode
  * without camera access, without a guide, with one, with a generated guide's tip being asked for and with the longest
  * Korean tip the server writes, taking and reviewing the scene photo, a scene photo without a person, and in a
  * session; Add a pose
- * guide with a saved guide; Reference confirm with the person found, and with the subject's pick; No person found;
+ * guide with a saved guide; Reference confirm with the person found, with a screenshot cut to its photo, and with the
+ * subject's pick; No person found;
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone, with a pose saved by its ♥, and in a
  * session; Couldn't create poses,
  * failed, refused, and without a person; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
@@ -276,6 +279,21 @@ class KoreanScreensTest {
         }
         idle()
         modules.maker.finish(Result.success(guide()))
+        assertKorean(screen())
+    }
+
+    @Test
+    fun referenceConfirm_withAScreenshotCut_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<ReferenceConfirmFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.referenceConfirmFragment)
+        }
+        scenario!!.onFragment {
+            it.requireActivity().viewModel<ReferenceViewModel>().onPhotoPicked(Uri.parse("content://photos/1"))
+        }
+        idle()
+        val crop = PhotoCrop(bitmap(54, 117), NormalizedRect(0f, 0.15f, 1f, 0.76f))
+        modules.maker.finish(Result.success(guide().copy(crop = crop)))
         assertKorean(screen())
     }
 

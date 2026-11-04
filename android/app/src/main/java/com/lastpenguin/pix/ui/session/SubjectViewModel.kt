@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -31,7 +31,8 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.ReferenceCorner
-import kotlin.coroutines.cancellation.CancellationException
+import com.lastpenguin.pix.ui.camera.ToggleLabel
+import com.lastpenguin.pix.ui.camera.toggleSaved
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -140,6 +141,11 @@ class SubjectViewModel(
 
     /** One notice per *Save guide* tap, as on the Camera screen; kept until the screen reads it. */
     val guideSaveNotices: Flow<GuideSaveNotice> = _guideSaveNotices.receiveAsFlow()
+
+    private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
+
+    /** One label per zoom step, as on the Camera screen (Design 2.8); the newest replaces one not yet shown. */
+    val toggleLabels: Flow<ToggleLabel> = _toggleLabels.receiveAsFlow()
 
     /** Each of the photographer's sets that ended, for its notice while this screen is in front (Design 2.6.5). */
     val poseSetEnds: Flow<PoseSetEnd> = poses?.ended ?: emptyFlow()
@@ -312,35 +318,21 @@ class SubjectViewModel(
     /**
      * *Save guide* (FR-6.16): keeps the guide on the video on this phone, to use again from *Add a pose guide*, as the
      * photographer's phone keeps it: the mask as received, the reference copy the thumbnail shows, the `anchor` and
-     * `source` its image carried, and the mirror's state (Design 2.6.5). Not saved twice; when
-     * [SavedGuideStore.MAX_SAVED] are saved, the store deletes the oldest and the notice says so.
+     * `source` its image carried, and the mirror's state (Design 2.6.5). Not saved twice: another tap takes it out of
+     * the saved guides again. When [SavedGuideStore.MAX_SAVED] are saved, the store deletes the oldest and the notice
+     * says so.
      */
     fun onSaveGuide() {
         val ui = _uiState.value
         val guide = ui.guide ?: return
         if (ui.savingGuide) return
-        // The store's own list, not only guideSaved, which follows it a moment later.
-        val before = savedGuides.saved.value
-        if (ui.guideSaved || before.any { it.id == guide.id }) {
-            _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
-            return
-        }
         // Without a reference copy yet, the outline is the saved guide's thumbnail.
         val kept = guide.copy(reference = ui.reference ?: guide.reference)
         val state = mirror.state.value
         _uiState.update { it.copy(savingGuide = true) }
         viewModelScope.launch {
             val notice = try {
-                savedGuides.save(kept, state).fold(
-                    onSuccess = {
-                        if (it.removedOldest) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED
-                    },
-                    onFailure = { GuideSaveNotice.FAILED },
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                GuideSaveNotice.FAILED
+                toggleSaved(savedGuides, kept, state)
             } finally {
                 _uiState.update { it.copy(savingGuide = false) }
             }
@@ -430,7 +422,10 @@ class SubjectViewModel(
     fun onZoomTap() {
         val ui = _uiState.value
         val step = nextZoomStep(quickZoomSteps(ui.minZoom, ui.maxZoom), ui.zoom) ?: return
-        if (zoomTo(step, final = true)) pendingZoomStep = step
+        if (zoomTo(step, final = true)) {
+            pendingZoomStep = step
+            _toggleLabels.trySend(ToggleLabel.Zoom(step))
+        }
     }
 
     /** Shows [ratio] and asks the photographer for it; false when the zoom cannot be changed. */

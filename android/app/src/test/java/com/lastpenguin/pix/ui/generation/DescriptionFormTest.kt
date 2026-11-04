@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -27,8 +27,9 @@ import org.robolectric.annotation.GraphicsMode
  * hidden); one chip each in their order, without the switch outside a session; a chip's tap on a field with text; its
  * ✕; in a session, the switch between all and the friend's, nothing used with the friend yet, and the friend gone; the
  * same history again (the chips kept as they are); a friend's name of 30 characters (cut short, both halves of the
- * switch on the screen). The last description rejected or not. Buttons: Generate with text, with an empty field, and
- * Skip.
+ * switch on the screen). The last description rejected or not. The one button: Suggest 4 poses for me with an empty
+ * field and one of spaces only (suggested poses), Generate 4 poses once something is typed (the text as typed), and
+ * back to Suggest when the field is emptied again; a text the other phone wrote changes it too.
  * In a session (FR-6.15): the other phone's text shown, but not over this field's typing; the field, the chips, and
  * the buttons waiting while the other person types or the link is paused, and the buttons while an answer is awaited;
  * the hint; Done and the buttons ending the typing; outside a session, nothing waits.
@@ -243,17 +244,49 @@ class DescriptionFormTest {
     }
 
     @Test
-    fun generate_sendsTheFieldAsTyped_andSkipAsksForSuggestions() {
+    fun theButton_suggestsPosesWithAnEmptyField_andGeneratesTheFieldAsTypedOnceSomethingIsTyped() {
+        val binding = form()
+        val button = binding.generateButton
+        val context = binding.root.context
+        val suggest = context.getString(R.string.suggest_four_poses)
+        val generate = context.getString(R.string.generate_four_poses)
+
+        assertEquals(suggest, button.text.toString())
+        button.performClick()
+        binding.descriptionInput.setText("   ")
+        assertEquals(suggest, button.text.toString())
+        button.performClick()
+        assertEquals(2, suggested)
+        assertTrue(generated.isEmpty())
+
+        binding.descriptionInput.setText("  Waving  ")
+        assertEquals(generate, button.text.toString())
+        button.performClick()
+        // The ViewModel decides what a padded text means.
+        assertEquals(listOf("  Waving  "), generated)
+
+        binding.descriptionInput.setText("")
+        assertEquals(suggest, button.text.toString())
+        button.performClick()
+        assertEquals(3, suggested)
+        assertEquals(1, generated.size)
+    }
+
+    @Test
+    fun theOtherPhonesText_changesTheButtonToo() {
         val binding = form()
 
-        binding.generateButton.performClick()
-        binding.descriptionInput.setText("  Waving  ")
-        binding.generateButton.performClick()
-        binding.suggestButton.performClick()
+        shared.showShared("jump", typing = null, sharedWith = "Dongje")
+        assertEquals(
+            binding.root.context.getString(R.string.generate_four_poses),
+            binding.generateButton.text.toString(),
+        )
 
-        // The ViewModel decides what an empty or padded text means.
-        assertEquals(listOf("", "  Waving  "), generated)
-        assertEquals(1, suggested)
+        shared.showShared("", typing = null, sharedWith = "Dongje")
+        assertEquals(
+            binding.root.context.getString(R.string.suggest_four_poses),
+            binding.generateButton.text.toString(),
+        )
     }
 
     @Test
@@ -269,7 +302,6 @@ class DescriptionFormTest {
         assertFalse(binding.descriptionInput.isEnabled)
         assertFalse(binding.chips().single().isEnabled)
         assertFalse(binding.generateButton.isEnabled)
-        assertFalse(binding.suggestButton.isEnabled)
         assertEquals(View.VISIBLE, binding.descriptionTyping.visibility)
         assertEquals("Dongje is typing…", binding.descriptionTyping.text.toString())
         assertEquals("Dongje sees this too", binding.sharedHint.text.toString())
@@ -311,7 +343,7 @@ class DescriptionFormTest {
         binding.generateButton.performClick()
 
         assertEquals(listOf(true, false, true, false), focus)
-        assertEquals(listOf(""), generated)
+        assertEquals(1, suggested)
     }
 
     @Test
@@ -323,6 +355,6 @@ class DescriptionFormTest {
         assertEquals(View.GONE, binding.sharedHint.visibility)
         assertEquals(View.GONE, binding.descriptionTyping.visibility)
         assertTrue(binding.descriptionInput.isEnabled)
-        assertTrue(binding.suggestButton.isEnabled)
+        assertTrue(binding.generateButton.isEnabled)
     }
 }

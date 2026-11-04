@@ -236,21 +236,16 @@
             tools:text="Junhyeong sees this too and can write it with you."
             tools:visibility="visible" />
 
-        <!-- With an empty field this asks for suggested poses, as Skip does (US-5). -->
+        <!--
+            The one button (US-5): "Suggest 4 poses for me" with an empty field, which asks for suggested poses, and
+            "Generate 4 poses" once something is typed, which asks for the description. DescriptionForm sets the text.
+        -->
         <Button
             android:id="@+id/generateButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/generate_four_poses"
+            android:text="@string/suggest_four_poses"
             app:icon="@drawable/ic_sparkle"
             app:iconSize="18dp" />
-
-        <Button
-            android:id="@+id/suggestButton"
-            style="@style/Widget.Pix.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/skip_suggest_poses" />
     </LinearLayout>
 </ScrollView>

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -6,6 +6,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.annotation.ColorRes
+import androidx.annotation.DrawableRes
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
@@ -39,14 +41,19 @@ import com.lastpenguin.pix.ui.camera.REFERENCE_SMALL_DP
 import com.lastpenguin.pix.ui.camera.ReferenceArea
 import com.lastpenguin.pix.ui.camera.ReferenceDragController
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
+import com.lastpenguin.pix.ui.camera.ToggleLabel
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
+import com.lastpenguin.pix.ui.camera.guideSaveIcon
+import com.lastpenguin.pix.ui.camera.guideSaveTint
 import com.lastpenguin.pix.ui.camera.placeReference
 import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
+import com.lastpenguin.pix.ui.camera.setLabelIcon
 import com.lastpenguin.pix.ui.camera.setReferenceActions
+import com.lastpenguin.pix.ui.camera.showPinchModeLabel
 import com.lastpenguin.pix.ui.camera.showReference
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.TutorialFragment
@@ -56,6 +63,7 @@ import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -91,6 +99,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
+    private var toggleLabelJob: Job? = null
+    private var pinchModeJob: Job? = null
 
     // Set while a step waits for this screen to be the current destination again (inFront).
     private var frontWatch: Pair<NavController, NavController.OnDestinationChangedListener>? = null
@@ -141,6 +151,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         setupZoomAccessibility(binding.zoomReadout)
         binding.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
+            showPinchMode(binding, viewModel.uiState.value.guideEditing)
         }
         // The photographer's brightness and flash from this phone (FR-7.3), on the Camera screen's scale.
         brightnessSlider = TrackedSliderController(
@@ -202,6 +213,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
                         binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
+                        if (ui.guide == null) binding.pinchModeLabel.isVisible = false
                         // Guide-colored once a guide is on the video; it then replaces the guide on both phones.
                         binding.guideButton.isActivated = ui.guide != null
                         binding.guideButton.isEnabled = ui.connected
@@ -268,11 +280,23 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             GuideSaveNotice.SAVED_OLDEST_REMOVED ->
                                 getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
 
-                            GuideSaveNotice.ALREADY_SAVED -> getString(R.string.guide_already_saved_notice)
+                            GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
 
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
-                        Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
+                        showToggleLabel(binding, text, guideSaveIcon(notice), guideSaveTint(notice))
+                    }
+                }
+                launch {
+                    viewModel.toggleLabels.collect { label ->
+                        if (label is ToggleLabel.Zoom) {
+                            showToggleLabel(
+                                binding,
+                                getString(R.string.zoom_ratio, DecimalFormat("0.#").format(label.ratio)),
+                                R.drawable.ic_zoom_small,
+                                R.color.pix_accent,
+                            )
+                        }
                     }
                 }
                 launch {
@@ -356,6 +380,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
         placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin)
+        binding.pinchModeLabel.translationY = binding.zoomRow.translationY
     }
 
     /**
@@ -691,8 +716,39 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         fun nanosSinceLastFrame(): Long = System.nanoTime() - lastFrameNanos
     }
 
+    /** What a toggle just did, at the top of the video for a few seconds, as on the Camera screen (Design 2.8). */
+    private fun showToggleLabel(
+        binding: FragmentSubjectBinding,
+        text: String,
+        @DrawableRes icon: Int,
+        @ColorRes tint: Int,
+    ) {
+        val chip = binding.toggleLabel
+        chip.text = text
+        setLabelIcon(chip, icon, tint)
+        chip.isVisible = true
+        toggleLabelJob?.cancel()
+        toggleLabelJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(LABEL_MS)
+            chip.isVisible = false
+        }
+    }
+
+    /** Over the guide-edit mode toggle for a few seconds: what a pinch moves now (Design 2.8). */
+    private fun showPinchMode(binding: FragmentSubjectBinding, guide: Boolean) {
+        showPinchModeLabel(binding.pinchModeLabel, guide)
+        pinchModeJob?.cancel()
+        pinchModeJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(LABEL_MS)
+            binding.pinchModeLabel.isVisible = false
+        }
+    }
+
     private companion object {
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
+
+        /** As long as the Camera screen's labels stay (CameraViewModel.NOTICE_MS). */
+        const val LABEL_MS = 3_000L
     }
 }

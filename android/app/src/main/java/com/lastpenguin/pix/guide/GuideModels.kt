@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -16,7 +16,7 @@ data class ReferenceGuide(
      * guide, which is an outline only (FR-2.2).
      */
     val mask: Bitmap,
-    /** Same size as [mask]; light stroke, about 8 px (3 dp) on screen. */
+    /** Same size as [mask]; light stroke, about 5.3 px (2 dp) on screen. */
     val outline: Bitmap,
     /** mask width / height. */
     val aspect: Float,

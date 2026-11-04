@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -18,11 +18,11 @@ enum class GuideColor(val argb: Int, val dark: Boolean = false) {
     PINK(0xFFFF8FB1.toInt()),
 }
 
-/** The guide line's thickness in the settings (FR-3.10), as a factor of the default 3 dp line (Design 2.6.1). */
+/** The guide line's thickness in the settings (FR-3.10), as a factor of the default 2 dp line (Design 2.6.1). */
 enum class GuideThickness(val scale: Float) {
-    THIN(2f / 3f),
+    THIN(0.75f),
     NORMAL(1f),
-    THICK(5f / 3f),
+    THICK(1.5f),
 }
 
 /** How this phone draws every guide: its own choice, never sent to the other phone, which draws in its own. */

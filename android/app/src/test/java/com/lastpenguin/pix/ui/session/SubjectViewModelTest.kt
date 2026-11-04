@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -604,7 +604,7 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun saveGuide_whenAlreadySaved_saysSoAndKeepsOneCopy() = runTest {
+    fun saveGuide_whenAlreadySaved_removesIt() = runTest {
         val store = SavedGuideStore.InMemory()
         val model = saving(store)
         val notices = mutableListOf<GuideSaveNotice>()
@@ -618,8 +618,8 @@ class SubjectViewModelTest {
         model.onSaveGuide()
         runCurrent()
 
-        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.ALREADY_SAVED), notices)
-        assertEquals(1, store.saved.value.size)
+        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.REMOVED), notices)
+        assertTrue(store.saved.value.isEmpty())
     }
 
     @Test

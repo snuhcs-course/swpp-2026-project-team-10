@@ -186,6 +186,18 @@
             android:importantForAccessibility="no"
             android:visibility="gone" />
 
+        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused, or beside the middle of the image from the
+             brightness button; drag up for brighter. It fades out after a few seconds without a touch (Design 2.8).
+             48 dp wide for the touch (NFR-16); placed in code. -->
+        <com.lastpenguin.pix.ui.camera.ExposureBarView
+            android:id="@+id/exposureBar"
+            android:layout_width="48dp"
+            android:layout_height="128dp"
+            android:layout_gravity="top|left"
+            android:visibility="gone"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible" />
+
         <ProgressBar
             android:id="@+id/cameraProgress"
             android:layout_width="40dp"
@@ -234,6 +246,19 @@
             android:layout_marginTop="12dp"
             android:gravity="center_horizontal"
             android:orientation="vertical">
+
+            <!-- What a toggle just did, such as "Guide hidden", "2×", or "Saved to My library", for a few seconds; a new
+                 toggle replaces it at once, and TalkBack reads it (Design 2.8). The hint steps aside meanwhile. -->
+            <TextView
+                android:id="@+id/toggleLabel"
+                style="@style/Widget.Pix.Chip.Small"
+                android:layout_marginBottom="8dp"
+                android:accessibilityLiveRegion="polite"
+                android:textSize="13sp"
+                android:visibility="gone"
+                tools:drawableStartCompat="@drawable/ic_visibility_off_small"
+                tools:text="@string/hint_guide_hidden"
+                tools:visibility="visible" />
 
             <!-- Saving, Photo saved, or why a photo failed (FR-1.6). -->
             <TextView
@@ -322,7 +347,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Right above the shutter's row: remote action notices, brightness, the pose tip, and the guide's controls. In
+    <!-- Right above the shutter's row: remote action notices, the pose tip, and the guide's controls. In
          the space below the image when they fit there, and over the image when it reaches the controls (R&S 6.2). -->
     <LinearLayout
         android:id="@+id/bottomOverlays"
@@ -345,50 +370,6 @@
             android:visibility="gone"
             tools:text="Junhyeong set zoom to 2×"
             tools:visibility="visible" />
-
-        <!-- Brightness (FR-1.11), opened from the button beside the zoom readout; the value is in EV. -->
-        <LinearLayout
-            android:id="@+id/brightnessPanel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_glass_panel"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:visibility="gone"
-            tools:visibility="visible">
-
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_brightness"
-                app:tint="@color/pix_text_soft" />
-
-            <com.google.android.material.slider.Slider
-                android:id="@+id/brightnessSlider"
-                style="@style/Widget.Pix.Slider"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:contentDescription="@string/brightness"
-                android:enabled="false"
-                android:value="1"
-                android:valueFrom="1"
-                android:valueTo="2" />
-
-            <TextView
-                android:id="@+id/brightnessValue"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:importantForAccessibility="no"
-                android:minWidth="40dp"
-                android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
-                tools:text="+0.7" />
-        </LinearLayout>
 
         <!-- How to hold the phone for a generated pose (FR-4.10): open once when its guide comes, "Preparing a
              tip…" until the tip arrives; a touch anywhere closes it, and the tip button in the top bar opens it
@@ -506,7 +487,8 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Opens the brightness slider over the preview (FR-1.11); checked while it is open. -->
+        <!-- Opens the brightness bar at the middle of the image's right edge (FR-1.11), without a tap to focus; checked while
+             the bar is up. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/brightnessButton"
             style="@style/Widget.Pix.Button.Icon"
@@ -591,6 +573,22 @@
                 tools:visibility="visible" />
         </LinearLayout>
     </FrameLayout>
+
+    <!-- Over the guide-edit mode toggle, for a few seconds after a tap: what a pinch moves now, Guide or Camera
+         (Design 2.8). Moved with the zoom row in code. -->
+    <TextView
+        android:id="@+id/pinchModeLabel"
+        style="@style/Widget.Pix.Chip.Small"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="4dp"
+        android:accessibilityLiveRegion="polite"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/zoomRow"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:text="@string/pinch_mode_guide"
+        tools:visibility="visible" />
 
     <LinearLayout
         android:id="@+id/bottomPanel"

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -132,7 +132,8 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
         tips = listOf(
             TutorialTip(R.string.tutorial_scene, CaptionSide.BELOW, locate = control(R.id.sceneImage)),
             TutorialTip(R.string.tutorial_describe, CaptionSide.ABOVE, locate = control(R.id.descriptionInput)),
-            TutorialTip(R.string.tutorial_suggest, CaptionSide.ABOVE, locate = control(R.id.suggestButton)),
+            // The one button, which asks for suggested poses while the field is empty (US-5).
+            TutorialTip(R.string.tutorial_suggest, CaptionSide.ABOVE, locate = control(R.id.generateButton)),
         ),
     ),
     TutorialScreen.SUBJECT_VIEW to TutorialTips(

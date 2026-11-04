@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -33,9 +33,10 @@ import kotlinx.coroutines.launch
 /**
  * *Generate poses* on the subject's phone (R&S 6.6, FR-6.15): the photographer's scene photo and description, as on
  * their phone. This phone's field holds the description while it is typed in and the photographer's does not, and
- * says who types otherwise; *Generate 4 poses* and *Skip* ask the photographer's phone, which starts the set. The screen
- * closes when the description ends, saying so when the photographer closed it. It covers Subject view, so it follows
- * the session itself, like the guide screens (Design 2.6.5). The first time either phone's Generate poses opens here,
+ * says who types otherwise; the one button, *Suggest 4 poses for me* with the field empty or *Generate 4 poses*,
+ * asks the photographer's phone, which starts the set. The screen closes when the description ends, saying so when
+ * the photographer closed it. It covers Subject view, so it follows the session itself, like the guide screens
+ * (Design 2.6.5). The first time either phone's Generate poses opens here,
  * its tutorial tips come over it (FR-10.4).
  * Owner: Shared steps (Iter3-P16).
  */

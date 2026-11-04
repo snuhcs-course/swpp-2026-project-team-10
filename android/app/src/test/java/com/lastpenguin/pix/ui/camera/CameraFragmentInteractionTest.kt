@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -71,7 +71,11 @@ import org.robolectric.annotation.GraphicsMode
  * and a tap on the readout through the quick steps (0.6×, 1×, 2×, back to 0.6×), by touch and by TalkBack; the
  * reference thumbnail's tap, drag,
  * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button; the preview's stream state;
- * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap; its icon kept while other state changes.
+ * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept while other
+ * state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its place, a drag
+ * up and down, kept up while held, gone after the idle time), on the right and, near the image's right edge, on the
+ * left; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the pinch mode's
+ * label over the guide-edit toggle, Camera then Guide.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -515,7 +519,7 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ ->
             slide(controls.opacitySlider, 0.8f)
-            slide(controls.brightnessSlider, ExposureScale.sliderValue(2, -4..4))
+            drag(controls.exposureBar, steps = 2)
         }
         idle()
         assertEquals(0.8f, modules.guides.state.value.opacity, 0.02f)
@@ -533,7 +537,7 @@ class CameraFragmentInteractionTest {
     // ---- Save guide --------------------------------------------------------------------
 
     @Test
-    fun saveGuide_fillsTheBookmarkAndSaysWhereItIs_andASecondTapSaysItIsSaved() {
+    fun saveGuide_fillsTheBookmarkAndSaysWhereItIs_andASecondTapRemovesIt() {
         val modules = launch()
         modules.guides.setGuide(guide())
         idle()
@@ -547,17 +551,147 @@ class CameraFragmentInteractionTest {
         assertEquals(listOf("guide-1"), modules.saved.saved.value.map { it.id })
         onScreen { controls, _ ->
             assertEquals(string(R.string.guide_saved), controls.saveGuideButton.contentDescription.toString())
-            assertTrue(controls.noticeText.isShown)
-            assertEquals(string(R.string.guide_saved_notice), controls.noticeText.text.toString())
+            assertTrue(controls.toggleLabel.isShown)
+            assertEquals(string(R.string.guide_saved_notice), controls.toggleLabel.text.toString())
         }
 
         onScreen { controls, _ -> controls.saveGuideButton.performClick() }
         idle()
 
-        assertEquals(1, modules.saved.saved.value.size)
+        assertTrue(modules.saved.saved.value.isEmpty())
         onScreen { controls, _ ->
-            assertEquals(string(R.string.guide_already_saved_notice), controls.noticeText.text.toString())
+            assertEquals(string(R.string.guide_removed_notice), controls.toggleLabel.text.toString())
+            assertEquals(string(R.string.save_guide), controls.saveGuideButton.contentDescription.toString())
         }
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertFalse(controls.toggleLabel.isShown) }
+    }
+
+    // ---- Design 2.8: brightness beside the focus, toggle labels --------------------------
+
+    @Test
+    fun aTapToFocus_bringsTheBrightnessBarBesideTheBox_andADragSetsIt_untilItGoesWithoutATouch() {
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        launch(camera)
+        onScreen { controls, _ -> assertFalse(controls.exposureBar.isShown) }
+
+        val (x, y) = onScreen { controls, _ ->
+            val preview = controls.previewView
+            val x = preview.width / 3f
+            val y = preview.height / 2f
+            touch(preview, MotionEvent.ACTION_DOWN, Pointer(1, x, y))
+            touch(preview, MotionEvent.ACTION_UP, Pointer(1, x, y))
+            x to y
+        }
+        idle()
+        onScreen { controls, _ ->
+            val bar = controls.exposureBar
+            val density = bar.resources.displayMetrics.density
+            assertTrue(bar.isShown)
+            assertTrue(controls.brightnessButton.isChecked)
+            // On the box's right, its 48 dp touch area reaching 12 dp over the 64 dp box, and centered on the tap.
+            assertEquals(x + 32f * density - 12f * density, bar.translationX, 1f)
+            assertEquals(y - bar.height / 2f, bar.translationY, 1f)
+            drag(bar, steps = 2)
+        }
+        idle()
+        assertEquals(2, camera.exposureRequests.last())
+
+        // Held up while a finger is on it, past the idle time.
+        onScreen { controls, _ -> touch(controls.exposureBar, MotionEvent.ACTION_DOWN, Pointer(1, 24f, 64f)) }
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertTrue(controls.exposureBar.isShown)
+            touch(controls.exposureBar, MotionEvent.ACTION_MOVE, Pointer(1, 24f, 200f))
+            touch(controls.exposureBar, MotionEvent.ACTION_UP, Pointer(1, 24f, 200f))
+        }
+        idle()
+        assertTrue(camera.exposureRequests.last() < 2)
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertFalse(controls.exposureBar.isShown)
+            assertFalse(controls.brightnessButton.isChecked)
+        }
+    }
+
+    @Test
+    fun aTapToFocusNearTheRightEdge_putsTheBrightnessBarOnTheBoxsLeft() {
+        launch(FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true))
+
+        val x = onScreen { controls, _ ->
+            val preview = controls.previewView
+            val x = preview.width - 20f
+            touch(preview, MotionEvent.ACTION_DOWN, Pointer(1, x, preview.height / 2f))
+            touch(preview, MotionEvent.ACTION_UP, Pointer(1, x, preview.height / 2f))
+            x
+        }
+        idle()
+        onScreen { controls, _ ->
+            val bar = controls.exposureBar
+            val density = bar.resources.displayMetrics.density
+            assertEquals(x - 32f * density + 12f * density - bar.width, bar.translationX, 1f)
+        }
+    }
+
+    @Test
+    fun hideAndShow_andAZoomStep_showALabelAtTheTop_thatTheNextReplaces_andThatGoes() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+
+        onScreen { controls, _ -> controls.hideGuideButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertTrue(controls.toggleLabel.isShown)
+            assertEquals(string(R.string.hint_guide_hidden), controls.toggleLabel.text.toString())
+            // The persistent hint steps aside while the label says the same.
+            assertFalse(controls.hintText.isShown)
+        }
+
+        onScreen { controls, _ -> controls.hideGuideButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.guide_shown_label), controls.toggleLabel.text.toString())
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS - 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+        onScreen { controls, _ -> assertEquals("2×", controls.toggleLabel.text.toString()) }
+        // The zoom label's own time, not the one before it.
+        shadowOf(Looper.getMainLooper()).idleFor(1_000, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertTrue(controls.toggleLabel.isShown) }
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertFalse(controls.toggleLabel.isShown) }
+    }
+
+    @Test
+    fun theGuideEditToggle_saysWhatAPinchMovesNow_overTheToggle() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+        onScreen { controls, _ -> assertFalse(controls.pinchModeLabel.isShown) }
+
+        // A new guide starts in edit mode, so the first tap gives the pinch back to the camera.
+        onScreen { controls, _ -> controls.editGuideButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            val label = controls.pinchModeLabel
+            assertTrue(label.isShown)
+            assertEquals(string(R.string.pinch_mode_camera), label.text.toString())
+            assertEquals(string(R.string.pinch_mode_camera_description), label.contentDescription.toString())
+            val toggle = IntArray(2).also(controls.editGuideButton::getLocationInWindow)
+            val above = IntArray(2).also(label::getLocationInWindow)
+            assertTrue(above[1] + label.height <= toggle[1])
+        }
+
+        onScreen { controls, _ -> controls.editGuideButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.pinch_mode_guide), controls.pinchModeLabel.text.toString())
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertFalse(controls.pinchModeLabel.isShown) }
     }
 
     @Test
@@ -649,6 +783,16 @@ class CameraFragmentInteractionTest {
         touch(slider, MotionEvent.ACTION_DOWN, Pointer(1, x, slider.height / 2f))
         touch(slider, MotionEvent.ACTION_MOVE, Pointer(1, x, slider.height / 2f))
         touch(slider, MotionEvent.ACTION_UP, Pointer(1, x, slider.height / 2f))
+    }
+
+    /** A drag up the brightness bar by [steps] exposure indexes (down for negative ones), from its middle. */
+    private fun drag(bar: ExposureBarView, steps: Int) {
+        assertTrue(bar.height > 0)
+        val travel = bar.height - 20f * bar.resources.displayMetrics.density
+        val dy = travel * steps / 8f
+        touch(bar, MotionEvent.ACTION_DOWN, Pointer(1, bar.width / 2f, bar.height / 2f))
+        touch(bar, MotionEvent.ACTION_MOVE, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
+        touch(bar, MotionEvent.ACTION_UP, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
     }
 
     /** A horizontal pinch from [from] apart to [to] apart, past the detector's slop so that it begins. */

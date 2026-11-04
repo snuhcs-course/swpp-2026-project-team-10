@@ -51,7 +51,12 @@
     <string name="guide_saved">가이드 저장됨</string>
     <string name="guide_saved_notice">가이드를 내 보관함에 저장했어요.</string>
     <string name="guide_saved_oldest_removed_notice">가이드를 저장했어요. %1$d개까지만 보관해서 가장 오래된 가이드를 지웠어요.</string>
-    <string name="guide_already_saved_notice">이미 저장한 가이드예요. 가이드에서 찾을 수 있어요.</string>
+    <string name="guide_removed_notice">내 보관함에서 뺐어요.</string>
+    <string name="guide_shown_label">가이드 표시</string>
+    <string name="pinch_mode_guide">가이드</string>
+    <string name="pinch_mode_camera">카메라</string>
+    <string name="pinch_mode_guide_description">핀치로 가이드를 움직여요</string>
+    <string name="pinch_mode_camera_description">핀치로 카메라를 확대하거나 축소해요</string>
     <string name="guide_save_failed_notice">가이드를 저장하지 못했어요. 휴대폰 저장 공간을 확인하세요.</string>
     <string name="delete_saved_guide">저장한 가이드 삭제</string>
     <string name="delete_saved_guide_title">저장한 가이드를 삭제할까요?</string>
@@ -157,7 +162,7 @@
     <string name="history_empty_with">%1$s님과 쓴 설명이 아직 없어요</string>
     <string name="history_delete">“%1$s” 설명을 기록에서 지우기</string>
     <string name="generate_four_poses">포즈 4개 생성</string>
-    <string name="skip_suggest_poses">건너뛰고 포즈 추천받기</string>
+    <string name="suggest_four_poses">포즈 4개 추천받기</string>
     <string name="choosing_poses">포즈 선택 중…</string>
     <string name="scene_photo_description">포즈를 생성할 배경 사진</string>
     <string name="creating_pose">생성 중…</string>
@@ -165,6 +170,7 @@
     <string name="ready_count">%2$d개 중 %1$d개 완료</string>
     <string name="generating_scene_caption">인물과 배경은 그대로 · 최대 60초</string>
     <string name="pick_pose_title">포즈 선택</string>
+    <string name="close_to_camera">닫고 카메라로 돌아가기</string>
     <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
     <string name="use_this_pose">이 포즈 사용</string>
     <string name="try_other_poses">다른 포즈 생성</string>

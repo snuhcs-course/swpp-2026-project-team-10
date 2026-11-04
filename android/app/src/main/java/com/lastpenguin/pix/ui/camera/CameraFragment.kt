@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
@@ -97,9 +98,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var pinchZoom: PinchZoomController? = null
     private var referenceDrag: ReferenceDragController? = null
     private var opacitySlider: TrackedSliderController? = null
-    private var brightnessSlider: TrackedSliderController? = null
     private var previewLogged = false
     private var noticeJob: Job? = null
+    private var toggleLabelJob: Job? = null
+    private var pinchModeJob: Job? = null
+
+    // Where the brightness bar stands beside: the last tap to focus, or the middle of the image (null), and when it
+    // goes again without a touch (FR-1.11, Design 2.8).
+    private var brightnessAnchor: PointF? = null
+    private var brightnessIdleJob: Job? = null
+    private var exposureBarHiding = false
 
     // The last frame stays on screen through a ratio change or a lens switch, until the rebound preview streams
     // again (NFR-19, Design 2.6.2, 2.6.5).
@@ -175,11 +183,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             { getString(R.string.guide_opacity_percent, (it * 100f).roundToInt()) },
             viewModel::onOpacityChange,
         )
-        // The slider runs from 1, because TrackedSliderController takes positive values; each step is an index.
-        brightnessSlider = TrackedSliderController(
-            controls.brightnessSlider,
-            { formatEv(sliderIndex(it)) },
-        ) { value, _ -> viewModel.onExposureChange(sliderIndex(value)) }
+        // Brightness beside the focus (FR-1.11): each step of a drag is applied as it comes, and the bar stays up while
+        // a finger is on it.
+        controls.exposureBar.describe = ::formatEv
+        controls.exposureBar.onChange = { index, _ -> viewModel.onExposureChange(index) }
+        controls.exposureBar.onTouching =
+            { touching -> if (touching) brightnessIdleJob?.cancel() else holdBrightness() }
         // While the scene photo is taken, the flash button turns the phone's light on and off instead (FR-4.1).
         controls.flashButton.setOnClickListener {
             if (isScenePhotoActive()) generationViewModel.toggleLight() else viewModel.onFlashTap()
@@ -188,8 +197,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             previewHold?.hold()
             viewModel.onAspectTap()
         }
+        // Without a tap to focus, the brightness button brings the bar up beside the middle of the image.
         controls.brightnessButton.setOnClickListener {
-            viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
+            val open = !viewModel.uiState.value.brightnessOpen
+            brightnessAnchor = null
+            viewModel.setBrightnessOpen(open)
+            if (open) holdBrightness()
         }
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
@@ -238,6 +251,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         setupTip(controls)
         controls.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
+            showPinchMode(controls, viewModel.uiState.value.guideEditing)
         }
         controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
 
@@ -368,11 +382,36 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             GuideSaveNotice.SAVED_OLDEST_REMOVED ->
                                 getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
 
-                            GuideSaveNotice.ALREADY_SAVED -> getString(R.string.guide_already_saved_notice)
+                            GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
 
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
-                        showNotice(controls, text)
+                        showToggleLabel(controls, text, guideSaveIcon(notice), guideSaveTint(notice))
+                    }
+                }
+                launch {
+                    viewModel.toggleLabels.collect { label ->
+                        when (label) {
+                            ToggleLabel.GuideHidden -> showToggleLabel(
+                                controls,
+                                getString(R.string.hint_guide_hidden),
+                                R.drawable.ic_visibility_off_small,
+                            )
+
+                            ToggleLabel.GuideShown -> showToggleLabel(
+                                controls,
+                                getString(R.string.guide_shown_label),
+                                R.drawable.ic_visibility,
+                                R.color.pix_guide,
+                            )
+
+                            is ToggleLabel.Zoom -> showToggleLabel(
+                                controls,
+                                getString(R.string.zoom_ratio, DecimalFormat("0.#").format(label.ratio)),
+                                R.drawable.ic_zoom_small,
+                                R.color.pix_accent,
+                            )
+                        }
                     }
                 }
                 launch {
@@ -398,6 +437,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             }
         }
         render(viewModel.uiState.value)
+        // A bar left up when the screen was made again still goes after a few seconds.
+        if (viewModel.uiState.value.brightnessOpen) holdBrightness()
     }
 
     override fun onResume() {
@@ -419,7 +460,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     override fun onPause() {
         pinchZoom?.finishInteraction()
         opacitySlider?.finishInteraction()
-        brightnessSlider?.finishInteraction()
+        binding?.exposureBar?.finishDrag()
         super.onPause()
     }
 
@@ -429,8 +470,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         referenceDrag = null
         opacitySlider?.finishInteraction()
         opacitySlider = null
-        brightnessSlider?.finishInteraction()
-        brightnessSlider = null
+        binding?.exposureBar?.finishDrag()
+        brightnessAnchor = null
+        exposureBarHiding = false
         previewHold?.release()
         previewHold = null
         binding = null
@@ -577,6 +619,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
         placeZoomRow(controls.zoomRow, controls.bottomOverlays, imageBottom, margin)
+        controls.pinchModeLabel.translationY = controls.zoomRow.translationY
     }
 
     private fun setupCompositionLevel(overlay: CameraCompositionView) {
@@ -654,7 +697,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.hideGuideButton.contentDescription =
             getString(if (hidden) R.string.show_guide else R.string.hide_guide)
         controls.hideGuideButton.isEnabled = guideEditable
-        // Save guide (FR-3.8): filled once saved; a tap then says where the saved guide is.
+        // Save guide (FR-3.8): filled once saved; another tap takes it out of the saved guides again.
         setIconOnce(
             controls.saveGuideButton,
             if (state.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
@@ -744,6 +787,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         renderTip(controls, state)
         renderScenePhoto(controls, generationViewModel.uiState.value, state, ready)
         renderLatency(controls)
+        // The mode's label goes with its toggle.
+        if (!controls.editGuideButton.isVisible) controls.pinchModeLabel.isVisible = false
     }
 
     /**
@@ -790,9 +835,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private fun renderReference(controls: FragmentCameraBinding, state: CameraUiState) {
         // The scene photo frames a new scene, which an earlier guide's reference is not part of.
         val reference = state.guide?.reference?.takeUnless { isScenePhotoActive() }
-        // The enlarged photo reaches under the chips: the hint steps aside, and a capture status stays on top.
-        controls.hintText.isInvisible =
-            controls.hintText.text.isNullOrEmpty() || (reference != null && state.referenceExpanded)
+        // The enlarged photo reaches under the chips: the hint steps aside, and a capture status stays on top. A
+        // toggle's label takes the hint's place while it shows.
+        controls.hintText.isInvisible = controls.hintText.text.isNullOrEmpty() ||
+            (reference != null && state.referenceExpanded) || controls.toggleLabel.isVisible
         controls.referenceThumbnail.showReference(reference) { photo ->
             if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) {
                 null
@@ -862,7 +908,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.flashButton.contentDescription =
                 getString(if (camera.torch) R.string.scene_light_on else R.string.scene_light_off)
             controls.brightnessButton.isVisible = false
-            controls.brightnessPanel.isVisible = false
+            showExposureBar(controls, false)
         }
         if (active) {
             controls.editGuideButton.isVisible = false
@@ -942,18 +988,68 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.brightnessButton.isVisible = hasBrightness
         controls.brightnessButton.isChecked = state.brightnessOpen
         controls.brightnessButton.isEnabled = ready
-        controls.brightnessPanel.isVisible = state.brightnessOpen
-        brightnessSlider?.render(
-            1f,
-            ExposureScale.sliderMax(range),
-            ExposureScale.sliderValue(state.exposure, range),
-            enabled = ready && hasBrightness,
-        )
-        controls.brightnessValue.text = formatEv(state.exposure)
+        controls.exposureBar.render(range, state.exposure, enabled = ready && hasBrightness)
+        placeExposureBar(controls, state)
+        showExposureBar(controls, state.brightnessOpen && hasBrightness)
     }
 
-    /** The exposure index for a brightness slider position (ExposureScale, shared with Subject view). */
-    private fun sliderIndex(value: Float): Int = ExposureScale.index(value, viewModel.uiState.value.exposureRange)
+    /**
+     * The brightness bar beside the focus box (Design 2.8): on its right, or its left near the image's right edge, and
+     * inside the image; at the middle of the image's right edge without a tap to focus.
+     */
+    private fun placeExposureBar(controls: FragmentCameraBinding, state: CameraUiState) {
+        val bar = controls.exposureBar
+        val preview = controls.previewView
+        val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
+        if (frame.width <= 0f || frame.height <= 0f) return
+        val width = bar.layoutParams.width.toFloat()
+        val height = bar.layoutParams.height.toFloat()
+        val anchor = brightnessAnchor
+        if (anchor == null) {
+            // At the middle of the image's right edge, clear of the horizon bar across its middle.
+            bar.translationX = maxOf(frame.left, frame.right - width)
+            bar.translationY = frame.centerY - height / 2f
+            return
+        }
+        val x = anchor.x
+        val y = anchor.y
+        val half = controls.focusRing.layoutParams.width / 2f
+        // The bar's line is in the middle of its 48 dp touch area, so the area reaches a little over the box.
+        val overlap = EXPOSURE_BAR_OVERLAP_DP * resources.displayMetrics.density
+        val right = x + half - overlap
+        val left = if (right + width <= frame.right) right else x - half + overlap - width
+        bar.translationX = left.coerceIn(frame.left, maxOf(frame.left, frame.right - width))
+        bar.translationY = (y - height / 2f).coerceIn(frame.top, maxOf(frame.top, frame.bottom - height))
+    }
+
+    /** Shows the brightness bar at once, or fades it out (Design 2.8). */
+    private fun showExposureBar(controls: FragmentCameraBinding, show: Boolean) {
+        val bar = controls.exposureBar
+        if (show) {
+            if (exposureBarHiding || !bar.isVisible) {
+                exposureBarHiding = false
+                bar.animate().cancel()
+                bar.alpha = 1f
+                bar.isVisible = true
+            }
+        } else if (bar.isVisible && !exposureBarHiding) {
+            bar.finishDrag()
+            exposureBarHiding = true
+            bar.animate().alpha(0f).setDuration(EXPOSURE_BAR_FADE_MS).withEndAction {
+                exposureBarHiding = false
+                bar.isVisible = false
+            }
+        }
+    }
+
+    /** The brightness bar goes again after [BRIGHTNESS_IDLE_MS] without a touch on it. */
+    private fun holdBrightness() {
+        brightnessIdleJob?.cancel()
+        brightnessIdleJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(BRIGHTNESS_IDLE_MS)
+            if (binding?.exposureBar?.isDragging != true) viewModel.setBrightnessOpen(false)
+        }
+    }
 
     /** An exposure index in EV, such as "+0.7" or "0". */
     private fun formatEv(index: Int): String = ExposureScale.formatEv(index, viewModel.uiState.value.exposureStep)
@@ -978,6 +1074,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         ring.animate().scaleX(1f).scaleY(1f).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
             ring.animate().alpha(0f).setStartDelay(FOCUS_RING_HOLD_MS).setDuration(FOCUS_RING_FADE_MS)
                 .withEndAction { ring.isVisible = false }
+        }
+        // Brightness is set beside where the camera focused (FR-1.11, Design 2.8).
+        if (state.exposureRange.first < state.exposureRange.last) {
+            brightnessAnchor = PointF(x, y)
+            viewModel.setBrightnessOpen(true)
+            placeExposureBar(controls, viewModel.uiState.value)
+            holdBrightness()
         }
     }
 
@@ -1107,6 +1210,39 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         button.setTag(R.id.icon_resource, icon)
     }
 
+    /**
+     * What a toggle just did, at the top of the image for [CameraViewModel.NOTICE_MS] (Design 2.8): a new label
+     * replaces the one showing at once, and the hint steps aside meanwhile.
+     */
+    private fun showToggleLabel(
+        controls: FragmentCameraBinding,
+        text: String,
+        @DrawableRes icon: Int,
+        @ColorRes tint: Int = R.color.pix_text,
+    ) {
+        val chip = controls.toggleLabel
+        chip.text = text
+        setLabelIcon(chip, icon, tint)
+        chip.isVisible = true
+        renderReference(controls, viewModel.uiState.value)
+        toggleLabelJob?.cancel()
+        toggleLabelJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(CameraViewModel.NOTICE_MS)
+            chip.isVisible = false
+            binding?.let { renderReference(it, viewModel.uiState.value) }
+        }
+    }
+
+    /** Over the guide-edit mode toggle for [CameraViewModel.NOTICE_MS]: what a pinch moves now (Design 2.8). */
+    private fun showPinchMode(controls: FragmentCameraBinding, guide: Boolean) {
+        showPinchModeLabel(controls.pinchModeLabel, guide)
+        pinchModeJob?.cancel()
+        pinchModeJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(CameraViewModel.NOTICE_MS)
+            controls.pinchModeLabel.isVisible = false
+        }
+    }
+
     private fun showNotice(controls: FragmentCameraBinding, text: String) {
         controls.noticeText.text = text
         controls.noticeText.isVisible = true
@@ -1141,5 +1277,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_HOLD_MS = 700L
         private const val FOCUS_RING_FADE_MS = 200L
         private const val CHIP_ICON_DP = 14f
+        private const val EXPOSURE_BAR_OVERLAP_DP = 12f
+        private const val EXPOSURE_BAR_FADE_MS = 200L
+
+        /** How long the brightness bar stays up without a touch (FR-1.11). */
+        const val BRIGHTNESS_IDLE_MS = 3_000L
     }
 }

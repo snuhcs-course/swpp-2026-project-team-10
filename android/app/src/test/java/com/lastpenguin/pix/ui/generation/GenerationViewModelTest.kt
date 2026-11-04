@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -1200,21 +1200,87 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun aSetMadeFromADescription_isKeptAsUsedBefore_withTheSessionsFriend() = runTest {
+    fun aSetMadeFromADescription_isKeptAsUsedBefore_onceTheServerAcceptsIt_withTheSessionsFriend() = runTest {
+        partner = SessionPartner("u_2", "Junhyeong")
         describeAPhoto()
         model.generate("  Wave  hello ")
         runCurrent()
-        assertEquals(listOf(PromptEntry("Wave hello", 1_000, Role.PHOTOGRAPHER)), history.entries.value)
+        // The friend as the set started, also when the link drops before the server answers.
+        partner = null
+        val run = generator.runs.single()
+        run.plan(listOf("Wave hello", "Wave", "Wave both hands", "Wave and smile"))
+        run.send(failed("pose-2"))
+        runCurrent()
+        // Planned, and a pose that failed, say nothing of the description yet.
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
 
-        partner = SessionPartner("u_2", "Junhyeong")
+        run.send(ready("pose-1"), ready("pose-3"))
+        runCurrent()
+        assertEquals(listOf(PromptEntry("Wave hello", 1_000, Role.PHOTOGRAPHER, setOf("u_2"))), history.entries.value)
+
         model.cancel()
         describeAPhoto()
         model.generate("Jump")
         runCurrent()
+        generator.runs.last().apply {
+            plan(listOf("Jump", "Jump high", "Jump and laugh", "Jump with arms up"))
+            send(ready("pose-1"))
+        }
+        runCurrent()
         assertEquals(
-            listOf("Jump" to setOf("u_2"), "Wave hello" to emptySet()),
+            listOf("Jump" to emptySet(), "Wave hello" to setOf("u_2")),
             history.entries.value.map { it.text to it.partners },
         )
+    }
+
+    @Test
+    fun aDescriptionTheServerTurnsDown_isNotKeptAsUsedBefore() = runTest {
+        describeAPhoto()
+        model.generate("Bleeding on the floor")
+        runCurrent()
+        val run = generator.runs.single()
+        run.plan(List(4) { "Bleeding on the floor" })
+        run.send(*(1..4).map { failed("pose-$it", GenerationError.REJECTED) }.toTypedArray())
+        run.finish()
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.FAILED, state.phase)
+        assertTrue(state.descriptionRejected)
+
+        // Nor when a set that fails for another reason is tried again and fails again.
+        model.retry()
+        runCurrent()
+        generator.runs.last().apply {
+            plan(List(4) { "Bleeding on the floor" })
+            finish(IOException("offline"))
+        }
+        runCurrent()
+
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
+    }
+
+    @Test
+    fun aSetCancelledBeforeTheServerAnswers_keepsNothing_andALaterSetKeepsOnlyItsOwn() = runTest {
+        describeAPhoto()
+        model.generate("Wave")
+        runCurrent()
+        val first = generator.runs.single()
+        first.plan(listOf("Wave", "Wave", "Wave", "Wave"))
+        runCurrent()
+        model.cancel()
+        // A candidate of the cancelled set that still arrives counts for nothing.
+        first.send(ready("pose-1"))
+        runCurrent()
+
+        describeAPhoto()
+        model.suggestPoses()
+        runCurrent()
+        generator.runs.last().apply {
+            plan()
+            send(ready("pose-1"))
+        }
+        runCurrent()
+
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
     }
 
     @Test
@@ -1237,7 +1303,13 @@ class GenerationViewModelTest {
         descriptions.request(DescriptionRequest.Edit(descriptions.ids.last(), holding = true, text = "jump"))
         descriptions.request(DescriptionRequest.Go(descriptions.ids.last(), "jump high", suggest = false))
         runCurrent()
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
 
+        generator.runs.single().apply {
+            plan(listOf("jump high", "jump", "jump with arms up", "jump and laugh"))
+            send(ready("pose-1"))
+        }
+        runCurrent()
         assertEquals(listOf(PromptEntry("jump high", 1_000, Role.PHOTOGRAPHER)), history.entries.value)
     }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park
 package com.lastpenguin.pix.guide
 
 import org.junit.Assert.assertEquals
@@ -46,7 +46,8 @@ class GuideSizesTest {
     @Test
     fun strokeScalesWithTheMaskHeight() {
         val atScreenSize = (GuideState.DEFAULT_HEIGHT * 1440f).toInt()
-        assertEquals(8f, outlineStrokePx(atScreenSize), 0.01f)
-        assertEquals(4f, outlineStrokePx(atScreenSize / 2), 0.01f)
+        // 2 dp on a typical phone (Design 2.8).
+        assertEquals(16f / 3f, outlineStrokePx(atScreenSize), 0.01f)
+        assertEquals(8f / 3f, outlineStrokePx(atScreenSize / 2), 0.01f)
     }
 }

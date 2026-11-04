@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
@@ -95,6 +95,22 @@ class CameraTipViewModelTest {
 
         model.onTipButton()
         assertTrue(model.tip!!.open)
+    }
+
+    @Test
+    fun theTipButtonWhileTheBannerIsOpen_closesIt_andAThirdTapOpensItAgain() = runTest(dispatcher) {
+        val model = model()
+        guides.setGuide(fakeGuide("g1"))
+        tips.value = GuideTip("g1", ready)
+        runCurrent()
+        assertTrue(model.tip!!.open)
+
+        model.onTipButton()
+        assertFalse(model.tip!!.open)
+
+        model.onTipButton()
+        assertTrue(model.tip!!.open)
+        assertFalse(model.tip!!.unseen)
     }
 
     @Test

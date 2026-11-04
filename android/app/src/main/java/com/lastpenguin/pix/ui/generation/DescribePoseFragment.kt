@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -37,10 +37,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks a description used before (FR-4.11), or lets the
- * server suggest four poses for the scene. Nothing is sent before *Generate 4 poses* or *Skip*. In a session the subject sees this step
- * too: one field at a time holds the description, and the subject's *Generate 4 poses* or *Skip* goes on here like this
- * phone's own (Design 2.6.5). The first time it opens, its tutorial tips come over it (FR-10.4).
+ * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks a description used before (FR-4.11), or, with
+ * the field left empty, lets the server suggest four poses for the scene. Nothing is sent before the one button,
+ * *Suggest 4 poses for me* or *Generate 4 poses*. In a session the subject sees this step too: one field at a time
+ * holds the description, and the subject's button goes on here like this phone's own (Design 2.6.5). The first time
+ * it opens, its tutorial tips come over it (FR-10.4).
  * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16.
  */
 class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
@@ -94,7 +95,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
                         form.showShared(generation.description, typing, subject)
                         // The descriptions used before, with the friend of an invitation's session, also while it reconnects (FR-4.11).
                         form.showHistory(used, session.partner)
-                        // The subject's Generate 4 poses or Skip came first: it goes on as this phone's own.
+                        // The subject's Generate 4 poses or Suggest came first: it goes on as this phone's own.
                         toGenerating()
                     }
             }
@@ -134,9 +135,10 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 }
 
 /**
- * The description field, its counter, the descriptions used before (FR-4.11), and the two buttons of Generate poses
- * (FR-4.8, US-5), on either phone. Apart from the fragments, so the form can be tested on the real layout without a
- * ViewModel or navigation. [showHistory] lists the descriptions used before as chips, all of them or, through the
+ * The description field, its counter, the descriptions used before (FR-4.11), and the one button of Generate poses
+ * (FR-4.8, US-5), on either phone: *Suggest 4 poses for me* ([onSuggest]) while the field is blank, *Generate 4
+ * poses* ([onGenerate], with the field as typed) once something is typed. Apart from the fragments, so the form
+ * can be tested on the real layout without a ViewModel or navigation. [showHistory] lists the descriptions used before as chips, all of them or, through the
  * switch, those used with the session's friend; a chip fills the field, and its ✕ asks [onForget] to drop it.
  * In a session, the field holds the description while it is focused (Design 2.6.5): Done, a closed keyboard, and
  * leaving the screen end that, and [showShared] shows what the other phone wrote and waits while it types.
@@ -148,7 +150,9 @@ class DescriptionForm(
     /** The service rejected the last description: say so under the field (US-5). */
     rejected: Boolean,
     onTextChanged: (String) -> Unit,
+    /** *Generate 4 poses*, with the field's text as typed. */
     onGenerate: (String) -> Unit,
+    /** *Suggest 4 poses for me*: the field is blank. */
     onSuggest: () -> Unit,
     /** The field took or lost focus. */
     onFocusChanged: (Boolean) -> Unit = {},
@@ -201,11 +205,8 @@ class DescriptionForm(
 
         binding.generateButton.setOnClickListener {
             stopTyping()
-            onGenerate(input.text.toString())
-        }
-        binding.suggestButton.setOnClickListener {
-            stopTyping()
-            onSuggest()
+            val text = input.text.toString()
+            if (text.isBlank()) onSuggest() else onGenerate(text)
         }
     }
 
@@ -292,16 +293,18 @@ class DescriptionForm(
         this.locked = locked
         binding.historyChips.children.forEach { it.isEnabled = !locked }
         binding.generateButton.isEnabled = !locked && !waiting
-        binding.suggestButton.isEnabled = !locked && !waiting
         binding.descriptionTyping.isVisible = typing != null
         if (typing != null) binding.descriptionTyping.text = context.getString(R.string.peer_typing, typing)
         binding.sharedHint.isVisible = sharedWith != null
         if (sharedWith != null) binding.sharedHint.text = context.getString(R.string.shared_hint, sharedWith)
     }
 
+    /** The counter, and the button for what the field holds: suggested poses while it is blank (US-5). */
     private fun renderCounter() {
         val context = binding.root.context
         binding.descriptionCounter.text =
             context.getString(R.string.description_counter, input.length(), DESCRIPTION_MAX_LENGTH)
+        val label = if (input.text.isBlank()) R.string.suggest_four_poses else R.string.generate_four_poses
+        binding.generateButton.setText(label)
     }
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -431,9 +431,41 @@ class SubjectFragmentRenderTest {
         idle()
 
         assertEquals(listOf("guide-1"), modules.saved.saved.value.map { it.id })
-        assertEquals(string(R.string.guide_saved_notice), ShadowToast.getTextOfLatestToast())
         onScreen { binding, _ ->
+            // At the top of the video, as on the Camera screen (Design 2.8).
+            assertTrue(binding.toggleLabel.isShown)
+            assertEquals(string(R.string.guide_saved_notice), binding.toggleLabel.text.toString())
             assertEquals(string(R.string.guide_saved), binding.saveGuideButton.contentDescription)
+            binding.saveGuideButton.performClick()
+        }
+        idle()
+
+        // A second tap takes it out of the saved guides again (FR-6.16).
+        assertTrue(modules.saved.saved.value.isEmpty())
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.guide_removed_notice), binding.toggleLabel.text.toString())
+            assertEquals(string(R.string.save_guide), binding.saveGuideButton.contentDescription)
+        }
+    }
+
+    @Test
+    fun theGuideEditToggle_andAZoomStep_sayWhatTheyDid() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+
+        onScreen { binding, _ -> binding.editGuideButton.performClick() }
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.pinchModeLabel.isShown)
+            assertEquals(string(R.string.pinch_mode_guide), binding.pinchModeLabel.text.toString())
+            binding.zoomReadout.performClick()
+        }
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.toggleLabel.isShown)
+            assertTrue(binding.toggleLabel.text.toString().endsWith("×"))
         }
     }
 

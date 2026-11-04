@@ -4,7 +4,7 @@ Kotlin, XML Views with ViewBinding. minSdk 29, targetSdk 36. Open this `android/
 
 ## What is here
 
-One activity with a navigation graph (`res/navigation/nav_graph.xml`), the screens of R&S 6 as Fragments and bottom sheets under `ui/`, and the modules behind the shared contracts of the Design Documentation, which `core/AppContainer.kt` creates ([Shared contracts](#shared-contracts), [Module classes](#module-classes)).
+One activity with a navigation graph (`res/navigation/nav_graph.xml`), hosted by `ui/ScreenTransitions.kt`'s `PixNavHostFragment`, which gives every move between screens its transition (Design 2.1), the screens of R&S 6 as Fragments and bottom sheets under `ui/`, and the modules behind the shared contracts of the Design Documentation, which `core/AppContainer.kt` creates ([Shared contracts](#shared-contracts), [Module classes](#module-classes)).
 
 ### Camera
 

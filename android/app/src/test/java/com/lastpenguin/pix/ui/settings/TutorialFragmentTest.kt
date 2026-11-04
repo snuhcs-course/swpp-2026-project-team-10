@@ -1,8 +1,12 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
+import android.animation.ValueAnimator
 import android.graphics.RectF
+import android.os.Looper
 import android.view.View
+import android.view.Window
+import android.view.WindowManager
 import androidx.activity.ComponentDialog
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
@@ -15,6 +19,7 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.settings.AppLanguage
 import com.lastpenguin.pix.settings.AppSettings
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.ScreenTestSupport.closeTips
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
@@ -23,6 +28,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.tipsOver
 import com.lastpenguin.pix.ui.ScreenTestSupport.tutorialOver
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.guide.AddGuideSheet
+import java.time.Duration
 import kotlin.math.max
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -34,8 +40,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
 
 /*
  * The tutorial's tips over a live screen (FR-10.4, Design 2.6.8), here over Add a pose guide, the sheet they open over
@@ -45,6 +53,9 @@ import org.robolectric.annotation.GraphicsMode
  * it shows (boundary). The captions are text, which TalkBack reads, one per ring.
  * Closing (equivalence partitioning): Back on the dialog closes them and marks the screen seen; showing them while
  * they are there adds no second layer.
+ * Fading (Iter3-A14), with the display's frames paused to see a fade's start: the tips fade in; *Got it* counts them
+ * seen at once, lets touches and keys through to the screen at once, and fades them out before they close; with the
+ * phone's animations off they come and go at once.
  * Whether a screen's tips are due: not while the stored answer loads or once seen, and still when another screen's are
  * seen; not again once closed, before the stored answer has caught up; every screen's again after *Show the tutorial
  * again*, those closed in this run too.
@@ -58,18 +69,36 @@ class TutorialFragmentTest {
 
     @After
     fun tearDown() {
+        ShadowChoreographer.setPaused(false)
+        setAnimatorScale(1f)
         scenario?.close()
     }
 
     /** Add a pose guide from Camera with its tips due, and [saved] guides kept. */
     private fun openSheet(saved: Int = 1) {
-        modules = TestAppContainer(tutorialSeen = emptySet()).install()
+        launchSheet(saved)
+        idleUntil { tips() != null && layer().placed.isNotEmpty() }
+    }
+
+    private fun launchSheet(saved: Int = 1, seen: Set<TutorialScreen> = emptySet()) {
+        modules = TestAppContainer(tutorialSeen = seen).install()
         runBlocking { repeat(saved) { modules.saved.save(guide().copy(id = "guide-$it"), GuideState()) } }
         scenario = launchFragment<AddGuideSheet>(
             fragmentArgs = bundleOf(AddGuideSheet.ARG_FROM_SUBJECT to false),
             themeResId = R.style.Theme_Pix,
         )
-        idleUntil { tips() != null && layer().placed.isNotEmpty() }
+    }
+
+    /** Lets the display's frames go until a fade has ended. */
+    private fun play() {
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(FADE_END_MS))
+    }
+
+    /** ValueAnimator's duration scale, which the phone's Remove animations sets to 0. */
+    private fun setAnimatorScale(scale: Float) {
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType)
+            .invoke(null, scale)
     }
 
     private fun tips(): TutorialScreen? {
@@ -196,6 +225,58 @@ class TutorialFragmentTest {
     }
 
     @Test
+    fun theTips_fadeIn() {
+        // Opened with its tips seen, then due again, as after *Show the tutorial again*: an activity started with the
+        // frames paused never gets its window's focus.
+        launchSheet(seen = TutorialScreen.entries.toSet())
+        idle()
+        ShadowChoreographer.setPaused(true)
+
+        runBlocking { modules.appSettings.resetTutorial() }
+        idleUntil { tips() != null }
+
+        assertEquals(0f, layer().alpha, 0f)
+        play()
+        assertEquals(1f, layer().alpha, 0f)
+    }
+
+    @Test
+    fun gotIt_countsTheTipsSeenAtOnce_letsTheScreenTakeTouches_andFadesThemOut() {
+        openSheet()
+        ShadowChoreographer.setPaused(true)
+
+        var window: Window? = null
+        scenario!!.onFragment {
+            window = TutorialFragment.over(it)!!.requireDialog().window
+            closeTips(it)
+        }
+        idle()
+
+        assertEquals(setOf(TutorialScreen.ADD_GUIDE), modules.appSettings.tutorialSeen.value)
+        val flags = window!!.attributes.flags
+        assertTrue(flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0)
+        assertTrue(flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE != 0)
+        // Still there, fading out.
+        assertEquals(1f, layer().alpha, 0f)
+        play()
+        assertNull(tips())
+    }
+
+    @Test
+    fun withAnimationsOff_theTipsComeAndGoAtOnce() {
+        setAnimatorScale(0f)
+        openSheet()
+        assertEquals(1f, layer().alpha, 0f)
+        // Nothing may wait for a display frame.
+        ShadowChoreographer.setPaused(true)
+
+        scenario!!.onFragment(::closeTips)
+        idle()
+
+        assertNull(tips())
+    }
+
+    @Test
     fun showingThemAgain_whileTheyAreThere_addsNoSecondLayer() {
         openSheet()
 
@@ -258,5 +339,8 @@ class TutorialFragmentTest {
     private companion object {
         /** The ring's 5 dp outside its control at xxhdpi, and a pixel of rounding. */
         const val RING_PAD_PX = 5f * 3 + 1
+
+        /** The tips' fade, 200 ms, and a little more. */
+        const val FADE_END_MS = 300L
     }
 }

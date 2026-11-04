@@ -41,7 +41,8 @@ import org.robolectric.shadows.ShadowChoreographer
  * (reconnecting, the camera paused) dims it, and it clears when the video is back. The photographer's new ratio: the
  * area moves to it, the video dims, and the grid and the guide wait for a frame of the new shape, or for the time
  * limit. The photographer's shutter: a blink, but none over a dimmed video. With the phone's animations off, each
- * change is at its end at once.
+ * change is at its end at once. Going to another screen (Iter3-A14): the video goes at once, since its surface would
+ * not fade with the screen; coming from one, it stays.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -268,6 +269,18 @@ class SubjectTransitionTest {
         modules.session.deliver(SessionMessage.PhotoShutter)
         idle()
         assertEquals(View.GONE, screen().videoScrim.visibility)
+    }
+
+    @Test
+    fun goingToAnotherScreen_takesTheVideoAwayAtOnce() {
+        val modules = launch()
+        connect(modules)
+
+        // What the fragment manager asks for as the screen comes, then as it goes (Design 2.1).
+        scenario!!.onFragment { it.onCreateAnimator(0, true, R.animator.screen_fade_in) }
+        assertEquals(View.VISIBLE, screen().liveView.visibility)
+        scenario!!.onFragment { it.onCreateAnimator(0, false, R.animator.screen_fade_out) }
+        assertEquals(View.INVISIBLE, screen().liveView.visibility)
     }
 
     private companion object {

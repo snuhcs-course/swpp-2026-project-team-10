@@ -53,6 +53,7 @@
 | 2.30 | 2026-11-04 | A screenshot cut to its photo (Iter3-A10, [#174]): FR-2.10; FR-2.3 and the F2 row with the cut; US-2's cases for a screenshot, *Use the whole image*, and a camera photo or a story; the *Reference confirm* row in 6.2; Figure 1 drawn with the cut. |
 | 2.31 | 2026-11-04 | Screenshots from other apps (Iter3-A11, [#177]): FR-2.10 revised, a photo centered between margins as in Google Images and Naver, and a story cut to its frame or to a shared post's card instead of used whole; US-2's cases. |
 | 2.32 | 2026-11-05 | The aspect ratios chosen from a row under the top bar (Iter3-A12, [#179]): FR-1.13 and the Camera screen of 6.2, whose ratio button opens the ratios, labeled as the phone is held (3:4, 9:16, 1:1), instead of moving to the next with each tap. |
+| 2.33 | 2026-11-05 | Transitions between screens (Iter3-A14, [#181]): 6.9 gains *Motion*, how each screen comes and goes, the tutorial's tips fading in and out, and the limits every change keeps. |
 
 Items marked **TBD** need a team decision.
 
@@ -788,6 +789,7 @@ These screens follow from the requirements above but are not yet in the wirefram
 - **Failure screens** always state what happened in plain words, offer a primary retry, and offer a way back. No screen is a dead end.
 - **The guide** is drawn only inside the camera image, as an outline of the person that never shows the reference's pixels or background, so it is not mistaken for a control or for the scene: a white line about 3 dp wide, with no fill (Design 2.6.1).
 - **Language.** The UI is in English and Korean, following the phone's language unless the settings screen chooses one (FR-10.2).
+- **Motion.** Each screen shows where it comes from and where Back goes (Design 2.1). To or from Camera and *Subject view*, whose picture is the camera's live image, the screen fades in place, since that picture should not slide. Between any other two, the next screen comes in a little from the right as the last one fades out, and Back, the system's back gesture, and *Back to camera* move the other way, also for a screen a notification or a link opened (*Invitation*). The sheets slide up and down as before. The tutorial's tips fade in and out (FR-10.4). A change lasts 300 ms or less and never holds up a tap, which acts at once, and with the phone's animations off every change is immediate.
 
 ### 6.10 Flow 7 · Settings
 
@@ -891,3 +893,4 @@ These screens follow from the requirements above but are not yet in the wirefram
 [#174]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/174
 [#177]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/177
 [#179]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/179
+[#181]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/181

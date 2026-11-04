@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -13,6 +13,7 @@ import com.lastpenguin.pix.ui.account.AccountViewModel
 import com.lastpenguin.pix.ui.account.FriendsViewModel
 import com.lastpenguin.pix.ui.camera.CameraViewModel
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import com.lastpenguin.pix.ui.generation.PoseSaveViewModel
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.InvitationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
@@ -90,6 +91,7 @@ object PixViewModels {
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }
+        initializer { PoseSaveViewModel(container.referenceGuideMaker, container.savedGuideStore) }
         initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
         initializer {
             SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer, container.promptHistory)

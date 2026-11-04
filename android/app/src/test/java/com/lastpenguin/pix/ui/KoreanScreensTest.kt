@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -56,6 +56,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.tipsOver
@@ -116,7 +117,8 @@ import org.robolectric.annotation.GraphicsMode
  * Korean tip the server writes, taking and reviewing the scene photo, a scene photo without a person, and in a
  * session; Add a pose
  * guide with a saved guide; Reference confirm with the person found, and with the subject's pick; No person found;
- * Generate poses; Generating poses with a candidate ready; Pick a pose, alone and in a session; Couldn't create poses,
+ * Generate poses; Generating poses with a candidate ready; Pick a pose, alone, with a pose saved by its ♥, and in a
+ * session; Couldn't create poses,
  * failed, refused, and without a person; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
  * friend; Sign in; Sign up; Pix ID setup; Account; the room code; Join with a code; Session not found; Subject view,
  * and while the photographer picks a pose, with a guide to save; the subject's Pick a pose; Connection lost; Camera in a
@@ -407,6 +409,25 @@ class KoreanScreensTest {
                 CandidateEvent.Ready("pose-4", bitmap()),
             )
         }.first
+        assertKorean(screen(), *poses.toTypedArray())
+    }
+
+    @Test
+    fun pickAPose_withAPoseSavedByItsHeart_isInKorean() {
+        val modules = generationModules()
+        val launched = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) {
+            finished(modules, it, CandidateEvent.Ready("pose-1", bitmap()), CandidateEvent.Ready("pose-2", bitmap()))
+        }.first
+        scenario = launched
+        launched.onFragment { fragment ->
+            val pages = fragment.requireView().findViewById<ViewGroup>(R.id.candidatePager).getChildAt(0) as ViewGroup
+            pages.getChildAt(0).findViewById<View>(R.id.heartButton).performClick()
+        }
+        idle()
+        modules.maker.finish(Result.success(guide().copy(source = GuideSource.GENERATED)))
+        val saved = screen().context.getString(R.string.remove_saved_pose)
+        idleUntil { screen().findViewById<View>(R.id.heartButton).contentDescription == saved }
+
         assertKorean(screen(), *poses.toTypedArray())
     }
 

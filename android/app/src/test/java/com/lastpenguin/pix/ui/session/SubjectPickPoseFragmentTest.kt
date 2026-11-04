@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -13,6 +13,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentPickPoseBinding
+import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.PeerInfo
@@ -22,6 +23,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
+import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -49,7 +51,8 @@ import org.robolectric.shadows.ShadowToast
  * choice or close (a notice and back to Subject view), by this phone's own pick (back without a notice), and an end
  * kept from an earlier set (nothing); a pick no step answers in 5 s (a notice, and it can be tapped again); Back
  * (Subject view, the set kept); the link reconnecting (the candidates kept, Use this pose waiting until it is back);
- * the session ending (back to Subject view, which shows what ended it); a 9:16 candidate in its own shape (FR-4.3).
+ * the session ending (back to Subject view, which shows what ended it); a 9:16 candidate in its own shape (FR-4.3);
+ * the ♥ (FR-4.14), which saves the candidate in this phone's library and sends nothing to the photographer's phone.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -295,5 +298,32 @@ class SubjectPickPoseFragmentTest {
         idle()
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun aHeart_savesTheCandidateInThisPhonesLibrary_andSendsNothing() {
+        val modules = picking()
+        launch()
+        val sent = modules.session.sent.size
+
+        onScreen { binding ->
+            val pages = binding.candidatePager.getChildAt(0) as RecyclerView
+            checkNotNull(pages.findViewHolderForAdapterPosition(0)).itemView.findViewById<View>(R.id.heartButton)
+                .performClick()
+        }
+        idle()
+        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        modules.maker.finish(Result.success(guide().copy(id = "saved-pose", source = GuideSource.GENERATED)))
+        idle()
+
+        assertEquals(
+            listOf("saved-pose" to GuideSource.GENERATED),
+            modules.saved.saved.value.map {
+                it.id to it.source
+            },
+        )
+        assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
+        // Neither a pick nor anything else: the ♥ stays on this phone, and the first Use this pose still decides.
+        assertEquals(sent, modules.session.sent.size)
     }
 }

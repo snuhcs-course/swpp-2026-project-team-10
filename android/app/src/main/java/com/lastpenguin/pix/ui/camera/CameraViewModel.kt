@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -464,12 +464,13 @@ class CameraViewModel(
             _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
             return
         }
-        val full = before.size >= SavedGuideStore.MAX_SAVED
         _uiState.update { it.copy(savingGuide = true) }
         viewModelScope.launch {
             val notice = try {
                 savedGuides.save(guide, guides.state.value).fold(
-                    onSuccess = { if (full) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
+                    onSuccess = {
+                        if (it.removedOldest) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED
+                    },
                     onFailure = { GuideSaveNotice.FAILED },
                 )
             } catch (error: CancellationException) {

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -23,28 +23,34 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.generation.PoseKey
 import com.lastpenguin.pix.ui.generation.PosePageAdapter
+import com.lastpenguin.pix.ui.generation.PoseSaveViewModel
 import com.lastpenguin.pix.ui.generation.PoseSlot
+import com.lastpenguin.pix.ui.generation.inSet
 import com.lastpenguin.pix.ui.generation.setupPosePager
 import com.lastpenguin.pix.ui.generation.showPosePages
+import com.lastpenguin.pix.ui.generation.showPoseSaveNotice
 import kotlinx.coroutines.launch
 
 /**
  * *Pick a pose* on the subject's phone (R&S 6.6, FR-6.15): the photographer's candidates, as on their phone, without
  * *Try other poses*. The swipe stays on this phone; *Use this pose* asks the photographer's phone, whose first choice
  * decides, and the screen closes when the set ends, saying so when the photographer decided. It covers Subject view,
- * so it follows the session itself, like the guide screens (Design 2.6.5).
- * Owner: Shared steps (Iter3-P16).
+ * so it follows the session itself, like the guide screens (Design 2.6.5). The ♥ keeps a candidate in this phone's own
+ * library (FR-4.14) and sends nothing to the photographer's phone.
+ * Owner: Shared steps (Iter3-P16); the ♥ the library (#171).
  */
 class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 
     private val viewModel: SubjectPickViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val saves: PoseSaveViewModel by activityViewModels { PixViewModels.Factory }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentPickPoseBinding.bind(view)
         binding.tryOtherButton.isVisible = false
-        val pages = PosePageAdapter()
+        val pages = PosePageAdapter(::onHeart)
         binding.setupPosePager(pages, viewModel::select)
         binding.usePoseButton.setOnClickListener { viewModel.usePose() }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
@@ -54,6 +60,12 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect { ui -> render(binding, pages, ui) } }
+                launch { saves.hearts.collect { showPages(binding, pages, viewModel.uiState.value) } }
+                launch {
+                    saves.results.collect { result ->
+                        if (result.setId == viewModel.uiState.value.setId) showPoseSaveNotice(result.notice)
+                    }
+                }
                 launch {
                     viewModel.ended.collect { end ->
                         // Only this screen's set: an end kept from an earlier one says nothing about it.
@@ -78,6 +90,13 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         }
     }
 
+    /** The ♥ on a candidate (FR-4.14): this phone's own library, which the photographer's phone never hears of. */
+    private fun onHeart(slot: PoseSlot) {
+        val setId = viewModel.uiState.value.setId ?: return
+        val image = (slot.event as? CandidateEvent.Ready)?.image ?: return
+        saves.toggle(PoseKey(setId, slot.pose.id), image)
+    }
+
     private fun render(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {
         if (ui.gone) {
             backToSubject()
@@ -86,14 +105,20 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         val name = ui.photographerName
         binding.sharedHint.isVisible = name != null
         if (name != null) binding.sharedHint.text = getString(R.string.shared_hint, name)
+        showPages(binding, pages, ui)
+        binding.usePoseButton.isEnabled = ui.selectedPoseId != null && !ui.waiting && !ui.reconnecting
+    }
+
+    private fun showPages(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {
+        if (ui.gone) return
         val count = ui.candidates.size
         // No pose names travel; a screen reader says which of the candidates it is instead.
         val slots = ui.candidates.mapIndexed { index, (poseId, image) ->
             val description = getString(R.string.pose_page_counter_description, index + 1, count)
             PoseSlot(PlannedPose(poseId, description), CandidateEvent.Ready(poseId, image))
         }
-        binding.showPosePages(pages, slots, ui.selectedPoseId, viewModel::select) { view != null }
-        binding.usePoseButton.isEnabled = ui.selectedPoseId != null && !ui.waiting && !ui.reconnecting
+        val hearts = saves.hearts.value.inSet(ui.setId)
+        binding.showPosePages(pages, slots, ui.selectedPoseId, viewModel::select, hearts) { view != null }
     }
 
     private fun backToSubject() {

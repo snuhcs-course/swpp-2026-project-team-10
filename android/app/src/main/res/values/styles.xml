@@ -244,6 +244,13 @@
         <item name="rippleColor">#1FFFFFFF</item>
     </style>
 
+    <!-- An icon button over a photo, such as the ♥ on Pick a pose: the round shape in glass, so it shows on any photo. -->
+    <style name="Widget.Pix.Button.Icon.OnPhoto">
+        <item name="backgroundTint">@color/pix_glass</item>
+        <item name="strokeColor">@color/pix_glass_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
     <!-- The top bar's flash: an icon without a shape, like the brightness button, in the middle of the bar's 44 dp,
          with a 48 x 48 dp touch area whose last 4 dp reach over the image's top edge. -->
     <style name="Widget.Pix.Button.Icon.TopBar">

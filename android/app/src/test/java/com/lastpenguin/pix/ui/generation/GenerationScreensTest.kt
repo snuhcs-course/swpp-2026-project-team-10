@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -11,6 +11,7 @@ import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
@@ -21,6 +22,7 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.guide.GuideSource
+import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
@@ -30,12 +32,14 @@ import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
+import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.guide.ReferenceUiState
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -47,6 +51,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowToast
 
 /*
  * The four generation screens (R&S 6.3, FR-4.4–4.8, US-5; Testing Documentation 2.1.6) on the real Fragments,
@@ -62,7 +67,10 @@ import org.robolectric.annotation.GraphicsMode
  * pose, so Use this pose works at once and takes the pose swiped to (to Reference confirm); a pose selected before
  * the screen opens is the one shown; Try other poses (back to Generate poses), system back; in a session, the hint
  * that the subject sees the poses too, and the subject's pick that comes first, which opens Reference confirm with its
- * candidate (Design 2.6.5). Couldn't create poses: Try again, a rejected description with Edit description, a scene in
+ * candidate (Design 2.6.5). The ♥ on Pick a pose (FR-4.14): on the page on screen only, saving the pose as a generated
+ * guide (disabled meanwhile, filled in red, "Pose saved"), a filled one removing it, a pose without a person (nothing saved),
+ * Use this pose after it (the saved guide goes on, cut out once), and a ♥ still saving when the pose is used (saved
+ * all the same). Couldn't create poses: Try again, a rejected description with Edit description, a scene in
  * which the server found no one with Shoot again (FR-4.13), Back to
  * camera. The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1), the
  * thumbnails, the slots, and the pages in that shape; the four slots of a 9:16 scene whole on screen, centered, and
@@ -576,6 +584,136 @@ class GenerationScreensTest {
                 it.requireActivity().viewModel<GenerationViewModel>().uiState.value.phase,
             )
         }
+    }
+
+    /** The ♥ of the page at [position] of Pick a pose. */
+    private fun heartAt(s: FragmentScenario<*>, position: Int): MaterialButton {
+        var heart: MaterialButton? = null
+        s.onFragment { fragment ->
+            val pages = FragmentPickPoseBinding.bind(
+                fragment.requireView(),
+            ).candidatePager.getChildAt(0) as RecyclerView
+            heart =
+                checkNotNull(pages.findViewHolderForAdapterPosition(position)).itemView.findViewById(R.id.heartButton)
+        }
+        return checkNotNull(heart)
+    }
+
+    private val generated = guide().copy(id = "saved-pose", source = GuideSource.GENERATED)
+
+    private fun color(view: View, id: Int) = view.context.getColor(id)
+
+    @Test
+    fun pick_heart_savesThePoseOnScreen_toTheLibrary() {
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        assertEquals(string(R.string.save_pose), heartAt(s, 0).contentDescription)
+        // Empty in the other icons' white.
+        assertEquals(color(heartAt(s, 0), R.color.pix_text), heartAt(s, 0).iconTint.defaultColor)
+
+        heartAt(s, 0).performClick()
+        // A page's heart changes as the pages are compared again, off the main thread.
+        idleUntil { !heartAt(s, 0).isEnabled }
+        // The person is cut out as for Use this pose; meanwhile the heart takes no second tap.
+        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        assertFalse(heartAt(s, 0).isEnabled)
+
+        modules.maker.finish(Result.success(generated))
+        idleUntil { heartAt(s, 0).isEnabled }
+
+        assertEquals(
+            listOf("saved-pose" to GuideSource.GENERATED),
+            modules.saved.saved.value.map {
+                it.id to it.source
+            },
+        )
+        assertTrue(heartAt(s, 0).isEnabled)
+        assertEquals(string(R.string.remove_saved_pose), heartAt(s, 0).contentDescription)
+        // Filled in red, so a saved pose shows at a glance.
+        assertEquals(color(heartAt(s, 0), R.color.pix_heart), heartAt(s, 0).iconTint.defaultColor)
+        assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
+        // The next page's pose is not saved.
+        s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).candidatePager.setCurrentItem(1, false) }
+        idle()
+        assertEquals(string(R.string.save_pose), heartAt(s, 1).contentDescription)
+    }
+
+    @Test
+    fun pick_aFilledHeart_removesThePose() {
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        heartAt(s, 0).performClick()
+        idle()
+        modules.maker.finish(Result.success(generated))
+        idleUntil { heartAt(s, 0).contentDescription == string(R.string.remove_saved_pose) }
+
+        heartAt(s, 0).performClick()
+        idleUntil { heartAt(s, 0).contentDescription == string(R.string.save_pose) }
+
+        assertTrue(modules.saved.saved.value.isEmpty())
+        assertEquals(string(R.string.save_pose), heartAt(s, 0).contentDescription)
+        assertEquals(string(R.string.pose_removed_notice), ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun pick_aHeartOnAPoseWithoutAPerson_savesNothing() {
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+
+        heartAt(s, 0).performClick()
+        idle()
+        modules.maker.finish(Result.failure(NoPersonFoundException()))
+        idleUntil { heartAt(s, 0).isEnabled }
+
+        assertTrue(modules.saved.saved.value.isEmpty())
+        assertEquals(string(R.string.save_pose), heartAt(s, 0).contentDescription)
+        assertTrue(heartAt(s, 0).isEnabled)
+        assertEquals(string(R.string.pose_no_person_notice), ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun pick_useThisPoseAfterItsHeart_goesOnWithTheSavedGuide() {
+        val modules = modules()
+        val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        heartAt(s, 0).performClick()
+        idle()
+        modules.maker.finish(Result.success(generated))
+        idle()
+
+        s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).usePoseButton.performClick() }
+        idle()
+
+        // Cut out once, for the heart; Reference confirm has the saved guide, so Camera knows it is saved.
+        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
+        s.onFragment {
+            assertEquals(
+                ReferenceUiState.Ready(generated),
+                it.requireActivity().viewModel<ReferenceViewModel>().uiState.value,
+            )
+        }
+    }
+
+    @Test
+    fun pick_aHeartStillSavingWhenThePoseIsUsed_savesAllTheSame() {
+        val modules = modules()
+        val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        heartAt(s, 0).performClick()
+        idle()
+
+        s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).usePoseButton.performClick() }
+        idle()
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
+        // The heart's cut first, then Reference confirm's own, since the heart had not saved yet.
+        modules.maker.finish(Result.success(generated))
+        idle()
+
+        assertEquals(listOf("saved-pose"), modules.saved.saved.value.map { it.id })
     }
 
     @Test

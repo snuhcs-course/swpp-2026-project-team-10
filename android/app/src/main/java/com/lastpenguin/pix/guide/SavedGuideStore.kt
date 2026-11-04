@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -14,6 +14,12 @@ import kotlinx.coroutines.flow.asStateFlow
 data class SavedGuide(val id: String, val savedAt: Long, val source: GuideSource)
 
 /**
+ * What [SavedGuideStore.save] did: the guide as listed, and whether the oldest was deleted to keep
+ * [SavedGuideStore.MAX_SAVED], decided inside the save, so a notice that says so is right however many saves overlap.
+ */
+data class GuideSaved(val guide: SavedGuide, val removedOldest: Boolean)
+
+/**
  * Saved guides (Design 2.1, FR-3.8, AD-16): in the app's private storage only, never in the gallery or on the server
  * (NFR-13), and still there after the app restarts. A guide keeps its [ReferenceGuide.id], so saving one that is
  * already saved keeps the one copy; at most [MAX_SAVED] are kept, and the oldest goes first.
@@ -23,8 +29,11 @@ interface SavedGuideStore {
     /** Newest first; empty until the storage has been read once. */
     val saved: StateFlow<List<SavedGuide>>
 
-    /** Keeps [guide] with [state]; fails when the storage cannot be written, and nothing is listed then. */
-    suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide>
+    /**
+     * Keeps [guide] with [state], saying whether that deleted the oldest; a guide already saved stays as it is. Fails
+     * when the storage cannot be written, and nothing is listed then.
+     */
+    suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved>
 
     /** The guide as it was saved, with the state it was saved with; fails for an unknown id or unreadable files. */
     suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>>
@@ -51,11 +60,12 @@ interface SavedGuideStore {
         private val _saved = MutableStateFlow<List<SavedGuide>>(emptyList())
         override val saved: StateFlow<List<SavedGuide>> = _saved.asStateFlow()
 
-        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> {
-            kept.firstOrNull { it.saved.id == guide.id }?.let { return Result.success(it.saved) }
+        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> {
+            kept.firstOrNull { it.saved.id == guide.id }?.let { return Result.success(GuideSaved(it.saved, false)) }
             val entry = Kept(SavedGuide(guide.id, clock(), guide.source), guide, state)
-            publish((listOf(entry) + kept).take(MAX_SAVED))
-            return Result.success(entry.saved)
+            val next = listOf(entry) + kept
+            publish(next.take(MAX_SAVED))
+            return Result.success(GuideSaved(entry.saved, removedOldest = next.size > MAX_SAVED))
         }
 
         override suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>> =

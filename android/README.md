@@ -88,7 +88,7 @@ The failure screens share `fragment_failure.xml`.
 | Package | What is in it |
 |---|---|
 | `camera/` | `CameraXController` and `PhotoSaver` behind `CameraController`, the zoom plan, and the frame cache |
-| `guide/` | The guide store, geometry, and overlay; `MlKitReferenceGuideMaker` with `SubjectSegmenter` and `OutlineExtractor`, and `findScreenshotPhoto`, which cuts a screenshot of a feed post to its photo first; the saved guides on disk; `GuideOutlines`, the outline at another thickness |
+| `guide/` | The guide store, geometry, and overlay; `MlKitReferenceGuideMaker` with `SubjectSegmenter` and `OutlineExtractor`, and `findScreenshotPhoto` with `SharedPostCard`, which cut a screenshot to its photo first (a feed post, an image viewer's photo, a story, or a post shared in one); the saved guides on disk; `GuideOutlines`, the outline at another thickness |
 | `settings/` | `DataStoreAppSettings` behind `AppSettings`, and `AndroidAppLanguage` behind `AppLanguage` (`AppCompatDelegate`) |
 | `generation/` | `RemotePoseGenerator`, the scene photo codec, the consent flag, and the pose tips |
 | `session/` | `RtcSessionManager` with the signaling and peer-connection clients, `CameraFrameSource`, `GuideSyncer`, `DescriptionSyncer`, `PoseSyncer`, `ConfirmSyncer`, `PhotoSyncer`, `RemoteControlHandler`, and the message codec and channel routing under `protocol/` and `signaling/` |

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -20,9 +20,13 @@ import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.session.DescriptionEnd
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.DescriptionForm
 import com.lastpenguin.pix.ui.generation.showScene
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
+import com.lastpenguin.pix.ui.settings.tutorialFor
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -31,13 +35,15 @@ import kotlinx.coroutines.launch
  * their phone. This phone's field holds the description while it is typed in and the photographer's does not, and
  * says who types otherwise; *Generate 4 poses* and *Skip* ask the photographer's phone, which starts the set. The screen
  * closes when the description ends, saying so when the photographer closed it. It covers Subject view, so it follows
- * the session itself, like the guide screens (Design 2.6.5).
+ * the session itself, like the guide screens (Design 2.6.5). The first time either phone's Generate poses opens here,
+ * its tutorial tips come over it (FR-10.4).
  * Owner: Shared steps (Iter3-P16).
  */
 class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
 
     private val viewModel: SubjectDescribeViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private var form: DescriptionForm? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -61,6 +67,8 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // The tutorial tips of Generate poses, the first time this phone shows it (FR-10.4).
+                launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.GENERATE_POSES)) }
                 launch {
                     combine(viewModel.uiState, viewModel.usedBefore, ::Pair).collect { (ui, used) ->
                         render(binding, form, ui)

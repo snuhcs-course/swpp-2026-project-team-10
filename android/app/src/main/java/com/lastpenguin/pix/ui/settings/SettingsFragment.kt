@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -71,7 +72,10 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         binding.helpRow.root.setOnClickListener { findNavController().navigate(R.id.action_settings_to_help) }
         binding.tutorialRow.settingTitle.setText(R.string.settings_tutorial)
         binding.tutorialRow.settingValue.isVisible = false
-        binding.tutorialRow.root.setOnClickListener { findNavController().navigate(R.id.action_settings_to_tutorial) }
+        binding.tutorialRow.root.setOnClickListener {
+            viewModel.resetTutorial()
+            Toast.makeText(requireContext(), R.string.settings_tutorial_reset, Toast.LENGTH_SHORT).show()
+        }
         binding.aboutRow.settingTitle.setText(R.string.settings_about)
         binding.aboutRow.settingValue.text = getString(R.string.settings_version, BuildConfig.VERSION_NAME)
         binding.aboutRow.root.setOnClickListener { findNavController().navigate(R.id.action_settings_to_about) }

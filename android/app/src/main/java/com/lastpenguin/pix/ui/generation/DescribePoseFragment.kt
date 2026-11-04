@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -27,8 +27,12 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
+import com.lastpenguin.pix.ui.settings.tutorialFor
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -36,13 +40,14 @@ import kotlinx.coroutines.launch
  * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks a description used before (FR-4.11), or lets the
  * server suggest four poses for the scene. Nothing is sent before *Generate 4 poses* or *Skip*. In a session the subject sees this step
  * too: one field at a time holds the description, and the subject's *Generate 4 poses* or *Skip* goes on here like this
- * phone's own (Design 2.6.5).
+ * phone's own (Design 2.6.5). The first time it opens, its tutorial tips come over it (FR-10.4).
  * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16.
  */
 class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 
     private val viewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
+    private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private var form: DescriptionForm? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -78,6 +83,8 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Its tutorial tips the first time it opens, on either phone (FR-10.4).
+                launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.GENERATE_POSES)) }
                 combine(viewModel.uiState, sessionViewModel.state, viewModel.usedBefore, ::Triple)
                     .collect { (generation, session, used) ->
                         // In a session the subject writes the description too, one field at a time (FR-6.15).

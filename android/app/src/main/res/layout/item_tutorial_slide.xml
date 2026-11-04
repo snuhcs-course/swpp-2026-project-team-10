@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- One slide of the tutorial. Its text is read from the dots: an image has no words for TalkBack. -->
-<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:importantForAccessibility="no"
-    android:scaleType="fitCenter" />

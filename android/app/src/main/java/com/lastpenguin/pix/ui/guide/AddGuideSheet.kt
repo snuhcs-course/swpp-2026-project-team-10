@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -17,8 +17,12 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
+import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
+import com.lastpenguin.pix.ui.settings.tutorialFor
 import kotlinx.coroutines.launch
 
 /**
@@ -26,12 +30,14 @@ import kotlinx.coroutines.launch
  * and the newest saved guides (FR-3.8, FR-3.11), then *Generate poses here*. Opened from Subject view
  * ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and *Generate poses here* waits for the shared steps
  * (FR-6.15, Design 2.6.5).
+ * The first time it opens from Camera, its tutorial tips come over it (FR-10.4).
  * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170.
  */
 class AddGuideSheet : BottomSheetDialogFragment() {
 
     private val referenceViewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
     private val generationViewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
+    private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
 
     /** A picked photo opens Reference confirm; closing the picker returns to the camera, guide unchanged (FR-2.7). */
     private val pickPhoto = registerPhotoPicker { uri ->
@@ -72,6 +78,10 @@ class AddGuideSheet : BottomSheetDialogFragment() {
         )
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Its tutorial tips the first time it opens (FR-10.4); from Subject view it lacks the poses they point at.
+                if (!referenceViewModel.forSubject) {
+                    launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.ADD_GUIDE)) }
+                }
                 launch { referenceViewModel.savedGuides.collect(savedGuides::render) }
                 launch {
                     referenceViewModel.savedGuideResults.collect { result ->

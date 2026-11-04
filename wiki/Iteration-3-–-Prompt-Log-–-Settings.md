@@ -8,7 +8,7 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Sungmin, 11-02] "Commit and push it. Write the PR body here so I can paste it." (PR [#163].)
 - [Sungmin, 11-02] "The review of [#163] is in. Fix it, then commit and push." (Codex found three. The AI agreement's row was drawn once on resume, so Settings restored before the stored answer loaded said "Not agreed"; it now follows `GenerationViewModel.consentGiven`. On Android 10–12 AppCompat gives Pix's own language to the activity only, so pose tips stayed in the phone's language; `MainActivity` now hands its resources to `ScreenLanguages`. A black outline vanished on Reference confirm's dark card; it now lies on a light backing.)
 
-## The first-use tutorial and fewer words on the screens ([#123], PRs [#167] and [#168])
+## The first-use tutorial and fewer words on the screens ([#123], PRs [#167], [#168], and [#173])
 
 - [Joonhyung, 11-02] "I'm going to do the tasks of issue #123. The settings screen is already built; on top of it I want to build the tutorial. Suggest how the tutorial should work." (The proposal was a walk over the live Camera, moving on with real taps.)
 - [Joonhyung, 11-02] With the `design-taste-frontend` skill: "Moving on by real taps would mean actually running streaming and image generation, so I'd rather make the tutorial slides, like the picture below. Write a spec for the tutorial. After the tutorial is built, I also want to remove as much of the explanatory text in the current UI as I can, to keep it clean." (The picture was another app's coach marks: a dimmed screen, dashed rings around controls, curved arrows, and captions. The spec: five slides drawn from the app's own wireframes and rendered as images in both languages, so nothing runs; captions in `strings.xml` for the translation and TalkBack; *Skip*, dots, and *Next*; the tutorial after the preview, never before it (FR-1.1); a stored flag that is unknown until read, so it never flashes; replay from Settings. For the text, a list of what to remove, shorten, and keep, in a PR of its own.)
@@ -21,6 +21,13 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-03] "Is there also logic that checks whether the app was downloaded for the first time, so the tutorial window can open first?" (Yes: Android gives an app no install signal, so a first start with nothing stored counts. The flag in `AppSettings` is false until the tutorial is closed by *Start*, *Skip*, or Back. Clearing the data or installing again shows it again, and a transfer to a new phone on Android 12 or later carries the flag along.)
 - [Joonhyung, 11-03] "It's PR #168: bring it in line with `dev`." (#167 was in `dev` as its squash, which conflicted with its own commits on #168. The documents and Figure 7 kept #168's versions, and slide 5 and its string took `dev`'s. The result is `dev` plus #168's changes alone, and the 1,396 tests pass.)
 - [Joonhyung, 11-03] "Another PR was merged, and now it conflicts. Bring it in line with `dev`." ([#164] had changed *Generate poses* too, so 13 files conflicted: four AI markers, the three documents, and Flows 2 and 5. Each block took #164's version, with #168's changes applied to it again: the header without its second line, and the shorter shared hint. Flows 2 and 5 were rendered again, #168's revision rows moved to R&S 2.25, Design 2.33, and Testing 2.35, and the 1,421 tests pass.)
+- [Jaewan, 11-03] "We added a tutorial in https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/167. But it's kinda hard to understand slides 2-5 at first since we've never seen those screens before, is it possible to make those slides appear the first time we enter those specific screens?"
+- [Jaewan, 11-03] "so right now the tutorial slides show fixed images. but would it be better if it works by adding a layer over the current screen? so that if the peson clicks 'got it' then only the tutorial content disappears. this seems more natural?"
+- [Jaewan, 11-03] "reset on settings, all captions at once, go ahead"
+- [Jaewan, 11-03] "do we need the black backdrop? the background is already dark so white text may already look okay. just disable this and i'll test this you don't have to test this"
+- [Jaewan, 11-03] "I think this is good. commit, push and create the PR"
+- [Jaewan, 11-03] "for the second tutorial, i think it may be okay to have the arrows go over the square boxes"
+- [Jaewan, 11-03] "yes"
 
 [#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
 [#159]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/159
@@ -29,3 +36,4 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 [#166]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/166
 [#167]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/167
 [#168]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/168
+[#168]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/173

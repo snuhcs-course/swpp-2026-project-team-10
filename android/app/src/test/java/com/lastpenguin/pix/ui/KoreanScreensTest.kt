@@ -51,12 +51,14 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.sceneBegin
 import com.lastpenguin.pix.session.sceneChunk
 import com.lastpenguin.pix.session.sceneEnd
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.tipsOver
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.account.AccountSheet
 import com.lastpenguin.pix.ui.account.AddFriendFragment
@@ -745,10 +747,30 @@ class KoreanScreensTest {
     }
 
     @Test
-    fun tutorial_isInKorean() {
-        TestAppContainer().install()
-        scenario = launchFragmentInContainer<TutorialFragment>(themeResId = R.style.Theme_Pix)
-        assertKorean(screen())
+    fun tutorial_overAddAPoseGuide_isInKorean() {
+        val modules = TestAppContainer(tutorialSeen = emptySet()).install()
+        runBlocking { modules.saved.save(guide(), GuideState()) }
+        scenario = launchFragment<AddGuideSheet>(themeResId = R.style.Theme_Pix)
+        idle()
+        var layer: View? = null
+        scenario!!.onFragment { layer = tipsOver(it) }
+        assertKorean(checkNotNull(layer))
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun tutorial_overSubjectView_withItsTitle_isInKorean() {
+        val modules = TestAppContainer(tutorialSeen = emptySet()).install()
+        val launched = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        scenario = launched
+        launched.attachNav(R.id.subjectFragment)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.mirror.setGuide(guide(withReference = false))
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600 + TutorialFragment.AFTER_PICTURE_MS))
+        var layer: View? = null
+        scenario!!.onFragment { layer = tipsOver(it) }
+        assertKorean(checkNotNull(layer))
     }
 
     @Test

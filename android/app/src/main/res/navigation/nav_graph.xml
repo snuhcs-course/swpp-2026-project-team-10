@@ -27,10 +27,6 @@
         <action
             android:id="@+id/action_camera_to_settings"
             app:destination="@id/settingsFragment" />
-        <!-- Once, on first use, over a Camera that is ready (FR-10.4). -->
-        <action
-            android:id="@+id/action_camera_to_tutorial"
-            app:destination="@id/tutorialFragment" />
     </fragment>
 
     <!-- Settings, How to use Pix, and About Pix (FR-10.1, FR-10.4, R&S 6.10) -->
@@ -41,9 +37,6 @@
         <action
             android:id="@+id/action_settings_to_help"
             app:destination="@id/helpFragment" />
-        <action
-            android:id="@+id/action_settings_to_tutorial"
-            app:destination="@id/tutorialFragment" />
         <action
             android:id="@+id/action_settings_to_about"
             app:destination="@id/aboutFragment" />
@@ -60,11 +53,6 @@
         android:id="@+id/helpFragment"
         android:name="com.lastpenguin.pix.ui.settings.HelpFragment"
         android:label="How to use Pix" />
-
-    <fragment
-        android:id="@+id/tutorialFragment"
-        android:name="com.lastpenguin.pix.ui.settings.TutorialFragment"
-        android:label="Tutorial" />
 
     <fragment
         android:id="@+id/aboutFragment"

@@ -1,50 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The first-use tutorial (FR-10.4): the slides, and below them Skip, a dot for each slide, and Next. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The first-use tutorial over a screen (FR-10.4): the dimming, the rings, and the captions, which CoachMarkLayout adds
+     and places, and Got it, which it places where nothing else is. -->
+<com.lastpenguin.pix.ui.settings.CoachMarkLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/pix_ground"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/slides"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:importantForAccessibility="no" />
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:paddingHorizontal="8dp">
-
-        <Button
-            android:id="@+id/skipButton"
-            style="@style/Widget.Pix.Button.Text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="start|center_vertical"
-            android:text="@string/tutorial_skip"
-            android:textColor="@color/pix_text_muted" />
-
-        <LinearLayout
-            android:id="@+id/dots"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:accessibilityLiveRegion="polite"
-            android:focusable="true"
-            android:gravity="center"
-            android:minHeight="48dp"
-            android:orientation="horizontal" />
-
-        <Button
-            android:id="@+id/nextButton"
-            style="@style/Widget.Pix.Button.Text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end|center_vertical"
-            android:text="@string/tutorial_next"
-            android:textColor="@color/pix_accent" />
-    </FrameLayout>
-</LinearLayout>
+    <!-- Named in full: a dialog's inflater swaps in a MaterialButton only under an AppCompat activity. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/gotItButton"
+        style="@style/Widget.Pix.Button.Small"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/tutorial_got_it" />
+</com.lastpenguin.pix.ui.settings.CoachMarkLayout>

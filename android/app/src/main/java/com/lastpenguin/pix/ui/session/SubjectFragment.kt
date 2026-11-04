@@ -1,6 +1,7 @@
 // AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
+import android.animation.Animator
 import android.animation.ValueAnimator
 import android.os.Bundle
 import android.view.View
@@ -10,6 +11,7 @@ import androidx.activity.addCallback
 import androidx.core.animation.doOnEnd
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -83,7 +85,8 @@ import org.webrtc.VideoSink
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
  * System back asks first (R&S 6.9). The first time the video shows, the tutorial's tips of this screen come over it
  * (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as their frame does, and
- * blinks at their shutter (Design 2.6.4).
+ * blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and the rest fades
+ * (Design 2.1).
  * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide*, the candidates, and the outline
  * Iter3-P16.
  */
@@ -581,6 +584,15 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         renderer?.release()
         renderer = null
         super.onDestroyView()
+    }
+
+    /**
+     * Going to another screen (Design 2.1), the video goes at once: its surface takes no view alpha, so it would stay
+     * bright while the rest of the screen fades, then vanish. The ground under it fades with the rest.
+     */
+    override fun onCreateAnimator(transit: Int, enter: Boolean, nextAnim: Int): Animator? {
+        if (!enter && nextAnim != 0) renderer?.isInvisible = true
+        return super.onCreateAnimator(transit, enter, nextAnim)
     }
 
     /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The transitions between screens (Design 2.1, ui/ScreenTransitions.kt), Material's shared axis and fade through:
+         how long each lasts, and how far a screen slides along x. -->
+    <integer name="screen_transition_ms">300</integer>
+    <dimen name="screen_slide">30dp</dimen>
+    <dimen name="screen_slide_back">-30dp</dimen>
+</resources>

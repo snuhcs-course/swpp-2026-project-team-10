@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -8,6 +8,8 @@ import android.graphics.Paint
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -32,8 +34,9 @@ import org.robolectric.annotation.GraphicsMode
  * thumbnail: a landscape reference (its middle cut to 3:4, not enlarged), a reference taller than the limit (cut and
  * scaled to 384 × 512), a guide without a reference (the outline, cut to 3:4), an unreadable reference (the outline),
  * an unreadable mask without a reference (null), an unknown id (null).
- * Boundary of MAX_SAVED: the 100th is kept with the others; the 101st deletes the oldest from the list and the
- * storage; 101 folders found at a start keep the newest 100.
+ * Boundary of MAX_SAVED: the 100th is kept with the others, its save saying it deleted nothing; the 101st deletes the
+ * oldest from the list and the storage, and says so; two saves at once with 99 kept, of which only the one that
+ * deletes the oldest says so; 101 folders found at a start keep the newest 100.
  * load: a saved guide (mask at most 720 px tall, outline rebuilt, anchor, aspect, source, state, and reference as
  * saved), an unknown id, an unreadable mask.
  * Migration from before the mask-only transfer (#113): a folder with `cutout.webp` and no `mask.png` is listed,
@@ -71,7 +74,8 @@ class FileSavedGuideStoreTest {
         val saved = store.save(guide("g2", source = GuideSource.GENERATED), GuideState()).getOrThrow()
 
         assertEquals(listOf("g2", "g1"), store.saved.value.map { it.id })
-        assertEquals(saved, store.saved.value.first())
+        assertEquals(saved.guide, store.saved.value.first())
+        assertFalse(saved.removedOldest)
         assertEquals(listOf(GuideSource.GENERATED, GuideSource.GALLERY), store.saved.value.map { it.source })
     }
 
@@ -150,7 +154,8 @@ class FileSavedGuideStoreTest {
 
         val again = store.save(guide("g1"), GuideState(cx = 0.3f)).getOrThrow()
 
-        assertEquals(first, again)
+        assertEquals(first.guide, again.guide)
+        assertFalse(again.removedOldest)
         assertEquals(listOf("g1"), store.saved.value.map { it.id })
     }
 
@@ -232,14 +237,33 @@ class FileSavedGuideStoreTest {
     fun save_hundredAndFirstGuide_deletesTheOldestFromListAndStorage() = runTest {
         val directory = File(folder.root, "guides")
         val store = store(directory)
-        repeat(SavedGuideStore.MAX_SAVED) { store.save(smallGuide("g$it"), GuideState()).getOrThrow() }
+        repeat(SavedGuideStore.MAX_SAVED - 1) { store.save(smallGuide("g$it"), GuideState()).getOrThrow() }
+        val hundredth = store.save(smallGuide("g99"), GuideState()).getOrThrow()
 
-        store.save(smallGuide("g100"), GuideState()).getOrThrow()
+        val next = store.save(smallGuide("g100"), GuideState()).getOrThrow()
 
+        // The save itself says whether it deleted the oldest: the 100th did not, the 101st did.
+        assertFalse(hundredth.removedOldest)
+        assertTrue(next.removedOldest)
         assertEquals(100, store.saved.value.size)
         assertEquals("g100", store.saved.value.first().id)
         assertEquals("g1", store.saved.value.last().id)
         assertFalse(File(directory, "g0").exists())
+    }
+
+    @Test
+    fun save_twoAtOnceWith99Kept_onlyTheOneThatDeletesTheOldestSaysSo() = runTest {
+        val store = store()
+        repeat(SavedGuideStore.MAX_SAVED - 1) { store.save(smallGuide("g$it"), GuideState()).getOrThrow() }
+
+        val both = listOf(
+            async { store.save(smallGuide("a"), GuideState()).getOrThrow() },
+            async { store.save(smallGuide("b"), GuideState()).getOrThrow() },
+        ).awaitAll()
+
+        assertEquals(1, both.count { it.removedOldest })
+        assertEquals(SavedGuideStore.MAX_SAVED, store.saved.value.size)
+        assertFalse(store.saved.value.any { it.id == "g0" })
     }
 
     @Test

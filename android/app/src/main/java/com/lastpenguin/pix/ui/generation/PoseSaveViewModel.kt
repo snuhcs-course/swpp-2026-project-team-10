@@ -105,14 +105,15 @@ class PoseSaveViewModel(private val maker: ReferenceGuideMaker, private val stor
         // A new set's candidates cannot reach the earlier ones', so their guides are let go.
         made.keys.removeAll { it.setId != key.setId }
         marked.update { hearts -> hearts.filterKeys { it.setId == key.setId } + (key to Heart.Saving) }
-        val full = store.saved.value.size >= SavedGuideStore.MAX_SAVED
         viewModelScope.launch {
             val notice = try {
                 val guide = maker.make(image, GuideSource.GENERATED).getOrThrow()
-                store.save(guide, GuideState(guideId = guide.id)).getOrThrow()
+                // Whether the oldest was deleted comes from the save itself: two hearts saved at once with 99 kept
+                // both see room beforehand, yet the second one's save deletes the oldest.
+                val saved = store.save(guide, GuideState(guideId = guide.id)).getOrThrow()
                 made[key] = guide
                 marked.update { it + (key to Heart.Saved(guide.id)) }
-                if (full) PoseSaveNotice.SAVED_OLDEST_REMOVED else PoseSaveNotice.SAVED
+                if (saved.removedOldest) PoseSaveNotice.SAVED_OLDEST_REMOVED else PoseSaveNotice.SAVED
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

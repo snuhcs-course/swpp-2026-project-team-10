@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -59,14 +59,18 @@ class FileSavedGuideStore(
         scope.launch { locked { } }
     }
 
-    override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> = locked { entries ->
-        entries.firstOrNull { it.saved.id == guide.id }?.let { return@locked Result.success(it.saved) }
+    override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> = locked { entries ->
+        entries.firstOrNull {
+            it.saved.id == guide.id
+        }?.let { return@locked Result.success(GuideSaved(it.saved, false)) }
         try {
             val entry = write(guide, state, order = (entries.maxOfOrNull { it.meta.order } ?: 0L) + 1)
             val kept = listOf(entry) + entries
-            kept.drop(SavedGuideStore.MAX_SAVED).forEach { remove(it.saved.id) }
+            val removed = kept.drop(SavedGuideStore.MAX_SAVED)
+            removed.forEach { remove(it.saved.id) }
             publish(kept.take(SavedGuideStore.MAX_SAVED))
-            Result.success(entry.saved)
+            // Decided under the lock, so two saves that overlap each say whether theirs deleted the oldest.
+            Result.success(GuideSaved(entry.saved, removedOldest = removed.isNotEmpty()))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {

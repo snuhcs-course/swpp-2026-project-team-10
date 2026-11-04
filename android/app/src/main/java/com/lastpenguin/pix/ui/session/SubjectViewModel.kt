@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-30, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -325,7 +325,6 @@ class SubjectViewModel(
             _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
             return
         }
-        val full = before.size >= SavedGuideStore.MAX_SAVED
         // Without a reference copy yet, the outline is the saved guide's thumbnail.
         val kept = guide.copy(reference = ui.reference ?: guide.reference)
         val state = mirror.state.value
@@ -333,7 +332,9 @@ class SubjectViewModel(
         viewModelScope.launch {
             val notice = try {
                 savedGuides.save(kept, state).fold(
-                    onSuccess = { if (full) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
+                    onSuccess = {
+                        if (it.removedOldest) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED
+                    },
                     onFailure = { GuideSaveNotice.FAILED },
                 )
             } catch (error: CancellationException) {

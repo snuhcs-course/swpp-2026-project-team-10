@@ -4,6 +4,7 @@ package com.lastpenguin.pix.ui.generation
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.guide.GuideSaved
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.NoPersonFoundException
@@ -41,7 +42,8 @@ import org.junit.Test
  * without a person (nothing saved, NO_PERSON), a maker or a store that fails (nothing saved, FAILED).
  * Keys: the same pose id in another set (another heart); a guide deleted in the library (the heart empty again, and
  * a ♥ saves it anew).
- * The library's size (boundary): 99 saved (SAVED) and 100 (SAVED_OLDEST_REMOVED, the oldest gone).
+ * The library's size (boundary): 99 saved (SAVED) and 100 (SAVED_OLDEST_REMOVED, the oldest gone); two hearts saved at
+ * once with 99 kept, both seeing room before they save (one SAVED, and the one that deletes the oldest says so).
  * savedGuide: the guide a filled heart saved, for *Use this pose*; none for an empty heart or one deleted since.
  * results: kept until read, so a ♥ finished after Pick a pose was left still tells its set.
  */
@@ -216,6 +218,29 @@ class PoseSaveViewModelTest {
     }
 
     @Test
+    fun twoHeartsSavedAtOnceWith99_theOneThatRemovesTheOldestSaysSo() = runTest {
+        fill(SavedGuideStore.MAX_SAVED - 1)
+        val second = PoseKey("set-1", "pose-2")
+
+        model.toggle(first, fakeBitmap())
+        model.toggle(second, fakeBitmap())
+        runCurrent()
+        maker.finish(Result.success(generated("guide-1")))
+        maker.finish(Result.success(generated("guide-2")))
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                PoseSaveResult("set-1", PoseSaveNotice.SAVED),
+                PoseSaveResult("set-1", PoseSaveNotice.SAVED_OLDEST_REMOVED),
+            ),
+            model.results.take(2).toList(),
+        )
+        assertEquals(SavedGuideStore.MAX_SAVED, saved.saved.value.size)
+        assertTrue(saved.saved.value.none { it.id == "old-0" })
+    }
+
+    @Test
     fun results_waitUntilRead_eachForItsSet() = runTest {
         saveFirst("guide-1")
         val next = PoseKey("set-2", "pose-3")
@@ -264,7 +289,7 @@ class PoseSaveViewModelTest {
 
     /** A library whose disk is full: nothing saves. */
     private class FailingStore : SavedGuideStore by SavedGuideStore.InMemory() {
-        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> =
+        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> =
             Result.failure(IOException("No space left"))
     }
 }

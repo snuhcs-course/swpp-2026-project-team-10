@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-28, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -31,6 +31,20 @@ data class ReferenceGuide(
      * Never sent to the subject and never drawn as the guide; null on the subject.
      */
     val reference: Bitmap? = null,
+    /**
+     * The picked image this guide was cut from, and where (FR-2.10): a screenshot of a feed post cut to its photo, which
+     * [mask], [anchor], and [reference] are made from. Null when the image was used whole, and for a generated pose.
+     * Stays on this phone: never sent and not saved.
+     */
+    val crop: PhotoCrop? = null,
+)
+
+/** A picked image and the part of it a guide was made from (FR-2.10). */
+data class PhotoCrop(
+    /** The whole picked image, long side at most 1024 px. */
+    val original: Bitmap,
+    /** The part kept, as fractions of [original]. */
+    val photo: NormalizedRect,
 )
 
 /** A box as fractions of an image's width and height, right and bottom exclusive (FR-3.1). */

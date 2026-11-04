@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -170,7 +170,13 @@ class TestAppContainer(
         val pending = ArrayDeque<CompletableDeferred<Result<ReferenceGuide>>>()
         val sources = mutableListOf<GuideSource>()
 
-        override suspend fun make(source: Uri): Result<ReferenceGuide> = next(GuideSource.GALLERY)
+        /** Each picked photo asked for, and whether as the whole image (FR-2.10). */
+        val picked = mutableListOf<Pair<Uri, Boolean>>()
+
+        override suspend fun make(source: Uri, wholeImage: Boolean): Result<ReferenceGuide> {
+            picked += source to wholeImage
+            return next(GuideSource.GALLERY)
+        }
 
         override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> = next(source)
 

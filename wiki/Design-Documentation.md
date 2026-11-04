@@ -68,6 +68,7 @@
 | 2.37 | 2026-11-04 | The guide library (Iter3-A8, [#170]; R&S FR-3.8, FR-3.11): *My library* on *Add a pose guide*, with *Add photo* and the newest ten saved guides, in place of *Upload a reference* and the saved guides' row, and `LibraryFragment` with the kind filters (2.6.2, 1.4.2, 2.9); `SavedGuideStore` keeps 100 guides, `SavedGuide` names its source and no longer holds a thumbnail, which `thumbnail(id)` reads when a cell shows, and a start reads only `meta.json` (2.1, 2.3, 2.8 *Guide store*, AD-16); the tutorial's tips on *Add a pose guide* ring *Add photo* and the saved guides as far as their row shows, with "Saved guides wait in My library", and *Generate poses here*'s caption goes above the library, since only *Cancel* fits below it; a ring is a circle only up to the shutter's size, and a caption with no place that keeps its arrow clear takes the nearest that covers nothing (2.6.8). |
 | 2.38 | 2026-11-04 | A generated pose saved with ♥ (Iter3-A9, [#171]; R&S FR-4.14): the ♥ on both phones' *Pick a pose*, `PoseSaveViewModel` keyed by the set and the pose (`PoseKey`, `GenerationUiState.setId`), and *Use this pose* going on with the saved guide (`onCandidatePicked(..., saved)`) (2.6.3, Figure 6, 1.4.2, 2.9). |
 | 2.39 | 2026-11-04 | After Codex's review of PR #175 (2.1, 2.3, 2.6.2, 2.6.3, 2.8): `SavedGuideStore.save` answers `GuideSaved`, which says whether that save deleted the oldest, decided under the store's lock; *Save guide* on both phones and the ♥ take the notice that the oldest was removed from it, not from the list's size beforehand, which two saves at once both read with room. |
+| 2.40 | 2026-11-04 | A screenshot cut to its photo (Iter3-A10, [#174]; R&S FR-2.10): `findScreenshotPhoto` in step 1 of 2.6.1, with the numbers and the 20 screenshots they come from, and *Reference confirm*'s cut (`ScreenshotCutView`, `ScreenshotCut`); `ReferenceGuideMaker.make(uri, wholeImage)`, `ReferenceGuide.crop` and `PhotoCrop`, `ReferenceViewModel.onUseWholeImage` (2.1, 2.3). |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail, and the plan of Iteration 3 (1.4.2, 2.9); the detailed design of each Iteration 3 feature is added in the PR that builds it. **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v2.0). Testing plans will be in the Testing Documentation.
 
@@ -327,7 +328,7 @@ The plan from the kickoff of 2026-10-25 (Team Meetings); the tasks and owners ar
 | **Shared steps on both phones** (FR-6.14–6.16) | The subject's phone opens guide selection; both phones write the description on *Generate poses*, one field at a time; poses are generated on the photographer's phone, whose candidates both phones show on *Pick a pose*, the first *Use this pose* deciding, and then the chosen pose's outline on *Reference confirm*, the first *Use this guide* deciding (2.5.1, 2.6.5); guides can be saved on either phone; photos are saved on both phones (2.5.1, 2.6.5). |
 | **Offline connection with a QR code** (F9) | The photographer's phone opens a local-only hotspot and runs the signaling itself, so neither the server nor a shared Wi-Fi is needed. The QR code carries the hotspot's connection details. The phone accepts only one connection per QR code, and the session starts only after both people tap *Resume*. This is another session entry point (AD-8). |
 | **Selfie mode** (FR-1.14) | The front camera as another `CameraController` selection (`setFacing`), with no ultrawide routing. It is a mirror everywhere: the preview, the photo, the scene photo, and the video a subject sees (2.6.4). It is offered in a session too (decided on 10/29; it was to be offered only while no session runs). A selfie's scene photo gets prompts of its own, because the others turned a selfie into a photo someone else took (2.6.3). |
-| **Guide library** (FR-3.8, FR-3.11, FR-4.14; Iter3-A8, [#170]; Iter3-A9, [#171]) | Added after the kickoff: saved guides grow into a library of up to 100, with *My library* at the top of *Add a pose guide* and a library screen that filters them by source, and a ♥ on *Pick a pose* saves a generated pose to it. As built: 2.6.2 (*The library*), 2.6.3 (*Saving a pose*), 2.8 (*Guide store*). Search, situations, and memos come in Iteration 4. |
+| **Guide library** (FR-3.8, FR-3.11, FR-4.14, FR-2.10; Iter3-A8, [#170]; Iter3-A9, [#171]; Iter3-A10, [#174]) | Added after the kickoff: saved guides grow into a library of up to 100, with *My library* at the top of *Add a pose guide* and a library screen that filters them by source, and a ♥ on *Pick a pose* saves a generated pose to it; a screenshot of a feed post is cut to its photo before its guide is made. As built: 2.6.1 (step 1, *Reference confirm's cut*), 2.6.2 (*The library*), 2.6.3 (*Saving a pose*), 2.8 (*Guide store*). Search, situations, and memos come in Iteration 4. |
 | **Settings, language, and tutorial** (F10, FR-3.10) | A settings screen with the language (Korean strings behind the same resource keys, the phone's language by default), the guide's color and line thickness, a latency indicator for sessions (from the `ping` round trip, 2.5.1), and how-to-use help; a tutorial on first use that the settings screen can start again. The settings screen as built (Iter3-P23): 2.6.8; it also has notifications, the AI agreement, the Pix account, and *About Pix*. |
 | **Invitations and sessions across networks** (Iter3-P13–P15; [#117], [#118], [#119]) | Built as designed in 2.6.6 and 2.6.7: push notifications with the link fallback, the TURN relay, `SessionEntry.Invitation`, `session.join`, and reconnection with ICE restart; friend requests use the same push path. Phones on cellular data reach the temporary AWS server until the course servers are open to them (2.8, Hosting). The invite link format was decided on 10/29 (2.6.6), and the wrong-code message on 10/26 (2.5.2). |
 | **The Could items** (FR-7.5, FR-7.7, NFR-19) | Built only if time allows, in this order of preference: the remote-control switch (Iter2-P17), remote focus (Iter2-P17), and the shutter freeze fix (Iter2-P5); each follows its note in 2.6.5. |
@@ -371,7 +372,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               CameraZoom, CameraZoomPlan, CameraFrameCache
 ├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore* (It 2), InMemoryGuideRepository,
 │               MlKitReferenceGuideMaker, FileSavedGuideStore (It 2), GuideGeometry, SubjectSegmenter,
-│               MaskSmoothing (It 2, functions), OutlineExtractor, overlay view
+│               MaskSmoothing (It 2, functions), OutlineExtractor, ScreenshotPhoto (It 3, a function), overlay view
 ├─ generation/  GenerationModels*, PoseGenerator*, RemotePoseGenerator, PoseImageCodec, GenerationConsent (DataStore),
 │               PromptHistory* (It 3, DataStore), PersonDetector* and RuleBasedPersonDetector, MlKitPersonSignals (It 3)
 ├─ account/     AccountModels*, AuthRepository*, FriendsRepository*, AuthTokens, BearerTokens, AccountRules, ApiMapping,
@@ -426,10 +427,11 @@ fun interface FrameSink { fun onFrame(image: ImageProxy, mirrored: Boolean) }   
                                                                                  // mirrored (It 3): the front camera's, to flip like its preview
 
 interface ReferenceGuideMaker {                         // fails with NoPersonFoundException (FR-2.4)
-    suspend fun make(source: Uri): Result<ReferenceGuide>                        // gallery photo
-    suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> // pose candidate
+    suspend fun make(source: Uri, wholeImage: Boolean = false): Result<ReferenceGuide>  // gallery photo; It 3: a screenshot of a
+                                                                                    // feed post is cut to its photo unless wholeImage (FR-2.10)
+    suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> // pose candidate, never cut
 }                                                        // It 2: the result carries the smoothed mask (It 3: alone, no cutout), the person's
-                                                         // box (anchor), and a reference copy of at most 512 px (2.6.1)
+                                                         // box (anchor), and a reference copy of at most 512 px (2.6.1); It 3: and the cut (crop)
 
 interface GuideRepository {
     val guide: StateFlow<ReferenceGuide?>
@@ -579,6 +581,7 @@ classDiagram
     +sharing StateFlow~Boolean~
     +usedBySubject Flow
     +onPhotoPicked(uri)
+    +onUseWholeImage()
     +onCandidatePicked(image, tipFrom, chosenBy, saved)
     +onUseGuide()
     +onUseSaved(id)
@@ -624,7 +627,7 @@ classDiagram
     +update(final, change)
   }
   class ReferenceGuideMaker {
-    +make(uri) Result~ReferenceGuide~
+    +make(uri, wholeImage) Result~ReferenceGuide~
   }
   class SubjectSegmenter {
     +segment(bitmap) Result~Segmentation~
@@ -1025,6 +1028,12 @@ data class ReferenceGuide(
     val source: GuideSource,      // GALLERY or GENERATED
     val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (the person and its 2 % margin), where a new guide starts (FR-3.1); on the subject too since Iter3-P16, for Save guide
     val reference: Bitmap? = null,        // the photo itself, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); never drawn as the guide; null in the subject's mirror, whose copy arrives in guide.reference.* and stays in MirrorReference
+    val crop: PhotoCrop? = null,          // It 3: the screenshot this guide was cut from, and where (FR-2.10); null for an image used whole and a generated pose; never sent or saved
+)
+
+data class PhotoCrop(
+    val original: Bitmap,         // the whole picked image, long side ≤ 1024 px, for Reference confirm's cut
+    val photo: NormalizedRect,    // the part kept, which mask, anchor, and reference are made from
 )
 
 data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float)   // fractions of an image's width and height
@@ -2095,14 +2104,16 @@ Only friends can invite each other (`403 NOT_FRIENDS` for anyone else, whether t
 
 #### 2.6.1 Reference guide: segmentation and outline
 
-1.  **Load.** Decode the picked image, applying its EXIF rotation, and downscale so the long side is at most 1280 px (a smaller photo is not scaled up).
+1.  **Load.** Decode the picked image, applying its EXIF rotation, and downscale so the long side is at most 1280 px (a smaller photo is not scaled up). **Cut a screenshot (It 3, FR-2.10, [#174]).** A picked image taller than 1.9:1 is searched for the photo of a feed post, in plain Kotlin over its pixels (`findScreenshotPhoto`), so it never leaves the phone (FR-2.6). The app's background is the color most rows are filled with alone (at least 5 % of the rows); a row is blank when 99 % of it is within 12 of that color on each channel. The photo is a run of rows between blank ones with no column of background in it away from its outer 2 % (the app's margins beside a photo narrower than the screen, or a grid's spacing), is 2:1 to 2:3 of the width (Instagram's posts are 1.91:1 to 3:4, a story 9:16), and touches neither the top nor the bottom of the image. The largest such run is cut, unless a second one is at least 80 % of its height; without one, the image is used whole, as are a generated pose and *Use the whole image*. Steps 2–5 then see the cut alone, so the mask, `anchor`, and `reference` are the post's, and `crop` keeps the screenshot at 1024 px with the photo's place in it. The numbers come from 20 Instagram screenshots in light and dark mode, sent through KakaoTalk as 648 × 1404 JPEGs: a tolerance of 3 took up to 7 rows of JPEG noise into the photo, and one of 20 lost a night sky to the dark background, while 12 cut all twenty at the photo's edges, within the one or two rows the resizing blends. A sky within 12 of a white app's background goes with the app. The cut is data, an image and a rectangle, so a crop chosen by hand later needs only another rectangle.
 2.  **Segment.** Run the ML Kit subject segmenter with only the foreground confidence mask enabled. The segmenter's model is delivered by Google Play services, so the first use checks that the module is installed and waits for its download, for at most 60 s; a model that is not ready by then, like a photo that cannot be read, shows "Couldn't use this photo. Try another one." and returns to the camera.
 3.  **Check for a person.** If fewer than 2% of the pixels have confidence ≥ 0.5, the step fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
 4.  **Smooth the mask (It 2, FR-2.9).** Blur the confidence mask with three box blurs whose radius is 0.8 % of the person's height (close to a Gaussian; 9 px for a person 1100 px tall), so its 0.5 level becomes a smooth curve. The person is the largest region of the mask, so a stray blob far above or below does not stretch the height. Then drop separate regions smaller than 1 % of the foreground, such as a stray blob beside a hand, and fill holes smaller than 0.2 %; the gap between an arm and the body stays, and background that reaches the photo's edge is never a hole. People of similar size, such as a couple, are all kept (FR-2.5); a figure that small, far in the background, is dropped with the specks. Crop the mask to its bounding box plus a 2 % margin, store the aspect ratio, and keep the box's position in the photo as `anchor` (FR-3.1).
 5.  **Outline.** Trace the smoothed mask's 0.5 level with marching squares, placing each crossing between two pixels by interpolation, so the line follows the blurred curve instead of pixel steps; a person cut off by the photo's edge stays open there. Round the line with two passes of corner cutting (Chaikin) and draw it as a white anti-aliased line with round joins, about 3 dp on screen and scaled to the mask size, with no fill. The width assumes the default start of 70 % of the frame height; a guide that starts larger or smaller from its `anchor` gets a proportionally thicker or thinner line, the same on both phones, because the subject has no `anchor` (2.6.2). No pixel of the reference is used (AD-15).
 6.  **Hand over.** Put the `ReferenceGuide` into `GuideRepository`, which places it at `anchor` (2.6.2). The subject receives only the **smoothed mask** (single-channel PNG, height ≤ 720 px) and runs step 5 on it, never step 4, so both phones draw the same shape. `ReferenceGuide.mask` is that mask as an `ALPHA_8` bitmap; the guide keeps none of the photo's pixels, and `MaskGuideImageCodec` sends it as `mask-png` (2.5.1). A guide made on the subject's phone (It 3) is handed over the other way in the same form, with its `anchor`, and the photographer adopts it (2.5.1, 2.6.5). The reference photo itself stays on the photographer's phone, downscaled to 512 px for the corner thumbnail (FR-3.9); since Iteration 3 a JPEG copy of it also goes once to the subject's phone for its own thumbnail (`guide.reference.*`, 2.5.1), never as the guide.
 
-All steps run on `Dispatchers.Default`. Target: ≤ 2 s from selection to *Reference confirm* including the smoothing (NFR-3); `Timings` marks `smooth.start` and `smooth.end` inside `seg.start`–`seg.end` show how much of it the smoothing takes. On the emulator the whole step took 0.25–0.35 s per photo once the model was loaded.
+All steps run on `Dispatchers.Default`. Target: ≤ 2 s from selection to *Reference confirm* including the smoothing (NFR-3); `Timings` marks `smooth.start` and `smooth.end` inside `seg.start`–`seg.end` show how much of it the smoothing takes, and `cut.start` and `cut.end` (the photo's size, or `whole`) the screenshot's cut. On the emulator the whole step took 0.25–0.35 s per photo once the model was loaded.
+
+**Reference confirm's cut (It 3, FR-2.10).** For a guide with a `crop`, `ScreenshotCutView` lies over the outline on *Reference confirm* and plays the cut once, in 2 s, when the person is found while the screen watches, and not again on a screen made anew (`ReferenceConfirmFragment` plays it only after `Working`): the screenshot whole in the card, the rest of it dimming while a frame in the accent color marks the photo, which shows on a white app's pale photo too, the photo filling the card where the outline will be, a hold, and then the photo going to the card's bottom right at 72 dp, where it stays, as the outline fades in. The frames are plain Kotlin (`ScreenshotCut`); a `ValueAnimator` drives them, so Android's *Remove animations* shows the end at once. "Cut from a screenshot" sits under "Person found", and *Use the whole image* (`ReferenceViewModel.onUseWholeImage`) makes the guide again from the picked `Uri` with `wholeImage`, keeping a confirm the subject shares shared, as *Choose another photo* does.
 
 **Out of scope: arms and legs in front of the body.** Folded arms or crossed legs disappear inside the silhouette, and the outline does not draw them.
 
@@ -2408,6 +2419,7 @@ Invitations need both the accounts server (박재완) and the session entry poin
 | 조성민 | The settings screen of #123, taken from it (Iter3-P23, [#123]) | 11/5 | 2.6.8 |
 | 조성민 | The guide library: *My library* on *Add a pose guide* and the library screen (Iter3-A8, [#170]) | 11/5 | 2.1, 2.6.2, 2.8, AD-16 |
 | 조성민 | A generated pose saved to the library with ♥ on *Pick a pose* (Iter3-A9, [#171]) | 11/5 | 2.6.3 |
+| 조성민 | A screenshot of a feed post cut to its photo for its guide (Iter3-A10, [#174]) | 11/5 | 2.1, 2.3, 2.6.1 |
 | 박동제 | Prompt history on *Generate poses* (Iter3-P24, [#124]) | 11/5 | *Still open* |
 | 박재완 | Four prompt templates and an improved default prompt (Iter3-P25, [#125]) | 11/5 | *Still open* |
 | 박재완 | Integrate the Iteration 3 features (Iter3-P28, [#128]) | 11/5 | — |
@@ -2499,3 +2511,4 @@ To be written in Iteration 5, with at least two patterns documented in detail. E
 [#165]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/165
 [#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
 [#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171
+[#174]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/174

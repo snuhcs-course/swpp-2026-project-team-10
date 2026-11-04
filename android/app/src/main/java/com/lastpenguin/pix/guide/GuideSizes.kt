@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -10,6 +10,9 @@ internal const val MAX_REFERENCE_LONG_SIDE = 1280
 
 /** The reference kept for the Camera screen's thumbnail, enlarged to at most half a phone's width (FR-3.9). */
 internal const val REFERENCE_THUMBNAIL_LONG_SIDE = 512
+
+/** A screenshot cut to its photo is kept this small with the guide, for Reference confirm's cut (FR-2.10). */
+internal const val CROP_ORIGINAL_LONG_SIDE = 1024
 
 /**
  * The outline's stroke where the guide first appears: about 8 px on screen, 3 dp on a typical phone (Design 2.6.1,

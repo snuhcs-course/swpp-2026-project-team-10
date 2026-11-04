@@ -121,6 +121,9 @@
     <string name="couldnt_use_photo">이 사진은 사용할 수 없어요. 다른 사진을 고르세요.</string>
     <string name="use_this_guide">이 가이드 사용</string>
     <string name="choose_another_photo">다른 사진 고르기</string>
+    <string name="cut_from_screenshot">스크린샷에서 사진만 남겼어요</string>
+    <string name="kept_photo_description">스크린샷에서 남긴 사진</string>
+    <string name="use_whole_image">이미지 전체 사용</string>
     <string name="no_person_title">인물을 인식하지 못했어요</string>
     <string name="no_person_message">인물 한 명이 또렷하게 나온 사진을 골라 주세요.</string>
 

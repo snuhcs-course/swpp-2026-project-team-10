@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-04, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -312,7 +312,10 @@ class SavedGuidesViewModelTest {
 
     /** Saved guides never go through the maker. */
     private object UnusedMaker : ReferenceGuideMaker {
-        override suspend fun make(source: Uri): Result<ReferenceGuide> = Result.failure(IOException("unused"))
+        override suspend fun make(
+            source: Uri,
+            wholeImage: Boolean,
+        ): Result<ReferenceGuide> = Result.failure(IOException("unused"))
 
         override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> =
             Result.failure(IOException("unused"))

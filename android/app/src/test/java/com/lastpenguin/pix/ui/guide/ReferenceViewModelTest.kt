@@ -504,7 +504,7 @@ class ReferenceViewModelTest {
         val pending = ArrayDeque<CompletableDeferred<Result<ReferenceGuide>>>()
         val sources = mutableListOf<GuideSource>()
 
-        override suspend fun make(source: Uri): Result<ReferenceGuide> = next(GuideSource.GALLERY)
+        override suspend fun make(source: Uri, wholeImage: Boolean): Result<ReferenceGuide> = next(GuideSource.GALLERY)
 
         override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> = next(source)
 

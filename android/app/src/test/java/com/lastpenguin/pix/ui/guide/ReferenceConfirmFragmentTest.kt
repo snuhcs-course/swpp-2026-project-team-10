@@ -1,16 +1,20 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.net.Uri
+import android.os.Looper
 import android.view.View
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentReferenceConfirmBinding
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.NoPersonFoundException
+import com.lastpenguin.pix.guide.NormalizedRect
+import com.lastpenguin.pix.guide.PhotoCrop
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
@@ -26,6 +30,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import java.io.IOException
+import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,7 +38,9 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowToast
 
 /*
@@ -47,6 +54,10 @@ import org.robolectric.shadows.ShadowToast
  * In a session (FR-6.15, Design 2.6.5): a chosen pose's outline goes to the subject, with the hint, and Choose another
  * photo keeps it there; a photo from Add a pose guide is not shared and has no hint; the subject's Use this guide that
  * comes first puts the guide on the camera with a notice, as this phone's own tap.
+ * A screenshot cut to its photo (FR-2.10): the cut plays once, the outline waiting until the photo leaves for the corner,
+ * with the chip and Use the whole image; a view made anew shows its end without playing again; Use the whole image
+ * makes the guide again from all of it, ends the cut while it plays, and on a chosen pose's confirm keeps it shared.
+ * A photo used whole has no cut, chip, or Use the whole image.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -252,12 +263,125 @@ class ReferenceConfirmFragmentTest {
             assertEquals(View.VISIBLE, binding.referenceImage.visibility)
             assertEquals(string(R.string.person_found), binding.referenceStatus.text.toString())
             assertTrue(binding.useGuideButton.isEnabled)
+            assertFalse(binding.screenshotCut.isShown)
+            assertFalse(binding.cutChip.isShown)
+            assertFalse(binding.useWholeImageButton.isShown)
             binding.useGuideButton.performClick()
         }
         idle()
 
         assertSame(made, modules.guides.guide.value)
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    /** A guide made from a screenshot's photo, rows 15–76 % of it. */
+    private fun cutGuide() = guide().copy(crop = PhotoCrop(bitmap(54, 117), NormalizedRect(0f, 0.15f, 1f, 0.76f)))
+
+    @Test
+    fun aScreenshotCutToItsPhoto_playsTheCut_thenKeepsThePhotoInTheCorner() {
+        val modules = launch()
+        pickPhoto()
+        // idle() moves the clock on frame by frame and would play the whole cut; paused, the cut waits at its start.
+        ShadowChoreographer.setPaused(true)
+
+        modules.maker.finish(Result.success(cutGuide()))
+        idle()
+
+        onScreen { binding ->
+            assertTrue(binding.screenshotCut.isShown)
+            assertEquals(0f, binding.screenshotCut.progress, 0f)
+            // The outline waits until the photo leaves for the corner.
+            assertEquals(0f, binding.referenceImage.alpha, 0f)
+            assertTrue(binding.cutChip.isShown)
+            assertTrue(binding.useWholeImageButton.isShown)
+        }
+
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(2_100))
+
+        onScreen { binding ->
+            assertTrue(binding.screenshotCut.isShown)
+            assertEquals(1f, binding.screenshotCut.progress, 0f)
+            assertEquals(1f, binding.referenceImage.alpha, 0f)
+        }
+    }
+
+    @Test
+    fun aCutOnAViewMadeAnew_showsItsEnd_withoutPlayingAgain() {
+        val modules = launch()
+        pickPhoto()
+        modules.maker.finish(Result.success(cutGuide()))
+        idle()
+
+        // The view goes and comes back, as on a configuration change; paused, a cut played again would still be at its
+        // start below.
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+        ShadowChoreographer.setPaused(true)
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        idle()
+
+        onScreen { binding ->
+            assertTrue(binding.screenshotCut.isShown)
+            assertEquals(1f, binding.screenshotCut.progress, 0f)
+            assertEquals(1f, binding.referenceImage.alpha, 0f)
+        }
+    }
+
+    @Test
+    fun useTheWholeImage_makesTheGuideAgainFromAllOfIt_andTheCutGoes() {
+        val modules = launch()
+        pickPhoto()
+        modules.maker.finish(Result.success(cutGuide()))
+        idle()
+
+        // While the cut still plays.
+        onScreen { it.useWholeImageButton.performClick() }
+        idle()
+
+        val uri = Uri.parse("content://photos/1")
+        assertEquals(listOf(uri to false, uri to true), modules.maker.picked)
+        onScreen { binding ->
+            assertEquals(string(R.string.finding_person), binding.referenceStatus.text.toString())
+            assertFalse(binding.useGuideButton.isEnabled)
+            assertFalse(binding.screenshotCut.isShown)
+            assertFalse(binding.cutChip.isShown)
+        }
+
+        val whole = guide()
+        modules.maker.finish(Result.success(whole))
+        idle()
+
+        onScreen { binding ->
+            assertFalse(binding.screenshotCut.isShown)
+            assertFalse(binding.cutChip.isShown)
+            assertFalse(binding.useWholeImageButton.isShown)
+            assertEquals(1f, binding.referenceImage.alpha, 0f)
+            binding.useGuideButton.performClick()
+        }
+        idle()
+        assertSame(whole, modules.guides.guide.value)
+    }
+
+    @Test
+    fun inASession_useTheWholeImage_onAChosenPosesConfirm_keepsItShared() {
+        val modules = launch()
+        inASession(modules)
+        pickCandidate()
+        modules.maker.finish(Result.success(guide()))
+        idle()
+        pickPhoto()
+        modules.maker.finish(Result.success(cutGuide()))
+        idle()
+
+        onScreen { it.useWholeImageButton.performClick() }
+        idle()
+
+        val steps = confirmSteps(modules).map { it.step }
+        assertEquals(
+            listOf(ConfirmStep.FINDING, ConfirmStep.READY, ConfirmStep.FINDING, ConfirmStep.READY, ConfirmStep.FINDING),
+            steps,
+        )
+        assertTrue(onScreen { it.sharedHint.isShown })
     }
 
     /** A generated pose's guide on the screen, with its tip asked for. */

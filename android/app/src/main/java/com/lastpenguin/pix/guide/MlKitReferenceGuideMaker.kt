@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -13,8 +13,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * [ReferenceGuideMaker] on the device: load, segment, smooth, crop, outline (Design 2.6.1).
- * Owner: PM (#5).
+ * [ReferenceGuideMaker] on the device: load, cut a screenshot to its photo, segment, smooth, crop, outline (Design
+ * 2.6.1).
+ * Owner: PM (#5); the screenshot's cut #174.
  */
 class MlKitReferenceGuideMaker(
     private val context: Context,
@@ -22,8 +23,8 @@ class MlKitReferenceGuideMaker(
     private val outlineExtractor: OutlineExtractor,
 ) : ReferenceGuideMaker {
 
-    override suspend fun make(source: Uri): Result<ReferenceGuide> =
-        timed(GuideSource.GALLERY) { build(decode(source), GuideSource.GALLERY) }
+    override suspend fun make(source: Uri, wholeImage: Boolean): Result<ReferenceGuide> =
+        timed(GuideSource.GALLERY) { fromPicked(decode(source), wholeImage) }
 
     override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> =
         timed(source) { build(bitmap, source) }
@@ -58,6 +59,28 @@ class MlKitReferenceGuideMaker(
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             decoder.setTargetSampleSize(decodeSampleSize(info.size.width, info.size.height))
         }
+
+    /**
+     * Step 1 after loading: a screenshot of a feed post is cut to its photo (FR-2.10), unless [wholeImage], and the
+     * guide is made from the photo alone, so its outline, its start, and its thumbnail are the post's. The guide keeps
+     * the screenshot, small, and where the photo was in it.
+     */
+    private suspend fun fromPicked(image: Bitmap, wholeImage: Boolean): ReferenceGuide {
+        if (wholeImage) return build(image, GuideSource.GALLERY)
+        Timings.mark("cut.start")
+        val photo = image.screenshotPhoto()
+        Timings.mark("cut.end", photo?.let { "${it.width}x${it.height}" } ?: "whole")
+        if (photo == null) return build(image, GuideSource.GALLERY)
+        val cut = Bitmap.createBitmap(image, photo.left, photo.top, photo.width, photo.height)
+        val crop = PhotoCrop(shrink(image, CROP_ORIGINAL_LONG_SIDE), photo.relativeTo(image.width, image.height))
+        return build(cut, GuideSource.GALLERY).copy(crop = crop)
+    }
+
+    private fun Bitmap.screenshotPhoto(): PixelRect? {
+        val pixels = IntArray(width * height)
+        getPixels(pixels, 0, width, 0, 0, width, height)
+        return findScreenshotPhoto(pixels, width, height)
+    }
 
     /**
      * Steps 2–5 on an upright image: segment, smooth the mask, crop to the person plus 2% and keep where that crop

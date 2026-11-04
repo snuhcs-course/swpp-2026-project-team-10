@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -29,8 +29,9 @@ import kotlinx.coroutines.launch
  * Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*; under the title,
  * whose pick it is when the subject chose the candidate (FR-6.15). In a session the subject sees the outline of a chosen
  * pose too, and a *Use this guide* of theirs that comes first goes back to the camera like this phone's own (Design
- * 2.6.5).
- * Owner: PM (#5); the outline on both phones Iter3-P16.
+ * 2.6.5). A screenshot cut to its photo (FR-2.10) plays the cut once, keeps the photo in the corner, and offers *Use
+ * the whole image*.
+ * Owner: PM (#5); the outline on both phones Iter3-P16; the screenshot's cut #174.
  */
 class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
@@ -41,8 +42,13 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
     /** *Choose another photo*; closing the picker keeps the current result. */
     private val pickPhoto = registerPhotoPicker { uri -> uri?.let(viewModel::onPhotoPicked) }
 
+    /** The state this view showed last: a cut plays only when the person was found while it watched. */
+    private var shown: ReferenceUiState? = null
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
+        shown = null
+        binding.screenshotCut.outline = binding.referenceImage
 
         // Back leaves without the guide: a person still being found and the tip asked for it stop (FR-4.10).
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
@@ -56,6 +62,7 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             backToShooting(viewModel)
         }
         binding.chooseAnotherButton.setOnClickListener { pickPhoto() }
+        binding.useWholeImageButton.setOnClickListener { viewModel.onUseWholeImage() }
         leaveWhenTheSessionEnds(viewModel)
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -113,6 +120,12 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             0,
         )
         binding.useGuideButton.isEnabled = ready != null
+        // A screenshot cut to its photo (FR-2.10): the cut plays once, not again when the screen is made anew.
+        val crop = ready?.guide?.crop
+        binding.screenshotCut.show(crop, play = shown == ReferenceUiState.Working)
+        binding.cutChip.isVisible = crop != null
+        binding.useWholeImageButton.isVisible = crop != null
+        shown = state
 
         when (state) {
             ReferenceUiState.NoPersonFound -> findNavController().navigate(

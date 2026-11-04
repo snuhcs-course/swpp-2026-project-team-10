@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Jaewan Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -14,6 +14,7 @@ import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
@@ -37,10 +38,11 @@ import org.robolectric.shadows.ShadowDialog
  * Add a pose guide (R&S 6.2, FR-3.6, FR-4.2), on the real bottom sheet. Partitions: no guide on the camera (Add)
  * or a guide (Replace, with Keep the current guide); Generate poses here with consent already given (the scene
  * photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts it), and
- * the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. Saved guides (FR-3.8): none (the section is hidden); one, which a tap puts on the camera, closing the
- * sheet; its ✕, which asks first (Cancel keeps it, Delete removes it); a configuration change, such as the language,
- * while one is still opening (it still opens). From Subject view (FR-6.15): no Generate poses here, and Replace only
- * for a guide on the video, not one on this phone's camera.
+ * the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. My library
+ * (FR-3.8, FR-3.11): nothing saved (Add photo alone); one guide, which a tap puts on the camera, closing the sheet;
+ * All, which opens the library and closes the sheet; a configuration change, such as the language, while a guide is
+ * still opening (it still opens). From Subject view (FR-6.15): no Generate poses here, and Replace only for a guide on
+ * the video, not one on this phone's camera.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -170,13 +172,28 @@ class AddGuideSheetTest {
     }
 
     @Test
-    fun savedGuides_noneSaved_hidesTheSection() {
+    fun myLibrary_nothingSaved_showsAddPhotoAlone() {
         launch()
 
         onSheet { binding ->
-            assertFalse(binding.savedGuidesTitle.isShown)
-            assertFalse(binding.savedGuidesScroll.isShown)
+            assertTrue(binding.addPhotoTile.isShown)
+            assertEquals(0, binding.savedGuidesList.childCount)
+            assertFalse(binding.libraryAllButton.isShown)
         }
+    }
+
+    @Test
+    fun myLibrary_all_opensTheLibraryAndCloses() {
+        val modules = TestAppContainer()
+        runBlocking { modules.saved.save(guide(), GuideState()) }
+        launch(modules)
+        val nav = scenario!!.attachNav(R.id.addGuideSheet)
+
+        onSheet { binding -> binding.libraryAllButton.performClick() }
+        idle()
+
+        assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
+        assertFalse(nav.backStack.any { it.destination.id == R.id.addGuideSheet })
     }
 
     @Test
@@ -186,7 +203,7 @@ class AddGuideSheetTest {
         launch(modules)
 
         onSheet { binding ->
-            assertTrue(binding.savedGuidesTitle.isShown)
+            assertEquals(string(R.string.library_all, 1), binding.libraryAllButton.text.toString())
             assertEquals(1, binding.savedGuidesList.childCount)
             ItemSavedGuideBinding.bind(binding.savedGuidesList.getChildAt(0)).thumbnail.performClick()
         }
@@ -225,29 +242,6 @@ class AddGuideSheetTest {
         idle()
 
         assertEquals("guide-1", modules.guides.guide.value?.id)
-    }
-
-    @Test
-    fun savedGuide_delete_asksFirst_cancelKeepsIt_deleteRemovesIt() {
-        val modules = TestAppContainer()
-        runBlocking { modules.saved.save(guide(), GuideState()) }
-        launch(modules)
-        val delete = { onSheet { binding -> ItemSavedGuideBinding.bind(binding.savedGuidesList.getChildAt(0)) } }
-
-        delete().deleteButton.performClick()
-        idle()
-        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
-        idle()
-        assertEquals(1, modules.saved.saved.value.size)
-
-        delete().deleteButton.performClick()
-        idle()
-        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
-        idle()
-
-        assertTrue(modules.saved.saved.value.isEmpty())
-        onSheet { binding -> assertFalse(binding.savedGuidesTitle.isShown) }
-        assertTrue(sheet.isAdded)
     }
 
     @Test

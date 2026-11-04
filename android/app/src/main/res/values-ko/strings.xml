@@ -49,18 +49,28 @@
     <!-- Saved guides (FR-3.8): the button on the guide's panel and its notices. -->
     <string name="save_guide">가이드 저장</string>
     <string name="guide_saved">가이드 저장됨</string>
-    <string name="guide_saved_notice">가이드를 저장했어요. 가이드에서 다시 사용할 수 있어요.</string>
+    <string name="guide_saved_notice">가이드를 내 보관함에 저장했어요.</string>
     <string name="guide_saved_oldest_removed_notice">가이드를 저장했어요. %1$d개까지만 보관해서 가장 오래된 가이드를 지웠어요.</string>
     <string name="guide_already_saved_notice">이미 저장한 가이드예요. 가이드에서 찾을 수 있어요.</string>
     <string name="guide_save_failed_notice">가이드를 저장하지 못했어요. 휴대폰 저장 공간을 확인하세요.</string>
-    <string name="saved_guides_title">저장한 가이드</string>
-    <string name="saved_guide_description">%1$s에 저장한 가이드</string>
     <string name="delete_saved_guide">저장한 가이드 삭제</string>
-    <string name="delete_saved_guide_description">%1$s에 저장한 가이드 삭제</string>
     <string name="delete_saved_guide_title">저장한 가이드를 삭제할까요?</string>
     <string name="delete_saved_guide_message">이 휴대폰에서 지워져요. 카메라에 있는 가이드는 그대로 남아요.</string>
     <string name="delete">삭제</string>
     <string name="saved_guide_open_failed">저장한 가이드를 열지 못했어요.</string>
+    <!-- The library (FR-3.11, R&S 6.2): every saved guide, filtered by kind. -->
+    <string name="my_library">내 보관함</string>
+    <string name="library_title">보관함</string>
+    <string name="library_title_description">보관함, 저장한 가이드 %1$d개</string>
+    <string name="library_all">전체 %1$d</string>
+    <string name="library_photos">사진 %1$d</string>
+    <string name="library_generated">AI 포즈 %1$d</string>
+    <string name="library_empty">아직 저장한 가이드가 없어요</string>
+    <string name="library_empty_body">카메라에서 가이드를 저장하거나 사진을 추가하세요.</string>
+    <string name="library_empty_filter">이 종류의 가이드가 아직 없어요</string>
+    <string name="add_photo">사진 추가</string>
+    <string name="saved_photo_guide_description">%1$s에 저장한 사진 가이드</string>
+    <string name="saved_pose_guide_description">%1$s에 저장한 AI 포즈 가이드</string>
     <string name="guide_offer_failed">가이드를 보내지 못했어요</string>
     <string name="reference_photo">참고 사진</string>
     <string name="enlarge_reference">크게 보기</string>
@@ -103,7 +113,6 @@
     <string name="add_guide_title">포즈 가이드 추가</string>
     <string name="replace_guide_title">포즈 가이드를 바꿀까요?</string>
     <string name="keep_current_guide">지금 가이드 유지</string>
-    <string name="upload_reference">참고 사진 올리기</string>
     <string name="generate_poses">AI로 포즈 생성</string>
     <string name="reference_title">참고 사진</string>
     <string name="reference_preview_description">참고 사진 속 인물</string>
@@ -401,7 +410,7 @@
     <string name="tutorial_switch">전면 카메라로 바꿔요</string>
     <string name="tutorial_upload">사진 속 사람의 윤곽을 따요</string>
     <string name="tutorial_generate">이 장소에 맞는 포즈 4개를 AI가 만들어요</string>
-    <string name="tutorial_saved">저장한 가이드를 다시 써요</string>
+    <string name="tutorial_saved">저장한 가이드는 내 보관함에 모여요</string>
     <string name="tutorial_move">끌어서 옮기고, 두 손가락으로 크기 조절</string>
     <string name="tutorial_edit">이 버튼이 켜져 있을 때만 가이드가 움직여요</string>
     <string name="tutorial_fade">흐리게 하거나 숨길 수 있어요</string>

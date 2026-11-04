@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -223,10 +223,13 @@ class CoachMarkLayout @JvmOverloads constructor(
         }
     }
 
-    /** The ring around a control: a circle for a round-ish one, a capsule otherwise, a little outside it. */
+    /**
+     * The ring around a control: a circle for a round-ish one up to the shutter's size, a capsule otherwise, a little
+     * outside it; a circle around a larger one, such as a tile, would spill over the controls beside it.
+     */
     private fun ringAround(target: RectF): Pair<RectF, Boolean> {
         val ratio = target.width() / max(target.height(), 1f)
-        return if (ratio in 0.7f..1.4f) {
+        return if (ratio in 0.7f..1.4f && max(target.width(), target.height()) <= MAX_ROUND_DP * density) {
             val radius = max(target.width(), target.height()) / 2 + ringPad
             RectF(
                 target.centerX() - radius,
@@ -249,7 +252,9 @@ class CoachMarkLayout @JvmOverloads constructor(
 
     /**
      * The nearest place for [mark]'s caption on its side, then the opposite one, then the others: farther away, shifted
-     * or narrower as needed, where it covers none of [blocked] and its arrow crosses none of [crossed].
+     * or narrower as needed, where it covers none of [blocked] and its arrow crosses none of [crossed]; failing that,
+     * the nearest where it covers none of [blocked], its arrow crossing what it must, as with large text on a screen
+     * full of tips.
      */
     private fun bestOption(
         mark: Mark,
@@ -268,6 +273,7 @@ class CoachMarkLayout @JvmOverloads constructor(
         val sides = listOf(mark.side, opposite(mark.side)) +
             CaptionSide.entries.filter { it != mark.side && it != opposite(mark.side) }
         var first: Option? = null
+        var crossing: Option? = null
         for (side in sides) {
             for (step in 0..MAX_STEPS) {
                 val gap = baseGap + step * stepGap
@@ -276,15 +282,15 @@ class CoachMarkLayout @JvmOverloads constructor(
                         val option = Option(side, spot, corridor(side, mark.align, ring, spot), maxWidth)
                         if (first == null) first = option
                         if (!safe.contains(spot)) continue
-                        if (blocked.none { it.overlaps(spot) } &&
-                            crossed.none { RectF.intersects(it, option.corridor) }
-                        ) {
-                            return option
+                        if (blocked.none { it.overlaps(spot) }) {
+                            if (crossed.none { RectF.intersects(it, option.corridor) }) return option
+                            if (crossing == null) crossing = option
                         }
                     }
                 }
             }
         }
+        crossing?.let { return it }
         // Nowhere free: the nearest place on its own side, kept on the screen.
         val near = first!!
         val dx = near.spot.left.coerceIn(safe.left, max(safe.left, safe.right - near.spot.width())) - near.spot.left
@@ -497,5 +503,8 @@ class CoachMarkLayout @JvmOverloads constructor(
         /** The widths a caption may take, of its widest. */
         val WIDTHS = listOf(1f, 0.75f, 0.55f)
         const val CORNER_DP = 24f
+
+        /** The longest side of a control a circle goes around: the shutter's 72 dp, and a little more. */
+        const val MAX_ROUND_DP = 80f
     }
 }

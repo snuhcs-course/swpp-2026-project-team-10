@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.collection.LruCache
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.generation.PoseTips
@@ -24,9 +25,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -45,18 +49,18 @@ sealed interface ReferenceUiState {
     data object Failed : ReferenceUiState
 }
 
-/** What a tap on a saved guide led to (FR-3.8): on the camera, or its files could not be read. */
+/** What a tap on a saved guide in the library led to (FR-3.8): on the camera, or its files could not be read. */
 enum class SavedGuideResult { USED, FAILED }
 
 /**
- * Add a pose guide → Reference confirm, and the saved guides on Add a pose guide (FR-3.8). Shared by AddGuideSheet,
- * ReferenceConfirmFragment, NoPersonFoundFragment, and PickPoseFragment (activity scope). The guide of a generated
- * pose also gets its tip asked for here, once its person is found (FR-4.10). Opened from Subject view
+ * Add a pose guide → Reference confirm, and the library of saved guides (FR-3.8, FR-3.11). Shared by AddGuideSheet,
+ * LibraryFragment, ReferenceConfirmFragment, NoPersonFoundFragment, and PickPoseFragment (activity scope). The guide
+ * of a generated pose also gets its tip asked for here, once its person is found (FR-4.10). Opened from Subject view
  * ([openFor]), the guide goes to the photographer through [subject] instead of this phone's camera (Design 2.6.5).
  * The Reference confirm of a pose chosen on Pick a pose is on the subject's phone too, through [confirms], and the
  * first *Use this guide* to reach this phone decides (Design 2.6.5, *Reference confirm on both phones*).
  * Owner: PM (#5); saved guides #58; pose tips; the guide from the subject Iter3-P9; the subject's pick and use
- * Iter3-P16.
+ * Iter3-P16; the library #170.
  */
 class ReferenceViewModel(
     private val maker: ReferenceGuideMaker,
@@ -99,8 +103,19 @@ class ReferenceViewModel(
      */
     val usedBySubject: Flow<Unit> = _usedBySubject.receiveAsFlow()
 
-    /** Newest first, for Add a pose guide. */
+    /** Newest first, for the *My library* row on Add a pose guide. */
     val savedGuides: StateFlow<List<SavedGuide>> = savedGuideStore.saved
+
+    private val libraryFilter = MutableStateFlow(LibraryFilter.ALL)
+
+    /** The library (FR-3.11): the saved guides of the chosen filter, and how many there are for each filter. */
+    val library: StateFlow<LibraryPage> = combine(savedGuideStore.saved, libraryFilter, ::libraryPage)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, libraryPage(savedGuideStore.saved.value, LibraryFilter.ALL))
+
+    /** The thumbnails shown last, up to [THUMBNAIL_CACHE_BYTES], so scrolling back does not read them again. */
+    private val thumbnails = object : LruCache<String, Bitmap>(THUMBNAIL_CACHE_BYTES) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
+    }
 
     private val _savedGuideResults = Channel<SavedGuideResult>(Channel.BUFFERED)
 
@@ -120,9 +135,24 @@ class ReferenceViewModel(
     var forSubject: Boolean = false
         private set
 
-    /** Add a pose guide opened from the Camera screen or, with [fromSubject], from Subject view (FR-6.15). */
+    /**
+     * Add a pose guide opened from the Camera screen or, with [fromSubject], from Subject view (FR-6.15). The library
+     * opened from it starts with every guide.
+     */
     fun openFor(fromSubject: Boolean) {
         forSubject = fromSubject && subject != null
+        libraryFilter.value = LibraryFilter.ALL
+    }
+
+    /** A filter chip in the library. */
+    fun onLibraryFilter(filter: LibraryFilter) {
+        libraryFilter.value = filter
+    }
+
+    /** A saved guide's thumbnail (Design 2.8, *Guide store*); null when its files cannot be read. */
+    suspend fun thumbnail(id: String): Bitmap? {
+        thumbnails[id]?.let { return it }
+        return savedGuideStore.thumbnail(id)?.also { thumbnails.put(id, it) }
     }
 
     /** Whether a guide is on the camera or the video, so Add a pose guide asks to replace it (FR-3.6). */
@@ -236,14 +266,17 @@ class ReferenceViewModel(
         }
     }
 
-    /** The sheet closed: a saved guide still opening must not replace the guide the user chose to keep. */
+    /** The sheet or the library closed: a saved guide still opening must not replace the guide kept on the camera. */
     fun cancelOpening() {
         opening?.cancel()
     }
 
-    /** *Delete* on a saved guide, after the sheet asked; a guide on the camera stays there. */
+    /** *Delete* on a saved guide, after the library asked; a guide on the camera stays there. */
     fun onDeleteSaved(id: String) {
-        viewModelScope.launch { savedGuideStore.delete(id) }
+        viewModelScope.launch {
+            savedGuideStore.delete(id)
+            thumbnails.remove(id)
+        }
     }
 
     /** Separates the person; a newer photo (*Choose another photo*) replaces one still in progress. */
@@ -266,5 +299,10 @@ class ReferenceViewModel(
                 },
             )
         }
+    }
+
+    private companion object {
+        /** About thirty full-size thumbnails: more than the library shows at once, a small part of the app's memory. */
+        const val THUMBNAIL_CACHE_BYTES = 24 * 1024 * 1024
     }
 }

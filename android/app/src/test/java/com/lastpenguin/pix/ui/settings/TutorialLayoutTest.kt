@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -61,7 +61,8 @@ import org.robolectric.annotation.GraphicsMode
  * and in Korean, at font scale 1.0 and 1.3 (boundary): every control the screen shows has its ring; every caption, the
  * title, and *Got it* lie inside the screen, whole, and clear of each other and of every ring. Camera, the guide on
  * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle), and
- * Add a pose guide its saved guides, so each is laid out at its fullest.
+ * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
+ * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -206,6 +207,17 @@ class TutorialLayoutTest {
             scenario?.close()
             scenario = null
         }
+    }
+
+    /** The ring of the tip whose caption is [caption], among those [layer] placed. */
+    private fun ringOf(layer: CoachMarkLayout, caption: Int): CoachMarkLayout.Placed =
+        layer.placed.filterNotNull().single { it.caption.text == app.getString(caption) }
+
+    @Test
+    fun aRoundControl_getsACircle_upToTheShutter_andALargerOneACapsule() {
+        assertTrue(ringOf(camera(withGuide = false), R.string.tutorial_shutter).round)
+        scenario?.close()
+        assertFalse(ringOf(sheet(), R.string.tutorial_upload).round)
     }
 
     @Test

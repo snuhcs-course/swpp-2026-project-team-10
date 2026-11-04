@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -81,6 +81,17 @@ class ReferenceViewModelTest {
 
         assertEquals(listOf(GuideSource.GENERATED), maker.sources)
         assertEquals(ReferenceUiState.Ready(guide), model.uiState.value)
+    }
+
+    @Test
+    fun onCandidatePicked_withTheGuideItsHeartSaved_goesOnWithIt_withoutCuttingAgain() = runTest {
+        val saved = guide()
+
+        model.onCandidatePicked(bitmap(), saved = saved)
+        runCurrent()
+
+        assertEquals(emptyList<GuideSource>(), maker.sources)
+        assertEquals(ReferenceUiState.Ready(saved), model.uiState.value)
     }
 
     @Test

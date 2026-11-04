@@ -165,6 +165,12 @@
     <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
     <string name="use_this_pose">이 포즈 사용</string>
     <string name="try_other_poses">다른 포즈 생성</string>
+    <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
+    <string name="save_pose">이 포즈를 내 보관함에 저장</string>
+    <string name="remove_saved_pose">이 포즈를 내 보관함에서 빼기</string>
+    <string name="pose_saved_notice">포즈를 내 보관함에 저장했어요.</string>
+    <string name="pose_removed_notice">포즈를 내 보관함에서 뺐어요.</string>
+    <string name="pose_no_person_notice">이 포즈에서 사람을 찾지 못했어요.</string>
     <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
     <string name="shared_hint">%1$s님도 보고 있어요</string>
     <string name="peer_chose_this_pose">%1$s님이 이 포즈를 골랐어요</string>

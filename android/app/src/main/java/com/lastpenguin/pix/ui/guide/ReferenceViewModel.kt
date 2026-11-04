@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -175,9 +175,15 @@ class ReferenceViewModel(
      * The pose chosen on Pick a pose. With [tipFrom], the scene and the pose it was made from, its tip is asked for
      * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10). [chosenBy] names the subject
      * when it was their pick in a session (FR-6.15). Its Reference confirm goes to the subject's phone too, which
-     * shows it while a session is connected.
+     * shows it while a session is connected. A pose its ♥ [saved] already (FR-4.14) goes on with that guide: its person
+     * is not cut out again, and on Camera the guide is the saved one.
      */
-    fun onCandidatePicked(image: Bitmap, tipFrom: TipSource? = null, chosenBy: String? = null) {
+    fun onCandidatePicked(
+        image: Bitmap,
+        tipFrom: TipSource? = null,
+        chosenBy: String? = null,
+        saved: ReferenceGuide? = null,
+    ) {
         _chosenBy.value = chosenBy
         val id = UUID.randomUUID().toString()
         sharedId = id
@@ -190,7 +196,7 @@ class ReferenceViewModel(
                     tipFor = guide.id
                 }
             },
-        ) { maker.make(image, GuideSource.GENERATED) }
+        ) { saved?.let { Result.success(it) } ?: maker.make(image, GuideSource.GENERATED) }
     }
 
     /** *Use this guide*. */

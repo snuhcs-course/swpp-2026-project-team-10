@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -66,6 +66,8 @@ data class GenerationUiState(
      * the subject's while theirs does, then nobody; the other phone's field waits meanwhile.
      */
     val descriptionWriter: Role? = null,
+    /** The set, from *Generate 4 poses* or *Skip* on: its poses' ids repeat in every set, so a ♥ names both (FR-4.14). */
+    val setId: String? = null,
     /** The poses of the set, once known; one slot each. */
     val poses: List<PlannedPose> = emptyList(),
     /** Results so far by pose id; the four slots fill as they arrive. */
@@ -480,6 +482,7 @@ class GenerationViewModel(
             selfie = selfie,
             request = request,
             description = description,
+            setId = id,
             phase = GenerationUiState.Phase.GENERATING,
         )
         generating = viewModelScope.launch { generate(id, scene, selfie, request) }

@@ -172,6 +172,12 @@
     <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
+    <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
+    <string name="save_pose">Save this pose to My library</string>
+    <string name="remove_saved_pose">Remove this pose from My library</string>
+    <string name="pose_saved_notice">Pose saved to My library.</string>
+    <string name="pose_removed_notice">Pose removed from My library.</string>
+    <string name="pose_no_person_notice">Couldn\'t find a person in this pose.</string>
     <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
     <string name="shared_hint">%1$s sees this too</string>
     <string name="peer_chose_this_pose">%1$s chose this pose</string>

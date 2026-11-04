@@ -66,6 +66,7 @@
 | 2.35 | 2026-11-03 | The tutorial on each screen (Iter3-P23, [#123]): tips over the live screen the first time it opens, drawn by `CoachMarkLayout` around the screen's own controls, in a dialog among the screen's child fragments; the slides and their drawings gone; `AppSettings.tutorialSeen` per screen and `resetTutorial` (2.1, 2.6.8). |
 | 2.36 | 2026-11-04 | After Codex's review of PR #173 (2.6.8): tips that are due wait under another screen and show once it closes; the guide's need a visible guide; Subject view's wait while a pose step covers the video. |
 | 2.37 | 2026-11-04 | The guide library (Iter3-A8, [#170]; R&S FR-3.8, FR-3.11): *My library* on *Add a pose guide*, with *Add photo* and the newest ten saved guides, in place of *Upload a reference* and the saved guides' row, and `LibraryFragment` with the kind filters (2.6.2, 1.4.2, 2.9); `SavedGuideStore` keeps 100 guides, `SavedGuide` names its source and no longer holds a thumbnail, which `thumbnail(id)` reads when a cell shows, and a start reads only `meta.json` (2.1, 2.3, 2.8 *Guide store*, AD-16); the tutorial's tips on *Add a pose guide* ring *Add photo* and the saved guides as far as their row shows, with "Saved guides wait in My library", and *Generate poses here*'s caption goes above the library, since only *Cancel* fits below it; a ring is a circle only up to the shutter's size, and a caption with no place that keeps its arrow clear takes the nearest that covers nothing (2.6.8). |
+| 2.38 | 2026-11-04 | A generated pose saved with ♥ (Iter3-A9, [#171]; R&S FR-4.14): the ♥ on both phones' *Pick a pose*, `PoseSaveViewModel` keyed by the set and the pose (`PoseKey`, `GenerationUiState.setId`), and *Use this pose* going on with the saved guide (`onCandidatePicked(..., saved)`) (2.6.3, Figure 6, 1.4.2, 2.9). |
 
 Audience: the development team. This page describes the design of Iterations 1 and 2 in detail, and the plan of Iteration 3 (1.4.2, 2.9); the detailed design of each Iteration 3 feature is added in the PR that builds it. **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v2.0). Testing plans will be in the Testing Documentation.
 
@@ -325,7 +326,7 @@ The plan from the kickoff of 2026-10-25 (Team Meetings); the tasks and owners ar
 | **Shared steps on both phones** (FR-6.14–6.16) | The subject's phone opens guide selection; both phones write the description on *Generate poses*, one field at a time; poses are generated on the photographer's phone, whose candidates both phones show on *Pick a pose*, the first *Use this pose* deciding, and then the chosen pose's outline on *Reference confirm*, the first *Use this guide* deciding (2.5.1, 2.6.5); guides can be saved on either phone; photos are saved on both phones (2.5.1, 2.6.5). |
 | **Offline connection with a QR code** (F9) | The photographer's phone opens a local-only hotspot and runs the signaling itself, so neither the server nor a shared Wi-Fi is needed. The QR code carries the hotspot's connection details. The phone accepts only one connection per QR code, and the session starts only after both people tap *Resume*. This is another session entry point (AD-8). |
 | **Selfie mode** (FR-1.14) | The front camera as another `CameraController` selection (`setFacing`), with no ultrawide routing. It is a mirror everywhere: the preview, the photo, the scene photo, and the video a subject sees (2.6.4). It is offered in a session too (decided on 10/29; it was to be offered only while no session runs). A selfie's scene photo gets prompts of its own, because the others turned a selfie into a photo someone else took (2.6.3). |
-| **Guide library** (FR-3.8, FR-3.11; Iter3-A8, [#170]) | Added after the kickoff: saved guides grow into a library of up to 100, with *My library* at the top of *Add a pose guide* and a library screen that filters them by source. As built: 2.6.2 (*The library*), 2.8 (*Guide store*). Search, situations, and memos come in Iteration 4. |
+| **Guide library** (FR-3.8, FR-3.11, FR-4.14; Iter3-A8, [#170]; Iter3-A9, [#171]) | Added after the kickoff: saved guides grow into a library of up to 100, with *My library* at the top of *Add a pose guide* and a library screen that filters them by source, and a ♥ on *Pick a pose* saves a generated pose to it. As built: 2.6.2 (*The library*), 2.6.3 (*Saving a pose*), 2.8 (*Guide store*). Search, situations, and memos come in Iteration 4. |
 | **Settings, language, and tutorial** (F10, FR-3.10) | A settings screen with the language (Korean strings behind the same resource keys, the phone's language by default), the guide's color and line thickness, a latency indicator for sessions (from the `ping` round trip, 2.5.1), and how-to-use help; a tutorial on first use that the settings screen can start again. The settings screen as built (Iter3-P23): 2.6.8; it also has notifications, the AI agreement, the Pix account, and *About Pix*. |
 | **Invitations and sessions across networks** (Iter3-P13–P15; [#117], [#118], [#119]) | Built as designed in 2.6.6 and 2.6.7: push notifications with the link fallback, the TURN relay, `SessionEntry.Invitation`, `session.join`, and reconnection with ICE restart; friend requests use the same push path. Phones on cellular data reach the temporary AWS server until the course servers are open to them (2.8, Hosting). The invite link format was decided on 10/29 (2.6.6), and the wrong-code message on 10/26 (2.5.2). |
 | **The Could items** (FR-7.5, FR-7.7, NFR-19) | Built only if time allows, in this order of preference: the remote-control switch (Iter2-P17), remote focus (Iter2-P17), and the shutter freeze fix (Iter2-P5); each follows its note in 2.6.5. |
@@ -345,7 +346,7 @@ flowchart TB
     C1["Camera"] --- C2["Add guide with My library · Library · Reference confirm"] --- C3["Generate poses · Generating · Pick a pose"] --- C4["Sign in · Sign up · Pix ID setup · Account · Friends · Add a friend · Sent requests"] --- C5["Invite sent · Invite not accepted · Invitation · Room code"] --- C6["Subject view"]
   end
   subgraph VM["ViewModels: StateFlow of UI state"]
-    V1["CameraViewModel"] --- V2["ReferenceViewModel"] --- V3["GenerationViewModel"] --- V4["AccountViewModel · FriendsViewModel"] --- V5["SessionViewModel · InvitationViewModel"] --- V6["SubjectViewModel"]
+    V1["CameraViewModel"] --- V2["ReferenceViewModel"] --- V3["GenerationViewModel · PoseSaveViewModel"] --- V4["AccountViewModel · FriendsViewModel"] --- V5["SessionViewModel · InvitationViewModel"] --- V6["SubjectViewModel"]
   end
   subgraph DOM["Managers and repositories"]
     D1["CameraController · CameraSettings"] --- D2["GuideRepository · SavedGuideStore"] --- D3["ReferenceGuideMaker"] --- D4["PoseGenerator · GenerationConsent · PersonDetector"] --- D5["AuthRepository · FriendsRepository · PresenceConnection · InvitationManager · PushTokenRegistrar"] --- D6["SessionManager"] --- D7["GuideSyncer · RemoteControlHandler"]
@@ -577,10 +578,16 @@ classDiagram
     +sharing StateFlow~Boolean~
     +usedBySubject Flow
     +onPhotoPicked(uri)
-    +onCandidatePicked(image, tipFrom, chosenBy)
+    +onCandidatePicked(image, tipFrom, chosenBy, saved)
     +onUseGuide()
     +onUseSaved(id)
     +onDeleteSaved(id)
+  }
+  class PoseSaveViewModel {
+    +hearts StateFlow~Map~
+    +results Flow
+    +toggle(key, image)
+    +savedGuide(key) ReferenceGuide
   }
   class CameraController {
     <<interface>>
@@ -658,11 +665,13 @@ classDiagram
   ReferenceViewModel --> ReferenceGuideMaker
   ReferenceViewModel --> GuideRepository
   ReferenceViewModel --> SavedGuideStore
+  PoseSaveViewModel --> ReferenceGuideMaker
+  PoseSaveViewModel --> SavedGuideStore
   CameraViewModel ..> GuideOverlayView : renders state
   GuideOverlayView ..> GuideGeometry : maps
 ```
 
-*Figure 6. Camera and guide classes, with the mask smoothing in `MaskSmoothing.kt` and `SavedGuideStore`, which `ReferenceViewModel` lists and opens on *Add a pose guide* and in the library.*
+*Figure 6. Camera and guide classes, with the mask smoothing in `MaskSmoothing.kt` and `SavedGuideStore`, which `ReferenceViewModel` lists and opens on *Add a pose guide* and in the library, and `PoseSaveViewModel` fills from the ♥ on *Pick a pose*.*
 
 ```mermaid
 classDiagram
@@ -2139,6 +2148,8 @@ The guide's normalized width is `height × aspect × (H / W)` of the current fra
 4.  **Progressive results.** The screen shows its four slots once the poses are known ("Choosing poses…" for suggested poses, "Creating…" for a description, until then), two by two in the scene photo's shape, as wide as half the screen or narrower and centered where two rows of them would not fit, as for a 9:16 scene (`CandidateGridFit`), and fills them as candidates arrive, and moves to *Pick a pose* when all four are done, or at 60 s if at least one is ready (*Time limit* below). Requests still open at the limit are cancelled. Zero candidates means *Couldn't create poses* (FR-4.7). When the service refused every pose of a description, that screen says it would not create poses for that description with this photo, and offers *Edit description* in place of *Try again*; *Back to camera* leads to another photo. The service does not say which of the two it refused (US-5). When the server found no one in the scene photo for every pose, it says so and offers *Shoot again*, which goes back to the camera for another photo. *Pick a pose* shows the ready candidates one per page of a `ViewPager2` (`PosePageAdapter`), each as large as the page allows in its own shape, with the neighbors showing at the sides and the position below; the page on screen is the selected candidate, which *Use this pose* takes ([#108]). After *Use this pose*, the app discards the other candidates, and the scene photo once its tip has been asked for.
 5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices the closed connection and cancels its own call to the image API, which then does not bill that image. On the course servers the course's proxy does not pass the phone's cancel on (measured 2026-10-13; 2.8, Hosting), so there a cancelled request runs to the end and is billed; the rate limit bounds that cost.
 
+**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥ at the top end of its photo: an outline in the other icons' white, filled in red (`pix_heart`, apart from the danger color) once saved, as hearts are elsewhere. `PoseSaveViewModel`, shared by the activity, cuts the person out of the candidate with `ReferenceGuideMaker.make(image, GENERATED)`, as *Use this pose* does, and saves the guide with `SavedGuideStore.save`, so it starts at its own `anchor` when used and the library shows it as an AI pose. A heart is keyed by its set and its pose (`PoseKey`), since every set's poses are `pose-1` to `pose-4`: `GenerationUiState.setId` on the photographer's phone, the shared set's id on the subject's. It is `Saving` while the person is cut out, with the button disabled so a second tap cannot save twice, then `Saved(guideId)` while the library still has that guide, so one deleted in the library, or removed as the oldest, is empty again; a tap on a filled heart deletes the guide. A candidate without a person saves nothing. A ♥ still saving when the screen is left goes on in the ViewModel's scope; each result names its set, and a screen shows only its own set's notice. *Use this pose* on a candidate whose heart is filled hands the saved guide to `ReferenceViewModel.onCandidatePicked(..., saved)`, which goes on with it instead of cutting the person out again, so the guide on Camera is the saved one and *Save guide* finds it saved; a ♥ still saving then is not waited for. Nothing of a ♥ is sent: each phone saves to its own library, and only *Use this pose* chooses (2.6.5).
+
 **Pose prompt.** Every candidate uses one prompt, `pose_prompt` in `server/src/pix_server/poses/prompts.toml` (a selfie has its own, *Selfie prompts* below), with the pose in place of `{pose}`: the user's description as written (Korean included, which the image model follows), a suggested pose, a variation, or a default pose. The prompt changes the pose and the expression and lets the model act as a photographer in three ways only: move the person within the scene, frame them closer (knee-up or waist-up), and raise, lower, or tilt the camera a little. It never shows more than the scene photo does, and its rules come after the pose so that they win over it: the same person, clothing, place, and light, and nothing added to lean or sit on. *Why:* with a fixed framing, a person photographed from afar stays small in every candidate. With this prompt, 13 of 16 descriptions were followed in all eight test photos with the same person and place. A candidate can be tighter than the live view; the photographer then zooms in or steps closer to match the guide. *Known limits:* a description can still add a prop, clothing, or a second person it asks for (a cup, a suit, a friend); walking toward the camera is mostly cut at the knees; and past the description filter, the image service decides what to refuse (a violent description was not refused by it in testing).
 
 **The user's words in the prompts.** A description, a suggested pose, or a variation reaches a prompt in quotation marks, and `checked_pose` makes its own double quotation marks (straight, typographic, full-width, or angle) single ones, so it cannot close them. Every prompt that holds the user's words says that the text in quotation marks only describes a pose and is never an instruction about the rules, the task, or the answer's form, and that the image model never writes it or any other text into the photo; every prompt that gets a photo says that text in the photo, such as a sign, belongs to the place. *Why:* the description filter below misses some attempts. On five scenes (2026-11-03) suggestions stayed usable, and variations of a Korean description stayed usable for the server, which keeps the first three: with this wording Gemini wrote four variations without repeating the description in four of five answers, where it repeated the description first in all five before.
@@ -2394,6 +2405,7 @@ Invitations need both the accounts server (박재완) and the session entry poin
 | 한준형 | The settings screen and the first-use tutorial (Iter3-P23, [#123]) | 11/5 | 1.4.2 |
 | 조성민 | The settings screen of #123, taken from it (Iter3-P23, [#123]) | 11/5 | 2.6.8 |
 | 조성민 | The guide library: *My library* on *Add a pose guide* and the library screen (Iter3-A8, [#170]) | 11/5 | 2.1, 2.6.2, 2.8, AD-16 |
+| 조성민 | A generated pose saved to the library with ♥ on *Pick a pose* (Iter3-A9, [#171]) | 11/5 | 2.6.3 |
 | 박동제 | Prompt history on *Generate poses* (Iter3-P24, [#124]) | 11/5 | *Still open* |
 | 박재완 | Four prompt templates and an improved default prompt (Iter3-P25, [#125]) | 11/5 | *Still open* |
 | 박재완 | Integrate the Iteration 3 features (Iter3-P28, [#128]) | 11/5 | — |
@@ -2484,3 +2496,4 @@ To be written in Iteration 5, with at least two patterns documented in detail. E
 [#158]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/158
 [#165]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/165
 [#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
+[#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171

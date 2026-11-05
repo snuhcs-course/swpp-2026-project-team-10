@@ -244,6 +244,7 @@ Each note lists the attendees, the agenda, the decisions for each agenda item, a
 | Date | Meeting | Topics |
 |---|---|---|
 | [2026-10-25 (Sun)](#2026-10-25-sun-iteration-3-kickoff) | Iteration 3 kickoff | Features, open questions, testing, tasks |
+| [2026-11-01 (Sun)](#2026-11-01-sun-user-test-wrap-up) | Iteration 3 mid-sync | User test results so far, what follows, tasks |
 
 ### 2026-10-25 (Sun): Iteration 3 kickoff
 
@@ -329,9 +330,45 @@ The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues ne
 
 [↑ Back to the list](#iteration-3)
 
+### 2026-11-01 (Sun): User test wrap-up
+
+**Attendees:** 박동제, 박재완, 조성민, 한준형
+
+**Agenda**
+1. Results so far
+2. What follows
+3. Tasks
+
+**1. Results so far**
+- The test runs on the build with the tasks due 10/30, against the temporary AWS server. 박동제 recruited the participants. Responses come in until 11/4. The full results are in [[Testing Documentation|Testing-Documentation]] 4.1.
+- No crash or freeze. The participants found the screens easy to understand in every scenario.
+- The most requested features: the prompts used before, on *Generate poses*, and photos saved on both phones.
+- ‘참고 사진 올리기’ was unclear to several participants.
+- An outline alone hides the pose under long hair or a thick coat, and the face and arms are not marked.
+- Some participants minded the photo going to an outside AI service. Some found the wait for poses long.
+
+**2. What follows**
+- In Iteration 3: prompt history and photos on both phones, as planned, and the guide's color and thickness in the settings screen.
+- In Iteration 4: one path per use case, which replaces ‘참고 사진 올리기’, and the face or arms marked on the guide.
+- No fix is decided yet for the outside AI service or the wait for poses.
+
+**3. Tasks**
+
+| Owner | Item | Due |
+|---|---|---|
+| 한준형 | Photos saved on both phones ([#121]) | 11/2 (Mon) |
+| 조성민 | The settings screen, with the guide's color and thickness ([#123]) | 11/2 (Mon) |
+| 박동제 | Prompt history on *Generate poses* ([#124]) | 11/3 (Tue) |
+| 박재완 | The user test results in the Testing Documentation (4.1) | 11/5 (Thu) |
+
+[↑ Back to the list](#iteration-3)
+
 [#1]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/1
 [#12]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/12
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13
 [#55]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/55
 [#56]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/56
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
+[#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
+[#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
+[#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124

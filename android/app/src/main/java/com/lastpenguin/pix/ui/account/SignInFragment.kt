@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -23,7 +23,8 @@ import kotlinx.coroutines.launch
 /**
  * Sign in (R&S 6.4, 6.8; FR-5.2, FR-5.13): a Pix ID and a password, *Continue with Google*, or *Sign up*. A Google
  * account that no Pix account uses asks "Do you already have a Pix account?"; *Yes* stays here and adds Google to the
- * account the person signs in to. Owner: Accounts (#54).
+ * account the person signs in to. Signed in, it goes back to the screen that opened it: Share my camera, Invitation, or
+ * Settings. Owner: Accounts (#54).
  */
 class SignInFragment : Fragment(R.layout.fragment_sign_in) {
 
@@ -60,7 +61,7 @@ class SignInFragment : Fragment(R.layout.fragment_sign_in) {
             is AccountEvent.SignedIn -> if (event.needsPixId) {
                 findNavController().navigate(R.id.action_signIn_to_pixIdSetup)
             } else {
-                findNavController().popBackStack(R.id.friendsFragment, false)
+                findNavController().popBackStack(R.id.signInFragment, true)
             }
 
             AccountEvent.AskExistingAccount -> MaterialAlertDialogBuilder(requireContext())
@@ -81,7 +82,7 @@ class SignInFragment : Fragment(R.layout.fragment_sign_in) {
         }
     }
 
-    /** Back to Friends; a Google account waiting to be added is forgotten. */
+    /** Back to the screen that opened Sign in; a Google account waiting to be added is forgotten. */
     private fun leave() {
         viewModel.forgetGoogle()
         findNavController().popBackStack()

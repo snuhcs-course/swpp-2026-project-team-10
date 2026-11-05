@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.account
 
 import android.content.Context
@@ -11,6 +11,7 @@ import com.lastpenguin.pix.core.network.FriendRequestBody
 import com.lastpenguin.pix.core.network.FriendRequestsDto
 import com.lastpenguin.pix.core.network.FriendsDto
 import com.lastpenguin.pix.core.network.GoogleTokenBody
+import com.lastpenguin.pix.core.network.IncomingInvitationsDto
 import com.lastpenguin.pix.core.network.InviteBody
 import com.lastpenguin.pix.core.network.LogInBody
 import com.lastpenguin.pix.core.network.LookupBody
@@ -125,6 +126,7 @@ class FakeAccountApi : PixAccountApi {
         rejoinToken = "photographer-token",
     )
     var opened = OpenedInvitationDto("inv_1", UserDto("u_1", "test1", "Test Account 1"), "PENDING", 1_030_000)
+    var incoming = IncomingInvitationsDto()
     var place = SessionPlaceDto("s_1", "subject-token")
     val bodies = mutableListOf<Any>()
 
@@ -185,6 +187,8 @@ class FakeAccountApi : PixAccountApi {
     override suspend fun invitation(invitationId: String): OpenedInvitationDto =
         opened.also { call("invitation:$invitationId") }
 
+    override suspend fun incomingInvitations(): IncomingInvitationsDto = incoming.also { call("incomingInvitations") }
+
     override suspend fun acceptInvitation(invitationId: String): SessionPlaceDto =
         place.also { call("acceptInvitation:$invitationId") }
 
@@ -211,6 +215,9 @@ class FakeInvitationManager : InvitationManager {
     var opened =
         OpenedInvitation("inv_1", PixUser("u_1", "test1", "Test Account 1"), InvitationStatus.PENDING, 1_030_000)
     var place = SessionPlace("s_1", "subject-token", emptyList())
+
+    /** What `incoming` answers, the received invitations' list (FR-6.17). */
+    var incoming = listOf<OpenedInvitation>()
     var inviteGate: CompletableDeferred<Unit>? = null
     var acceptGate: CompletableDeferred<Unit>? = null
     var cancelGate: CompletableDeferred<Unit>? = null
@@ -226,6 +233,8 @@ class FakeInvitationManager : InvitationManager {
     }
 
     override suspend fun open(invitationId: String) = answer("open:$invitationId") { opened }
+
+    override suspend fun incoming() = answer("incoming") { incoming }
 
     override suspend fun accept(invitationId: String): Result<SessionPlace> {
         acceptGate?.await()

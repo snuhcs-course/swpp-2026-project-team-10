@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.fragment.app.testing.launchFragmentInContainer
@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 
-/* Session not found (R&S 6.7, FR-8.3): the texts, Try again back to Join with code with the kept code, Back. */
+/* Session not found (R&S 6.7, FR-8.3): the texts, Try again back to See their camera with the kept code, Back. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SessionNotFoundFragmentTest {

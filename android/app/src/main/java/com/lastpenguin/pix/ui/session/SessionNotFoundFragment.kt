@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -8,7 +8,7 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
 
-/** Session not found (R&S 6.7, FR-8.3). *Try again* goes back to Join with code. Owner: Real-time (#8). */
+/** Session not found (R&S 6.7, FR-8.3). *Try again* goes back to See their camera. Owner: Real-time (#8). */
 class SessionNotFoundFragment : Fragment(R.layout.fragment_failure) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -18,7 +18,7 @@ class SessionNotFoundFragment : Fragment(R.layout.fragment_failure) {
 
         binding.primaryButton.setText(R.string.try_again)
         binding.primaryButton.setOnClickListener {
-            // The action carries keepCode, so Join with code offers the kept code for editing (FR-8.3, #81).
+            // The action carries keepCode, so See their camera offers the kept code for editing (FR-8.3, #81).
             findNavController().navigate(R.id.action_sessionNotFound_to_joinCode)
         }
         binding.secondaryButton.setText(R.string.back)

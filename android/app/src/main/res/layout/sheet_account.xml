@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Account, from the account button on Friends (R&S 6.8, decided in Iter2-P13; FR-5.12, FR-5.14): the name and the
+<!-- Account, from the account button on Share my camera (R&S 6.8, decided in Iter2-P13; FR-5.12, FR-5.14): the name and the
      Pix ID, Add Google or Add a password, and Sign out. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"

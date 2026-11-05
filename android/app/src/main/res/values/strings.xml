@@ -209,14 +209,17 @@
     <string name="generation_failed_title">Couldn\'t create poses</string>
     <string name="generation_failed_message">The request failed or took longer than 60 seconds. Your photo is kept, so you can try again.</string>
 
-    <!-- Flow 3: Friends, Add a friend (R&S 6.4) -->
-    <string name="friends_overline">Friends</string>
+    <!-- Flow 3: Share my camera, with the Pix friends; Add a friend (R&S 6.4, 6.7) -->
+    <string name="share_my_camera">Share my camera</string>
     <string name="account">Account</string>
-    <string name="signed_out_title">Shoot with friends</string>
-    <string name="signed_out_body">Sign in to add friends by their Pix ID and invite them to shoot together.</string>
+    <string name="invite_pix_friend">Invite a Pix friend</string>
+    <string name="invite_pix_friend_body">Once they accept, my camera shows on their phone.</string>
+    <string name="connect_nearby">Connect with someone nearby</string>
+    <string name="connect_nearby_body">No Pix friend or sign-in needed.</string>
+    <string name="show_code">Show a code</string>
+    <string name="show_code_body">They enter this phone\'s 6-digit code</string>
+    <string name="signed_out_body">Sign in to add friends by their Pix ID and invite them.</string>
     <string name="sign_in_to_add_friends">Sign in to add friends</string>
-    <string name="use_room_code_instead">Use a room code instead</string>
-    <string name="use_room_code">Use a room code</string>
     <string name="choose_pix_id_title">Choose your Pix ID</string>
     <string name="choose_pix_id_body">Friends find you by your Pix ID.</string>
     <string name="choose_pix_id">Choose a Pix ID</string>
@@ -241,7 +244,7 @@
     <string name="remove_friend_message">You won\'t see each other in your friend lists. You can add each other again later.</string>
     <string name="remove_friend">Remove friend</string>
     <string name="friends_offline">Couldn\'t update your friends. Check your connection.</string>
-    <!-- Sent requests, from "Sent requests · 2" on Friends (FR-5.16). -->
+    <!-- Sent requests, from "Sent requests · 2" on Share my camera (FR-5.16). -->
     <string name="sent_requests_count">Sent requests · %1$d</string>
     <string name="sent_requests_title">Sent requests</string>
     <string name="no_sent_requests_title">No sent requests</string>
@@ -318,22 +321,43 @@
     <string name="password_added">Password added. You can sign in with your Pix ID now.</string>
     <string name="signed_out">Signed out</string>
 
-    <!-- Flow 6: Room code -->
+    <!-- Flow 6: Who takes the photo, Room code, See their camera (R&S 6.7) -->
+    <string name="who_takes_the_photo">Who takes the photo?</string>
+    <string name="role_photographer">I\'ll take the photo</string>
+    <string name="role_photographer_body">My camera shows on the other phone</string>
+    <string name="role_subject">I\'ll be in the photo</string>
+    <string name="role_subject_body">Watch their camera as you pose</string>
+    <!-- The badge on I'll be in the photo while invitations wait (FR-6.17); short, since it shares the tile's top. -->
+    <plurals name="invitations_waiting">
+        <item quantity="one">%1$d invite</item>
+        <item quantity="other">%1$d invites</item>
+    </plurals>
     <string name="room_code_title">Your room code</string>
-    <string name="room_code_body">Your friend joins by entering this code in Pix.</string>
+    <string name="room_code_body">Enter this code on the phone of the person in the photo</string>
+    <!-- Where the other phone enters it: "Shoot together › I'll be in the photo". -->
+    <string name="room_code_path" translatable="false">%1$s › %2$s</string>
     <string name="room_code_placeholder" translatable="false">––– –––</string>
     <string name="getting_code">Getting a code…</string>
-    <string name="waiting_for_friend">Waiting for your friend…</string>
-    <string name="friend_joined_connecting">Your friend joined · connecting…</string>
-    <string name="code_expired">The code expired. Tap Use a room code again for a new one.</string>
+    <string name="waiting_to_connect">Waiting to connect…</string>
+    <string name="peer_joined_connecting">They joined · connecting…</string>
+    <string name="code_expired">The code expired. Tap Show a code again for a new one.</string>
     <string name="code_expiry">Expires in 10 min</string>
-    <string name="join_instead">Join with a code instead</string>
-    <string name="join_title">Join with a code</string>
-    <string name="join_body">Enter the code on your friend\'s screen.</string>
-    <string name="room_code_label">Room code</string>
-    <string name="join">Join</string>
+    <string name="join_title">See their camera</string>
+    <string name="join_body">Enter the code on the photographer\'s phone</string>
+    <string name="join_body_or">Or enter the code on the photographer\'s phone</string>
+    <!-- Where that code comes from: "I'll take the photo › Show a code". -->
+    <string name="join_hint">It shows when they tap %1$s › %2$s.</string>
+    <string name="join">Connect</string>
+    <string name="join_invite_note">Invitations from Pix friends wait here for a minute, even if you miss the notification.</string>
+    <!-- See their camera's received invitations (FR-6.17). -->
+    <string name="received_invitations">Received invitations</string>
+    <string name="accepting_shows_camera">Accepting shows their camera.</string>
+    <!-- The time an invitation has left, 0:48. -->
+    <string name="invitation_time_left" translatable="false">%1$d:%2$02d</string>
+    <string name="accept_invitation_from">Accept %1$s\'s invitation</string>
+    <string name="decline_invitation_from">Decline %1$s\'s invitation</string>
     <string name="session_not_found_title">Session not found</string>
-    <string name="session_not_found_message">Check the code with your friend and try again.</string>
+    <string name="session_not_found_message">Check the code on the photographer\'s phone and try again.</string>
 
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s\'s camera</string>
@@ -379,7 +403,7 @@
     <string name="invitation_in_session">You\'re in another session. Leave it first, then accept.</string>
     <string name="invitation_notification">%1$s invites you to shoot together</string>
     <string name="friend_request_notification">%1$s sent you a friend request</string>
-    <string name="friend_request_notification_body">Open Friends to accept or decline.</string>
+    <string name="friend_request_notification_body">Tap to accept or decline.</string>
     <string name="invitations_channel">Invitations</string>
     <string name="friend_requests_channel">Friend requests</string>
 
@@ -428,7 +452,7 @@
     <string name="help_poses_title">Generate poses</string>
     <string name="help_poses_body">Tap Guide › Generate poses here and take a photo of the scene. AI makes four poses for that person in that place; the one you pick becomes the guide.</string>
     <string name="help_together_title">Shoot together</string>
-    <string name="help_together_body">Invite a friend from Shoot together, or give them a room code. Their phone shows your camera live, with the same guide.</string>
+    <string name="help_together_body">On Shoot together, choose who takes the photo. Invite a Pix friend or show a code to the person in the photo, and their phone shows your camera live, with the same guide.</string>
     <string name="help_remote_title">From the subject\'s phone</string>
     <string name="help_remote_body">The person in the photo can zoom, change the brightness and the flash, and move the guide from their own phone. Only the photographer takes the photo.</string>
     <string name="about_title">About Pix</string>
@@ -439,7 +463,7 @@
     <string name="settings_tutorial_reset">The tutorial shows again on each screen.</string>
     <string name="tutorial_got_it">Got it</string>
     <string name="tutorial_settings">Change the language and the guide\'s look</string>
-    <string name="tutorial_together">Show a friend your camera live</string>
+    <string name="tutorial_together">Share your camera live with another phone</string>
     <string name="tutorial_guide">Add a photo or AI pose guide</string>
     <string name="tutorial_shutter">Only the photo is saved, never the guide</string>
     <string name="tutorial_switch">Change to the front camera</string>

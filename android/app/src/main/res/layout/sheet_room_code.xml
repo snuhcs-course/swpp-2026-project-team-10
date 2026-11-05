@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Room code, photographer (R&S 6.7, FR-8.1, FR-8.4, FR-8.5). -->
+<!-- Room code, photographer (R&S 6.7, FR-8.1, FR-8.4, FR-8.5): the code, and where the other phone enters it. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -49,32 +49,31 @@
         android:textAppearance="@style/TextAppearance.Pix.Label"
         android:textColor="@color/pix_text" />
 
-    <!-- What the friend does, in a box of its own under the code's status. -->
+    <!-- Which phone enters the code, and where, in a box of its own under the code's status. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         android:background="@drawable/bg_list_card"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="12dp">
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_people"
-            app:tint="@color/pix_text_soft" />
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp">
 
         <TextView
             android:id="@+id/joinSteps"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_weight="1"
-            android:lineSpacingMultiplier="1.2"
             android:text="@string/room_code_body"
-            android:textAppearance="@style/TextAppearance.Pix.Body" />
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <!-- "Shoot together › I'll be in the photo", set by RoomCodeSheet from the buttons' own labels. -->
+        <TextView
+            android:id="@+id/whereText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
     </LinearLayout>
 
     <TextView
@@ -90,18 +89,10 @@
         android:textAppearance="@style/TextAppearance.Pix.Caption" />
 
     <Button
-        android:id="@+id/joinInsteadButton"
+        android:id="@+id/cancelButton"
         style="@style/Widget.Pix.Button.Secondary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/join_instead" />
-
-    <Button
-        android:id="@+id/cancelButton"
-        style="@style/Widget.Pix.Button.Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="20dp"
         android:text="@string/cancel" />
 </LinearLayout>

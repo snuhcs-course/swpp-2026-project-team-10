@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A received invitation on See their camera (FR-6.17): who invites, the time it has left, Decline and Accept. One
+     compact row each, also when there is only one. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/bg_invitation_card"
+    android:gravity="center_vertical"
+    android:minHeight="64dp"
+    android:paddingVertical="12dp"
+    android:paddingStart="14dp"
+    android:paddingEnd="12dp">
+
+    <TextView
+        android:id="@+id/avatarText"
+        style="@style/Widget.Pix.Avatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        tools:text="T" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/nameText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text"
+            tools:text="Test Account 1" />
+
+        <TextView
+            android:id="@+id/timeLeftText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:drawablePadding="4dp"
+            android:fontFeatureSettings="tnum"
+            android:gravity="center_vertical"
+            android:textAppearance="@style/TextAppearance.Pix.Caption"
+            android:textColor="@color/pix_accent"
+            app:drawableStartCompat="@drawable/ic_clock_small"
+            app:drawableTint="@color/pix_accent"
+            tools:text="0:48" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/declineButton"
+        style="@style/Widget.Pix.Button.Secondary.Small"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="@string/decline" />
+
+    <Button
+        android:id="@+id/acceptButton"
+        style="@style/Widget.Pix.Button.Small"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="@string/accept" />
+</LinearLayout>

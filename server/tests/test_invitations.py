@@ -1,10 +1,12 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
-"""Invitations through the REST API and the signaling socket (Design 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9).
+# AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+"""Invitations through the REST API and the signaling socket (Design 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9, FR-6.17).
 
 Partitions:
 - invite: a friend, offline or online; someone who is not a friend, an unknown user, oneself; a friend in a session
   (BUSY, nothing saved); a caller signed out or without a Pix ID; the session store down (nothing saved)
 - open: pending; 59 s, 60 s, and 61 s after it was sent; answered; unknown; without a sign-in
+- incoming: none; one; several, newest first; another user's; answered (accepted, declined, cancelled); 59 s and 60 s
+  after it was sent; without a sign-in; an invitation still opens by its id
 - answer: accept, decline, or cancel by the one who may (the friend, the friend, the photographer), or by anyone else;
   after an earlier answer; accepting at 59 s, 60 s, and 61 s; accepting once the room has ended; declining while the
   session store is down
@@ -203,6 +205,55 @@ def test_opening_shows_who_invites_without_a_sign_in_until_it_expires(client, cl
 
 def test_opening_an_unknown_invitation_is_not_found(client):
     assert_error(client.get("/api/v1/invitations/inv_01JB2C3D4E5F6G7H8J9KAMNPQR"), 404, "NOT_FOUND")
+
+
+# --- incoming ------------------------------------------------------------------------------------------------------
+
+
+def incoming(client, headers):
+    response = client.get("/api/v1/invitations/incoming", headers=headers)
+    assert response.status_code == 200, response.text
+    return response.json()["invitations"]
+
+
+def test_incoming_lists_the_callers_pending_invitations_newest_first(client, clock, sign_up, friends):
+    (dongje, dongje_user), (junhyeong, junhyeong_user) = friends
+    assert incoming(client, junhyeong) == []
+    first = sent(client, friends)
+    seoyeon, seoyeon_user = sign_up("seoyeon.k", "Seoyeon")
+    request = client.post("/api/v1/friend-requests", headers=seoyeon, json={"userId": junhyeong_user["id"]})
+    assert client.post(f"/api/v1/friend-requests/{request.json()['id']}/accept", headers=junhyeong).status_code == 200
+    clock.advance(1)
+    second = invite(client, seoyeon, junhyeong_user).json()
+    assert incoming(client, junhyeong) == [
+        {"id": second["id"], "from": public(seoyeon_user), "status": "PENDING", "expiresAt": second["expiresAt"]},
+        {"id": first["id"], "from": public(dongje_user), "status": "PENDING", "expiresAt": first["expiresAt"]},
+    ]
+    # Only the friend's: the photographer's own invitations are not theirs to answer.
+    assert incoming(client, dongje) == []
+    assert incoming(client, seoyeon) == []
+
+
+@pytest.mark.parametrize("action", ["accept", "decline", "cancel"])
+def test_an_answered_invitation_leaves_the_list(client, friends, action):
+    (dongje, _), (junhyeong, _) = friends
+    invitation = sent(client, friends)
+    assert answer(client, dongje if action == "cancel" else junhyeong, invitation, action).status_code in (200, 204)
+    assert incoming(client, junhyeong) == []
+
+
+@pytest.mark.parametrize(("seconds", "listed"), [(59, True), (60, False)])
+def test_an_invitation_is_listed_until_it_expires(client, clock, friends, seconds, listed):
+    (_, _), (junhyeong, _) = friends
+    invitation = sent(client, friends)
+    clock.advance(seconds)
+    assert [item["id"] for item in incoming(client, junhyeong)] == ([invitation["id"]] if listed else [])
+
+
+def test_incoming_needs_a_sign_in_and_leaves_opening_by_id_working(client, friends):
+    invitation = sent(client, friends)
+    assert_error(client.get("/api/v1/invitations/incoming"), 401, "UNAUTHENTICATED")
+    assert client.get(f"/api/v1/invitations/{invitation['id']}").json()["status"] == "PENDING"
 
 
 # --- answer --------------------------------------------------------------------------------------------------------

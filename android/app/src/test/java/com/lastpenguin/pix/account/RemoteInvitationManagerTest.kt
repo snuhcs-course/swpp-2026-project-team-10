@@ -1,8 +1,11 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.account
 
+import com.lastpenguin.pix.core.network.IncomingInvitationsDto
 import com.lastpenguin.pix.core.network.InviteBody
+import com.lastpenguin.pix.core.network.OpenedInvitationDto
 import com.lastpenguin.pix.core.network.SessionPlaceDto
+import com.lastpenguin.pix.core.network.UserDto
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.signaling.IceServer
 import java.io.IOException
@@ -11,8 +14,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /*
- * Partitions for invitations (Design 2.5.3, FR-6.1–6.4, FR-6.9). Invite: sent (the link and the photographer's place),
- * NOT_FRIENDS, BUSY, no connection. Open: each status, a status the app does not know (gone), NOT_FOUND. Accept: the
+ * Partitions for invitations (Design 2.5.3, FR-6.1–6.4, FR-6.9, FR-6.17). Invite: sent (the link and the
+ * photographer's place), NOT_FRIENDS, BUSY, no connection. Open: each status, a status the app does not know (gone),
+ * NOT_FOUND. Incoming: none, two in the server's order, a server without the endpoint (NOT_FOUND). Accept: the
  * friend's place, INVITATION_GONE (410 with its code, and a 410 without one). Decline and cancel.
  */
 class RemoteInvitationManagerTest {
@@ -62,6 +66,39 @@ class RemoteInvitationManagerTest {
         assertEquals(PixUser("u_1", "test1", "Test Account 1"), invitations.open("inv_1").getOrThrow().from)
         api.failure = httpError(404, "NOT_FOUND")
         assertEquals(AccountError.NOT_FOUND, failure(invitations.open("inv_9")))
+    }
+
+    @Test
+    fun incoming_listsTheInvitationsInTheServersOrder_orFailsOnAnOlderServer() = runTest {
+        assertEquals(emptyList<OpenedInvitation>(), invitations.incoming().getOrThrow())
+        api.incoming = IncomingInvitationsDto(
+            listOf(
+                OpenedInvitationDto("inv_2", UserDto("u_3", "test3", "Test Account 3"), "PENDING", 1_050_000),
+                api.opened,
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                OpenedInvitation(
+                    "inv_2",
+                    PixUser("u_3", "test3", "Test Account 3"),
+                    InvitationStatus.PENDING,
+                    1_050_000,
+                ),
+                OpenedInvitation(
+                    "inv_1",
+                    PixUser("u_1", "test1", "Test Account 1"),
+                    InvitationStatus.PENDING,
+                    1_030_000,
+                ),
+            ),
+            invitations.incoming().getOrThrow(),
+        )
+        assertEquals("incomingInvitations", api.calls.last())
+        // An older server reads "incoming" as an invitation id.
+        api.failure = httpError(404, "NOT_FOUND")
+        assertEquals(AccountError.NOT_FOUND, failure(invitations.incoming()))
     }
 
     @Test

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A friend on Friends: name, online status, and Invite (FR-5.9). Long-press removes (FR-5.10). -->
+<!-- A friend on Share my camera: name, online status, and Invite (FR-5.9). Long-press removes (FR-5.10). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"

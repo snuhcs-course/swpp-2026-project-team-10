@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -145,6 +145,13 @@ interface PixAccountApi {
     /** `403 NOT_FRIENDS`, `409 BUSY` (FR-6.1, FR-6.9). */
     @POST("api/v1/invitations")
     suspend fun invite(@Body body: InviteBody): SentInvitationDto
+
+    /**
+     * The caller's pending invitations, newest first, which *See their camera* lists (FR-6.17). A server older than
+     * this endpoint answers `404 NOT_FOUND`, taking "incoming" for an invitation id.
+     */
+    @GET("api/v1/invitations/incoming")
+    suspend fun incomingInvitations(): IncomingInvitationsDto
 
     /** Needs no sign-in, so a link opens it on any phone (FR-6.4); `404 NOT_FOUND`. */
     @GET("api/v1/invitations/{id}")

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
@@ -38,7 +38,8 @@ import org.robolectric.shadows.ShadowToast
  * Settings on the real screen (FR-10.1–10.4, FR-3.10, FR-4.2), with the settings in memory behind the ViewModel.
  * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, signed out);
  * each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
- * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the account signed in and signed out;
+ * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the
+ * account signed in and signed out (Sign in; Friends until #188);
  * notifications, How to use Pix, and About Pix opened; *Show the tutorial again*, which makes every screen's tips due
  * again and says so.
  */
@@ -208,12 +209,12 @@ class SettingsFragmentTest {
     }
 
     @Test
-    fun signedOut_theAccountRowOpensFriends() {
+    fun signedOut_theAccountRowOpensSignIn() {
         launch()
 
         onScreen { it.accountRow.root.performClick() }
 
-        assertEquals(R.id.friendsFragment, nav.currentDestination?.id)
+        assertEquals(R.id.signInFragment, nav.currentDestination?.id)
     }
 
     @Test

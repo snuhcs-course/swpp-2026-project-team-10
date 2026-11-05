@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.account
 
 import android.Manifest
@@ -41,9 +41,11 @@ import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlinx.coroutines.launch
 
 /**
- * Friends, the screen *Shoot together* opens (R&S 6.4; FR-5.4–5.10, FR-5.16, FR-8.1). Signed out it offers *Sign in to
- * add friends* and *Use a room code instead*, and an account made with Google first chooses its Pix ID; room codes
- * never need a sign-in (FR-5.1). Requests the user sent open on Sent requests. Owner: Accounts (#54).
+ * Share my camera, the photographer's ways to connect, opened by *I'll take the photo* on Who takes the photo? (R&S 6.4,
+ * 6.7; FR-5.4–5.10, FR-5.16, FR-8.1). The Pix friends to invite come first; signed out, *Sign in to add friends* takes
+ * their place, and an account made with Google first chooses its Pix ID. *Show a code* is always there, since room codes
+ * never need a sign-in (FR-5.1). A friend request's notification, Sign in, and *Cancel invite* come back here too.
+ * Requests the user sent open on Sent requests. Owner: Accounts (#54).
  */
 class FriendsFragment : Fragment(R.layout.fragment_friends) {
 
@@ -171,8 +173,8 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
 }
 
 /**
- * Draws [FriendsUiState] on Friends' layout and reports taps to [actions]. Apart from the fragment, so every state can
- * be rendered on the real layout in a test without a ViewModel or navigation.
+ * Draws [FriendsUiState] on Share my camera's layout and reports taps to [actions]. Apart from the fragment, so every
+ * state can be rendered on the real layout in a test without a ViewModel or navigation.
  */
 class FriendsScreen(private val binding: FragmentFriendsBinding, private val actions: Actions) {
 
@@ -201,8 +203,7 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
         binding.addFriendButton.setOnClickListener { actions.addFriend() }
         binding.sentRequestsButton.setOnClickListener { actions.openSentRequests() }
         binding.accountButton.setOnClickListener { actions.openAccount() }
-        binding.roomCodeButton.setOnClickListener { actions.useRoomCode() }
-        binding.roomCodeInsteadButton.setOnClickListener { actions.useRoomCode() }
+        binding.showCodeButton.setOnClickListener { actions.useRoomCode() }
     }
 
     fun render(state: FriendsUiState) {
@@ -213,18 +214,17 @@ class FriendsScreen(private val binding: FragmentFriendsBinding, private val act
 
         binding.accountButton.isVisible = account != null
         binding.promptCard.isVisible = signedOut || needsPixId
+        // Signed out, *Invite a Pix friend* above the card already says what signing in is for.
+        binding.promptTitle.isVisible = needsPixId
         if (signedOut) {
-            binding.promptTitle.setText(R.string.signed_out_title)
             binding.promptBody.setText(R.string.signed_out_body)
         } else if (needsPixId) {
             binding.promptTitle.setText(R.string.choose_pix_id_title)
             binding.promptBody.setText(R.string.choose_pix_id_body)
         }
         binding.signInButton.isVisible = signedOut
-        binding.roomCodeInsteadButton.isVisible = signedOut
         binding.choosePixIdButton.isVisible = needsPixId
         binding.addFriendButton.isVisible = pixId != null
-        binding.roomCodeButton.isVisible = !signedOut
 
         binding.myPixIdText.isVisible = pixId != null
         if (pixId != null) {

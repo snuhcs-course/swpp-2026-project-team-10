@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -21,9 +21,9 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Sent requests, from *Sent requests · N* on Friends (R&S 6.4; FR-5.16): the requests the user sent that nobody
- * answered yet, each with *Withdraw*. The list refreshes as on Friends, so an accepted request leaves it. Signed out, or
- * without a Pix ID, it goes back to Friends. Owner: Accounts (#54).
+ * Sent requests, from *Sent requests · N* on Share my camera (R&S 6.4; FR-5.16): the requests the user sent that
+ * nobody answered yet, each with *Withdraw*. The list refreshes as on Share my camera, so an accepted request leaves
+ * it. Signed out, or without a Pix ID, it goes back to Share my camera. Owner: Accounts (#54).
  */
 class SentRequestsFragment : Fragment(R.layout.fragment_sent_requests) {
 

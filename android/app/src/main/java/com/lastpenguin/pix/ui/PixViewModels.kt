@@ -15,6 +15,7 @@ import com.lastpenguin.pix.ui.camera.CameraViewModel
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.PoseSaveViewModel
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
+import com.lastpenguin.pix.ui.session.IncomingInvitationsViewModel
 import com.lastpenguin.pix.ui.session.InvitationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.SubjectConfirmViewModel
@@ -79,6 +80,7 @@ object PixViewModels {
             )
         }
         initializer { InvitationViewModel(container.invitationManager, container.authRepository) }
+        initializer { IncomingInvitationsViewModel(container.invitationManager, container.authRepository) }
         initializer {
             SubjectViewModel(
                 container.sessionManager,

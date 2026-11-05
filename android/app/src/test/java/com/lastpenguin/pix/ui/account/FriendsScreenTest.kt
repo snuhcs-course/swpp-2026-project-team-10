@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.account
 
 import android.view.LayoutInflater
@@ -23,12 +23,12 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 
 /*
- * Partitions for the Friends screen (R&S 6.4; FR-5.4, FR-5.7, FR-5.9, FR-5.10, FR-5.16, FR-8.1), on the real layout.
- * The account: loading, signed out (Sign in and the room code instead of the list), signed in without a Pix ID (Choose
- * a Pix ID), with one. The lists: no friends (the empty card), friends online, offline, and in a session; received
- * requests, one being answered (its buttons wait); sent requests (none: no button; some: their count; signed out: no
- * button). The last refresh failed. Taps: the room code, My Pix ID (copied), Accept and Decline, Sent requests, a long
- * press on a friend (Remove).
+ * Partitions for Share my camera, Friends until #188 (R&S 6.4, 6.7; FR-5.4, FR-5.7, FR-5.9, FR-5.10, FR-5.16, FR-8.1),
+ * on the real layout. The account: loading, signed out (Sign in instead of the list, its card without a title), signed
+ * in without a Pix ID (Choose a Pix ID), with one. Show a code is there in each. The lists: no friends (the empty card),
+ * friends online, offline, and in a session; received requests, one being answered (its buttons wait); sent requests
+ * (none: no button; some: their count; signed out: no button). The last refresh failed. Taps: Show a code, My Pix ID
+ * (copied), Accept and Decline, Sent requests, a long press on a friend (Remove).
  */
 @RunWith(AndroidJUnit4::class)
 class FriendsScreenTest {
@@ -92,29 +92,29 @@ class FriendsScreenTest {
     private val View.shown get() = visibility == View.VISIBLE
 
     @Test
-    fun signedOut_offersSignInAndTheRoomCodeInsteadOfTheList() {
+    fun signedOut_offersSignInInsteadOfTheList_andShowACode() {
         val (binding, screen) = screen()
 
         screen.render(FriendsUiState(AuthState.SignedOut, friends = listOf(testAccount2)))
 
         assertTrue(binding.promptCard.shown)
-        assertEquals("Shoot with friends", binding.promptTitle.text.toString())
-        assertTrue(binding.signInButton.shown && binding.roomCodeInsteadButton.shown)
+        assertFalse(binding.promptTitle.shown)
+        assertTrue(binding.signInButton.shown && binding.showCodeButton.shown)
         assertFalse(binding.addFriendButton.shown || binding.accountButton.shown || binding.myPixIdText.shown)
         assertEquals(0, binding.friendsList.childCount)
         binding.signInButton.performClick()
-        binding.roomCodeInsteadButton.performClick()
+        binding.showCodeButton.performClick()
         assertEquals(listOf("signIn", "roomCode"), taps)
     }
 
     @Test
-    fun loading_showsOnlyTheRoomCode() {
+    fun loading_showsOnlyShowACode() {
         val (binding, screen) = screen()
 
         screen.render(FriendsUiState(AuthState.Loading))
 
         assertFalse(binding.promptCard.shown || binding.signInButton.shown || binding.addFriendButton.shown)
-        assertTrue(binding.roomCodeButton.shown)
+        assertTrue(binding.showCodeButton.shown)
     }
 
     @Test
@@ -124,7 +124,7 @@ class FriendsScreenTest {
         screen.render(FriendsUiState(AuthState.SignedIn(account.copy(pixId = null))))
 
         assertEquals("Choose your Pix ID", binding.promptTitle.text.toString())
-        assertTrue(binding.choosePixIdButton.shown && binding.roomCodeButton.shown && binding.accountButton.shown)
+        assertTrue(binding.choosePixIdButton.shown && binding.showCodeButton.shown && binding.accountButton.shown)
         assertFalse(binding.addFriendButton.shown || binding.myPixIdText.shown || binding.emptyCard.shown)
         binding.choosePixIdButton.performClick()
         assertEquals(listOf("choosePixId"), taps)
@@ -136,7 +136,7 @@ class FriendsScreenTest {
 
         screen.render(FriendsUiState(AuthState.SignedIn(account)))
 
-        assertTrue(binding.emptyCard.shown && binding.addFriendButton.shown)
+        assertTrue(binding.emptyCard.shown && binding.addFriendButton.shown && binding.showCodeButton.shown)
         assertFalse(binding.promptCard.shown)
         assertEquals("My Pix ID: test1", binding.myPixIdText.text.toString())
         binding.myPixIdText.performClick()

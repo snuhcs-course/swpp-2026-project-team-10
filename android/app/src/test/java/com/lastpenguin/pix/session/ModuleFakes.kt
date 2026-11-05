@@ -88,8 +88,12 @@ class FakeSessionManager : SessionManager {
     /** Every `leave`, with its reason, so a screen test can see a cancelled room or a left session. */
     val leaves = mutableListOf<EndReason>()
 
+    /** Set to have `leave` end the session, as the real one does before it returns. */
+    var endsOnLeave = false
+
     override suspend fun leave(reason: EndReason) {
         leaves += reason
+        if (endsOnLeave) _state.value = SessionState.Ended(reason)
     }
 
     fun setState(state: SessionState) {

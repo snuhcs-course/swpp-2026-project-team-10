@@ -11,6 +11,4 @@ Pix is an Android camera app that helps two people get the portrait one of them 
 
 **Documents:** [[Requirements and Specifications|Requirements-and-Specifications]] · [[Design Documentation|Design-Documentation]] · [[Testing Documentation|Testing-Documentation]]
 
-**Code and demo:** the [repository](https://github.com/snuhcs-course/swpp-2026-project-team-10) and its README.
-
 **Team 10:** 한준형 · 박동제 · 박재완 · 조성민

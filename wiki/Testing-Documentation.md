@@ -1,4 +1,5 @@
-## Document Revision History
+<details>
+<summary><b>Document Revision History</b></summary>
 
 | Version | Date | Key changes |
 |---|---|---|
@@ -77,7 +78,9 @@
 | 2.53 | 2026-11-05 | Same-iteration change notes removed from the shared steps' row, IT-9, IT-13, and IT-23 (1.1, 2.1.5). |
 | 2.54 | 2026-11-05 | The AI module test plan: evaluation set, rules, judge, test sets, commands, and thresholds, declared before the first run (3.1). |
 
-For the team and the course staff, this page makes our testing reproducible: anyone can rerun the commands and compare the numbers with goals set in advance. FR-, NFR-, and US- IDs refer to [Requirements and Specifications](Requirements-and-Specifications), and "Design 2.x" to the [Design Documentation](Design-Documentation). **TBD** marks a value not yet set; **TODO**, a part filled in when its iteration comes.
+</details>
+
+This page describes how Pix is tested and records the results. It is written for the team and the course staff. FR-, NFR-, and US- IDs refer to [Requirements and Specifications](Requirements-and-Specifications), and "Design 2.x" to the [Design Documentation](Design-Documentation). **TBD** marks a value not yet set; **TODO**, a part filled in when its iteration comes.
 
 Sections 1–3 **verify** Pix against the R&S and the Design (tests, the AI evaluation set, static checks, code review). Sections 4 and 5 **validate** it against users' needs (Week 6, *Verification vs. Validation*). Where each type of test is:
 
@@ -550,21 +553,21 @@ Failures, gaps, and follow-ups:
 
 #### 2.2.2 Integration scripts
 
-Each cell is the phone run of a script of 2.1.5 in that iteration. *pass* means every step ran and passed; *pass, step not run* means the steps that ran passed and one did not run; *partial* means only part of the script ran; *—* means the script was not yet planned. Each iteration's column is one run; its record in Appendix B gives each script's date and build.
+Each cell is the phone run of a script of 2.1.5 in that iteration. *pass* means every step ran and passed; *pass, step not run* means the steps that ran passed and one did not run; *partial* means only part of the script ran; *covered by* names the later scripts that check the same flow; *—* means the script was not yet planned. Each iteration's column is one run; its record in Appendix B gives each script's date and build.
 
 | Script | Flow | Iteration 2 | Iteration 3 |
 |---|---|---|---|
-| IT-1 | Room-code session, same Wi-Fi | pass, one observation | not run |
+| IT-1 | Room-code session, same Wi-Fi | pass, one observation | pass |
 | IT-2 | Invitation across networks | not run | pass |
 | IT-3 | Invite link fallback | not run | pass |
 | IT-4 | Reconnection | not run | pass |
-| IT-5 | Guide sync and moves from both phones | pass, step not run | not run |
-| IT-6 | Remote zoom, brightness, flash, guide moves | partial | not run |
-| IT-7 | Pose description | pass, step not run | not run |
-| IT-8 | Aspect ratios and saved photo | pass | not run |
-| IT-9 | Saved guides | pass, step not run | not run |
-| IT-10 | Zoom without stutter | pass on the S23 Ultra, S21 not run | not run |
-| IT-11 | Sign-in and friends | partial, one phone | not run |
+| IT-5 | Guide sync and moves from both phones | pass, step not run | covered by IT-15, IT-32 |
+| IT-6 | Remote zoom, brightness, flash, guide moves | partial | pass |
+| IT-7 | Pose description | pass, step not run | covered by IT-17, IT-32, and the AI test (3.2) |
+| IT-8 | Aspect ratios and saved photo | pass | pass |
+| IT-9 | Saved guides | pass, step not run | covered by IT-26 |
+| IT-10 | Zoom without stutter | pass on the S23 Ultra, S21 not run | pass |
+| IT-11 | Sign-in and friends | partial, one phone | pass |
 | IT-12 | Room-code session across networks | — | pass, one note |
 | IT-13 | Korean | — | pass |
 | IT-14 | Reference thumbnail on Subject view | — | pass |
@@ -598,11 +601,11 @@ Notes:
 - **IT-10, Iteration 2:** the S21, the only phone with a separate ultrawide, was not run.
 - **IT-11, Iteration 2:** one phone only. The second phone's Pix ID sign-up, *Check*, and the friend request were not recorded; `test_friends.py`, `RemoteFriendsRepositoryTest`, and the Friends screen tests cover them on the JVM.
 - **All scripts, Iteration 2:** the cellular pairs of 2.1.6 did not run, because the course server is reachable only from the campus network and the relay was not built (Iter2-P16). No `Timings` log was taken, so no time was measured (2.2.3).
-- **IT-1 and IT-5 to IT-11, Iteration 3:** not run again as scripts.
+- **Iteration 2's scripts, Iteration 3:** IT-1, IT-6, IT-8, IT-10, and IT-11 ran again, with the parts left open in Iteration 2: IT-6's full control set, IT-10 on the S21, and IT-11 on two phones. IT-5, IT-7, and IT-9 are covered by later scripts.
 - **IT-12, Iteration 3:** the mobile-data notice in a phone's first cellular session was not checked.
 - **IT-21, Iteration 3:** the language on Android 12 (an emulator) was not run.
 - **IT-22, Iteration 3:** defect: a description the filter refuses is still kept under *Used before* in the prompt history. Fixed by Iter3-A15 ([#182]): a description is kept only once the server accepts its set (IT-34).
-- **Iteration 3:** IT-26 to IT-34 and IT-17, IT-20, and IT-23 ran last, at `c842fa1`, after the features that added or changed them. The other scripts ran at `7b03e9e`; their flows did not change after it, or IT-32 to IT-34 check the change.
+- **Iteration 3:** IT-1, IT-6, IT-8, IT-10, IT-11, IT-17, IT-20, IT-23, and IT-26 to IT-34 ran last, at `c842fa1`. The other scripts ran at `7b03e9e`; their flows did not change after it, or IT-32 to IT-34 check the change.
 - **IT-30, Iteration 3:** the camera switch on Android 10 and 11 ran on an API 30 emulator; no such phone was at hand.
 
 Of the 13 Iteration 2 user stories (R&S 4.4, Iter2-P21), 7 passed on the phones (US-1, 2, 3, 5, 10, 11, 13), 3 were partial (US-4, 6, 12), 2 had automated tests only (US-7, 8), and US-9 was not built. The [2026-10-23 record](#run-2026-10-23-integration-scripts) maps each story and each acceptance case to its tests and scripts.
@@ -613,13 +616,13 @@ One row per NFR that the runs' scripts touch, measured by the method in R&S 5 ("
 
 | NFR | Target | Iteration 2 (10/22–10/23) | Iteration 3 (11/04–11/06) |
 |---|---|---|---|
-| NFR-5 | ≤ 0.5 s on Wi-Fi; ≤ 0.8 s on cellular or relay | Not measured (no `Timings` log). The live view in `Streaming.mov` followed without a visible lag (IT-1) | 0.2 s on the same Wi-Fi and 0.3 s across networks (stopwatch); 0.3 s cellular with cellular and 0.5 s over the relay (IT-12). Sample count not recorded |
+| NFR-5 | ≤ 0.5 s on Wi-Fi; ≤ 0.8 s on cellular or relay | Not measured (no `Timings` log). The live view in `Streaming.mov` followed without a visible lag (IT-1) | 0.2 s on the same Wi-Fi and 0.3 s across networks (stopwatch); 0.3 s cellular with cellular and 0.5 s over the relay (IT-12). Sample count not recorded; about 0.3 s on one Wi-Fi by eye (IT-1) |
 | NFR-6 | 720p and ≥ 24 fps on Wi-Fi; ≥ 480p and 15 fps on a weak network | — | Above the floor in the `stats` lines while photos went, on Wi-Fi and with the subject on cellular; values not noted (IT-20) |
-| NFR-7 | ≤ 0.3 s guide; ≤ 0.5 s remote action | Not measured. The guide and the brightness change followed without a visible lag (IT-5, IT-6) | The subject's guide on both phones at once, by eye; not computed from the two phones' logs (IT-15). Typed text on the other phone in about 0.3 s, and a guide drag shown at once while a photo was sent, by eye (IT-17, IT-20) |
+| NFR-7 | ≤ 0.3 s guide; ≤ 0.5 s remote action | Not measured. The guide and the brightness change followed without a visible lag (IT-5, IT-6) | The subject's guide on both phones at once, by eye; not computed from the two phones' logs (IT-15). Typed text on the other phone in about 0.3 s, and a guide drag shown at once while a photo was sent, by eye (IT-17, IT-20); the subject's zoom, brightness, flash, and guide moves applied in about 0.3 s, by eye (IT-6) |
 | NFR-9 | push ≤ 5 s (95 %); live ≤ 10 s | Not run (Iter2-P15 moved to Iteration 3) | Push 2 s; live view 2 s after *Accept* from the push and about 1 s from *See their camera*; 3 s from the invite link to the live view. Invitation count not recorded (IT-2, IT-3, IT-33) |
 | NFR-10 | ≥ 90 % per network pair | Same Wi-Fi: every session connected, fewer than 10 per pair. Other pairs not run: campus-only server, no relay (Iter2-P16) | 10 of 10 in each of different Wi-Fi, Wi-Fi with cellular, cellular with cellular, and `relayOnly`; every same-Wi-Fi session connected (IT-12) |
 | NFR-11 | recover ≤ 10 s; no crash on a network switch | Not run (Iter2-P16 moved to Iteration 3) | About 5 s after 5 s of airplane mode on either phone, on one Wi-Fi and with the subject on cellular (IT-4); about 4 s from Wi-Fi to cellular, no crash (IT-16) |
-| NFR-19 | no stutter, no blank preview | S23 Ultra (10/22): no stutter before or after the fix, 30 fps, no lens switch (native 0.6×). S21 not run ([#93], `zoom_timings.py`) | Not measured (IT-10 not run) |
+| NFR-19 | no stutter, no blank preview | S23 Ultra (10/22): no stutter before or after the fix, 30 fps, no lens switch (native 0.6×). S21 not run ([#93], `zoom_timings.py`) | On the S21 and the S22: no stutter or blank preview, and the last frame shown at a lens switch, by eye; frame intervals not measured (IT-10) |
 
 ---
 
@@ -824,7 +827,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 
 | Date | Iteration | What ran | Commit | Outcome | Section |
 |---|---|---|---|---|---|
-| 2026-11-06 | 3 | Integration scripts on the phones (IT-2, 3, 4, 12–34), from 11/04 | `7b03e9e`, `c842fa1` | 26 of 26 pass, IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
+| 2026-11-06 | 3 | Integration scripts on the phones (IT-1–4, 6, 8, 10–34), from 11/04 | `7b03e9e`, `c842fa1` | 31 of 31 pass; IT-5, 7, and 9 covered by later scripts; IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
 | 2026-11-05 | 3 | AI module tests: three runs of the 50 cases, the judge's validation, the description filter, and the person check on a Galaxy Note20 | `430447f` | Suggestions (78.0 %) and the person check (34.6 % of people refused) fail; the other nine thresholds pass, tips at the threshold (80.0 %) | [3.2](#32-results), [record](#run-2026-11-05-ai-module-tests) |
 | 2026-11-04 | 3 | User test, 11/1–11/4: six participants outside the team, a Google Form over five scenarios | — | SUS 77.9; no crashes; 5 of 6 say Pix would help; follow-ups for Iteration 4 in 4.1 | 4.1 |
@@ -1714,21 +1717,26 @@ Mutation analysis (2.1.7) did not run; it moved to Iteration 4.
 
 ### Run 2026-11-06 integration scripts
 
-- **Build:** `dev` at `c842fa1`, with the last Iteration 3 feature merged (Iter3-A15, [#182]); debug builds, and `-Ppix.relayOnly=true` for IT-12's last pair. The scripts whose flows did not change after `7b03e9e` ([#173] merged) ran on 11/04 on that build; IT-17, IT-20, IT-23, and IT-26 to IT-34 ran on 11/06 on `c842fa1`.
-- **Phones:** a Galaxy S22 (Android 15) as the photographer and a Galaxy S23 Ultra (Android 16) as the subject. A Galaxy S21 (Android 14) for IT-13 and IT-21, and as IT-12's hotspot. The `Pix_P` emulator for IT-34's tilts, and an API 30 emulator for IT-30's camera switch on Android 10 and 11.
+- **Build:** `dev` at `c842fa1`, with the last Iteration 3 feature merged (Iter3-A15, [#182]); debug builds, and `-Ppix.relayOnly=true` for IT-12's last pair. The scripts whose flows did not change after `7b03e9e` ([#173] merged) ran on 11/04 on that build; IT-1, IT-6, IT-8, IT-10, IT-11, IT-17, IT-20, IT-23, and IT-26 to IT-34 ran on 11/06 on `c842fa1`.
+- **Phones:** a Galaxy S22 (Android 15) as the photographer and a Galaxy S23 Ultra (Android 16) as the subject. A Galaxy S21 (Android 14) for IT-10, IT-13, and IT-21, and as IT-12's hotspot. The `Pix_P` emulator for IT-34's tilts, and an API 30 emulator for IT-30's camera switch on Android 10 and 11.
 - **Server:** the AWS server, with a TURN key.
 - **Tester:** Jaewan Park.
 - **Evidence:** none kept. On 11/04, times were read from the `PixTimings` and `PixPhotoSync` logs or a stopwatch, and the md5 lists came from `adb shell md5sum` on both phones. On 11/06, times were estimated by eye.
 - **Networks:** every pair of NFR-10 ran. The same Wi-Fi (IT-14, IT-15, IT-17, IT-19, IT-20, IT-23, IT-24, IT-26 to IT-34); different Wi-Fi with one phone on the S21's hotspot, Wi-Fi with cellular, cellular with cellular, and one Wi-Fi with `relayOnly` (IT-12); the subject on cellular for IT-17 and IT-20.
-- **Not run:** IT-1 and IT-5 to IT-11, the Iteration 2 scripts, were not run again as scripts.
+- **Covered by later scripts:** IT-5 (IT-15, IT-32), IT-7 (IT-17, IT-32, and the AI test), and IT-9 (IT-26).
 
 Unless the table says otherwise, the S22 is the photographer and the S23 Ultra the subject, on Wi-Fi.
 
 | Script | Date | Setup | Result | Measured |
 |---|---|---|---|---|
+| IT-1 | 11/06 | Same Wi-Fi | pass | Live view about 1 s after joining; delay about 0.3 s by eye; the camera ran behind the code, and no "camera paused" before the first frame |
 | IT-2 | 11/04 | Photographer on Wi-Fi, subject on cellular | pass | Push 2 s; live view 2 s; `ice.pair` srflx |
 | IT-3 | 11/04 | As IT-2, the subject's Pix notifications off | pass | Link to live view 3 s |
 | IT-4 | 11/04 | Room code; one Wi-Fi, then the subject on cellular | pass | `session.reconnected` about 5 s on both phones, for both drops, in both rounds |
+| IT-6 | 11/06 | Same Wi-Fi | pass | 20 gestures per control from the subject's phone, each applied in about 0.3 s by eye; the notice once per gesture; both phones the same on release |
+| IT-8 | 11/06 | The S22, then with the subject | pass | Saved photos at 16:9 and 1:1 matched the preview; the subject's grid lines ended at the video's edges in each ratio |
+| IT-10 | 11/06 | The S21 and the S22, also from the subject's phone | pass | No visible stutter or blank preview; the last frame at a lens switch. By eye; frame intervals not measured |
+| IT-11 | 11/06 | One phone on Wi-Fi, one on cellular; the AWS server, which replaced Server B | pass | *Online* about 2 s, *Check* about 1 s, a withdrawn request gone about 2 s after; the added Google account opened the password account |
 | IT-12 | 11/04 | Room code; Wi-Fi with the S21's hotspot, Wi-Fi with cellular, cellular with cellular, one Wi-Fi with `relayOnly` | pass, one note | `ice.pair`: Wi-Fi/hotspot srflx, Wi-Fi/cellular srflx, cellular/cellular relay, `relayOnly` relay; live view 2 s; 10/10 per pair (40/40); stopwatch delay 0.3 s cellular with cellular, 0.5 s |
 | IT-13 | 11/04 | S21, S22, S23 Ultra set to Korean | pass | All flows of R&S 6 on all three phones; no cut or overlapping text |
 | IT-14 | 11/04 | Same Wi-Fi, in place of the setup's emulator and server on the Mac | pass | `guide.sent reference` to `guide.applied reference` about 1 s |
@@ -1775,7 +1783,6 @@ Observations:
 - **IT-25:** the first check was no slower. The friend near, about 10 m away, and with their back turned, and the selfie, all opened *Generate poses*. The dog passed the phone's check and ended in *Couldn't create poses*. The server log showed `NO_PERSON` at 0.03 and no image request or suggestion request.
 - **IT-20, 11/06:** how the photos were compared, and the check of the subject's cache after *End session*, were not recorded.
 - **IT-26 to IT-34, 11/06:** every check held. No logs were copied, so the times are by eye.
-
 
 ### Run 2026-11-05 AI module tests
 

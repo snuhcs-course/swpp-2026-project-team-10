@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.core.network
 
 import com.lastpenguin.pix.session.signaling.IceServer
@@ -161,6 +161,10 @@ data class SentInvitationDto(
 /** `GET /invitations/{id}`, which needs no sign-in: who invites, and the invitation's status. */
 @Serializable
 data class OpenedInvitationDto(val id: String, val from: UserDto, val status: String, val expiresAt: Long)
+
+/** `GET /invitations/incoming`: the caller's pending invitations that have not expired, newest first. */
+@Serializable
+data class IncomingInvitationsDto(val invitations: List<OpenedInvitationDto> = emptyList())
 
 /** `POST /invitations/{id}/accept`: the friend's place in the session. */
 @Serializable

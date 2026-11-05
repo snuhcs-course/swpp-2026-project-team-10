@@ -1,6 +1,9 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
@@ -11,7 +14,6 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
-import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -29,9 +31,10 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * Room code's render paths (R&S 6.7, FR-8.1, FR-8.4; Testing Documentation 2.1.6), on the real bottom sheet.
  * Partitions on the session state: Idle, Waiting (the formatted code), Connecting, Connected (the sheet closes),
- * Ended by expiry and by another failure; Join with a code instead; Cancel; a configuration change, such as the
- * language, while the code waits (the room stays). The expiry note on one line at the Galaxy S22's 360 × 705 dp, at
- * font scale 1 and 1.3.
+ * Ended by expiry and by another failure; which phone enters the code and where, with no way to join instead (#188;
+ * until then, Join with a code instead cancelled the code and opened Join with code); Cancel; a configuration change,
+ * such as the language, while the code waits (the room stays). The expiry note on one line at the Galaxy S22's
+ * 360 × 705 dp, at font scale 1 and 1.3.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -115,13 +118,13 @@ class RoomCodeSheetTest {
         idle()
         onSheet { binding ->
             assertEquals("482 915", binding.codeText.text.toString())
-            assertEquals(string(R.string.waiting_for_friend), binding.statusText.text.toString())
+            assertEquals(string(R.string.waiting_to_connect), binding.statusText.text.toString())
         }
 
         modules.session.setState(SessionState.Connecting("s1"))
         idle()
         onSheet { binding ->
-            assertEquals(string(R.string.friend_joined_connecting), binding.statusText.text.toString())
+            assertEquals(string(R.string.peer_joined_connecting), binding.statusText.text.toString())
         }
     }
 
@@ -155,17 +158,25 @@ class RoomCodeSheetTest {
     }
 
     @Test
-    fun joinInstead_cancelsTheRoomAndOpensJoinWithCode() {
+    fun saysThatThePersonInThePhotoEntersTheCode_andWhere_withNoWayToJoinInstead() {
         val modules = launch()
-        val nav = scenario!!.attachNav(R.id.roomCodeSheet)
         modules.session.setState(SessionState.Waiting("482915"))
         idle()
 
-        onSheet { binding -> binding.joinInsteadButton.performClick() }
-        idle()
-
-        assertEquals(EndReason.CANCELLED, modules.session.leaves.first())
-        assertEquals(R.id.joinCodeFragment, nav.currentDestination?.id)
+        onSheet { binding ->
+            assertEquals(string(R.string.room_code_body), binding.joinSteps.text.toString())
+            val where = binding.whereText.text
+            assertEquals("Shoot together › I'll be in the photo", where.toString())
+            // The other phone's button stands out.
+            val span = (where as Spanned).getSpans(0, where.length, ForegroundColorSpan::class.java).single()
+            val colored = where.subSequence(where.getSpanStart(span), where.getSpanEnd(span)).toString()
+            assertEquals("I'll be in the photo", colored)
+            // This phone's code is for the other phone: Cancel is the sheet's only button.
+            val buttons = (0 until binding.root.childCount).map {
+                binding.root.getChildAt(it)
+            }.filterIsInstance<Button>()
+            assertEquals(listOf(binding.cancelButton), buttons)
+        }
     }
 
     @Test

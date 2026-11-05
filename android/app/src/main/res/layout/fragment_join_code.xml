@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Join with code, subject (R&S 6.7, FR-8.2, FR-8.3, FR-8.5). -->
+<!-- See their camera, subject (R&S 6.7, FR-8.2, FR-8.3, FR-8.5, FR-6.17): the received invitations, if any, then the
+     code from the photographer's phone, and where it comes from there. #122 adds Scan a QR code under Connect. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:paddingHorizontal="20dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="20dp">
+    android:paddingTop="8dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
         android:gravity="center_vertical"
         android:minHeight="56dp">
 
@@ -30,110 +29,176 @@
             android:textAppearance="@style/TextAppearance.Pix.Header" />
     </LinearLayout>
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:lineSpacingMultiplier="1.2"
-        android:text="@string/join_body"
-        android:textAppearance="@style/TextAppearance.Pix.BodyLarge"
-        android:textColor="@color/pix_text_muted" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="28dp"
-        android:labelFor="@id/codeInput"
-        android:text="@string/room_code_label"
-        android:textAppearance="@style/TextAppearance.Pix.Overline" />
-
-    <!-- Six digit boxes drawn from codeInput, which lies over them and takes the digits (FR-8.2). -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="10dp">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="center_horizontal"
-            android:gravity="center_vertical"
-            android:importantForAccessibility="noHideDescendants">
-
-            <TextView
-                android:id="@+id/digit1"
-                style="@style/Widget.Pix.CodeDigit" />
-
-            <TextView
-                android:id="@+id/digit2"
-                style="@style/Widget.Pix.CodeDigit"
-                android:layout_marginStart="8dp" />
-
-            <TextView
-                android:id="@+id/digit3"
-                style="@style/Widget.Pix.CodeDigit"
-                android:layout_marginStart="8dp" />
-
-            <View
-                android:layout_width="8dp"
-                android:layout_height="2dp"
-                android:layout_marginHorizontal="6dp"
-                android:background="@color/pix_outline" />
-
-            <TextView
-                android:id="@+id/digit4"
-                style="@style/Widget.Pix.CodeDigit" />
-
-            <TextView
-                android:id="@+id/digit5"
-                style="@style/Widget.Pix.CodeDigit"
-                android:layout_marginStart="8dp" />
-
-            <TextView
-                android:id="@+id/digit6"
-                style="@style/Widget.Pix.CodeDigit"
-                android:layout_marginStart="8dp" />
-        </LinearLayout>
-
-        <!-- Digits only; Join stays disabled until 6 digits are entered (FR-8.2). -->
-        <EditText
-            android:id="@+id/codeInput"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:autofillHints="none"
-            android:background="@null"
-            android:cursorVisible="false"
-            android:digits="0123456789"
-            android:imeOptions="actionDone"
-            android:importantForAutofill="no"
-            android:inputType="number"
-            android:maxLength="6"
-            android:textColor="@android:color/transparent" />
-    </FrameLayout>
-
-    <!-- "Connecting…" while joining, or why the join failed (FR-8.5). -->
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:accessibilityLiveRegion="polite"
-        android:gravity="center"
-        android:textAppearance="@style/TextAppearance.Pix.Body"
-        android:textColor="@color/pix_text_soft"
-        android:visibility="gone"
-        tools:text="Connecting…"
-        tools:visibility="visible" />
-
-    <Space
+    <!-- Fills the screen, so the note stays at the bottom, and scrolls when invitations and the keyboard need more. -->
+    <ScrollView
+        android:id="@+id/scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:fillViewport="true">
 
-    <Button
-        android:id="@+id/joinButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:enabled="false"
-        android:text="@string/join" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingBottom="20dp">
+
+            <!-- Received invitations from Pix friends, newest first, while they wait (FR-6.17). -->
+            <LinearLayout
+                android:id="@+id/invitationsSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityHeading="true"
+                    android:text="@string/received_invitations"
+                    android:textAppearance="@style/TextAppearance.Pix.Action"
+                    android:textColor="@color/pix_text" />
+
+                <!-- One item_incoming_invitation each, added by JoinCodeFragment. -->
+                <LinearLayout
+                    android:id="@+id/invitationsList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/accepting_shows_camera"
+                    android:textAppearance="@style/TextAppearance.Pix.Caption"
+                    android:textColor="@color/pix_text_faint" />
+            </LinearLayout>
+
+            <!-- "Enter the code…", or "Or enter the code…" under invitations. -->
+            <TextView
+                android:id="@+id/codeHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:labelFor="@id/codeInput"
+                android:text="@string/join_body"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+            <!-- "It shows when they tap I'll take the photo › Show a code.", set by JoinCodeFragment from the labels. -->
+            <TextView
+                android:id="@+id/joinHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingMultiplier="1.2"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+
+            <!-- Six digit boxes drawn from codeInput, which lies over them and takes the digits (FR-8.2). -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="20dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="center_horizontal"
+                    android:gravity="center_vertical"
+                    android:importantForAccessibility="noHideDescendants">
+
+                    <TextView
+                        android:id="@+id/digit1"
+                        style="@style/Widget.Pix.CodeDigit" />
+
+                    <TextView
+                        android:id="@+id/digit2"
+                        style="@style/Widget.Pix.CodeDigit"
+                        android:layout_marginStart="8dp" />
+
+                    <TextView
+                        android:id="@+id/digit3"
+                        style="@style/Widget.Pix.CodeDigit"
+                        android:layout_marginStart="8dp" />
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="2dp"
+                        android:layout_marginHorizontal="6dp"
+                        android:background="@color/pix_outline" />
+
+                    <TextView
+                        android:id="@+id/digit4"
+                        style="@style/Widget.Pix.CodeDigit" />
+
+                    <TextView
+                        android:id="@+id/digit5"
+                        style="@style/Widget.Pix.CodeDigit"
+                        android:layout_marginStart="8dp" />
+
+                    <TextView
+                        android:id="@+id/digit6"
+                        style="@style/Widget.Pix.CodeDigit"
+                        android:layout_marginStart="8dp" />
+                </LinearLayout>
+
+                <!-- Digits only; Join stays disabled until 6 digits are entered (FR-8.2). -->
+                <EditText
+                    android:id="@+id/codeInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:autofillHints="none"
+                    android:background="@null"
+                    android:cursorVisible="false"
+                    android:digits="0123456789"
+                    android:imeOptions="actionDone"
+                    android:importantForAutofill="no"
+                    android:inputType="number"
+                    android:maxLength="6"
+                    android:textColor="@android:color/transparent" />
+            </FrameLayout>
+
+            <Button
+                android:id="@+id/joinButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:enabled="false"
+                android:text="@string/join" />
+
+            <!-- "Connecting…" while joining, or why the join failed (FR-8.5). -->
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:accessibilityLiveRegion="polite"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.Pix.Body"
+                android:textColor="@color/pix_text_soft"
+                android:visibility="gone"
+                tools:text="Connecting…"
+                tools:visibility="visible" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="16dp" />
+
+            <!-- An invitation is the other way in, between Pix friends (FR-6.1, FR-6.17). -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.2"
+                android:text="@string/join_invite_note"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                android:textColor="@color/pix_text_faint" />
+        </LinearLayout>
+    </ScrollView>
 </LinearLayout>

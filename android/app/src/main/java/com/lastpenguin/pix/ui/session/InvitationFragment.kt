@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.res.ColorStateList
@@ -16,8 +16,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
-import com.lastpenguin.pix.session.EndReason
-import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.account.accountMessage
@@ -58,46 +56,41 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
         }
     }
 
-    /** A session open on this phone would keep the invitation's from starting, so nothing is accepted (FR-6.9). */
+    /**
+     * A session open on this phone would keep the invitation's from starting, so nothing is accepted (FR-6.9); a room
+     * it waits in alone, after its subject left, is ended first (#188).
+     */
     private fun accept() {
-        if (sessionViewModel.busy) toast(getString(R.string.invitation_in_session)) else viewModel.accept()
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (sessionViewModel.endWaitingRoom()) {
+                viewModel.accept()
+            } else {
+                toast(
+                    getString(R.string.invitation_in_session),
+                )
+            }
+        }
     }
 
     private fun join(accepted: InvitationEvent.Accepted) {
-        val partner = SessionPartner(accepted.from.userId, accepted.from.displayName)
-        if (sessionViewModel.joinInvitation(accepted.invitationId, accepted.place, partner)) {
+        if (sessionViewModel.joinAccepted(accepted.invitationId, accepted.place, accepted.from)) {
             viewModel.joining = true
             return
         }
-        // A session opened here after *Accept* was tapped; the invitation is answered, so it is gone for this phone.
         toast(getString(R.string.invitation_in_session))
         viewModel.gone()
     }
 
     private fun onSession(state: SessionState) {
         if (!viewModel.joining) return
-        when (state) {
-            is SessionState.Connecting -> if (state.sessionId != null) navigate(R.id.action_invitation_to_subject)
-
-            is SessionState.Connected, is SessionState.Reconnecting -> navigate(R.id.action_invitation_to_subject)
-
-            is SessionState.Ended -> {
-                viewModel.joining = false
-                when (state.reason) {
-                    // The photographer left between the accept and this phone taking its place.
-                    EndReason.NOT_FOUND, EndReason.EXPIRED -> viewModel.gone()
-
-                    EndReason.CANCELLED, EndReason.LEFT -> Unit
-
-                    else -> {
-                        toast(getString(R.string.couldnt_connect))
-                        viewModel.gone()
-                    }
-                }
-            }
-
-            else -> Unit
+        val join = InvitationJoin.of(state) ?: return
+        if (join == InvitationJoin.JOINED) {
+            navigate(R.id.action_invitation_to_subject)
+            return
         }
+        viewModel.joining = false
+        if (join == InvitationJoin.FAILED) toast(getString(R.string.couldnt_connect))
+        if (join != InvitationJoin.CLOSED) viewModel.gone()
     }
 
     private fun render(binding: FragmentFailureBinding, state: InvitationUiState) {
@@ -134,12 +127,12 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
                 binding.secondaryButton.setOnClickListener { viewModel.decline() }
             }
 
-            // Friends signs in, then back here the answer is offered (Sign in returns to Friends).
+            // Sign in, then back here the answer is offered (Sign in goes back to the screen that opened it).
             is InvitationUiState.SignedOut -> {
                 binding.failureTitle.text = getString(R.string.invitation_title, state.from)
                 binding.failureMessage.setText(R.string.invitation_sign_in)
                 binding.primaryButton.setText(R.string.sign_in)
-                binding.primaryButton.setOnClickListener { navigate(R.id.action_invitation_to_friends) }
+                binding.primaryButton.setOnClickListener { navigate(R.id.action_invitation_to_signIn) }
                 backButton(binding)
             }
 

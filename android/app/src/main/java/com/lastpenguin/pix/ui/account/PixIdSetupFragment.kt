@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -22,8 +22,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Pix ID setup, for an account made with Google (R&S 6.8; FR-5.2, FR-5.3, FR-5.15, US-6). *Save* waits until the Pix
- * ID follows the rule, and *Check* tells whether it is free first; a taken one keeps the input. Back leaves without
- * one, and Friends asks again. Owner: Accounts (#54).
+ * ID follows the rule, and *Check* tells whether it is free first; a taken one keeps the input. It opens in Sign in's
+ * place or from Share my camera, so saving and Back both go back to the screen under it; Back leaves without one, and
+ * Share my camera asks again. Owner: Accounts (#54).
  */
 class PixIdSetupFragment : Fragment(R.layout.fragment_pix_id_setup) {
 
@@ -43,13 +44,11 @@ class PixIdSetupFragment : Fragment(R.layout.fragment_pix_id_setup) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(form::render) }
-                launch { viewModel.events.collect { if (it == AccountEvent.PixIdSaved) toFriends() } }
+                launch {
+                    viewModel.events.collect { if (it == AccountEvent.PixIdSaved) findNavController().popBackStack() }
+                }
             }
         }
-    }
-
-    private fun toFriends() {
-        findNavController().popBackStack(R.id.friendsFragment, false)
     }
 }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -32,8 +32,9 @@ import org.robolectric.shadows.ShadowToast
 
 /*
  * Sign in on the real Fragment (R&S 6.4, 6.8; FR-5.2, FR-5.13), with the account fakes behind the ViewModel;
- * `AccountFormsTest` covers the form's fields. Partitions here: a sign-in that succeeds (back to Friends) or whose
- * account has no Pix ID yet (to Pix ID setup); one refused (the message, cleared on the next edit); Continue with
+ * `AccountFormsTest` covers the form's fields. Partitions here: a sign-in that succeeds (back to the screen that opened
+ * Sign in, Share my camera here; `SignInWayBackTest` opens it from Settings) or whose account has no Pix ID yet (to
+ * Pix ID setup, in Sign in's place); one refused (the message, cleared on the next edit); Continue with
  * Google for a registered account, and for one no Pix account uses (the question: Yes keeps the screen in its
  * linking state and the next sign-in adds Google, with the failure of that step as a message; No makes an account);
  * Sign up; Back, which forgets the waiting Google account.
@@ -52,7 +53,7 @@ class SignInFragmentTest {
         scenario?.close()
     }
 
-    /** Sign in with Friends and Camera below it, as the app opens it. */
+    /** Sign in with Share my camera and Camera below it, as the app opens it. */
     private fun launch(modules: TestAppContainer = TestAppContainer()): TestAppContainer {
         modules.install()
         scenario = launchFragmentInContainer<SignInFragment>(themeResId = R.style.Theme_Pix)
@@ -81,7 +82,7 @@ class SignInFragmentTest {
     }
 
     @Test
-    fun aSignIn_goesBackToFriends() {
+    fun aSignIn_goesBackToTheScreenThatOpenedIt() {
         val modules = launch()
 
         signIn()
@@ -101,6 +102,7 @@ class SignInFragmentTest {
         idle()
 
         assertEquals(R.id.pixIdSetupFragment, nav.currentDestination?.id)
+        assertEquals(R.id.friendsFragment, nav.previousBackStackEntry?.destination?.id)
     }
 
     @Test

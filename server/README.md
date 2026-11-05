@@ -174,6 +174,7 @@ The flow is Design §2.6.6 and the bodies are in §2.5.3; the code is in [`src/p
 | Endpoint | Result |
 | --- | --- |
 | `POST /invitations` | `{"friendId"}` → `201 {"id","to","status","expiresAt","link","sessionId","rejoinToken","iceServers"}`. The session opens at once, with only the photographer's place, which its phone takes with `session.join`; the friend's phones get a push. `403 NOT_FRIENDS` for anyone but a friend, existing or not, and `409 BUSY` while the friend is in a session, a waiting room included. |
+| `GET /invitations/incoming` | `{"invitations":[{"id","from","status","expiresAt"}]}`: the caller's invitations still pending and not expired, newest first, at most 20, which *See their camera* lists so one whose notification was dismissed can still be answered (#188). Declared before `/invitations/{id}`, which would otherwise take `incoming` for an id. |
 | `GET /invitations/{id}` | `{"id","from","status","expiresAt"}`, what the friend's *Invitation* screen shows, without a sign-in. `status` is `PENDING`, `ACCEPTED`, `DECLINED`, `CANCELLED`, or `EXPIRED` from 60 s on. |
 | `POST /invitations/{id}/accept` | The friend: `200 {"sessionId","rejoinToken","iceServers"}`, the subject's place, to take within `PIX_INVITATION_JOIN_SECONDS` (15). The photographer then hears `peer.joined`, as with a room code. |
 | `POST /invitations/{id}/decline` | The friend: `204`; the room ends and the photographer gets `DECLINED`. |

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.ClipboardManager
@@ -39,11 +39,12 @@ import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
 /*
- * Friends on the real Fragment (R&S 6.4; FR-5.4, FR-5.7, FR-5.9, FR-5.16, FR-8.1), with the account fakes behind
- * the ViewModels; `FriendsScreenTest` covers the layout's states. Partitions here: the account signed out (Sign in
- * and the room code lead on), without a Pix ID (Choose a Pix ID), with one (Add a friend, Sent requests, Account,
- * the refresh running); My Pix ID copied; Accept and Decline on a request, Remove on a friend after its question;
- * Back; the server ending the sign-in and a failed answer, each as a message.
+ * Share my camera (Friends until #188) on the real Fragment (R&S 6.4, 6.7; FR-5.4, FR-5.7, FR-5.9, FR-5.16, FR-8.1),
+ * with the account fakes behind the ViewModels; `FriendsScreenTest` covers the layout's states. Partitions here: the
+ * account signed out (Sign in, with no title over its card, and Show a code lead on), without a Pix ID (Choose a Pix
+ * ID), with one (Add a friend, Sent requests, Account, the refresh running); My Pix ID copied; Accept and Decline on a
+ * request, Remove on a friend after its question; Back; the server ending the sign-in and a failed answer, each as a
+ * message.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -86,7 +87,9 @@ class FriendsFragmentTest {
 
         onScreen { binding ->
             assertEquals(View.VISIBLE, binding.promptCard.visibility)
-            assertEquals(string(R.string.signed_out_title), binding.promptTitle.text.toString())
+            // Invite a Pix friend, above the card, says what signing in is for.
+            assertEquals(View.GONE, binding.promptTitle.visibility)
+            assertEquals(string(R.string.signed_out_body), binding.promptBody.text.toString())
             binding.signInButton.performClick()
         }
         idle()
@@ -95,10 +98,10 @@ class FriendsFragmentTest {
     }
 
     @Test
-    fun signedOut_roomCodeInstead_startsARoomAndOpensTheCode() {
+    fun signedOut_showACode_startsARoomAndOpensTheCode() {
         val modules = launch(AuthState.SignedOut)
 
-        onScreen { it.roomCodeInsteadButton.performClick() }
+        onScreen { it.showCodeButton.performClick() }
         idle()
 
         assertEquals(listOf(SessionEntry.NewRoom to Role.PHOTOGRAPHER), modules.session.starts)
@@ -110,6 +113,7 @@ class FriendsFragmentTest {
         launch(AuthState.SignedIn(account.copy(pixId = null, hasGoogle = true)))
 
         onScreen { binding ->
+            assertEquals(View.VISIBLE, binding.promptTitle.visibility)
             assertEquals(string(R.string.choose_pix_id_title), binding.promptTitle.text.toString())
             binding.choosePixIdButton.performClick()
         }

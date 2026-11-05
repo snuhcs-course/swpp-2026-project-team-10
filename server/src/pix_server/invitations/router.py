@@ -1,12 +1,13 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
-"""Invitations to shoot together (Design Documentation 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9).
+# AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+"""Invitations to shoot together (Design Documentation 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9, FR-6.17).
 
 Inviting a friend opens the session at once, with only the photographer's place: the answer carries that place's
 rejoin token, with which the photographer's phone takes it over signaling, and accepting gives the friend the
 subject's. Both join with `session.join`, and the photographer hears `peer.joined` as with a room code (AD-8). The row
 records what the two decided, and the room ends with it: a decline or a cancel removes it, and the sweeper expires a
 room nobody joined at the invitation's expiry, which tells the photographer. Only friends invite each other, and only
-the friend answers; anyone with the link can see who is inviting.
+the friend answers; anyone with the link can see who is inviting. The friend's pending invitations are also listed, so
+one whose notification was dismissed can still be answered within its minute.
 """
 
 import math
@@ -18,7 +19,7 @@ from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import InstrumentedAttribute
 
 from pix_server.accounts.auth import Database, SignedIn, millis, now_of
@@ -36,6 +37,8 @@ pages = APIRouter()
 
 # Rows are deleted this long after they were created (Design 2.7).
 KEEP = timedelta(days=1)
+# More pending invitations than this, all from different friends within one minute, are not worth a longer answer.
+INCOMING_LIMIT = 20
 INVITATION_ID = re.compile(r"inv_[0-9A-HJKMNP-TV-Z]{26}")
 
 Status = Literal["PENDING", "ACCEPTED", "DECLINED", "CANCELLED", "EXPIRED"]
@@ -65,6 +68,10 @@ class OpenedInvitation(BaseModel):
     sender: UserOut = Field(serialization_alias="from")
     status: Status
     expiresAt: int
+
+
+class IncomingInvitations(BaseModel):
+    invitations: list[OpenedInvitation]
 
 
 class AcceptedInvitation(BaseModel):
@@ -168,6 +175,32 @@ async def invite(
         sessionId=invitation.session_id,
         rejoinToken=token,
         iceServers=ice_servers,
+    )
+
+
+# Declared before `/invitations/{invitation_id}`, which would otherwise take "incoming" for an id.
+@router.get("/invitations/incoming")
+async def incoming_invitations(request: Request, caller: SignedIn, db: Database) -> IncomingInvitations:
+    """The caller's pending invitations that have not expired, newest first (FR-6.17): the ones *See their camera*
+    lists, so an invitation whose notification was dismissed can still be accepted."""
+    rows = await db.execute(
+        select(Invitation, User)
+        .join(User, User.id == Invitation.from_user_id)
+        .where(
+            Invitation.to_user_id == caller.user.id,
+            Invitation.status == "PENDING",
+            Invitation.expires_at > now_of(request.app),
+        )
+        .order_by(Invitation.created_at.desc(), Invitation.id.desc())
+        .limit(INCOMING_LIMIT)
+    )
+    return IncomingInvitations(
+        invitations=[
+            OpenedInvitation(
+                id=invitation.id, sender=UserOut.of(sender), status="PENDING", expiresAt=millis(invitation.expires_at)
+            )
+            for invitation, sender in rows
+        ]
     )
 
 

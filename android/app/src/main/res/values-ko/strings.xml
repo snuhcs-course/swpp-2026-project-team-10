@@ -193,14 +193,17 @@
     <string name="generation_failed_title">포즈를 생성하지 못했어요</string>
     <string name="generation_failed_message">문제가 생겼거나 60초 넘게 걸렸어요. 사진은 그대로 있으니 다시 시도해 보세요.</string>
 
-    <!-- Flow 3: Friends, Add a friend (R&S 6.4) -->
-    <string name="friends_overline">친구</string>
+    <!-- Flow 3: Share my camera, with the Pix friends; Add a friend (R&S 6.4, 6.7) -->
+    <string name="share_my_camera">내 카메라 공유</string>
     <string name="account">계정</string>
-    <string name="signed_out_title">친구와 카메라 공유</string>
-    <string name="signed_out_body">로그인하면 Pix ID로 친구를 추가하고 카메라 공유에 초대할 수 있어요.</string>
+    <string name="invite_pix_friend">Pix 친구 초대</string>
+    <string name="invite_pix_friend_body">수락하면 상대 폰에 내 카메라 화면이 떠요.</string>
+    <string name="connect_nearby">옆에 있는 사람과 바로 연결</string>
+    <string name="connect_nearby_body">Pix 친구가 아니어도, 로그인하지 않아도 돼요.</string>
+    <string name="show_code">코드 보여주기</string>
+    <string name="show_code_body">상대가 내 폰의 6자리 코드를 입력해요</string>
+    <string name="signed_out_body">로그인하면 Pix ID로 친구를 추가하고 초대할 수 있어요.</string>
     <string name="sign_in_to_add_friends">로그인하고 친구 추가</string>
-    <string name="use_room_code_instead">로그인 없이 참여 코드 사용</string>
-    <string name="use_room_code">참여 코드 사용</string>
     <string name="choose_pix_id_title">Pix ID 정하기</string>
     <string name="choose_pix_id_body">친구들이 Pix ID로 나를 찾아요.</string>
     <string name="choose_pix_id">Pix ID 정하기</string>
@@ -222,7 +225,7 @@
     <string name="remove_friend_message">서로의 친구 목록에서 사라져요. 나중에 다시 추가할 수 있어요.</string>
     <string name="remove_friend">친구 삭제</string>
     <string name="friends_offline">친구 목록을 새로 고치지 못했어요. 연결을 확인하세요.</string>
-    <!-- Sent requests, from "Sent requests · 2" on Friends (FR-5.16). -->
+    <!-- Sent requests, from "Sent requests · 2" on Share my camera (FR-5.16). -->
     <string name="sent_requests_count">보낸 요청 · %1$d</string>
     <string name="sent_requests_title">보낸 요청</string>
     <string name="no_sent_requests_title">보낸 요청이 없어요</string>
@@ -299,21 +302,34 @@
     <string name="password_added">비밀번호를 추가했어요. 이제 Pix ID로 로그인할 수 있어요.</string>
     <string name="signed_out">로그아웃했어요</string>
 
-    <!-- Flow 6: Room code -->
+    <!-- Flow 6: Who takes the photo, Room code, See their camera (R&S 6.7) -->
+    <string name="who_takes_the_photo">누가 찍나요?</string>
+    <string name="role_photographer">내가 찍을게요</string>
+    <string name="role_photographer_body">내 카메라 화면이 상대 폰에 보여요</string>
+    <string name="role_subject">내가 찍힐게요</string>
+    <string name="role_subject_body">상대 카메라를 보면서 포즈를 잡아요</string>
+    <plurals name="invitations_waiting">
+        <item quantity="other">초대 %1$d</item>
+    </plurals>
     <string name="room_code_title">참여 코드</string>
-    <string name="room_code_body">친구가 Pix에서 이 코드를 입력하면 돼요.</string>
+    <string name="room_code_body">찍힐 사람 폰에서 이 코드를 입력하세요</string>
     <string name="getting_code">코드 받는 중…</string>
-    <string name="waiting_for_friend">친구를 기다리는 중…</string>
-    <string name="friend_joined_connecting">친구가 들어왔어요 · 연결 중…</string>
-    <string name="code_expired">코드가 만료됐어요. 참여 코드 사용을 다시 눌러 새 코드를 받으세요.</string>
+    <string name="waiting_to_connect">연결을 기다리는 중…</string>
+    <string name="peer_joined_connecting">상대가 들어왔어요 · 연결 중…</string>
+    <string name="code_expired">코드가 만료됐어요. 코드 보여주기를 다시 눌러 새 코드를 받으세요.</string>
     <string name="code_expiry">10분 뒤 만료</string>
-    <string name="join_instead">받은 코드로 참여하기</string>
-    <string name="join_title">코드로 참여</string>
-    <string name="join_body">친구 화면의 코드를 입력하세요.</string>
-    <string name="room_code_label">참여 코드</string>
-    <string name="join">참여</string>
+    <string name="join_title">상대 카메라 보기</string>
+    <string name="join_body">찍는 사람 폰에 뜬 코드를 입력하세요</string>
+    <string name="join_body_or">또는 찍는 사람 폰에 뜬 코드를 입력하세요</string>
+    <string name="join_hint">찍어 줄 사람이 %1$s › %2$s를 누르면 나와요.</string>
+    <string name="join">연결</string>
+    <string name="join_invite_note">Pix 친구의 초대는 알림을 놓쳐도 1분 동안 여기에 떠요.</string>
+    <string name="received_invitations">받은 초대</string>
+    <string name="accepting_shows_camera">수락하면 그 사람의 카메라가 보여요.</string>
+    <string name="accept_invitation_from">%1$s님의 초대 수락</string>
+    <string name="decline_invitation_from">%1$s님의 초대 거절</string>
     <string name="session_not_found_title">참여할 수 없는 코드예요</string>
-    <string name="session_not_found_message">코드가 맞는지 친구에게 확인해 보세요.</string>
+    <string name="session_not_found_message">찍는 사람 폰의 코드와 같은지 확인해 보세요.</string>
 
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s님의 카메라</string>
@@ -358,7 +374,7 @@
     <string name="invitation_in_session">지금 다른 카메라 공유 중이에요. 먼저 끝낸 뒤 수락하세요.</string>
     <string name="invitation_notification">%1$s님이 카메라 공유에 초대했어요</string>
     <string name="friend_request_notification">%1$s님이 친구 요청을 보냈어요</string>
-    <string name="friend_request_notification_body">친구 화면에서 수락하거나 거절하세요.</string>
+    <string name="friend_request_notification_body">눌러서 수락하거나 거절하세요.</string>
     <string name="invitations_channel">초대</string>
     <string name="friend_requests_channel">친구 요청</string>
 
@@ -406,7 +422,7 @@
     <string name="help_poses_title">AI로 포즈 생성</string>
     <string name="help_poses_body">가이드 › AI로 포즈 생성을 누르고 장면을 찍으면, 그 자리의 그 사람에게 맞는 포즈 4개를 AI가 만들어요. 고른 포즈가 가이드가 돼요.</string>
     <string name="help_together_title">카메라 공유</string>
-    <string name="help_together_body">카메라 공유에서 친구를 초대하거나 참여 코드를 알려 주세요. 친구 폰에 내 카메라 화면이 같은 가이드와 함께 실시간으로 보여요.</string>
+    <string name="help_together_body">카메라 공유에서 누가 찍을지 고르세요. Pix 친구를 초대하거나 찍힐 사람에게 코드를 보여주면, 상대 폰에 내 카메라 화면이 같은 가이드와 함께 실시간으로 보여요.</string>
     <string name="help_remote_title">찍히는 사람의 폰에서</string>
     <string name="help_remote_body">찍히는 사람은 자기 폰에서 줌, 밝기, 플래시를 바꾸고 가이드를 옮길 수 있어요. 사진은 찍는 사람만 찍어요.</string>
     <string name="about_title">앱 정보</string>
@@ -417,7 +433,7 @@
     <string name="settings_tutorial_reset">화면마다 튜토리얼이 다시 나와요.</string>
     <string name="tutorial_got_it">알겠어요</string>
     <string name="tutorial_settings">언어와 가이드 모양을 바꿔요</string>
-    <string name="tutorial_together">친구에게 카메라를 실시간으로 보여줘요</string>
+    <string name="tutorial_together">다른 폰과 카메라 화면을 실시간으로 공유해요</string>
     <string name="tutorial_guide">사진이나 AI 포즈로 가이드를 더해요</string>
     <string name="tutorial_shutter">가이드 없이 사진만 저장돼요</string>
     <string name="tutorial_switch">전면 카메라로 바꿔요</string>

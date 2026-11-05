@@ -180,9 +180,10 @@ class CameraFragmentInteractionTest {
         assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
 
         nav.setCurrentDestination(R.id.cameraFragment)
+        // Who takes the photo? first (#188; until then, Shoot together opened Friends).
         onScreen { controls, _ -> controls.shootTogetherButton.performClick() }
         idle()
-        assertEquals(R.id.friendsFragment, nav.currentDestination?.id)
+        assertEquals(R.id.shootTogetherSheet, nav.currentDestination?.id)
     }
 
     @Test

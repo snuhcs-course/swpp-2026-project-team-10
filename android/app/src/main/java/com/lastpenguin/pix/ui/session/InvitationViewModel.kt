@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.ViewModel
@@ -69,7 +69,7 @@ class InvitationViewModel(private val invitations: InvitationManager, private va
     var joining = false
 
     init {
-        // A sign-in made from this screen (through Friends) offers the answer when the screen comes back.
+        // A sign-in made from this screen (Sign in comes back here) offers the answer when the screen comes back.
         viewModelScope.launch { auth.state.collect { show() } }
     }
 

@@ -158,7 +158,7 @@ class SessionViewModel(
     /**
      * The code the subject entered last, kept only where it is reused: *Session not found* offers it for editing
      * (FR-8.3), and *Reconnect* on *Connection lost* joins it again (FR-6.11). *Leave*, the photographer's *End
-     * session*, a room gone while reconnecting, and starting a room clear it, so *Join with code* opens empty (#81).
+     * session*, a room gone while reconnecting, and starting a room clear it, so *See their camera* opens empty (#81).
      */
     var lastCode: String? = null
         private set
@@ -238,11 +238,11 @@ class SessionViewModel(
     }
 
     /**
-     * Photographer: *Invite* on Friends, or *Invite again* (FR-6.1–6.3). The server opens the session with this phone's
-     * place, which it takes at once, waiting in `Inviting` for the friend. Ignored while a session is open or another
-     * invitation is on its way. A session started while it is on its way, as with *Use a room code*, keeps this phone,
-     * so the invitation is cancelled rather than left to a friend whose *Accept* would find nobody waiting; so is one
-     * whose screen has closed meanwhile ([inviteResults]).
+     * Photographer: *Invite* on Share my camera, or *Invite again* (FR-6.1–6.3). The server opens the session with this
+     * phone's place, which it takes at once, waiting in `Inviting` for the friend. Ignored while a session is open or
+     * another invitation is on its way. A session started while it is on its way, as with *Show a code*, keeps this
+     * phone, so the invitation is cancelled rather than left to a friend whose *Accept* would find nobody waiting; so
+     * is one whose screen has closed meanwhile ([inviteResults]).
      */
     fun invite(friend: PixUser) {
         if (_sendingInvite.value || isOpen(state.value)) return
@@ -273,7 +273,7 @@ class SessionViewModel(
 
     /**
      * Photographer: *Cancel invite*, or *Invite sent* closed while waiting (FR-6.2). The phone leaves the session at
-     * once, without waiting for the server's answer, so another flow such as *Use a room code* can start right away;
+     * once, without waiting for the server's answer, so another flow such as *Show a code* can start right away;
      * the cancel goes to the server alongside, and the friend's *Invitation* says it is no longer available either way
      * (FR-6.4). Once the friend has accepted, the invitation is answered, so only the session ends, also while the
      * phones are still connecting.
@@ -295,6 +295,22 @@ class SessionViewModel(
     /** A room or an invitation waits, or a session runs, on this phone, so *Accept* on Invitation must wait (FR-6.9). */
     val busy: Boolean
         get() = isOpen(state.value)
+
+    /**
+     * Subject: ends the room this phone waits in with nobody, as after its subject left, which keeps it open for a
+     * *Reconnect* (Design 2.4) with nothing on Camera to say so, since this phone is to be in the photo now (#188).
+     * Returns once the room is gone, and whether a session can start here: one with someone in it, or on its way,
+     * stays, so *Accept* is refused then (FR-6.9).
+     */
+    suspend fun endWaitingRoom(): Boolean {
+        if (state.value is SessionState.Waiting) viewModelScope.launch { session.leave(EndReason.CANCELLED) }.join()
+        return !busy
+    }
+
+    /** [endWaitingRoom] without waiting for it: *I'll be in the photo*, as See their camera opens. */
+    fun leaveWaitingRoom() {
+        viewModelScope.launch { endWaitingRoom() }
+    }
 
     /**
      * Subject: *Accept* on Invitation gave this phone its place, which the session takes now (FR-6.1). False, with
@@ -490,7 +506,7 @@ class SessionViewModel(
      * What an end does with the kept code (#81): *Connection lost* keeps it for *Reconnect*; an unknown or expired
      * code keeps it for editing on *Session not found*, unless a reconnect found the room gone; a reconnect that
      * failed otherwise keeps it for another try; every other end, such as *Leave* or the photographer's *End
-     * session*, forgets it, so the next *Join with code* starts empty.
+     * session*, forgets it, so the next *See their camera* starts empty.
      */
     private fun onEnded(reason: EndReason) {
         val keep = when (reason) {

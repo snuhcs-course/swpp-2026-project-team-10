@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -1213,6 +1213,8 @@ class GenerationViewModelTest {
         assertEquals(PoseRequest.Described("jump high"), generator.runs.single().request)
         assertEquals("jump high", state.description)
         assertEquals("started 'jump high'", descriptions.calls.last())
+        // The start names the set it started, which the subject's history waits for (FR-4.11).
+        assertEquals(state.setId, descriptions.startedSets.last())
 
         model.cancel()
         describeAPhoto()
@@ -1389,6 +1391,9 @@ class GenerationViewModelTest {
     private class RecordingDescriptions : DescriptionShare {
         val calls = mutableListOf<String>()
         val ids = mutableListOf<String>()
+
+        /** The set each start named. */
+        val startedSets = mutableListOf<String?>()
         private val sent = MutableSharedFlow<DescriptionRequest>(extraBufferCapacity = 8)
         override val requests: Flow<DescriptionRequest> = sent
 
@@ -1404,9 +1409,10 @@ class GenerationViewModelTest {
             calls += "update '$text' $writer"
         }
 
-        override fun end(descriptionId: String, started: Boolean, text: String) {
+        override fun end(descriptionId: String, started: Boolean, text: String, setId: String?) {
             check(descriptionId == ids.last())
             calls += if (started) "started '$text'" else "closed"
+            if (started) startedSets += setId
         }
     }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -410,8 +410,8 @@ class GenerationViewModel(
      * Generate poses ended: a set [started] from it, with the description [text] its request has, or it closed, also
      * on the subject's phone.
      */
-    private fun endDescription(started: Boolean, text: String = "") {
-        descriptionId?.let { descriptions.end(it, started, text) }
+    private fun endDescription(started: Boolean, text: String = "", setId: String? = null) {
+        descriptionId?.let { descriptions.end(it, started, text, setId) }
         descriptionId = null
     }
 
@@ -476,9 +476,10 @@ class GenerationViewModel(
     private fun start(scene: Bitmap, selfie: Boolean, request: PoseRequest, description: String) {
         generating?.cancel()
         val described = (request as? PoseRequest.Described)?.text.orEmpty()
-        endDescription(started = true, text = described)
-        closeSet()
         val id = UUID.randomUUID().toString()
+        // The start names its set, so the subject's history waits for this set's answer (FR-4.11).
+        endDescription(started = true, text = described, setId = id)
+        closeSet()
         setId = id
         // Kept once the server accepts it, whichever phone wrote it, with the friend as the set starts; suggested
         // poses have no description to keep.

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.generation
 
 import android.content.Context
@@ -105,8 +105,10 @@ internal fun List<PromptEntry>.without(text: String): List<PromptEntry> = filter
  * Subject: each set the photographer's phone started from a shared *Generate poses* ([started]: its description, and
  * the session's friend as the start found it) is this phone's history too (Design 2.6.5), once the server accepted
  * the description: once the set that follows the start, as [sets] (`PoseSyncer.mirror`) shows it, has a candidate or
- * is PICKING. A set that ends without one, as a description the server turns down does, keeps nothing, and the next
- * start replaces a start still waiting. Followed on [scope] for the life of the app, because the set can start while
+ * is PICKING. The start names its set ([StartedDescription.setId]), since `pose.step` and the start come on their own
+ * and either can arrive first; from an older photographer, whose start names none, the set that follows is taken. A set
+ * that ends without one, as a description the server turns down does, keeps nothing, and the next start replaces a
+ * start still waiting. Followed on [scope] for the life of the app, because the set can start while
  * Subject view, not *Generate poses*, is in front.
  */
 fun PromptHistory.followSubjectSets(
@@ -115,6 +117,23 @@ fun PromptHistory.followSubjectSets(
     scope: CoroutineScope,
 ): Job = scope.launch {
     started.collectLatest { start ->
+        val named = start.setId
+        if (named != null) {
+            // That set, whether its answer came before the start or comes after; another set means it ended unanswered.
+            var seen = false
+            val decided = sets.first { set ->
+                when {
+                    set?.setId == named -> {
+                        seen = true
+                        set.accepted
+                    }
+
+                    else -> seen
+                }
+            }
+            if (decided?.setId == named) record(start.text, Role.SUBJECT, start.partner?.userId)
+            return@collectLatest
+        }
         // A set already accepted when the start comes is an earlier one, whose end has not arrived yet.
         val earlier = sets.value?.takeIf { it.accepted }?.setId
         var setId: String? = null

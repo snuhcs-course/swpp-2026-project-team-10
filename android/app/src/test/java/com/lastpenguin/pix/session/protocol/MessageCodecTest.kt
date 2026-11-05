@@ -71,6 +71,7 @@ class MessageCodecTest {
             SessionMessage.GuideConfirmUse("c1", "g1"),
             SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.SUBJECT, rejected = true),
             SessionMessage.PoseDescription("d1", DescriptionStep.STARTED),
+            SessionMessage.PoseDescription("d1", DescriptionStep.STARTED, "wave", setId = "s1"),
             SessionMessage.PoseSceneBegin("d1", "jpeg", 768, 1024, 151_320, 17),
             SessionMessage.PoseSceneChunk("d1", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PoseSceneEnd("d1", 3735928559L),

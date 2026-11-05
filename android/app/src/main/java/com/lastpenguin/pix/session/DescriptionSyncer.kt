@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -54,9 +54,9 @@ interface DescriptionShare {
 
     /**
      * A set started from the description ([started]), with the [text] it was asked with, as the set's request has
-     * it, or Generate poses closed without one.
+     * it, and its [setId], or Generate poses closed without one.
      */
-    fun end(descriptionId: String, started: Boolean, text: String = "")
+    fun end(descriptionId: String, started: Boolean, text: String = "", setId: String? = null)
 
     /** For a phone with nothing to share, such as the ViewModel's tests. */
     object None : DescriptionShare {
@@ -66,7 +66,7 @@ interface DescriptionShare {
 
         override fun update(descriptionId: String, text: String, writer: Role?) = Unit
 
-        override fun end(descriptionId: String, started: Boolean, text: String) = Unit
+        override fun end(descriptionId: String, started: Boolean, text: String, setId: String?) = Unit
     }
 }
 
@@ -92,9 +92,10 @@ data class DescriptionEnd(val descriptionId: String, val started: Boolean)
 
 /**
  * Subject: a set the photographer's phone started from a description, for the prompt history (FR-4.11): [text] as the
- * set's request had it, and [partner], the friend of an invitation's session as it was when the set started.
+ * set's request had it, [partner], the friend of an invitation's session as it was when the set started, and the set's
+ * [setId], or null from a photographer of an older version.
  */
-data class StartedDescription(val text: String, val partner: SessionPartner?)
+data class StartedDescription(val text: String, val partner: SessionPartner?, val setId: String? = null)
 
 /**
  * Shows the photographer's *Generate poses* on the subject's *Generate poses* (Design 2.5.1: pose.description,
@@ -130,6 +131,7 @@ class DescriptionSyncer(
         val text: String = "",
         val writer: Role? = null,
         val rejected: Boolean = false,
+        val setId: String? = null,
     ) {
         /**
          * What the subject is told of it: writer and rejected only while it is open, and the text also with STARTED,
@@ -138,7 +140,7 @@ class DescriptionSyncer(
         val message: SessionMessage.PoseDescription
             get() = when (step) {
                 DescriptionStep.OPEN -> SessionMessage.PoseDescription(descriptionId, step, text, writer, rejected)
-                DescriptionStep.STARTED -> SessionMessage.PoseDescription(descriptionId, step, text)
+                DescriptionStep.STARTED -> SessionMessage.PoseDescription(descriptionId, step, text, setId = setId)
                 DescriptionStep.CLOSED -> SessionMessage.PoseDescription(descriptionId, step)
             }
     }
@@ -162,11 +164,11 @@ class DescriptionSyncer(
         }
     }
 
-    override fun end(descriptionId: String, started: Boolean, text: String) {
+    override fun end(descriptionId: String, started: Boolean, text: String, setId: String?) {
         shared.update { description ->
             if (description?.descriptionId == descriptionId && description.step == DescriptionStep.OPEN) {
                 if (started) {
-                    SharedDescription(descriptionId, DescriptionStep.STARTED, text = text)
+                    SharedDescription(descriptionId, DescriptionStep.STARTED, text = text, setId = setId)
                 } else {
                     SharedDescription(descriptionId, DescriptionStep.CLOSED)
                 }
@@ -390,7 +392,7 @@ class DescriptionSyncer(
                         // history records it, because the link can drop between the two.
                         val text = message.text ?: current.text
                         val partner = session.state.value.partner
-                        if (text.isNotBlank()) _started.tryEmit(StartedDescription(text, partner))
+                        if (text.isNotBlank()) _started.tryEmit(StartedDescription(text, partner, message.setId))
                         _startedScene.value = StartedScene(current.scene, suggested = text.isBlank())
                     }
                 }

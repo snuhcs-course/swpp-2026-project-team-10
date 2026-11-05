@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.generation
 
 import androidx.datastore.core.DataStore
@@ -191,6 +191,46 @@ class PromptHistoryTest {
         runCurrent()
 
         assertEquals(listOf(PromptEntry("Wave", 1_000, Role.SUBJECT)), entries)
+    }
+
+    @Test
+    fun aStartThatNamesItsSet_countsThatSet_evenAcceptedBeforeTheStartArrived() = runTest {
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, sets, backgroundScope)
+        runCurrent()
+
+        // pose.step won the race: the started set already has a candidate when its start comes.
+        sets.value = withACandidate("s1")
+        runCurrent()
+        started.emit(StartedDescription("Wave", null, setId = "s1"))
+        runCurrent()
+        assertEquals(listOf(PromptEntry("Wave", 1_000, Role.SUBJECT)), entries)
+
+        // The start first, an earlier set still showing, then the named set's answer.
+        now = 2_000
+        started.emit(StartedDescription("Jump", null, setId = "s2"))
+        runCurrent()
+        assertEquals(1, entries.size)
+        sets.value = generatingSet("s2")
+        sets.value = withACandidate("s2")
+        runCurrent()
+        assertEquals(listOf("Jump", "Wave"), entries.map { it.text })
+    }
+
+    @Test
+    fun theNamedSetEndingUnanswered_keepsNothing_evenIfAnotherSetIsAcceptedAfter() = runTest {
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, sets, backgroundScope)
+        runCurrent()
+
+        started.emit(StartedDescription("Bleeding", null, setId = "s1"))
+        sets.value = generatingSet("s1")
+        runCurrent()
+        sets.value = null
+        sets.value = withACandidate("s2")
+        runCurrent()
+
+        assertEquals(emptyList<PromptEntry>(), entries)
     }
 
     @Test

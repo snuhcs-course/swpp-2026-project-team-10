@@ -129,7 +129,7 @@
 
 ## Iteration 2
 
-The kickoff on 2026-10-09 replaced that day's standup ([[Team Meetings|Team-Meetings]]). Weekend standups are flexible.
+Weekend standups are flexible.
 
 <details>
 <summary><b>2026-10-12 (Mon)</b> · 23:00–23:10</summary>
@@ -241,8 +241,6 @@ The kickoff on 2026-10-09 replaced that day's standup ([[Team Meetings|Team-Meet
 
 ## Iteration 3
 
-The kickoff on 2026-10-25 replaced that day's standup ([[Team Meetings|Team-Meetings]]).
-
 <details>
 <summary><b>2026-10-26 (Mon)</b> · 23:00–23:10</summary>
 
@@ -300,6 +298,78 @@ The kickoff on 2026-10-25 replaced that day's standup ([[Team Meetings|Team-Meet
 | 박재완 | Approved [#151]; pose candidates now follow the scene photo's ratio ([#155]); prepared the user test planned for the weekend (10/31–11/1) | Run the user test | – |
 | 조성민 | Merged inviting a friend to shoot together ([#154]); reviewed the user test questions and format | Run the user test | – |
 | 한준형 | Merged the shared steps ([#151]); started photos saved on both phones ([#121]); reviewed the user test questions and format | Run the user test; open the PR for [#121] | – |
+
+</details>
+
+<details>
+<summary><b>2026-10-31 (Sat)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Ran the user test; Addressed the review on [#157] and merged it | Run the user test | – |
+| 박재완 | Ran the user test; the app logo and branding assets ([#161]) | Run the user test; merge [#161] | – |
+| 조성민 | Ran the user test | Run the user test | – |
+| 한준형 | Ran the user test; Photos saved on both phones, PR opened ([#159]) and the review addressed | Run the user test; merge [#159] | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-01 (Sun)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Ran the user test | Prompt history on *Generate poses* ([#124]) | – |
+| 박재완 | Ran the user test | Merge [#161] | – |
+| 조성민 | Ran the user test | The settings screen ([#123]) | – |
+| 한준형 | Ran the user test | Merge [#159]; the first-use tutorial ([#123]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-02 (Mon)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Prompt history on *Generate poses*, PR opened ([#164]) | Address the review on [#164] and merge it | – |
+| 박재완 | Merged the app icon and branding assets ([#161]) | Iter3-A7: checks before pose generation, a description filter and a person check ([#165]) | – |
+| 조성민 | The settings screen ([#163]) | Iter3-A8: one library for every saved guide ([#170]) | – |
+| 한준형 | Merged photos saved on both phones ([#159]) | Iter3-P23: the first-use tutorial ([#123]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-03 (Tue)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged prompt history ([#164]) | Heuristic evaluation | – |
+| 박재완 | Harmful and manipulative pose descriptions are now refused ([#166]); the scene photo is checked for a person before pose generation ([#169]); the tutorial's tips on each screen, PR opened ([#173]) | Merge [#173]; heuristic evaluation | – |
+| 조성민 | One library for every saved guide, PR opened ([#172]) | Merge [#172]; Iter3-A9: save a generated pose to the library ([#171]) | – |
+| 한준형 | The first-use tutorial ([#167]); shorter explanatory text on the screens ([#168]); reviewed [#173] | Review [#172]; heuristic evaluation | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-04 (Wed)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Heuristic evaluation | Prepare for user acceptance testing | - |
+| 박재완 | Merged the tutorial's tips on each screen ([#173]); heuristic evaluation | Write up the user test results; Iter3-P26: the AI module test ([#126]) | – |
+| 조성민 | Merged the guide library ([#172]); a generated pose saved to the library ([#175]); the photo cut out of a screenshot ([#176], [#178]); heuristic evaluation, with issues for its fixes ([#179]–[#181]) | Camera animations ([#179]), screen transitions ([#181]), and the guide and pose flow ([#180]) | – |
+| 한준형 | Approved [#172]; heuristic evaluation, with issues for Camera's controls ([#182]) and camera quality ([#183]) | Iter3-A15: Camera's controls after the review ([#182]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-05 (Thu)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Prepared for user acceptance testing | - | – |
+| 박재완 | Wrote up the user test results; the AI module test plan ([#126]) | Run the AI module test and open its PR; iteration 3 documents ([#129]) | – |
+| 조성민 | Camera animations on both phones ([#184]); transitions between screens ([#186]); the guide and pose flow polished ([#187]); choosing who takes the photo before connecting ([#189]) | - | – |
+| 한준형 | Camera's controls after the heuristic evaluation ([#185]) | - | – |
 
 </details>
 
@@ -404,3 +474,33 @@ The kickoff on 2026-10-25 replaced that day's standup ([[Team Meetings|Team-Meet
 [#154]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/154
 [#155]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/155
 [#157]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/157
+[#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
+[#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124
+[#126]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/126
+[#129]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/129
+[#159]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/159
+[#161]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/161
+[#163]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/163
+[#164]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/164
+[#165]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/165
+[#166]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/166
+[#167]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/167
+[#168]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/168
+[#169]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/169
+[#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
+[#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171
+[#172]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/172
+[#173]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/173
+[#175]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/175
+[#176]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/176
+[#178]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/178
+[#179]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/179
+[#180]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/180
+[#181]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/181
+[#182]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/182
+[#183]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/183
+[#184]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/184
+[#185]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/185
+[#186]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/186
+[#187]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/187
+[#189]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/189

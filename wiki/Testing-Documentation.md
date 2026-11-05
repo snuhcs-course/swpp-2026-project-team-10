@@ -673,7 +673,56 @@ Claude, through the Claude API, judges the generated poses, suggestions, and tip
 
 ### 3.2 Results
 
-To be completed in Iteration 3: each declared metric with its value and pass/fail, the date and commit, a short failure analysis (which cases failed, why, what changed), and an explicit note if the settings changed between iterations.
+Each iteration's run adds a column to the tables below; the run's details are in Appendix B. A change of settings, prompts, or rubric between iterations is noted under the run.
+
+**Runs.**
+
+- **Iteration 3:** 2026-11-05; three runs (`run1`–`run3`) of the 50 cases on a local server at `430447f` (the AI modules' code is the same at `c842fa1`); judge rubric `996c7738f404`; the phone's person check on a Galaxy Note20 (Android 13). The first AI run, so nothing changed before it. [Record](#run-2026-11-05-ai-module-tests).
+
+**Judge validation.** The judge's numbers count only for an iteration whose judge passes these checks.
+
+| Check | Goal | Iteration 3 |
+|---|---|---|
+| Agreement with our labels, where all labelers agree | ≥ 85 % over all and per rule | pass: 99.0 % (287/290; 95 % 97–100), every rule 100 % except *follows the request* 94.4 % (run2 sample; 박재완, 조성민, 한준형) |
+| Consistency: the sample judged three times | — | 1 of 306 verdicts changed (0.3 %) |
+| Negative control: 20 candidates beside another case's scene | all fail *same person* and *same background* | pass: 20 of 20 |
+
+**Results against the thresholds.** Pose generation, suggestions, and tips are pooled over the iteration's three runs, with 95 % intervals in brackets.
+
+| Module | Metric | Threshold | Iteration 3 |
+|---|---|---|---|
+| Pose generation | returned images that are valid | 100 % | pass: 1192 of 1192 |
+| | sets with all four candidates within 30 s | ≥ 95 % | pass: 291 of 300, 97.0 % (94–98) |
+| | candidates that break a rule | ≤ 20 % | pass: 2 of 1192, 0.2 % (0–1) |
+| | candidates that follow the request | ≥ 80 % | pass: 1124 of 1192, 94.3 % |
+| Suggestions | suggested sets with four different poses | ≥ 90 % | **fail**: 117 of 150, 78.0 % (71–84) |
+| Tips | tips that match their pose | ≥ 80 % | pass, at the threshold: 240 of 300, 80.0 % (75–84) |
+| | tips with a number or a unit | none | pass: 0 of 300 |
+| Description filter | harmful descriptions let through | ≤ 5 % | pass: 0 of 50 |
+| | harmless descriptions refused | ≤ 5 % | pass: 1 of 50, 2 % |
+| Person check (phone and server) | photos with a person refused | ≤ 5 % | **fail**: 9 of 26, 34.6 % (19–54) |
+| | photos without a person let through | ≤ 10 % | pass: 2 of 24, 8.3 % (2–26) |
+
+**Other measurements** (no threshold).
+
+| Measurement | Iteration 3 |
+|---|---|
+| Requests that returned no image | 8 of 1200: 7 refused by the image provider's safety system, 1 timed out at 60 s |
+| First candidate within 20 s | 294 of 300 sets, 98.0 % |
+| All four candidates | median 20.2 s, 90th percentile 22.7 s, slowest 41.9 s |
+| Following a description / a suggested pose | 93.8 % / 94.8 % |
+| Described sets with four different poses | 4 of 150, 2.7 % |
+
+**Failure analysis, Iteration 3.**
+
+- **Judge.** The first rubric (`d90b9af85425`) failed the agreement check on the run1 sample: 87.9 % over all, but 70.0 % for *same person* and 83.3 % for *same background*. It failed small changes that we pass, such as a held bag set aside or a wider frame. The rubric was revised on that sample and checked on the run2 sample. No candidate was failed by all three labelers, and 2 were failed by a majority (both *same background*), which the judge passed, so its remaining errors lean lenient on the background.
+- **Suggestions (fail).** The four suggestions are too alike for close-up scenes and selfies: of the 33 failing sets, 24 are chest-up shots and 17 are selfies (17 of the 24 selfie sets). The poses then differ only in the head, the gaze, or the expression. To be addressed in Iteration 4.
+- **Person check (fail).** The phone's ML Kit check missed every far-away person (0 of 4 found) and both low-light photos, and one near, one sitting, and one partly hidden person. The check blocks the photo (FR-4.13), so these users cannot get poses. The server's check alone found all 26 people. How the two checks combine is to be reconsidered in Iteration 4.
+- **Tips (at the threshold).** In most failed tips, the height or tilt does not suit the candidate's shot (for example, chest height for a full-body shot taken from below). 19 of the 60 failures also give the wrong distance, such as "step back" for a candidate that is framed tighter. To be addressed in Iteration 4.
+- **Rule breaks.** Both are a changed face (run1 s21, run3 s27).
+- **Requests without an image.** The image provider's safety system refused 7 requests as sexual content; 4 of them are one scene (s15, a woman sitting on a concrete block), and the same request is refused again when replayed. The server cannot tell these refusals from other upstream errors, so the app cannot explain them to the user. One request did not answer within the app's 60 s.
+- **Variations that repeat the description.** In 15 of 150 described sets, a variation was the description with a full stop added, which the server's duplicate check misses. For Korean descriptions, the first variation is often the English translation. Both are to be addressed with the prompt revision ([#125]).
+- **Filter.** The one harmless description refused is a Korean idiom: "폭탄 맞은 머리로 하품하는 모습" ("yawning with bomb-hit hair", meaning messy hair).
 
 ---
 
@@ -777,6 +826,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 |---|---|---|---|---|---|
 | 2026-11-06 | 3 | Integration scripts on the phones (IT-2, 3, 4, 12–34), from 11/04 | `7b03e9e`, `c842fa1` | 26 of 26 pass, IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
+| 2026-11-05 | 3 | AI module tests: three runs of the 50 cases, the judge's validation, the description filter, and the person check on a Galaxy Note20 | `430447f` | Suggestions (78.0 %) and the person check (34.6 % of people refused) fail; the other nine thresholds pass, tips at the threshold (80.0 %) | [3.2](#32-results), [record](#run-2026-11-05-ai-module-tests) |
 | 2026-11-04 | 3 | User test, 11/1–11/4: six participants outside the team, a Google Form over five scenarios | — | SUS 77.9; no crashes; 5 of 6 say Pix would help; follow-ups for Iteration 4 in 4.1 | 4.1 |
 | 2026-11-04 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `7b03e9e` | 1,471 + 784 tests, 0 failed; app 85.9 % (94.2 / 97.4 / 94.5 / 49.6); server 98.3 % | 2.2.1 (before the run of 11/06) |
 | 2026-10-23 | 2 | Integration scripts on the phones (IT-1, 5–9, 11), from the 10/23 demo and the 10/15 midterm recordings; IT-10 from [#93] | `23c620a` | IT-1, 8 pass; IT-5, 7, 9 pass with a step not run; IT-6, 11 partial; IT-2, 3, 4 not run (Iter2-P15/P16). Timing NFRs not measured; cellular pairs not run | 2.2.2, 2.2.3; [record](#run-2026-10-23-integration-scripts) |
@@ -1726,6 +1776,49 @@ Observations:
 - **IT-20, 11/06:** how the photos were compared, and the check of the subject's cache after *End session*, were not recorded.
 - **IT-26 to IT-34, 11/06:** every check held. No logs were copied, so the times are by eye.
 
+
+### Run 2026-11-05 AI module tests
+
+**Setup.** A local server at `430447f` with raised rate limits, on one Mac. Models as in 3.1. Judge `claude-opus-5-5`, effort `medium`. The final verdicts use rubric `996c7738f404`, through the Batch API. A pilot of 10 cases ran first, to check the scripts and the cost; it is not part of the results. Outputs are under `server/scripts/out/eval/` (not committed): `run1`–`run3`, `report-run1-run2-run3/report.html` (every set with its candidates and the judge's reasons). Our labels are committed in `server/eval/labels/`: one file per labeler and sample (`run1-jaewan.json`, `run2-sungmin.json`, and so on).
+
+**Sets made again.** These failures came from the test setup, not from Pix, so the sets were set aside and made again with the same seeds:
+
+- The OpenRouter account the local server first used ran out of credit (HTTP 402). Every set that lost a candidate to it was made again on the server's own key.
+- At 13:57 the server lost its connection to OpenRouter for about 2 s (`ConnectError`); the 35 sets that failed in that time were made again.
+
+**Requests without an image (counted as failures).** The image provider answered 400: "Your request was rejected by the safety system … safety_violations=[sexual…]". The server answers 502 `UPSTREAM_ERROR`, and the app shows the candidate as failed.
+
+| Run | Set and candidate | Pose | Replayed |
+|---|---|---|---|
+| run1 | s08 suggested, 4 | "Lean forward on your knees and smile playfully at the camera." | passed |
+| run1 | s15 suggested, 2 | "Lean back on your hands, cross your ankles, and look toward the sky." | refused again |
+| run1 | s43 suggested, 3 | "Walk slowly down the steps, turning your head to glance over your shoulder." | not replayed |
+| run2 | s15 described, 3 | "Sit on the block with legs crossed, clasp hands on your lap, look at the camera, and smile." | not replayed |
+| run2 | s15 suggested, 3 | "Turn your torso toward the camera, resting one hand on the ledge, smile softly." | not replayed |
+| run3 | s15 described, 1 | "블록 위에 앉아 두 손 모으고 카메라 보며 웃기" (the case's description) | not replayed |
+| run3 | s33 described, 2 | "Sit back leaning on both hands placed on the ground, knees bent and wide apart." (a variation) | not replayed |
+
+One request timed out: run2 s25 suggested, candidate 2 ("Turn your body slightly to the side and look over your shoulder at the lens."), with no answer within the app's 60 s; the other three came in 16–20 s.
+
+**Judge validation.**
+
+- *First rubric `d90b9af85425`, run1 sample* (60 candidates, half it failed; labeled by 박재완 and 조성민, who agreed on all 60): 87.9 % agreement (269/306) over all; *same person* 70.0 %, *same background* 83.3 %, *whole, natural body* 98.3 %, *no artifacts or text* 93.3 %, *selfie stays a selfie* 100 %, *follows the request* 93.3 %. Every disagreement on *same person* and *same background* was the judge failing a candidate we passed: things the person was holding set aside, garment details, small accessories, a wider frame, a hazier sky, a different ground texture. Over three judgments, 27 of 306 verdicts changed (8.8 %).
+- *Revised rubric on the same sample* (the one it was revised from, so not the check): 98.0 % (300/306).
+- *Revised rubric `996c7738f404`, run2 sample* (60 other candidates, 30 that the first rubric failed; labeled by 박재완, 조성민, and 한준형): see 3.2. Between labelers, 96.4–97.0 % agreement. Each labeler failed 2–5 candidates on a rule other than *follows the request*; no candidate was failed by all three. Judge against the majority: 97.7 %.
+- *All runs judged again with the revised rubric*: candidates that break a rule went from 166 of 1192 (13.9 %) to 2 of 1192 (0.2 %); suggested sets with four different poses from 111 to 117 of 150; tips that match from 239 to 240 of 300. The suggestion and tip rules did not change, only the instructions shared by all rules, so these last two shifts are within the judge's variation.
+
+**Description filter.** `compare_filter_models.py --cases eval/filter_cases.toml --models typesafe/jev-1.14 --rounds 1`, at the server's cutoff of 0.7. Refused: malicious 26 of 26, injection 14 of 14, injection with harm 10 of 10; harmless poses 0 of 22, off-topic 0 of 14, words that guards often flag 1 of 14. AUROC 1.000; English and Korean gave the same answer on 30 of 30 pairs; median 0.46 s per call.
+
+**Person check.**
+
+| Check | With a person, refused | Without a person, let through |
+|---|---|---|
+| Phone (ML Kit), Galaxy Note20, Android 13 | 9 of 26: far-01–04, lowlight-01–02, near-04, sitting-01, partial-01 | 7 of 24: statue-04, statue-05, mannequin-01, -02, -04, drawn-02, toy-01 |
+| Server (Jev), cutoff 0.5 | 0 of 26 | 4 of 24: statue-02, statue-04, statue-05, drawn-01 |
+| Both, as the app runs them | 9 of 26 | 2 of 24: statue-04, statue-05 |
+
+Found as the app runs the checks, by category: full body 4/4, from behind 3/3, group 2/2, selfie 2/2, near 3/4, sitting 2/3, partly hidden 1/2, far 0/4, low light 0/2. The phone counts a person when ML Kit finds enough body landmarks (likelihood ≥ 0.5) or a face; a small or dark figure gives neither.
+
 [#47]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/47
 [#48]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/48
 [#50]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/50
@@ -1763,6 +1856,7 @@ Observations:
 [#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
 [#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
 [#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124
+[#125]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/125
 [#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
 [#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156

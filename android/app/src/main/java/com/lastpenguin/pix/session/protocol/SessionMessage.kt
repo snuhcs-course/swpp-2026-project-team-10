@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -413,8 +413,9 @@ sealed interface SessionMessage {
 }
 
 /**
- * The steps of the photographer's set of candidates (Design 2.6.5): GENERATING from *Generate 4 poses* or *Skip*,
- * PICKING once its *Pick a pose* opens, then CHOSEN by the first *Use this pose*, or CLOSED without a choice.
+ * The steps of the photographer's set of candidates (Design 2.6.5): GENERATING from *Suggest 4 poses* or *Generate 4
+ * poses from this*, PICKING once its *Pick a pose* opens, then CHOSEN by the first *Use this pose*, or CLOSED without
+ * a choice.
  */
 @Serializable
 enum class PoseSetStep { GENERATING, PICKING, CHOSEN, CLOSED }
@@ -425,7 +426,7 @@ enum class PhotoRefusal { TOO_LARGE, BROKEN, STORAGE }
 
 /**
  * The steps of the photographer's *Generate poses* in a session (Design 2.6.5): OPEN while the description is written,
- * then STARTED by the first *Generate 4 poses* or *Skip*, or CLOSED without a set.
+ * then STARTED by the first *Suggest 4 poses* or *Generate 4 poses from this*, or CLOSED without a set.
  */
 @Serializable
 enum class DescriptionStep { OPEN, STARTED, CLOSED }

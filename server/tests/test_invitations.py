@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 """Invitations through the REST API and the signaling socket (Design 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9, FR-6.17).
 
 Partitions:
@@ -14,7 +14,8 @@ Partitions:
   still has time to join, and one who never joins lets the room expire; a decline or the expiry tells a waiting
   photographer; a cancel frees the photographer's socket
 - the push: to each of the friend's phones, with the data the app needs, at high priority, for the invitation's 60 s;
-  not to the photographer; a device FCM no longer knows is removed; FCM failing leaves the invitation working
+  not to the photographer; not to a phone whose sign-in expired; a device FCM no longer knows is removed; FCM failing
+  leaves the invitation working
 - the link: an invitation id gives the page that opens Pix and names nobody; anything else is not found
 """
 
@@ -474,6 +475,20 @@ def test_the_invitation_is_pushed_to_each_of_the_friends_phones(client, friends,
         assert push["authorization"] == "Bearer test-fcm-access"
         assert push["url"] == "https://fcm.googleapis.com/v1/projects/pix-test/messages:send"
     assert len(fcm_api.token_requests) == 1
+
+
+def test_a_phone_whose_sign_in_expired_gets_no_push(client, clock, friends, fcm_api):
+    (_, _), (junhyeong, _) = friends
+    register_device(client, junhyeong, "junhyeong-old-phone")
+    clock.advance(20 * 86400)
+    new_phone = client.post("/api/v1/auth/login", json={"pixId": "junhyeong.h", "password": "sunset2026"}).json()
+    register_device(client, {"Authorization": f"Bearer {new_phone['accessToken']}"}, "junhyeong-phone")
+    # The first sign-in ends 30 days after it began; the second one lasts another 20 days.
+    clock.advance(11 * 86400)
+    dongje = client.post("/api/v1/auth/login", json={"pixId": "dongje.p", "password": "sunset2026"}).json()
+    response = invite(client, {"Authorization": f"Bearer {dongje['accessToken']}"}, friends[1][1])
+    assert response.status_code == 201, response.text
+    assert [push["token"] for push in fcm_api.pushes] == ["junhyeong-phone"]
 
 
 def test_a_device_fcm_no_longer_knows_is_removed(client, friends, fcm_api):

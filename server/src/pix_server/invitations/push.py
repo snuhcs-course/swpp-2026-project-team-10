@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 """Push notifications through Firebase Cloud Messaging's HTTP v1 API (Design Documentation 2.6.6, AD-13).
 
 The server signs in as a service account of the app's Firebase project: it signs a JWT with the account's key and
@@ -21,7 +21,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
-from pix_server.db.models import Device
+from pix_server.accounts.auth import now_of
+from pix_server.db.models import AuthSession, Device
 from pix_server.errors import raised_by_database
 
 logger = logging.getLogger(__name__)
@@ -145,14 +146,20 @@ class PushSender:
 
 
 async def push_to_user(app: FastAPI, user_id: str, data: dict[str, str], ttl_seconds: int) -> None:
-    """Sends a push to every phone the user is signed in on, and removes the devices FCM no longer knows. Runs after the
+    """Sends a push to every phone the user is signed in on, and removes the devices FCM no longer knows. A device of
+    an expired session gets nothing; its row stays until the user's next sign-in removes the session. Runs after the
     response (a background task), so a slow FCM never holds up the request that caused it."""
     sender: PushSender = app.state.push
     if not sender.enabled:
         return
     try:
         async with app.state.database() as db:
-            tokens = list(await db.scalars(select(Device.fcm_token).where(Device.user_id == user_id)))
+            signed_in = (
+                select(Device.fcm_token)
+                .join(AuthSession, AuthSession.id == Device.session_id)
+                .where(Device.user_id == user_id, AuthSession.expires_at > now_of(app))
+            )
+            tokens = list(await db.scalars(signed_in))
         gone = await sender.send(tokens, data, ttl_seconds)
         if gone:
             async with app.state.database() as db:

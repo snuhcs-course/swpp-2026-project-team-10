@@ -48,6 +48,8 @@ Run the lint/format/unit-test commands below and `./gradlew :app:assembleDebug`.
 | `guide/SavedGuideStore.kt` | Saved guides on the phone, the library: `SavedGuideStore` (with `thumbnail`, read when a cell shows), `SavedGuide` (with its source), and `SavedGuideStore.InMemory` for tests | 2.1, 2.3 |
 | `generation/GenerationModels.kt`, `generation/PoseGenerator.kt` | Pose requests, planned poses, generation and candidate events, generator interface | 2.1, 2.3 |
 | `generation/PoseTipper.kt` | How to hold the phone for a generated pose: `PoseTipper`, `PoseTip` | 2.1, 2.6.3 |
+| `generation/PersonDetector.kt` | The person check on the phone before a scene photo is sent: `PersonDetector` | 2.1, 2.6.3 |
+| `generation/PromptHistory.kt` | The descriptions used before, on this phone: `PromptHistory`, `PromptEntry`, and `PromptHistory.InMemory` for tests | 2.1, 2.6.3 |
 | `session/SessionModels.kt`, `session/SessionManager.kt` | Roles, entries, session states, session interface | 2.1, 2.3, 2.4 |
 | `session/protocol/SessionMessage.kt` | Data channel messages between the two phones | 2.5.1 |
 | `session/signaling/SignalMessage.kt` | WebSocket signaling messages | 2.5.2 |

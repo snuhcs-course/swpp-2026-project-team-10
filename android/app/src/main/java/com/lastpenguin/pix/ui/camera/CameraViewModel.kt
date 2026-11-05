@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -68,7 +68,7 @@ sealed interface ToggleLabel {
 
 /**
  * The pose tip of the guide on the camera (FR-4.10), as the screen shows it: a banner over the bottom of the preview
- * that opens once when the guide comes, and the tip button in the top bar.
+ * that opens once when the guide comes, and the tip button in the zoom row.
  */
 data class TipBanner(
     /** The guide the tip is for; a new guide opens the banner again. */

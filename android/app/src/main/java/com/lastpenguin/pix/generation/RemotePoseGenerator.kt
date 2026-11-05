@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -53,7 +53,7 @@ class RemotePoseGenerator(
             MultipartBody.Part.createFormData("image", "scene.jpg", photo.toRequestBody(JPEG)),
             if (selfie) "true".toRequestBody(TEXT) else null,
         )
-        // One seed for the set gives each pose a seed of its own, in the order of the poses (Design 2.6.3, step 2).
+        // One seed for the set gives each pose a seed of its own, in the order of the poses (Design 2.6.3, step 3).
         val seeds = Random(seed)
         var written: Deferred<CandidateEvent>? = null
         val texts = when (request) {

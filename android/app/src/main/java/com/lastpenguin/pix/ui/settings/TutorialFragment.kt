@@ -137,7 +137,8 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
         tips = listOf(
             TutorialTip(R.string.tutorial_scene, CaptionSide.BELOW, locate = control(R.id.sceneImage)),
             TutorialTip(R.string.tutorial_describe, CaptionSide.ABOVE, locate = control(R.id.descriptionInput)),
-            TutorialTip(R.string.tutorial_suggest, CaptionSide.ABOVE, locate = control(R.id.suggestButton)),
+            // The one button (Iter3-A13): left empty, the field asks for suggested poses.
+            TutorialTip(R.string.tutorial_suggest, CaptionSide.ABOVE, locate = control(R.id.generateButton)),
         ),
     ),
     TutorialScreen.SUBJECT_VIEW to TutorialTips(

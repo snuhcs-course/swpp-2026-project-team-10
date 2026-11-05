@@ -175,6 +175,22 @@ sealed interface SessionMessage {
     data class PoseCandidateEnd(val setId: String, val poseId: String, val crc32: Long) : SessionMessage
 
     /**
+     * The candidates the photographer's set [setId] plans, in the order of its slots (Iter3-A13): the subject's
+     * *Generating poses* shows the same slots. Sent once they are planned, which takes suggested poses a few seconds.
+     */
+    @Serializable
+    @SerialName("pose.planned")
+    data class PosePlanned(val setId: String, val poseIds: List<String>) : SessionMessage
+
+    /**
+     * The candidate [poseId] of the set [setId] could not be created (Iter3-A13), so the subject's slot says so as the
+     * photographer's does, which shows every failure alike; no reason travels, so a new one breaks no older phone.
+     */
+    @Serializable
+    @SerialName("pose.candidate.failed")
+    data class PoseCandidateFailed(val setId: String, val poseId: String) : SessionMessage
+
+    /**
      * The subject's *Use this pose* on the candidate [poseId] (FR-6.15), a request like its others (AD-7): the
      * photographer takes it only while the set [setId] is PICKING and nobody has chosen, and answers with `pose.step`.
      */

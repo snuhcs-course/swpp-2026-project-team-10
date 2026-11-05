@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -700,13 +700,13 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.PICKING))
         runCurrent()
         assertEquals(PoseSetStep.PICKING, model.uiState.value.poseStep)
-        assertTrue(model.claimPickOpening("set1"))
-        assertFalse(model.claimPickOpening("set1"))
+        assertTrue(model.claimSetOpening("set1"))
+        assertFalse(model.claimSetOpening("set1"))
 
         session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED))
         runCurrent()
         assertNull(model.uiState.value.poseStep)
-        assertTrue("a new set opens again", model.claimPickOpening("set2"))
+        assertTrue("a new set opens again", model.claimSetOpening("set2"))
     }
 
     private companion object {

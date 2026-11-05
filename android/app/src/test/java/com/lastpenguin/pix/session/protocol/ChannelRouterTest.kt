@@ -42,6 +42,9 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideImageChunk("g", 0, "AA==")))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideClear))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Leave(EndReason.LEFT)))
+        // The slots and a failure come in order with the set's other messages (Iter3-A13).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PosePlanned("set1", listOf("pose-1"))))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseCandidateFailed("set1", "pose-1")))
     }
 
     @Test

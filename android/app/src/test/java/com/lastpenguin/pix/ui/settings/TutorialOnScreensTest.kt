@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.os.Looper
@@ -267,9 +267,10 @@ class TutorialOnScreensTest {
     @Test
     fun subjectView_whileThePhotographerCreatesPoses_holdsItsTips_untilTheVideoShowsAgain() {
         val modules = noneSeen()
-        subjectView(modules)
+        val nav = subjectView(modules)
         modules.poses.startAsReceiver(receiving)
-        // The photographer starts a set as the video comes, and its text covers the video.
+        // The photographer starts a set as the video comes: its text covers the video, and its Generating poses opens
+        // over Subject view (Iter3-A13).
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         modules.video.deliverFrame()
         modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, emptyList()))
@@ -278,6 +279,8 @@ class TutorialOnScreensTest {
         assertNull(tips())
 
         modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, emptyList()))
+        // The set's end takes Generating poses back to Subject view (SubjectGeneratingFragmentTest).
+        nav.popBackStack()
         modules.video.deliverFrame()
         waitMs(600)
         waitMs(TutorialFragment.AFTER_PICTURE_MS)

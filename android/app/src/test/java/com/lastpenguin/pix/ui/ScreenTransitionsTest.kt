@@ -356,6 +356,7 @@ class ScreenTransitionsTest {
             R.id.sessionNotFoundFragment to Kind.SCREEN,
             R.id.subjectFragment to Kind.LIVE,
             R.id.subjectDescribeFragment to Kind.SCREEN,
+            R.id.subjectGeneratingFragment to Kind.SCREEN,
             R.id.subjectPickPoseFragment to Kind.SCREEN,
             R.id.subjectConfirmFragment to Kind.SCREEN,
             R.id.connectionLostFragment to Kind.SCREEN,

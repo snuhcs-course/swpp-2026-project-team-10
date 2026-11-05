@@ -59,6 +59,8 @@ class MessageCodecTest {
             SessionMessage.PoseCandidateBegin("set1", "pose-4", "jpeg", 768, 1024, 151_320, 17),
             SessionMessage.PoseCandidateChunk("set1", "pose-4", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PoseCandidateEnd("set1", "pose-4", 3735928559L),
+            SessionMessage.PosePlanned("set1", listOf("pose-1", "pose-2", "pose-3", "pose-4")),
+            SessionMessage.PoseCandidateFailed("set1", "pose-2"),
             SessionMessage.PosePick("set1", "pose-4"),
             SessionMessage.GuideConfirm("c1", ConfirmStep.FINDING),
             SessionMessage.GuideConfirm("c1", ConfirmStep.READY, guideId = "g1"),

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -894,8 +894,9 @@ class GenerationViewModelTest {
     }
 
     // ---- the set on the subject's phone (Design 2.6.5, Iter3-P16) -------------------------------------------------
-    // Partitions: each phase change is told (a new set, each created candidate, Pick a pose with the pager's order, an
-    // end without a choice from GENERATING, PICKING, or FAILED); the first choice wins (this phone's own, the
+    // Partitions: each phase change is told (a new set, its planned slots, each created candidate and each that failed,
+    // also at the time limit (Iter3-A13), Pick a pose with the pager's order, an end without a choice from GENERATING,
+    // PICKING, or FAILED); the first choice wins (this phone's own, the
     // subject's pick of this set); a pick is ignored for another set, while generating, for a candidate that failed,
     // and after a choice; a new set gets a new id.
 
@@ -910,8 +911,31 @@ class GenerationViewModelTest {
 
         val set = share.opened.single()
         assertEquals(
-            listOf("open $set", "candidate pose-3", "candidate pose-1", "picking pose-1,pose-3"),
+            listOf(
+                "open $set",
+                "planned pose-1,pose-2,pose-3,pose-4",
+                "candidate pose-3",
+                "failed pose-2",
+                "candidate pose-1",
+                "picking pose-1,pose-3",
+            ),
             share.calls,
+        )
+    }
+
+    @Test
+    fun candidatesWithoutAnAnswerAtTheLimit_areToldAsFailed() = runTest {
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        run.plan()
+        run.send(ready("pose-2"))
+
+        advanceTimeBy(LIMIT_MS)
+        runCurrent()
+
+        assertEquals(
+            listOf("failed pose-1", "failed pose-3", "failed pose-4"),
+            share.calls.filter { it.startsWith("failed") },
         )
     }
 
@@ -1328,9 +1352,19 @@ class GenerationViewModelTest {
             calls += "open $setId"
         }
 
+        override fun planned(setId: String, poseIds: List<String>) {
+            check(setId == opened.last())
+            calls += "planned ${poseIds.joinToString(",")}"
+        }
+
         override fun candidate(setId: String, poseId: String, image: Bitmap) {
             check(setId == opened.last())
             calls += "candidate $poseId"
+        }
+
+        override fun failed(setId: String, poseId: String) {
+            check(setId == opened.last())
+            calls += "failed $poseId"
         }
 
         override fun picking(setId: String, poseIds: List<String>) {

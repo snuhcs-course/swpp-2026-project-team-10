@@ -9,4 +9,6 @@
     <item name="icon_resource" type="id" />
     <!-- The read of a cell's saved-guide thumbnail, cancelled when the cell gets another guide (FR-3.11). -->
     <item name="thumbnail_job" type="id" />
+    <!-- A view's pop under way (ui/Motion.kt), stopped when the view is bound again. -->
+    <item name="pop" type="id" />
 </resources>

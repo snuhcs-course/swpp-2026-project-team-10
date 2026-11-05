@@ -157,8 +157,9 @@
     <string name="history_with">%1$s님과</string>
     <string name="history_empty_with">%1$s님과 쓴 설명이 아직 없어요</string>
     <string name="history_delete">“%1$s” 설명을 기록에서 지우기</string>
-    <string name="generate_four_poses">포즈 4개 생성</string>
-    <string name="skip_suggest_poses">건너뛰고 포즈 추천받기</string>
+    <string name="suggest_four_poses">AI 추천 포즈 4개 생성</string>
+    <string name="generate_four_from_description">입력한 포즈로 4개 생성</string>
+    <string name="clear_description">설명 지우기</string>
     <string name="choosing_poses">포즈 선택 중…</string>
     <string name="scene_photo_description">포즈를 생성할 배경 사진</string>
     <string name="creating_pose">생성 중…</string>
@@ -180,6 +181,8 @@
     <string name="peer_chose_this_pose">%1$s님이 이 포즈를 골랐어요</string>
     <string name="peer_chose_pose">%1$s님이 포즈를 골랐어요</string>
     <string name="peer_closed_poses">%1$s님이 포즈 고르기를 닫았어요</string>
+    <string name="peer_stopped_poses">%1$s님이 포즈 생성을 멈췄어요</string>
+    <string name="peer_poses_failed">%1$s님의 포즈를 생성하지 못했어요</string>
     <string name="pose_pick_failed">고른 포즈를 보내지 못했어요</string>
     <string name="peer_used_guide">%1$s님이 이 가이드를 사용했어요</string>
     <string name="peer_closed_reference">%1$s님이 참고 사진을 닫았어요</string>

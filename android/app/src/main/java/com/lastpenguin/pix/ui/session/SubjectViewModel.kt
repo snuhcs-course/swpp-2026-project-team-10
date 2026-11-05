@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -144,8 +144,8 @@ class SubjectViewModel(
     /** Each of the photographer's sets that ended, for its notice while this screen is in front (Design 2.6.5). */
     val poseSetEnds: Flow<PoseSetEnd> = poses?.ended ?: emptyFlow()
 
-    /** The last set whose *Pick a pose* this screen opened by itself, so it opens once per set. */
-    private var pickOpenedFor: String? = null
+    /** The last set one of whose screens this screen opened by itself, so it opens once per set. */
+    private var setOpenedFor: String? = null
 
     /** Each of the photographer's Reference confirms that ended, for its notice while this screen is in front. */
     val confirmEnds: Flow<ConfirmEnd> = confirms?.ended ?: emptyFlow()
@@ -349,12 +349,13 @@ class SubjectViewModel(
     }
 
     /**
-     * Whether Subject view should open *Pick a pose* by itself for [setId] now: once per set, so Back keeps it closed
-     * and the button opens it again (Design 2.6.5).
+     * Whether Subject view should open a screen of the set [setId] by itself now, *Generating poses* or *Pick a pose*:
+     * once per set, so Back keeps it closed and the button opens it again (Design 2.6.5); *Generating poses* goes on to
+     * *Pick a pose* by itself.
      */
-    fun claimPickOpening(setId: String): Boolean {
-        if (pickOpenedFor == setId) return false
-        pickOpenedFor = setId
+    fun claimSetOpening(setId: String): Boolean {
+        if (setOpenedFor == setId) return false
+        setOpenedFor = setId
         return true
     }
 

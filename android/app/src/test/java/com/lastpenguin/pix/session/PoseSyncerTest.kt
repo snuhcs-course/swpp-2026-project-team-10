@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.PoseSetStep
@@ -20,7 +20,8 @@ import org.junit.Test
 /*
  * The photographer's candidates on the subject's Pick a pose (Design 2.5.1, 2.6.5; Iter3-P16), with the fakes of
  * ModuleFakes.kt.
- * Photographer, the set (state-based): GENERATING, each candidate as it arrives, then PICKING with its order, then
+ * Photographer, the set (state-based): GENERATING, the planned slots and each failure before the copies (Iter3-A13;
+ * none for a set that is not generating), each candidate as it arrives, then PICKING with its order, then
  * CHOSEN with whose pick; CLOSED from GENERATING or PICKING; one end per set, so a close after a choice sends nothing;
  * a candidate or a step after the end is not sent; a candidate that cannot be encoded is left out, also from PICKING.
  * Photographer, the connection: nothing goes while no subject is connected; a sender started later (a reconnect)
@@ -31,7 +32,8 @@ import org.junit.Test
  * Subject, the copy (state-based): built from GENERATING, the copies, and PICKING, in the photographer's order with
  * missing copies left out; dropped at its end, which is reported with whether Pick a pose had it, at another set's
  * start, at another set's end without a notice, and when the session ends; kept through a reconnect, where the copies
- * sent again are not read again.
+ * sent again are not read again; the slots and the failures of the set held (Iter3-A13), not another's, and the same
+ * again after a reconnect changing nothing.
  * Subject, a copy (fault injection, boundary): a broken transfer, a header over 1024 px or 1 MiB (both at the limit
  * read), a copy that does not decode, and a copy of a set not shown are let go.
  * Subject, a pick (boundary of the deadline): sent and waiting; answered by its set's end; reported just after 5 s
@@ -55,11 +57,13 @@ class PoseSyncerTest {
     private fun sentCandidates(): List<String> =
         session.sent.filterIsInstance<SessionMessage.PoseCandidateBegin>().map { it.poseId }
 
-    /** What went out, in order: steps by name, candidates by id. */
+    /** What went out, in order: steps by name, candidates by id, the slots and the failures (Iter3-A13) by kind. */
     private fun sentOrder(): List<String> = session.sent.mapNotNull {
         when (it) {
             is SessionMessage.PoseStep -> it.step.name
             is SessionMessage.PoseCandidateBegin -> it.poseId
+            is SessionMessage.PosePlanned -> "planned ${it.poseIds.joinToString(",")}"
+            is SessionMessage.PoseCandidateFailed -> "failed ${it.poseId}"
             else -> null
         }
     }
@@ -218,6 +222,52 @@ class PoseSyncerTest {
     }
 
     @Test
+    fun `the slots and each failure go before the copies, and again after a reconnect`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        val first = Job()
+        syncer.startAsSender(TestScope(testScheduler + first))
+        syncer.open("set1")
+        runCurrent()
+        syncer.planned("set1", listOf("pose-1", "pose-2", "pose-3", "pose-4"))
+        syncer.failed("set1", "pose-2")
+        syncer.candidate("set1", "pose-1", fakeBitmap())
+        syncer.failed("set1", "pose-2")
+        runCurrent()
+
+        assertEquals(
+            listOf("GENERATING", "planned pose-1,pose-2,pose-3,pose-4", "failed pose-2", "pose-1"),
+            sentOrder(),
+        )
+
+        first.cancel()
+        session.sent.clear()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+        assertEquals(
+            listOf("GENERATING", "planned pose-1,pose-2,pose-3,pose-4", "failed pose-2", "pose-1"),
+            sentOrder(),
+        )
+    }
+
+    @Test
+    fun `the slots and failures of a set that is not generating are not taken`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        syncer.startAsSender(backgroundScope)
+        syncer.planned("set0", listOf("pose-1"))
+        syncer.open("set1")
+        syncer.candidate("set1", "pose-1", fakeBitmap())
+        syncer.picking("set1", listOf("pose-1"))
+        syncer.planned("set1", listOf("pose-1"))
+        syncer.failed("set1", "pose-2")
+        syncer.failed("set0", "pose-2")
+        runCurrent()
+
+        assertEquals(listOf("GENERATING", "pose-1", "PICKING"), sentOrder())
+    }
+
+    @Test
     fun `a set that ended before the sender heard of it goes as its end alone`() = runTest {
         val syncer = syncer()
         syncer.open("set1")
@@ -333,6 +383,31 @@ class PoseSyncerTest {
         val set = syncer.mirror.value
         assertEquals(PoseSetStep.PICKING, set?.step)
         assertEquals(listOf("pose-1", "pose-3"), set?.ready?.map { it.first })
+    }
+
+    @Test
+    fun `the subject keeps the slots and the failures of the set it holds, not another's`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        session.deliver(SessionMessage.PosePlanned("set0", listOf("pose-9")))
+        deliverStep("set1", PoseSetStep.GENERATING)
+        session.deliver(SessionMessage.PosePlanned("set1", listOf("pose-1", "pose-2")))
+        session.deliver(SessionMessage.PoseCandidateFailed("set1", "pose-2"))
+        session.deliver(SessionMessage.PoseCandidateFailed("set0", "pose-1"))
+        runCurrent()
+
+        val set = syncer.mirror.value
+        assertEquals(listOf("pose-1", "pose-2"), set?.slots)
+        assertEquals(setOf("pose-2"), set?.failed)
+
+        // Sent again after a reconnect: nothing changes.
+        session.deliver(SessionMessage.PosePlanned("set1", listOf("pose-1", "pose-2")))
+        session.deliver(SessionMessage.PoseCandidateFailed("set1", "pose-2"))
+        runCurrent()
+        assertEquals(set, syncer.mirror.value)
     }
 
     @Test

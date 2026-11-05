@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -41,6 +41,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowToast
 
 /*
@@ -51,7 +52,8 @@ import org.robolectric.shadows.ShadowToast
  * back to Subject view), by this phone's own use (back without a notice), and an end kept from an earlier confirm
  * (nothing); a use no step answers in 5 s (a notice, and it can be tapped again); Back (Subject view, the confirm
  * kept); the link reconnecting (the outline kept, Use this guide waiting until it is back); the session ending (back
- * to Subject view, which shows what ended it).
+ * to Subject view, which shows what ended it). The outline fading in as it arrives, with the display's frames paused
+ * (Iter3-A13), but not on a view made with it there.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,6 +63,7 @@ class SubjectConfirmFragmentTest {
 
     @After
     fun tearDown() {
+        ShadowChoreographer.setPaused(false)
         scenario?.close()
         receiving.cancel()
     }
@@ -152,6 +155,25 @@ class SubjectConfirmFragmentTest {
             assertEquals(View.VISIBLE, binding.referenceProgress.visibility)
             assertFalse(binding.useGuideButton.isEnabled)
         }
+    }
+
+    @Test
+    fun theOutline_fadesInAsItArrives_butNotOnAViewMadeWithItThere() {
+        val modules = confirming(ready = false)
+        launch()
+        ShadowChoreographer.setPaused(true)
+
+        readyWith(modules, "g1")
+
+        assertEquals(0f, onScreen { it.referenceImage.alpha }, 0f)
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+        assertEquals(1f, onScreen { it.referenceImage.alpha }, 0f)
+
+        scenario!!.close()
+        confirming()
+        launch()
+        assertEquals(1f, onScreen { it.referenceImage.alpha }, 0f)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.animation.ObjectAnimator
@@ -29,7 +29,11 @@ class LiveDotView @JvmOverloads constructor(context: Context, attrs: AttributeSe
 
     /** Puts the dot [MARGIN_DP] inside the top right corner of the image of [frameAspect] fitted in [parent]. */
     fun placeIn(parent: View, frameAspect: Float) {
-        val frame = fitViewfinderFrame(parent.width.toFloat(), parent.height.toFloat(), frameAspect)
+        placeAt(fitViewfinderFrame(parent.width.toFloat(), parent.height.toFloat(), frameAspect))
+    }
+
+    /** Puts the dot [MARGIN_DP] inside the top right corner of [frame], in its parent's coordinates. */
+    internal fun placeAt(frame: ViewfinderFrame) {
         val margin = MARGIN_DP * resources.displayMetrics.density
         translationX = frame.right - margin - layoutParams.width
         translationY = frame.top + margin

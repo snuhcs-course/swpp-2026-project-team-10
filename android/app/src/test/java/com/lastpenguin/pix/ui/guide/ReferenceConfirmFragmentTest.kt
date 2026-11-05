@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
+import android.animation.ValueAnimator
 import android.net.Uri
 import android.os.Looper
 import android.view.View
@@ -57,7 +58,8 @@ import org.robolectric.shadows.ShadowToast
  * A screenshot cut to its photo (FR-2.10): the cut plays once, the outline waiting until the photo leaves for the corner,
  * with the chip and Use the whole image; a view made anew shows its end without playing again; Use the whole image
  * makes the guide again from all of it, ends the cut while it plays, and on a chosen pose's confirm keeps it shared.
- * A photo used whole has no cut, chip, or Use the whole image.
+ * A photo used whole has no cut, chip, or Use the whole image. A photo's outline fades in as its person is found
+ * (Iter3-A13), and is there at once with the phone's animations off.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -67,6 +69,8 @@ class ReferenceConfirmFragmentTest {
 
     @After
     fun tearDown() {
+        ShadowChoreographer.setPaused(false)
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType).invoke(null, 1f)
         scenario?.close()
     }
 
@@ -272,6 +276,37 @@ class ReferenceConfirmFragmentTest {
 
         assertSame(made, modules.guides.guide.value)
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun aPhotosOutline_fadesInAsItsPersonIsFound() {
+        val modules = launch()
+        pickPhoto()
+        ShadowChoreographer.setPaused(true)
+
+        modules.maker.finish(Result.success(guide()))
+        idle()
+
+        onScreen { binding ->
+            assertTrue(binding.referenceImage.isShown)
+            assertEquals(0f, binding.referenceImage.alpha, 0f)
+        }
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+        assertEquals(1f, onScreen { it.referenceImage.alpha }, 0f)
+    }
+
+    @Test
+    fun withAnimationsOff_aPhotosOutlineIsThereAtOnce() {
+        val modules = launch()
+        pickPhoto()
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType).invoke(null, 0f)
+        ShadowChoreographer.setPaused(true)
+
+        modules.maker.finish(Result.success(guide()))
+        idle()
+
+        assertEquals(1f, onScreen { it.referenceImage.alpha }, 0f)
     }
 
     /** A guide made from a screenshot's photo, rows 15–76 % of it. */

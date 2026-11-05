@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -42,6 +42,9 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideImageChunk("g", 0, "AA==")))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideClear))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Leave(EndReason.LEFT)))
+        // The slots and a failure come in order with the set's other messages (Iter3-A13).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PosePlanned("set1", listOf("pose-1"))))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseCandidateFailed("set1", "pose-1")))
     }
 
     @Test
@@ -56,6 +59,12 @@ class ChannelRouterTest {
         assertTrue(router.latestOnly(SessionMessage.GuideMove("g", 0.4f, 0.5f, 0.8f)))
         assertTrue(router.latestOnly(SessionMessage.ExposureSet(3)))
         assertFalse(router.latestOnly(SessionMessage.FlashSet(FlashMode.ON)))
+    }
+
+    @Test
+    fun `the shutter goes on the realtime channel, as a moment that is wrong late, and is never dropped as stale`() {
+        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.PhotoShutter))
+        assertFalse(router.latestOnly(SessionMessage.PhotoShutter))
     }
 
     @Test

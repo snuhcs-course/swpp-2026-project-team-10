@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -52,8 +52,9 @@ import org.robolectric.shadows.ShadowToast
  * the photographer's phone; the photographer typing (the field, the chips, and the buttons wait, saying who types) and
  * done; this phone's typing sent while it holds the field and given back when it ends; a description used before sent
  * at once from its chip, and the switch to the ones used with the photographer in an invitation's session; the one
- * button, Generate 4 poses with a description and Suggest 4 poses for me with the field empty, sent and waiting; the description's end by a set started (back to Subject view without a notice), by
- * the photographer's close (a notice), and an end kept from an earlier description (nothing); a go no end answers in
+ * button sent and waiting, and with the field cleared by its ✕, asking for suggested poses (Iter3-A13); the
+ * description's end by a set started (back to Subject view without a notice), by the photographer's close (a notice),
+ * and an end kept from an earlier description (nothing); a go no end answers in
  * 5 s (a notice); Back (Subject view, the description kept); the link reconnecting (everything waits); the session
  * ending (back to Subject view).
  */
@@ -233,12 +234,12 @@ class SubjectDescribeFragmentTest {
     }
 
     @Test
-    fun generate_isSent_andWaitsForTheAnswer() {
+    fun theButton_isSent_andWaitsForTheAnswer() {
         val modules = describing()
         launch()
 
         onScreen { binding ->
-            assertEquals(string(R.string.generate_four_poses), binding.generateButton.text.toString())
+            assertEquals(string(R.string.generate_four_from_description), binding.generateButton.text.toString())
             binding.generateButton.performClick()
         }
         idle()
@@ -253,22 +254,25 @@ class SubjectDescribeFragmentTest {
     }
 
     @Test
-    fun withAnEmptyField_theButtonAsksForSuggestedPoses() {
-        val modules = describing(text = "")
+    fun theButtonWithTheFieldCleared_asksForSuggestedPoses() {
+        val modules = describing()
         launch()
 
         onScreen { binding ->
+            binding.clearDescriptionButton.performClick()
             assertEquals(string(R.string.suggest_four_poses), binding.generateButton.text.toString())
             binding.generateButton.performClick()
         }
         idle()
 
+        // The ✕ goes to the photographer as an edit, as typing would, before the button.
+        assertEquals("", edits(modules).last().text)
         assertEquals(listOf(SessionMessage.PoseDescriptionGo("d1", "", suggest = true)), goes(modules))
     }
 
     @Test
     fun aSetStarted_closesItWithoutANotice() {
-        val modules = describing()
+        val modules = describing(text = "")
         val nav = launch()
         onScreen { it.generateButton.performClick() }
         idle()

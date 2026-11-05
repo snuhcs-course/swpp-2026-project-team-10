@@ -354,7 +354,7 @@ class CameraFragmentRenderTest {
         launch(camera)
 
         onScreen { controls, _ ->
-            assertEquals(string(R.string.aspect_4_3), controls.aspectButton.text.toString())
+            assertEquals(string(R.string.aspect_3_4), controls.aspectButton.text.toString())
             assertEquals(AspectRatio.R4_3.frameAspect, controls.compositionOverlay.frameAspect)
         }
 
@@ -362,7 +362,7 @@ class CameraFragmentRenderTest {
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(string(R.string.aspect_16_9), controls.aspectButton.text.toString())
+            assertEquals(string(R.string.aspect_9_16), controls.aspectButton.text.toString())
             assertEquals(AspectRatio.R16_9.frameAspect, controls.compositionOverlay.frameAspect)
             assertEquals(AspectRatio.R16_9.frameAspect, controls.guideOverlay.frameAspect)
         }

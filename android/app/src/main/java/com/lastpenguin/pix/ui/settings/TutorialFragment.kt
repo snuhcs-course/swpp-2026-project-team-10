@@ -8,6 +8,9 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.WindowManager
+import androidx.activity.ComponentDialog
+import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDialogFragment
@@ -18,7 +21,9 @@ import androidx.fragment.app.activityViewModels
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.guide.GuideOverlayView
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.fadeTo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
@@ -132,7 +137,7 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
         tips = listOf(
             TutorialTip(R.string.tutorial_scene, CaptionSide.BELOW, locate = control(R.id.sceneImage)),
             TutorialTip(R.string.tutorial_describe, CaptionSide.ABOVE, locate = control(R.id.descriptionInput)),
-            // The one button, which asks for suggested poses while the field is empty (US-5).
+            // The one button (Iter3-A13): left empty, the field asks for suggested poses.
             TutorialTip(R.string.tutorial_suggest, CaptionSide.ABOVE, locate = control(R.id.generateButton)),
         ),
     ),
@@ -156,7 +161,8 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
  * caption for each control of it the screen shows ([TUTORIAL_TIPS]), drawn by [CoachMarkLayout] over the live screen,
  * so it lines up on every phone and *Got it* leaves exactly what was under it. It is a full-screen dialog among the
  * screen's child fragments, not a destination of its own, so the camera and a session's video run on under it, a sheet
- * stays open, and the screen still navigates. *Got it* and Back close it, and the screen's tips count as seen.
+ * stays open, and the screen still navigates. *Got it* and Back close it, and the screen's tips count as seen. The
+ * tips fade in and out in 200 ms (Iter3-A14); while they fade out, touches and keys go to the screen already.
  * Owner: Settings (#123).
  */
 class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
@@ -167,6 +173,8 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
     internal val screen by lazy { TutorialScreen.valueOf(requireArguments().getString(ARG_SCREEN)!!) }
 
     private var watch: Pair<View, ViewTreeObserver.OnPreDrawListener>? = null
+
+    private var closing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -199,10 +207,27 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
         }
         screenView.viewTreeObserver.addOnPreDrawListener(follow)
         watch = screenView to follow
-        layout.findViewById<View>(R.id.gotItButton).setOnClickListener {
-            seen()
-            dismiss()
+        layout.findViewById<View>(R.id.gotItButton).setOnClickListener { close() }
+        (requireDialog() as ComponentDialog).onBackPressedDispatcher.addCallback(viewLifecycleOwner) { close() }
+        // Recreated with the screen, they come at once, as they were.
+        if (savedInstanceState == null) {
+            layout.alpha = 0f
+            layout.fadeTo(1f, Motion.FADE_MS)
         }
+    }
+
+    /**
+     * *Got it* and Back: the tips count as seen at once, the screen under them takes touches and keys at once, and they
+     * fade out, then close.
+     */
+    private fun close() {
+        if (closing) return
+        closing = true
+        seen()
+        requireDialog().window?.addFlags(
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+        )
+        requireView().fadeTo(0f, Motion.FADE_MS) { if (isAdded) dismissAllowingStateLoss() }
     }
 
     override fun onDestroyView() {
@@ -211,7 +236,7 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
         super.onDestroyView()
     }
 
-    /** Back, on the dialog. */
+    /** The dialog cancelled other than by Back, which closes it. */
     override fun onCancel(dialog: DialogInterface) {
         super.onCancel(dialog)
         seen()

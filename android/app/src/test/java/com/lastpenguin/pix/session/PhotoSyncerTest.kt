@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.net.Uri
@@ -49,7 +49,8 @@ import org.robolectric.RobolectricTestRunner
  * `photo.saved`; nothing outside a session.
  * Photographer, the shutter (state-based): a photo belongs to the session at its shutter, so another session never gets
  * it, one that ended during the save counts it once, a reconnect keeps it, and one that could not be saved is not
- * counted.
+ * counted. A connected subject hears of the shutter at once (`photo.shutter`, Iter3-A12); while reconnecting, and
+ * outside a session, no one does.
  * Photographer, the limits (boundary): 0 B, one chunk, one byte more, 40 MiB, one byte more; 32 chunks past the last
  * `photo.ack` and one more; a chunk that waits in `sendBulk` goes once.
  * Photographer, failures (fault injection): a photo that cannot be opened or read, one the subject refuses, one with
@@ -66,6 +67,7 @@ import org.robolectric.RobolectricTestRunner
  * when the session ends, and an old one removed when a session starts; a photo already saved answered, not saved again.
  * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
  * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
+ * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -237,6 +239,28 @@ class PhotoSyncerTest {
         runCurrent()
 
         assertEquals(1, begins.size)
+    }
+
+    @Test
+    fun `the shutter tells a connected subject at once, before the photo is saved`() = runTest {
+        val (syncer, _) = sender()
+
+        checkNotNull(syncer.shutter())
+
+        assertEquals(listOf(SessionMessage.PhotoShutter), sentOf(SessionMessage.PhotoShutter::class.java))
+        assertTrue(begins.isEmpty())
+    }
+
+    @Test
+    fun `a shutter while the link reconnects or outside a session tells no one`() = runTest {
+        val (syncer, _) = sender()
+        session.setState(SessionState.Reconnecting("s_1", since = 0))
+        checkNotNull(syncer.shutter())
+
+        session.setState(SessionState.Waiting("123456"))
+        assertNull(syncer.shutter())
+
+        assertTrue(sentOf(SessionMessage.PhotoShutter::class.java).isEmpty())
     }
 
     @Test
@@ -825,5 +849,21 @@ class PhotoSyncerTest {
         receiver()
 
         assertTrue(partFiles().isEmpty())
+    }
+
+    @Test
+    fun `the photographer's shutter reaches a listening screen, and one that came before is not kept`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+
+        var shutters = 0
+        backgroundScope.launch(StandardTestDispatcher(testScheduler)) { syncer.shutters.collect { shutters++ } }
+        runCurrent()
+        assertEquals(0, shutters)
+
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+        assertEquals(1, shutters)
     }
 }

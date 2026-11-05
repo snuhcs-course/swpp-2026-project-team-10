@@ -1,31 +1,40 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Size
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
+import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.camera.view.PreviewView
+import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
@@ -60,7 +69,9 @@ import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionNotice
@@ -93,6 +104,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private var binding: FragmentCameraBinding? = null
     private var sceneBack: OnBackPressedCallback? = null
+    private var aspectsBack: OnBackPressedCallback? = null
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
@@ -114,12 +126,48 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var previewHold: PreviewHold? = null
     private var stillJob: Job? = null
 
-    // The frame's ratio when the held frame was taken: the grid and the guide stay over a held frame of that ratio.
+    // The frame's ratio and place when the held frame was taken, while it is on screen.
     private var stillAspect: AspectRatio? = null
+    private var stillPlace: FramePlace? = null
+
+    // Whether the held frame waits dimmed and blurred (veilStill), for a new ratio or the other camera; a lens change of
+    // the zoom, which goes on under the fingers, leaves it as it is.
+    private var stillVeiled = false
+    private var blur: ValueAnimator? = null
+
+    // The held frame turning over for the other camera (flipStill).
+    private var flip: ValueAnimator? = null
+
+    // The held frame's blur in pixels, which a test cannot read back from the view.
+    @VisibleForTesting
+    internal var stillBlur = 0f
+        private set
+
+    // From a new ratio over a held frame until that frame has gone: the grid and the guide wait for the new frame, so
+    // the guide is never drawn where it does not belong (FR-3.7, AD-10).
+    private var reframing = false
+
+    // Where the preview shows and for which ratio; a new ratio over a held frame moves it there (reframe).
+    private var shownAspect: AspectRatio? = null
+    private var shown: FramePlace? = null
+    private var move: ValueAnimator? = null
+
+    // The move under way, which a test sets to a point between its ends: the display's paused frames catch up at once.
+    @VisibleForTesting
+    internal val frameMove: ValueAnimator? get() = move
+
+    @VisibleForTesting
+    internal val stillFlip: ValueAnimator? get() = flip
 
     // The preview's last frame for PreviewHold; a test stands in for PreviewView, which has no surface on the JVM.
     @VisibleForTesting
     internal var previewFrame: () -> Bitmap? = { binding?.previewView?.bitmap }
+
+    // The last photo's thumbnail, off the main thread; a test stands in for MediaStore, which has no photos on the JVM.
+    @VisibleForTesting
+    internal var thumbnailOf: (Uri) -> Bitmap? = { uri ->
+        requireContext().contentResolver.loadThumbnail(uri, Size(THUMBNAIL_PX, THUMBNAIL_PX), null)
+    }
 
     // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
     private var previewArea = PreviewArea(0f, 0f, 0f)
@@ -139,15 +187,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.previewView.scaleType = PreviewView.ScaleType.FIT_CENTER
         // TextureView composes predictably with guide and permission/error layers above it.
         controls.previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        // Far enough that the held frame turning over stays inside the preview instead of reaching out of the screen.
+        controls.aspectStill.cameraDistance = FLIP_CAMERA_DISTANCE * resources.displayMetrics.density
         // PreviewView fits the viewport's crop but still draws the camera image around it: show only the frame, or,
         // for 1:1, the whole 4:3 area with the rest dimmed.
-        controls.previewView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            fitToFrame(controls, placedAspect())
-        }
+        controls.previewView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitToFrame(controls) }
         // The preview's place follows the screen's height and the bars' (R&S 6.2), known only after layout.
         val placePreview = View.OnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
             if (bottom - top != oldBottom - oldTop) {
-                view.post { binding?.let { layoutPreview(it, placedAspect()) } }
+                view.post { binding?.let(::placePreview) }
             }
         }
         controls.root.addOnLayoutChangeListener(placePreview)
@@ -193,9 +241,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.flashButton.setOnClickListener {
             if (isScenePhotoActive()) generationViewModel.toggleLight() else viewModel.onFlashTap()
         }
+        // The ratios open under the top bar (FR-1.13); a touch anywhere else closes them (setupTip), and so does Back.
         controls.aspectButton.setOnClickListener {
-            previewHold?.hold()
-            viewModel.onAspectTap()
+            viewModel.setAspectsOpen(!viewModel.uiState.value.aspectsOpen)
+        }
+        for ((aspect, option) in aspectOptions(controls)) {
+            option.contentDescription = getString(R.string.aspect_ratio_description, aspectLabel(aspect))
+            option.setOnClickListener { chooseAspect(aspect) }
+        }
+        aspectsBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
+            viewModel.setAspectsOpen(false)
         }
         // Without a tap to focus, the brightness button brings the bar up beside the middle of the image.
         controls.brightnessButton.setOnClickListener {
@@ -232,15 +287,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
             if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
                 generationViewModel.takeScene()
-            } else {
-                viewModel.onShutter()
+            } else if (viewModel.onShutter()) {
+                // The preview blinks as the photo is taken (FR-1.5).
+                blinkPreview(controls.previewScrim)
             }
         }
         setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { openLastPhoto() }
-        // Selfie mode (FR-1.14): the last frame stays up while the other camera opens, as for a ratio change.
+        // Selfie mode (FR-1.14): the last frame stays up, blurred, and turns over while the other camera opens.
         controls.switchCameraButton.setOnClickListener {
             previewHold?.hold()
+            veilStill(flip = true)
             viewModel.onSwitchCamera()
         }
         controls.guideOverlay.onGesture = viewModel::onGuideGesture
@@ -255,7 +312,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
 
-        val resolver = requireContext().contentResolver
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
@@ -415,13 +471,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     }
                 }
                 launch {
+                    // A photo just taken grows into the thumbnail (FR-1.6); one there as the screen opens just shows.
+                    var opening = true
                     viewModel.uiState.map { it.lastPhoto }.distinctUntilChanged().collectLatest { uri ->
+                        val taken = !opening
+                        opening = false
                         val thumbnail = if (uri == null) {
                             null
                         } else {
                             withContext(Dispatchers.IO) {
                                 try {
-                                    resolver.loadThumbnail(uri, Size(144, 144), null)
+                                    thumbnailOf(uri)
                                 } catch (_: Exception) {
                                     null // The full photo can still be opened if thumbnail decoding fails.
                                 }
@@ -431,6 +491,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             controls.galleryThumbnail.setImageResource(R.drawable.gallery_placeholder)
                         } else {
                             controls.galleryThumbnail.setImageBitmap(thumbnail)
+                            if (taken) growIn(controls.galleryThumbnail)
                         }
                     }
                 }
@@ -473,10 +534,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         binding?.exposureBar?.finishDrag()
         brightnessAnchor = null
         exposureBarHiding = false
-        previewHold?.release()
+        move?.let {
+            move = null
+            it.cancel()
+        }
+        // Without its hold, the screen takes the held frame down at once, also one a cancelled move left up.
+        val hold = previewHold
         previewHold = null
+        hold?.release()
+        binding?.let(::clearStill)
+        reframing = false
+        shown = null
+        shownAspect = null
         binding = null
         sceneBack = null
+        aspectsBack = null
         previewLogged = false
         super.onDestroyView()
     }
@@ -578,45 +650,112 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         return ReferenceArea(margin, margin, container.width - margin, bottom)
     }
 
-    /**
-     * Puts the preview where previewArea says for [aspect] (R&S 6.2), and the zoom row at the bottom of its image. The
-     * controls get a dark gradient while they lie over it. Margins change only when the place does, as the screen
-     * renders on every zoom step of a pinch.
-     */
-    private fun layoutPreview(controls: FragmentCameraBinding, aspect: AspectRatio) {
+    /** Where previewArea puts the image of [aspect] on this screen (R&S 6.2); null before layout. */
+    private fun placeFor(controls: FragmentCameraBinding, aspect: AspectRatio): FramePlace? {
         val root = controls.root
-        if (root.width == 0 || root.height == 0) return
-        val area = previewArea(
+        if (root.width == 0 || root.height == 0) return null
+        return framePlace(
             root.width.toFloat(),
             root.height.toFloat(),
             controls.topBar.height - TOP_BAR_OVERHANG_DP * resources.displayMetrics.density,
             controls.bottomPanel.height.toFloat(),
-            aspect.previewAspect,
+            aspect,
         )
-        previewArea = area
+    }
+
+    /** After the screen or a bar changed size: the preview in its ratio's place at once, a move ended. */
+    private fun placePreview(controls: FragmentCameraBinding) {
+        endMove()
+        val aspect = shownAspect ?: viewModel.uiState.value.aspect
+        val place = placeFor(controls, aspect) ?: return
+        shownAspect = aspect
+        showPlace(controls, place)
+    }
+
+    /**
+     * Shows the preview in [aspect]'s place. A new ratio over a held frame moves there in [Motion.MOVE_MS] while the
+     * camera rebinds (Design 2.6.2): the frame's edges, and the held frame with the scene, to where the new ratio's
+     * preview will show it. Otherwise, and while animations are off, the preview is there at once.
+     */
+    private fun reframe(controls: FragmentCameraBinding, aspect: AspectRatio) {
+        if (aspect == shownAspect) return
+        val to = placeFor(controls, aspect) ?: return
+        endMove()
+        val from = shown
+        shownAspect = aspect
+        if (from == null || previewHold?.holding != true || !controls.aspectStill.isVisible) {
+            showPlace(controls, to)
+            return
+        }
+        reframing = true
+        if (!Motion.on()) {
+            moveStep(controls, from, to, 1f)
+            return
+        }
+        move = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = Motion.MOVE_MS
+            interpolator = Motion.STANDARD
+            addUpdateListener { step -> binding?.let { moveStep(it, from, to, step.animatedValue as Float) } }
+            doOnEnd { ended ->
+                if (move !== ended) return@doOnEnd
+                move = null
+                // The camera may stream again already: the held frame goes now that the frame is in its place.
+                stillSettled()
+            }
+            start()
+        }
+    }
+
+    /** Ends a move at its place, as when it is replaced or the screen changes size. */
+    private fun endMove() {
+        move?.end()
+    }
+
+    /** [fraction] of a ratio change's move: the frame's edges, and the held frame with the scene (sceneMove). */
+    private fun moveStep(controls: FragmentCameraBinding, from: FramePlace, to: FramePlace, fraction: Float) {
+        val place = lerp(from, to, fraction)
+        showPlace(controls, place)
+        val still = controls.aspectStill
+        val taken = stillPlace
+        if (!still.isVisible || taken == null) return
+        val scene = sceneMove(taken, place)
+        // The still is in the area's coordinates, as the preview was where it was taken.
+        still.imageMatrix = Matrix().apply {
+            setTranslate(-scene.fromX, -(scene.fromY - taken.area.top))
+            postScale(scene.scale, scene.scale)
+            postTranslate(scene.x, scene.y - place.area.top)
+        }
+        still.clipBounds = place.clip()
+    }
+
+    /**
+     * Puts the preview at [place] (R&S 6.2): the area's margins, the clip, the live light, and the zoom row at the
+     * bottom of its image. The controls get a dark gradient while they lie over it. Margins change only when the
+     * place does, as the screen renders on every zoom step of a pinch.
+     */
+    private fun showPlace(controls: FragmentCameraBinding, place: FramePlace) {
+        shown = place
+        previewArea = place.area
         val container = controls.previewContainer
         val params = container.layoutParams as ViewGroup.MarginLayoutParams
-        val top = area.top.roundToInt()
-        val bottom = (root.height - area.bottom).roundToInt()
+        val top = place.area.top.roundToInt()
+        val bottom = (controls.root.height - place.area.bottom).roundToInt()
         if (params.topMargin != top || params.bottomMargin != bottom) {
             params.topMargin = top
             params.bottomMargin = bottom
             container.layoutParams = params
         }
-        controls.bottomPanel.setBackgroundResource(if (area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        controls.bottomPanel.setBackgroundResource(if (place.area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
+        fitToFrame(controls)
         placeZoomRow(controls)
     }
 
     /** The zoom row at the bottom of the image as it shows (1:1 inside the 4:3 area), above the panels and controls. */
     private fun placeZoomRow(controls: FragmentCameraBinding) {
-        val area = previewArea
+        val place = shown ?: return
+        val area = place.area
         if (area.bottom <= area.top) return
-        val frame = fitViewfinderFrame(
-            controls.root.width.toFloat(),
-            area.bottom - area.top,
-            placedAspect().frameAspect,
-        )
-        val imageBottom = minOf(area.top + frame.bottom, area.bottom - area.underControls)
+        val imageBottom = minOf(place.frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
         placeZoomRow(controls.zoomRow, controls.bottomOverlays, imageBottom, margin)
         controls.pinchModeLabel.translationY = controls.zoomRow.translationY
@@ -670,16 +809,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val unavailable = state.cameraStatus == CameraStatus.UNAVAILABLE
         // First, so a frame held from here on also hides the spinner below.
         previewHold?.onStatus(state.cameraStatus)
-        // Over a held frame of the same ratio (a lens switch) the grid and the guide stay; after a ratio change they
-        // would not fit the old frame.
-        val overlays = ready || (previewHold?.holding == true && stillAspect == state.aspect)
+        // A new ratio over a held frame moves there while the camera rebinds; otherwise the preview is there at once.
+        reframe(controls, state.aspect)
+        // Over a held frame of the same ratio (a lens switch) the grid and the guide stay; through a ratio change they
+        // wait for the new frame.
+        val overlays = !reframing && (ready || previewHold?.holding == true)
         controls.compositionOverlay.isVisible = overlays
-        // The grid and the guide follow the chosen frame (AD-10); a new ratio re-fits both at once.
+        // The grid and the guide follow the chosen frame (AD-10).
         controls.compositionOverlay.frameAspect = state.aspect.frameAspect
         controls.guideOverlay.frameAspect = state.aspect.frameAspect
-        // A held frame keeps the old ratio's place until the new one streams, as a shorter area would cut it.
-        layoutPreview(controls, placedAspect())
-        fitToFrame(controls, placedAspect())
+        fitToFrame(controls)
         controls.guideOverlay.render(state.guide, state.guideState)
         controls.guideOverlay.isVisible = overlays
         // Camera + guide (R&S 6.2). Visibility follows the guide alone: a lens switch briefly leaves READY,
@@ -796,7 +935,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
      * button opens it again. The banner is clickable as well, so TalkBack can close it.
      */
     private fun setupTip(controls: FragmentCameraBinding) {
-        (controls.root as TouchWatchingLayout).onTouchEnd = viewModel::onAnyTouch
+        (controls.root as TouchWatchingLayout).onTouchEnd = { event ->
+            viewModel.onAnyTouch()
+            // The ratios close at a touch anywhere but on them or their button, which opens and closes them itself.
+            if (!controls.aspectButton.isUnder(event, controls.root) &&
+                !controls.aspectPanel.isUnder(event, controls.root)
+            ) {
+                viewModel.setAspectsOpen(false)
+            }
+        }
         controls.tipButton.setOnClickListener { viewModel.onTipButton() }
         controls.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
         ViewCompat.replaceAccessibilityAction(
@@ -902,6 +1049,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             val light = !reviewing && camera.hasFlash
             controls.cameraSettings.isVisible = light
             controls.aspectButton.isVisible = false
+            controls.aspectPanel.isVisible = false
+            aspectsBack?.isEnabled = false
             controls.flashButton.isVisible = light
             controls.flashButton.isEnabled = ready
             controls.flashButton.setIconResource(if (camera.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
@@ -971,17 +1120,25 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 FlashMode.ON -> R.string.flash_on
             },
         )
-        val aspect = getString(
-            when (state.aspect) {
-                AspectRatio.R4_3 -> R.string.aspect_4_3
-                AspectRatio.R16_9 -> R.string.aspect_16_9
-                AspectRatio.R1_1 -> R.string.aspect_1_1
-            },
-        )
+        val aspect = aspectLabel(state.aspect)
         controls.aspectButton.text = aspect
         controls.aspectButton.contentDescription = getString(R.string.aspect_ratio_description, aspect)
         // A rebind waits for a photo being saved, so the ratio cannot change under the shutter.
-        controls.aspectButton.isEnabled = ready && !state.isSaving
+        val choosable = ready && !state.isSaving
+        controls.aspectButton.isEnabled = choosable
+        // The ratios under the top bar, the chosen one selected (FR-1.13).
+        controls.aspectPanel.isVisible = state.aspectsOpen
+        aspectsBack?.isEnabled = state.aspectsOpen
+        // The ratios cover the top of the image, where a toggle's label shows: opening them takes the label down.
+        if (state.aspectsOpen && controls.toggleLabel.isVisible) {
+            toggleLabelJob?.cancel()
+            controls.toggleLabel.isVisible = false
+            renderReference(controls, state)
+        }
+        for ((choice, option) in aspectOptions(controls)) {
+            option.isSelected = choice == state.aspect
+            option.isEnabled = choosable
+        }
 
         val range = state.exposureRange
         val hasBrightness = range.first < range.last
@@ -1051,6 +1208,45 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    /** The ratios under the top bar in their order: the tallest first (FR-1.13). */
+    private fun aspectOptions(controls: FragmentCameraBinding): List<Pair<AspectRatio, View>> = listOf(
+        AspectRatio.R16_9 to controls.aspect916Option,
+        AspectRatio.R4_3 to controls.aspect34Option,
+        AspectRatio.R1_1 to controls.aspect11Option,
+    )
+
+    /** A ratio as the phone is held, upright: 3:4, 9:16, or 1:1. */
+    private fun aspectLabel(aspect: AspectRatio): String = getString(
+        when (aspect) {
+            AspectRatio.R4_3 -> R.string.aspect_3_4
+            AspectRatio.R16_9 -> R.string.aspect_9_16
+            AspectRatio.R1_1 -> R.string.aspect_1_1
+        },
+    )
+
+    /**
+     * A ratio chosen under the top bar (FR-1.13): a new one holds the preview's last frame while the camera rebinds, as
+     * the ratio's change moves it (reframe); the chosen one only closes the ratios.
+     */
+    private fun chooseAspect(aspect: AspectRatio) {
+        val state = viewModel.uiState.value
+        if (aspect != state.aspect && !state.isSaving) {
+            previewHold?.hold()
+            veilStill(flip = false)
+        }
+        viewModel.onAspectChosen(aspect)
+    }
+
+    /** Whether [event], in [root]'s coordinates, is on this view as it shows. */
+    private fun View.isUnder(event: MotionEvent, root: View): Boolean {
+        if (!isShown) return false
+        val at = IntArray(2).also(::getLocationInWindow)
+        val origin = IntArray(2).also(root::getLocationInWindow)
+        val x = event.x + origin[0] - at[0]
+        val y = event.y + origin[1] - at[1]
+        return x >= 0f && x < width && y >= 0f && y < height
+    }
+
     /** An exposure index in EV, such as "+0.7" or "0". */
     private fun formatEv(index: Int): String = ExposureScale.formatEv(index, viewModel.uiState.value.exposureStep)
 
@@ -1093,22 +1289,23 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         connected?.let { controls.liveDot.contentDescription = getString(R.string.live_badge, it.peer.displayName) }
     }
 
-    /** The ratio the preview is placed for: a held frame's while it shows, then the chosen one. */
-    private fun placedAspect(): AspectRatio =
-        stillAspect.takeIf { previewHold?.holding == true } ?: viewModel.uiState.value.aspect
-
     /** Puts the preview's last frame over it while the camera rebinds (PreviewHold); false without a frame. */
     private fun showStill(): Boolean {
         val controls = binding ?: return false
         val frame = previewFrame() ?: return false
-        val aspect = viewModel.uiState.value.aspect
+        endMove()
+        // One still fading out is replaced.
+        clearStill(controls)
+        val aspect = shownAspect ?: viewModel.uiState.value.aspect
         controls.aspectStill.setImageBitmap(heldFrame(frame, aspect))
         // The bitmap is the whole camera image; show the old frame only, as the preview did.
         controls.aspectStill.clipBounds = controls.previewView.clipBounds
         controls.aspectStill.isVisible = true
+        controls.stillGround.isVisible = true
         // The grid stays over a held frame of the same ratio; a 1:1 one has its outside dimmed already.
         controls.compositionOverlay.dimOutside = false
         stillAspect = aspect
+        stillPlace = shown
         Timings.mark("preview.still", "on")
         stillJob?.cancel()
         // If the stream never reports a restart, the old frame still goes.
@@ -1124,30 +1321,189 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         Timings.mark("preview.still", "off")
         stillJob?.cancel()
         stillJob = null
-        binding?.aspectStill?.let {
-            it.isVisible = false
-            it.setImageDrawable(null)
-        }
+        // A frame still moving or turning goes once it is still (stillSettled).
+        if (move == null && flip == null) dropStill()
+    }
+
+    /** A move or a turn has ended: the held frame goes now if the camera streams again. */
+    private fun stillSettled() {
+        if (move != null || flip != null || previewHold?.holding == true) return
+        dropStill()
+        render(viewModel.uiState.value)
     }
 
     /**
-     * Clips the preview to the fit-centered frame of [aspect] (AD-10), except 1:1, which shows the whole 4:3 area with
-     * the rest dimmed (R&S 6.2), and puts the live light in the frame's corner. Nothing is clipped before layout.
+     * How the held frame waits while the camera rebinds for a new ratio or the other camera (Design 2.6.2): dimmed,
+     * and blurred where Android can (12 and later); for the other camera it also turns over, top over bottom
+     * ([flip]). A lens change of the zoom leaves it as it is.
      */
-    private fun fitToFrame(controls: FragmentCameraBinding, aspect: AspectRatio) {
-        val view = controls.previewView
-        val frame = fitViewfinderFrame(view.width.toFloat(), view.height.toFloat(), aspect.frameAspect)
-        val clip = if (frame.width > 0f && aspect.previewAspect == aspect.frameAspect) {
-            Rect(frame.left.roundToInt(), frame.top.roundToInt(), frame.right.roundToInt(), frame.bottom.roundToInt())
-        } else {
-            null
+    private fun veilStill(flip: Boolean) {
+        val controls = binding ?: return
+        if (previewHold?.holding != true || !controls.aspectStill.isVisible) return
+        if (flip) flipStill(controls.aspectStill)
+        if (stillVeiled) return
+        stillVeiled = true
+        val scrim = controls.previewScrim
+        if (!scrim.isVisible) {
+            scrim.alpha = 0f
+            scrim.isVisible = true
         }
-        if (view.clipBounds != clip) view.clipBounds = clip
+        scrim.fadeTo(HOLD_DIM, Motion.DIM_MS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) blurStill(controls.aspectStill)
+    }
+
+    /**
+     * Turns the held frame over, top over bottom, in [Motion.FLIP_MS], as the other camera opens (FR-1.14): to its edge,
+     * then from the other edge back to flat, so its face shows throughout. Not while animations are off.
+     */
+    private fun flipStill(still: ImageView) {
+        if (!Motion.on()) return
+        flip?.let {
+            flip = null
+            it.cancel()
+        }
+        flip = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = Motion.FLIP_MS
+            interpolator = Motion.STANDARD
+            addUpdateListener {
+                val turned = it.animatedValue as Float
+                still.rotationX = if (turned < 0.5f) HALF_TURN * turned else HALF_TURN * turned - HALF_TURN
+            }
+            doOnEnd { ended ->
+                if (flip !== ended) return@doOnEnd
+                flip = null
+                still.rotationX = 0f
+                stillSettled()
+            }
+            start()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun blurStill(still: ImageView) {
+        val radius = STILL_BLUR_DP * resources.displayMetrics.density
+        if (!Motion.on()) {
+            setStillBlur(still, radius)
+            return
+        }
+        blur = ValueAnimator.ofFloat(0f, radius).apply {
+            duration = Motion.DIM_MS
+            addUpdateListener { setStillBlur(still, it.animatedValue as Float) }
+            start()
+        }
+    }
+
+    private fun setStillBlur(still: ImageView, radius: Float) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || stillBlur == radius) return
+        stillBlur = radius
+        still.setRenderEffect(
+            if (radius < MIN_BLUR_PX) null else RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP),
+        )
+    }
+
+    /**
+     * Takes the held frame down for the camera's own preview: faded after a new ratio or the other camera, with the
+     * grid and the guide fading back in after a ratio change; at once after a lens change of the zoom, which goes on
+     * under the fingers, while animations are off, and when the screen goes.
+     */
+    private fun dropStill() {
+        val controls = binding ?: return
+        val overlaysBack = reframing
+        reframing = false
+        val still = controls.aspectStill
+        if (!still.isVisible) return
+        if (!stillVeiled || previewHold == null || !Motion.on()) {
+            clearStill(controls)
+            return
+        }
+        // The new preview shows through as the held frame fades.
+        controls.stillGround.isVisible = false
+        if (overlaysBack) {
+            for (overlay in listOf(controls.guideOverlay, controls.compositionOverlay)) {
+                overlay.alpha = 0f
+                overlay.fadeTo(1f, Motion.FADE_MS)
+            }
+        } else if (stillAspect?.let { it.previewAspect != it.frameAspect } == true) {
+            // A lens switch in 1:1: the grid dims the outside again at once, so the frame fades inside it only.
+            still.clipBounds = shown?.frameClip()
+        }
+        still.fadeTo(0f, Motion.FADE_MS) { binding?.let(::clearStill) }
+        controls.previewScrim.fadeTo(0f, Motion.FADE_MS)
+    }
+
+    private fun clearStill(controls: FragmentCameraBinding) {
+        blur?.let {
+            blur = null
+            it.cancel()
+        }
+        flip?.let {
+            flip = null
+            it.cancel()
+        }
+        val still = controls.aspectStill
+        setStillBlur(still, 0f)
+        still.animate().cancel()
+        still.isVisible = false
+        still.setImageDrawable(null)
+        still.imageMatrix = null
+        still.alpha = 1f
+        still.rotationX = 0f
+        controls.stillGround.isVisible = false
+        controls.previewScrim.animate().cancel()
+        controls.previewScrim.alpha = 0f
+        controls.previewScrim.isVisible = false
+        stillVeiled = false
+        stillAspect = null
+        stillPlace = null
+    }
+
+    /** The preview blinks as a photo is taken (FR-1.5), down and back in [Motion.BLINK_MS]; not without animations. */
+    private fun blinkPreview(scrim: View) {
+        if (!Motion.on() || binding?.aspectStill?.isVisible == true) return
+        scrim.alpha = 0f
+        scrim.isVisible = true
+        scrim.fadeTo(SHUTTER_DIM, Motion.BLINK_MS / 3) {
+            scrim.fadeTo(0f, Motion.BLINK_MS * 2 / 3) { scrim.isVisible = false }
+        }
+    }
+
+    /** A new photo's thumbnail grows in from [THUMBNAIL_START_SCALE] (FR-1.6). */
+    private fun growIn(view: View) {
+        if (!Motion.on()) return
+        view.animate().cancel()
+        view.scaleX = THUMBNAIL_START_SCALE
+        view.scaleY = THUMBNAIL_START_SCALE
+        view.alpha = 0f
+        view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(Motion.FADE_MS).setInterpolator(Motion.STANDARD)
+            .start()
+    }
+
+    /**
+     * Clips the preview to where its image shows (AD-10): the frame, or for 1:1 the whole 4:3 area with the rest
+     * dimmed (R&S 6.2), and puts the live light in the frame's corner. Nothing is clipped before layout.
+     */
+    private fun fitToFrame(controls: FragmentCameraBinding) {
+        val place = shown
+        val clip = place?.clip()
+        if (controls.previewView.clipBounds != clip) controls.previewView.clipBounds = clip
+        if (controls.previewScrim.clipBounds != clip) controls.previewScrim.clipBounds = clip
+        val aspect = shownAspect ?: viewModel.uiState.value.aspect
         // A held 1:1 frame has its outside dimmed already (heldFrame), and the grid stays over it during a lens switch.
         controls.compositionOverlay.dimOutside =
             aspect.previewAspect != aspect.frameAspect && previewHold?.holding != true
-        controls.liveDot.placeIn(controls.previewContainer, aspect.frameAspect)
+        place?.let { controls.liveDot.placeAt(it.frame.inArea(it.area)) }
     }
+
+    /** What of the area shows, in the area's coordinates; null when all of it does. */
+    private fun FramePlace.clip(): Rect? = if (showsArea) null else shows.inArea(area).toRect()
+
+    /** The frame alone, in the area's coordinates. */
+    private fun FramePlace.frameClip(): Rect = frame.inArea(area).toRect()
+
+    private fun ViewfinderFrame.inArea(area: PreviewArea) = copy(top = top - area.top)
+
+    private fun ViewfinderFrame.toRect() =
+        Rect(left.roundToInt(), top.roundToInt(), right.roundToInt(), bottom.roundToInt())
 
     /** The hint chip over the preview: what to do next, with an icon in the color of what it is about. */
     private fun showHint(
@@ -1272,6 +1628,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     companion object {
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
         private const val STILL_TIMEOUT_MS = 2_000L
+        private const val HOLD_DIM = 0.5f
+        private const val SHUTTER_DIM = 0.6f
+        private const val STILL_BLUR_DP = 16f
+        private const val MIN_BLUR_PX = 0.5f
+        private const val HALF_TURN = 180f
+        private const val FLIP_CAMERA_DISTANCE = 8_000f
+        private const val THUMBNAIL_START_SCALE = 0.6f
+        private const val THUMBNAIL_PX = 144
         private const val FOCUS_RING_START_SCALE = 1.25f
         private const val FOCUS_RING_SHRINK_MS = 150L
         private const val FOCUS_RING_HOLD_MS = 700L

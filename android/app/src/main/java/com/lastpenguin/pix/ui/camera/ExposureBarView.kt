@@ -203,7 +203,7 @@ class ExposureBarView @JvmOverloads constructor(
         const val LINE_OUTLINE_DP = 2.5f
         const val LINE_ALPHA = 204
         const val OUTLINE_ALPHA = 90
-        const val SUN_DP = 10f
+        const val SUN_DP = 7f
         const val GAP_DP = 3f
         const val CORE = 0.4f
         const val RAY_START = 0.68f

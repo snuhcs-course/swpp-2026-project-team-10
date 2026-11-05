@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -31,7 +31,7 @@ data class SubjectDescribeUiState(
     /** Whose field holds the description; null while nobody types. */
     val writer: Role? = null,
     val rejected: Boolean = false,
-    /** *Generate 4 poses* or *Suggest 4 poses for me* was tapped, and the photographer's phone has not answered yet. */
+    /** *Generate 4 poses* or *Suggest 4 poses* was tapped, and the photographer's phone has not answered yet. */
     val waiting: Boolean = false,
     /** The description this screen opened with ended or was replaced: the screen goes back to Subject view. */
     val gone: Boolean = false,
@@ -45,7 +45,7 @@ data class SubjectDescribeUiState(
 /**
  * The subject's *Generate poses* (Design 2.6.5, *Generate poses on both phones*): shows the photographer's description
  * from [descriptions], sends this phone's typing while its field holds the description, and sends *Generate 4 poses* or
- * *Suggest 4 poses for me*, which the photographer's phone decides.
+ * *Suggest 4 poses*, which the photographer's phone decides.
  * Owner: Shared steps (Iter3-P16).
  */
 class SubjectDescribeViewModel(
@@ -63,7 +63,7 @@ class SubjectDescribeViewModel(
     /** Each description that ended while this screen was in front, for its notice (Design 2.6.5). */
     val ended: Flow<DescriptionEnd> = descriptions.ended
 
-    /** Each *Generate 4 poses* or *Suggest 4 poses for me* that the photographer's phone did not answer in time. */
+    /** Each *Generate 4 poses* or *Suggest 4 poses* that the photographer's phone did not answer in time. */
     val goFailed: Flow<String> = descriptions.goFailed
 
     /** Whether this phone's field is focused, so it holds the description unless the photographer's does. */
@@ -129,10 +129,7 @@ class SubjectDescribeViewModel(
         }
     }
 
-    /**
-     * *Generate 4 poses* with [text], or *Suggest 4 poses for me* when [suggest]: a request to the photographer's
-     * phone (AD-7).
-     */
+    /** The one button: poses of [text], or suggested ones when [suggest], asked of the photographer's phone (AD-7). */
     fun go(text: String, suggest: Boolean) {
         val ui = _uiState.value
         if (ui.waiting || ui.gone || ui.reconnecting || ui.writer == Role.PHOTOGRAPHER) return

@@ -23,7 +23,8 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Flash (FR-1.12) and the aspect ratio (FR-1.13); each tap moves to the next choice. -->
+        <!-- Flash (FR-1.12), whose tap moves to the next choice, and the aspect ratio (FR-1.13), whose tap opens the
+             ratios under the bar. -->
         <LinearLayout
             android:id="@+id/cameraSettings"
             android:layout_width="wrap_content"
@@ -48,7 +49,7 @@
                 style="@style/Widget.Pix.Button.Text.TopBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/aspect_4_3" />
+                android:text="@string/aspect_3_4" />
 
         </LinearLayout>
 
@@ -132,6 +133,60 @@
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- The ratios, opened from the ratio in the top bar (FR-1.13): each drawn in its own shape, the chosen one bright.
+         A choice, a touch anywhere else, or Back closes them. -->
+    <LinearLayout
+        android:id="@+id/aspectPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="4dp"
+        android:accessibilityPaneTitle="@string/aspect_ratios"
+        android:background="@drawable/bg_aspect_panel"
+        android:orientation="horizontal"
+        android:outlineProvider="none"
+        android:paddingHorizontal="8dp"
+        android:translationZ="2dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        tools:visibility="visible">
+
+        <FrameLayout
+            android:id="@+id/aspect916Option"
+            style="@style/Widget.Pix.AspectOption">
+
+            <TextView
+                style="@style/Widget.Pix.AspectOption.Shape"
+                android:layout_width="22dp"
+                android:layout_height="29dp"
+                android:text="@string/aspect_9_16" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/aspect34Option"
+            style="@style/Widget.Pix.AspectOption">
+
+            <TextView
+                style="@style/Widget.Pix.AspectOption.Shape"
+                android:layout_width="22dp"
+                android:layout_height="25dp"
+                android:text="@string/aspect_3_4" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/aspect11Option"
+            style="@style/Widget.Pix.AspectOption">
+
+            <TextView
+                style="@style/Widget.Pix.AspectOption.Shape"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:text="@string/aspect_1_1" />
+        </FrameLayout>
+    </LinearLayout>
+
     <FrameLayout
         android:id="@+id/previewContainer"
         android:layout_width="0dp"
@@ -151,15 +206,37 @@
             android:layout_height="match_parent"
             android:background="@color/pix_ground" />
 
+        <!-- The ground behind a held frame, so that nothing of the rebinding preview shows while the frame turns over for
+             the other camera; it goes as the held frame starts to fade. -->
+        <View
+            android:id="@+id/stillGround"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/pix_ground"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
         <!-- The last frame, held while the camera rebinds for a new ratio or lens (PreviewHold, Design 2.6.2, 2.6.5). It is
-             drawn at its own size from the top left, not fitted: a new ratio resizes this area at once, but its top and
-             width stay, so the old frame keeps its place until the new one streams. -->
+             drawn at its own size from the top left, where the preview was, and for a new ratio its matrix moves it with
+             the scene to where the new ratio shows it. The ground covers what it does not, and the preview under it. -->
         <ImageView
             android:id="@+id/aspectStill"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@color/pix_ground"
             android:importantForAccessibility="no"
             android:scaleType="matrix"
+            android:visibility="gone" />
+
+        <!-- Dims the held frame, blurred where Android can, while the camera rebinds for a new ratio or the other camera,
+             and the preview for a moment at the shutter (Design 2.6.2). Under the grid and the guide. -->
+        <View
+            android:id="@+id/previewScrim"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0"
+            android:background="@color/pix_ground"
+            android:importantForAccessibility="no"
             android:visibility="gone" />
 
         <com.lastpenguin.pix.guide.GuideOverlayView

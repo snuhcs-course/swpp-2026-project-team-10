@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 /**
@@ -8,7 +8,7 @@ package com.lastpenguin.pix.session.protocol
 class ChannelRouter {
 
     enum class Channel {
-        /** Unordered, no retransmits: gesture steps. */
+        /** Unordered, no retransmits: gesture steps, and moments that are wrong late. */
         REALTIME,
 
         /** Ordered and reliable: images, final values, everything else. */
@@ -21,7 +21,7 @@ class ChannelRouter {
         is SessionMessage.ZoomSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.GuideMove -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.ExposureSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
-        is SessionMessage.Ping, is SessionMessage.Pong -> Channel.REALTIME
+        is SessionMessage.Ping, is SessionMessage.Pong, SessionMessage.PhotoShutter -> Channel.REALTIME
         else -> Channel.RELIABLE
     }
 

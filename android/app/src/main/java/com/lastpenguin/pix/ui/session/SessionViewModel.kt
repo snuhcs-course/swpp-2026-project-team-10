@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -130,6 +131,9 @@ class SessionViewModel(
      * read, so one that comes while the activity is stopped is shown when it starts again.
      */
     val photoNotices: Flow<PhotoNotice> = _photoNotices.receiveAsFlow()
+
+    /** Subject: the photographer's shutter, for Subject view's blink; one while no screen listens is not kept. */
+    val shutters: Flow<Unit> = photoSyncer?.shutters ?: emptyFlow()
 
     private val _photosNotSent = Channel<PhotosNotSent>(Channel.UNLIMITED)
 

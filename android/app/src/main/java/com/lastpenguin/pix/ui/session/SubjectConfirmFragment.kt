@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -20,7 +20,9 @@ import com.lastpenguin.pix.session.ConfirmEnd
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.ConfirmStep
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showOutline
 import kotlinx.coroutines.flow.map
@@ -31,7 +33,7 @@ import kotlinx.coroutines.launch
  * on their phone, without *Choose another photo*. *Use this guide* asks the photographer's phone, whose first use
  * decides, and the screen closes when the confirm ends, saying so when the photographer decided; the guide then comes
  * to Subject view like any guide. It covers Subject view, so it follows the session itself, like the guide screens
- * (Design 2.6.5).
+ * (Design 2.6.5). The outline fades in as it arrives, as on the photographer's phone (Iter3-A13).
  * Owner: Shared steps (Iter3-P16).
  */
 class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
@@ -40,8 +42,12 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
 
+    /** Whether this view showed the outline at its last render; null before the first, so a view made anew fades none. */
+    private var hadOutline: Boolean? = null
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
+        hadOutline = null
         binding.chooseAnotherButton.isVisible = false
         binding.useGuideButton.setOnClickListener { viewModel.useGuide() }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
@@ -91,6 +97,11 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         val guide = ui.guide
         binding.referenceProgress.isVisible = guide == null
         binding.referenceImage.isVisible = guide != null
+        if (guide != null && hadOutline == false) {
+            binding.referenceImage.alpha = 0f
+            binding.referenceImage.fadeTo(1f, Motion.FADE_MS)
+        }
+        hadOutline = guide != null
         binding.referenceStatus.isVisible = true
         binding.referenceStatus.setText(if (guide != null) R.string.person_found else R.string.finding_person)
         binding.referenceStatus.setCompoundDrawablesRelativeWithIntrinsicBounds(

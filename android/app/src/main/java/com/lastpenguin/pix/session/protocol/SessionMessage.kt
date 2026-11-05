@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -175,6 +175,22 @@ sealed interface SessionMessage {
     data class PoseCandidateEnd(val setId: String, val poseId: String, val crc32: Long) : SessionMessage
 
     /**
+     * The candidates the photographer's set [setId] plans, in the order of its slots (Iter3-A13): the subject's
+     * *Generating poses* shows the same slots. Sent once they are planned, which takes suggested poses a few seconds.
+     */
+    @Serializable
+    @SerialName("pose.planned")
+    data class PosePlanned(val setId: String, val poseIds: List<String>) : SessionMessage
+
+    /**
+     * The candidate [poseId] of the set [setId] could not be created (Iter3-A13), so the subject's slot says so as the
+     * photographer's does, which shows every failure alike; no reason travels, so a new one breaks no older phone.
+     */
+    @Serializable
+    @SerialName("pose.candidate.failed")
+    data class PoseCandidateFailed(val setId: String, val poseId: String) : SessionMessage
+
+    /**
      * The subject's *Use this pose* on the candidate [poseId] (FR-6.15), a request like its others (AD-7): the
      * photographer takes it only while the set [setId] is PICKING and nobody has chosen, and answers with `pose.step`.
      */
@@ -269,6 +285,15 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("photo.ack")
     data class PhotoAck(val photoId: String, val next: Int) : SessionMessage
+
+    /**
+     * The photographer pressed the shutter in a session (Design 2.5.1, Iter3-A12): the subject's video blinks then, as
+     * the photographer's preview does, and not seconds later with the photo's `photo.begin`. It goes on the realtime
+     * channel, since a blink that comes late shows a moment that has passed, and one lost shows none.
+     */
+    @Serializable
+    @SerialName("photo.shutter")
+    data object PhotoShutter : SessionMessage
 
     /** Whether the photo is in the subject's album; without it, [reason] says why not. */
     @Serializable

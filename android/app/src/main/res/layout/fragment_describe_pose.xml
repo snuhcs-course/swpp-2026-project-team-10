@@ -86,19 +86,43 @@
             android:textAppearance="@style/TextAppearance.Pix.Action.Small"
             android:textColor="@color/pix_text" />
 
-        <!-- Korean or English; input stops at 100 characters (FR-4.8). It wraps, and Done closes the keyboard. The hint
-             is its accessibility label, so the label above does not point at it (lint LabelFor). -->
-        <EditText
-            android:id="@+id/descriptionInput"
-            style="@style/Widget.Pix.TextField"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="@string/describe_hint"
-            android:imeOptions="actionDone"
-            android:importantForAutofill="no"
-            android:inputType="textCapSentences"
-            android:maxLength="100" />
+            android:layout_marginTop="8dp">
+
+            <!-- Korean or English; input stops at 100 characters (FR-4.8). It wraps, and Done closes the keyboard. The
+                 hint is its accessibility label, so the label above does not point at it (lint LabelFor). Its end
+                 leaves room for the clear button. -->
+            <EditText
+                android:id="@+id/descriptionInput"
+                style="@style/Widget.Pix.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/describe_hint"
+                android:imeOptions="actionDone"
+                android:importantForAutofill="no"
+                android:inputType="textCapSentences"
+                android:maxLength="100"
+                android:paddingEnd="48dp" />
+
+            <!-- ✕ empties the field while it holds text and is not waiting (Iter3-A13), so the one button below asks for
+                 suggested poses again; on the first line, in a 48 dp touch area. -->
+            <ImageButton
+                android:id="@+id/clearDescriptionButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="end|top"
+                android:layout_marginTop="2dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/clear_description"
+                android:padding="15dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_close"
+                android:visibility="gone"
+                app:tint="@color/pix_text_muted"
+                tools:visibility="visible" />
+        </FrameLayout>
 
         <!-- The counter stays at the end, under the field's right edge, with or without the message. -->
         <LinearLayout
@@ -236,10 +260,8 @@
             tools:text="Junhyeong sees this too and can write it with you."
             tools:visibility="visible" />
 
-        <!--
-            The one button (US-5): "Suggest 4 poses for me" with an empty field, which asks for suggested poses, and
-            "Generate 4 poses" once something is typed, which asks for the description. DescriptionForm sets the text.
-        -->
+        <!-- The one button (Iter3-A13): with an empty field it asks for suggested poses, and says so; with a
+             description, four poses of it (FR-4.4, FR-4.8, US-5). DescriptionForm sets its label as the field changes. -->
         <Button
             android:id="@+id/generateButton"
             android:layout_width="match_parent"

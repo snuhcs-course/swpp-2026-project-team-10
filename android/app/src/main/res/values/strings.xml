@@ -99,8 +99,9 @@
     <string name="scene_light_off">Light off</string>
     <string name="scene_light_on">Light on</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
-    <string name="aspect_4_3" translatable="false">4:3</string>
-    <string name="aspect_16_9" translatable="false">16:9</string>
+    <string name="aspect_ratios">Aspect ratios</string>
+    <string name="aspect_3_4" translatable="false">3:4</string>
+    <string name="aspect_9_16" translatable="false">9:16</string>
     <string name="aspect_1_1" translatable="false">1:1</string>
     <string name="brightness">Brightness</string>
     <string name="live_badge">Live · %1$s connected</string>
@@ -167,9 +168,10 @@
     <string name="history_with">With %1$s</string>
     <string name="history_empty_with">Nothing used with %1$s yet</string>
     <string name="history_delete">Remove “%1$s” from the descriptions used before</string>
-    <!-- The one button of Generate poses (US-5): once something is typed, and while the field is empty. -->
-    <string name="generate_four_poses">Generate 4 poses</string>
-    <string name="suggest_four_poses">Suggest 4 poses for me</string>
+    <!-- The one button of Generate poses (Iter3-A13): its label with an empty field, and with a description. -->
+    <string name="suggest_four_poses">Suggest 4 poses</string>
+    <string name="generate_four_from_description">Generate 4 poses from this</string>
+    <string name="clear_description">Clear the description</string>
     <string name="choosing_poses">Choosing poses…</string>
     <string name="scene_photo_description">The photo of the scene the poses are made from</string>
     <string name="creating_pose">Creating…</string>
@@ -194,6 +196,9 @@
     <string name="peer_chose_this_pose">%1$s chose this pose</string>
     <string name="peer_chose_pose">%1$s chose a pose</string>
     <string name="peer_closed_poses">%1$s closed the poses</string>
+    <!-- The subject's Generating poses as the photographer's set ends without a candidate (Iter3-A13). -->
+    <string name="peer_stopped_poses">%1$s stopped creating poses</string>
+    <string name="peer_poses_failed">%1$s\'s poses couldn\'t be created</string>
     <string name="pose_pick_failed">Couldn\'t send your pick</string>
     <string name="peer_used_guide">%1$s used this guide</string>
     <string name="peer_closed_reference">%1$s closed the reference</string>

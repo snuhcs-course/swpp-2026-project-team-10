@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Rect
@@ -14,6 +14,8 @@ import com.lastpenguin.pix.databinding.ItemPoseCandidateBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.guide.GuideGeometry
+import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.fadeTo
 
 /** One cell of the candidate grid: a pose and what has arrived for it; null while it is being created. */
 data class PoseSlot(val pose: PlannedPose, val event: CandidateEvent?, val selected: Boolean = false)
@@ -24,7 +26,8 @@ fun GenerationUiState.slots(): List<PoseSlot> =
 
 /**
  * The 2×2 candidate grid of Generating poses (R&S 6.3), filling in as candidates arrive; Pick a pose shows them one
- * at a time instead ([PosePageAdapter]).
+ * at a time instead ([PosePageAdapter]). A candidate that arrives, or a failure, fades in where its spinner was
+ * (Iter3-A13); a slot bound anew, as when the screen is made again, shows what it has at once.
  * Owner: Server/AI/Sync (#7).
  */
 class PoseCandidateAdapter : ListAdapter<PoseSlot, PoseCandidateAdapter.Holder>(Diff) {
@@ -50,6 +53,10 @@ class PoseCandidateAdapter : ListAdapter<PoseSlot, PoseCandidateAdapter.Holder>(
         val binding = holder.binding
         val image = (slot.event as? CandidateEvent.Ready)?.image
 
+        for (view in listOf(binding.poseImage, binding.poseStatus)) {
+            view.animate().cancel()
+            view.alpha = 1f
+        }
         // A model can round the ratio by a few pixels; the image is fitted into the slot, so none of it is cut off.
         binding.poseImage.keepAspect(frameAspect)
         binding.poseImage.setImageBitmap(image)
@@ -61,10 +68,29 @@ class PoseCandidateAdapter : ListAdapter<PoseSlot, PoseCandidateAdapter.Holder>(
         binding.root.contentDescription = slot.pose.text
     }
 
-    private object Diff : DiffUtil.ItemCallback<PoseSlot>() {
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: List<Any>) {
+        onBindViewHolder(holder, position)
+        if (ARRIVED !in payloads) return
+        val binding = holder.binding
+        val shown = if (getItem(position).event is CandidateEvent.Ready) binding.poseImage else binding.poseStatus
+        shown.alpha = 0f
+        shown.fadeTo(1f, Motion.FADE_MS)
+    }
+
+    internal object Diff : DiffUtil.ItemCallback<PoseSlot>() {
         override fun areItemsTheSame(oldItem: PoseSlot, newItem: PoseSlot) = oldItem.pose.id == newItem.pose.id
 
         override fun areContentsTheSame(oldItem: PoseSlot, newItem: PoseSlot) = oldItem == newItem
+
+        // The slot's candidate or failure has just come, so the bind fades it in; with a payload the slot is bound in
+        // place, without RecyclerView's own cross-fade.
+        override fun getChangePayload(oldItem: PoseSlot, newItem: PoseSlot): Any? =
+            ARRIVED.takeIf { oldItem.event == null && newItem.event != null }
+    }
+
+    internal companion object {
+        /** A slot's candidate or failure arrived. */
+        const val ARRIVED = "arrived"
     }
 }
 

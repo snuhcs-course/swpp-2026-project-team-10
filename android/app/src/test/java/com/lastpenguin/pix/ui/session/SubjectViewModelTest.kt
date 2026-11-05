@@ -700,13 +700,13 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.PICKING))
         runCurrent()
         assertEquals(PoseSetStep.PICKING, model.uiState.value.poseStep)
-        assertTrue(model.claimPickOpening("set1"))
-        assertFalse(model.claimPickOpening("set1"))
+        assertTrue(model.claimSetOpening("set1"))
+        assertFalse(model.claimSetOpening("set1"))
 
         session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED))
         runCurrent()
         assertNull(model.uiState.value.poseStep)
-        assertTrue("a new set opens again", model.claimPickOpening("set2"))
+        assertTrue("a new set opens again", model.claimSetOpening("set2"))
     }
 
     private companion object {

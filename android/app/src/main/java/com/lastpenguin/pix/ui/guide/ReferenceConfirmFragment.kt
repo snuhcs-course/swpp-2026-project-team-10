@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -17,7 +17,9 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentReferenceConfirmBinding
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showOutline
@@ -30,7 +32,7 @@ import kotlinx.coroutines.launch
  * whose pick it is when the subject chose the candidate (FR-6.15). In a session the subject sees the outline of a chosen
  * pose too, and a *Use this guide* of theirs that comes first goes back to the camera like this phone's own (Design
  * 2.6.5). A screenshot cut to its photo (FR-2.10) plays the cut once, keeps the photo in the corner, and offers *Use
- * the whole image*.
+ * the whole image*. The outline fades in as its person is found, a screenshot's with its cut (Iter3-A13).
  * Owner: PM (#5); the outline on both phones Iter3-P16; the screenshot's cut #174.
  */
 class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
@@ -122,7 +124,13 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         binding.useGuideButton.isEnabled = ready != null
         // A screenshot cut to its photo (FR-2.10): the cut plays once, not again when the screen is made anew.
         val crop = ready?.guide?.crop
-        binding.screenshotCut.show(crop, play = shown == ReferenceUiState.Working)
+        val found = ready != null && shown == ReferenceUiState.Working
+        binding.screenshotCut.show(crop, play = found)
+        // A photo's outline fades in where the spinner was; a screenshot's cut fades it in at its own end.
+        if (found && crop == null) {
+            binding.referenceImage.alpha = 0f
+            binding.referenceImage.fadeTo(1f, Motion.FADE_MS)
+        }
         binding.cutChip.isVisible = crop != null
         binding.useWholeImageButton.isVisible = crop != null
         shown = state

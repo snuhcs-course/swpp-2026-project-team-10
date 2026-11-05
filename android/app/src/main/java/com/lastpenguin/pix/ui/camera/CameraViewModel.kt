@@ -138,6 +138,8 @@ data class CameraUiState(
     val exposureStep: Float = 0f,
     /** Whether the brightness slider is open above the controls. */
     val brightnessOpen: Boolean = false,
+    /** Whether the ratios are open under the top bar (FR-1.13). */
+    val aspectsOpen: Boolean = false,
     /** False hides the flash button (FR-1.12). */
     val hasFlash: Boolean = false,
     val flash: FlashMode = FlashMode.OFF,
@@ -305,6 +307,11 @@ class CameraViewModel(
         }
     }
 
+    /** The ratios under the top bar open or close (FR-1.13). */
+    fun setAspectsOpen(open: Boolean) {
+        _uiState.update { it.copy(aspectsOpen = open) }
+    }
+
     /**
      * The tip button: the tip opens again, and is no longer unseen; another tap while it is open closes it. A tip that
      * could not be had has no button.
@@ -332,12 +339,13 @@ class CameraViewModel(
         camera.bind(owner, surfaceProvider)
     }
 
-    fun onShutter() {
-        if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return
+    /** Takes a photo, unless one is being saved or the camera is not ready; true when it takes one. */
+    fun onShutter(): Boolean {
+        if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return false
         savedNoticeJob?.cancel()
         // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
-        _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false) }
+        _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false, aspectsOpen = false) }
         val takenAt = clock()
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
         val sessionId = photos.shutter()
@@ -368,6 +376,7 @@ class CameraViewModel(
                 _uiState.update { it.copy(isSaving = false) }
             }
         }
+        return true
     }
 
     /** [final] is false for the steps of a pinch, so the camera holds its lens until the pinch ends (NFR-19). */
@@ -443,17 +452,16 @@ class CameraViewModel(
         camera.setFacing(if (state.facing == CameraFacing.BACK) CameraFacing.FRONT else CameraFacing.BACK)
     }
 
-    /** The ratio button cycles 4:3, 16:9, 1:1 (FR-1.13), and the choice is kept for the next time. */
-    fun onAspectTap() {
+    /**
+     * A ratio chosen under the top bar (FR-1.13): the ratios close, and a new one goes to the camera and is kept for the
+     * next time. None while a photo is being saved, since a rebind waits for it.
+     */
+    fun onAspectChosen(aspect: AspectRatio) {
         val state = _uiState.value
-        if (state.isSaving) return
-        val next = when (state.aspect) {
-            AspectRatio.R4_3 -> AspectRatio.R16_9
-            AspectRatio.R16_9 -> AspectRatio.R1_1
-            AspectRatio.R1_1 -> AspectRatio.R4_3
-        }
-        camera.setAspectRatio(next)
-        viewModelScope.launch { settings.saveAspectRatio(next) }
+        _uiState.update { it.copy(aspectsOpen = false) }
+        if (state.isSaving || aspect == state.aspect) return
+        camera.setAspectRatio(aspect)
+        viewModelScope.launch { settings.saveAspectRatio(aspect) }
     }
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */

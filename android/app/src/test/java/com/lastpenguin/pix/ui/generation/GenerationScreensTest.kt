@@ -71,7 +71,8 @@ import org.robolectric.shadows.ShadowToast
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
  * Cancel. Pick a pose: only the ready candidates, one per page with a counter; the page on screen is the selected
  * pose, so Use this pose works at once and takes the pose swiped to (to Reference confirm); a pose selected before
- * the screen opens is the one shown; Try other poses (back to Generate poses), system back; in a session, the hint
+ * the screen opens is the one shown; Try other poses and system back (back to Generate poses, the photo and the
+ * description kept), the ✕ (back to the camera, the set discarded); in a session, the hint
  * that the subject sees the poses too, and the subject's pick that comes first, which opens Reference confirm with its
  * candidate (Design 2.6.5). The ♥ on Pick a pose (FR-4.14): on the page on screen only, saving the pose as a generated
  * guide (disabled meanwhile, filled in red, "Pose saved"), a filled one removing it, a pose without a person (nothing saved),
@@ -252,6 +253,13 @@ class GenerationScreensTest {
             binding.generateButton.performClick()
         }
         idle()
+        // The server accepts it once its first candidate comes, after the link is back.
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        modules.generator.runs.last().apply {
+            plan(poses)
+            send(CandidateEvent.Ready("pose-1", bitmap()))
+        }
+        idle()
 
         assertEquals(
             listOf("Lean on the wall" to setOf("u_2"), "Wave" to emptySet(), "Jump" to setOf("u_2")),
@@ -283,6 +291,7 @@ class GenerationScreensTest {
         s.onFragment { fragment ->
             val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
             binding.descriptionInput.setText("벽에 기대서 웃기")
+            assertEquals(string(R.string.generate_four_from_description), binding.generateButton.text.toString())
             binding.generateButton.performClick()
         }
         idle()
@@ -910,24 +919,61 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_tryOtherPosesReturnsToGeneratePoses_andBackDiscardsTheSet() {
+    fun pick_tryOtherPosesAndBack_returnToGeneratePoses_withThePhotoAndTheDescriptionKept() {
+        val modules = modules()
+        val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        val back: List<(PickPoseFragment) -> Unit> = listOf(
+            { FragmentPickPoseBinding.bind(it.requireView()).tryOtherButton.performClick() },
+            { it.requireActivity().onBackPressedDispatcher.onBackPressed() },
+        )
+
+        for (press in back) {
+            s.onFragment(press)
+            idle()
+            s.onFragment {
+                val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
+                assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+                assertNotNull(state.scene)
+                assertEquals("hands on hips", state.description)
+                assertTrue(state.poses.isEmpty())
+            }
+            assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
+            assertEquals(R.id.cameraFragment, nav.previousBackStackEntry?.destination?.id)
+            assertFalse(modules.generator.runs.last().cancelled)
+
+            // Another set, back on Pick a pose.
+            s.onFragment {
+                it.requireActivity().viewModel<GenerationViewModel>().generate("hands on hips")
+                modules.generator.runs.last().apply {
+                    plan(poses)
+                    send(CandidateEvent.Ready("pose-1", bitmap()))
+                    finish()
+                }
+            }
+            idle()
+            nav.navigate(R.id.action_describePose_to_generating)
+            nav.navigate(R.id.action_generating_to_pickPose)
+        }
+    }
+
+    @Test
+    fun pick_theCloseButtonReturnsToTheCamera_andDiscardsTheSet() {
         val modules = modules()
         val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
         scenario = s
 
-        s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).tryOtherButton.performClick() }
-        idle()
-        s.onFragment {
-            val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
-            assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
-            assertEquals("hands on hips", state.description)
+        s.onFragment { fragment ->
+            val close = FragmentPickPoseBinding.bind(fragment.requireView()).backButton
+            assertEquals(string(R.string.close_to_camera), close.contentDescription)
+            close.performClick()
         }
-        assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
-
-        nav.setCurrentDestination(R.id.pickPoseFragment)
-        s.onFragment { it.requireActivity().onBackPressedDispatcher.onBackPressed() }
         idle()
+
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+        s.onFragment {
+            assertEquals(GenerationUiState(), it.requireActivity().viewModel<GenerationViewModel>().uiState.value)
+        }
     }
 
     // ---- Couldn't create poses ------------------------------------------------------------

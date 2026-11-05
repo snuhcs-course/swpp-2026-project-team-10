@@ -53,7 +53,12 @@
     <string name="guide_saved">Guide saved</string>
     <string name="guide_saved_notice">Guide saved to My library.</string>
     <string name="guide_saved_oldest_removed_notice">Guide saved. The oldest saved guide was removed to keep %1$d.</string>
-    <string name="guide_already_saved_notice">This guide is already saved. Find it under Guide.</string>
+    <string name="guide_removed_notice">Removed from My library.</string>
+    <string name="guide_shown_label">Guide shown</string>
+    <string name="pinch_mode_guide">Guide</string>
+    <string name="pinch_mode_camera">Camera</string>
+    <string name="pinch_mode_guide_description">Pinch moves the guide</string>
+    <string name="pinch_mode_camera_description">Pinch zooms the camera</string>
     <string name="guide_save_failed_notice">Couldn\'t save the guide. Check the phone\'s storage.</string>
     <string name="delete_saved_guide">Delete saved guide</string>
     <string name="delete_saved_guide_title">Delete this saved guide?</string>
@@ -174,6 +179,8 @@
     <string name="ready_count">%1$d of %2$d ready</string>
     <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
+    <!-- The ✕ at the top of Pick a pose, for TalkBack: it leaves for the camera, while Back goes to Generate poses. -->
+    <string name="close_to_camera">Close, back to Camera</string>
     <string name="pose_page_counter" translatable="false">%1$d / %2$d</string>
     <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
     <string name="use_this_pose">Use this pose</string>
@@ -402,6 +409,9 @@
 
     <!-- Settings, How to use Pix, About Pix (R&S 6.10; FR-10.1–10.5, FR-3.10, FR-4.2) -->
     <string name="settings">Settings</string>
+    <string name="settings_section_camera">Camera</string>
+    <string name="settings_base_brightness">Base brightness</string>
+    <string name="settings_base_brightness_body">Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap.</string>
     <string name="settings_section_guide">Guide</string>
     <string name="settings_guide_color">Color</string>
     <string name="settings_guide_thickness">Thickness</string>

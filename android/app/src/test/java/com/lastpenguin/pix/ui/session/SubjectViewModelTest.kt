@@ -604,7 +604,7 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun saveGuide_whenAlreadySaved_saysSoAndKeepsOneCopy() = runTest {
+    fun saveGuide_whenAlreadySaved_removesIt() = runTest {
         val store = SavedGuideStore.InMemory()
         val model = saving(store)
         val notices = mutableListOf<GuideSaveNotice>()
@@ -618,8 +618,8 @@ class SubjectViewModelTest {
         model.onSaveGuide()
         runCurrent()
 
-        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.ALREADY_SAVED), notices)
-        assertEquals(1, store.saved.value.size)
+        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.REMOVED), notices)
+        assertTrue(store.saved.value.isEmpty())
     }
 
     @Test

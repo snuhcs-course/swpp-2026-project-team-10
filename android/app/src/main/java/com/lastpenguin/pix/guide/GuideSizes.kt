@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -15,10 +15,11 @@ internal const val REFERENCE_THUMBNAIL_LONG_SIDE = 512
 internal const val CROP_ORIGINAL_LONG_SIDE = 1024
 
 /**
- * The outline's stroke where the guide first appears: about 8 px on screen, 3 dp on a typical phone (Design 2.6.1,
- * step 5). Much lower values round to a 1 px stroke on the 720 px mask the subject receives.
+ * The outline's stroke where the guide first appears: about 5.3 px on screen, 2 dp on a typical phone (Design 2.6.1,
+ * step 5), thin enough not to compete with the photo. Much lower values round to a 1 px stroke on the 720 px mask the
+ * subject receives.
  */
-private const val STROKE_ON_SCREEN_PX = 8f
+private const val STROKE_ON_SCREEN_PX = 16f / 3f
 
 /** A new guide is [GuideState.DEFAULT_HEIGHT] of the frame; a 1080 px wide phone's 3:4 frame is 1440 px tall. */
 private const val GUIDE_ON_SCREEN_PX = GuideState.DEFAULT_HEIGHT * 1440f

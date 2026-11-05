@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -66,7 +66,10 @@ data class GenerationUiState(
      * the subject's while theirs does, then nobody; the other phone's field waits meanwhile.
      */
     val descriptionWriter: Role? = null,
-    /** The set, from *Generate 4 poses* or *Skip* on: its poses' ids repeat in every set, so a ♥ names both (FR-4.14). */
+    /**
+     * The set, from *Generate 4 poses* or *Suggest 4 poses* on: its poses' ids repeat in every set, so a ♥ names
+     * both (FR-4.14).
+     */
     val setId: String? = null,
     /** The poses of the set, once known; one slot each. */
     val poses: List<PlannedPose> = emptyList(),
@@ -121,7 +124,8 @@ data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
  * [descriptions], where either phone writes the description, one at a time, and starts the set; each set goes to the
  * subject's *Pick a pose* through [share], and the subject's first pick of it counts as a *Use this pose* (Design
  * 2.6.5). Each set made from a description, by either phone, goes into this phone's [history] as the photographer's,
- * with the session's friend from [partner] (FR-4.11).
+ * with the session's friend from [partner] as the set started, once the server has accepted the description: a set
+ * whose first candidate arrives (FR-4.11). A description the server turns down never makes one.
  * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16; the history Iter3-P24.
  */
 class GenerationViewModel(
@@ -159,6 +163,11 @@ class GenerationViewModel(
 
     /** The set being generated or picked from, as [share] knows it; null between sets. */
     private var setId: String? = null
+
+    /** The set made from a description that the history waits to keep until the server accepts it (FR-4.11). */
+    private class UnrecordedSet(val setId: String, val text: String, val partnerId: String?)
+
+    private var unrecorded: UnrecordedSet? = null
 
     /** Generate poses as [descriptions] knows it, while the phase is DESCRIBING; null otherwise. */
     private var descriptionId: String? = null
@@ -355,8 +364,8 @@ class GenerationViewModel(
 
     /**
      * The subject's field and buttons on Generate poses (FR-6.15), requests like its others (AD-7): an edit is taken
-     * while this phone's field does not hold the description, and *Generate 4 poses* or *Skip* the same way, with the
-     * subject's text while its field held it.
+     * while this phone's field does not hold the description, and *Generate 4 poses* or *Suggest 4 poses* the same
+     * way, with the subject's text while its field held it.
      */
     private fun onSubjectRequest(request: DescriptionRequest) {
         val state = _uiState.value
@@ -401,8 +410,8 @@ class GenerationViewModel(
      * Generate poses ended: a set [started] from it, with the description [text] its request has, or it closed, also
      * on the subject's phone.
      */
-    private fun endDescription(started: Boolean, text: String = "") {
-        descriptionId?.let { descriptions.end(it, started, text) }
+    private fun endDescription(started: Boolean, text: String = "", setId: String? = null) {
+        descriptionId?.let { descriptions.end(it, started, text, setId) }
         descriptionId = null
     }
 
@@ -412,8 +421,8 @@ class GenerationViewModel(
     }
 
     /**
-     * *Generate 4 poses*: four candidates of the description, or of four suggested poses when the field is blank
-     * (US-5). Only from Generate poses.
+     * *Generate 4 poses*: four candidates of the description, or of four suggested poses when it is blank (US-5).
+     * Only from Generate poses.
      */
     fun generate(description: String) {
         val state = _uiState.value
@@ -421,7 +430,7 @@ class GenerationViewModel(
         start(state.scene, state.selfie, PoseRequest.of(description), description)
     }
 
-    /** *Skip, suggest poses for me*: the server chooses four poses for the scene (FR-4.4). */
+    /** *Suggest 4 poses*, with the field blank: the server chooses four poses for the scene (FR-4.4). */
     fun suggestPoses() {
         val state = _uiState.value
         if (!state.canStart || state.scene == null) return
@@ -467,15 +476,14 @@ class GenerationViewModel(
     private fun start(scene: Bitmap, selfie: Boolean, request: PoseRequest, description: String) {
         generating?.cancel()
         val described = (request as? PoseRequest.Described)?.text.orEmpty()
-        endDescription(started = true, text = described)
-        // Kept once the set starts, whichever phone wrote it; suggested poses have no description to keep.
-        if (described.isNotEmpty()) {
-            val partner = partner()
-            viewModelScope.launch { history.record(described, Role.PHOTOGRAPHER, partner?.userId) }
-        }
-        closeSet()
         val id = UUID.randomUUID().toString()
+        // The start names its set, so the subject's history waits for this set's answer (FR-4.11).
+        endDescription(started = true, text = described, setId = id)
+        closeSet()
         setId = id
+        // Kept once the server accepts it, whichever phone wrote it, with the friend as the set starts; suggested
+        // poses have no description to keep.
+        unrecorded = described.takeIf { it.isNotEmpty() }?.let { UnrecordedSet(id, it, partner()?.userId) }
         share.open(id)
         _uiState.value = GenerationUiState(
             scene = scene,
@@ -602,11 +610,25 @@ class GenerationViewModel(
                 if (event is CandidateEvent.Ready && _uiState.value.readyCount == 0) Timings.mark("pose.first")
                 _uiState.update { it.copy(candidates = it.candidates + (event.poseId to event)) }
                 when (event) {
-                    is CandidateEvent.Ready -> share.candidate(id, event.poseId, event.image)
+                    is CandidateEvent.Ready -> {
+                        record(id)
+                        share.candidate(id, event.poseId, event.image)
+                    }
+
                     is CandidateEvent.Failed -> share.failed(id, event.poseId)
                 }
             }
         }
+    }
+
+    /**
+     * The set [id]'s first candidate arrived, so the server accepted its description (FR-4.11): it goes into the
+     * history, once. A description the description filter turns down fails every candidate and is never kept.
+     */
+    private fun record(id: String) {
+        val set = unrecorded?.takeIf { it.setId == id } ?: return
+        unrecorded = null
+        viewModelScope.launch { history.record(set.text, Role.PHOTOGRAPHER, set.partnerId) }
     }
 
     /**

@@ -203,7 +203,9 @@ sealed interface SessionMessage {
      * Iter3-P16): with OPEN, the description's [text], the phone whose field holds it ([writer]; null while nobody
      * types), and whether the service refused the last set's description ([rejected]). It ends once, with STARTED
      * when a set starts from it, or CLOSED. With STARTED, [text] is the set's description as its request has it,
-     * empty for suggested poses (FR-4.11); a photographer of an older version sends none, so it is null then.
+     * empty for suggested poses (FR-4.11); a photographer of an older version sends none, so it is null then. With
+     * STARTED, [setId] names the set that started, as `pose.step` names it, so the subject's history waits for that
+     * set's answer and no other (FR-4.11); null from an older photographer.
      */
     @Serializable
     @SerialName("pose.description")
@@ -213,6 +215,7 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val text: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val writer: Role? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val rejected: Boolean = false,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val setId: String? = null,
     ) : SessionMessage
 
     /**

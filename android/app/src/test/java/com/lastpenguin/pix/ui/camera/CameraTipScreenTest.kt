@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -135,6 +135,24 @@ class CameraTipScreenTest {
             assertFalse(controls.tipBanner.isShown)
             controls.tipButton.performClick()
         }
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
+    }
+
+    @Test
+    fun aFingersTapOnTheTipButton_closesAnOpenTip_andTheNextOpensIt() {
+        launch()
+        generatedGuideOnCamera()
+        modules.tipper.requests.single().tip(TIP)
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
+
+        // Through the root, as a finger lands: the touch that closes a tip elsewhere leaves the button to do it.
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.tipButton) }
+        idle()
+        onScreen { controls, _ -> assertFalse(controls.tipBanner.isShown) }
+
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.tipButton) }
         idle()
         onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
     }

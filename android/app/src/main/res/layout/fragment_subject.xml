@@ -145,6 +145,20 @@
             android:visibility="gone"
             tools:ignore="RtlHardcoded"
             tools:visibility="visible" />
+
+        <!-- What a toggle just did, such as "2×" or "Saved to My library", for a few seconds at the top of the video, as
+             on the Camera screen (Design 2.8); a new one replaces it at once, and TalkBack reads it. -->
+        <TextView
+            android:id="@+id/toggleLabel"
+            style="@style/Widget.Pix.Chip.Small"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="@string/guide_saved_notice"
+            tools:visibility="visible" />
     </FrameLayout>
 
     <!-- Right above the caption, as the Camera screen's panels sit above its shutter: the photographer's brightness
@@ -279,6 +293,22 @@
             app:iconTint="@color/edit_guide_icon"
             tools:visibility="visible" />
     </FrameLayout>
+
+    <!-- Over the guide-edit mode toggle, for a few seconds after a tap: what a pinch moves now, Guide or Camera
+         (Design 2.8). Moved with the zoom row in code. -->
+    <TextView
+        android:id="@+id/pinchModeLabel"
+        style="@style/Widget.Pix.Chip.Small"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="4dp"
+        android:accessibilityLiveRegion="polite"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/zoomRow"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:text="@string/pinch_mode_guide"
+        tools:visibility="visible" />
 
     <LinearLayout
         android:id="@+id/bottomPanel"

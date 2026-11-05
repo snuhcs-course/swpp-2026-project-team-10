@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -41,6 +41,7 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseTips.onCamera,
                 container.photoSyncer,
+                container.appSettings.baseBrightness,
             )
         }
         initializer {

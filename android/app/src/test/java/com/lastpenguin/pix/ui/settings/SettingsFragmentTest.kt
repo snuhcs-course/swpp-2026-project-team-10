@@ -1,12 +1,14 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
 import android.provider.Settings
+import android.view.MotionEvent
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.slider.Slider
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
@@ -22,6 +24,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.tutorialOver
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,7 +40,7 @@ import org.robolectric.shadows.ShadowToast
 /*
  * Settings on the real screen (FR-10.1–10.4, FR-3.10, FR-4.2), with the settings in memory behind the ViewModel.
  * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, signed out);
- * each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
+ * the base brightness at 0 EV, slid to +1 EV and saved, and shown as kept; each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the
  * account signed in and signed out (Sign in; Friends until #188);
  * notifications, How to use Pix, and About Pix opened; *Show the tutorial again*, which makes every screen's tips due
@@ -113,6 +116,46 @@ class SettingsFragmentTest {
         onScreen { it.colorPink.performClick() }
         onScreen { it.thicknessThin.performClick() }
         assertEquals(GuideLook(GuideColor.PINK, GuideThickness.THIN), modules.appSettings.guideLook.value)
+    }
+
+    @Test
+    fun theBaseBrightness_startsAtZero_isSavedAsItIsSlid_andShowsWhatIsKept() {
+        val modules = launch()
+        onScreen { binding ->
+            assertEquals(6f, binding.baseBrightnessSlider.value)
+            assertEquals("0", binding.baseBrightnessValue.text.toString())
+        }
+
+        // Three thirds of an EV up: +1 EV.
+        onScreen { binding -> slideTo(binding.baseBrightnessSlider, 9f) }
+        assertEquals(1f, modules.appSettings.baseBrightness.value, 0.001f)
+        onScreen { assertEquals("+1.0", it.baseBrightnessValue.text.toString()) }
+
+        runBlocking { modules.appSettings.setBaseBrightness(-2f) }
+        onScreen { binding ->
+            assertEquals(0f, binding.baseBrightnessSlider.value)
+            assertEquals("-2.0", binding.baseBrightnessValue.text.toString())
+        }
+
+        // Past the ends, the setting keeps to −2..+2 EV, the slider's ends.
+        runBlocking { modules.appSettings.setBaseBrightness(5f) }
+        assertEquals(2f, modules.appSettings.baseBrightness.value, 0.001f)
+        onScreen { binding ->
+            assertEquals(12f, binding.baseBrightnessSlider.value)
+            assertEquals("+2.0", binding.baseBrightnessValue.text.toString())
+        }
+    }
+
+    private fun slideTo(slider: Slider, value: Float) {
+        assertTrue(slider.trackWidth > 0)
+        val x =
+            slider.trackSidePadding +
+                (value - slider.valueFrom) / (slider.valueTo - slider.valueFrom) * slider.trackWidth
+        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP)) {
+            val event = MotionEvent.obtain(1_000L, 1_000L, action, x, slider.height / 2f, 0)
+            slider.dispatchTouchEvent(event)
+            event.recycle()
+        }
     }
 
     @Test

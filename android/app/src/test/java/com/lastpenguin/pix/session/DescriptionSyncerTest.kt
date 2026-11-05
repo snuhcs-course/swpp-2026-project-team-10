@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.DescriptionStep
@@ -64,8 +64,14 @@ class DescriptionSyncerTest {
         }
     }
 
-    private fun deliver(step: DescriptionStep, text: String? = null, writer: Role? = null, id: String = "d1") {
-        session.deliver(SessionMessage.PoseDescription(id, step, text, writer))
+    private fun deliver(
+        step: DescriptionStep,
+        text: String? = null,
+        writer: Role? = null,
+        id: String = "d1",
+        setId: String? = null,
+    ) {
+        session.deliver(SessionMessage.PoseDescription(id, step, text, writer, setId = setId))
     }
 
     /** The photographer's photo of [id] as the subject receives it. */
@@ -149,6 +155,16 @@ class DescriptionSyncerTest {
         runCurrent()
         assertEquals(
             SessionMessage.PoseDescription("d2", DescriptionStep.STARTED, ""),
+            session.sent.filterIsInstance<SessionMessage.PoseDescription>().last(),
+        )
+
+        // The start names its set, so the subject's history waits for that set's answer.
+        syncer.open("d3", fakeBitmap(), "jump", rejected = false)
+        runCurrent()
+        syncer.end("d3", started = true, text = "jump", setId = "s3")
+        runCurrent()
+        assertEquals(
+            SessionMessage.PoseDescription("d3", DescriptionStep.STARTED, "jump", setId = "s3"),
             session.sent.filterIsInstance<SessionMessage.PoseDescription>().last(),
         )
     }
@@ -313,9 +329,9 @@ class DescriptionSyncerTest {
             backgroundScope.launch { syncer.started.collect { started += it } }
             runCurrent()
 
-            deliver(DescriptionStep.STARTED, text = "wave hello")
+            deliver(DescriptionStep.STARTED, text = "wave hello", setId = "s1")
             runCurrent()
-            // A photographer of an older version sends no text with the start: the copy's text stands in.
+            // A photographer of an older version sends no text or set with the start: the copy's text stands in.
             deliver(DescriptionStep.OPEN, "jump", id = "d2")
             deliver(DescriptionStep.STARTED, id = "d2")
             runCurrent()
@@ -327,7 +343,11 @@ class DescriptionSyncerTest {
             deliver(DescriptionStep.STARTED, text = "", id = "d4")
             runCurrent()
 
-            assertEquals(listOf(StartedDescription("wave hello", null), StartedDescription("jump", null)), started)
+            // The set's id comes with the start; an older photographer names none.
+            assertEquals(
+                listOf(StartedDescription("wave hello", null, "s1"), StartedDescription("jump", null)),
+                started,
+            )
         }
 
     @Test

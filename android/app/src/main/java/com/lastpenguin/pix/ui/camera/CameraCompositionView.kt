@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-27, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -12,7 +12,10 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.frameAspect
 
-/** Viewfinder-only composition aids. Never consumes gestures or enters captured/streamed frames. */
+/**
+ * Viewfinder-only composition aids. Never consumes gestures or enters captured/streamed frames. The lines are thin so
+ * that they do not compete with the photo, and each has a dark outline so it still shows on a bright scene (Design 2.8).
+ */
 class CameraCompositionView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -20,19 +23,19 @@ class CameraCompositionView @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(135, 255, 255, 255)
-        strokeWidth = density * 0.75f
+        strokeWidth = density * GRID_DP
     }
     private val gridOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(50, 0, 0, 0)
-        strokeWidth = density * 1.5f
+        strokeWidth = density * GRID_OUTLINE_DP
     }
     private val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeWidth = density * 3f
+        strokeWidth = density * BAR_DP
         strokeCap = Paint.Cap.ROUND
     }
     private val barOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(140, 0, 0, 0)
-        strokeWidth = density * 4.5f
+        strokeWidth = density * BAR_OUTLINE_DP
         strokeCap = Paint.Cap.ROUND
     }
     private val levelColor = context.getColor(R.color.camera_level_aligned)
@@ -108,14 +111,18 @@ class CameraCompositionView @JvmOverloads constructor(
     private fun drawLevel(canvas: Canvas, value: CameraLevel) {
         val cx = frame.centerX
         val cy = frame.centerY
-        val cellWidth = frame.width / 3f
+        // Held on its side, the horizon runs along the frame's long side, and the bar with it (FR-1.10).
+        val span = (if (value.baseDegrees == 0f) frame.width else frame.height) / 3f
         bar.color = if (value.isLevel) levelColor else Color.WHITE
+        val held = canvas.save()
+        canvas.rotate(value.baseDegrees, cx, cy)
         // Fixed short wings mark the target horizon; the middle segment follows gravity.
-        drawBar(canvas, cx - cellWidth * 0.44f, cy, cx - cellWidth * 0.34f, cy)
-        drawBar(canvas, cx + cellWidth * 0.34f, cy, cx + cellWidth * 0.44f, cy)
+        drawBar(canvas, cx - span * 0.44f, cy, cx - span * 0.34f, cy)
+        drawBar(canvas, cx + span * 0.34f, cy, cx + span * 0.44f, cy)
+        canvas.restoreToCount(held)
         val rotated = canvas.save()
-        canvas.rotate(if (value.isLevel) 0f else value.angleDegrees, cx, cy)
-        drawBar(canvas, cx - cellWidth * 0.30f, cy, cx + cellWidth * 0.30f, cy)
+        canvas.rotate(if (value.isLevel) value.baseDegrees else value.angleDegrees, cx, cy)
+        drawBar(canvas, cx - span * 0.30f, cy, cx + span * 0.30f, cy)
         canvas.restoreToCount(rotated)
     }
 
@@ -125,6 +132,10 @@ class CameraCompositionView @JvmOverloads constructor(
     }
 }
 
+private const val GRID_DP = 0.5f
+private const val GRID_OUTLINE_DP = 1f
+private const val BAR_DP = 1.5f
+private const val BAR_OUTLINE_DP = 2.5f
 private const val DIM_ALPHA = 153
 private val outsideDim = Paint().apply { color = Color.argb(DIM_ALPHA, 0, 0, 0) }
 

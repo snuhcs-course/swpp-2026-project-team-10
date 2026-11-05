@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Looper
 import android.view.View
+import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.ViewModelProvider
@@ -32,6 +33,7 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -134,9 +136,9 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)
             assertEquals(View.INVISIBLE, controls.hintText.visibility)
-            // No flash and no exposure range in the capabilities: both controls are hidden (FR-1.11, FR-1.12).
+            // No flash and no exposure range in the capabilities: neither the flash nor brightness shows (FR-1.11, FR-1.12).
             assertEquals(View.GONE, controls.flashButton.visibility)
-            assertEquals(View.GONE, controls.brightnessButton.visibility)
+            assertEquals(View.GONE, controls.exposureBar.visibility)
             assertFalse(controls.galleryButton.isEnabled)
         }
     }
@@ -221,10 +223,13 @@ class CameraFragmentRenderTest {
             assertFalse(controls.editGuideButton.isEnabled)
             assertEquals(string(R.string.show_guide), controls.hideGuideButton.contentDescription)
             assertEquals(string(R.string.hint_guide_hidden), controls.hintText.text.toString())
-            assertEquals(View.VISIBLE, controls.hintText.visibility)
+            // The toggle's label says it first; the hint takes its place once the label goes (Design 2.8).
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             // The reference stays in its corner while the guide is hidden (FR-3.9).
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
         }
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.hintText.visibility) }
 
         onScreen { controls, _ -> controls.hideGuideButton.performClick() }
         idle()
@@ -315,21 +320,27 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun exposureRange_showsTheBrightnessButtonAndATapOpensThePanel() {
+    fun aBarUpWithoutATapToFocus_asAfterTheScreenIsMadeAgain_standsAtTheRightEdge() {
         launch(FakeCameraController(exposureRange = -4..4))
+        // No button opens it: the base brightness is in Settings (FR-1.11), and a tap to focus brings the bar.
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.exposureBar.visibility) }
 
-        onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.brightnessButton.visibility)
-            assertEquals(View.GONE, controls.brightnessPanel.visibility)
-            controls.brightnessButton.performClick()
+        onScreen { _, fragment ->
+            ViewModelProvider(fragment, PixViewModels.Factory)[CameraViewModel::class.java].setBrightnessOpen(true)
         }
         idle()
 
         onScreen { controls, _ ->
-            assertTrue(controls.brightnessButton.isChecked)
-            assertEquals(View.VISIBLE, controls.brightnessPanel.visibility)
-            assertTrue(controls.brightnessSlider.isEnabled)
-            assertEquals("0", controls.brightnessValue.text.toString())
+            val bar = controls.exposureBar
+            val preview = controls.previewView
+            assertEquals(View.VISIBLE, bar.visibility)
+            assertTrue(bar.isEnabled)
+            assertEquals(0, bar.index)
+            assertEquals("0", ViewCompat.getStateDescription(bar).toString())
+            // At the middle of the image's right edge, clear of the horizon bar.
+            val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), 3f / 4f)
+            assertEquals(frame.right - bar.width, bar.translationX, 1f)
+            assertEquals(frame.centerY - bar.height / 2f, bar.translationY, 1f)
         }
     }
 
@@ -372,7 +383,7 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.flashButton.visibility)
             assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
             assertEquals(View.GONE, controls.aspectButton.visibility)
-            assertEquals(View.GONE, controls.brightnessButton.visibility)
+            assertEquals(View.GONE, controls.exposureBar.visibility)
             assertEquals(View.GONE, controls.guideOverlay.visibility)
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)

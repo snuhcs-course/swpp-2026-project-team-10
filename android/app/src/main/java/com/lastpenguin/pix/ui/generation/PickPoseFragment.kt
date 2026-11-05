@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -31,7 +31,9 @@ import kotlinx.coroutines.launch
  * Pick a pose (R&S 6.3): the created candidates one at a time, as large as the screen allows, and a swipe for the
  * next. The pose on screen is the selected one, which *Use this pose* takes. In a session the subject sees the same
  * candidates, and a pick of theirs that comes first goes on here like this phone's own (Design 2.6.5). The ♥ on a
- * candidate keeps it in this phone's library (FR-4.14), and *Use this pose* goes on with the guide it saved.
+ * candidate keeps it in this phone's library (FR-4.14), and *Use this pose* goes on with the guide it saved. Back, like
+ * *Try other poses*, goes to Generate poses with the photo and the description kept; the ✕ at the top leaves for the
+ * camera and discards them.
  * Owner: Server/AI/Sync (#7). The chosen pose goes to Reference confirm (#5); the set on both phones Iter3-P16; the ♥
  * the library (#171).
  */
@@ -52,14 +54,13 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
             val saved = savedGuide(viewModel.uiState.value)
             viewModel.usePose()?.let { goOn(it, chosenBy = null, saved) }
         }
-        binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
-        binding.tryOtherButton.setOnClickListener {
-            // Generate poses again, with the photo and the description kept, so the user can change what to ask for.
-            viewModel.describeAgain()
-            findNavController().navigate(R.id.action_pickPose_to_describePose)
-        }
-        // Leaving this screen with system back discards the candidates.
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToCamera() }
+        // The top bar's control is a ✕ here, which leaves for the camera; the subject's Pick a pose keeps the arrow.
+        binding.backButton.setImageResource(R.drawable.ic_close)
+        binding.backButton.contentDescription = getString(R.string.close_to_camera)
+        binding.backButton.setOnClickListener { backToCamera() }
+        binding.tryOtherButton.setOnClickListener { describeAgain() }
+        // System back is Try other poses: the set is left, the photo and the description are kept.
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { describeAgain() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -113,6 +114,16 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         viewModel.cancel()
     }
 
+    /** Generate poses again, with the photo and the description kept, so the user can change what to ask for. */
+    private fun describeAgain() {
+        viewModel.describeAgain()
+        val navController = findNavController()
+        if (navController.currentDestination?.id == R.id.pickPoseFragment) {
+            navController.navigate(R.id.action_pickPose_to_describePose)
+        }
+    }
+
+    /** The ✕: back to the camera, discarding the photo, the description, and the candidates. */
     private fun backToCamera() {
         viewModel.cancel()
         findNavController().popBackStack(R.id.cameraFragment, false)

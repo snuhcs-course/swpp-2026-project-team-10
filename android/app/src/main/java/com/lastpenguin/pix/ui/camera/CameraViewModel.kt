@@ -48,8 +48,22 @@ enum class GuideSaveNotice {
 
     /** Saved, and the oldest saved guide was deleted to keep [SavedGuideStore.MAX_SAVED]. */
     SAVED_OLDEST_REMOVED,
-    ALREADY_SAVED,
+
+    /** A second tap on a saved guide's bookmark took it out of the saved guides again. */
+    REMOVED,
     FAILED,
+}
+
+/**
+ * What a toggle on the camera screens just did, shown as a short label at the top of the image (Design 2.8): showing or
+ * hiding the guide, and a zoom step.
+ */
+sealed interface ToggleLabel {
+    data object GuideHidden : ToggleLabel
+
+    data object GuideShown : ToggleLabel
+
+    data class Zoom(val ratio: Float) : ToggleLabel
 }
 
 /**
@@ -76,6 +90,27 @@ internal fun nextTip(previous: TipBanner?, guideId: String?, state: TipState?): 
     val arrivedClosed = state is TipState.Ready && previous.state !is TipState.Ready && !previous.open
     return previous.copy(state = state, unseen = previous.unseen || arrivedClosed)
 }
+
+/**
+ * *Save guide* as a toggle (FR-3.8, FR-6.16): saves [guide] with [state], or takes it out of [store] when it is saved
+ * already, by its id, which a guide keeps through save and load.
+ */
+internal suspend fun toggleSaved(store: SavedGuideStore, guide: ReferenceGuide, state: GuideState): GuideSaveNotice =
+    try {
+        if (store.saved.value.any { it.id == guide.id }) {
+            store.delete(guide.id)
+            GuideSaveNotice.REMOVED
+        } else {
+            store.save(guide, state).fold(
+                onSuccess = { if (it.removedOldest) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
+                onFailure = { GuideSaveNotice.FAILED },
+            )
+        }
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        GuideSaveNotice.FAILED
+    }
 
 internal fun captureFailureNotice(error: Throwable): CaptureNotice = when {
     error is SecurityException -> CaptureNotice.PERMISSION_REQUIRED
@@ -156,6 +191,8 @@ class CameraViewModel(
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
     /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
     private val photos: PhotoShare = PhotoShare.None,
+    /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
+    private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
@@ -172,6 +209,11 @@ class CameraViewModel(
 
     /** One notice per *Save guide* tap, shown like the other short notices; kept until the screen reads it. */
     val guideSaveNotices: Flow<GuideSaveNotice> = _guideSaveNotices.receiveAsFlow()
+
+    private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
+
+    /** One label per toggle, the newest replacing one not yet shown; the screen shows it for [NOTICE_MS]. */
+    val toggleLabels: Flow<ToggleLabel> = _toggleLabels.receiveAsFlow()
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
@@ -214,6 +256,15 @@ class CameraViewModel(
                 pendingZoomStep = null
                 _uiState.update { it.copy(facing = facing) }
             }
+        }
+        viewModelScope.launch {
+            // The base brightness, once the camera's range is known and whenever the setting or the camera changes;
+            // what a drag added is gone with it (FR-1.11).
+            camera.capabilities
+                .map { it?.exposureRange to it?.exposureStep }
+                .distinctUntilChanged()
+                .combine(baseBrightness) { _, _ -> }
+                .collect { applyBaseBrightness() }
         }
         viewModelScope.launch {
             camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
@@ -272,11 +323,14 @@ class CameraViewModel(
         _uiState.update { it.copy(aspectsOpen = open) }
     }
 
-    /** The tip button: the tip opens again, and is no longer unseen. A tip that could not be had has no button. */
+    /**
+     * The tip button: the tip opens again, and is no longer unseen; another tap while it is open closes it. A tip that
+     * could not be had has no button.
+     */
     fun onTipButton() {
         _uiState.update { state ->
             val tip = state.tip?.takeIf { it.state != TipState.Failed } ?: return@update state
-            state.copy(tip = tip.copy(open = true, unseen = false))
+            state.copy(tip = tip.copy(open = !tip.open, unseen = false))
         }
     }
 
@@ -349,7 +403,10 @@ class CameraViewModel(
     fun onZoomTap() {
         val state = _uiState.value
         val step = nextZoomStep(quickZoomSteps(state.minZoom, state.maxZoom), pendingZoomStep ?: state.zoom) ?: return
-        if (requestZoom(step, final = true)) pendingZoomStep = step
+        if (requestZoom(step, final = true)) {
+            pendingZoomStep = step
+            _toggleLabels.trySend(ToggleLabel.Zoom(step))
+        }
     }
 
     /** Asks the camera for [ratio] while it can zoom; false when it cannot. */
@@ -364,15 +421,33 @@ class CameraViewModel(
         return true
     }
 
-    /** A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4); the camera focuses and meters there. */
+    /**
+     * A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4): the camera focuses and meters there if it can, and
+     * the brightness goes back to the base.
+     */
     fun onFocusTap(x: Float, y: Float) {
         val state = _uiState.value
-        if (state.cameraStatus != CameraStatus.READY || !state.supportsFocusPoint) return
+        if (state.cameraStatus != CameraStatus.READY) return
         if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
-        camera.setFocusPoint(x, y)
+        if (state.supportsFocusPoint) camera.setFocusPoint(x, y)
+        // A new tap drops the brightness a drag added after the last one, back to the base (FR-1.11), also on a camera
+        // that cannot focus on a point.
+        applyBaseBrightness()
     }
 
-    /** From the brightness slider: each step is applied as it comes, like a pinch zoom (FR-1.11). */
+    /** The exposure index of the base brightness for this camera, or null without exposure compensation. */
+    fun baseExposureIndex(): Int? {
+        val capabilities = camera.capabilities.value ?: return null
+        val range = capabilities.exposureRange
+        if (range.first >= range.last) return null
+        return ExposureScale.indexOf(baseBrightness.value, capabilities.exposureStep, range)
+    }
+
+    private fun applyBaseBrightness() {
+        baseExposureIndex()?.let(camera::setExposure)
+    }
+
+    /** From the brightness bar or a drag on the preview: each step is applied as it comes, like a pinch zoom (FR-1.11). */
     fun onExposureChange(index: Int) {
         val range = _uiState.value.exposureRange
         if (range.first >= range.last) return
@@ -446,6 +521,7 @@ class CameraViewModel(
     fun onHideToggle() {
         if (_uiState.value.guide == null) return
         guides.update(final = true) { it.copy(visible = !it.visible) }
+        _toggleLabels.trySend(if (guides.state.value.visible) ToggleLabel.GuideShown else ToggleLabel.GuideHidden)
     }
 
     /** A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). */
@@ -460,31 +536,18 @@ class CameraViewModel(
 
     /**
      * *Save guide* (FR-3.8): keeps the guide on the camera, to use again from *Add a pose guide*. A saved guide is
-     * not saved twice; when [SavedGuideStore.MAX_SAVED] are saved, the store deletes the oldest and the notice says so.
+     * not saved twice: another tap takes it out of the saved guides again. When [SavedGuideStore.MAX_SAVED] are saved,
+     * the store deletes the oldest and the notice says so.
      */
     fun onSaveGuide() {
         val state = _uiState.value
         val guide = state.guide ?: return
         if (state.savingGuide) return
-        // The store's own list, not only guideSaved, which follows it a moment later.
-        val before = savedGuides.saved.value
-        if (state.guideSaved || before.any { it.id == guide.id }) {
-            _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
-            return
-        }
         _uiState.update { it.copy(savingGuide = true) }
         viewModelScope.launch {
             val notice = try {
-                savedGuides.save(guide, guides.state.value).fold(
-                    onSuccess = {
-                        if (it.removedOldest) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED
-                    },
-                    onFailure = { GuideSaveNotice.FAILED },
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                GuideSaveNotice.FAILED
+                // The store's own list, not only guideSaved, which follows it a moment later.
+                toggleSaved(savedGuides, guide, guides.state.value)
             } finally {
                 _uiState.update { it.copy(savingGuide = false) }
             }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
@@ -30,7 +30,7 @@ import org.junit.Test
 /*
  * Partitions for *Save guide* on the Camera screen (FR-3.8), state-based, with the in-memory store.
  * onSaveGuide: a guide not saved yet (stored with its state, shown as saved, SAVED), a guide already saved
- * (ALREADY_SAVED, stored once), no guide (nothing), a full store (SAVED_OLDEST_REMOVED), a store another save fills
+ * (REMOVED, taken out of the store and shown as not saved; a third tap saves it again), no guide (nothing), a full store (SAVED_OLDEST_REMOVED), a store another save fills
  * while this one writes (SAVED_OLDEST_REMOVED, as the store's save answers), a store that cannot write
  * (FAILED, not shown as saved, the button free again), a store that throws (the same, no crash), a second tap while
  * the first is writing (one save). A notice that comes while no screen collects waits for the screen.
@@ -86,7 +86,7 @@ class SaveGuideViewModelTest {
     }
 
     @Test
-    fun onSaveGuide_guideAlreadySaved_saysSoAndKeepsOneCopy() = runTest(dispatcher) {
+    fun onSaveGuide_guideAlreadySaved_removesIt_andAThirdTapSavesItAgain() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
         runCurrent()
@@ -97,8 +97,16 @@ class SaveGuideViewModelTest {
         model.onSaveGuide()
         runCurrent()
 
-        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.ALREADY_SAVED), notices)
-        assertEquals(1, saved.saved.value.size)
+        assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.REMOVED), notices)
+        assertTrue(saved.saved.value.isEmpty())
+        assertFalse(model.uiState.value.guideSaved)
+        // The guide stays on the camera.
+        assertEquals("g1", model.uiState.value.guide?.id)
+
+        model.onSaveGuide()
+        runCurrent()
+        assertEquals(listOf("g1"), saved.saved.value.map { it.id })
+        assertTrue(model.uiState.value.guideSaved)
     }
 
     @Test

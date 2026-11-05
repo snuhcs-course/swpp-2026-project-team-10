@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -14,7 +14,7 @@ import com.lastpenguin.pix.guide.GuideLook
 
 /**
  * A person's outline in the chosen look over a sky-to-ground gradient, so white and black lines both show, at the
- * line's size on Camera: 3 dp for the default thickness (Design 2.6.1).
+ * line's size on Camera: 2 dp for the default thickness (Design 2.6.1).
  */
 class GuideLookPreview @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     View(context, attrs) {
@@ -63,7 +63,7 @@ class GuideLookPreview @JvmOverloads constructor(context: Context, attrs: Attrib
     }
 
     private companion object {
-        const val LINE_DP = 3f
+        const val LINE_DP = 2f
         const val CORNER_DP = 14f
         const val SKY = 0xFFAFC3D6.toInt()
         const val GROUND = 0xFF33373E.toInt()

@@ -238,7 +238,10 @@ class SubjectDescribeFragmentTest {
         val modules = describing()
         launch()
 
-        onScreen { it.generateButton.performClick() }
+        onScreen { binding ->
+            assertEquals(string(R.string.generate_four_from_description), binding.generateButton.text.toString())
+            binding.generateButton.performClick()
+        }
         idle()
 
         assertEquals(listOf(SessionMessage.PoseDescriptionGo("d1", "wave", suggest = false)), goes(modules))

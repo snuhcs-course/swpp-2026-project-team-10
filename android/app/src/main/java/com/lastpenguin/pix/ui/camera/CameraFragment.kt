@@ -219,12 +219,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             }
         }
         // A pinch on the preview zooms while guide-edit mode is off (AD-17); each step is applied as it comes.
-        // A tap focuses there (FR-1.4); the pinch controller owns the preview's touches, so it reports the tap.
+        // A tap focuses there (FR-1.4), and a drag up or down sets the brightness (FR-1.11); the pinch controller owns
+        // the preview's touches, so it reports both.
         pinchZoom = PinchZoomController(
             controls.previewView,
             range = ::zoomRange,
             current = { viewModel.uiState.value.zoom },
             onTap = ::onPreviewTap,
+            onDrag = previewBrightnessDrag,
         ) { ratio, final -> viewModel.onZoomChanged(ratio, final) }
         opacitySlider = TrackedSliderController(
             controls.opacitySlider,
@@ -251,13 +253,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         aspectsBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
             viewModel.setAspectsOpen(false)
-        }
-        // Without a tap to focus, the brightness button brings the bar up beside the middle of the image.
-        controls.brightnessButton.setOnClickListener {
-            val open = !viewModel.uiState.value.brightnessOpen
-            brightnessAnchor = null
-            viewModel.setBrightnessOpen(open)
-            if (open) holdBrightness()
         }
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
@@ -936,7 +931,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
      */
     private fun setupTip(controls: FragmentCameraBinding) {
         (controls.root as TouchWatchingLayout).onTouchEnd = { event ->
-            viewModel.onAnyTouch()
+            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again.
+            if (!controls.tipButtonFrame.isUnder(event, controls.root)) viewModel.onAnyTouch()
             // The ratios close at a touch anywhere but on them or their button, which opens and closes them itself.
             if (!controls.aspectButton.isUnder(event, controls.root) &&
                 !controls.aspectPanel.isUnder(event, controls.root)
@@ -1056,7 +1052,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.flashButton.setIconResource(if (camera.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
             controls.flashButton.contentDescription =
                 getString(if (camera.torch) R.string.scene_light_on else R.string.scene_light_off)
-            controls.brightnessButton.isVisible = false
             showExposureBar(controls, false)
         }
         if (active) {
@@ -1142,9 +1137,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
         val range = state.exposureRange
         val hasBrightness = range.first < range.last
-        controls.brightnessButton.isVisible = hasBrightness
-        controls.brightnessButton.isChecked = state.brightnessOpen
-        controls.brightnessButton.isEnabled = ready
         controls.exposureBar.render(range, state.exposure, enabled = ready && hasBrightness)
         placeExposureBar(controls, state)
         showExposureBar(controls, state.brightnessOpen && hasBrightness)
@@ -1204,7 +1196,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         brightnessIdleJob?.cancel()
         brightnessIdleJob = viewLifecycleOwner.lifecycleScope.launch {
             delay(BRIGHTNESS_IDLE_MS)
-            if (binding?.exposureBar?.isDragging != true) viewModel.setBrightnessOpen(false)
+            if (binding?.exposureBar?.isHeld != true) viewModel.setBrightnessOpen(false)
         }
     }
 
@@ -1250,15 +1242,63 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /** An exposure index in EV, such as "+0.7" or "0". */
     private fun formatEv(index: Int): String = ExposureScale.formatEv(index, viewModel.uiState.value.exposureStep)
 
-    /** A tap on the preview: focus there if it is inside the camera image, and show where (FR-1.4). */
+    /**
+     * A drag up or down on the preview (FR-1.11, Design 2.8): with the bar up after a tap to focus, it moves the
+     * brightness on from there; without it, the drag focuses where it started first, as a tap would, so it starts
+     * from the base brightness. Either way it moves the bar's sun as a drag on the bar would.
+     */
+    private val previewBrightnessDrag = object : PinchZoomController.VerticalDrag {
+        override fun onStart(x: Float, y: Float): Boolean {
+            val controls = binding ?: return false
+            val state = viewModel.uiState.value
+            if (state.exposureRange.first >= state.exposureRange.last || isScenePhotoActive()) return false
+            if (!state.brightnessOpen || !controls.exposureBar.isVisible) {
+                onPreviewTap(x, y)
+                if (!viewModel.uiState.value.brightnessOpen) return false
+                // The focus went back to the base brightness; the sun starts there, before the camera's echo.
+                val base = viewModel.baseExposureIndex() ?: return false
+                controls.exposureBar.render(state.exposureRange, base, enabled = true)
+            }
+            if (!viewModel.uiState.value.brightnessOpen) return false
+            controls.exposureBar.startDrag()
+            return controls.exposureBar.isDragging
+        }
+
+        override fun onMove(up: Float) {
+            binding?.exposureBar?.dragTo(up)
+        }
+
+        override fun onEnd() {
+            binding?.exposureBar?.finishDrag()
+        }
+    }
+
+    /**
+     * A tap on the preview inside the camera image: focus there and show where (FR-1.4), and bring the brightness bar
+     * beside it, back at the base brightness (FR-1.11).
+     */
     private fun onPreviewTap(x: Float, y: Float) {
         val controls = binding ?: return
         val state = viewModel.uiState.value
-        if (state.cameraStatus != CameraStatus.READY || !state.supportsFocusPoint || isScenePhotoActive()) return
+        val hasBrightness = state.exposureRange.first < state.exposureRange.last
+        if (state.cameraStatus != CameraStatus.READY || isScenePhotoActive()) return
+        if (!state.supportsFocusPoint && !hasBrightness) return
         val preview = controls.previewView
         val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
         if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return
         viewModel.onFocusTap((x - frame.left) / frame.width, (y - frame.top) / frame.height)
+        if (state.supportsFocusPoint) showFocusRing(controls, x, y)
+        // Brightness is set beside where the camera focused (FR-1.11, Design 2.8), or where the tap was on a camera
+        // that cannot focus on a point.
+        if (hasBrightness) {
+            brightnessAnchor = PointF(x, y)
+            viewModel.setBrightnessOpen(true)
+            placeExposureBar(controls, viewModel.uiState.value)
+            holdBrightness()
+        }
+    }
+
+    private fun showFocusRing(controls: FragmentCameraBinding, x: Float, y: Float) {
         val ring = controls.focusRing
         ring.animate().cancel()
         ring.translationX = x - ring.layoutParams.width / 2f
@@ -1270,13 +1310,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         ring.animate().scaleX(1f).scaleY(1f).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
             ring.animate().alpha(0f).setStartDelay(FOCUS_RING_HOLD_MS).setDuration(FOCUS_RING_FADE_MS)
                 .withEndAction { ring.isVisible = false }
-        }
-        // Brightness is set beside where the camera focused (FR-1.11, Design 2.8).
-        if (state.exposureRange.first < state.exposureRange.last) {
-            brightnessAnchor = PointF(x, y)
-            viewModel.setBrightnessOpen(true)
-            placeExposureBar(controls, viewModel.uiState.value)
-            holdBrightness()
         }
     }
 

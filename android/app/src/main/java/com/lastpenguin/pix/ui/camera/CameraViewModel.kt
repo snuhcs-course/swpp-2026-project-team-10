@@ -191,6 +191,8 @@ class CameraViewModel(
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
     /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
     private val photos: PhotoShare = PhotoShare.None,
+    /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
+    private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
@@ -254,6 +256,15 @@ class CameraViewModel(
                 pendingZoomStep = null
                 _uiState.update { it.copy(facing = facing) }
             }
+        }
+        viewModelScope.launch {
+            // The base brightness, once the camera's range is known and whenever the setting or the camera changes;
+            // what a drag added is gone with it (FR-1.11).
+            camera.capabilities
+                .map { it?.exposureRange to it?.exposureStep }
+                .distinctUntilChanged()
+                .combine(baseBrightness) { _, _ -> }
+                .collect { applyBaseBrightness() }
         }
         viewModelScope.launch {
             camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
@@ -410,15 +421,33 @@ class CameraViewModel(
         return true
     }
 
-    /** A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4); the camera focuses and meters there. */
+    /**
+     * A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4): the camera focuses and meters there if it can, and
+     * the brightness goes back to the base.
+     */
     fun onFocusTap(x: Float, y: Float) {
         val state = _uiState.value
-        if (state.cameraStatus != CameraStatus.READY || !state.supportsFocusPoint) return
+        if (state.cameraStatus != CameraStatus.READY) return
         if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
-        camera.setFocusPoint(x, y)
+        if (state.supportsFocusPoint) camera.setFocusPoint(x, y)
+        // A new tap drops the brightness a drag added after the last one, back to the base (FR-1.11), also on a camera
+        // that cannot focus on a point.
+        applyBaseBrightness()
     }
 
-    /** From the brightness slider: each step is applied as it comes, like a pinch zoom (FR-1.11). */
+    /** The exposure index of the base brightness for this camera, or null without exposure compensation. */
+    fun baseExposureIndex(): Int? {
+        val capabilities = camera.capabilities.value ?: return null
+        val range = capabilities.exposureRange
+        if (range.first >= range.last) return null
+        return ExposureScale.indexOf(baseBrightness.value, capabilities.exposureStep, range)
+    }
+
+    private fun applyBaseBrightness() {
+        baseExposureIndex()?.let(camera::setExposure)
+    }
+
+    /** From the brightness bar or a drag on the preview: each step is applied as it comes, like a pinch zoom (FR-1.11). */
     fun onExposureChange(index: Int) {
         val range = _uiState.value.exposureRange
         if (range.first >= range.last) return

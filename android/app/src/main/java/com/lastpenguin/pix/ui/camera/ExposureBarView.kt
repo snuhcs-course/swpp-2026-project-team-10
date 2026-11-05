@@ -20,8 +20,9 @@ import kotlin.math.sin
 /**
  * The brightness beside the focus (FR-1.11, Design 2.8): a thin vertical line with a sun on it at the applied exposure
  * index. A drag anywhere on it moves the sun, up for brighter and down for darker, from where it was; each step is
- * reported as it comes and the last once more as final when the finger lifts, like a pinch zoom. TalkBack reads it as a
- * slider and moves it a step at a time.
+ * reported as it comes and the last once more as final when the finger lifts, like a pinch zoom. A drag up or down on
+ * the preview moves it the same way ([startDrag], [dragTo]). TalkBack reads it as a slider and moves it a step at a
+ * time; while it has TalkBack's focus, it counts as touched, so the screen keeps it up.
  */
 class ExposureBarView @JvmOverloads constructor(
     context: Context,
@@ -47,7 +48,6 @@ class ExposureBarView @JvmOverloads constructor(
         strokeCap = Paint.Cap.ROUND
     }
     private var range: IntRange = 0..0
-    private var downY = 0f
     private var downIndex = 0
 
     /** The index the sun shows: the applied one, or the finger's while a drag runs. */
@@ -57,6 +57,12 @@ class ExposureBarView @JvmOverloads constructor(
     /** A drag is moving the sun; the screen keeps the bar up and leaves the sun under the finger. */
     var isDragging: Boolean = false
         private set
+
+    // TalkBack's focus is on the bar.
+    private var focused = false
+
+    /** A drag or TalkBack's focus is on the bar, so the screen keeps it up. */
+    val isHeld: Boolean get() = isDragging || focused
 
     /** Each new index, and the last again with `final` when the drag ends. */
     var onChange: ((index: Int, final: Boolean) -> Unit)? = null
@@ -127,28 +133,42 @@ class ExposureBarView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
-                isDragging = true
                 downY = event.y
-                downIndex = index
-                onTouching?.invoke(true)
+                startDrag()
             }
 
-            MotionEvent.ACTION_MOVE -> {
-                val travel = height - 2 * SUN_DP * density
-                if (travel <= 0f) return true
-                val steps = (downY - event.y) / travel * (range.last - range.first)
-                val next = (downIndex + steps.roundToInt()).coerceIn(range)
-                if (next != index) {
-                    index = next
-                    ViewCompat.setStateDescription(this, describe(index))
-                    invalidate()
-                    onChange?.invoke(index, false)
-                }
-            }
+            MotionEvent.ACTION_MOVE -> dragTo(downY - event.y)
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> finishDrag()
         }
         return true
+    }
+
+    private var downY = 0f
+
+    /** A drag starts from the index shown, on the bar or on the preview. */
+    fun startDrag() {
+        if (!isEnabled || isDragging) return
+        isDragging = true
+        downIndex = index
+        onTouching?.invoke(true)
+    }
+
+    /** The finger is [up] pixels above where the drag started: the sun moves as far, the bar's length the range. */
+    fun dragTo(up: Float) {
+        if (!isDragging) return
+        // A drag on the preview can start before the bar, just shown, is laid out: its own height stands in then.
+        val length = if (height > 0) height else layoutParams?.height ?: 0
+        val travel = length - 2 * SUN_DP * density
+        if (travel <= 0f) return
+        val steps = up / travel * (range.last - range.first)
+        val next = (downIndex + steps.roundToInt()).coerceIn(range)
+        if (next != index) {
+            index = next
+            ViewCompat.setStateDescription(this, describe(index))
+            invalidate()
+            onChange?.invoke(index, false)
+        }
     }
 
     /** Ends a drag in progress with its final value, as when the screen pauses under the finger. */
@@ -176,6 +196,18 @@ class ExposureBarView @JvmOverloads constructor(
     }
 
     override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
+        // TalkBack's focus holds the bar up as a finger on it would, until the focus moves on.
+        when (action) {
+            AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS -> {
+                focused = true
+                onTouching?.invoke(true)
+            }
+
+            AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS -> {
+                focused = false
+                onTouching?.invoke(false)
+            }
+        }
         if (!isEnabled) return super.performAccessibilityAction(action, arguments)
         val next = when (action) {
             AccessibilityNodeInfo.ACTION_SCROLL_FORWARD -> index + 1

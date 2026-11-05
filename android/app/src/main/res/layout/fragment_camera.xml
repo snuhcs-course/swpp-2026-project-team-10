@@ -263,9 +263,9 @@
             android:importantForAccessibility="no"
             android:visibility="gone" />
 
-        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused, or beside the middle of the image from the
-             brightness button; drag up for brighter. It fades out after a few seconds without a touch (Design 2.8).
-             48 dp wide for the touch (NFR-16); placed in code. -->
+        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused; a drag up on it or on the preview adds to
+             the base brightness from Settings until the next tap. It fades out after a few seconds without a touch
+             (Design 2.8). 48 dp wide for the touch (NFR-16); placed in code. -->
         <com.lastpenguin.pix.ui.camera.ExposureBarView
             android:id="@+id/exposureBar"
             android:layout_width="48dp"
@@ -549,10 +549,10 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- The brightness button, the applied zoom (FR-1.3), which a pinch on the preview changes, the pose tip's
-         button, and the guide-edit mode toggle, over the bottom of the image whatever the ratio, above the panels
-         below when they reach into it (placed in code); the same row as Subject view, which has no tip. The readout keeps the Zoom in / Zoom out
-         accessibility actions. -->
+    <!-- The applied zoom (FR-1.3), which a pinch on the preview changes, the pose tip's button, and the guide-edit
+         mode toggle, over the bottom of the image whatever the ratio, above the panels below when they reach into it
+         (placed in code); the same row as Subject view, which has no tip and keeps a brightness button, since the base
+         brightness is in Settings here (FR-1.11). The readout keeps the Zoom in / Zoom out accessibility actions. -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
@@ -563,22 +563,6 @@
         app:layout_constraintBottom_toTopOf="@id/bottomPanel"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
-
-        <!-- Opens the brightness bar at the middle of the image's right edge (FR-1.11), without a tap to focus; checked while
-             the bar is up. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/brightnessButton"
-            style="@style/Widget.Pix.Button.Icon"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="start|center_vertical"
-            android:checkable="true"
-            android:contentDescription="@string/brightness"
-            android:visibility="gone"
-            app:backgroundTint="@color/brightness_button_background"
-            app:icon="@drawable/ic_brightness"
-            app:iconTint="@color/brightness_button_icon"
-            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/zoomReadout"

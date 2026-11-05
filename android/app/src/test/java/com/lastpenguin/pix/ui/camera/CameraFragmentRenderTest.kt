@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -136,9 +136,9 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)
             assertEquals(View.INVISIBLE, controls.hintText.visibility)
-            // No flash and no exposure range in the capabilities: both controls are hidden (FR-1.11, FR-1.12).
+            // No flash and no exposure range in the capabilities: neither the flash nor brightness shows (FR-1.11, FR-1.12).
             assertEquals(View.GONE, controls.flashButton.visibility)
-            assertEquals(View.GONE, controls.brightnessButton.visibility)
+            assertEquals(View.GONE, controls.exposureBar.visibility)
             assertFalse(controls.galleryButton.isEnabled)
         }
     }
@@ -320,20 +320,19 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun exposureRange_showsTheBrightnessButtonAndATapOpensTheBarAtTheRightEdge() {
+    fun aBarUpWithoutATapToFocus_asAfterTheScreenIsMadeAgain_standsAtTheRightEdge() {
         launch(FakeCameraController(exposureRange = -4..4))
+        // No button opens it: the base brightness is in Settings (FR-1.11), and a tap to focus brings the bar.
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.exposureBar.visibility) }
 
-        onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.brightnessButton.visibility)
-            assertEquals(View.GONE, controls.exposureBar.visibility)
-            controls.brightnessButton.performClick()
+        onScreen { _, fragment ->
+            ViewModelProvider(fragment, PixViewModels.Factory)[CameraViewModel::class.java].setBrightnessOpen(true)
         }
         idle()
 
         onScreen { controls, _ ->
             val bar = controls.exposureBar
             val preview = controls.previewView
-            assertTrue(controls.brightnessButton.isChecked)
             assertEquals(View.VISIBLE, bar.visibility)
             assertTrue(bar.isEnabled)
             assertEquals(0, bar.index)
@@ -342,10 +341,7 @@ class CameraFragmentRenderTest {
             val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), 3f / 4f)
             assertEquals(frame.right - bar.width, bar.translationX, 1f)
             assertEquals(frame.centerY - bar.height / 2f, bar.translationY, 1f)
-            controls.brightnessButton.performClick()
         }
-        idle()
-        onScreen { controls, _ -> assertEquals(View.GONE, controls.exposureBar.visibility) }
     }
 
     @Test
@@ -387,7 +383,7 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.flashButton.visibility)
             assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
             assertEquals(View.GONE, controls.aspectButton.visibility)
-            assertEquals(View.GONE, controls.brightnessButton.visibility)
+            assertEquals(View.GONE, controls.exposureBar.visibility)
             assertEquals(View.GONE, controls.guideOverlay.visibility)
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)

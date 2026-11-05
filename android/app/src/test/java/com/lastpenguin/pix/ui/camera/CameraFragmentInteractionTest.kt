@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -511,14 +512,12 @@ class CameraFragmentInteractionTest {
 
     @Test
     fun theSliders_sendOpacityAndBrightness_andTheRatioButtonCyclesTheRatio() {
-        val camera = FakeCameraController(exposureRange = -4..4)
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
         val modules = launch(camera)
-        modules.guides.setGuide(guide())
+        // A tap to focus brings the brightness bar up; then the guide, whose edit mode takes the preview's touches.
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
         idle()
-
-        onScreen { controls, _ ->
-            controls.brightnessButton.performClick()
-        }
+        modules.guides.setGuide(guide())
         idle()
         onScreen { controls, _ ->
             slide(controls.opacitySlider, 0.8f)
@@ -593,7 +592,6 @@ class CameraFragmentInteractionTest {
             val bar = controls.exposureBar
             val density = bar.resources.displayMetrics.density
             assertTrue(bar.isShown)
-            assertTrue(controls.brightnessButton.isChecked)
             // On the box's right, its 48 dp touch area reaching 12 dp over the 64 dp box, and centered on the tap.
             assertEquals(x + 32f * density - 12f * density, bar.translationX, 1f)
             assertEquals(y - bar.height / 2f, bar.translationY, 1f)
@@ -613,10 +611,118 @@ class CameraFragmentInteractionTest {
         idle()
         assertTrue(camera.exposureRequests.last() < 2)
         shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertFalse(controls.exposureBar.isShown) }
+    }
+
+    @Test
+    fun theBaseBrightnessFromSettings_isWhereTheCameraStarts_andEachTapToFocusGoesBackToIt() {
+        // 0.5 EV per index: +1 EV is index 2.
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        val modules = launch(camera)
+        assertEquals(0, camera.exposureRequests.last())
+
+        runBlocking { modules.appSettings.setBaseBrightness(1f) }
+        idle()
+        assertEquals(2, camera.exposureRequests.last())
+
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+        idle()
+        onScreen { controls, _ -> drag(controls.exposureBar, steps = 2) }
+        idle()
+        assertEquals(4, camera.exposureRequests.last())
+
+        // A new focus drops what the drag added, and keeps the base.
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
+        idle()
+        assertEquals(2, camera.exposureRequests.last())
+        assertEquals(2, camera.focusPoints.size)
+    }
+
+    @Test
+    fun aDragUpOrDownOnThePreview_focusesWhereItStarts_andMovesTheBrightness_thenGoesOnFromThereWhileTheBarIsUp() {
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        launch(camera)
+
+        // Straight from the finger's down, without lifting: it focuses there and the bar's sun follows the finger.
         onScreen { controls, _ ->
-            assertFalse(controls.exposureBar.isShown)
-            assertFalse(controls.brightnessButton.isChecked)
+            val preview = controls.previewView
+            val bar = controls.exposureBar
+            val x = preview.width / 3f
+            val y = preview.height / 2f
+            val dy = previewDrag(bar, steps = 2)
+            touch(preview, MotionEvent.ACTION_DOWN, Pointer(1, x, y))
+            touch(preview, MotionEvent.ACTION_MOVE, Pointer(1, x, y - dy / 2f))
+            touch(preview, MotionEvent.ACTION_MOVE, Pointer(1, x, y - dy))
+            touch(preview, MotionEvent.ACTION_UP, Pointer(1, x, y - dy))
         }
+        idle()
+        assertEquals(1, camera.focusPoints.size)
+        assertEquals(2, camera.exposureRequests.last())
+        onScreen { controls, _ -> assertTrue(controls.exposureBar.isShown) }
+
+        // With the bar up, another drag goes on from there, down this time, without focusing again.
+        onScreen { controls, _ ->
+            val preview = controls.previewView
+            val dy = previewDrag(controls.exposureBar, steps = 3)
+            touch(preview, MotionEvent.ACTION_DOWN, Pointer(1, 40f, 300f))
+            touch(preview, MotionEvent.ACTION_MOVE, Pointer(1, 40f, 300f + dy))
+            touch(preview, MotionEvent.ACTION_UP, Pointer(1, 40f, 300f + dy))
+        }
+        idle()
+        assertEquals(1, camera.focusPoints.size)
+        assertEquals(-1, camera.exposureRequests.last())
+    }
+
+    @Test
+    fun aSidewaysDragOnThePreview_isNoBrightness() {
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        launch(camera)
+        val before = camera.exposureRequests.toList()
+
+        onScreen { controls, _ ->
+            val preview = controls.previewView
+            touch(preview, MotionEvent.ACTION_DOWN, Pointer(1, 100f, 300f))
+            touch(preview, MotionEvent.ACTION_MOVE, Pointer(1, 400f, 320f))
+            touch(preview, MotionEvent.ACTION_UP, Pointer(1, 400f, 320f))
+        }
+        idle()
+        assertEquals(before, camera.exposureRequests)
+        assertTrue(camera.focusPoints.isEmpty())
+    }
+
+    @Test
+    fun talkBacksFocusOnTheBrightnessBar_keepsItUp_pastTheIdleTime() {
+        launch(FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true))
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+        idle()
+
+        onScreen { controls, _ ->
+            controls.exposureBar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertTrue(controls.exposureBar.isShown)
+            controls.exposureBar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null)
+            controls.exposureBar.performAccessibilityAction(
+                AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS,
+                null,
+            )
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertFalse(controls.exposureBar.isShown) }
+    }
+
+    /** A tap to focus at [x] on the preview's middle line. */
+    private fun tapPreview(controls: FragmentCameraBinding, x: Float) {
+        val preview = controls.previewView
+        touch(preview, MotionEvent.ACTION_DOWN, Pointer(1, x, preview.height / 2f))
+        touch(preview, MotionEvent.ACTION_UP, Pointer(1, x, preview.height / 2f))
+    }
+
+    /** How far a finger moves for [steps] exposure indexes on [bar], whose length is the range (-4..4 here). */
+    private fun previewDrag(bar: ExposureBarView, steps: Int): Float {
+        val travel = bar.layoutParams.height - 14f * bar.resources.displayMetrics.density
+        return travel * steps / 8f
     }
 
     @Test
@@ -809,7 +915,7 @@ class CameraFragmentInteractionTest {
     /** A drag up the brightness bar by [steps] exposure indexes (down for negative ones), from its middle. */
     private fun drag(bar: ExposureBarView, steps: Int) {
         assertTrue(bar.height > 0)
-        val travel = bar.height - 20f * bar.resources.displayMetrics.density
+        val travel = bar.height - 14f * bar.resources.displayMetrics.density
         val dy = travel * steps / 8f
         touch(bar, MotionEvent.ACTION_DOWN, Pointer(1, bar.width / 2f, bar.height / 2f))
         touch(bar, MotionEvent.ACTION_MOVE, Pointer(1, bar.width / 2f, bar.height / 2f - dy))

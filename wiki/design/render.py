@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 """Render the drawings in wiki/design/ to the images the wiki pages show.
 
 Each drawing has one image in wiki/images/, named after it:
@@ -23,16 +23,16 @@ that `wireframes/ko.json` lists under `notes` stay in English, except where they
 the button an arrow starts from: that part is marked `data-ui` (`tap <span data-ui>Shoot together</span>`) and becomes
 the same Korean as on the screen. A screen's text that is one of the English strings of
 `android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in, becomes that string's
-Korean from `values-ko`. The rest, such as the screens the app does not have yet, is in ko.json under the flow's name,
-which also keeps the names and Pix IDs of the flow's people as they are. A screen's text with a Latin letter that
-neither gives, or an entry the flow no longer uses, stops the render, so ko.json changes with the drawing; render the
-flows again after a Korean string changes. Anything as wide as its content in the app (a chip, a button, a line of text
-its parent centers, or a row of them) is drawn as one element marked `data-fit` (left, center, or right: the side its
-parent keeps it at), and in Korean it takes its content's width from that side. A dialog is one box whose content flows,
-centered on the screen, with its buttons in a row that wraps (`flex-flow: row-reverse wrap`): as in the app, they stand
-side by side when they fit and stack at the right when they do not, so the Korean dialog takes its own height and its
-own buttons' places. A sheet whose text sets its height, such as the room code's, flows the same way from the screen's
-bottom.
+Korean from `values-ko`; a quantity string's English forms ("1 invite", "2 invites") become its Korean `other`. The
+rest, such as the screens the app does not have yet, is in ko.json under the flow's name, which also keeps the names and
+Pix IDs of the flow's people as they are. A screen's text with a Latin letter that neither gives, or an entry the flow
+no longer uses, stops the render, so ko.json changes with the drawing; render the flows again after a Korean string
+changes. Anything as wide as its content in the app (a chip, a button, a line of text its parent centers, or a row of
+them) is drawn as one element marked `data-fit` (left, center, or right: the side its parent keeps it at), and in Korean
+it takes its content's width from that side. A dialog is one box whose content flows, centered on the screen, with its
+buttons in a row that wraps (`flex-flow: row-reverse wrap`): as in the app, they stand side by side when they fit and
+stack at the right when they do not, so the Korean dialog takes its own height and its own buttons' places. A sheet
+whose text sets its height, such as the room code's, flows the same way from the screen's bottom.
 
 Change the drawing, never the image alone, and render it in the same PR:
 
@@ -110,8 +110,8 @@ def clean(text: str) -> str:
     return " ".join(text.replace("\u2019", "'").split())
 
 
-def android_strings(folder: str) -> tuple[dict[str, str], dict[str, list[str]]]:
-    """The strings and the string arrays of one values folder, unescaped."""
+def android_strings(folder: str) -> tuple[dict[str, str], dict[str, list[str]], dict[str, dict[str, str]]]:
+    """The strings, the string arrays, and the quantity strings (by quantity) of one values folder, unescaped."""
 
     def unescape(text: str | None) -> str:
         return (text or "").replace("\\'", "'").replace('\\"', '"').replace("\\@", "@").replace("\\n", " ")
@@ -119,7 +119,11 @@ def android_strings(folder: str) -> tuple[dict[str, str], dict[str, list[str]]]:
     root = ElementTree.parse(STRINGS / folder / "strings.xml").getroot()
     strings = {e.get("name"): unescape(e.text) for e in root.iter("string")}
     arrays = {e.get("name"): [unescape(item.text) for item in e.iter("item")] for e in root.iter("string-array")}
-    return strings, arrays
+    plurals = {
+        e.get("name"): {item.get("quantity"): unescape(item.text) for item in e.iter("item")}
+        for e in root.iter("plurals")
+    }
+    return strings, arrays, plurals
 
 
 class Korean:
@@ -132,8 +136,8 @@ class Korean:
         self.notes = {clean(text).casefold() for text in entries.get("notes", [])}
         self.written = {clean(text).casefold(): text for group in entries.values() for text in group}
         self.used: set[str] = set()
-        english, english_arrays = android_strings("values")
-        korean, korean_arrays = android_strings("values-ko")
+        english, english_arrays, english_plurals = android_strings("values")
+        korean, korean_arrays, korean_plurals = android_strings("values-ko")
         self.strings: dict[str, str] = {}
         formats = []
         for name, text in english.items():
@@ -144,6 +148,10 @@ class Korean:
         for name, items in english_arrays.items():
             for text, translated in zip(items, korean_arrays.get(name, [])):
                 self.strings.setdefault(clean(text).casefold(), translated)
+        # Korean counts with "other" alone, so each English quantity ("1 invite", "2 invites") takes it.
+        for name, items in english_plurals.items():
+            for text in items.values():
+                formats.append((self.pattern(text), korean_plurals.get(name, {}).get("other"), text))
         # The longest words first, so "%1$s left" does not take a text that a longer string matches.
         self.formats = sorted(formats, key=lambda f: -len(ARGUMENT.sub("", f[2])))
 

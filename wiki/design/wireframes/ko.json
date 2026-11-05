@@ -54,6 +54,13 @@
       "Walking away, looking back": "걸어가며 뒤돌아보기"
     }
   },
+  "flow6_room_code_prototype": {
+    "keep": [
+      "Test Account 2",
+      "Test Account 3",
+      "T"
+    ]
+  },
   "flow7_settings": {
     "keep": [
       "AndroidX (CameraX, Navigation, DataStore, Credentials)",

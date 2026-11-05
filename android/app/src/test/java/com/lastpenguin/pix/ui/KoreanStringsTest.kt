@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import java.io.File
@@ -11,9 +11,10 @@ import org.w3c.dom.Element
 /*
  * The Korean strings (FR-10.2, Iter3-P7; Testing Documentation 2.1.6), read from values/ and values-ko/ as written.
  * Android Lint's MissingTranslation already fails a key without Korean; these check what lint does not. Format
- * arguments: none, one, two in another order (ready_count), and a Korean string that drops one or adds one. Language:
- * a Korean string in Hangul, one left in English, and a name Korean keeps (Pix ID). Not translated: a string without
- * words, the app's name, and a sentence marked so. The idea chips: the same number, each within the description field.
+ * arguments: none, one, two in another order (ready_count), one with a width (invitation_time_left), and a Korean
+ * string that drops one or adds one; a quantity string's Korean (only `other`) against the English `other`. Language:
+ * a Korean string or quantity in Hangul, one left in English, and a name Korean keeps (Pix ID). Not translated: a
+ * string without words, the app's name, and a sentence marked so. The idea chips: the same number, each within the description field.
  * Fonts: a text style that names a @font/pix_* alias or DM Mono, one that names a Manrope file itself (which would leave
  * Korean in the phone's font), and an alias with and without its Korean (Pretendard) counterpart in res/font-ko/.
  */
@@ -28,6 +29,17 @@ class KoreanStringsTest {
             arguments(text) != arguments(english.strings.getValue(key))
         }
         assertEquals(emptyMap<String, String>(), different)
+    }
+
+    @Test
+    fun everyKoreanQuantity_hasTheEnglishFormatArguments_andIsInHangul() {
+        // Korean counts with `other` alone; each of its quantities must still take the English count.
+        val wrong = korean.plurals.flatMap { (key, items) ->
+            val english = arguments(this.english.plurals.getValue(key).getValue("other"))
+            items.filter { (_, text) -> arguments(text) != english || HANGUL !in text }.map { "$key/${it.key}" }
+        }
+        assertEquals(emptyList<String>(), wrong)
+        assertTrue(korean.plurals.isNotEmpty())
     }
 
     @Test
@@ -72,11 +84,14 @@ class KoreanStringsTest {
     private fun arguments(text: String): List<String> =
         ARGUMENT.findAll(text.replace("%%", "")).map { it.value }.sorted().toList()
 
-    /** One strings.xml: the translatable strings, the ones marked not translatable, and the arrays. */
+    /** One strings.xml: the translatable strings, the ones marked not translatable, the arrays, and the plurals. */
     private class Strings(file: File) {
         val strings = mutableMapOf<String, String>()
         val untranslatable = mutableMapOf<String, String>()
         val arrays = mutableMapOf<String, List<String>>()
+
+        /** Each quantity string's texts by quantity (`one`, `other`). */
+        val plurals = mutableMapOf<String, Map<String, String>>()
 
         init {
             val root = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file).documentElement
@@ -96,13 +111,20 @@ class KoreanStringsTest {
                         val items = element.getElementsByTagName("item")
                         arrays[name] = (0 until items.length).map { items.item(it).textContent }
                     }
+
+                    "plurals" -> {
+                        val items = element.getElementsByTagName("item")
+                        plurals[name] = (0 until items.length).map { items.item(it) as Element }
+                            .associate { it.getAttribute("quantity") to it.textContent }
+                    }
                 }
             }
         }
     }
 
     private companion object {
-        val ARGUMENT = Regex("""%(\d+\$)?[a-zA-Z]""")
+        // %1$s, %d, and %2$02d, with flags and a width.
+        val ARGUMENT = Regex("""%(\d+\$)?[-#+ 0,(]*\d*[a-zA-Z]""")
         val HANGUL = Regex("""\p{IsHangul}""")
         val LETTER = Regex("""\p{L}""")
     }

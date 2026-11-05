@@ -263,9 +263,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.setOnClickListener {
             findNavController().navigate(R.id.action_camera_to_addGuide)
         }
-        // Friends, which also offers the room code without signing in (FR-8.1).
+        // Who takes the photo? first, then that phone's ways to connect (FR-5.2, R&S 6.7).
         controls.shootTogetherButton.setOnClickListener {
-            findNavController().navigate(R.id.action_camera_to_friends)
+            findNavController().navigate(R.id.action_camera_to_shootTogether)
         }
         controls.settingsButton.setOnClickListener {
             findNavController().navigate(R.id.action_camera_to_settings)

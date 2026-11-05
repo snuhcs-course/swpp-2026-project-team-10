@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -204,11 +204,11 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         }
     }
 
-    /** The account sheet once signed in; signed out, Friends, which offers signing in and the room code (FR-5.1). */
+    /** The account sheet once signed in; signed out, Sign in, which comes back here (FR-10.5). */
     private fun openAccount() {
         when (viewModel.account.value) {
             is AuthState.SignedIn -> findNavController().navigate(R.id.action_settings_to_account)
-            AuthState.SignedOut -> findNavController().navigate(R.id.action_settings_to_friends)
+            AuthState.SignedOut -> findNavController().navigate(R.id.action_settings_to_signIn)
             AuthState.Loading -> Unit
         }
     }

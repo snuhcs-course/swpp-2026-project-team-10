@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.core.os.bundleOf
@@ -36,8 +36,10 @@ import org.robolectric.shadows.ShadowToast
  * with its deep link's argument. Partitions: an open invitation (who invites, Accept and Decline); Accept taking the
  * place (Subject view once the session has it, also when it connected while the screen was stopped or after the screen
  * was recreated) or finding the session gone (no longer available); Accept with another session open on this phone,
- * before the answer (said, nothing accepted) or after it (said, no longer available); Decline (the camera); not open
- * any more (no longer available, Back to camera only); signed out (Sign in, through Friends); not loaded (Try again).
+ * before the answer (said, nothing accepted) or after it (said, no longer available), or with a room this phone waits
+ * in alone after its subject left (the room ended, then accepted; #188); Decline (the camera); not open
+ * any more (no longer available, Back to camera only); signed out (Sign in itself, which comes back here; through
+ * Friends until #188); not loaded (Try again).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -169,6 +171,21 @@ class InvitationFragmentTest {
     }
 
     @Test
+    fun accept_whileThisPhoneWaitsInARoomAlone_endsTheRoom_thenAccepts() {
+        val modules = launch()
+        modules.session.endsOnLeave = true
+        modules.session.setState(SessionState.Waiting("482915"))
+        idle()
+
+        onScreen { binding -> binding.primaryButton.performClick() }
+        idle()
+
+        assertEquals(listOf(EndReason.CANCELLED), modules.session.leaves)
+        assertEquals(listOf("open:inv_1", "accept:inv_1"), modules.invitations.calls)
+        assertEquals(SessionEntry.Invitation::class, modules.session.starts.single().first::class)
+    }
+
+    @Test
     fun accept_answeredAsASessionOpensHere_saysSo_andTheInvitationIsGone() {
         val modules = launch()
         // The server's answer comes after another session opened on this phone.
@@ -219,7 +236,7 @@ class InvitationFragmentTest {
     }
 
     @Test
-    fun signedOut_offersToSignIn_throughFriends() {
+    fun signedOut_opensSignIn() {
         launch { it.auth.expire() }
 
         onScreen { binding ->
@@ -230,7 +247,7 @@ class InvitationFragmentTest {
         }
         idle()
 
-        assertEquals(R.id.friendsFragment, nav.currentDestination?.id)
+        assertEquals(R.id.signInFragment, nav.currentDestination?.id)
     }
 
     @Test

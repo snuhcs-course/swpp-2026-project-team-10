@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.push
 
 import android.Manifest
@@ -19,8 +19,9 @@ import com.lastpenguin.pix.R
 
 /**
  * The notifications that pushes ask for (Design 2.6.6): an invitation, which opens the *Invitation* screen, and a friend
- * request, which opens *Friends* (FR-5.7). Pushes are FCM data messages, so Pix writes every notification itself, in
- * the phone's language, whether Pix is closed, in the background, or in front. Owner: Real-time (#119).
+ * request, which opens *Share my camera* with its requests (FR-5.7). Pushes are FCM data messages, so Pix writes every
+ * notification itself, in the phone's language, whether Pix is closed, in the background, or in front. An invitation
+ * answered from See their camera's list takes its notification away (FR-6.17). Owner: Real-time (#119).
  */
 object PushNotifications {
     const val INVITATIONS = "invitations"
@@ -50,6 +51,11 @@ object PushNotifications {
         createChannels(context)
         NotificationManagerCompat.from(context).notify(id, notification)
         return true
+    }
+
+    /** Takes away the notification of an invitation answered in Pix, which would otherwise open it as gone. */
+    fun cancelInvitation(context: Context, invitationId: String) {
+        NotificationManagerCompat.from(context).cancel(invitationId.hashCode())
     }
 
     private fun invitation(context: Context, data: Map<String, String>, now: Long): Pair<Int, Notification>? {

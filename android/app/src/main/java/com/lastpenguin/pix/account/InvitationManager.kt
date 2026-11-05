@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.InviteBody
@@ -9,7 +9,7 @@ import com.lastpenguin.pix.core.network.SessionPlaceDto
 import com.lastpenguin.pix.session.SessionPlace
 
 /**
- * Invitations to shoot together (Design 2.1, 2.6.6; FR-6.1–6.4, FR-6.9). Sending opens the session on the server with
+ * Invitations to shoot together (Design 2.1, 2.6.6; FR-6.1–6.4, FR-6.9, FR-6.17). Sending opens the session on the server with
  * the photographer's place, and accepting gives the friend theirs; the session itself starts in [SessionManager]
  * with `SessionEntry.Invite` or `SessionEntry.Invitation`. Failures are [AccountException]: NOT_FRIENDS, BUSY,
  * INVITATION_GONE, NOT_FOUND, or the phone's own (OFFLINE, SIGNED_OUT). Owner: Real-time (#119).
@@ -22,6 +22,9 @@ interface InvitationManager {
 
     /** The invitation a push or a link names, without a sign-in; NOT_FOUND for an unknown one. */
     suspend fun open(invitationId: String): Result<OpenedInvitation>
+
+    /** The pending invitations this sign-in received that have not expired, newest first (FR-6.17). */
+    suspend fun incoming(): Result<List<OpenedInvitation>>
 
     /** The friend accepts: their place in the session. INVITATION_GONE once it was answered or expired. */
     suspend fun accept(invitationId: String): Result<SessionPlace>
@@ -40,6 +43,9 @@ class RemoteInvitationManager(private val api: PixAccountApi) : InvitationManage
 
     override suspend fun open(invitationId: String): Result<OpenedInvitation> =
         accountCall { api.invitation(invitationId).toOpenedInvitation() }
+
+    override suspend fun incoming(): Result<List<OpenedInvitation>> =
+        accountCall { api.incomingInvitations().invitations.map { it.toOpenedInvitation() } }
 
     override suspend fun accept(invitationId: String): Result<SessionPlace> =
         accountCall { api.acceptInvitation(invitationId).toPlace() }

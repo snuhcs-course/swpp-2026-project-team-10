@@ -24,6 +24,7 @@ import com.lastpenguin.pix.account.Account
 import com.lastpenguin.pix.account.Friend
 import com.lastpenguin.pix.account.FriendRequest
 import com.lastpenguin.pix.account.InvitationStatus
+import com.lastpenguin.pix.account.OpenedInvitation
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -90,6 +91,7 @@ import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
+import com.lastpenguin.pix.ui.session.ShootTogetherSheet
 import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
 import com.lastpenguin.pix.ui.session.SubjectDescribeFragment
 import com.lastpenguin.pix.ui.session.SubjectFragment
@@ -124,8 +126,9 @@ import org.robolectric.annotation.GraphicsMode
  * subject's pick; No person found;
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone, with a pose saved by its ♥, and in a
  * session; Couldn't create poses,
- * failed, refused, and without a person; Friends signed out, and with a friend, a request, and a sent request; Sent requests; Add a
- * friend; Sign in; Sign up; Pix ID setup; Account; the room code; Join with a code; Session not found; Subject view,
+ * failed, refused, and without a person; Who takes the photo?; Share my camera signed out, and with a friend, a request,
+ * and a sent request; Sent requests; Add a friend; Sign in; Sign up; Pix ID setup; Account; the room code; See their
+ * camera; Session not found; Subject view,
  * and while the photographer picks a pose, with a guide to save; the subject's Pick a pose; Connection lost; Camera in a
  * session with the delay shown; Settings, signed in; How to use Pix; About Pix. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
@@ -510,13 +513,13 @@ class KoreanScreensTest {
     }
 
     @Test
-    fun friends_signedOut_isInKorean() {
+    fun shareMyCamera_signedOut_isInKorean() {
         accountScreen<FriendsFragment>(R.id.friendsFragment, signedIn = false)
         assertKorean(screen())
     }
 
     @Test
-    fun friends_withAFriendARequestAndASentRequest_isInKorean() {
+    fun shareMyCamera_withAFriendARequestAndASentRequest_isInKorean() {
         accountScreen<FriendsFragment>(R.id.friendsFragment) { modules ->
             modules.friends.friendsFlow.value = listOf(friend)
             modules.friends.requestsFlow.value = listOf(request)
@@ -565,6 +568,20 @@ class KoreanScreensTest {
     }
 
     // ---- Sessions ----------------------------------------------------------------------
+
+    @Test
+    fun whoTakesThePhoto_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchFragment<ShootTogetherSheet>(themeResId = R.style.Theme_Pix)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun whoTakesThePhoto_withInvitationsWaiting_isInKorean() {
+        invited().install()
+        scenario = launchFragment<ShootTogetherSheet>(themeResId = R.style.Theme_Pix)
+        assertKorean(screen())
+    }
 
     @Test
     fun roomCode_waitingForAFriend_isInKorean() {
@@ -616,13 +633,37 @@ class KoreanScreensTest {
     }
 
     @Test
-    fun joinWithACode_isInKorean() {
+    fun seeTheirCamera_isInKorean() {
         TestAppContainer().install()
         scenario = launchFragmentInContainer<JoinCodeFragment>(
             fragmentArgs = bundleOf("keepCode" to false),
             themeResId = R.style.Theme_Pix,
         ).also { it.attachNav(R.id.joinCodeFragment) }
         assertKorean(screen())
+    }
+
+    @Test
+    fun seeTheirCamera_withReceivedInvitations_isInKorean() {
+        invited().install()
+        scenario = launchFragmentInContainer<JoinCodeFragment>(
+            fragmentArgs = bundleOf("keepCode" to false),
+            themeResId = R.style.Theme_Pix,
+        ).also { it.attachNav(R.id.joinCodeFragment) }
+        assertKorean(screen(), *people)
+    }
+
+    /** Signed in, with two received invitations waiting (FR-6.17). */
+    private fun invited() = TestAppContainer().apply {
+        auth.signInAs(auth.account)
+        invitations.incoming = listOf(
+            OpenedInvitation(
+                "inv_2",
+                PixUser("u_3", "test3", "Test Account 3"),
+                InvitationStatus.PENDING,
+                System.currentTimeMillis() + 48_000,
+            ),
+            invitations.opened.copy(expiresAt = System.currentTimeMillis() + 21_000),
+        )
     }
 
     @Test

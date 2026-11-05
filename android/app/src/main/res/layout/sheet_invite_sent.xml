@@ -13,7 +13,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
-    <!-- The friend's initial, as on Friends. -->
+    <!-- The friend's initial, as on Share my camera. -->
     <TextView
         android:id="@+id/avatarText"
         android:layout_width="64dp"

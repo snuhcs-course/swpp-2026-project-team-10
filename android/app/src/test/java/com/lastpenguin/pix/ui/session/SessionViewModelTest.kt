@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -75,7 +75,8 @@ import org.junit.runner.RunWith
  * Session photos (Design 2.6.5, 2.6.7): one not sent waits for the Camera screen; those going when the session ends are
  * said after the end's own notice, under that session's name; a drop keeps one going; the subject's saved or failed
  * photo is a notice, which waits for the activity; one saved before this phone has seen Connected is noticed at once,
- * and one that failed then waits for that session's name.
+ * and one that failed then waits for that session's name. A room this phone waits in alone, as after its subject left
+ * (#188): ended for the subject's way in; Idle (nothing to end); a session with someone in it or on its way (kept).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -639,7 +640,7 @@ class SessionViewModelTest {
     fun invite_aSessionStartedWhileItIsOnItsWay_cancelsTheInvitation_andKeepsTheSession() = runTest(dispatcher) {
         val results = inviteResults()
         model.invite(friend)
-        // *Use a room code* before the server answered the invitation.
+        // *Show a code* before the server answered the invitation.
         model.startRoom()
         runCurrent()
 
@@ -679,7 +680,7 @@ class SessionViewModelTest {
         assertEquals(listOf(EndReason.CANCELLED), session.leaves)
         session.setState(SessionState.Ended(EndReason.CANCELLED))
         runCurrent()
-        // *Use a room code*, right after Friends opens.
+        // *Show a code*, right after Share my camera opens.
         model.startRoom()
         runCurrent()
         assertEquals(SessionEntry.NewRoom to Role.PHOTOGRAPHER, session.starts.last())
@@ -719,6 +720,36 @@ class SessionViewModelTest {
 
         assertEquals(SessionEntry.Invitation("inv_1", place, partner) to Role.SUBJECT, session.starts.last())
         assertNull(model.lastCode)
+    }
+
+    @Test
+    fun endWaitingRoom_endsARoomWithNobodyIn_andLetsTheInvitationStart() = runTest(dispatcher) {
+        session.endsOnLeave = true
+        session.setState(SessionState.Waiting(CODE))
+        runCurrent()
+
+        assertTrue(model.endWaitingRoom())
+
+        assertEquals(listOf(EndReason.CANCELLED), session.leaves)
+        assertTrue(model.joinInvitation("inv_1", SessionPlace("s_2", "subject-token", emptyList()), partner))
+    }
+
+    @Test
+    fun endWaitingRoom_keepsASessionWithSomeoneInOrOnItsWay_andEndsNothingWhenIdle() = runTest(dispatcher) {
+        session.endsOnLeave = true
+        assertTrue(model.endWaitingRoom())
+        for (open in listOf(
+            SessionState.Inviting("inv_0"),
+            SessionState.Connecting("s_1"),
+            SessionState.Connected("s_1", PeerInfo("Dongje"), Role.PHOTOGRAPHER),
+            SessionState.Reconnecting("s_1", since = 0L),
+        )) {
+            session.setState(open)
+            runCurrent()
+
+            assertFalse(open.toString(), model.endWaitingRoom())
+        }
+        assertEquals(emptyList<EndReason>(), session.leaves)
     }
 
     @Test

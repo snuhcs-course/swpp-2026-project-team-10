@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A count in the accent, such as the invitations waiting on I'll be in the photo (FR-6.17). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="999dp" />
+    <solid android:color="@color/pix_accent" />
+</shape>

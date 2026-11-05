@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Who takes the photo?, from Camera's Shoot together (R&S 6.7, FR-5.2): each choice says in one line what it does,
+     and I'll be in the photo counts the received invitations waiting (FR-6.17). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingBottom="28dp">
+
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:text="@string/shoot_together"
+        android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="2dp"
+        android:accessibilityHeading="true"
+        android:text="@string/who_takes_the_photo"
+        android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
+
+    <!-- The two choices side by side, as tall as the taller one. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/photographerButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_option_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:minHeight="168dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <FrameLayout
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_icon_tile">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_camera"
+                    app:tint="@color/pix_accent" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="@string/role_photographer"
+                android:textAppearance="@style/TextAppearance.Pix.Action"
+                android:textColor="@color/pix_text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/role_photographer_body"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/subjectButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_option_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:minHeight="168dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <FrameLayout
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_icon_tile">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_pose"
+                        app:tint="@color/pix_accent" />
+                </FrameLayout>
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <!-- "1 invite" while received invitations wait, which See their camera lists (FR-6.17). -->
+                <TextView
+                    android:id="@+id/invitationsBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_count_badge"
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="3dp"
+                    android:textAppearance="@style/TextAppearance.Pix.Caption"
+                    android:textColor="@color/pix_on_accent"
+                    android:visibility="gone"
+                    tools:text="1 invite"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="@string/role_subject"
+                android:textAppearance="@style/TextAppearance.Pix.Action"
+                android:textColor="@color/pix_text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/role_subject_body"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

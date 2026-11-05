@@ -224,13 +224,13 @@ class ScreenTransitionsTest {
         pix.go(R.id.joinCodeFragment)
         ShadowChoreographer.setPaused(true)
 
-        // Join with code closes itself for Session not found: the two share the x axis.
+        // See their camera closes itself for Session not found: the two share the x axis.
         pix.go(R.id.action_joinCode_to_sessionNotFound)
         val notFound = pix.shown()
         assertComing(notFound, from = slide())
         play()
 
-        // Its Back goes to Camera, which was beneath Join with code: a fade, not a slide back.
+        // Its Back goes to Camera, which was beneath See their camera: a fade, not a slide back.
         ShadowChoreographer.setPaused(true)
         FragmentFailureBinding.bind(notFound).secondaryButton.performClick()
         idle()
@@ -348,6 +348,7 @@ class ScreenTransitionsTest {
             R.id.signUpFragment to Kind.SCREEN,
             R.id.pixIdSetupFragment to Kind.SCREEN,
             R.id.accountSheet to Kind.SHEET,
+            R.id.shootTogetherSheet to Kind.SHEET,
             R.id.roomCodeSheet to Kind.SHEET,
             R.id.inviteSentSheet to Kind.SHEET,
             R.id.inviteNotAcceptedFragment to Kind.SCREEN,

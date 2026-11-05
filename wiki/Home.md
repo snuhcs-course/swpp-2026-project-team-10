@@ -1,7 +1,7 @@
 <p align="left">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../branding/png/pix-horizontal-on-dark.png">
-    <img alt="Pix" src="../branding/png/pix-horizontal.png" width="320">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/snuhcs-course/swpp-2026-project-team-10/dev/branding/png/pix-horizontal-on-dark.png">
+    <img alt="Pix" src="https://raw.githubusercontent.com/snuhcs-course/swpp-2026-project-team-10/dev/branding/png/pix-horizontal.png" width="320">
   </picture>
 </p>
 

@@ -63,7 +63,7 @@ Rules and pitfalls for working in `android/`. What the code does and why is in [
 
 ## Testing
 
-How to write a test, the fakes, and the pitfalls in full: Testing Documentation 2.1.1 and 2.1.8; the partitions to cover: 2.1.6. The traps that bite most:
+How to write a test, the fakes, and the pitfalls in full: Testing Documentation 2.1.1 and 2.1.8; the techniques: 2.1.6, with each test class's partitions in its header comment. The traps that bite most:
 
 - A screen test builds a `TestAppContainer` and installs it (`PixApplication.installContainer`) before launching; grant the camera permission through Robolectric's shadow; run the main looper (`idle()`) after every state change or click, `idleFor` for loops with `delay`, and a short real sleep before `idle()` for `Dispatchers.IO` work. A `ListAdapter`'s second and later lists are diffed on a background thread, so wait for the item count with `ScreenTestSupport.idleUntil`, not one `idle()`. `FragmentScenario.moveToState(CREATED)` destroys the screen's view, so a test of Pix in the background hosts the Fragment in `Robolectric.buildActivity` and stops the activity, which keeps it (`InviteNotAcceptedFragmentTest`).
 - Render through a started `AppCompatActivity` (`Robolectric.buildActivity(...).setup()`), or `<Button>` stays a platform Button and `app:` attributes and icons are ignored; `launchFragmentInContainer` hosts a plain `FragmentActivity` (`RoomCodeSheetTest.showOverAppCompat` for a text with an icon).

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import androidx.lifecycle.ViewModel
@@ -36,6 +36,9 @@ class SettingsViewModel(
 
     val showLatency: StateFlow<Boolean> = settings.showLatency
 
+    /** The Camera screen's base brightness in EV (FR-1.11), which its tap to focus goes back to. */
+    val baseBrightness: StateFlow<Float> = settings.baseBrightness
+
     /** For the *Pix account* row: the Pix ID once signed in. */
     val account: StateFlow<AuthState> = auth.state
 
@@ -49,6 +52,10 @@ class SettingsViewModel(
 
     fun setShowLatency(show: Boolean) {
         viewModelScope.launch { settings.setShowLatency(show) }
+    }
+
+    fun setBaseBrightness(ev: Float) {
+        viewModelScope.launch { settings.setBaseBrightness(ev) }
     }
 
     /** Set at once: the stored answer comes back later, and a screen shown again must not show its tips twice. */

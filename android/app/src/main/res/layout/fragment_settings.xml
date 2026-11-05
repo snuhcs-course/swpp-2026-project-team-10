@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Settings, from the gear on Camera (FR-10.1, R&S 6.10): the guide's color and thickness with a preview (FR-3.10), the
-     latency indicator (FR-10.3), the language (FR-10.2), notifications, the AI consent (FR-4.2), the Pix account, how
+<!-- Settings, from the gear on Camera (FR-10.1, R&S 6.10): the camera's base brightness (FR-1.11), the guide's color
+     and thickness with a preview (FR-3.10), the latency indicator (FR-10.3), the language (FR-10.2), notifications, the AI consent (FR-4.2), the Pix account, how
      to use Pix, and the app's version and licenses. Every choice applies at once and stays after a restart. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -45,11 +45,82 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Guide (FR-3.10) -->
+            <!-- Camera: the base brightness every photo starts from (FR-1.11), as iPhone's exposure adjustment. -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:accessibilityHeading="true"
+                android:text="@string/settings_section_camera"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <LinearLayout
+                android:id="@+id/baseBrightnessRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_list_card"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="4dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_base_brightness"
+                    android:textAppearance="@style/TextAppearance.Pix.BodyLarge" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_base_brightness_body"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_brightness"
+                        app:tint="@color/pix_text_muted" />
+
+                    <!-- In thirds of an EV from -2 to +2; SettingsFragment maps the positions. -->
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/baseBrightnessSlider"
+                        style="@style/Widget.Pix.Slider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/settings_base_brightness"
+                        android:stepSize="1"
+                        android:value="6"
+                        android:valueFrom="0"
+                        android:valueTo="12" />
+
+                    <TextView
+                        android:id="@+id/baseBrightnessValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:importantForAccessibility="no"
+                        android:minWidth="40dp"
+                        android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                        tools:text="+0.7" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Guide (FR-3.10) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
                 android:layout_marginBottom="8dp"
                 android:accessibilityHeading="true"
                 android:text="@string/settings_section_guide"

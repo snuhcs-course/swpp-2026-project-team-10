@@ -386,6 +386,9 @@
 
     <!-- Settings, How to use Pix, About Pix -->
     <string name="settings">설정</string>
+    <string name="settings_section_camera">카메라</string>
+    <string name="settings_base_brightness">기본 밝기</string>
+    <string name="settings_base_brightness_body">모든 사진이 이 밝기에서 시작해요. 화면을 눌러 초점을 맞춘 뒤 위아래로 밀면 다음에 누를 때까지 더 밝거나 어둡게 바뀌어요.</string>
     <string name="settings_section_guide">가이드</string>
     <string name="settings_guide_color">색</string>
     <string name="settings_guide_thickness">두께</string>

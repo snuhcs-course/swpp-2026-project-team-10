@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -27,11 +27,13 @@ import com.lastpenguin.pix.guide.GuideLook
 import com.lastpenguin.pix.guide.GuideThickness
 import com.lastpenguin.pix.settings.Language
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
- * Settings (FR-10.1, R&S 6.10), from the gear on Camera. The guide's look and the latency indicator are kept by
+ * Settings (FR-10.1, R&S 6.10), from the gear on Camera. The base brightness, the guide's look, and the latency indicator are kept by
  * [SettingsViewModel]; the language is Android's per-app language, which recreates the screen in it; notifications open
  * Android's settings for Pix; the AI consent can be withdrawn here and is asked for again before the next scene photo.
  * Owner: Settings (#123).
@@ -58,6 +60,12 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             if (checked != viewModel.showLatency.value) viewModel.setShowLatency(checked)
         }
         binding.latencyRow.setOnClickListener { binding.latencySwitch.toggle() }
+        // The base brightness (FR-1.11), saved as each step is chosen; the Camera screen applies it when it shows.
+        binding.baseBrightnessSlider.setLabelFormatter { ExposureScale.formatEv(brightnessEv(it)) }
+        binding.baseBrightnessSlider.addOnChangeListener { _, value, fromUser ->
+            binding.baseBrightnessValue.text = ExposureScale.formatEv(brightnessEv(value))
+            if (fromUser) viewModel.setBaseBrightness(brightnessEv(value))
+        }
 
         binding.languageRow.settingTitle.setText(R.string.settings_language)
         binding.languageRow.root.setOnClickListener { chooseLanguage() }
@@ -84,6 +92,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.guideLook.collect { renderLook(binding, it) } }
                 launch { viewModel.showLatency.collect { binding.latencySwitch.isChecked = it } }
+                launch { viewModel.baseBrightness.collect { renderBrightness(binding, it) } }
                 launch { viewModel.account.collect { renderAccount(binding.accountRow, it) } }
                 // Followed, not read once: Android may restore Pix straight to this screen before the answer loads.
                 launch { generationViewModel.consentGiven.collect { renderConsent(binding.consentRow, it) } }
@@ -103,6 +112,16 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         binding = null
         super.onDestroyView()
     }
+
+    private fun renderBrightness(binding: FragmentSettingsBinding, ev: Float) {
+        val slider = binding.baseBrightnessSlider
+        val position = (ev * BRIGHTNESS_STEPS_PER_EV).roundToInt() + BRIGHTNESS_ZERO
+        slider.value = position.toFloat().coerceIn(slider.valueFrom, slider.valueTo)
+        binding.baseBrightnessValue.text = ExposureScale.formatEv(brightnessEv(slider.value))
+    }
+
+    /** A slider position in EV: thirds of an EV, with 0 EV in the middle. */
+    private fun brightnessEv(position: Float): Float = (position - BRIGHTNESS_ZERO) / BRIGHTNESS_STEPS_PER_EV
 
     private fun swatches(binding: FragmentSettingsBinding) = listOf(
         GuideColor.WHITE to binding.colorWhite,
@@ -216,5 +235,9 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
     internal companion object {
         const val ENGLISH_NAME = "English"
         const val KOREAN_NAME = "한국어"
+
+        // The base brightness slider's positions, 0..12: thirds of an EV, 0 EV at 6.
+        const val BRIGHTNESS_STEPS_PER_EV = 3f
+        const val BRIGHTNESS_ZERO = 6
     }
 }

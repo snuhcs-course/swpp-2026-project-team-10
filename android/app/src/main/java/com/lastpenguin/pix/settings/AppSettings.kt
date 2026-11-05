@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.settings
 
 import android.content.Context
@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,8 +26,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * The choices on the settings screen that outlive the app (FR-10.1, Design 2.8): the guide's look and the latency
- * indicator, and which screens' tutorial tips were seen (FR-10.4). Each change applies at once, through the flows.
+ * The choices on the settings screen that outlive the app (FR-10.1, Design 2.8): the guide's look, the camera's base
+ * brightness, the latency indicator, and which screens' tutorial tips were seen (FR-10.4). Each change applies at once, through the flows.
  * The language is not here: Android keeps it as Pix's per-app language (`AppCompatDelegate.setApplicationLocales`).
  * Owner: Settings (#123).
  */
@@ -37,6 +38,12 @@ interface AppSettings {
     /** Whether both phones' screens show the live view's delay during a session (FR-10.3); off by default. */
     val showLatency: StateFlow<Boolean>
 
+    /**
+     * The Camera screen's base brightness in EV (FR-1.11), within [BASE_BRIGHTNESS_EV]: every photo starts from it, and a
+     * drag after a tap to focus adds to it until the next tap; 0 by default.
+     */
+    val baseBrightness: StateFlow<Float>
+
     /** The screens whose tutorial tips were seen; null until the stored answer is read, so none ever flash (FR-10.4). */
     val tutorialSeen: StateFlow<Set<TutorialScreen>?>
 
@@ -45,6 +52,9 @@ interface AppSettings {
     suspend fun setGuideThickness(thickness: GuideThickness)
 
     suspend fun setShowLatency(show: Boolean)
+
+    /** Kept within [BASE_BRIGHTNESS_EV]. */
+    suspend fun setBaseBrightness(ev: Float)
 
     /** Adds [screens] to the tips seen. */
     suspend fun setTutorialSeen(screens: Set<TutorialScreen>)
@@ -56,6 +66,7 @@ interface AppSettings {
     class InMemory(
         look: GuideLook = GuideLook(),
         latency: Boolean = false,
+        brightness: Float = 0f,
         tutorial: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
     ) : AppSettings {
         private val _guideLook = MutableStateFlow(look)
@@ -63,6 +74,9 @@ interface AppSettings {
 
         private val _showLatency = MutableStateFlow(latency)
         override val showLatency: StateFlow<Boolean> = _showLatency.asStateFlow()
+
+        private val _baseBrightness = MutableStateFlow(brightness)
+        override val baseBrightness: StateFlow<Float> = _baseBrightness.asStateFlow()
 
         private val _tutorialSeen = MutableStateFlow(tutorial)
         override val tutorialSeen: StateFlow<Set<TutorialScreen>?> = _tutorialSeen.asStateFlow()
@@ -79,6 +93,10 @@ interface AppSettings {
             _showLatency.value = show
         }
 
+        override suspend fun setBaseBrightness(ev: Float) {
+            _baseBrightness.value = ev.coerceIn(BASE_BRIGHTNESS_EV)
+        }
+
         override suspend fun setTutorialSeen(screens: Set<TutorialScreen>) {
             _tutorialSeen.value = _tutorialSeen.value.orEmpty() + screens
         }
@@ -88,6 +106,9 @@ interface AppSettings {
         }
     }
 }
+
+/** The base brightness's choices in EV (FR-1.11), as on the settings screen's slider; a camera's own range clamps it. */
+val BASE_BRIGHTNESS_EV: ClosedFloatingPointRange<Float> = -2f..2f
 
 /** The screens the first-use tutorial explains, each with its own tips the first time it opens (FR-10.4, Design 2.6.8). */
 enum class TutorialScreen {
@@ -121,6 +142,10 @@ class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSetting
     override val showLatency: StateFlow<Boolean> =
         preferences.map { it[SHOW_LATENCY] ?: false }.stateIn(scope, SharingStarted.Eagerly, false)
 
+    override val baseBrightness: StateFlow<Float> =
+        preferences.map { (it[BASE_BRIGHTNESS] ?: 0f).coerceIn(BASE_BRIGHTNESS_EV) }
+            .stateIn(scope, SharingStarted.Eagerly, 0f)
+
     override val tutorialSeen: StateFlow<Set<TutorialScreen>?> =
         preferences.map<Preferences, Set<TutorialScreen>?> { stored ->
             val names = stored[TUTORIAL_SEEN].orEmpty()
@@ -132,6 +157,8 @@ class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSetting
     override suspend fun setGuideThickness(thickness: GuideThickness) = save { it[GUIDE_THICKNESS] = thickness.name }
 
     override suspend fun setShowLatency(show: Boolean) = save { it[SHOW_LATENCY] = show }
+
+    override suspend fun setBaseBrightness(ev: Float) = save { it[BASE_BRIGHTNESS] = ev.coerceIn(BASE_BRIGHTNESS_EV) }
 
     override suspend fun setTutorialSeen(screens: Set<TutorialScreen>) = save { stored ->
         stored[TUTORIAL_SEEN] = stored[TUTORIAL_SEEN].orEmpty() + screens.map { it.name }
@@ -158,6 +185,7 @@ class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSetting
         val GUIDE_COLOR = stringPreferencesKey("guide_color")
         val GUIDE_THICKNESS = stringPreferencesKey("guide_thickness")
         val SHOW_LATENCY = booleanPreferencesKey("show_latency")
+        val BASE_BRIGHTNESS = floatPreferencesKey("base_brightness_ev")
         val TUTORIAL_SEEN = stringSetPreferencesKey("tutorial_seen_screens")
     }
 }

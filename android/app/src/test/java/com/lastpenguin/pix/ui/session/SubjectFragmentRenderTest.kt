@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -66,8 +66,9 @@ import org.robolectric.shadows.ShadowToast
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
- * and filled; the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", Pick a
- * pose opened once per set and then by its button, a set with no copy here, which opens nothing, a set the
+ * and filled; the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", the set's
+ * Generating poses opened once per set (Iter3-A13), which goes on to Pick a pose by itself, so after Back each opens by
+ * the button, a new set opening its Generating poses again, a set with no copy here, which opens nothing, a set the
  * photographer closes after Back, which says so, and a
  * set kept through a reconnect, with "Reconnecting…" in place of what the photographer is doing; the photographer's
  * Reference confirm (FR-6.15): "checking the guide", Your reference opened once per confirm and then by the same
@@ -454,7 +455,7 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun thePhotographersSet_saysWhatTheyAreDoing_andOpensPickAPoseOncePerSet() {
+    fun thePhotographersSet_saysWhatTheyAreDoing_andOpensItsGeneratingPosesOncePerSet() {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
         connect(modules)
@@ -462,18 +463,12 @@ class SubjectFragmentRenderTest {
         idle()
 
         poseStep(modules, PoseSetStep.GENERATING)
+        assertEquals(R.id.subjectGeneratingFragment, nav.currentDestination?.id)
         onScreen { binding, _ ->
             assertEquals(View.VISIBLE, binding.connectingText.visibility)
             assertEquals(string(R.string.peer_creating_poses, "Dongje"), binding.connectingText.text.toString())
-            assertEquals(View.GONE, binding.pickPoseButton.visibility)
-        }
-        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-
-        picking(modules)
-        assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
-        onScreen { binding, _ ->
-            assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
+            assertEquals(string(R.string.generating_title), binding.pickPoseLabel.text.toString())
         }
 
         // Back keeps it closed, though Subject view renders again; its button opens it again.
@@ -483,7 +478,25 @@ class SubjectFragmentRenderTest {
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
         onScreen { binding, _ -> binding.pickPoseButton.performClick() }
         idle()
+        assertEquals(R.id.subjectGeneratingFragment, nav.currentDestination?.id)
+
+        // After Back, the set's Pick a pose waits for the button: Generating poses would have gone on to it.
+        nav.popBackStack()
+        picking(modules)
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
+            assertEquals(string(R.string.pick_pose_title), binding.pickPoseLabel.text.toString())
+            binding.pickPoseButton.performClick()
+        }
+        idle()
         assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
+
+        // The next set opens its Generating poses again.
+        nav.popBackStack()
+        modules.session.deliver(SessionMessage.PoseStep("set2", PoseSetStep.GENERATING))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertEquals(R.id.subjectGeneratingFragment, nav.currentDestination?.id)
     }
 
     @Test
@@ -494,6 +507,8 @@ class SubjectFragmentRenderTest {
         modules.poses.startAsReceiver(receiving)
         idle()
         poseStep(modules, PoseSetStep.GENERATING)
+        // Generating poses goes back to Subject view by itself for such a set (SubjectGeneratingFragmentTest).
+        nav.popBackStack()
 
         // No copy fitted the subject's limit, so PICKING names none (Codex's review).
         poseStep(modules, PoseSetStep.PICKING)

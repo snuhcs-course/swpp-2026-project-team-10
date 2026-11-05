@@ -364,6 +364,9 @@
             android:id="@+id/action_subject_to_pickPose"
             app:destination="@id/subjectPickPoseFragment" />
         <action
+            android:id="@+id/action_subject_to_generating"
+            app:destination="@id/subjectGeneratingFragment" />
+        <action
             android:id="@+id/action_subject_to_confirm"
             app:destination="@id/subjectConfirmFragment" />
         <action
@@ -381,6 +384,19 @@
         android:id="@+id/subjectDescribeFragment"
         android:name="com.lastpenguin.pix.ui.session.SubjectDescribeFragment"
         android:label="Generate poses" />
+
+    <!-- The photographer's set as it is created, on the subject's phone (FR-6.15, Iter3-A13); its Pick a pose takes its
+         place, and back is Subject view. -->
+    <fragment
+        android:id="@+id/subjectGeneratingFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectGeneratingFragment"
+        android:label="Generating poses">
+        <action
+            android:id="@+id/action_subjectGenerating_to_pickPose"
+            app:destination="@id/subjectPickPoseFragment"
+            app:popUpTo="@id/subjectGeneratingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
 
     <!-- The photographer's candidates on the subject's phone (FR-6.15); back is Subject view. -->
     <fragment

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -566,7 +566,7 @@ class GenerationViewModel(
                 Log.w(TAG, "Generation stopped: $error")
             }
         }
-        if (inTime == null) stopUnanswered()
+        if (inTime == null) stopUnanswered(id)
         val state = _uiState.value
         Timings.mark("pose.done", "${state.readyCount} of ${state.poses.size} ready")
         fun failedAll(error: GenerationError) = state.poses.isNotEmpty() &&
@@ -594,24 +594,32 @@ class GenerationViewModel(
             is GenerationEvent.Planned -> {
                 Timings.mark("pose.planned")
                 _uiState.update { it.copy(poses = event.poses) }
+                // The subject's Generating poses lays out the same slots (Iter3-A13).
+                share.planned(id, event.poses.map { it.id })
             }
 
             is CandidateEvent -> {
                 if (event is CandidateEvent.Ready && _uiState.value.readyCount == 0) Timings.mark("pose.first")
                 _uiState.update { it.copy(candidates = it.candidates + (event.poseId to event)) }
-                if (event is CandidateEvent.Ready) share.candidate(id, event.poseId, event.image)
+                when (event) {
+                    is CandidateEvent.Ready -> share.candidate(id, event.poseId, event.image)
+                    is CandidateEvent.Failed -> share.failed(id, event.poseId)
+                }
             }
         }
     }
 
-    /** The limit ended the collector, and with it the requests still open: their poses count as timed out. */
-    private fun stopUnanswered() {
-        _uiState.update { state ->
-            val unanswered = state.poses.filter { it.id !in state.candidates }
-            for (pose in unanswered) Log.w(TAG, "${pose.id}: no answer within $limitMs ms")
-            val timedOut = unanswered.associate { it.id to CandidateEvent.Failed(it.id, GenerationError.TIMEOUT) }
-            state.copy(candidates = state.candidates + timedOut)
-        }
+    /**
+     * The limit ended the collector of the set [id], and with it the requests still open: their poses count as timed
+     * out, on the subject's phone too.
+     */
+    private fun stopUnanswered(id: String) {
+        val state = _uiState.value
+        val unanswered = state.poses.filter { it.id !in state.candidates }
+        for (pose in unanswered) Log.w(TAG, "${pose.id}: no answer within $limitMs ms")
+        val timedOut = unanswered.associate { it.id to CandidateEvent.Failed(it.id, GenerationError.TIMEOUT) }
+        _uiState.update { it.copy(candidates = it.candidates + timedOut) }
+        for (pose in unanswered) share.failed(id, pose.id)
     }
 
     companion object {

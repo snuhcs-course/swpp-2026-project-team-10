@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -80,6 +80,12 @@ data class MirrorDescription(
     /** The scene photo's copy, once it arrived. */
     val scene: Bitmap? = null,
 )
+
+/**
+ * The scene of the description a set last started from, as the subject has it (Iter3-A13): its photo, null when its copy
+ * had not arrived, and whether the set asks for suggested poses, for the subject's *Generating poses*.
+ */
+data class StartedScene(val scene: Bitmap?, val suggested: Boolean)
 
 /** How a description the subject knew ended: a set [started] from it, or Generate poses closed without one. */
 data class DescriptionEnd(val descriptionId: String, val started: Boolean)
@@ -251,6 +257,14 @@ class DescriptionSyncer(
     /** Subject: the photographer's open Generate poses; null when there is none. */
     val mirror: StateFlow<MirrorDescription?> = _mirror.asStateFlow()
 
+    private val _startedScene = MutableStateFlow<StartedScene?>(null)
+
+    /**
+     * Subject: the scene of the description a set last started from, kept for *Generating poses* after the description
+     * ended, until another opens or the session ends; null before any.
+     */
+    val startedScene: StateFlow<StartedScene?> = _startedScene.asStateFlow()
+
     private val _going = MutableStateFlow<String?>(null)
 
     /** Subject: the description whose *Generate 4 poses* or *Skip* no end has answered yet. */
@@ -323,6 +337,7 @@ class DescriptionSyncer(
                     deadline?.cancel()
                     _going.value = null
                     _mirror.value = null
+                    _startedScene.value = null
                 }
             }
         }
@@ -348,7 +363,10 @@ class DescriptionSyncer(
         val current = _mirror.value
         when (message.step) {
             DescriptionStep.OPEN -> {
-                if (current?.descriptionId != message.descriptionId) answer()
+                if (current?.descriptionId != message.descriptionId) {
+                    answer()
+                    _startedScene.value = null
+                }
                 _mirror.value = MirrorDescription(
                     message.descriptionId,
                     message.text.orEmpty(),
@@ -373,6 +391,7 @@ class DescriptionSyncer(
                         val text = message.text ?: current.text
                         val partner = session.state.value.partner
                         if (text.isNotBlank()) _started.tryEmit(StartedDescription(text, partner))
+                        _startedScene.value = StartedScene(current.scene, suggested = text.isBlank())
                     }
                 }
 

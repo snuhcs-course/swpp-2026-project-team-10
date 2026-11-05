@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.guide
 
+import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -14,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
@@ -30,10 +32,22 @@ class GuideLookTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val bitmaps = mutableListOf<Bitmap>()
 
+    // What is drawn after each change, as with the phone's animations off: the guide's own animations are in
+    // GuideOverlayMotionTest (Iter3-A13).
+    @Before
+    fun animationsOff() = setAnimatorScale(0f)
+
     @After
     fun recycleBitmaps() = onMain {
+        setAnimatorScale(1f)
         bitmaps.forEach(Bitmap::recycle)
         bitmaps.clear()
+    }
+
+    /** ValueAnimator's duration scale, which the phone's Remove animations sets to 0. */
+    private fun setAnimatorScale(scale: Float) {
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType)
+            .invoke(null, scale)
     }
 
     @Test

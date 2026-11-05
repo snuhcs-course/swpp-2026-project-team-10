@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -37,8 +37,14 @@ interface PoseShare {
     /** *Generate 4 poses* or *Skip* started the set [setId], in place of any other. */
     fun open(setId: String)
 
+    /** The candidates [setId] plans, [poseIds] in the order of their slots. */
+    fun planned(setId: String, poseIds: List<String>)
+
     /** The candidate [poseId] of [setId] arrived. */
     fun candidate(setId: String, poseId: String, image: Bitmap)
+
+    /** The candidate [poseId] of [setId] could not be created. */
+    fun failed(setId: String, poseId: String)
 
     /** *Pick a pose* opened with the created candidates [poseIds], in its order. */
     fun picking(setId: String, poseIds: List<String>)
@@ -55,7 +61,11 @@ interface PoseShare {
 
         override fun open(setId: String) = Unit
 
+        override fun planned(setId: String, poseIds: List<String>) = Unit
+
         override fun candidate(setId: String, poseId: String, image: Bitmap) = Unit
+
+        override fun failed(setId: String, poseId: String) = Unit
 
         override fun picking(setId: String, poseIds: List<String>) = Unit
 
@@ -67,14 +77,19 @@ interface PoseShare {
 
 /**
  * The photographer's open set as the subject has it (Design 2.6.5): GENERATING or PICKING, with the copies that
- * arrived. An ended set is not kept.
+ * arrived, and, for *Generating poses*, its slots and the candidates that failed (Iter3-A13). An ended set is not kept.
  */
 data class MirrorPoseSet(
     val setId: String,
     val step: PoseSetStep,
     /** With PICKING: the photographer's created candidates, in its order. */
     val poseIds: List<String> = emptyList(),
+    /** In the order they arrived. */
     val candidates: Map<String, Bitmap> = emptyMap(),
+    /** The set's planned candidates in the order of their slots; empty until planned, and from a photographer of
+     *  before Iter3-A13, which does not say. */
+    val slots: List<String> = emptyList(),
+    val failed: Set<String> = emptySet(),
 ) {
     /** What the subject's *Pick a pose* shows: the candidates of [poseIds] whose copy is here, in their order. */
     val ready: List<Pair<String, Bitmap>>
@@ -92,8 +107,8 @@ data class PoseSetEnd(val setId: String, val step: PoseSetStep, val by: Role?, v
  * pose.pick; Design 2.6.5, *Pick a pose on both phones*).
  *
  * Photographer ([PoseShare], [startAsSender]): keeps the open set as GenerationViewModel reports it and, while the
- * session is connected, sends what the subject does not have yet, in order: the step, each candidate's copy, one at
- * a time, then PICKING or the set's end. A sender started again after the link reconnects (Design 2.6.7) sends the
+ * session is connected, sends what the subject does not have yet, in order: the step, the planned slots and each
+ * failed candidate (Iter3-A13), each candidate's copy, one at a time, then PICKING or the set's end. A sender started again after the link reconnects (Design 2.6.7) sends the
  * open set again, or only the end of a set that ended during the drop, which closes it on a subject that still holds
  * it. The subject's picks of the PICKING set go to [picks]; deciding is GenerationViewModel's, which calls [chosen].
  *
@@ -119,6 +134,9 @@ class PoseSyncer(
         val poseIds: List<String> = emptyList(),
         val chosen: String? = null,
         val by: Role? = null,
+        val slots: List<String> = emptyList(),
+        /** In the order they failed. */
+        val failed: List<String> = emptyList(),
     ) {
         val open: Boolean get() = step == PoseSetStep.GENERATING || step == PoseSetStep.PICKING
     }
@@ -132,10 +150,26 @@ class PoseSyncer(
         shared.value = SharedSet(setId, PoseSetStep.GENERATING)
     }
 
+    override fun planned(setId: String, poseIds: List<String>) {
+        shared.update { set ->
+            if (set?.setId == setId && set.step == PoseSetStep.GENERATING) set.copy(slots = poseIds) else set
+        }
+    }
+
     override fun candidate(setId: String, poseId: String, image: Bitmap) {
         shared.update { set ->
             if (set?.setId == setId && set.step == PoseSetStep.GENERATING) {
                 set.copy(candidates = set.candidates + (poseId to image))
+            } else {
+                set
+            }
+        }
+    }
+
+    override fun failed(setId: String, poseId: String) {
+        shared.update { set ->
+            if (set?.setId == setId && set.step == PoseSetStep.GENERATING && poseId !in set.failed) {
+                set.copy(failed = set.failed + poseId)
             } else {
                 set
             }
@@ -175,6 +209,8 @@ class PoseSyncer(
             var announced: String? = null
             var sentStep: PoseSetStep? = null
             val sent = mutableSetOf<String>()
+            var slotsSent = false
+            val failuresSent = mutableSetOf<String>()
 
             // The copies that went out; PICKING names only these, so the subject is never told of one it cannot have.
             // One that names none still says the photographer is picking; the subject then opens no Pick a pose.
@@ -185,11 +221,30 @@ class PoseSyncer(
                     announced = set.setId
                     sent.clear()
                     delivered.clear()
+                    slotsSent = false
+                    failuresSent.clear()
                     // A set that ended before this sender heard of it goes as its end alone: a subject that held it
                     // through a reconnect closes it, and any other drops the set it holds or has nothing to drop.
                     val step = if (set.open) PoseSetStep.GENERATING else set.step
                     send(SessionMessage.PoseStep(set.setId, step, poseId = set.chosen, by = set.by))
                     sentStep = step
+                }
+                // The slots and the failures before the copies, which take a while to encode, so the subject's
+                // Generating poses lays out its slots and marks a failure at once (Iter3-A13).
+                if (set.open && set.slots.isNotEmpty() && !slotsSent) {
+                    slotsSent = true
+                    session.send(SessionMessage.PosePlanned(set.setId, set.slots))
+                    Timings.mark("pose.sent", "planned ${set.setId} ${set.slots.size}")
+                }
+                if (set.open) {
+                    for (poseId in set.failed) {
+                        if (failuresSent.add(
+                                poseId,
+                            )
+                        ) {
+                            session.send(SessionMessage.PoseCandidateFailed(set.setId, poseId))
+                        }
+                    }
                 }
                 for ((poseId, image) in set.candidates) {
                     // A set that ended or was replaced while an earlier copy was encoded sends no more of them.
@@ -285,6 +340,14 @@ class PoseSyncer(
                 session.incoming.collect { message ->
                     when (message) {
                         is SessionMessage.PoseStep -> onStep(message)
+
+                        is SessionMessage.PosePlanned -> _mirror.update { set ->
+                            if (set?.setId == message.setId) set.copy(slots = message.poseIds) else set
+                        }
+
+                        is SessionMessage.PoseCandidateFailed -> _mirror.update { set ->
+                            if (set?.setId == message.setId) set.copy(failed = set.failed + message.poseId) else set
+                        }
 
                         is SessionMessage.PoseCandidateBegin -> {
                             // Only for the set being shown; a copy of an ended or replaced set is let go, and so is

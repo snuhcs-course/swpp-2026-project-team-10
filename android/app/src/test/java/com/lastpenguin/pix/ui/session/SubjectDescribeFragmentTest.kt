@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -51,9 +51,10 @@ import org.robolectric.shadows.ShadowToast
  * description delivered to the container's DescriptionSyncer. Partitions: the scene photo, the text, and the hint as on
  * the photographer's phone; the photographer typing (the field, the chips, and the buttons wait, saying who types) and
  * done; this phone's typing sent while it holds the field and given back when it ends; a description used before sent
- * at once from its chip, and the switch to the ones used with the photographer in an invitation's session; Generate 4
- * poses and Skip sent and waiting; the description's end by a set started (back to Subject view without a notice), by
- * the photographer's close (a notice), and an end kept from an earlier description (nothing); a go no end answers in
+ * at once from its chip, and the switch to the ones used with the photographer in an invitation's session; the one
+ * button sent and waiting, and with the field cleared by its ✕, asking for suggested poses (Iter3-A13); the
+ * description's end by a set started (back to Subject view without a notice), by the photographer's close (a notice),
+ * and an end kept from an earlier description (nothing); a go no end answers in
  * 5 s (a notice); Back (Subject view, the description kept); the link reconnecting (everything waits); the session
  * ending (back to Subject view).
  */
@@ -158,7 +159,6 @@ class SubjectDescribeFragmentTest {
             assertFalse(binding.descriptionInput.isEnabled)
             assertFalse(binding.historyChips.getChildAt(0).isEnabled)
             assertFalse(binding.generateButton.isEnabled)
-            assertFalse(binding.suggestButton.isEnabled)
             assertEquals(string(R.string.peer_typing, "Dongje"), binding.descriptionTyping.text.toString())
         }
 
@@ -234,7 +234,7 @@ class SubjectDescribeFragmentTest {
     }
 
     @Test
-    fun generateAndSkip_areSent_andWaitForTheAnswer() {
+    fun theButton_isSent_andWaitsForTheAnswer() {
         val modules = describing()
         launch()
 
@@ -244,18 +244,34 @@ class SubjectDescribeFragmentTest {
         assertEquals(listOf(SessionMessage.PoseDescriptionGo("d1", "wave", suggest = false)), goes(modules))
         onScreen { binding ->
             assertFalse(binding.generateButton.isEnabled)
-            assertFalse(binding.suggestButton.isEnabled)
-            binding.suggestButton.performClick()
+            binding.generateButton.performClick()
         }
         idle()
         assertEquals(1, goes(modules).size)
     }
 
     @Test
-    fun aSetStarted_closesItWithoutANotice() {
+    fun theButtonWithTheFieldCleared_asksForSuggestedPoses() {
         val modules = describing()
+        launch()
+
+        onScreen { binding ->
+            binding.clearDescriptionButton.performClick()
+            assertEquals(string(R.string.suggest_four_poses), binding.generateButton.text.toString())
+            binding.generateButton.performClick()
+        }
+        idle()
+
+        // The ✕ goes to the photographer as an edit, as typing would, before the button.
+        assertEquals("", edits(modules).last().text)
+        assertEquals(listOf(SessionMessage.PoseDescriptionGo("d1", "", suggest = true)), goes(modules))
+    }
+
+    @Test
+    fun aSetStarted_closesItWithoutANotice() {
+        val modules = describing(text = "")
         val nav = launch()
-        onScreen { it.suggestButton.performClick() }
+        onScreen { it.generateButton.performClick() }
         idle()
 
         step(modules, DescriptionStep.STARTED)

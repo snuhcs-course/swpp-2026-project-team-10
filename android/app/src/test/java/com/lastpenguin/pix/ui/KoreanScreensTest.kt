@@ -16,6 +16,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
@@ -92,6 +93,7 @@ import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
 import com.lastpenguin.pix.ui.session.SubjectDescribeFragment
 import com.lastpenguin.pix.ui.session.SubjectFragment
+import com.lastpenguin.pix.ui.session.SubjectGeneratingFragment
 import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
 import com.lastpenguin.pix.ui.settings.AboutFragment
 import com.lastpenguin.pix.ui.settings.HelpFragment
@@ -754,6 +756,29 @@ class KoreanScreensTest {
         scenario = launchFragmentInContainer<SubjectConfirmFragment>(themeResId = R.style.Theme_Pix).also {
             it.attachNav(R.id.subjectConfirmFragment)
         }
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun subjectsGeneratingPoses_withACandidateAndAFailure_isInKorean() {
+        // A copy with pixels, since the screen is drawn.
+        val modules = TestAppContainer(candidateImage = { bitmap() }).install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING))
+        modules.session.deliver(SessionMessage.PosePlanned("set1", listOf("pose-1", "pose-2", "pose-3", "pose-4")))
+        modules.session.deliver(SessionMessage.PoseCandidateFailed("set1", "pose-2"))
+        val copy = checkNotNull(FakePoseCandidateCodec().encode("pose-1", bitmap()))
+        modules.session.deliver(copy.begin("set1"))
+        for (i in copy.chunks.indices) modules.session.deliver(copy.chunk("set1", i))
+        modules.session.deliver(copy.end("set1"))
+        idle()
+        scenario = launchFragmentInContainer<SubjectGeneratingFragment>(themeResId = R.style.Theme_Pix).also {
+            it.attachNav(R.id.subjectGeneratingFragment)
+        }
+        // The grid compares its slots off the main thread before it shows them.
+        idleUntil { screen().findViewById<RecyclerView>(R.id.candidateGrid).childCount == 4 }
         assertKorean(screen(), *people)
     }
 

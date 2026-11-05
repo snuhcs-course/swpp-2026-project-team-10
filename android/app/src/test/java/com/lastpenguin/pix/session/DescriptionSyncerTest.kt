@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.DescriptionStep
@@ -31,7 +31,9 @@ import org.junit.Test
  * description are passed on; any of another description or after the end is dropped.
  * Subject, the copy (state-based): built from OPEN and the photo, updated by each OPEN, dropped at its end, which is
  * reported with whether a set started, at another description's start, at another one's end without a notice, and when
- * the session ends; kept through a reconnect, where the photo sent again is not read again.
+ * the session ends; kept through a reconnect, where the photo sent again is not read again. The scene a set started
+ * from, kept past its description's end for Generating poses (Iter3-A13), suggested for an empty text, and dropped by
+ * another description's start.
  * Subject, the photo (fault injection, boundary): a broken transfer, a header over 1024 px or 1 MiB (at the limit read),
  * and a photo that does not decode are let go.
  * Subject, the requests (boundary of the deadline): an edit sent only with a description and a session; a Generate 4
@@ -327,6 +329,25 @@ class DescriptionSyncerTest {
 
             assertEquals(listOf(StartedDescription("wave hello", null), StartedDescription("jump", null)), started)
         }
+
+    @Test
+    fun `the scene a set started from stays for Generating poses, until another description opens`() = runTest {
+        val syncer = open()
+        val photo = syncer.mirror.value?.scene
+
+        deliver(DescriptionStep.STARTED, text = "wave")
+        runCurrent()
+        assertNull(syncer.mirror.value)
+        assertEquals(StartedScene(photo, suggested = false), syncer.startedScene.value)
+
+        deliver(DescriptionStep.OPEN, "lean", id = "d2")
+        runCurrent()
+        assertNull(syncer.startedScene.value)
+        // Suggested poses: the start carries an empty text; the copy of d2's photo never came.
+        deliver(DescriptionStep.STARTED, text = "", id = "d2")
+        runCurrent()
+        assertEquals(StartedScene(null, suggested = true), syncer.startedScene.value)
+    }
 
     @Test
     fun `a set started in an invitation's session carries the friend the start found`() = runTest {

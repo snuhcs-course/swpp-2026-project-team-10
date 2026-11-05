@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -19,6 +19,7 @@ import com.lastpenguin.pix.ui.session.InvitationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.SubjectConfirmViewModel
 import com.lastpenguin.pix.ui.session.SubjectDescribeViewModel
+import com.lastpenguin.pix.ui.session.SubjectGeneratingViewModel
 import com.lastpenguin.pix.ui.session.SubjectPickViewModel
 import com.lastpenguin.pix.ui.session.SubjectViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
@@ -91,6 +92,9 @@ object PixViewModels {
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }
+        initializer {
+            SubjectGeneratingViewModel(container.sessionManager, container.poseSyncer, container.descriptionSyncer)
+        }
         initializer { PoseSaveViewModel(container.referenceGuideMaker, container.savedGuideStore) }
         initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
         initializer {

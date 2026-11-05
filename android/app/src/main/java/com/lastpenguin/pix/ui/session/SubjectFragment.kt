@@ -180,6 +180,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             when {
                 confirming(ui) -> openConfirm()
                 describing(ui) -> openDescribe()
+                generating(ui) -> openGenerating()
                 else -> openPick()
             }
         }
@@ -610,19 +611,23 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     /**
-     * The photographer's steps (Design 2.6.5): *Generate poses*, *Pick a pose*, or *Your reference* opens by itself the
-     * first time this screen sees the description open, the set ready, or the confirm open while it is in front, and
-     * the button beside *Guide* opens it again while it lasts.
+     * The photographer's steps (Design 2.6.5): *Generate poses*, *Generating poses* (Iter3-A13), *Pick a pose*, or *Your
+     * reference* opens by itself the first time this screen sees the description open, the set created or ready, or the
+     * confirm open while it is in front, and the button beside *Guide* opens it again while it lasts. A set opens one
+     * of its screens by itself once: *Generating poses* goes on to *Pick a pose* by itself, and after Back from it,
+     * *Pick a pose* waits for the button.
      */
     private fun renderPoses(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         // A set with no copy here has nothing to pick from: the photographer picks on its own phone.
         val picking = ui.poseStep == PoseSetStep.PICKING && ui.posesReady && ui.connected
+        val generating = generating(ui)
         val confirming = confirming(ui)
         val describing = describing(ui)
-        binding.pickPoseButton.isVisible = picking || confirming || describing
+        binding.pickPoseButton.isVisible = picking || generating || confirming || describing
         val label = when {
             confirming -> R.string.reference_title
             describing -> R.string.describe_title
+            generating -> R.string.generating_title
             else -> R.string.pick_pose_title
         }
         binding.pickPoseLabel.setText(label)
@@ -635,7 +640,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         if (confirming && confirmId != null) {
             if (inFront(binding) && viewModel.claimConfirmOpening(confirmId)) openConfirm()
         } else if (picking && setId != null) {
-            if (inFront(binding) && viewModel.claimPickOpening(setId)) openPick()
+            if (inFront(binding) && viewModel.claimSetOpening(setId)) openPick()
+        } else if (generating && setId != null) {
+            if (inFront(binding) && viewModel.claimSetOpening(setId)) openGenerating()
         } else if (describing && describeId != null) {
             if (inFront(binding) && viewModel.claimDescribeOpening(describeId)) openDescribe()
         }
@@ -694,6 +701,15 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun openPick() {
         val nav = findNavController()
         if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_pickPose)
+    }
+
+    /** Whether the photographer's set is being created; a confirm or a description held here is shown first. */
+    private fun generating(ui: SubjectUiState): Boolean =
+        ui.poseStep == PoseSetStep.GENERATING && ui.connected && !confirming(ui) && !describing(ui)
+
+    private fun openGenerating() {
+        val nav = findNavController()
+        if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_generating)
     }
 
     private fun openConfirm() {

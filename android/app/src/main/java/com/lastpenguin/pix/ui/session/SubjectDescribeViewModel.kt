@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -129,7 +129,7 @@ class SubjectDescribeViewModel(
         }
     }
 
-    /** *Generate 4 poses* with [text], or *Skip* when [suggest]: a request to the photographer's phone (AD-7). */
+    /** The one button: poses of [text], or suggested ones when [suggest], asked of the photographer's phone (AD-7). */
     fun go(text: String, suggest: Boolean) {
         val ui = _uiState.value
         if (ui.waiting || ui.gone || ui.reconnecting || ui.writer == Role.PHOTOGRAPHER) return

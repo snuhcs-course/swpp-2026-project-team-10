@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -54,14 +54,15 @@ class ScreenshotCutView @JvmOverloads constructor(context: Context, attrs: Attri
 
     /**
      * Shows [crop] in the corner, after playing the cut when [play]: once, when its person was just found. Null hides
-     * the view and shows the outline as it is.
+     * the view and gives back the outline a cut faded, leaving any other fade of it to its screen.
      */
     fun show(crop: PhotoCrop?, play: Boolean) {
         animator?.cancel()
+        val hadCrop = this.crop != null
         this.crop = crop
         isVisible = crop != null
         if (crop == null) {
-            outline?.alpha = 1f
+            if (hadCrop) outline?.alpha = 1f
             return
         }
         if (!play) {

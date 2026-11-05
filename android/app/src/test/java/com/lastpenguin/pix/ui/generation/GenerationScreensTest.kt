@@ -1,9 +1,12 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
+import android.animation.Animator
+import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
+import android.os.Looper
 import android.view.View
 import android.widget.ImageView
 import androidx.fragment.app.FragmentActivity
@@ -41,6 +44,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.guide.ReferenceUiState
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
+import java.time.Duration
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -49,8 +53,10 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowToast
 
 /*
@@ -58,7 +64,7 @@ import org.robolectric.shadows.ShadowToast
  * with the shared GenerationViewModel put in the right phase before each screen's view is created. Generate poses: opens with the scene and the
  * descriptions used before, newest first (FR-4.11; none hides them; a chip fills the field, and its ✕ drops it; in an
  * invitation's session, the switch to the ones used with the friend, kept while the link reconnects, for a set started
- * meanwhile), Generate 4 poses and Skip start a run and open
+ * meanwhile), the one button starts a run, of the text or of suggested poses for an empty field (Iter3-A13), and opens
  * Generating poses, Cancel; in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
  * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
@@ -70,7 +76,8 @@ import org.robolectric.shadows.ShadowToast
  * candidate (Design 2.6.5). The ♥ on Pick a pose (FR-4.14): on the page on screen only, saving the pose as a generated
  * guide (disabled meanwhile, filled in red, "Pose saved"), a filled one removing it, a pose without a person (nothing saved),
  * Use this pose after it (the saved guide goes on, cut out once), and a ♥ still saving when the pose is used (saved
- * all the same). Couldn't create poses: Try again, a rejected description with Edit description, a scene in
+ * all the same). The ♥'s pop (Iter3-A13), with the display's frames paused: a ♥ that saves pops once, and one that
+ * removes does not; with animations off, it only fills. A candidate's fade is in PoseCandidateAdapterTest. Couldn't create poses: Try again, a rejected description with Edit description, a scene in
  * which the server found no one with Shoot again (FR-4.13), Back to
  * camera. The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1), the
  * thumbnails, the slots, and the pages in that shape; the four slots of a 9:16 scene whole on screen, centered, and
@@ -84,7 +91,44 @@ class GenerationScreensTest {
 
     @After
     fun tearDown() {
+        ShadowChoreographer.setPaused(false)
+        setAnimatorScale(1f)
         scenario?.close()
+    }
+
+    /**
+     * Lays [list] out where it is, as its next frame would: a list binds a change in its layout. Letting a frame through
+     * instead would play the fade it starts to its end at once (Testing 2.1.8).
+     */
+    private fun layOut(list: View) {
+        // A list of a fixed size posts its changes to the next frame instead of asking for a layout.
+        list.forceLayout()
+        list.measure(
+            View.MeasureSpec.makeMeasureSpec(list.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(list.height, View.MeasureSpec.EXACTLY),
+        )
+        list.layout(list.left, list.top, list.right, list.bottom)
+    }
+
+    private fun pagesOf(s: FragmentScenario<*>): RecyclerView {
+        var pages: RecyclerView? = null
+        s.onFragment {
+            pages =
+                FragmentPickPoseBinding.bind(it.requireView()).candidatePager.getChildAt(0) as RecyclerView
+        }
+        return checkNotNull(pages)
+    }
+
+    /** Lets the display's frames go until a fade or a pop has ended. */
+    private fun play() {
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(MOTION_END_MS))
+    }
+
+    /** ValueAnimator's duration scale, which the phone's Remove animations sets to 0. */
+    private fun setAnimatorScale(scale: Float) {
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType)
+            .invoke(null, scale)
     }
 
     /** The scene photo in each of the app's ratios: 3:4, 9:16, 1:1. */
@@ -248,12 +292,16 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun describe_skipAsksForSuggestions_andCancelReturnsToTheCamera() {
+    fun describe_theButtonWithAnEmptyField_asksForSuggestions_andCancelReturnsToTheCamera() {
         val modules = modules()
         val (s, nav) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
         scenario = s
 
-        s.onFragment { FragmentDescribePoseBinding.bind(it.requireView()).suggestButton.performClick() }
+        s.onFragment {
+            val button = FragmentDescribePoseBinding.bind(it.requireView()).generateButton
+            assertEquals(it.getString(R.string.suggest_four_poses), button.text.toString())
+            button.performClick()
+        }
         idle()
         assertEquals(PoseRequest.Suggested, modules.generator.runs.single().request)
         assertEquals(R.id.generatingFragment, nav.currentDestination?.id)
@@ -639,6 +687,59 @@ class GenerationScreensTest {
         assertEquals(string(R.string.save_pose), heartAt(s, 1).contentDescription)
     }
 
+    /** The heart of the page at [position] as the pager's adapter has it, which it compares off the main thread. */
+    private fun heartStateAt(s: FragmentScenario<*>, position: Int): Heart? {
+        var heart: Heart? = null
+        s.onFragment { fragment ->
+            val adapter = FragmentPickPoseBinding.bind(fragment.requireView()).candidatePager.adapter
+            heart = (adapter as PosePageAdapter).currentList[position].heart
+        }
+        return heart
+    }
+
+    private fun MaterialButton.popping(): Boolean = (getTag(R.id.pop) as? Animator)?.isRunning == true
+
+    @Test
+    fun pick_aHeartThatSaves_popsOnce_andOneThatRemoves_doesNot() {
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        heartAt(s, 0).performClick()
+        idleUntil { !heartAt(s, 0).isEnabled }
+        assertFalse(heartAt(s, 0).popping())
+        ShadowChoreographer.setPaused(true)
+
+        modules.maker.finish(Result.success(generated))
+        idleUntil { heartStateAt(s, 0) is Heart.Saved }
+        layOut(pagesOf(s))
+
+        assertTrue(heartAt(s, 0).popping())
+        play()
+        assertFalse(heartAt(s, 0).popping())
+        assertEquals(1f, heartAt(s, 0).scaleX, 0f)
+
+        heartAt(s, 0).performClick()
+        idleUntil { heartAt(s, 0).contentDescription == string(R.string.save_pose) }
+        assertFalse(heartAt(s, 0).popping())
+        assertEquals(1f, heartAt(s, 0).scaleX, 0f)
+    }
+
+    @Test
+    fun pick_withAnimationsOff_aHeartThatSaves_justFills() {
+        val modules = modules()
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        setAnimatorScale(0f)
+        heartAt(s, 0).performClick()
+        idleUntil { !heartAt(s, 0).isEnabled }
+
+        modules.maker.finish(Result.success(generated))
+        idleUntil { heartAt(s, 0).contentDescription == string(R.string.remove_saved_pose) }
+
+        assertFalse(heartAt(s, 0).popping())
+        assertEquals(1f, heartAt(s, 0).scaleX, 0f)
+    }
+
     @Test
     fun pick_aFilledHeart_removesThePose() {
         val modules = modules()
@@ -947,5 +1048,10 @@ class GenerationScreensTest {
         picture.offset(paddingLeft.toFloat(), paddingTop.toFloat())
         return picture.left >= -0.5f && picture.top >= -0.5f &&
             picture.right <= width + 0.5f && picture.bottom <= height + 0.5f
+    }
+
+    private companion object {
+        /** The longest of the fades and the pop, and a little more. */
+        const val MOTION_END_MS = 300L
     }
 }

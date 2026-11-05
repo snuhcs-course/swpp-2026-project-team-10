@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -27,8 +27,9 @@ import org.robolectric.annotation.GraphicsMode
  * hidden); one chip each in their order, without the switch outside a session; a chip's tap on a field with text; its
  * ✕; in a session, the switch between all and the friend's, nothing used with the friend yet, and the friend gone; the
  * same history again (the chips kept as they are); a friend's name of 30 characters (cut short, both halves of the
- * switch on the screen). The last description rejected or not. Buttons: Generate with text, with an empty field, and
- * Skip.
+ * switch on the screen). The last description rejected or not. The one button (Iter3-A13): its label for an empty
+ * field, spaces only, a typed text, a kept text, a chip, and the other phone's text; it sends the field as typed. The
+ * ✕: shown with text, hidden with none and while the field waits; it empties the field as typing would.
  * In a session (FR-6.15): the other phone's text shown, but not over this field's typing; the field, the chips, and
  * the buttons waiting while the other person types or the link is paused, and the buttons while an answer is awaited;
  * the hint; Done and the buttons ending the typing; outside a session, nothing waits.
@@ -38,7 +39,6 @@ import org.robolectric.annotation.GraphicsMode
 class DescriptionFormTest {
     private val changes = mutableListOf<String>()
     private val generated = mutableListOf<String>()
-    private var suggested = 0
     private val focus = mutableListOf<Boolean>()
     private val forgotten = mutableListOf<String>()
     private lateinit var shared: DescriptionForm
@@ -53,7 +53,6 @@ class DescriptionFormTest {
             rejected = rejected,
             onTextChanged = { changes += it },
             onGenerate = { generated += it },
-            onSuggest = { suggested++ },
             onFocusChanged = { focus += it },
             onForget = { forgotten += it },
         ).also { shared = it }
@@ -242,18 +241,65 @@ class DescriptionFormTest {
         assertEquals("피 흘리는 모습", binding.descriptionInput.text.toString())
     }
 
-    @Test
-    fun generate_sendsTheFieldAsTyped_andSkipAsksForSuggestions() {
-        val binding = form()
+    private fun FragmentDescribePoseBinding.label() = generateButton.text.toString()
 
+    private fun FragmentDescribePoseBinding.suggest() = root.context.getString(R.string.suggest_four_poses)
+
+    private fun FragmentDescribePoseBinding.describe() = root.context.getString(R.string.generate_four_from_description)
+
+    @Test
+    fun theButton_sendsTheFieldAsTyped_andItsLabelSaysWhatItStarts() {
+        val binding = form()
+        assertEquals(binding.suggest(), binding.label())
         binding.generateButton.performClick()
+
+        // Spaces alone ask for suggested poses too (PoseRequest.of).
+        binding.descriptionInput.setText("   ")
+        assertEquals(binding.suggest(), binding.label())
         binding.descriptionInput.setText("  Waving  ")
+        assertEquals(binding.describe(), binding.label())
         binding.generateButton.performClick()
-        binding.suggestButton.performClick()
 
         // The ViewModel decides what an empty or padded text means.
         assertEquals(listOf("", "  Waving  "), generated)
-        assertEquals(1, suggested)
+    }
+
+    @Test
+    fun theLabel_followsAKeptText_theOtherPhonesText_andAChip() {
+        val binding = form(text = "jump")
+        assertEquals(binding.describe(), binding.label())
+
+        shared.showShared("", typing = "Dongje", sharedWith = "Dongje")
+        assertEquals(binding.suggest(), binding.label())
+        shared.showShared("wave", typing = null, sharedWith = "Dongje")
+        assertEquals(binding.describe(), binding.label())
+
+        binding.descriptionInput.setText("")
+        shared.showHistory(listOf(entry("Wave")), partner = null)
+        binding.chips().single().performClick()
+        assertEquals(binding.describe(), binding.label())
+    }
+
+    @Test
+    fun theClear_emptiesTheFieldAsTypingWould_andShowsOnlyWithTextItCanTake() {
+        val binding = form()
+        val clear = binding.clearDescriptionButton
+        assertEquals(View.GONE, clear.visibility)
+
+        binding.descriptionInput.setText("wave")
+        assertEquals(View.VISIBLE, clear.visibility)
+        clear.performClick()
+
+        assertEquals("", binding.descriptionInput.text.toString())
+        assertEquals("", changes.last())
+        assertEquals(binding.suggest(), binding.label())
+        assertEquals(View.GONE, clear.visibility)
+
+        // While the other person types, this field takes nothing.
+        shared.showShared("jump", typing = "Dongje", sharedWith = "Dongje")
+        assertEquals(View.GONE, clear.visibility)
+        shared.showShared("jump", typing = null, sharedWith = "Dongje")
+        assertEquals(View.VISIBLE, clear.visibility)
     }
 
     @Test
@@ -269,7 +315,6 @@ class DescriptionFormTest {
         assertFalse(binding.descriptionInput.isEnabled)
         assertFalse(binding.chips().single().isEnabled)
         assertFalse(binding.generateButton.isEnabled)
-        assertFalse(binding.suggestButton.isEnabled)
         assertEquals(View.VISIBLE, binding.descriptionTyping.visibility)
         assertEquals("Dongje is typing…", binding.descriptionTyping.text.toString())
         assertEquals("Dongje sees this too", binding.sharedHint.text.toString())
@@ -323,6 +368,6 @@ class DescriptionFormTest {
         assertEquals(View.GONE, binding.sharedHint.visibility)
         assertEquals(View.GONE, binding.descriptionTyping.visibility)
         assertTrue(binding.descriptionInput.isEnabled)
-        assertTrue(binding.suggestButton.isEnabled)
+        assertTrue(binding.generateButton.isEnabled)
     }
 }

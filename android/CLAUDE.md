@@ -5,7 +5,7 @@ Rules and pitfalls for working in `android/`. What the code does and why is in [
 ## Commands and environment
 
 - Before pushing, from `android/`: `./gradlew spotlessCheck :app:lintDebug :app:testDebugUnitTest :app:assembleDebug` (README, *Lint, format, and test*). The tests need JDK 21 or later; Android Studio's bundled JBR works, so set `JAVA_HOME` to it when `java` is not on the PATH.
-- All tests are in `app/src/test/` (no `androidTest`): plain JVM tests for logic, Robolectric (`AndroidJUnit4`, native graphics) for Views, Canvas, touch, and Material widgets. Permissions, real CameraX capture, MediaStore, and hardware zoom ranges still need an emulator or a phone.
+- All tests are in `app/src/test/`: plain JVM tests for logic, Robolectric (`AndroidJUnit4`, native graphics) for Views, Canvas, touch, and Material widgets. Permissions, real CameraX capture, MediaStore, and hardware zoom ranges still need an emulator or a phone. `app/src/androidTest/` holds only `PersonCheckEval`, a measurement of the phone's person check for the AI module tests that runs on a device and never in CI (Testing Documentation 3.1).
 - `BuildConfig.SERVER_URL` is set per build type in `app/build.gradle.kts`: release builds use Server A; debug builds use `pix.serverUrl` from `local.properties` or a Gradle property, defaulting to the AWS server, which runs `dev` and answers from any network. The servers have no TLS, so cleartext is allowed through the network security config, not `usesCleartextTraffic`, which Android ignores once a config exists: `src/main/res/xml/network_security_config.xml` lists the course hosts for release builds, the copy under `src/debug/` allows every host, and a new server host goes into the main file. `-Ppix.relayOnly=true` sets `BuildConfig.RELAY_ONLY`, which makes `WebRtcRuntime` use the TURN relay only.
 - Start an emulator with `-camera-back emulated`: the default virtual-scene camera can stall the Camera screen (dumps, `screencap`, and taps hang). `adb shell uiautomator dump --windows` is needed to see bottom sheets and dialogs.
 
@@ -63,7 +63,7 @@ Rules and pitfalls for working in `android/`. What the code does and why is in [
 
 ## Testing
 
-How to write a test, the fakes, and the pitfalls in full: Testing Documentation 2.1.1 and 2.1.8; the partitions to cover: 2.1.6. The traps that bite most:
+How to write a test, the fakes, and the pitfalls in full: Testing Documentation 2.1.1 and 2.1.8; the techniques: 2.1.6, with each test class's partitions in its header comment. The traps that bite most:
 
 - A screen test builds a `TestAppContainer` and installs it (`PixApplication.installContainer`) before launching; grant the camera permission through Robolectric's shadow; run the main looper (`idle()`) after every state change or click, `idleFor` for loops with `delay`, and a short real sleep before `idle()` for `Dispatchers.IO` work. A `ListAdapter`'s second and later lists are diffed on a background thread, so wait for the item count with `ScreenTestSupport.idleUntil`, not one `idle()`. `FragmentScenario.moveToState(CREATED)` destroys the screen's view, so a test of Pix in the background hosts the Fragment in `Robolectric.buildActivity` and stops the activity, which keeps it (`InviteNotAcceptedFragmentTest`).
 - Render through a started `AppCompatActivity` (`Robolectric.buildActivity(...).setup()`), or `<Button>` stays a platform Button and `app:` attributes and icons are ignored; `launchFragmentInContainer` hosts a plain `FragmentActivity` (`RoomCodeSheetTest.showOverAppCompat` for a text with an icon).

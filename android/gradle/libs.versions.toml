@@ -31,6 +31,8 @@ firebaseBom = "34.0.0"
 googleServices = "4.4.3"
 junit = "4.13.2"
 androidxTestJunit = "1.3.0"
+# Runs the instrumented code of src/androidTest on a device; the AndroidX Test release of androidxTestJunit.
+androidxTestRunner = "1.7.0"
 # Runs View, Canvas, and touch tests on the JVM (Android SDK 36 support needs 4.16+).
 robolectric = "4.17"
 # Formatting and style checks: Spotless runs ktlint (see build.gradle.kts and .editorconfig).
@@ -79,6 +81,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]

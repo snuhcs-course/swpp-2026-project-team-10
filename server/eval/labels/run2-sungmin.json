@@ -1,0 +1,432 @@
+{
+  "labeler": "Sungmin",
+  "run": "run2",
+  "labels": {
+    "pose-s37-s-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s23-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s38-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s28-s-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s32-d-1": {
+      "same_background": "pass",
+      "same_person": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s37-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s25-d-2": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s43-s-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s20-s-2": {
+      "follows_request": "pass",
+      "selfie_stays_selfie": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_person": "pass",
+      "same_background": "pass"
+    },
+    "pose-s13-d-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "selfie_stays_selfie": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s10-s-4": {
+      "follows_request": "pass",
+      "selfie_stays_selfie": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s37-d-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s50-d-2": {
+      "same_background": "fail",
+      "same_person": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s46-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s25-s-3": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s43-s-3": {
+      "same_person": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s07-d-2": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "selfie_stays_selfie": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s50-d-4": {
+      "follows_request": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass",
+      "no_artifacts_or_text": "pass"
+    },
+    "pose-s41-s-2": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s15-d-4": {
+      "same_background": "pass",
+      "same_person": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s13-d-2": {
+      "follows_request": "pass",
+      "selfie_stays_selfie": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s22-s-1": {
+      "same_background": "fail",
+      "same_person": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s29-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s27-d-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "fail",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s46-s-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s29-s-2": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s44-d-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "fail"
+    },
+    "pose-s31-d-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s32-d-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s05-s-4": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_person": "pass",
+      "same_background": "pass"
+    },
+    "pose-s21-s-2": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s06-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s03-s-2": {
+      "same_person": "pass",
+      "same_background": "fail",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s32-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s34-s-1": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s09-d-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s48-s-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s36-d-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s28-s-1": {
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s27-s-1": {
+      "follows_request": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s50-s-4": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s25-d-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s01-d-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s08-s-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s33-d-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s50-s-3": {
+      "same_person": "pass",
+      "whole_natural_body": "fail",
+      "no_artifacts_or_text": "pass",
+      "same_background": "pass",
+      "follows_request": "fail"
+    },
+    "pose-s08-s-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "fail"
+    },
+    "pose-s06-d-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s34-s-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s11-s-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s33-s-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s48-d-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s45-d-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "selfie_stays_selfie": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s05-d-1": {
+      "follows_request": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s48-d-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "no_artifacts_or_text": "pass",
+      "whole_natural_body": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s34-d-1": {
+      "follows_request": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "same_background": "pass",
+      "same_person": "pass"
+    },
+    "pose-s18-d-1": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s01-s-2": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s08-d-4": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    },
+    "pose-s05-d-3": {
+      "same_person": "pass",
+      "same_background": "pass",
+      "whole_natural_body": "pass",
+      "no_artifacts_or_text": "pass",
+      "follows_request": "pass"
+    }
+  }
+}

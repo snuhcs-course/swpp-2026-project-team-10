@@ -36,7 +36,7 @@ This branch is the **Iteration 2 build**: the Pix server runs on the course's pu
 
 ## Demo videos
 
-Recorded on a Galaxy S23 Ultra (photographer) and a Galaxy S25 Ultra (subject) with the Iteration 2 build on `dev`, against the course server (#98). They are also the evidence of the integration run in [Testing Documentation 2.2.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#222-iteration-2--integration-tests-215); the full-size files are in the team's shared folder.
+Recorded on a Galaxy S23 Ultra (photographer) and a Galaxy S25 Ultra (subject) with the Iteration 2 build on `dev`, against the course server (#98). They are also the evidence of the integration run in [Testing Documentation, Appendix B](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#run-2026-10-23-integration-scripts); the full-size files are in the team's shared folder.
 
 | Video | What it shows | Player |
 |---|---|---|

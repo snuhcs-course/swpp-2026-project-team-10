@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -49,6 +49,9 @@ android {
         versionName = "0.1.0"
         buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
         buildConfigField("boolean", "RELAY_ONLY", "false")
+        // Instrumented code on a phone or emulator (src/androidTest): so far only the person check's measurement for the
+        // AI module tests (Testing Documentation 3.1), which needs the device's ML Kit.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -198,4 +201,6 @@ dependencies {
     // A real HTTP server on the JVM for the token refresh path, which lives in OkHttp's interceptor and
     // authenticator, and for the signaling socket's client.
     testImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

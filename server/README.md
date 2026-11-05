@@ -482,3 +482,44 @@ uv run --env-file .env scripts/try_pose_tips.py tips --prompt-file my_prompt.txt
 ```
 
 `candidates` and `set` prepare each scene like the app and ask for candidates the way the server does, with its pose and suggestion prompts, model, and ratio, and keep each scene and candidate in `scripts/out/tips/pairs/<name>/`; a pair that exists is never made again. `tips` sends every pair with the server's tip prompt, schema, and reasoning effort, or with `--prompt-file` and `--reasoning`, with the server's `tip_korean` after the prompt for `--language ko`, and writes `results.json`, `report.html`, and contact sheets (`sheet-<n>.png`: the scene, the candidate, the decisions, and the sentence) to `scripts/out/tips/runs/<timestamp>-<label>/`, with the prompt it used. It prints the latency, the reasoning tokens, the sentences with a number or without an angle, and, with `--rounds`, how many pairs got the same decisions every time. `scripts/out/` is git-ignored; the photos go to OpenRouter as in the other scripts.
+
+## Evaluate the AI modules
+
+[`scripts/eval_poses.py`](scripts/eval_poses.py) runs the AI module tests of the [Testing Documentation](../wiki/Testing-Documentation.md) (3.1) on the frozen set in [`eval/`](eval/): `pose_cases.json`, one scene photo of `eval/scenes/` and one description per case (the photos' sources and licences are in `eval/scenes/SOURCES.md`). `generate` sends each case to a running Pix server twice, with its description and without one, the way the app's `RemotePoseGenerator` does, and keeps every scene, candidate, time, and tip in `scripts/out/eval/<run>/`; `judge` has Claude (`claude-opus-5-5`) check every candidate against the rules of [`eval/rubrics.toml`](eval/rubrics.toml), every set of four poses for being different, and every tip for matching its pose, through the Batch API at half price unless `--now`; `report` gives the metrics of 3.1 for one run or several. It does not import `pix_server`; uv installs the Anthropic SDK for this script alone from the header of the file, and `judge` reads `ANTHROPIC_API_KEY` from the environment.
+
+The server needs limits high enough for a run (100 sets, 400 candidates, 100 tips): start one locally with the key in `server/.env` and a database of its own, then run the steps.
+
+```sh
+mkdir -p scripts/out/eval && PIX_POSE_RATE_LIMIT=5000 PIX_POSE_GLOBAL_LIMIT=5000 PIX_SUGGESTION_RATE_LIMIT=5000 PIX_SUGGESTION_GLOBAL_LIMIT=5000 \
+  PIX_TIP_RATE_LIMIT=5000 PIX_TIP_GLOBAL_LIMIT=5000 PIX_DATABASE_URL=sqlite+aiosqlite:///scripts/out/eval/pix.db \
+  uv run --env-file .env uvicorn pix_server.main:app --port 8765 --workers 1     # in its own terminal
+uv run scripts/eval_poses.py generate --run pilot --limit 10                   # a pilot: the first 10 cases
+uv run --env-file .env scripts/eval_poses.py judge pilot --now                 # direct calls, for results in minutes
+uv run scripts/eval_poses.py generate --run run1                               # a full run; an interrupted one continues
+uv run --env-file .env scripts/eval_poses.py judge run1                        # the Batch API; waits for the results
+uv run scripts/eval_poses.py report run1 run2 run3                             # each run, then all together
+```
+
+`generate` makes one set at a time, as one phone would, so the times are a phone's; a set already made is skipped. `judge` sends only what has no verdict with the current rubric (its hash is kept with each verdict), so a changed rubric judges a run again; `--no-wait` sends the batches and stops, and running it again collects them. `report` prints the metrics with 95 % intervals and writes `summary.txt`, `summary.json`, and `report.html`, every set with its candidates and the judge's reasons, those with a broken rule first.
+
+To check the judge (3.1, *How to trust the judge*): `sample` picks 60 candidates of a judged run, half that the judge failed and half that it passed, into `label.html`; two of us open it in a browser, answer every rule without seeing the judge's verdicts, and download our labels, which are kept in `eval/labels/` as `<run>-<name>.json`. `judge --repeat 3` judges the same 60 twice more, `judge --sample` judges only those 60 (to try a changed rubric on them before judging whole runs again), `sample --by-rubric HASH` splits a new sample by an earlier rubric's verdicts (to check a changed rubric on the cases the old one failed), and `agree` compares our labels with each other and with the judge, and counts the verdicts that changed across the three judgments.
+
+```sh
+uv run scripts/eval_poses.py sample run1 --size 60
+uv run --env-file .env scripts/eval_poses.py judge run1 --repeat 3
+uv run scripts/eval_poses.py agree run2 --labels eval/labels/run2-*.json      # the labels are kept in eval/labels/
+```
+
+The description filter and the person check are measured on their own held-out sets with the scripts above: `compare_filter_models.py --cases eval/filter_cases.toml` and `try_person_check.py` with `eval/person/with/` and `eval/person/without/` (labels in `eval/person/labels.json`). The phone's person check runs on a device with the app's `PersonCheckEval` (`android/app/src/androidTest/`): install the app and its test APK, push the photos to `/data/local/tmp`, start it with `adb shell am instrument`, and pull `phone.json` (Gradle's `connectedDebugAndroidTest` would uninstall the app and the file with it); `person` puts both checks together, as the app runs them.
+
+```sh
+(cd ../android && ./gradlew :app:installDebug :app:installDebugAndroidTest)          # one device connected
+adb push eval/person/. /data/local/tmp/pix-eval-person/
+adb shell am instrument -w -e class com.lastpenguin.pix.generation.PersonCheckEval com.lastpenguin.pix.test/androidx.test.runner.AndroidJUnitRunner
+adb pull /sdcard/Android/data/com.lastpenguin.pix/files/phone.json scripts/out/person/phone.json
+uv run --env-file .env scripts/compare_filter_models.py --cases eval/filter_cases.toml --models typesafe/jev-1.14 --rounds 1 --label heldout
+uv run --env-file .env scripts/try_person_check.py --with-person eval/person/with --without-person eval/person/without --label heldout
+uv run scripts/eval_poses.py person --phone scripts/out/person/phone.json --jev scripts/out/person/<timestamp>-heldout/results.json
+```
+
+A full run's images cost an estimated $5 through OpenRouter, and its judgments about $7.50 with the Batch API. The judging cost is from the 10-case pilot of 2026-11-05: with direct calls, about $0.030 a pose, $0.018 a tip, and $0.008 a set of suggestions (about 4K input and 0.6K output tokens each, at $4 and $20 per million tokens), and half that in a batch. The photos go to OpenRouter and to Anthropic.

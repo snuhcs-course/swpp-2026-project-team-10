@@ -1,244 +1,226 @@
 Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
 
-## Sessions on different networks ([#117], PRs [#134], [#139])
+## Sessions on different networks ([#134], [#139])
 
 **The AWS server and the plan (10/25)**
 
-- [Sungmin, 10-25] "Now I have to build the connection between different networks, and the server has moved to AWS (its public IP, DNS name, and user). Set the app up to reach the AWS server, working on a new branch." (Port 80 answered `/health`, `/version` with the latest `dev`, and a WebSocket upgrade; the course servers answer only on campus. Debug builds defaulted to the AWS server, and release builds kept Server A.)
-- [Sungmin, 10-25] "Can I work on the connection between networks now? Write a concrete plan first, and do not implement yet." (Three parts: the TURN relay, reconnection with `session.join` and an ICE restart, and the cellular notice with the measurements; the decisions that were open, such as Cloudflare or coturn and how a room-code phone proves it may rejoin.)
-- [Sungmin, 10-25] "Is there anything I have to do?" / "Does this cost money? How do I make the TURN key?" (Cloudflare's documents: 1,000 GB a month free, then $0.05 per GB from the relay to the phone; the dashboard steps.)
-- [Sungmin, 10-25] "Can't you put it in? I wrote it in `.turn_env`." (The two values went into `server/.env` without being printed, a request to Cloudflare's API confirmed the key, and `.turn_env` was kept out of git. SSH to the AWS server timed out, so its `.env` was left to the person who runs it.)
-- [Sungmin, 10-25] "Can't I put it on AWS myself? I know the AWS secret key too." / "Does it have to be on the AWS server before I can work?" (Only for the tests on cellular data: the code, its tests, and the relay on one Wi-Fi need the key on the laptop alone.)
-- [Sungmin, 10-25] "OK, start implementing." (The server's `turn` module and settings; in the app the `ice.pair` line and a relay-only debug option; tests and documents. A local server with the real key handed each phone its own credentials.)
-- [Sungmin, 10-25] "I want to tell the server's operator the key. Is the name `PIX_TURN_API_TOKEN` enough?" (Both names are needed, with `PIX_TURN_KEY_ID`.)
+- [Sungmin, 10-25] "Now I have to build the connection between different networks, and the server has moved to AWS (its public IP, DNS name, and user). Set the app up to reach the AWS server, working on a new branch."
+- [Sungmin, 10-25] "Can I work on the connection between networks now? Write a concrete plan first, and do not implement yet."
+- [Sungmin, 10-25] "Is there anything I have to do?" / "Does this cost money? How do I make the TURN key?"
+- [Sungmin, 10-25] "Can't you put it in? I wrote it in `.turn_env`."
+- [Sungmin, 10-25] "Can't I put it on AWS myself? I know the AWS secret key too." / "Does it have to be on the AWS server before I can work?"
+- [Sungmin, 10-25] "OK, start implementing."
+- [Sungmin, 10-25] "I want to tell the server's operator the key. Is the name `PIX_TURN_API_TOKEN` enough?"
 - [Sungmin, 10-25] "Is the implementation done? Do I test it now?"
 
 **Two PRs, as the issue asks (10/26)**
 
-- [Sungmin, 10-26] "A new issue is open for this, #117. Pull `dev`, open new branches from it, move the code there, and write the wiki documents again to match." (The issue asks for the server first on `feat/117-turn-credentials`, then the app on `feat/117-turn-relay`. The work was kept as patches and split, and the documents were written again for the Iteration 3 pages, which now describe only the current design.)
+- [Sungmin, 10-26] "A new issue is open for this, #117. Pull `dev`, open new branches from it, move the code there, and write the wiki documents again to match."
 - [Sungmin, 10-26] "So I open the server PR first?" / "Commit and push it first."
 
 **The server PR ([#134], 10/26)**
 
-- [Sungmin, 10-26] "The PR has a review: fix it. And `dev` changed the wiki, so my PR's wiki documents conflict: fix them, then commit and push." (One Codex finding, and it was right: while the subject waited up to 3 s for its credentials, the photographer could leave, and a photographer who opened a new room on the same socket got `peer.joined` there. `peer.joined` now waits for the credentials and goes out only while the subject still has its place and the photographer is still there (`SessionStore.seated`); two of the three new tests fail on the old code. `dev` was merged in rather than rebased, so nothing was force-pushed.)
+- [Sungmin, 10-26] "The PR has a review: fix it. And `dev` changed the wiki, so my PR's wiki documents conflict: fix them, then commit and push."
 
 **The app PR ([#139], 10/26 – 10/27)**
 
-- [Sungmin, 10-26] "It is merged. Pull `dev` again, open the new branch, and put in the rest." (The app's part moved over cleanly. Then the mobile-data notice (FR-6.13) and the wrong-code message, taken from the Design's *Still open* proposal; `SessionManager.path` and `EndReason.RATE_LIMITED` as contract changes; R&S section 6. The "same Wi-Fi" texts were left for a decision, since room codes now work across networks.)
-- [Sungmin, 10-27] "The phones are connected: install the APK." / "I connected the other phone: install it there too." (The S23 Ultra and the S25 Ultra, against the AWS server.)
-- [Sungmin, 10-27] "Testing works well. I'll open the PR: commit and push." (#135 had come in meanwhile; its revision rows stayed and this branch's moved one number up.)
-- [Sungmin, 10-27] "Check whether the review on the PR needs fixing." / "Commit and push." (One Codex finding, and it was right: the flag was stored before the notice was sent, across two DataStore calls, so a screen that stopped in between could miss the notice for good. The notice became a pending state that the Camera screen or Subject view shows and then confirms, and only that stores the flag.)
-- [Sungmin, 10-27] "Yes, go ahead." (Merging `dev` again after #137: the R&S screen rows and the Testing tables took #137's text with this branch's additions.)
+- [Sungmin, 10-26] "It is merged. Pull `dev` again, open the new branch, and put in the rest."
+- [Sungmin, 10-27] "The phones are connected: install the APK." / "I connected the other phone: install it there too."
+- [Sungmin, 10-27] "Testing works well. I'll open the PR: commit and push."
+- [Sungmin, 10-27] "Check whether the review on the PR needs fixing." / "Commit and push."
+- [Sungmin, 10-27] "Yes, go ahead."
 - [Sungmin, 10-27] "The prompt log has to go up as a Markdown file too, so write it."
 
-## The mask-only guide transfer ([#113], PR [#145])
+## The mask-only guide transfer ([#145])
 
 **Before the work (10/27)**
 
 - [Joonhyung, 10-27] "Iteration 3 has started. Check the issues and the documents, and explain in detail what was decided and which parts are mine."
-- [Joonhyung, 10-27] "Before implementing, write the protocol v3 messages in the format of Design 2.5.1. I will use it to agree with Jaewan on 10/28." (A proposal for the shared steps' messages and the guide in either direction, published as a page for the meeting.)
+- [Joonhyung, 10-27] "Before implementing, write the protocol v3 messages in the format of Design 2.5.1. I will use it to agree with Jaewan on 10/28."
 - [Joonhyung, 10-27] "Explain what AD-7 is, and in the end what exactly needs deciding."
-- [Joonhyung, 10-27] "Explain the part labeled 'guide renderer (local copy)'. When the photographer loads a reference now, does the image go to the subject and the subject make the outline there?" (Yes, but what went was a WebP cutout with the person's pixels; the subject only traced its alpha, so the mask alone would do.)
+- [Joonhyung, 10-27] "Explain the part labeled 'guide renderer (local copy)'. When the photographer loads a reference now, does the image go to the subject and the subject make the outline there?"
 - [Joonhyung, 10-27] "I am now taking P9. First explain P9 in detail."
 
 **The photographer's direction (10/27)**
 
-- [Joonhyung, 10-27] "Make `feat/113-mask-only-guide` from `dev`, and as the first PR implement `ReferenceGuide.mask`, the `mask-png` codec, `mask.png` for saved guides with the move from the existing `cutout.webp`, and protocol 3. The subject-to-photographer direction goes in the next PR." (The mask is written and read as an 8-bit grayscale PNG in plain Kotlin, so its bytes do not depend on the platform and the JVM tests reach it; a first comment claimed, unchecked, that `Bitmap.compress` puts `ALPHA_8` in a platform-dependent channel, and was reworded to what is known: there is no grayscale config. 850 unit tests passed.)
+- [Joonhyung, 10-27] "Make `feat/113-mask-only-guide` from `dev`, and as the first PR implement `ReferenceGuide.mask`, the `mask-png` codec, `mask.png` for saved guides with the move from the existing `cutout.webp`, and protocol 3. The subject-to-photographer direction goes in the next PR."
 
 **Checks on two phones (10/27 – 10/28)**
 
-- [Joonhyung, 10-27] "Before committing, tell me the procedure to check guide sync and the move of saved guides on two phones." (Seven steps with `adb`, `run-as`, and the `PixTimings`, `PixGuideSync`, `PixSession`, and `PixSavedGuides` lines, and a pass condition for each.)
-- [Joonhyung, 10-27] "Streaming does not connect, maybe because I have no server running. I used to run a local server; can I use the AWS server I have open now?" / "I started the server at the EC2 address. How do I set `pix.serverUrl` to it?" (`local.properties` pointed debug builds at a laptop address; the EC2 name is the same server as the default, and `-Ppix.serverUrl` sets it for one build.)
-- [Joonhyung, 10-28] The `adb` commands as written failed in zsh, which reads `<P>` as a redirection. (The connected serials were listed, and the one guide folder on the Note9 turned out to be saved by the new build, so it did not test the move.)
-- [Joonhyung, 10-28] "I checked 4-3 with screenshots, and 4-4 too. It saves like this." / "I checked 4-5 myself: a guide loaded comes up on the subject too." (With the logs: a saved guide's 9,149-byte `mask.png` went in one chunk, a subject joining again got only the state, and a new guide sent its image once under its new id.)
-- [Joonhyung, 10-28] The protocol 2 build failed in the check worktree for want of `local.properties`. (Its SDK path and the server address were added there, and the build was copied out.)
-- [Joonhyung, 10-28] "If the versions differ, the session ends with *The session has ended* and does not connect. So let's skip step 3." (That is step 5's pass condition; the move from `cutout.webp` stays covered by `FileSavedGuideStoreTest` only, and the PR says so.)
+- [Joonhyung, 10-27] "Before committing, tell me the procedure to check guide sync and the move of saved guides on two phones."
+- [Joonhyung, 10-27] "Streaming does not connect, maybe because I have no server running. I used to run a local server; can I use the AWS server I have open now?" / "I started the server at the EC2 address. How do I set `pix.serverUrl` to it?"
+- [Joonhyung, 10-28] "I checked 4-3 with screenshots, and 4-4 too. It saves like this." / "I checked 4-5 myself: a guide loaded comes up on the subject too."
+- [Joonhyung, 10-28] "If the versions differ, the session ends with *The session has ended* and does not connect. So let's skip step 3."
 
 **The PR (10/28)**
 
-- [Joonhyung, 10-28] "Then put me in the AI marker, bring in `dev`, commit on the existing branch, write the PR, and push. Then write the prompt history needed for this feature, but do not commit it yet." (`dev` brought [#138] and [#144]; the Testing Documentation's revision rows and the Views row conflicted, and this branch's rows moved to Design 2.7 and Testing 2.9. 889 unit tests passed.)
+- [Joonhyung, 10-28] "Then put me in the AI marker, bring in `dev`, commit on the existing branch, write the PR, and push. Then write the prompt history needed for this feature, but do not commit it yet."
 - [Joonhyung, 10-28] "Commit the prompt log to the P9 branch and push it to PR #145."
-- [Joonhyung, 10-28] "Check this review and fix and commit what it asks." / "Push the fix to PR #145." (One Codex finding, and it was right: a move that stopped after `mask.png` was in place, or whose delete failed, left `cutout.webp` with the reference's pixels for good, because a folder with a mask was never moved again. The delete is now tried at every read while the cutout is there; the new test fails on the old code.)
-- [Joonhyung, 10-28] "PR #145 has merge conflicts with its base branch. Merge the base branch in, resolve the conflicts, and push." (`dev` had brought [#143], which sends a 512 px reference copy to the subject for its thumbnail. `AppContainer` built `GuideSyncer` with the removed `WebpGuideImageCodec`, the revision rows moved to Design 2.8 and Testing 2.10, AD-6 and 2.6.1 kept #143's sentences without the one about the WebP cutout, and `android/README.md`, which still described the cutout, was brought up to date. 905 unit tests passed.)
-- [Joonhyung, 10-28] "Update PR #145's summary so it says only the guide image is mask-only, since #143 sends a 512 px reference copy for the thumbnail." (`gh pr edit` failed on GitHub's retired Projects (classic) API, so the description went through the REST API.)
+- [Joonhyung, 10-28] "Check this review and fix and commit what it asks." / "Push the fix to PR #145."
+- [Joonhyung, 10-28] "PR #145 has merge conflicts with its base branch. Merge the base branch in, resolve the conflicts, and push."
+- [Joonhyung, 10-28] "Update PR #145's summary so it says only the guide image is mask-only, since #143 sends a 512 px reference copy for the thumbnail."
 
 **The subject's direction (10/28)**
 
-- [Joonhyung, 10-28] "'Either phone can send a guide image, for the shared steps' seems to be needed now. Write the spec to implement it." (Scope, AD-7 kept, `anchor` and `source` in `guide.image.begin` within version 3, the photographer adopting the guide without sending it back, the subject drawing it at once, the edge cases, the files, the tests, and the documents, with one decision left: whether the PR includes the *Guide* button on Subject view.)
-- [Joonhyung, 10-28] "Check whether I understood this right and explain it simply: before, the photographer kept `reference.webp` and sent the cutout, from which the subject traced the outline; now it keeps `reference.webp` and `mask.png` and sends the mask. Then is the remaining task S→P done as a mirror image?" (Mostly right, with three corrections: a guide is written to disk only on *Save guide*, the old cutout held the person's colored pixels, and since #143 a reference copy also goes to the subject. The sending is the same both ways; what differs is that the photographer owns the guide, so it adopts the subject's guide, needs its `anchor`, and must not send it back.)
-- [Joonhyung, 10-28] "Is showing the reference copy on the subject already built?" (Yes, by #143: `MirrorReference`, the thumbnail on Subject view, and its tests.)
-- [Joonhyung, 10-28] "Implement the S→P protocol with the spec we made, sending the `anchor` to the photographer too. First draw the flow again, then update the documents (Design, Testing) without a version bump, and include the *Guide* button on Subject view." (The flow was drawn first. Not in the spec, and decided while building it: the subject's answer cannot be told from the photographer's earlier messages, so they wait until a `guide.state` names the offered guide, at most 5 s; the subject's thumbnail uses its own reference photo; the guide screens go back with `backToShooting`, because a fixed `popBackStack(cameraFragment)` from Subject view would have ended the session. Without a version bump the S→P part went into the existing Design 2.8 and Testing 2.10 rows; R&S got its first row for this PR, and Figure 5 was redrawn with the button. 923 unit tests passed.)
-- [Joonhyung, 10-28] "Is the photographer the one that first places the outline? Is that a design choice, and why the subject sends an `anchor` in S→P, or is it because P16 is not done yet? Does P16 also have to show the outline first on the subject?" (A design choice: the start position needs the photographer's camera ratio, so the photographer computes it, and the `anchor` is that computation's input, which the mask alone does not hold. The subject already draws its guide at once, and the photographer's state then settles it; P16 reuses `offer` for a candidate the subject picks.)
-- [Joonhyung, 10-28] "Run the S→P protocol on the emulator, take screenshots, and report." (No phone was connected, so two read-only instances of the one emulator image were started and a saved guide was written into the subject's files, for want of a photo of a person. Both booted, but adb kept them offline even with the emulators and adb started outside the sandbox, so the run was stopped.)
-- [Joonhyung, 10-28] "The emulator is not running now. First commit what is implemented and update the PR." (Committed with `Closes #113`; the PR took the issue's title, both directions, and the device checks still to do.)
+- [Joonhyung, 10-28] "'Either phone can send a guide image, for the shared steps' seems to be needed now. Write the spec to implement it."
+- [Joonhyung, 10-28] "Check whether I understood this right and explain it simply: before, the photographer kept `reference.webp` and sent the cutout, from which the subject traced the outline; now it keeps `reference.webp` and `mask.png` and sends the mask. Then is the remaining task S→P done as a mirror image?"
+- [Joonhyung, 10-28] "Is showing the reference copy on the subject already built?"
+- [Joonhyung, 10-28] "Implement the S→P protocol with the spec we made, sending the `anchor` to the photographer too. First draw the flow again, then update the documents (Design, Testing) without a version bump, and include the *Guide* button on Subject view."
+- [Joonhyung, 10-28] "Is the photographer the one that first places the outline? Is that a design choice, and why the subject sends an `anchor` in S→P, or is it because P16 is not done yet? Does P16 also have to show the outline first on the subject?"
+- [Joonhyung, 10-28] "Run the S→P protocol on the emulator, take screenshots, and report."
+- [Joonhyung, 10-28] "The emulator is not running now. First commit what is implemented and update the PR."
 - [Joonhyung, 10-28] "Update the prompt log too, without committing."
-- [Joonhyung, 10-28] "Redraw Flow 5 with the changed UI, the zoom row's toggle included, commit and push it, and resolve the conflicts." (Subject view in Figure 5 gained the guide-edit mode toggle beside the zoom readout, rendered in both languages. `dev` had brought [#146], which took Design 2.8 and Testing 2.10, so this branch's rows moved to 2.9 and 2.11, and the technique rows kept both sides' cases. 935 unit tests passed.)
+- [Joonhyung, 10-28] "Redraw Flow 5 with the changed UI, the zoom row's toggle included, commit and push it, and resolve the conflicts."
 - [Joonhyung, 10-28] "Commit the prompt log and push it to PR #145."
 
-## Reconnection after a short drop ([#118], PR [#149])
+## Reconnection after a short drop ([#149])
 
 **The plan and the build (10/27)**
 
-- [Sungmin, 10-27] "Now I'll take issue #118. Pull `dev` first, then write a concrete, detailed plan of how to build it. Do not implement yet." (The server holds a dead socket for up to about 40 s, until Uvicorn's pings go unanswered, so a phone coming back over a new socket would find its place taken. The plan: a rejoin token per place, which takes the place back even from the old socket; `Reconnecting` with a 10 s budget on both phones; an ICE restart from the photographer on the same peer connection, so the channels and the video track stay; six decisions, each with a recommendation.)
-- [Sungmin, 10-27] "Can you implement it now?" (With the recommended decisions. On the server, the token in `room.created` and `session.joined`, stored only as a SHA-256, `session.join`, and the `REJOIN` Lua script; in the app, `SessionState.Reconnecting`, `SessionEntry.Rejoin`, local candidates held until their description is out, and the socket opened again on every drop. 13 new server tests and 12 manager tests; a mutation check showed that the candidate and `peer.left` tests catch their regressions. 860 unit tests passed.)
+- [Sungmin, 10-27] "Now I'll take issue #118. Pull `dev` first, then write a concrete, detailed plan of how to build it. Do not implement yet."
+- [Sungmin, 10-27] "Can you implement it now?"
 
 **`dev` again (10/28)**
 
-- [Sungmin, 10-28] "Pull `dev` again and resolve the conflicts." (Seven PRs had come in, [#138] to [#148], and 15 files conflicted. [#144] had already replaced the "same Wi-Fi" text on *Connection lost*, so this branch's text and its redrawn Flow 5 were dropped; `reconnecting` got its Korean string; IT-13 was taken by the Korean walk-through, so the Wi-Fi-off script became IT-16; the revision rows moved to Design 2.10, R&S 2.11, and Testing 2.13. One gap had no conflict marker: the reconnect path built `PeerInfo` without [#143]'s `haveReferenceId`, so the photographer would have sent the reference photo again after every drop. 961 unit tests passed.)
+- [Sungmin, 10-28] "Pull `dev` again and resolve the conflicts."
 
 **Two phones (10/28 – 10/29)**
 
-- [Sungmin, 10-28] "How do I test this?" / "Why a local server? Can't I test with the AWS server?" (AWS runs `dev`, which gives no tokens, so the app would take the path for older servers: the subject would not open its socket again and would miss the restart offer. Running this branch there would need Jaewan, since the server is shared and serves the user test of 10/31.)
-- [Sungmin, 10-28] "I connected a phone: install it." (The S25 Ultra, and the emulator as the second phone, against a server on the laptop, with an APK built for its address.)
-- [Sungmin, 10-28] "OK, done." (The phone had been the photographer, in airplane mode both times. A short drop came back in 3.8 s. The long one ended on time, but the photographer's socket waited 30 s to come back, because the tries while reconnecting had counted toward its backoff, and a subject's *Reconnect* made while the photographer was off the server would never get an offer.)
-- [Sungmin, 10-28] "OK, go ahead with the fixes." (The tries while reconnecting no longer count, and a subject waiting for an offer sends `session.join` again when `peer.rejoined` says the photographer is back. The second test at first passed without its fix, because the repeated `session.join` equals the *Reconnect*'s first one; it now compares only the messages sent after `peer.rejoined`.)
-- [Sungmin, 10-28] "Install it again." (Now on the S23 Ultra; both devices' logs went to files, so they outlast a closed emulator.)
-- [Sungmin, 10-28] "Why doesn't the outline show on the emulator? It's painfully slow." (Play services never download ML Kit's segmentation module on the emulator, so the guide maker waits 60 s and fails. The guide came from the phone instead, through *Guide* on Subject view ([#145]).)
-- [Sungmin, 10-28] "Testing is done." (The system logs showed airplane mode on the emulator, the photographer, not on the phone. The backoff fix held: the photographer's socket tried again 1, 2, and 4 s after giving up and was back on the third try, and the *Reconnect* connected at once. Earlier, a tap on the phone had been followed by its realtime channel closing alone, with no drop on either side, and the new rule that a closed channel ends the session turned that into *Connection lost*; `dev` had only logged it.)
-- [Sungmin, 10-28] "OK, go ahead with the fix." (Only the reliable channel closing ends the session; after the realtime channel closes alone, its steps and pings go on the reliable one, and reconnecting ends with the reliable channel alone. One mutant ran for 24 minutes: its failing assertion left the session connected, and the ping loop kept `runTest` draining virtual time.)
-- [Sungmin, 10-29] "Done." (IT-4 as written, with airplane mode on the subject's phone for 6 s: `session.reconnected` 4102 ms and 3917 ms, and the video and the guide back on the same connection. With 20 s both phones gave up at 10 s; a *Reconnect* tapped 12 ms before Wi-Fi was back failed and kept the screen, and the next one connected in 0.7 s.)
+- [Sungmin, 10-28] "How do I test this?" / "Why a local server? Can't I test with the AWS server?"
+- [Sungmin, 10-28] "I connected a phone: install it."
+- [Sungmin, 10-28] "OK, done."
+- [Sungmin, 10-28] "OK, go ahead with the fixes."
+- [Sungmin, 10-28] "Install it again."
+- [Sungmin, 10-28] "Why doesn't the outline show on the emulator? It's painfully slow."
+- [Sungmin, 10-28] "Testing is done."
+- [Sungmin, 10-28] "OK, go ahead with the fix."
+- [Sungmin, 10-29] "Done."
 
 **The PR (10/29)**
 
-- [Sungmin, 10-29] "I think this can be committed and pushed as it is." (Before the commit, the AI markers of the files this PR changed were dated and named for it.)
-- [Sungmin, 10-29] "Do the reviews on PR #149 need fixing? If so, fix them, commit, and push." (Three Codex findings, all right. Two restarts asked for at once, when both phones take their places back, could both be answered while the photographer applied only the first answer, leaving the phones with different ICE credentials: a restart now waits for the pending answer, at most 2 s, because an offer that went to the subject's old socket is never answered, and plain serializing would have held back the restart that saved IT-4. A *Reconnect* that failed before the server answered dropped its token, so the next one joined the code, which a server still holding the old socket refuses as `FULL`: the token is now kept until the server refuses it, which also explains the first failed tap. The background limit skipped `Reconnecting`: it now counts, and its deadline holds when the link comes back. Each fix has a test that fails without it; 967 unit tests passed.)
+- [Sungmin, 10-29] "I think this can be committed and pushed as it is."
+- [Sungmin, 10-29] "Do the reviews on PR #149 need fixing? If so, fix them, commit, and push."
 - [Sungmin, 10-29] "Write the AI prompt log for this too, then commit and push it."
 
-## Shared steps on both phones ([#120], PR [#151])
+## Shared steps on both phones ([#151])
 
 **Before the work (10/26)**
 
-- [Joonhyung, 10-26] "Make `feat/120-shared-steps`. I want to build the *Guide* and *Generate poses here* buttons on Subject view first, so draw the flow for it first." (The branch was made from the latest `dev`, and two flows were drawn: the subject opening the same *Add a pose guide* as the Camera screen, and both phones following the photographer's generation steps, with the subject's taps as requests and the photographer's phone calling the server. Left open: which phone shows the consent notice when the subject starts, how the subject's *Generating* and *Pick a pose* get their state, and the message names, to be agreed with Jaewan on 10/28. The *Guide* button was then built with the guide in either direction ([#113], above).)
+- [Joonhyung, 10-26] "Make `feat/120-shared-steps`. I want to build the *Guide* and *Generate poses here* buttons on Subject view first, so draw the flow for it first."
 
 **The spec (10/28)**
 
-- [Joonhyung, 10-28] "Check issue #120 and explain in detail what has to be built on top of P9." (With *Generate poses here* dropped from the subject's phone, as decided on the issue, what was left was *Save guide* on Subject view: the subject's copy of a guide had no `anchor`, and its `source` was always `GALLERY`, so the photographer's images had to carry both, still within version 3. The issue's *Done when* no longer matched the decision.)
-- [Joonhyung, 10-28] "Leave *Generate poses* out of the subject's phone, but first write a spec that puts in P16 the photographer's candidates on the subject's *Pick a pose* too, with the side that picks first deciding." (`pose.step`, `pose.candidate.*`, and `pose.pick` on the reliable channel; a JPEG copy of each candidate, at most 1024 px, sent as it arrives; the first pick to reach the photographer's phone wins, and each set has one end. Recommended and taken: the subject's pick still goes through the photographer's *Reference confirm*, where *No person found* is already handled.)
+- [Joonhyung, 10-28] "Check issue #120 and explain in detail what has to be built on top of P9."
+- [Joonhyung, 10-28] "Leave *Generate poses* out of the subject's phone, but first write a spec that puts in P16 the photographer's candidates on the subject's *Pick a pose* too, with the side that picks first deciding."
 
 **The build (10/28 – 10/29)**
 
-- [Joonhyung, 10-28] "Make `feat/120-shared-steps` from `dev` with this spec, and first draw the wireframes of Flow 5 (Subject view, the subject's *Pick a pose*) and the photographer's *Pick a pose*. Then fix the documents (R&S, Design, Testing) and implement it." / "Continue from where it stopped." (Flows 4 and 5 in both languages, Flow 4 made as wide as Flow 5 so the arrows between them line up; FR-6.15, FR-6.16, US-16, AD-7, 2.5.1, and 2.6.5, with the changed goal of Testing 1.1 kept next to the original. `PoseSyncer` sends the set as it goes, only `GenerationViewModel` decides who chose, and *Save guide* keeps the mask, the reference copy, and the `anchor`. Found and fixed before the PR: the Testing page named a codec test that did not exist yet, and *Describe again* closed an open set even when it did nothing. A bug put into each of four places made its test fail; 1001 unit tests passed.)
-- [Joonhyung, 10-29] "First bring in what may conflict with `dev`, and fix it." ([#149] and [#150] had come in. Five files conflicted; the revision rows moved to R&S 2.12, Design 2.12, and Testing 2.14, and the two-phone script to IT-17. One gap had no conflict marker: [#149]'s `Reconnecting` state kept the subject's set through a drop, so an open set is now sent again from the start after a reconnect, one that ended meanwhile as its end alone, and *Use this pose* waits while the link reconnects. A race was found on the way: a set closed while its last copy was being encoded still sent `PICKING`. 1028 unit tests passed.)
-- [Joonhyung, 10-29] "Fix the stale PICKING race in PoseSyncer's sender here, with a test." (A step of a set that changed while its copies were sent is skipped, and the next state sends the current one; the new test got `PICKING` before `CLOSED` on the old code.)
+- [Joonhyung, 10-28] "Make `feat/120-shared-steps` from `dev` with this spec, and first draw the wireframes of Flow 5 (Subject view, the subject's *Pick a pose*) and the photographer's *Pick a pose*. Then fix the documents (R&S, Design, Testing) and implement it." / "Continue from where it stopped."
+- [Joonhyung, 10-29] "First bring in what may conflict with `dev`, and fix it."
+- [Joonhyung, 10-29] "Fix the stale PICKING race in PoseSyncer's sender here, with a test."
 
 **The PR ([#151], 10/29)**
 
-- [Joonhyung, 10-29] "Commit this to feat/120-shared-steps, push it, and open a PR to dev titled 'feat: share the guide and pose steps on both phones' with Closes #120." (The PR names Sungmin, Jaewan, and Dongje for the shared contracts it changes, and lists the issue's *Done when* as changed by the decision.)
-- [Joonhyung, 10-29] "Start two emulators, S and P, for this feature, and report with screenshots of the right moments." (Two read-only instances of the one AVD booted, and the session stopped there, before anything was installed. Jaewan's review came next, from a run of the PR on two emulators: five items, with the flow screenshots.)
+- [Joonhyung, 10-29] "Commit this to feat/120-shared-steps, push it, and open a PR to dev titled 'feat: share the guide and pose steps on both phones' with Closes #120."
+- [Joonhyung, 10-29] "Start two emulators, S and P, for this feature, and report with screenshots of the right moments."
 
 **After Jaewan's review (10/29)**
 
-- [Joonhyung, 10-29] "Check this review. In particular, after a photo is chosen and the photographer's phone makes the outline with ML Kit, the subject's phone has no *Use this guide* for that outline. Build it so the subject can tap *Use this guide* too." (Item 5. The photographer's phone still finds the person and sends the outline with its step to the subject's *Your reference* (`guide.confirm`, `guide.confirm.image.*`, `guide.confirm.use`, `ConfirmSyncer`); the first *Use this guide* to reach the photographer's phone decides, and the photographer's own use or Back closes the subject's screen with its notice. Subject view says "… is checking the guide…", which also covers item 1's "Connecting…". The tests showed that opening *Your reference* looked up the nav controller on every render, which throws where none is attached; it now does so only when a screen opens. 1073 unit tests passed.)
-- [Joonhyung, 10-29] "Commit this to feat/120-shared-steps, push it, and update the PR #151 description to match." (`gh pr edit` still failed on the Projects (classic) API, so the description went through the REST API.)
-- [Joonhyung, 10-29] "*Generate poses* does not let P and S both write the pose description yet (review item 3): change it so they write it together. Also resolve the merge conflicts." / Asked how: "While P or S is typing, the other cannot type and sees something like 'The other person is typing.' A button the first one taps, or simply tapping the field first, either works." ([#153] conflicted only in two wiki pages, and the merge was pushed on its own. The photographer's *Use this photo* now opens *Generate poses* on the subject's phone too, with a copy of the scene photo (`pose.description`, `pose.scene.*`). The first tap on the field holds it, as the photographer's phone decides, and the other phone shows the text with "… is typing…" while its field, chips, and buttons wait (`pose.description.edit`, `DescriptionSyncer`). Done, a closed keyboard, a button, leaving the screen, or the subject's link dropping frees it, and either phone's *Generate 4 poses* or *Skip* starts the set on the photographer's phone (`pose.description.go`). Subject view says "… is describing a pose…" instead of "camera paused". The keyboard closing cannot be shown under Robolectric, so only Done and the buttons are tested; 1122 unit tests passed.)
-- [Joonhyung, 10-29] "Commit the shared Generate poses to feat/120-shared-steps, push it, and update the PR #151 description to match." (Items 2 and 4 of the review and two Codex findings stayed in the description as not done.)
+- [Joonhyung, 10-29] "Check this review. In particular, after a photo is chosen and the photographer's phone makes the outline with ML Kit, the subject's phone has no *Use this guide* for that outline. Build it so the subject can tap *Use this guide* too."
+- [Joonhyung, 10-29] "Commit this to feat/120-shared-steps, push it, and update the PR #151 description to match."
+- [Joonhyung, 10-29] "*Generate poses* does not let P and S both write the pose description yet (review item 3): change it so they write it together. Also resolve the merge conflicts." / "While P or S is typing, the other cannot type and sees something like 'The other person is typing.' A button the first one taps, or simply tapping the field first, either works."
+- [Joonhyung, 10-29] "Commit the shared Generate poses to feat/120-shared-steps, push it, and update the PR #151 description to match."
 
 **Codex and CI through Auto-fix (10/29 – 10/30)**
 
-- [Joonhyung, 10-29] "Turn on Auto-fix for PR #151, so CI failures on it get fixed here." (Auto-fix then brought the two Codex findings, both right. A detailed candidate's copy could be over the subject's 1 MiB limit, so the photographer now encodes it again at lower quality (85, 70, 55), the scene photo too, and leaves out one that still does not fit, and `PICKING` names only the copies sent. An end left from an earlier set closed the subject's *Pick a pose*, which now ignores it, as *Your reference* and *Generate poses* already did; the tests for that end on all three screens had passed without the fix, because they attached navigation too late and the error was swallowed, and with the setup fixed each fails without its fix. After a second `@codex review` on 10/30, two more findings, both right: a set whose copies all failed opened an empty *Pick a pose*, so the subject's phone now opens it only with a copy there; and a step that came while *Add a pose guide* covered Subject view counted as opened and never opened, so it now opens once the sheet closes. Each time a server test outside this PR failed on timing, with the server code the same as `dev`'s, and passed on a re-run. 1126 unit tests passed.)
+- [Joonhyung, 10-29] "Turn on Auto-fix for PR #151, so CI failures on it get fixed here."
 
 **Two emulators (10/29 – 10/30)**
 
-- [Joonhyung, 10-29] "The Android emulator runs very slowly on Apple Silicon. Find a way to fix it, apply it, and test this PR with it. Take screenshots of the right moments during the test, like the photos in the PR's review comment, and return them with explanations." (The StackOverflow page it linked could not be opened. The image already ran natively as arm64 on Hypervisor.framework; the cause was the Mac's memory, with swap at 17.8 of 18.4 GB and each emulator holding 2.6 GB. Two new AVDs on the same Google Play image, which ML Kit's segmentation needs, ran headless with the host GPU at 720 × 1600, with no audio, an emulated camera, and animations off: boot went from 79 to 29 s and Pix's cold start from 13–19 to 6–7 s, while 53 % of the frames were still janky. Both phones were driven with `adb`, and four boards of the steps, with the messages between the phones, were drawn: the shared description, the subject's *Use this guide*, the photographer deciding while the subject steps away, and the end of a shared description. Items 2 and 4 were still seen, and the idea chips on the waiting phone are drawn like enabled ones.)
-- [Joonhyung, 10-30] "Write the PR again with these photos included." (Asked how the images should reach GitHub, the answer was Claude in Chrome, which was not connected, so the description was drafted here and the boards were added to it on GitHub.)
+- [Joonhyung, 10-29] "The Android emulator runs very slowly on Apple Silicon. Find a way to fix it, apply it, and test this PR with it. Take screenshots of the right moments during the test, like the photos in the PR's review comment, and return them with explanations."
+- [Joonhyung, 10-30] "Write the PR again with these photos included."
 
-## Invitations with push notifications ([#119], PRs [#153] and [#154])
+## Invitations with push notifications ([#153], [#154])
 
 **The plan (10/29)**
 
-- [Sungmin, 10-29] "Pull `dev`: it has been updated." ([#149] and [#150] had come in, so the branch for #119 could start from `dev` with reconnection in it.)
-- [Sungmin, 10-29] "I'm starting #119: write a detailed plan first. Do I need other screens for it? And there are hardly any screens for friends, such as a friend's profile: is that worth adding, in another issue? The plan first." (Two PRs, the server first. The documented flow had two gaps: accepting created the session, but the photographer's phone got no token for its place, and `invitation.accepted` would be lost while the photographer's socket reconnected. The plan opened the session when the invitation is sent instead, so both phones take their places with `session.join` as after a drop. Four decisions with a recommendation each: when the session opens, the link's format, the Firebase setup, and whether 30 s is enough for the link. The screens were already in R&S 6.5 and 6.6: *Invite sent*, *Invite not accepted*, and *Invitation*, whose "no longer available" became a state of its own screen. A friend's profile adds little to shooting together and would bring photo storage; a row sheet, initials, and a request badge were offered for after the user test.)
-- [Sungmin, 10-29] "Why is Firebase needed here?" (Android keeps no socket open for a closed app; Google Play services' one connection per phone, reached through FCM, is what wakes it, and other push services use it too. Only FCM is used, which is free.)
-- [Sungmin, 10-29] "What else do I have to do besides signing up for Firebase? In detail." (A Firebase project with Analytics off, the Android app `com.lastpenguin.pix` for `google-services.json`, and a service account with only the FCM role for the server's key, kept outside the repository; Jaewan to install it on the AWS server.)
-- [Sungmin, 10-29] "I put `google-services.json` in `android/app` and the key file in the repository's folder. Check them." (The key belonged to another Google Cloud project than the app's, `pix-swpp-fall-2026` against `pix-swpp`, so the server could not have sent to the app's tokens; it also sat in the public repository's folder, which nothing ignored. The check read only the key's type, project, and account, never the private key.)
-- [Sungmin, 10-29] "I made it again: `pix-swpp-5b…json`." (The right project. On the questions that followed: the key moved out of the repository to `~/pix-secrets/`, the session opens when the invitation is sent, and the link is a page served at `/i/<id>`.)
+- [Sungmin, 10-29] "Pull `dev`: it has been updated."
+- [Sungmin, 10-29] "I'm starting #119: write a detailed plan first. Do I need other screens for it? And there are hardly any screens for friends, such as a friend's profile: is that worth adding, in another issue? The plan first."
+- [Sungmin, 10-29] "Why is Firebase needed here?"
+- [Sungmin, 10-29] "What else do I have to do besides signing up for Firebase? In detail."
+- [Sungmin, 10-29] "I put `google-services.json` in `android/app` and the key file in the repository's folder. Check them."
+- [Sungmin, 10-29] "I made it again: `pix-swpp-5b…json`."
 
 **The server (10/29)**
 
-- (The server PR: the `invitations` table, the `INVITE`, `ACCEPT_INVITATION`, and `END_INVITATION` scripts, `REJOIN` sending `peer.joined` to a photographer that comes after the subject, the FCM sender over HTTP v1 with `google-auth`'s signer instead of `firebase-admin`, and the link page; FCM keeps the data key `from` for itself, so the name went as `fromName`. A mutation check found the 30 s boundary's tests passing with the comparison broken, since the session store also refuses an expired room; decline and cancel at the boundary, which need no room, now catch it. A script that restored the mutated files with `git checkout` was blocked by the session's guard before it ran, because it would also have thrown away the uncommitted work; the mutants ran again from copies in the scratchpad. The real key was checked against Google with `validate_only`, sending nothing. 597 server tests passed.)
-- [Sungmin, 10-29] "Can't I test it yet? Which key do I install on AWS?" (Not until the app registers its token and shows the notification, which is the second PR; the key to install is the service account's, not `google-services.json`.)
-- [Sungmin, 10-29] "Commit and push it." (PR [#153].)
-- [Sungmin, 10-29] "Can't I install the key on AWS myself? See whether I can." (This Mac had no SSH key, host entry, or AWS credentials for that server, although its SSH port answered; Jaewan could add the public key, or install the key themselves.)
-- [Sungmin, 10-29] "So I ask for `fcm-sender.json` to be installed on the AWS server?" / "Before my PR is merged, or after?" (Yes, handed over in person rather than through a messenger; before the merge it needs no restart, since the deploy starts the new copy with it.)
-- [Sungmin, 10-29] "It's installed on AWS." / "Merged." (The deploy of `00e9396` served the link page and the endpoints.)
+- [Sungmin, 10-29] "Can't I test it yet? Which key do I install on AWS?"
+- [Sungmin, 10-29] "Commit and push it."
+- [Sungmin, 10-29] "Can't I install the key on AWS myself? See whether I can."
+- [Sungmin, 10-29] "So I ask for `fcm-sender.json` to be installed on the AWS server?" / "Before my PR is merged, or after?"
+- [Sungmin, 10-29] "It's installed on AWS." / "Merged."
 
 **The app (10/29)**
 
-- [Sungmin, 10-29] "Make a branch from the latest `dev` and start." (The `google-services` plugin worked with AGP 9.3. `InvitationManager`, `PushTokenRegistrar`, the `push/` package, `SessionEntry.Invite` and `SessionEntry.Invitation`, `Inviting`, the three screens, the deep links, and the access token on every session socket, so a friend in a session is `BUSY`. An invitation's photographer could not go back to `Waiting` without a code, which would have crashed, so its session ends there. Both phones got the APK against the AWS server.)
-- [Sungmin, 10-29] "Is the link really working? Check it. The rest seems to work." (On the emulator's Chrome the page's *Open in Pix* opened *Invitation*. The phone's log showed the link opened on the inviting phone itself, where it cannot be accepted, just as the 30 s ran out.)
-- [Sungmin, 10-29] "Let's make it 60 s; 30 s is too short. It works. Make it 60 s, then commit and push." (60 s on the server, the photographer's own wait at 80 s, and "within a minute"; one test that could not fail, since another timer ended the session first, now checks that a connected session outlasts the invitation's wait. 1007 unit tests passed.)
-- [Sungmin, 10-29] "Go on with the rest." (Tests of the three screens and their Korean, the token in the socket's upgrade, Flows 3, 3b, 4, and 5 redrawn, and the documents. Two Korean strings followed the wireframe's earlier translation.)
-- [Sungmin, 10-29] "The PR is [#154]. Fix what its review asks for, then commit and push." (Codex found three: *Cancel invite* did nothing once the friend had accepted and the phones were connecting, yet went to *Friends*, so it now ends the session, while closing the sheet then keeps it, as on *Room code*; *Invitation* navigated on transitions, which a screen stopped with Pix in the background, or recreated, missed, leaving it on "Connecting…", so it follows the session's state with its flag in its ViewModel; and *Accept* with another session open spent the invitation, since the session ignores a second start, so it is refused before the server is called. `JoinCodeFragment` and *Connection lost* also navigate on transitions; this PR leaves them as they are. Six mutants of the fixes each failed a new test; 1040 unit tests passed.)
-- [Sungmin, 10-30] "There is a new review on [#154]. Fix it if it needs fixing, then commit and push." (Codex found two more. *Use a room code* tapped before the server answered an invitation opened a room, and the invitation's own start was then ignored, leaving the friend an invitation nobody waited on; an invitation answered after another session started on the phone is now cancelled. A link that starts Pix from another app's task, without a task of its own, was opened by the navigation graph alone, as its source confirmed, so *Decline* and *Back to camera* found no Camera to go back to; `MainActivity` now opens every link itself, over Camera at a start. Three mutants each failed a new test; 1044 unit tests passed.)
-- [Sungmin, 10-30] "Something new was merged and [#154] has a lot of conflicts. Resolve them, then commit and push." ([#151] had come in, and `dev` was merged into the branch rather than rebased onto. Fourteen files conflicted. The invitation's revision rows moved after #151's, to Design 2.18, R&S 2.15, and Testing 2.20; `SessionViewModel` takes `InvitationManager` before #151's optional syncers; the AI markers keep every reviewer; R&S keeps #151's new rows and captions without "not built yet"; two technique rows that both sides added to were merged word by word; and Flows 4 and 5 were drawn again from the wireframes, which had merged on their own. 1203 unit tests passed.)
-- [Sungmin, 10-30] "Did you fix this review?" (pasting Codex's third finding) / "Fix it, then commit and push." (It had come after the second round was read, so it was not. *Cancel invite* waited for the server's answer before leaving the session, so *Use a room code* tapped meanwhile started nothing and left *Room code* on "Getting code". The phone now leaves at once and sends the cancel alongside; on the server, a cancel after the room is gone still marks the invitation cancelled. The old order failed the new test; 1204 unit tests passed.)
-- [Sungmin, 10-30] "The new one is in `dev`. Resolve the conflicts, then commit and push. Don't fix the test: the new `dev` changed it." ([#152] had come in, with the server test that read the socket count before a closed socket was freed already waiting for it, so the test was left as `dev` has it. Ten files conflicted: the AI markers keep every reviewer; the invitation's revision rows moved after selfie mode's, to Design 2.19, R&S 2.16, and Testing 2.21; in the techniques table, the push items and the selfie items, added at the same place, both stay; one line of Flow 4's wireframe held both selfie mode's camera buttons and the *Invite sent* sheet, merged word by word, and Flows 4 and 5 were drawn again. 1225 unit tests and the server's tests passed, but for the one that fails only on this Mac.)
-- [Sungmin, 10-30] "A new review came in on [#154]. Fix it." (Codex's fourth finding: *Invite* tapped and Friends left for Camera before the server answered still started the invitation, but no screen took the result, so *Invite sent* never opened and an unseen `Inviting` session kept *Use a room code* from starting. The results now go through a `SharedFlow`, and an invitation answered while no screen collects them is cancelled. The first test passed the old code, since the fake answered before the screen's collector had gone; the fake's `invite` can now be held, as `accept` and `cancel` could. The screen tests that invite take the result through a new `ScreenTestSupport.inviteFromFriends`. Without the fix the new test fails; 1226 unit tests passed.)
-- [Sungmin, 10-30] "There's a new review. Fix it, then commit and push." (Codex's fifth finding followed from the fourth: *Invite again* disabled itself when tapped and came back only on a failure, so an invitation dropped while Pix was in the background, which reports nothing, left it disabled. `SessionViewModel.sendingInvite` is now a state the screen follows. `FragmentScenario` destroys the view when it stops a screen, which would have hidden the bug, so the new test stops a whole activity; it fails on the old screen. 1227 unit tests passed.)
+- [Sungmin, 10-29] "Make a branch from the latest `dev` and start."
+- [Sungmin, 10-29] "Is the link really working? Check it. The rest seems to work."
+- [Sungmin, 10-29] "Let's make it 60 s; 30 s is too short. It works. Make it 60 s, then commit and push."
+- [Sungmin, 10-29] "Go on with the rest."
+- [Sungmin, 10-29] "The PR is #154. Fix what its review asks for, then commit and push."
+- [Sungmin, 10-30] "There is a new review on #154. Fix it if it needs fixing, then commit and push."
+- [Sungmin, 10-30] "Something new was merged and #154 has a lot of conflicts. Resolve them, then commit and push."
+- [Sungmin, 10-30] "Did you fix this review?" / "Fix it, then commit and push."
+- [Sungmin, 10-30] "The new one is in `dev`. Resolve the conflicts, then commit and push. Don't fix the test: the new `dev` changed it."
+- [Sungmin, 10-30] "A new review came in on #154. Fix it."
+- [Sungmin, 10-30] "There's a new review. Fix it, then commit and push."
 
-## Session photos on both phones ([#121], PR [#159])
+## Session photos on both phones ([#159])
 
 **The spec (10/30)**
 
-- [Joonhyung, 10-30] "Now I am going to build P17. Check the tasks and review the requirements for writing the spec." (The issue is short, but ten points were open, each with a recommendation. The two that mattered: nobody knew how large a photo is, since `CameraXController` allows high-resolution modes, and with one reliable queue every control message would wait behind hundreds of chunks. FR-6.14's "by default" promised a setting nobody had planned, and NFR-13 did not mention the photos.)
-- [Joonhyung, 10-30] "Write the P17 spec with the recommended choices, before creating the branch or changing any code." (The saved JPEG itself goes in chunks, one photo at a time, behind every other reliable message; a short drop pauses it, and the next chunk follows; a session that ends drops what is left and says "Couldn't send"; the subject writes to a file in the cache and saves it through a pending MediaStore row.)
+- [Joonhyung, 10-30] "Now I am going to build P17. Check the tasks and review the requirements for writing the spec."
+- [Joonhyung, 10-30] "Write the P17 spec with the recommended choices, before creating the branch or changing any code."
 
 **The build (10/30 – 10/31)**
 
-- [Joonhyung, 10-30] "Yes, start." (No phone was connected, so the photo sizes stayed unmeasured and the 40 MiB limit an assumption. Flows 4 and 5 gained the notices as note boxes, then R&S, Design, Testing, and the code. Reading the receive path showed a gap in the spec: the message buffers on the receiving phone hold 256 and 64 messages and drop what does not fit, silently, so a photo could break on any phone slower than the link. `photo.ack` now keeps at most 32 chunks unacknowledged. `sendBulk` replaced the spec's `awaitBulkRoom`, which left a race between the check and the send, and `PhotoSyncer` runs for the whole session, because a sender stopped at `Reconnecting` would miss a `photo.saved` that came meanwhile. Rereading the code found `InputStream.readNBytes`, which needs API 33 in an app with `minSdk` 29, a toast shown twice for a photo sent twice, and a refused MediaStore insert that would have crashed the app. A bug put into each of eleven places made its test fail; 1179 unit tests passed. On two emulators a photo arrived with the same md5, and force-stopping the subject gave "Couldn't send a photo to Phone S" about 4 s after "Phone S disconnected".)
+- [Joonhyung, 10-30] "Yes, start."
 
 **The PR ([#159], 10/31)**
 
-- [Joonhyung, 10-31] "First put everything together, the screenshots of the tests you ran included, commit it, and open the PR." / "Continue from where it stopped." (The first run had logged the photographer's notices as text, so it had to be repeated with screenshots, and the emulators were stopped partway. `dev` had brought [#152], [#154], [#155], and [#157], with 19 conflicts: the revision rows moved to R&S 2.19, Design 2.23, and Testing 2.25, the script to IT-20, and `MainActivityTest` had come from both sides, so the toast's test became `MainActivityPhotoToastTest`. 1320 unit tests passed. The run was repeated on the merged build as one script, with the emulators alone on the Mac: a burst that follows the camera, and frames recorded from the shutter on, because a toast is gone before a log line can be read. Six photos arrived in the order taken, each with the same md5. Two boards were drawn, but Claude in Chrome was not connected and the built-in browser not signed in, so the PR opened with a place marked for each.)
+- [Joonhyung, 10-31] "First put everything together, the screenshots of the tests you ran included, commit it, and open the PR." / "Continue from where it stopped."
 
-## Choosing who takes the photo ([#188])
+## Choosing who takes the photo ([#189])
 
 **The idea and the sketch (11/05)**
 
-- [Sungmin, 11-05] "Before the QR issue, I want to add a feature in a new issue. On Shoot together, with a room code or with a friend, it is confusing who shoots and who is shot. The user should choose a role first and then do what that role does; now, for example, the person in the photo has to enter the room code, but nobody knows who should enter it. How should we solve it? Can you sketch a UI that only I can see?" (The role is hidden in how the phones connect: the phone that shows a code or sends an invitation is the camera, and *Friends* held both phones' ways in. A private sketch of two options: the role chosen first, then only that role's ways to connect, or one screen with a tab per role; the first recommended, because a tab chosen in advance lets people go on without choosing, and because #122's *Show QR* and *Scan QR* then fall on the right phones.)
-- [Sungmin, 11-05] "Option A is good, but it looks like an app an AI made: too many needless explanations, and the first screen is especially bad." (The diagram, the subtitles, and the lists of what each choice offers went; the first screen became a sheet over Camera with two tiles.)
-- [Sungmin, 11-05] "Now it is too plain. And a top bar that says 'the photographer' and 'the person in the photo' is strange. I didn't ask to drop every explanation; the needed ones should stay, since the point is to reduce the confusion." (Explanations kept where they say what a choice does or where the other phone taps; the screens named for what they do, *Share my camera* and *See their camera*; the code sheet names the phone that enters the code and the way there, *Shoot together › I'll be in the photo*.)
-- [Sungmin, 11-05] "It keeps saying 'friend', but it could be a parent. Isn't 'friend' too narrow?" (A friend only for the Pix friend list; elsewhere the role, or 상대, *the other person*. Of the 32 Korean strings that say 친구, those not about the friend list change too.)
-- [Sungmin, 11-05] "This is much better. Write a new issue with this image, and attach the image to the issue body." (#188, Iter3-A17. GitHub's API takes no image for an issue, and the upload to a gist was refused, so the issue keeps a place for the image to be dropped in on GitHub.)
+- [Sungmin, 11-05] "Before the QR issue, I want to add a feature in a new issue. On Shoot together, with a room code or with a friend, it is confusing who shoots and who is shot. The user should choose a role first and then do what that role does; now, for example, the person in the photo has to enter the room code, but nobody knows who should enter it. How should we solve it? Can you sketch a UI that only I can see?"
+- [Sungmin, 11-05] "Option A is good, but it looks like an app an AI made: too many needless explanations, and the first screen is especially bad."
+- [Sungmin, 11-05] "Now it is too plain. And a top bar that says 'the photographer' and 'the person in the photo' is strange. I didn't ask to drop every explanation; the needed ones should stay, since the point is to reduce the confusion."
+- [Sungmin, 11-05] "It keeps saying 'friend', but it could be a parent. Isn't 'friend' too narrow?"
+- [Sungmin, 11-05] "This is much better. Write a new issue with this image, and attach the image to the issue body."
 
 **The plan (11/05)**
 
-- [Sungmin, 11-05] "Write a concrete plan for #188 first. Don't start implementing yet." (Four choices, each with a recommendation: keep the destinations and the classes, `friendsFragment` and `joinCodeFragment`, which a friend request's notification, *Cancel invite*, and the tests already name; leave the QR rows to #122 instead of hidden views; send *Invitation* and Settings to *Sign in* itself, which then goes back to the screen that opened it, since a subject sent through *Share my camera* to sign in would meet the same confusion; and keep *Show a code* at the bottom, so a long friend list does not hide it.)
+- [Sungmin, 11-05] "Write a concrete plan for #188 first. Don't start implementing yet."
 
 **The build (11/05)**
 
-- [Sungmin, 11-05] "Let's go with all your recommendations. Start implementing." (The sheet, the two screens reworked, the sign-in's way back, the strings in both languages, and the tests; the screens were rendered under Robolectric and checked against the sketch in English and Korean. The wireframes of Flows 3, 3b, 4, and 6 were drawn from the app's own view bounds, and Flow 7's *How to use Pix* still showed the old help text: its Korean render had let it through as the format string "Invite %1$s".)
+- [Sungmin, 11-05] "Let's go with all your recommendations. Start implementing."
 
 **Received invitations (11/05)**
 
-- [Sungmin, 11-05] "Is there a place where I can see the invitations I received, like an invitation list? I might dismiss a notification by mistake." (There was none: an invitation reached the phone only as its notification, and *Invitation* opened only from it or from the link. An invitation lasts a minute, so the list is for that minute, on *See their camera*, where the person in the photo goes.)
-- [Sungmin, 11-05] "No, I'll build it in this issue. Can you sketch the UI, only for me?" (The role sheet with a count on *I'll be in the photo*, and *See their camera* with the invitations above the code: one as a large card (C2), two as compact rows (C3).)
-- [Sungmin, 11-05] "C3 is much better. Add this to issue 188." Then: "So make it the C3 UI even when only one arrives." (One compact row per invitation, also for one; the issue gained the task, its tests, its texts, and the definition of done.)
-- [Sungmin, 11-05] "First make an implementation plan." Then: "I'll implement it as planned, with your recommendations." (*Accept* in the row, through the same session-following code as *Invitation* (`InvitationJoin`); a read every 5 s while the sheet or the screen is shown, rather than a push over the signaling socket, which would change the shared protocol for a minute's list; the time left on the phone's clock, as the notification's; the count as the app's first quantity string; the notification taken away for an invitation answered in Pix; and a failed read, as from a server without the list, taken as none, with the new route declared before `/invitations/{id}`, which would otherwise take "incoming" for an id. In English the row cut the inviter's name at 360 dp until its buttons' padding went from 16 dp to 12 dp, and the wireframe renderer, which read no quantity strings, now gives each English form the Korean `other`.)
-- [Sungmin, 11-05] "This is strange. I'm not sharing another camera, yet accepting the invitation says to end it first." (The phone had been the photographer of a room-code session whose subject left: by design (Design 2.4) its room stays open for a *Reconnect*, with nothing on Camera to show it, so it counted as another session and the app refused *Accept* before asking the server; a code entered there would have been ignored too. With the roles chosen now, the same phone soon takes the other one, so *I'll be in the photo* and *Accept* end such a room first, while a session with someone in it still refuses them. A Camera notice for the waiting room was left for its own issue.)
+- [Sungmin, 11-05] "Is there a place where I can see the invitations I received, like an invitation list? I might dismiss a notification by mistake."
+- [Sungmin, 11-05] "No, I'll build it in this issue. Can you sketch the UI, only for me?"
+- [Sungmin, 11-05] "C3 is much better. Add this to issue 188." / "So make it the C3 UI even when only one arrives."
+- [Sungmin, 11-05] "First make an implementation plan." / "I'll implement it as planned, with your recommendations."
+- [Sungmin, 11-05] "This is strange. I'm not sharing another camera, yet accepting the invitation says to end it first."
 - [Sungmin, 11-05] "Fix it for now."
 
-[#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
 [#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
-[#113]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/113
 [#145]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/145
-[#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138
-[#144]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/144
-[#143]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/143
-[#146]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/146
-[#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
 [#149]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/149
-[#148]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/148
-[#120]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/120
 [#151]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/151
-[#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
 [#153]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/153
-[#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
 [#154]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/154
-[#152]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/152
-[#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
 [#159]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/159
-[#155]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/155
-[#157]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/157
-[#188]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/188
+[#189]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/189

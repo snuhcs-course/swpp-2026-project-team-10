@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
@@ -217,8 +217,8 @@ class GenerationScreensTest {
     fun describe_inAnInvitationsSession_switchesToTheDescriptionsUsedWithTheFriend() {
         val modules = modules()
         usedBefore(modules)
-        val friend = SessionPartner("u_2", "Junhyeong")
-        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER, friend))
+        val friend = SessionPartner("u_2", "Joonhyung")
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung", null), Role.PHOTOGRAPHER, friend))
         val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
         scenario = s
         idle()
@@ -226,7 +226,7 @@ class GenerationScreensTest {
         s.onFragment { fragment ->
             val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
             assertEquals(View.VISIBLE, binding.historyFilter.visibility)
-            assertEquals(string(R.string.history_with, "Junhyeong"), binding.historyWithPartner.text.toString())
+            assertEquals(string(R.string.history_with, "Joonhyung"), binding.historyWithPartner.text.toString())
             assertTrue(binding.historyAll.isSelected)
 
             binding.historyWithPartner.performClick()
@@ -240,7 +240,7 @@ class GenerationScreensTest {
     fun describe_aSetStartedWhileTheLinkReconnects_keepsTheFriend() {
         val modules = modules()
         usedBefore(modules)
-        val friend = SessionPartner("u_2", "Junhyeong")
+        val friend = SessionPartner("u_2", "Joonhyung")
         modules.session.setState(SessionState.Reconnecting("s_1", 0L, friend))
         val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
         scenario = s
@@ -254,7 +254,7 @@ class GenerationScreensTest {
         }
         idle()
         // The server accepts it once its first candidate comes, after the link is back.
-        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung", null), Role.PHOTOGRAPHER))
         modules.generator.runs.last().apply {
             plan(poses)
             send(CandidateEvent.Ready("pose-1", bitmap()))
@@ -322,11 +322,11 @@ class GenerationScreensTest {
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 
-    /** Generate poses in a session with Junhyeong; the screen's SessionViewModel sends it to the subject. */
+    /** Generate poses in a session with Joonhyung; the screen's SessionViewModel sends it to the subject. */
     private fun describingInASession(
         modules: TestAppContainer,
     ): Pair<FragmentScenario<DescribePoseFragment>, TestNavHostController> {
-        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung", null), Role.PHOTOGRAPHER))
         val (s, nav) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
         scenario = s
         idle()
@@ -344,7 +344,7 @@ class GenerationScreensTest {
         s.onFragment { fragment ->
             val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
             assertTrue(binding.sharedHint.isShown)
-            assertEquals(string(R.string.shared_hint, "Junhyeong"), binding.sharedHint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Joonhyung"), binding.sharedHint.text.toString())
             binding.descriptionInput.requestFocus()
             binding.descriptionInput.setText("wave")
         }
@@ -370,7 +370,7 @@ class GenerationScreensTest {
             assertFalse(binding.descriptionInput.isEnabled)
             assertFalse(binding.generateButton.isEnabled)
             assertTrue(binding.descriptionTyping.isShown)
-            assertEquals(string(R.string.peer_typing, "Junhyeong"), binding.descriptionTyping.text.toString())
+            assertEquals(string(R.string.peer_typing, "Joonhyung"), binding.descriptionTyping.text.toString())
         }
 
         modules.session.deliver(SessionMessage.PoseDescriptionEdit(id, holding = false, text = "jump high"))
@@ -867,20 +867,20 @@ class GenerationScreensTest {
         scenario = s
         s.onFragment { assertFalse(FragmentPickPoseBinding.bind(it.requireView()).sharedHint.isShown) }
 
-        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung", null), Role.PHOTOGRAPHER))
         idle()
 
         s.onFragment {
             val hint = FragmentPickPoseBinding.bind(it.requireView()).sharedHint
             assertTrue(hint.isShown)
-            assertEquals(string(R.string.shared_hint, "Junhyeong"), hint.text.toString())
+            assertEquals(string(R.string.shared_hint, "Joonhyung"), hint.text.toString())
         }
     }
 
     @Test
     fun pick_theSubjectsPickThatComesFirst_opensReferenceConfirmWithItsCandidate() {
         val modules = modules()
-        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", null), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung", null), Role.PHOTOGRAPHER))
         val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
         scenario = s
         val set = modules.session.sent.filterIsInstance<SessionMessage.PoseStep>().first().setId
@@ -894,7 +894,7 @@ class GenerationScreensTest {
         assertEquals(PoseSetStep.CHOSEN, end.step)
         assertEquals("pose-4" to Role.SUBJECT, end.poseId to end.by)
         s.onFragment {
-            assertEquals("Junhyeong", it.requireActivity().viewModel<ReferenceViewModel>().chosenBy.value)
+            assertEquals("Joonhyung", it.requireActivity().viewModel<ReferenceViewModel>().chosenBy.value)
         }
     }
 

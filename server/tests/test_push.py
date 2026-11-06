@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 """The push sender against a fake of Google's token endpoint and FCM, and the friend request's push (Design 2.6.6,
 AD-13; R&S FR-5.7).
 
@@ -148,22 +148,22 @@ def test_an_unusable_key_file_sends_no_pushes_and_says_so(tmp_path, caplog, cont
 
 def test_a_friend_request_is_pushed_to_the_receivers_phones(client, sign_up, fcm_api):
     dongje, _ = sign_up("dongje.p", "Dongje")
-    junhyeong, junhyeong_user = sign_up("junhyeong.h", "Junhyeong")
-    client.post("/api/v1/devices", headers=junhyeong, json={"fcmToken": "junhyeong-phone", "platform": "android"})
+    joonhyung, joonhyung_user = sign_up("joonhyung.h", "Joonhyung")
+    client.post("/api/v1/devices", headers=joonhyung, json={"fcmToken": "joonhyung-phone", "platform": "android"})
     client.post("/api/v1/devices", headers=dongje, json={"fcmToken": "dongje-phone", "platform": "android"})
-    sent = client.post("/api/v1/friend-requests", headers=dongje, json={"userId": junhyeong_user["id"]})
+    sent = client.post("/api/v1/friend-requests", headers=dongje, json={"userId": joonhyung_user["id"]})
     assert sent.status_code == 201
     ((push),) = fcm_api.pushes
-    assert push["token"] == "junhyeong-phone"
+    assert push["token"] == "joonhyung-phone"
     assert push["data"] == {"type": "friend.request", "requestId": sent.json()["id"], "fromName": "Dongje"}
     assert push["android"] == {"priority": "HIGH", "ttl": "86400s"}
 
 
 def test_a_request_that_makes_friends_pushes_nothing(client, sign_up, fcm_api):
     dongje, dongje_user = sign_up("dongje.p", "Dongje")
-    junhyeong, junhyeong_user = sign_up("junhyeong.h", "Junhyeong")
-    client.post("/api/v1/friend-requests", headers=dongje, json={"userId": junhyeong_user["id"]})
+    joonhyung, joonhyung_user = sign_up("joonhyung.h", "Joonhyung")
+    client.post("/api/v1/friend-requests", headers=dongje, json={"userId": joonhyung_user["id"]})
     client.post("/api/v1/devices", headers=dongje, json={"fcmToken": "dongje-phone", "platform": "android"})
-    answer = client.post("/api/v1/friend-requests", headers=junhyeong, json={"userId": dongje_user["id"]})
+    answer = client.post("/api/v1/friend-requests", headers=joonhyung, json={"userId": dongje_user["id"]})
     assert answer.status_code == 200
     assert fcm_api.pushes == []

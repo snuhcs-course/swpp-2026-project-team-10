@@ -172,7 +172,7 @@ data class CameraUiState(
     val savingGuide: Boolean = false,
     /** The last saved photo, for the thumbnail and "Saved without the guide". */
     val lastPhoto: Uri? = null,
-    /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
+    /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
     /** The pose tip of the guide on the camera (FR-4.10), or null when it has none. */
     val tip: TipBanner? = null,

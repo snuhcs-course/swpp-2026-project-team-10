@@ -440,12 +440,12 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Remote action notice, such as "Junhyeong set zoom to 2×" (FR-7.4). -->
+        <!-- Remote action notice, such as "Joonhyung set zoom to 2×" (FR-7.4). -->
         <TextView
             android:id="@+id/noticeText"
             style="@style/Widget.Pix.Chip.Small"
             android:visibility="gone"
-            tools:text="Junhyeong set zoom to 2×"
+            tools:text="Joonhyung set zoom to 2×"
             tools:visibility="visible" />
 
         <!-- How to hold the phone for a generated pose (FR-4.10): open once when its guide comes, "Preparing a

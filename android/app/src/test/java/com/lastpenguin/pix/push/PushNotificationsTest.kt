@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.push
 
 import android.Manifest
@@ -67,12 +67,12 @@ class PushNotificationsTest {
 
     @Test
     fun aFriendRequest_opensFriends() {
-        val data = mapOf("type" to "friend.request", "requestId" to "fr_1", "fromName" to "Junhyeong")
+        val data = mapOf("type" to "friend.request", "requestId" to "fr_1", "fromName" to "Joonhyung")
         assertTrue(PushNotifications.show(context, data, NOW))
 
         val notification = posted().single()
         assertEquals(PushNotifications.FRIEND_REQUESTS, notification.channelId)
-        assertEquals("Junhyeong sent you a friend request", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertEquals("Joonhyung sent you a friend request", notification.extras.getString(Notification.EXTRA_TITLE))
         assertEquals(Uri.parse("pix://friends"), shadowOf(notification.contentIntent).savedIntent.data)
     }
 

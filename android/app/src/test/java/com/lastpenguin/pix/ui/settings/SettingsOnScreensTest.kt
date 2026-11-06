@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -93,7 +93,7 @@ class SettingsOnScreensTest {
 
     private fun color(id: Int): Int = ContextCompat.getColor(app, id)
 
-    private val connected = SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER)
+    private val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
 
     // ---- The gear (FR-10.1) ----------------------------------------------------------------------------------------
 

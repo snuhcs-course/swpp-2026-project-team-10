@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -50,22 +50,22 @@ import kotlinx.coroutines.launch
 
 /** Short notices for the photographer's camera screen. */
 sealed interface SessionNotice {
-    /** The other phone left or dropped: "Junhyeong left" (FR-6.10, FR-6.11). */
+    /** The other phone left or dropped: "Joonhyung left" (FR-6.10, FR-6.11). */
     data class PeerGone(val name: String, val reason: EndReason) : SessionNotice
 
-    /** The subject changed the zoom: "Junhyeong set zoom to 2×" (FR-7.4). */
+    /** The subject changed the zoom: "Joonhyung set zoom to 2×" (FR-7.4). */
     data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
 
-    /** The subject moved or resized the guide: "Junhyeong moved the guide" (FR-7.2, FR-7.4). */
+    /** The subject moved or resized the guide: "Joonhyung moved the guide" (FR-7.2, FR-7.4). */
     data class RemoteGuideMove(val name: String) : SessionNotice
 
-    /** The subject set the brightness: "Junhyeong set brightness to +1"; [index] is the applied exposure index. */
+    /** The subject set the brightness: "Joonhyung set brightness to +1"; [index] is the applied exposure index. */
     data class RemoteBrightness(val name: String, val index: Int) : SessionNotice
 
-    /** The subject changed the flash: "Junhyeong turned the flash on". */
+    /** The subject changed the flash: "Joonhyung turned the flash on". */
     data class RemoteFlash(val name: String, val mode: FlashMode) : SessionNotice
 
-    /** A guide made on the subject's phone is now the guide: "Junhyeong set a pose guide" (FR-6.15, FR-7.4). */
+    /** A guide made on the subject's phone is now the guide: "Joonhyung set a pose guide" (FR-6.15, FR-7.4). */
     data class RemoteGuide(val name: String) : SessionNotice
 }
 

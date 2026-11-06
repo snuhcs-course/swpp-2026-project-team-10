@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -44,7 +44,7 @@ class MessageCodecTest {
     @Test
     fun `every message type survives a round trip`() {
         val messages = listOf(
-            SessionMessage.Hello(appVersion = "0.1.0", role = Role.SUBJECT, name = "Junhyeong", haveGuideId = "g1"),
+            SessionMessage.Hello(appVersion = "0.1.0", role = Role.SUBJECT, name = "Joonhyung", haveGuideId = "g1"),
             SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(0.6f, 1f, 2f, 3f))),
             SessionMessage.GuideImageBegin("g1", "mask-png", 540, 720, 9120, 1, 0.75f),
             SessionMessage.GuideImageChunk("g1", 0, "UklGRl68AABXRUJQ"),

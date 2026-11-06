@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideSource
@@ -61,7 +61,7 @@ class GuideFromSubjectTest {
         )
 
     private fun connectedAs(role: Role, haveGuideId: String? = null) {
-        session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong", haveGuideId), role))
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung", haveGuideId), role))
     }
 
     /** The subject's image of [id] as the photographer receives it. */

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 """Lookup, friend requests, the friend list, and presence through the REST API and the signaling socket
 (Design 2.5.3, R&S FR-5.5–5.10, NFR-15).
 
@@ -65,46 +65,46 @@ def offline(user):
 @pytest.fixture
 def two(sign_up):
     """Two password accounts: (headers, account) each."""
-    return sign_up("dongje.p", "Dongje"), sign_up("junhyeong.h", "Junhyeong")
+    return sign_up("dongje.p", "Dongje"), sign_up("joonhyung.h", "Joonhyung")
 
 
 def befriend(client, two):
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
-    assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong).status_code == 200
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
+    assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=joonhyung).status_code == 200
 
 
 # --- lookup --------------------------------------------------------------------------------------------------------
 
 
 def test_lookup_finds_only_an_exact_pix_id(client, two):
-    (dongje, _), (_, junhyeong_user) = two
-    response = find(client, dongje, "junhyeong.h")
+    (dongje, _), (_, joonhyung_user) = two
+    response = find(client, dongje, "joonhyung.h")
     assert response.status_code == 200
-    assert response.json() == {"user": public(junhyeong_user), "relation": "NONE", "requestId": None}
-    assert_error(find(client, dongje, "junhyeong"), 404, "NOT_FOUND")
-    assert_error(find(client, dongje, "junhyeong.h2"), 404, "NOT_FOUND")
+    assert response.json() == {"user": public(joonhyung_user), "relation": "NONE", "requestId": None}
+    assert_error(find(client, dongje, "joonhyung"), 404, "NOT_FOUND")
+    assert_error(find(client, dongje, "joonhyung.h2"), 404, "NOT_FOUND")
 
 
 def test_lookup_ignores_capitals_and_spaces(client, two):
     (dongje, _), _ = two
-    assert find(client, dongje, " Junhyeong.H ").json()["relation"] == "NONE"
+    assert find(client, dongje, " Joonhyung.H ").json()["relation"] == "NONE"
 
 
 def test_lookup_marks_the_caller_and_a_friend(client, two):
-    (dongje, _), (junhyeong, _) = two
+    (dongje, _), (joonhyung, _) = two
     assert find(client, dongje, "dongje.p").json()["relation"] == "SELF"
     befriend(client, two)
-    assert find(client, dongje, "junhyeong.h").json()["relation"] == "FRIEND"
-    assert find(client, junhyeong, "dongje.p").json()["relation"] == "FRIEND"
+    assert find(client, dongje, "joonhyung.h").json()["relation"] == "FRIEND"
+    assert find(client, joonhyung, "dongje.p").json()["relation"] == "FRIEND"
 
 
 def test_lookup_marks_a_pending_request_from_either_side_with_its_id(client, two):
-    (dongje, _), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
-    sent = find(client, dongje, "junhyeong.h").json()
+    (dongje, _), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
+    sent = find(client, dongje, "joonhyung.h").json()
     assert (sent["relation"], sent["requestId"]) == ("REQUESTED", request_id)
-    received = find(client, junhyeong, "dongje.p").json()
+    received = find(client, joonhyung, "dongje.p").json()
     assert (received["relation"], received["requestId"]) == ("INCOMING", request_id)
 
 
@@ -130,25 +130,25 @@ def test_lookup_without_a_pix_id_is_invalid(client, two):
 
 
 def test_request_and_accept_make_each_user_appear_in_the_others_friend_list(client, two):
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    sent = request_friend(client, dongje, junhyeong_user)
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
+    sent = request_friend(client, dongje, joonhyung_user)
     assert sent.status_code == 201
     request_id = sent.json()["id"]
     assert request_id.startswith("fr_")
-    assert sent.json() == {"id": request_id, "to": public(junhyeong_user), "createdAt": 1_000_000}
-    assert requests_of(client, junhyeong) == {
+    assert sent.json() == {"id": request_id, "to": public(joonhyung_user), "createdAt": 1_000_000}
+    assert requests_of(client, joonhyung) == {
         "incoming": [{"id": request_id, "from": public(dongje_user), "createdAt": 1_000_000}],
         "outgoing": [],
     }
     assert requests_of(client, dongje)["outgoing"] == [sent.json()]
 
-    accepted = client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong)
+    accepted = client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=joonhyung)
     assert accepted.status_code == 200
     assert accepted.json() == {"friend": offline(dongje_user)}
-    assert friends_of(client, dongje) == [offline(junhyeong_user)]
-    assert friends_of(client, junhyeong) == [offline(dongje_user)]
+    assert friends_of(client, dongje) == [offline(joonhyung_user)]
+    assert friends_of(client, joonhyung) == [offline(dongje_user)]
     assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
-    assert requests_of(client, junhyeong) == {"incoming": [], "outgoing": []}
+    assert requests_of(client, joonhyung) == {"incoming": [], "outgoing": []}
 
 
 def test_requests_are_listed_newest_first(client, clock, sign_up):
@@ -161,26 +161,26 @@ def test_requests_are_listed_newest_first(client, clock, sign_up):
 
 
 def test_request_to_oneself_unknown_or_twice_is_refused(client, two):
-    (dongje, dongje_user), (_, junhyeong_user) = two
+    (dongje, dongje_user), (_, joonhyung_user) = two
     assert_error(request_friend(client, dongje, dongje_user), 400, "INVALID_REQUEST")
     assert_error(request_friend(client, dongje, {"id": "u_UNKNOWN"}), 404, "NOT_FOUND")
-    request_friend(client, dongje, junhyeong_user)
-    assert_error(request_friend(client, dongje, junhyeong_user), 409, "ALREADY_REQUESTED")
+    request_friend(client, dongje, joonhyung_user)
+    assert_error(request_friend(client, dongje, joonhyung_user), 409, "ALREADY_REQUESTED")
 
 
 def test_request_to_a_friend_answers_already_friends(client, two):
-    (dongje, _), (_, junhyeong_user) = two
+    (dongje, _), (_, joonhyung_user) = two
     befriend(client, two)
-    assert_error(request_friend(client, dongje, junhyeong_user), 409, "ALREADY_FRIENDS")
+    assert_error(request_friend(client, dongje, joonhyung_user), 409, "ALREADY_FRIENDS")
 
 
 def test_request_to_someone_who_already_asked_accepts_their_request(client, two):
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    request_friend(client, dongje, junhyeong_user)
-    response = request_friend(client, junhyeong, dongje_user)
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
+    request_friend(client, dongje, joonhyung_user)
+    response = request_friend(client, joonhyung, dongje_user)
     assert response.status_code == 200
     assert response.json() == {"friend": offline(dongje_user)}
-    assert friends_of(client, dongje) == [offline(junhyeong_user)]
+    assert friends_of(client, dongje) == [offline(joonhyung_user)]
     assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
 
 
@@ -188,30 +188,30 @@ def test_request_to_someone_who_already_asked_accepts_their_request(client, two)
 
 
 def test_only_the_receiver_can_accept_and_only_once(client, two):
-    (dongje, _), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    (dongje, _), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
     assert_error(client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=dongje), 404, "NOT_FOUND")
-    assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong).status_code == 200
-    assert_error(client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong), 404, "NOT_FOUND")
-    assert_error(client.post("/api/v1/friend-requests/fr_UNKNOWN/accept", headers=junhyeong), 404, "NOT_FOUND")
+    assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=joonhyung).status_code == 200
+    assert_error(client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=joonhyung), 404, "NOT_FOUND")
+    assert_error(client.post("/api/v1/friend-requests/fr_UNKNOWN/accept", headers=joonhyung), 404, "NOT_FOUND")
 
 
 def test_declined_request_is_gone_and_can_be_sent_again(client, two):
-    (dongje, _), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    (dongje, _), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
     assert_error(client.post(f"/api/v1/friend-requests/{request_id}/decline", headers=dongje), 404, "NOT_FOUND")
-    assert client.post(f"/api/v1/friend-requests/{request_id}/decline", headers=junhyeong).status_code == 204
-    assert requests_of(client, junhyeong) == {"incoming": [], "outgoing": []}
+    assert client.post(f"/api/v1/friend-requests/{request_id}/decline", headers=joonhyung).status_code == 204
+    assert requests_of(client, joonhyung) == {"incoming": [], "outgoing": []}
     assert friends_of(client, dongje) == []
-    assert request_friend(client, dongje, junhyeong_user).status_code == 201
+    assert request_friend(client, dongje, joonhyung_user).status_code == 201
 
 
 def test_only_the_sender_can_withdraw_a_request(client, two):
-    (dongje, _), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
-    assert_error(client.delete(f"/api/v1/friend-requests/{request_id}", headers=junhyeong), 404, "NOT_FOUND")
+    (dongje, _), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
+    assert_error(client.delete(f"/api/v1/friend-requests/{request_id}", headers=joonhyung), 404, "NOT_FOUND")
     assert client.delete(f"/api/v1/friend-requests/{request_id}", headers=dongje).status_code == 204
-    assert requests_of(client, junhyeong)["incoming"] == []
+    assert requests_of(client, joonhyung)["incoming"] == []
     assert_error(client.delete(f"/api/v1/friend-requests/{request_id}", headers=dongje), 404, "NOT_FOUND")
 
 
@@ -229,20 +229,20 @@ def test_friend_list_starts_empty_and_is_ordered_by_name(client, sign_up):
 
 
 def test_removed_friend_is_gone_for_both_and_can_be_added_again(client, two):
-    (dongje, _), (junhyeong, junhyeong_user) = two
+    (dongje, _), (joonhyung, joonhyung_user) = two
     befriend(client, two)
-    assert client.delete(f"/api/v1/friends/{junhyeong_user['id']}", headers=dongje).status_code == 204
+    assert client.delete(f"/api/v1/friends/{joonhyung_user['id']}", headers=dongje).status_code == 204
     assert friends_of(client, dongje) == []
-    assert friends_of(client, junhyeong) == []
-    assert client.delete(f"/api/v1/friends/{junhyeong_user['id']}", headers=dongje).status_code == 204
-    assert request_friend(client, dongje, junhyeong_user).status_code == 201
+    assert friends_of(client, joonhyung) == []
+    assert client.delete(f"/api/v1/friends/{joonhyung_user['id']}", headers=dongje).status_code == 204
+    assert request_friend(client, dongje, joonhyung_user).status_code == 201
 
 
 def test_removing_a_user_also_drops_pending_requests_between_the_two(client, two):
-    (dongje, _), (junhyeong, junhyeong_user) = two
-    request_friend(client, dongje, junhyeong_user)
-    client.delete(f"/api/v1/friends/{junhyeong_user['id']}", headers=dongje)
-    assert requests_of(client, junhyeong)["incoming"] == []
+    (dongje, _), (joonhyung, joonhyung_user) = two
+    request_friend(client, dongje, joonhyung_user)
+    client.delete(f"/api/v1/friends/{joonhyung_user['id']}", headers=dongje)
+    assert requests_of(client, joonhyung)["incoming"] == []
 
 
 # --- presence ------------------------------------------------------------------------------------------------------
@@ -269,10 +269,10 @@ def wait_for_presence(client, headers, expected):
 
 
 def test_signed_in_socket_makes_a_friend_online_and_a_room_puts_them_in_a_session(client, two):
-    (dongje, _), (junhyeong, _) = two
+    (dongje, _), (joonhyung, _) = two
     befriend(client, two)
     assert presence(client, dongje) == (False, False)
-    with client.websocket_connect("/ws", headers=junhyeong) as socket:
+    with client.websocket_connect("/ws", headers=joonhyung) as socket:
         registered(socket)
         assert presence(client, dongje) == (True, False)
         socket.send_json({"type": "room.create"})
@@ -292,10 +292,10 @@ def test_anonymous_or_unknown_token_socket_works_but_shows_nobody_online(client,
 
 
 def test_friend_stays_online_while_one_of_two_sockets_is_open(client, two):
-    (dongje, _), (junhyeong, _) = two
+    (dongje, _), (joonhyung, _) = two
     befriend(client, two)
-    with client.websocket_connect("/ws", headers=junhyeong) as first:
-        with client.websocket_connect("/ws", headers=junhyeong) as second:
+    with client.websocket_connect("/ws", headers=joonhyung) as first:
+        with client.websocket_connect("/ws", headers=joonhyung) as second:
             second.send_json({"type": "room.create"})
             second.receive_json()
             first.send_json({"type": "room.create"})
@@ -306,10 +306,10 @@ def test_friend_stays_online_while_one_of_two_sockets_is_open(client, two):
 
 
 def test_socket_with_an_expired_token_works_but_shows_nobody_online(client, clock, two):
-    (dongje, _), (junhyeong, _) = two
+    (dongje, _), (joonhyung, _) = two
     befriend(client, two)
     clock.advance(15 * 60)
-    with client.websocket_connect("/ws", headers=junhyeong) as socket:
+    with client.websocket_connect("/ws", headers=joonhyung) as socket:
         socket.send_json({"type": "room.create"})
         assert socket.receive_json()["type"] == "room.created"
         # Both access tokens expired at once, so the friend list is read with a new one.
@@ -340,24 +340,24 @@ def insert_request(client, request_id, sender, receiver):
 
 def test_accepting_when_already_friends_keeps_one_friendship(client, two):
     """Both users answer at the same moment: the second answer finds the friendship already there."""
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    request_friend(client, dongje, junhyeong_user)
-    second = client.post("/api/v1/friend-requests", headers=junhyeong, json={"userId": dongje_user["id"]})
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
+    request_friend(client, dongje, joonhyung_user)
+    second = client.post("/api/v1/friend-requests", headers=joonhyung, json={"userId": dongje_user["id"]})
     assert second.status_code == 200
     # A request that slipped in before the friendship was seen is answered without a second row.
-    insert_request(client, "fr_LATE", dongje_user, junhyeong_user)
-    accepted = client.post("/api/v1/friend-requests/fr_LATE/accept", headers=junhyeong)
+    insert_request(client, "fr_LATE", dongje_user, joonhyung_user)
+    accepted = client.post("/api/v1/friend-requests/fr_LATE/accept", headers=joonhyung)
     assert accepted.status_code == 200
-    assert friends_of(client, dongje) == [offline(junhyeong_user)]
-    assert friends_of(client, junhyeong) == [offline(dongje_user)]
+    assert friends_of(client, dongje) == [offline(joonhyung_user)]
+    assert friends_of(client, joonhyung) == [offline(dongje_user)]
 
 
 @pytest.mark.parametrize("first", ["same direction", "opposite direction"])
 def test_one_request_at_most_between_two_users(client, two, first):
     """The database refuses a second request between the same two users, in either direction."""
-    (_, dongje_user), (_, junhyeong_user) = two
-    insert_request(client, "fr_1", dongje_user, junhyeong_user)
-    sender, receiver = (dongje_user, junhyeong_user) if first == "same direction" else (junhyeong_user, dongje_user)
+    (_, dongje_user), (_, joonhyung_user) = two
+    insert_request(client, "fr_1", dongje_user, joonhyung_user)
+    sender, receiver = (dongje_user, joonhyung_user) if first == "same direction" else (joonhyung_user, dongje_user)
     with pytest.raises(IntegrityError):
         insert_request(client, "fr_2", sender, receiver)
 
@@ -381,68 +381,68 @@ def at_once(client, *calls):
 
 @pytest.mark.parametrize("other", ["withdraw", "decline"])
 def test_accepting_at_the_moment_the_request_is_withdrawn_or_declined_does_one_of_the_two(client, two, other):
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
     second = (
         ("DELETE", f"/api/v1/friend-requests/{request_id}", dongje)
         if other == "withdraw"
-        else ("POST", f"/api/v1/friend-requests/{request_id}/decline", junhyeong)
+        else ("POST", f"/api/v1/friend-requests/{request_id}/decline", joonhyung)
     )
-    accepted, ended = at_once(client, ("POST", f"/api/v1/friend-requests/{request_id}/accept", junhyeong), second)
+    accepted, ended = at_once(client, ("POST", f"/api/v1/friend-requests/{request_id}/accept", joonhyung), second)
     assert sorted([accepted.status_code, ended.status_code]) in ([200, 404], [204, 404])
-    expected = [offline(junhyeong_user)] if accepted.status_code == 200 else []
+    expected = [offline(joonhyung_user)] if accepted.status_code == 200 else []
     assert friends_of(client, dongje) == expected
-    assert requests_of(client, junhyeong)["incoming"] == []
+    assert requests_of(client, joonhyung)["incoming"] == []
 
 
 def test_sending_while_accepting_the_reverse_request_leaves_only_the_friendship(client, two):
-    """Junhyeong taps Add for Dongje at the moment he accepts Dongje's request. Whichever runs first, the other
+    """Joonhyung taps Add for Dongje at the moment he accepts Dongje's request. Whichever runs first, the other
     finds the result, so no request is left next to the friendship."""
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
     sent, accepted = at_once(
         client,
-        ("POST", "/api/v1/friend-requests", junhyeong, {"userId": dongje_user["id"]}),
-        ("POST", f"/api/v1/friend-requests/{request_id}/accept", junhyeong, None),
+        ("POST", "/api/v1/friend-requests", joonhyung, {"userId": dongje_user["id"]}),
+        ("POST", f"/api/v1/friend-requests/{request_id}/accept", joonhyung, None),
     )
     assert 200 in (sent.status_code, accepted.status_code)
-    assert friends_of(client, dongje) == [offline(junhyeong_user)]
+    assert friends_of(client, dongje) == [offline(joonhyung_user)]
     assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
-    assert requests_of(client, junhyeong) == {"incoming": [], "outgoing": []}
+    assert requests_of(client, joonhyung) == {"incoming": [], "outgoing": []}
 
 
 def test_accept_answers_unavailable_and_saves_nothing_while_the_session_store_is_down(client, two, outage):
     """Presence comes from the session store; it is read before the commit, so a failure leaves the request to
     accept again."""
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
-    request_id = request_friend(client, dongje, junhyeong_user).json()["id"]
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
+    request_id = request_friend(client, dongje, joonhyung_user).json()["id"]
     outage(True)
-    assert_error(client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong), 503, "UNAVAILABLE")
+    assert_error(client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=joonhyung), 503, "UNAVAILABLE")
     outage(False)
     assert friends_of(client, dongje) == []
-    assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=junhyeong).status_code == 200
-    assert friends_of(client, dongje) == [offline(junhyeong_user)]
+    assert client.post(f"/api/v1/friend-requests/{request_id}/accept", headers=joonhyung).status_code == 200
+    assert friends_of(client, dongje) == [offline(joonhyung_user)]
 
 
 def test_requests_sent_to_each_other_at_once_make_the_two_friends(client, two):
     """The second to run finds the first's request and accepts it, instead of leaving one request each way."""
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = two
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = two
     answers = at_once(
         client,
-        ("POST", "/api/v1/friend-requests", dongje, {"userId": junhyeong_user["id"]}),
-        ("POST", "/api/v1/friend-requests", junhyeong, {"userId": dongje_user["id"]}),
+        ("POST", "/api/v1/friend-requests", dongje, {"userId": joonhyung_user["id"]}),
+        ("POST", "/api/v1/friend-requests", joonhyung, {"userId": dongje_user["id"]}),
     )
     assert sorted(answer.status_code for answer in answers) == [200, 201]
-    assert friends_of(client, dongje) == [offline(junhyeong_user)]
+    assert friends_of(client, dongje) == [offline(joonhyung_user)]
     assert requests_of(client, dongje) == {"incoming": [], "outgoing": []}
-    assert requests_of(client, junhyeong) == {"incoming": [], "outgoing": []}
+    assert requests_of(client, joonhyung) == {"incoming": [], "outgoing": []}
 
 
 def test_the_same_request_sent_twice_at_once_is_saved_once(client, two):
-    (dongje, _), (junhyeong, junhyeong_user) = two
+    (dongje, _), (joonhyung, joonhyung_user) = two
     answers = at_once(
         client,
-        *[("POST", "/api/v1/friend-requests", dongje, {"userId": junhyeong_user["id"]})] * 2,
+        *[("POST", "/api/v1/friend-requests", dongje, {"userId": joonhyung_user["id"]})] * 2,
     )
     assert sorted(answer.status_code for answer in answers) == [201, 409]
-    assert len(requests_of(client, junhyeong)["incoming"]) == 1
+    assert len(requests_of(client, joonhyung)["incoming"]) == 1

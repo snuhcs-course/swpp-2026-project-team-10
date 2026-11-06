@@ -41,12 +41,12 @@ def public(user):
 
 @pytest.fixture
 def friends(client, sign_up):
-    """Dongje and Junhyeong, who are friends: (headers, account) each."""
+    """Dongje and Joonhyung, who are friends: (headers, account) each."""
     dongje = sign_up("dongje.p", "Dongje")
-    junhyeong = sign_up("junhyeong.h", "Junhyeong")
-    sent = client.post("/api/v1/friend-requests", headers=dongje[0], json={"userId": junhyeong[1]["id"]})
-    assert client.post(f"/api/v1/friend-requests/{sent.json()['id']}/accept", headers=junhyeong[0]).status_code == 200
-    return dongje, junhyeong
+    joonhyung = sign_up("joonhyung.h", "Joonhyung")
+    sent = client.post("/api/v1/friend-requests", headers=dongje[0], json={"userId": joonhyung[1]["id"]})
+    assert client.post(f"/api/v1/friend-requests/{sent.json()['id']}/accept", headers=joonhyung[0]).status_code == 200
+    return dongje, joonhyung
 
 
 def invite(client, headers, friend):
@@ -54,9 +54,9 @@ def invite(client, headers, friend):
 
 
 def sent(client, friends):
-    """Dongje invites Junhyeong."""
-    (dongje, _), (_, junhyeong_user) = friends
-    response = invite(client, dongje, junhyeong_user)
+    """Dongje invites Joonhyung."""
+    (dongje, _), (_, joonhyung_user) = friends
+    response = invite(client, dongje, joonhyung_user)
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -66,8 +66,8 @@ def answer(client, headers, invitation, action):
 
 
 def accepted(client, friends, invitation):
-    (_, _), (junhyeong, _) = friends
-    response = answer(client, junhyeong, invitation, "accept")
+    (_, _), (joonhyung, _) = friends
+    response = answer(client, joonhyung, invitation, "accept")
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -109,11 +109,11 @@ def invitation_rows(settings):
 
 
 def test_inviting_a_friend_answers_with_the_link_and_the_photographers_place(client, clock, friends, turn_api):
-    (dongje, _), (_, junhyeong_user) = friends
+    (dongje, _), (_, joonhyung_user) = friends
     invitation = sent(client, friends)
     assert set(invitation) == {"id", "to", "status", "expiresAt", "link", "sessionId", "rejoinToken", "iceServers"}
     assert INVITATION_ID.fullmatch(invitation["id"])
-    assert invitation["to"] == public(junhyeong_user)
+    assert invitation["to"] == public(joonhyung_user)
     assert invitation["status"] == "PENDING"
     assert invitation["expiresAt"] == (clock.now + 60) * 1000
     assert invitation["link"] == f"http://testserver/i/{invitation['id']}"
@@ -129,8 +129,8 @@ def test_inviting_a_friend_answers_with_the_link_and_the_photographers_place(cli
 
 
 def test_inviting_an_online_friend_who_is_in_no_session_works(client, friends):
-    (_, _), (junhyeong, _) = friends
-    with client.websocket_connect("/ws", headers=junhyeong) as presence:
+    (_, _), (joonhyung, _) = friends
+    with client.websocket_connect("/ws", headers=joonhyung) as presence:
         presence.send_json({"type": "hello"})
         assert presence.receive_json()["type"] == "error"
         sent(client, friends)
@@ -149,38 +149,38 @@ def test_only_a_friend_can_be_invited(client, sign_up, friends, settings, who):
 
 
 def test_a_friend_in_another_session_is_busy_and_nothing_is_saved(client, friends, settings, fcm_api):
-    (dongje, _), (junhyeong, junhyeong_user) = friends
-    register_device(client, junhyeong, "junhyeong-phone")
-    with client.websocket_connect("/ws", headers=junhyeong) as busy:
+    (dongje, _), (joonhyung, joonhyung_user) = friends
+    register_device(client, joonhyung, "joonhyung-phone")
+    with client.websocket_connect("/ws", headers=joonhyung) as busy:
         busy.send_json({"type": "room.create"})
         assert busy.receive_json()["type"] == "room.created"
-        response = invite(client, dongje, junhyeong_user)
+        response = invite(client, dongje, joonhyung_user)
         assert_error(response, 409, "BUSY")
-        assert response.json()["error"]["message"] == "Junhyeong is in another session"
+        assert response.json()["error"]["message"] == "Joonhyung is in another session"
         busy.send_json({"type": "leave"})
         assert invitation_rows(settings) == 0
         assert fcm_api.pushes == []
         # The room is gone once the leave is handled, so the friend can be invited again.
         deadline = time.monotonic() + 2
-        while invite(client, dongje, junhyeong_user).status_code == 409 and time.monotonic() < deadline:
+        while invite(client, dongje, joonhyung_user).status_code == 409 and time.monotonic() < deadline:
             time.sleep(0.01)
     assert invitation_rows(settings) == 1
 
 
 def test_inviting_needs_a_sign_in_and_a_pix_id(client, friends):
-    (_, _), (_, junhyeong_user) = friends
-    assert_error(invite(client, {}, junhyeong_user), 401, "UNAUTHENTICATED")
+    (_, _), (_, joonhyung_user) = friends
+    assert_error(invite(client, {}, joonhyung_user), 401, "UNAUTHENTICATED")
     google = client.post("/api/v1/auth/google/signup", json={"idToken": "google:sub-1:Seoyeon"}).json()
     assert_error(
-        invite(client, {"Authorization": f"Bearer {google['accessToken']}"}, junhyeong_user), 403, "PIX_ID_REQUIRED"
+        invite(client, {"Authorization": f"Bearer {google['accessToken']}"}, joonhyung_user), 403, "PIX_ID_REQUIRED"
     )
 
 
 def test_inviting_while_the_session_store_is_down_saves_nothing(client, friends, settings, outage):
-    (dongje, _), (_, junhyeong_user) = friends
+    (dongje, _), (_, joonhyung_user) = friends
     outage(True)
     try:
-        assert_error(invite(client, dongje, junhyeong_user), 503, "UNAVAILABLE")
+        assert_error(invite(client, dongje, joonhyung_user), 503, "UNAVAILABLE")
     finally:
         outage(False)
     assert invitation_rows(settings) == 0
@@ -218,15 +218,15 @@ def incoming(client, headers):
 
 
 def test_incoming_lists_the_callers_pending_invitations_newest_first(client, clock, sign_up, friends):
-    (dongje, dongje_user), (junhyeong, junhyeong_user) = friends
-    assert incoming(client, junhyeong) == []
+    (dongje, dongje_user), (joonhyung, joonhyung_user) = friends
+    assert incoming(client, joonhyung) == []
     first = sent(client, friends)
     seoyeon, seoyeon_user = sign_up("seoyeon.k", "Seoyeon")
-    request = client.post("/api/v1/friend-requests", headers=seoyeon, json={"userId": junhyeong_user["id"]})
-    assert client.post(f"/api/v1/friend-requests/{request.json()['id']}/accept", headers=junhyeong).status_code == 200
+    request = client.post("/api/v1/friend-requests", headers=seoyeon, json={"userId": joonhyung_user["id"]})
+    assert client.post(f"/api/v1/friend-requests/{request.json()['id']}/accept", headers=joonhyung).status_code == 200
     clock.advance(1)
-    second = invite(client, seoyeon, junhyeong_user).json()
-    assert incoming(client, junhyeong) == [
+    second = invite(client, seoyeon, joonhyung_user).json()
+    assert incoming(client, joonhyung) == [
         {"id": second["id"], "from": public(seoyeon_user), "status": "PENDING", "expiresAt": second["expiresAt"]},
         {"id": first["id"], "from": public(dongje_user), "status": "PENDING", "expiresAt": first["expiresAt"]},
     ]
@@ -237,18 +237,18 @@ def test_incoming_lists_the_callers_pending_invitations_newest_first(client, clo
 
 @pytest.mark.parametrize("action", ["accept", "decline", "cancel"])
 def test_an_answered_invitation_leaves_the_list(client, friends, action):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
-    assert answer(client, dongje if action == "cancel" else junhyeong, invitation, action).status_code in (200, 204)
-    assert incoming(client, junhyeong) == []
+    assert answer(client, dongje if action == "cancel" else joonhyung, invitation, action).status_code in (200, 204)
+    assert incoming(client, joonhyung) == []
 
 
 @pytest.mark.parametrize(("seconds", "listed"), [(59, True), (60, False)])
 def test_an_invitation_is_listed_until_it_expires(client, clock, friends, seconds, listed):
-    (_, _), (junhyeong, _) = friends
+    (_, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     clock.advance(seconds)
-    assert [item["id"] for item in incoming(client, junhyeong)] == ([invitation["id"]] if listed else [])
+    assert [item["id"] for item in incoming(client, joonhyung)] == ([invitation["id"]] if listed else [])
 
 
 def test_incoming_needs_a_sign_in_and_leaves_opening_by_id_working(client, friends):
@@ -262,10 +262,10 @@ def test_incoming_needs_a_sign_in_and_leaves_opening_by_id_working(client, frien
 
 @pytest.mark.parametrize(("seconds", "status"), [(59, 200), (60, 410), (61, 410)])
 def test_accepting_works_until_the_invitation_expires(client, clock, friends, turn_api, seconds, status):
-    (_, _), (junhyeong, _) = friends
+    (_, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     clock.advance(seconds)
-    response = answer(client, junhyeong, invitation, "accept")
+    response = answer(client, joonhyung, invitation, "accept")
     assert response.status_code == status, response.text
     if status == 200:
         place = response.json()
@@ -282,15 +282,15 @@ def test_accepting_works_until_the_invitation_expires(client, clock, friends, tu
 @pytest.mark.parametrize(("seconds", "status"), [(59, 204), (60, 410)])
 def test_declining_and_cancelling_work_until_the_invitation_expires(client, clock, friends, action, seconds, status):
     """Unlike an accept, neither needs the room, so only the invitation's own expiry refuses them."""
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     clock.advance(seconds)
-    response = answer(client, dongje if action == "cancel" else junhyeong, invitation, action)
+    response = answer(client, dongje if action == "cancel" else joonhyung, invitation, action)
     assert response.status_code == status, response.text
 
 
 def test_only_the_friend_answers_and_only_the_photographer_cancels(client, sign_up, friends):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     stranger, _ = sign_up("stranger.k", "Stranger")
     invitation = sent(client, friends)
     for headers, action in [
@@ -299,10 +299,10 @@ def test_only_the_friend_answers_and_only_the_photographer_cancels(client, sign_
         (stranger, "cancel"),
         (dongje, "accept"),
         (dongje, "decline"),
-        (junhyeong, "cancel"),
+        (joonhyung, "cancel"),
     ]:
         assert_error(answer(client, headers, invitation, action), 404, "NOT_FOUND")
-    assert_error(answer(client, junhyeong, {"id": "inv_01JB2C3D4E5F6G7H8J9KAMNPQR"}, "accept"), 404, "NOT_FOUND")
+    assert_error(answer(client, joonhyung, {"id": "inv_01JB2C3D4E5F6G7H8J9KAMNPQR"}, "accept"), 404, "NOT_FOUND")
     assert_error(answer(client, {}, invitation, "accept"), 401, "UNAUTHENTICATED")
     assert status_of(client, invitation) == "PENDING"
 
@@ -311,17 +311,17 @@ def test_only_the_friend_answers_and_only_the_photographer_cancels(client, sign_
     ("first", "status"), [("accept", "ACCEPTED"), ("decline", "DECLINED"), ("cancel", "CANCELLED")]
 )
 def test_an_answered_invitation_is_gone_for_every_later_answer(client, friends, first, status):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
-    by = dongje if first == "cancel" else junhyeong
+    by = dongje if first == "cancel" else joonhyung
     assert answer(client, by, invitation, first).status_code in (200, 204)
-    for headers, action in [(junhyeong, "accept"), (junhyeong, "decline"), (dongje, "cancel")]:
+    for headers, action in [(joonhyung, "accept"), (joonhyung, "decline"), (dongje, "cancel")]:
         assert_error(answer(client, headers, invitation, action), 410, "INVITATION_GONE")
     assert status_of(client, invitation) == status
 
 
 def test_accepting_once_the_photographer_left_is_gone_and_leaves_it_pending(client, friends):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     with client.websocket_connect("/ws", headers=dongje) as photographer:
         take_place(photographer, invitation)
@@ -329,16 +329,16 @@ def test_accepting_once_the_photographer_left_is_gone_and_leaves_it_pending(clie
         # The leave is handled once a later message on the socket is answered.
         photographer.send_json({"type": "hello"})
         assert photographer.receive_json()["type"] == "error"
-    assert_error(answer(client, junhyeong, invitation, "accept"), 410, "INVITATION_GONE")
+    assert_error(answer(client, joonhyung, invitation, "accept"), 410, "INVITATION_GONE")
     assert status_of(client, invitation) == "PENDING"
 
 
 def test_declining_while_the_session_store_is_down_changes_nothing(client, friends, outage):
-    (_, _), (junhyeong, _) = friends
+    (_, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     outage(True)
     try:
-        assert_error(answer(client, junhyeong, invitation, "decline"), 503, "UNAVAILABLE")
+        assert_error(answer(client, joonhyung, invitation, "decline"), 503, "UNAVAILABLE")
     finally:
         outage(False)
     assert status_of(client, invitation) == "PENDING"
@@ -348,11 +348,11 @@ def test_declining_while_the_session_store_is_down_changes_nothing(client, frien
 
 
 def test_the_friend_accepts_and_the_photographer_hears_peer_joined(client, friends):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     with (
         client.websocket_connect("/ws", headers=dongje) as photographer,
-        client.websocket_connect("/ws", headers=junhyeong) as subject,
+        client.websocket_connect("/ws", headers=joonhyung) as subject,
     ):
         assert take_place(photographer, invitation)["role"] == "PHOTOGRAPHER"
         place = accepted(client, friends, invitation)
@@ -368,11 +368,11 @@ def test_the_friend_accepts_and_the_photographer_hears_peer_joined(client, frien
 
 
 def test_a_friend_who_joins_first_is_announced_to_the_photographer_when_it_comes(client, friends):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     place = accepted(client, friends, invitation)
     with (
-        client.websocket_connect("/ws", headers=junhyeong) as subject,
+        client.websocket_connect("/ws", headers=joonhyung) as subject,
         client.websocket_connect("/ws", headers=dongje) as photographer,
     ):
         assert take_place(subject, place)["role"] == "SUBJECT"
@@ -384,11 +384,11 @@ def test_a_friend_who_joins_first_is_announced_to_the_photographer_when_it_comes
 
 
 def test_a_decline_tells_the_waiting_photographer_and_frees_its_socket(client, friends):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     with client.websocket_connect("/ws", headers=dongje) as photographer:
         take_place(photographer, invitation)
-        assert answer(client, junhyeong, invitation, "decline").status_code == 204
+        assert answer(client, joonhyung, invitation, "decline").status_code == 204
         assert photographer.receive_json() == {
             "type": "error",
             "code": "DECLINED",
@@ -399,7 +399,7 @@ def test_a_decline_tells_the_waiting_photographer_and_frees_its_socket(client, f
 
 
 def test_an_unanswered_invitation_expires_and_tells_the_photographer(client, clock, friends):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     with client.websocket_connect("/ws", headers=dongje) as photographer:
         take_place(photographer, invitation)
@@ -409,7 +409,7 @@ def test_an_unanswered_invitation_expires_and_tells_the_photographer(client, clo
             "code": "EXPIRED",
             "message": "Nobody joined in time; the room has expired",
         }
-    assert_error(answer(client, junhyeong, invitation, "accept"), 410, "INVITATION_GONE")
+    assert_error(answer(client, joonhyung, invitation, "accept"), 410, "INVITATION_GONE")
 
 
 def test_a_cancel_ends_the_room_and_frees_the_photographers_socket(client, friends):
@@ -424,11 +424,11 @@ def test_a_cancel_ends_the_room_and_frees_the_photographers_socket(client, frien
 
 
 def test_a_friend_who_accepts_in_the_last_second_still_has_time_to_join(client, clock, friends):
-    (dongje, _), (junhyeong, _) = friends
+    (dongje, _), (joonhyung, _) = friends
     invitation = sent(client, friends)
     with (
         client.websocket_connect("/ws", headers=dongje) as photographer,
-        client.websocket_connect("/ws", headers=junhyeong) as subject,
+        client.websocket_connect("/ws", headers=joonhyung) as subject,
     ):
         take_place(photographer, invitation)
         clock.advance(59)
@@ -457,13 +457,13 @@ def test_a_friend_who_accepts_and_never_joins_lets_the_room_expire(client, clock
 
 
 def test_the_invitation_is_pushed_to_each_of_the_friends_phones(client, friends, fcm_api):
-    (dongje, _), (junhyeong, _) = friends
-    other_phone = client.post("/api/v1/auth/login", json={"pixId": "junhyeong.h", "password": "sunset2026"}).json()
-    register_device(client, junhyeong, "junhyeong-phone")
-    register_device(client, {"Authorization": f"Bearer {other_phone['accessToken']}"}, "junhyeong-tablet")
+    (dongje, _), (joonhyung, _) = friends
+    other_phone = client.post("/api/v1/auth/login", json={"pixId": "joonhyung.h", "password": "sunset2026"}).json()
+    register_device(client, joonhyung, "joonhyung-phone")
+    register_device(client, {"Authorization": f"Bearer {other_phone['accessToken']}"}, "joonhyung-tablet")
     register_device(client, dongje, "dongje-phone")
     invitation = sent(client, friends)
-    assert sorted(push["token"] for push in fcm_api.pushes) == ["junhyeong-phone", "junhyeong-tablet"]
+    assert sorted(push["token"] for push in fcm_api.pushes) == ["joonhyung-phone", "joonhyung-tablet"]
     for push in fcm_api.pushes:
         assert push["data"] == {
             "type": "invitation",
@@ -478,36 +478,36 @@ def test_the_invitation_is_pushed_to_each_of_the_friends_phones(client, friends,
 
 
 def test_a_phone_whose_sign_in_expired_gets_no_push(client, clock, friends, fcm_api):
-    (_, _), (junhyeong, _) = friends
-    register_device(client, junhyeong, "junhyeong-old-phone")
+    (_, _), (joonhyung, _) = friends
+    register_device(client, joonhyung, "joonhyung-old-phone")
     clock.advance(20 * 86400)
-    new_phone = client.post("/api/v1/auth/login", json={"pixId": "junhyeong.h", "password": "sunset2026"}).json()
-    register_device(client, {"Authorization": f"Bearer {new_phone['accessToken']}"}, "junhyeong-phone")
+    new_phone = client.post("/api/v1/auth/login", json={"pixId": "joonhyung.h", "password": "sunset2026"}).json()
+    register_device(client, {"Authorization": f"Bearer {new_phone['accessToken']}"}, "joonhyung-phone")
     # The first sign-in ends 30 days after it began; the second one lasts another 20 days.
     clock.advance(11 * 86400)
     dongje = client.post("/api/v1/auth/login", json={"pixId": "dongje.p", "password": "sunset2026"}).json()
     response = invite(client, {"Authorization": f"Bearer {dongje['accessToken']}"}, friends[1][1])
     assert response.status_code == 201, response.text
-    assert [push["token"] for push in fcm_api.pushes] == ["junhyeong-phone"]
+    assert [push["token"] for push in fcm_api.pushes] == ["joonhyung-phone"]
 
 
 def test_a_device_fcm_no_longer_knows_is_removed(client, friends, fcm_api):
-    (dongje, _), (junhyeong, _) = friends
-    other_phone = client.post("/api/v1/auth/login", json={"pixId": "junhyeong.h", "password": "sunset2026"}).json()
-    register_device(client, junhyeong, "junhyeong-phone")
-    register_device(client, {"Authorization": f"Bearer {other_phone['accessToken']}"}, "junhyeong-old-phone")
-    fcm_api.unregistered.add("junhyeong-old-phone")
+    (dongje, _), (joonhyung, _) = friends
+    other_phone = client.post("/api/v1/auth/login", json={"pixId": "joonhyung.h", "password": "sunset2026"}).json()
+    register_device(client, joonhyung, "joonhyung-phone")
+    register_device(client, {"Authorization": f"Bearer {other_phone['accessToken']}"}, "joonhyung-old-phone")
+    fcm_api.unregistered.add("joonhyung-old-phone")
     first = sent(client, friends)
     assert answer(client, dongje, first, "cancel").status_code == 204
     fcm_api.pushes.clear()
     sent(client, friends)
-    assert [push["token"] for push in fcm_api.pushes] == ["junhyeong-phone"]
+    assert [push["token"] for push in fcm_api.pushes] == ["joonhyung-phone"]
 
 
 @pytest.mark.parametrize("failing", ["token", "push"])
 def test_fcm_failing_leaves_the_invitation_working(client, friends, fcm_api, failing):
-    (_, _), (junhyeong, _) = friends
-    register_device(client, junhyeong, "junhyeong-phone")
+    (_, _), (joonhyung, _) = friends
+    register_device(client, joonhyung, "joonhyung-phone")
     if failing == "token":
         fcm_api.token_status = 500
     else:
@@ -519,7 +519,7 @@ def test_fcm_failing_leaves_the_invitation_working(client, friends, fcm_api, fai
     fcm_api.token_status = 200
     fcm_api.pushes.clear()
     sent(client, friends)
-    assert [push["token"] for push in fcm_api.pushes] == ["junhyeong-phone"]
+    assert [push["token"] for push in fcm_api.pushes] == ["joonhyung-phone"]
 
 
 # --- the link ------------------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -1227,7 +1227,7 @@ class GenerationViewModelTest {
 
     @Test
     fun aSetMadeFromADescription_isKeptAsUsedBefore_onceTheServerAcceptsIt_withTheSessionsFriend() = runTest {
-        partner = SessionPartner("u_2", "Junhyeong")
+        partner = SessionPartner("u_2", "Joonhyung")
         describeAPhoto()
         model.generate("  Wave  hello ")
         runCurrent()

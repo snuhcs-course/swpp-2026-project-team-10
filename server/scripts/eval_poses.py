@@ -35,7 +35,7 @@ JSON schema; verdicts go to judgments.jsonl with the rubric's hash, and a reques
 reads ANTHROPIC_API_KEY. `report` counts the rules each candidate breaks, the requests it follows, the times, the
 suggested sets whose four poses all differ, and the tips that match their pose or hold a number or unit; with several
 runs it gives each run and all together, with 95 % intervals. `sample`, `agree`, and `judge --repeat` check the judge
-(3.1, *How to trust the judge*). `person` puts the phone's person check (the app's PersonCheckEval on a device) and
+(3.1, *Judge validation*). `person` puts the phone's person check (the app's PersonCheckEval on a device) and
 the server's (try_person_check.py) together, as the app runs them. The photos go to the Pix server's models and to
 Anthropic.
 """

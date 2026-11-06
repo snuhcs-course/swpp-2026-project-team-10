@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.session.signaling
 
 import com.lastpenguin.pix.session.EndReason
@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The JSON must match the server (server/README.md) and Design 2.5.2 exactly. */
+/** The JSON must match the server and Design 2.5.2 exactly. */
 class SignalCodecTest {
 
     @Test

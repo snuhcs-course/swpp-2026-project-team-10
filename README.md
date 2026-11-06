@@ -18,12 +18,12 @@
 
 Pix is an Android camera app that helps two people get the portrait one of them has in mind. When friends photograph each other, the person in the photo usually knows the pose and framing they want, but only the photographer sees the screen. Pix gives both people the same view: the photographer puts a pose guide on the camera, and the friend's phone shows the live camera with the same guide and can adjust the shot. The photographer takes the photo, and it is saved at full quality without the guide.
 
-This branch is the **Iteration 2 build**: the Pix server runs on the course's public servers, Pix accounts and friends exist, and the subject's phone can move the guide and change the brightness and the flash as well as the zoom. Two phones still connect with a room code on one Wi-Fi network; invitations and sessions across networks come in Iteration 3.
+This branch is the **Iteration 3 build**. Two phones now connect over Wi-Fi or cellular data, with an invitation or a room code. Both phones follow the guide and pose steps together, and both phones keep the photo. AI poses fit the scene's ratio and come with a tip on how to take them. Pix also has selfie mode, a guide library, settings, a tutorial, and Korean.
 
 ## Contents
 
 - [Demo videos](#demo-videos)
-- [What Iteration 2 does](#what-iteration-2-does)
+- [Features implemented](#features-implemented): [Major progress in Iteration 3](#major-progress-in-iteration-3)
 - [Known limitations and to-dos](#known-limitations-and-to-dos)
 - [How it works](#how-it-works)
 - [Technology stack](#technology-stack)
@@ -36,79 +36,97 @@ This branch is the **Iteration 2 build**: the Pix server runs on the course's pu
 
 ## Demo videos
 
-Recorded on a Galaxy S23 Ultra (photographer) and a Galaxy S25 Ultra (subject) with the Iteration 2 build on `dev`, against the course server (#98). They are also the evidence of the integration run in [Testing Documentation, Appendix B](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#run-2026-10-23-integration-scripts); the full-size files are in the team's shared folder.
+Both videos show the photographer's phone (Galaxy S23 Ultra) and the subject's phone (Galaxy S25 Ultra) side by side. The phones run a debug build of Iteration 3 with the AWS server.
 
-| Video | What it shows | Player |
-|---|---|---|
-| **Camera basics** | The aspect ratio 4:3 → 16:9 → 1:1 with a photo saved in each, the brightness slider, the flash button, zoom, and the last-photo thumbnail | <video src="https://github.com/user-attachments/assets/42a0c887-c326-4025-810d-a0bbcffeb2ee" controls width="220"></video> |
-| **Guide from a photo** | *Add a pose guide* with saved guides, a reference photo turned into an outline guide, drag and pinch, opacity, hide, and *Save guide* | <video src="https://github.com/user-attachments/assets/8e64ef8c-8fef-4398-ba66-bbedf2b953d0" controls width="220"></video> |
-| **Sign-in and account** | *Friends* signed out, *Continue with Google*, the account sheet with *Edit name*, *Add a password*, and *Sign out* | <video src="https://github.com/user-attachments/assets/88f5413d-0cb8-4226-9d46-2cf4788362fc" controls width="220"></video> |
-| **Shoot together** (both phones) | A room-code session: the live view, a guide from a reference on both phones, the photographer's moves followed on the subject's phone, a ratio change, the scene photo with a typed description and *Generating poses*, and the subject's brightness applied on the photographer's phone | <video src="https://github.com/user-attachments/assets/724a8990-4207-4f40-8cce-ba2a923e4c07" controls width="320"></video> |
+**1. Pose guide from a photo**
 
-## What Iteration 2 does
+https://github.com/user-attachments/assets/9a5d3121-1a4c-4954-a7a1-98f3a6575be8
+
+**2. AI pose generation**
+
+https://github.com/user-attachments/assets/bb74c7e2-876a-432c-9f6a-e400385f095b
+
+## Features implemented
+
+This table lists everything the Iteration 3 build can do. The subsection below lists what is new in Iteration 3.
 
 | Feature | What you can do |
 |---|---|
-| **Camera** | Pix opens straight to the rear camera. Choose the aspect ratio 4:3, 16:9, or 1:1; the preview, the grid, the guide, the saved photo, and the subject's live view all follow it. Tap to focus, drag the brightness slider (in EV), cycle the flash, and pinch to zoom across the phone's real range, including an ultrawide lens where the phone has one, without stutter. Photos are saved at full resolution to a "Pix" album, without the guide. |
-| **Guide from a photo** | Pick a gallery photo. Pix separates the person on the phone with ML Kit Subject Segmentation and draws a smooth white outline, never the photo's pixels. The guide starts where the person stands in the reference, and a thumbnail of the reference sits in a corner of the preview (tap to enlarge, drag to another corner). The photo never leaves the phone. |
-| **Guide controls** | Drag the guide, pinch it to 30–300 % of its size, fade it to 10–90 %, hide and show it, replace it, or remove it. A guide-edit mode toggle decides what a pinch does: with it on, gestures edit the guide; with it off, a pinch zooms the camera. *Save guide* keeps up to 20 guides on the phone, listed on *Add a pose guide* to reuse or delete. |
-| **AI pose generation** | Take a photo of the scene on the Camera screen, then describe the pose in words (with idea chips) or let Pix suggest four poses for the scene. The Pix server asks an image-editing model for four candidates of the same person in the same place, one prompt per candidate; a description gets the description plus three variations of it. Candidates appear as they arrive; the chosen one becomes the guide. |
-| **Pix ID and friends** | Sign up with a Pix ID and a password, or continue with Google and choose a Pix ID; a Google account can add a password and a password account can add Google. Find friends by their exact Pix ID, send and answer friend requests, withdraw a sent request, and see which friends are online. Everything else in Pix works without signing in. |
-| **Shoot together** | *Shoot together* opens *Friends*, where *Use a room code* gives the photographer a 6-digit code; the friend joins with it on the same Wi-Fi. The friend's phone shows the live camera over WebRTC in the photographer's aspect ratio with the same guide. |
-| **Remote controls from the friend's phone** | Pinch to zoom the photographer's camera, drag the brightness slider, tap the flash, and, with the guide-edit toggle on, move and resize the guide. The photographer's phone applies each request, echoes what it applied so both phones agree, and shows a short notice ("Dongje moved the guide"). Only the photographer takes photos. |
+| **Camera** | Pix opens on the rear camera. Choose the ratio 3:4, 9:16, or 1:1. Tap to focus, then drag the bar beside the focus box to change the brightness. Pinch to zoom, or tap the zoom readout to step through the zoom levels. Use the flash, the grid, and the level. The camera switch beside the shutter turns on selfie mode. Pix saves each photo at full resolution to the "Pix" album, without the guide. |
+| **Guide from a photo** | Pick a photo of a person. A screenshot of a post from Instagram or another app also works: Pix cuts the screenshot to its photo. ML Kit finds the person on the phone, and Pix draws a white outline, never the photo's pixels. The guide starts where the person stands in the photo. A thumbnail of the photo stays in a corner of the preview. The Pix server never receives the photo. |
+| **Guide controls and library** | Drag the guide, pinch to resize it, fade it, hide it, replace it, or remove it. The guide-edit toggle sets what a pinch does: it moves the guide or zooms the camera. *Save guide* keeps the guide in *My library*. The library holds up to 100 guides, from photos and from AI poses. |
+| **AI pose generation** | Tap *Guide* › *Generate poses here* and take a photo of the scene. Pix checks that the photo shows a person. Describe a pose, or let Pix suggest four poses. The Pix server checks the description with a filter model. Then an image model makes four candidates of the same person in the same place, in the scene's ratio. Swipe through the candidates and pick one. It becomes the guide, and a tip on Camera tells the photographer how to hold the phone. ♥ saves a candidate to *My library*. Descriptions used before show under the text field. |
+| **Pix ID and friends** | Sign up with a Pix ID and a password, or continue with Google. Find friends by their exact Pix ID. Send and answer friend requests. A friend request arrives as a push notification. Everything else in Pix works without an account. |
+| **Shoot together** | Tap *Shoot together* and choose who takes the photo. The photographer invites a Pix friend or shows a 6-digit code. The friend gets a push notification and accepts the invitation. Without an account, the subject enters the code. The phones connect over Wi-Fi or cellular data. When the phones have no direct path, a TURN relay forwards the encrypted video. After a drop of less than 10 s, the session comes back by itself. |
+| **Both phones in a session** | The subject's phone shows the live camera in the photographer's ratio, with the same guide and thumbnail. Either phone can add a guide from a photo. Both phones show the pose description as either person types it. Both phones show the candidates as they arrive. The first phone to pick a candidate decides. The subject can zoom, change the brightness and the flash, and move the guide. Only the photographer takes the photo. Both phones save it. |
+| **Settings and help** | The gear on Camera opens *Settings*. It has the base brightness, the guide's color and thickness, and the live-view delay. It also has the language (English or Korean), notifications, the AI agreement, and the Pix account. At first use, a tutorial shows tips over each screen. *Settings* can show the tutorial again. |
 
 The plan for every iteration is in [Requirements and Specifications §4.1](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications#41-scope-by-iteration).
 
+### Major progress in Iteration 3
+
+These features are new since the Iteration 2 build:
+
+- **Any network.** Sessions work over Wi-Fi and cellular data through a TURN relay ([#134], [#139]). After a short drop, a session comes back by itself ([#149]).
+- **Invitations.** A Pix friend gets invitations and friend requests as push notifications. A link works when no notification arrives ([#153], [#154]). Before the phones connect, each person chooses who takes the photo ([#189]).
+- **Both phones work together.** Either phone can add a guide, and both phones follow the pose steps ([#145], [#151]). Both phones save each photo ([#159]). The subject's phone shows the reference thumbnail ([#143]).
+- **Better AI poses.** The candidates fit the scene's ratio ([#155]), and *Pick a pose* shows them one at a time ([#133]). A tip in English or Korean tells the photographer how to take the pose ([#135], [#157]). A filter refuses harmful descriptions, and a person check refuses scenes without a person ([#166], [#169]). *Generate poses* shows the descriptions used before ([#164]).
+- **More ways to get a guide.** Pix adds selfie mode ([#152]), the guide library ([#172]), and ♥ to save an AI pose ([#175]). A screenshot of a post becomes a guide from its photo ([#176], [#178]).
+- **Polish.** Pix adds settings ([#163]), a tutorial over each screen ([#167], [#173]), Korean ([#138]), and animations between states and screens ([#184], [#186], [#187]). Camera's controls fit every phone ([#137]), and they follow the heuristic evaluation ([#185]).
+- **Servers and tests.** GitHub Actions deploys the AWS server, which answers from every network ([#150]). The AI module test checks the AI features with an LLM judge, which we checked against our own labels ([#190]).
+
 ## Known limitations and to-dos
 
-Moved from Iteration 2 to Iteration 3 (decided 2026-10-23; the design is written in Design Documentation 2.6.5–2.6.7):
+Moved from Iteration 3 to Iteration 4 ([Design Documentation 2.9](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#29-module-ownership-and-build-order)):
 
-- **Invitations** (Iter2-P15): *Invite* on *Friends* is disabled. There are no push notifications and no invite link yet; two phones connect with a room code.
-- **Sessions across networks** (Iter2-P16): no TURN relay and no automatic reconnection. Both phones must be on the same Wi-Fi; from another network a join opens *Subject view* and ends on *Connection lost*. The course servers are reachable only from the campus network, which is also why the cellular pairs of the test matrix did not run.
-- **Could items**: the switch that lets the photographer block remote control, remote tap-to-focus, the guide color switch, and the shutter freeze.
+- **Offline connection with a QR code** ([#122]): not built. Both phones must reach the Pix server.
+- **Four prompt templates** ([#125]): a description still goes to the image model as itself and three variations.
+- **The remote-control switch and remote focus** (FR-7.5, FR-7.7): not built. The photographer cannot block the subject's controls, and the subject cannot focus.
+- **Camera quality and the shutter freeze** ([#183]): the camera's quality and speed are not yet close to the phone's own camera. The preview also freezes for a moment when the photographer takes a photo.
 
-Known limitations of the Iteration 2 build:
+Known limitations of the Iteration 3 build ([Testing Documentation 3.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#32-results)):
 
-- The server asks the image model for a 3:4 candidate whatever the scene's ratio, so a 16:9 or 1:1 scene gets a guide of the wrong shape (Design 2.6.3; the fix is planned for Iteration 3).
-- The guide image sent to the subject is still the cutout as a WebP with alpha; the mask-only transfer decided on 2026-10-16 is not built (Design 2.5.1).
-- The zoom fix (Iter2-P5) is measured on the S23 Ultra, which zooms to 0.6× natively; the S21, the test phone with a separate ultrawide lens, is still to be measured (Testing Documentation IT-10).
-- The timing targets (live-view delay, control round trip) were not measured in Iteration 2; the integration run was recorded on video without a `Timings` log.
+- The person check on the phone misses people who are far away or in low light. Pix then refuses the scene photo, so these users get no poses.
+- Suggested poses are often too alike for close-up scenes and selfies.
+- Some error messages do not say why a request failed. For example, a request over the daily AI limit shows the general error message.
+- The course servers answer only on the campus network. So debug builds use the AWS server.
 
-### Next: Iteration 3
+### Next: Iteration 4
 
-- Invitations with push notifications and an invite link, the TURN relay, and reconnection (the items above)
-- Connecting two phones without internet with a QR code and a hotspot
-- Selfie mode, a settings screen with the guide color and a frame-delay indicator, and a Korean language setting
-- Sending the photos to the subject
-- The heuristic evaluation and the user acceptance test stories
+- Fixes from the user test and the heuristic evaluation, such as a separate error message for each failure and new app colors
+- The user acceptance test (UAT) on 11/16 and 11/18, and its fixes
+- Search, situations, and memos in the library (FR-3.11)
+- The items above: the QR connection, the prompt templates, the remote-control switch, remote focus, and camera quality
 
 ## How it works
 
 ![Architecture](wiki/images/design_target_architecture.png)
 
-- **Pix server** (FastAPI, on the course's two servers behind nginx, two workers each): creates room codes and relays the WebRTC connection setup between the two phones (a session store in Redis lets any worker serve any socket), keeps accounts, Pix IDs, friends, and presence in PostgreSQL, and forwards pose requests to the image and vision models through OpenRouter, which keeps the API key off the phones. It never sees the video. Server A runs `main` for release builds; Server B runs `dev`. A new commit on either branch is built into a Docker image and deployed blue-green by a timer on the server.
-- **Phone to phone** (WebRTC): the live video, the guide image, guide positions, and the subject's zoom, brightness, flash, and guide moves go directly between the two phones over two data channels. Each phone draws the guide itself, so it never appears in the video or in saved photos.
-- **On the phone**: the camera (CameraX), the person separation for guides (ML Kit), saved guides, and the sign-in tokens stay on the phone.
+- **Pix server** (FastAPI behind nginx on port 80): connects the two phones (signaling) and keeps accounts, friends, and invitations. It sends push notifications through Firebase Cloud Messaging (FCM). It checks each description and scene photo with a decision model. Then it sends the pose requests to the image and vision models through OpenRouter. The API key stays on the server. The server never sees the video.
+- **Servers**: Server A on the course servers runs `main` for release builds. Server B runs `dev` for staging. The AWS server runs `dev` for debug builds and answers from any network. Each server deploys a new commit blue-green. The course servers pull it with a timer, and GitHub Actions deploys the AWS server.
+- **Phone to phone** (WebRTC): the live video and the photos go directly between the two phones. So do the guide, the shared steps, the candidates, and the subject's controls. Without a direct path, Cloudflare's TURN relay forwards the encrypted packets. Each phone draws the guide itself, so the guide never appears in the video or in saved photos.
+- **On the phone**: CameraX runs the camera, and ML Kit makes the outline and the person check. The guide library, the settings, and the sign-in tokens stay on the phone.
 
-The dashed parts of the figure, push notifications and the relay, are Iteration 3. The full design is in the [Design Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation).
+The full design is in the [Design Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation).
 
 ## Technology stack
 
 | Part | Stack |
 |---|---|
-| Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel and coroutines · CameraX 1.6 · ML Kit Subject Segmentation · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore · Credential Manager with Google ID |
-| Server | Python 3.11 · FastAPI and Uvicorn (WebSocket signaling and REST API) · SQLAlchemy 2 with asyncpg and Alembic on PostgreSQL 18 · Redis (session store) · PyJWT and argon2 · pydantic-settings · httpx2 · Pillow · Docker, nginx, and a blue-green deploy script on the course servers |
-| AI | OpenRouter: GPT Image 2.5 Flare at low quality for the pose candidates, Gemini 3.1 Flash Lite for the pose suggestions (both server settings) |
-| Tests and CI | JUnit 4, Robolectric 4.17, and FragmentScenario with JaCoCo · pytest with pytest-cov, fakeredis, and SQLite · Spotless with ktlint · Ruff · GitHub Actions (lint, tests, the server image, the deploy, the wiki) |
+| Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel, and coroutines · CameraX 1.6 · ML Kit Subject Segmentation, Pose Detection, and Face Detection · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore · Credential Manager with Google ID · Firebase Cloud Messaging |
+| Server | Python 3.11 · FastAPI and Uvicorn (WebSocket signaling and REST API) · SQLAlchemy 2 with asyncpg and Alembic on PostgreSQL 18 · Redis (session store) · PyJWT and argon2 · google-auth (Google sign-in and FCM) · pydantic-settings · httpx2 · Pillow · Docker and nginx with blue-green deploys |
+| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging · OpenRouter · AWS EC2 (the AWS server) |
+| AI | Through OpenRouter: GPT Image 2.5 Flare at low quality for the candidates · Gemini 3.1 Flash Lite for the suggestions and the tips · Jev 1.14 (`typesafe/jev-1.14`) for the description filter and the person check. The AI module test uses Claude Opus 5.5 as its judge. |
+| Tests and CI | JUnit 4, Robolectric 4.17, and FragmentScenario with JaCoCo · pytest with pytest-cov, fakeredis, and SQLite · Spotless with ktlint · Ruff · GitHub Actions (lint, tests, the server image, the AWS deploy, the wiki) |
 
 ## Development environment
 
 | Part | Requirements |
 |---|---|
-| Android app | Android Studio with its bundled JDK (21 or later is needed for the unit tests), Kotlin 2.2, Gradle 9.5 through the wrapper. minSdk 29 (Android 10), target and compile SDK 36. |
-| Server | Only for a local server: Python 3.11 or later and [uv](https://docs.astral.sh/uv/getting-started/installation/), and an [OpenRouter](https://openrouter.ai/) API key with credits for pose generation. Redis and PostgreSQL are optional locally (the server keeps rooms in the process and accounts in a SQLite file without them). |
-| Tested on | Galaxy S21, S22, S23 Ultra, and S25 Ultra |
-| Network | Both phones on one Wi-Fi network that allows traffic between devices and reaches the course server (the campus network does; a phone hotspot works for the phones and needs a local server for the laptop). Cellular data cannot reach the course servers yet. |
+| Android app | Android Studio with its bundled JDK (the unit tests need JDK 21 or later), Kotlin 2.2, and Gradle 9.5 through the wrapper. minSdk 29 (Android 10), target and compile SDK 36. |
+| Server | Only for a local server: Python 3.11 or later and [uv](https://docs.astral.sh/uv/getting-started/installation/). Pose generation needs an [OpenRouter](https://openrouter.ai/) API key with credits. Redis and PostgreSQL are optional locally. Without them, the server keeps rooms in the process and accounts in a SQLite file. |
+| Tested on | Galaxy S21, S22, S23 Ultra, S25 Ultra, and Note20 |
+| Network | Wi-Fi or cellular data on each phone. The AWS server answers from any network. The course servers answer only on the campus network. |
 
 ## Run the demo
 
@@ -117,20 +135,20 @@ The dashed parts of the figure, push notifications and the relay, are Iteration 
 ```sh
 git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git
 cd swpp-2026-project-team-10
-git checkout iteration-2-demo
+git checkout iteration-3-demo
 ```
 
 ### 2. Choose a server
 
-**The public server (no laptop needed).** Server A, `http://swpp26t10.147-46-242-169.sslip.io/`, runs this iteration's `main`; a release build of the app uses it by default. For a debug build, create `android/local.properties` with
+**The AWS server (no setup).** A debug build uses the AWS server, `http://3.105.185.251/`, by default. It runs `dev` and answers from any network, cellular data included. To check it, open `http://3.105.185.251/health` in a phone's browser. It answers `{"status":"ok"}`.
+
+**Server A (campus network only).** A release build uses Server A, `http://swpp26t10.147-46-242-169.sslip.io/`. It runs `main`. To use it in a debug build, create `android/local.properties` with this line:
 
 ```properties
 pix.serverUrl=http://swpp26t10.147-46-242-169.sslip.io/
 ```
 
-(or Server B, `http://swpp26t10.147-46-242-174.sslip.io/`, which runs `dev`). Check `http://swpp26t10.147-46-242-169.sslip.io/health` from a phone's browser on the campus network: it answers `{"status":"ok"}`.
-
-**A server on the laptop.** From the repository root:
+**A server on the laptop.** Run these commands from the repository root:
 
 ```sh
 cd server
@@ -138,37 +156,50 @@ uv sync --locked
 cp .env.example .env
 ```
 
-Put your OpenRouter key in `server/.env` as `OPENROUTER_API_KEY=...`; without it everything except pose generation works. Then start one worker:
+Put the keys you need in `server/.env`. The server runs without them, but some features stop:
+
+| Key | Without it |
+|---|---|
+| `OPENROUTER_API_KEY` | No pose generation |
+| `PIX_TURN_KEY_ID`, `PIX_TURN_API_TOKEN` | No TURN relay, so sessions across networks often fail |
+| `PIX_FCM_CREDENTIALS_FILE` | No push notifications. The invite link still works. |
+| `PIX_GOOGLE_CLIENT_ID` | No Google sign-in. Sign-up with a Pix ID and a password still works. |
+
+Then start one worker:
 
 ```sh
 uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 65536
 ```
 
-Rooms stay in the process and accounts in `server/pix.db`. Find the laptop's Wi-Fi address (on macOS, `ipconfig getifaddr en0`), check `http://<laptop-IP>:8000/health` from a phone, and put `pix.serverUrl=http://<laptop-IP>:8000/` in `android/local.properties`. On an emulator, skip `local.properties`: the default `http://10.0.2.2:8000/` already reaches the laptop. More in the [server README](server/README.md).
+The server keeps rooms in the process and accounts in `server/pix.db`. Find the laptop's Wi-Fi address (on macOS, `ipconfig getifaddr en0`). Check `http://<laptop-IP>:8000/health` from a phone. Then put `pix.serverUrl=http://<laptop-IP>:8000/` in `android/local.properties`. For an emulator, use `pix.serverUrl=http://10.0.2.2:8000/`. The [server README](server/README.md) has more detail.
 
 ### 3. Install the app on both phones
 
-Connect a phone with USB debugging on, then from `android/`:
+Connect a phone with USB debugging on. Then run this command from `android/`:
 
 ```sh
 ./gradlew :app:installDebug
 ```
 
-Repeat for the second phone. For Google sign-in on a debug build, the phone's debug key must be an Android OAuth client in the team's Google Cloud project (`./gradlew :app:signingReport`, then a project owner adds the `SHA1` of `Variant: debug`); sign-up with a Pix ID and a password needs nothing.
+Do the same for the second phone. Google sign-in on a debug build needs the phone's debug key in the team's Google Cloud project. Run `./gradlew :app:signingReport`, and a project owner adds the `SHA1` of `Variant: debug` as an Android OAuth client. Sign-up with a Pix ID and a password needs no setup.
 
 ### 4. Try the flows
 
-1. **Camera.** Pix opens on the camera. Tap the ratio button in the top bar to cycle 4:3, 16:9, and 1:1; tap the sun button for the brightness slider; tap the flash button; tap the preview to focus; pinch to zoom. Take a photo: "Saved without the guide" appears and the thumbnail changes.
-2. **Guide from a photo.** Tap *Guide* › *Upload a reference*, pick a photo of a person, and tap *Use this guide*. The outline starts where the person stands in the photo. With the guide-edit toggle on (it turns on with a new guide), drag and pinch the guide; the bar below the preview fades, hides, saves (bookmark), or removes it. Turn the toggle off and a pinch zooms the camera again. *Guide* now asks whether to replace the guide and lists the saved ones. The first time, the segmentation model is downloaded through Google Play services, which can take a minute.
-3. **AI poses.** Tap *Guide* › *Generate poses here*, accept the notice, take a photo of the scene, and tap *Use this photo*. Type a pose (or tap an idea chip) and *Generate 4 poses*, or *Skip, suggest poses for me*. Candidates fill in as they arrive, usually within 30 s; tap one, *Use this pose*, and *Use this guide*. Every set is billed as up to four images.
-4. **Pix ID and friends** (two phones). Tap *Shoot together*. On one phone *Sign in to add friends* › *New to Pix? Sign up* with a Pix ID and a password; on the other *Continue with Google* and choose a Pix ID. Tap *Add a friend*, search the other's Pix ID, *Add*; the other phone sees the request on *Friends* within 10 s and accepts. Each friend shows as online while Pix is open. The account icon opens the sheet with *Edit name*, *Add a password* or *Add Google*, and *Sign out*.
-5. **Shoot together.** On the photographer's phone, *Shoot together* › *Use a room code* shows a code over the live camera. On the friend's phone, *Shoot together* › *Use a room code instead* › *Join with a code instead*, enter the code, and *Join*. The friend sees the live camera in the photographer's ratio with the same guide. On the friend's phone: pinch to zoom, drag the brightness slider, tap the flash, and turn the guide-edit toggle on to move and resize the guide; the photographer's phone follows and shows a notice for each. The photographer takes the photo. *Leave* or *End session* ends it.
+Pix follows the phone's language, English or Korean. The steps below use the English labels.
 
-With one phone, `server/tools/fake_photographer.py` or `server/tools/fake_subject.py` can play the other side against a local server; see the [server README](server/README.md#testing-the-photographers-phone-without-a-second-phone).
+1. **Camera.** Pix opens on the camera. At first use, the tutorial shows tips over the screen. Tap *Got it*. Tap the ratio button and choose 3:4, 9:16, or 1:1. Tap the preview to focus, then drag the bar beside the focus box. Pinch to zoom, or tap the zoom readout. Tap the camera switch beside the shutter for selfie mode. Take a photo. "Saved without the guide" appears.
+2. **Guide from a photo.** Tap *Guide* › *Add photo* and pick a photo of a person, or a screenshot of a post. Tap *Use this guide*. The outline starts where the person stands in the photo. With the guide-edit toggle on, drag and pinch the guide. The bar under the preview fades, hides, saves, or removes the guide. A saved guide shows in *My library*. At first use, Google Play services downloads the segmentation model. This can take a minute.
+3. **AI poses.** Tap *Guide* › *Generate poses here*. Accept the notice. Take a photo of the scene with a person in it, and tap *Use this photo*. Type a pose and tap *Generate 4 poses from this*. Or leave the field empty and tap *Suggest 4 poses*. The candidates appear as they are ready, usually within 30 s. Swipe through them, tap *Use this pose*, and then *Use this guide*. A tip on how to take the pose shows on Camera. The bulb button shows it again. Each set costs up to four images on OpenRouter.
+4. **Pix ID and friends** (two phones). Tap *Shoot together* › *I'll take the photo* › *Sign in to add friends*. Sign up with a Pix ID and a password (*New to Pix? Sign up*), or continue with Google. Do the same on the other phone. Tap *Add a friend* and search for the other Pix ID. The other phone gets a push notification and accepts the request.
+5. **Shoot together with an invitation.** On the photographer's phone, tap *Shoot together* › *I'll take the photo*, then *Invite* next to the friend. The subject's phone gets a notification. Tap it, then tap *Accept*. The invitation also waits for a minute under *Shoot together* › *I'll be in the photo* › *Received invitations*. The subject's phone shows the live camera with the same guide. Try it with one phone on cellular data.
+6. **Shoot together with a code** (no sign-in). On the photographer's phone, tap *Shoot together* › *I'll take the photo* › *Show a code*. On the subject's phone, tap *Shoot together* › *I'll be in the photo*. Enter the code and tap *Connect*.
+7. **In a session.** On the subject's phone, pinch to zoom, change the brightness and the flash, and move the guide with the guide-edit toggle on. The photographer's phone follows. Add a guide or generate poses: the other phone shows each step. The photographer takes the photo, and both phones save it. Turn off Wi-Fi on one phone for a few seconds. The session comes back by itself. *Leave* or *End session* ends the session.
+
+With one phone, `server/tools/fake_photographer.py` or `server/tools/fake_subject.py` can be the other phone against a local server. See the [server README](server/README.md#testing-the-photographers-phone-without-a-second-phone).
 
 ## Tests and checks
 
-Every pull request runs these in GitHub Actions; run them locally before you push.
+GitHub Actions runs these checks on every pull request. Run them locally before you push.
 
 | Part | From | Command |
 |---|---|---|
@@ -177,28 +208,70 @@ Every pull request runs these in GitHub Actions; run them locally before you pus
 | Server | `server/` | `uv run ruff check . && uv run ruff format --check . && uv run pytest` |
 | Server, with coverage | `server/` | `uv run pytest --cov=pix_server --cov-branch --cov-report=html` → `htmlcov/index.html` |
 
-At the close of Iteration 2: 756 app tests and 431 server tests, app line coverage 79.6 % (managers 93.5 %, ViewModels 95.4 %, Views 91.1 %, platform adapters 43.2 %), server 98.1 %; the targets, the integration scripts, and the results are in the [Testing Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation). More detail is in the [Android README](android/README.md) and the [server README](server/README.md).
+At the close of Iteration 3, all 1,711 app tests and 791 server tests pass. App line coverage is 86.9 % (managers 94.4 %, ViewModels 97.7 %, Views 93.7 %, platform adapters 50.4 %). Server line coverage is 98.3 %. The AI module test measures the candidates, the suggestions, the tips, the description filter, and the person check against fixed thresholds. The targets, the integration scripts, and all results are in the [Testing Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation). The [Android README](android/README.md) and the [server README](server/README.md) have more detail.
 
 ## Repository
 
 | Folder | Contents |
 |---|---|
 | `android/` | The Android app (open this folder in Android Studio) |
-| `server/` | The Pix server, its tests, the deploy files for the course servers, and tools for testing with one phone |
-| `wiki/` | The source of the GitHub wiki, published on every push to `dev` |
-| `branding/` | The logo: SVG masters of every version, PNG exports, and the usage guide |
+| `server/` | The Pix server, its tests, the AI module test, the deploy files, and tools for tests with one phone |
+| `wiki/` | The source of the GitHub wiki. A push to `dev` publishes it. `wiki/design/` holds the sources of the figures and the wireframes. |
+| `branding/` | The logo: SVG masters, PNG exports, and the usage guide |
 | `.github/` | CI workflows and the pull request template |
 
-Branches: `main` holds the stable version and `dev` is the integration branch. Each task is a branch from `dev` that returns through a reviewed, squash-merged pull request. `iteration-N-demo` holds the code shown in that iteration's demo, and at the end of an iteration `dev` is merged into `main`.
+Branches: `main` holds the stable version, and `dev` is the integration branch. Each task gets a branch from `dev`. The branch returns to `dev` through a reviewed, squash-merged pull request. `iteration-N-demo` holds the code of that iteration's demo. At the end of each iteration, the team merges `dev` into `main`.
 
 ## Documents
 
 - [Requirements and Specifications](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications)
 - [Design Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation)
 - [Testing Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation)
-- [AI Collaboration Report – Iteration 2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/AI-Collaboration-Report-%E2%80%93-Iteration-2)
+- [AI Collaboration Report – Iteration 3](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/AI-Collaboration-Report-%E2%80%93-Iteration-3)
 - [Team Meetings](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Team-Meetings) and [Daily Standup Meeting Log](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Daily-Standup-Meeting-Log)
 
 ## Team
 
-SWPP 2026 Team 10: 한준형 (PM in Iteration 2; design, testing, and integration), 박동제 (camera controls, reference guide, guide controls, saved guides), 박재완 (server, deployment, accounts and friends, pose generation), 조성민 (real-time session, guide sync, remote controls, zoom).
+SWPP 2026 Team 10:
+
+- 박동제: PM in Iteration 1. Camera, reference guide, guide controls, pose tips, selfie mode, and the prompt history.
+- 박재완: PM in Iteration 3. Server, deployment, accounts and friends, pose generation, the AI checks and the AI module test, and the documents.
+- 조성민: PM in Iterations 4 and 5. Real-time session, sessions across networks, reconnection, invitations, remote controls, settings, the guide library, and the animations.
+- 한준형: PM in Iteration 2. Guide transfer, shared steps, photos on both phones, the tutorial, and Camera's controls after the heuristic evaluation.
+
+[#122]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/122
+[#125]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/125
+[#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
+[#134]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/134
+[#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
+[#137]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/137
+[#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138
+[#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
+[#143]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/143
+[#145]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/145
+[#149]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/149
+[#150]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/150
+[#151]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/151
+[#152]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/152
+[#153]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/153
+[#154]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/154
+[#155]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/155
+[#157]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/157
+[#159]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/159
+[#163]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/163
+[#164]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/164
+[#166]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/166
+[#167]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/167
+[#169]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/169
+[#172]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/172
+[#173]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/173
+[#175]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/175
+[#176]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/176
+[#178]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/178
+[#183]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/183
+[#184]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/184
+[#185]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/185
+[#186]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/186
+[#187]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/187
+[#189]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/189
+[#190]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/190

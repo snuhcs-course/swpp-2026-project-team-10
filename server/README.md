@@ -1,21 +1,32 @@
 # Pix server
 
-FastAPI backend for Pix: session signaling (room codes, the WebRTC SDP/ICE relay between one photographer and one subject, and STUN/TURN credentials from Cloudflare), the pose generation REST API (candidates from an image-editing model on [OpenRouter](https://openrouter.ai/), poses and tips from a vision model), and accounts and friends. Video, guide images, guide state, and remote control go directly between the phones over WebRTC. Rooms, room codes, presence, and the rate limits are in a Redis session store, so several worker processes can run ([Session store](#session-store)); accounts, friend requests, the friend list, and invitations are in a database ([Accounts and friends](#accounts-and-friends), [Invitations and push](#invitations-and-push), [Database](#database)). Invitations and friend requests reach the friend's phone as push notifications through Firebase Cloud Messaging.
+The Pix server is a FastAPI backend with three parts:
 
-The wire contract comes from [Design Documentation §2.5.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation) and Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt). Room behavior follows [FR-8 and FR-6](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications). The REST contract comes from Design Documentation §2.5.3 and Android's [PixApi.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/PixApi.kt) and [ApiModels.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/ApiModels.kt); pose generation follows §2.6.3 and FR-4.
+- **Session signaling:** room codes, the WebRTC SDP/ICE relay between one photographer and one subject, and STUN/TURN credentials from Cloudflare.
+- **The pose generation REST API:** candidates from an image-editing model on [OpenRouter](https://openrouter.ai/), and poses and tips from a vision model.
+- **Accounts and friends.**
+
+Video, guide images, guide state, and remote control go directly between the phones over WebRTC. Rooms, room codes, presence, and the rate limits are in a Redis session store, so several worker processes can run ([Session store](#session-store)). A database holds the accounts, friend requests, the friend list, and invitations ([Database](#database)). Invitations and friend requests reach the friend's phone as push notifications through Firebase Cloud Messaging (FCM).
+
+This README tells how to set up, run, test, deploy, and operate the server, and how to run its tools. The [Design Documentation][design] (2.5–2.8) gives the design. Room behavior follows FR-6 and FR-8 of the [Requirements and Specifications][rs].
 
 ## Setup
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the repository root:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/). Then run these commands from the repository root:
 
 ```sh
 cd server
 uv sync --locked
 ```
 
-Optional settings are listed in `.env.example`. Copy it to `.env` in `server/` to override defaults, or export `PIX_` environment variables. The default waiting-room TTL is 600 seconds, empty-session TTL is 60 seconds, and cleanup runs every second. Expiry is also checked during message handling. If changing `PIX_MAX_MESSAGE_BYTES`, keep Uvicorn's `--ws-max-size` consistent.
+`.env.example` lists the optional settings. To change a default, copy the file to `.env` in `server/`, or export `PIX_` environment variables. If you change `PIX_MAX_MESSAGE_BYTES`, set Uvicorn's `--ws-max-size` to match.
 
-Pose generation needs `OPENROUTER_API_KEY`, an OpenRouter key with credits, in `.env` or the environment. Without it the server still runs, `POST /poses` answers `UPSTREAM_ERROR`, and `POST /pose-suggestions` answers the default poses. Google sign-in needs `PIX_GOOGLE_CLIENT_ID`, the web client ID that the app passes to Google sign-in; without it the Google endpoints answer `503 UNAVAILABLE`, and sign-up with a Pix ID and a password still works. Sessions across networks need `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN`, the TURN key of Cloudflare Realtime: with them each phone gets Cloudflare's STUN and TURN servers with credentials of its own, valid for `PIX_TURN_TTL_SECONDS` (4 h); without them, or when Cloudflare fails or takes longer than `PIX_TURN_TIMEOUT_SECONDS` (3 s), each phone gets Cloudflare's STUN server only, which is enough on one Wi-Fi (Design 2.6.7). The server logs only Cloudflare's status, never the token or a credential.
+Some features need a value in `.env` or in the environment:
+
+- **Pose generation** needs `OPENROUTER_API_KEY`, an OpenRouter key with credits. Without it, the server still runs. `POST /poses` and `POST /pose-tips` answer `UPSTREAM_ERROR`, and `POST /pose-suggestions` answers the default poses. OpenRouter bills each generated image, so set a spending limit on the key in OpenRouter's dashboard.
+- **Google sign-in** needs `PIX_GOOGLE_CLIENT_ID`, the web client ID that the app passes to Google sign-in. Without it, the Google endpoints answer `503 UNAVAILABLE`. Sign-up with a Pix ID and a password still works.
+- **Sessions across networks** need `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN`, the TURN key of Cloudflare Realtime. With the key, each phone gets Cloudflare's STUN and TURN servers with its own credentials. The credentials are valid for `PIX_TURN_TTL_SECONDS` (4 h). Without the key, each phone gets Cloudflare's STUN server only. The same happens when Cloudflare fails or takes longer than `PIX_TURN_TIMEOUT_SECONDS` (3 s). The server logs only Cloudflare's status, never the token or a credential.
+- **Push notifications** need `PIX_FCM_CREDENTIALS_FILE` ([Push notifications](#push-notifications)).
 
 ## Run it locally
 
@@ -25,55 +36,41 @@ From `server/`, start the server:
 uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000 --workers 1 --ws-max-size 65536
 ```
 
-Started this way, without `PIX_REDIS_URL`, the server keeps its rooms inside the process, so use **one worker**; a restart loses the rooms. Without `PIX_DATABASE_URL` the accounts are in `pix.db`, a SQLite file in `server/` that survives restarts; delete it to start over. For development, `--reload` can replace `--workers 1`; a reload ends existing sessions. To run several workers, or to keep rooms across a restart, give it a Redis ([Session store](#session-store)).
+Started this way without `PIX_REDIS_URL`, the server keeps its rooms inside the process. So use **one worker**. A restart loses the rooms. Without `PIX_DATABASE_URL`, the accounts are in `pix.db`, a SQLite file in `server/` that stays after a restart. To start again with no accounts, delete the file. For development, you can use `--reload` instead of `--workers 1`, but a reload ends the open sessions.
 
-Point a debug build at the laptop with `pix.serverUrl` (`android/README.md`, *Server address*): `http://<laptop-IP>:8000/` from a phone on the same Wi-Fi, which must allow device-to-device traffic and inbound TCP port 8000 on the laptop, or `http://10.0.2.2:8000/` from an emulator. Without a TURN key each phone gets Cloudflare's STUN server only, which is enough on one Wi-Fi; across networks the server needs the TURN key ([Setup](#setup)), or use the AWS server the debug build defaults to.
+To run several workers, or to keep rooms after a restart, give the server a Redis ([Session store](#session-store)). Several workers also need one `PIX_JWT_SECRET`. Without it, each process makes its own token key at start, so the workers refuse each other's access tokens. A restart also ends the access tokens, and the app refreshes them.
 
-Uvicorn's WebSocket ping/pong detects dead connections; no application heartbeat message is required.
+To connect a debug build to the laptop, set `pix.serverUrl` (`android/README.md`, *Server address*):
 
-`GET /health` returns `{"status":"ok"}`, or `503` with `{"status":"unavailable"}` while the session store does not answer.
+- From a phone on the same Wi-Fi, use `http://<laptop-IP>:8000/`. The Wi-Fi must allow device-to-device traffic, and the laptop must accept inbound TCP on port 8000.
+- From an emulator, use `http://10.0.2.2:8000/`.
+
+Without a TURN key, each phone gets Cloudflare's STUN server only, which is enough on one Wi-Fi ([Design 2.6.7][d267]). Across networks, give the server the TURN key ([Setup](#setup)), or use the AWS server. Debug builds use the AWS server by default.
+
+Uvicorn's WebSocket ping and pong find dead connections. The protocol needs no heartbeat message of its own.
+
+`GET /health` returns `{"status":"ok"}`. While the session store does not answer, it returns `503` with `{"status":"unavailable"}`.
 
 ## WebSocket protocol
 
-Send JSON **text** frames to `/ws` on a persistent connection. A socket belongs to at most one room. Messages and field casing match the Android contract. A signed-in phone sends `Authorization: Bearer <access token>` with the upgrade, which shows its user as online to their friends while the socket is open; without a token, or with an unknown or expired one, the socket works the same but shows nobody online.
+Phones send JSON text frames to `/ws` on a persistent connection. [Design 2.5.2][d252] gives the messages, the error codes, and the rules for rooms, invitations' rooms, and rejoin tokens. Android's [SignalMessage.kt](../android/app/src/main/java/com/lastpenguin/pix/session/signaling/SignalMessage.kt) implements the phone's side. A room code is a string of six random digits, and it can start with zeroes. The server does not log request bodies, room codes, or signaling payloads.
 
-| Client message | Result |
-| --- | --- |
-| `{"type":"room.create"}` | Sender gets `{"type":"room.created","code":"482915","sessionId":"s_…","iceServers":[…],"rejoinToken":"…"}`, its own STUN and TURN entries (Design 2.5.2) and the token that lets a new socket take its place again. |
-| `{"type":"room.join","code":"482915"}` | Subject gets `{"type":"session.joined","sessionId":"s_…","role":"SUBJECT","iceServers":[…],"rejoinToken":"…"}`, the credentials asked for only once the join succeeded; photographer gets `{"type":"peer.joined"}`. |
-| `{"type":"session.join","sessionId":"s_…","rejoin":true,"rejoinToken":"…"}` | A phone whose socket dropped takes its place again (Design 2.6.7). It gets `{"type":"session.joined","sessionId":"s_…","role":"…","iceServers":[]}` and keeps its first credentials; the other phone gets `{"type":"peer.rejoined"}`, or `{"type":"peer.joined"}` with `"rejoin":false`, when the phone starts a new peer connection. An invitation's two phones take their places this way too, with `"rejoin":false` and the tokens from the invitation's endpoints ([Invitations and push](#invitations-and-push)). |
-| `{"type":"signal","sdp":{"type":"offer","sdp":"v=0\r\n…"}}` | Forwarded unchanged to the subject. Only the photographer sends offers; only the subject sends answers. |
-| `{"type":"signal","candidate":{"sdpMid":"0","sdpMLineIndex":0,"candidate":"candidate:…"}}` | Forwarded unchanged to the other phone. `sdpMid` may be null; an empty candidate marks the end of candidates. |
-| `{"type":"leave"}` | Other phone gets `{"type":"peer.left","reason":"PEER_LEFT"}`. There is no acknowledgment to the sender. |
+The server closes a socket with these codes:
 
-A `signal` has exactly one non-null `sdp` or `candidate`; the unused field may be omitted or null, as in Android serialization. Unexpected fields are rejected. Neither display names nor media are exchanged through this hub.
-
-Room codes are random six-digit strings, including possible leading zeroes, and unique among active/recently expired codes. An unjoined room expires after ten minutes; its photographer receives an `EXPIRED` error and can create a new room on the same socket. Once joined, a session does not expire at that deadline. An invitation's room has no code and expires with the invitation, 60 s after it was sent, or `PIX_INVITATION_JOIN_SECONDS` (15) after the friend accepted, if that is later; a declined invitation ends it with a `DECLINED` error to the photographer.
-
-An explicit photographer `leave` cancels the room immediately and releases both sockets. A subject `leave` releases that subject and notifies the photographer; the room remains available for a manual join while the photographer is still connected. On an unexpected socket disconnect, the remaining peer receives `peer.left` with reason `CONNECTION_LOST`. A room without a photographer cannot be joined. Sessions are removed 60 seconds after their last socket disconnects (or earlier if an unjoined code expires); until then either phone takes its place again with `session.join` and its token.
-
-Each place has its own rejoin token, and the session store keeps only its SHA-256. The token decides the place and the role. A socket that still holds the place is taken to be the phone's old one, which the server notices only once its pings go unanswered: the place moves to the new socket at once, and the old socket keeps no session, so its disconnect later sends no `peer.left`. A subject that joins with the code makes the earlier subject's token useless, and a subject `leave` ends its own.
-
-Errors have the form `{"type":"error","code":"NOT_FOUND","message":"No active room with this code"}`.
-
-| Code | Meaning |
-| --- | --- |
-| `NOT_FOUND` | Unknown/cancelled room, or photographer disconnected; for `session.join`, a session that ended. |
-| `FORBIDDEN` | A `session.join` whose token has no place in the session. |
-| `FULL` | A subject already occupies the room, or no code could be allocated. |
-| `EXPIRED` | Room expired. Codes are remembered for another ten minutes, then report `NOT_FOUND`. An invitation's room sends it to its photographer when nobody joined in time. |
-| `DECLINED` | Sent to the photographer of an invitation's room when the friend declined; the room is gone, and the socket can start another. |
-| `RATE_LIMITED` | The client's address sent `PIX_JOIN_FAILURE_LIMIT` (100) wrong codes, unknown or expired, within `PIX_JOIN_FAILURE_WINDOW_SECONDS` (600). Every join from it is refused, the right code included, until the oldest leaves the window, so codes cannot be guessed. The count is per address, in the session store. |
-| `UNKNOWN_TYPE` | Unrecognized message type. |
-| `INVALID_MESSAGE` | Malformed JSON, binary frame, invalid fields, or invalid signaling payload. |
-| `INVALID_STATE` | Already in a room (for `session.join`, another session, or the other place of this one), signaling before joining, or SDP from the wrong role. |
-| `PEER_UNAVAILABLE` | No connected counterpart to receive a signal. |
-
-Errors leave the socket usable. Text messages larger than 64 KiB close the socket with code 1009. Slow consumers have a bounded outgoing queue; queue overflow or a five-second send timeout disconnects that socket with code 1013. The server also closes its sockets with 1013 when the session store fails or restarts ([Session store](#session-store)); the phone can connect again later. Request bodies, room codes, and signaling payloads are not logged by the app.
+- **1009:** a text message larger than 64 KiB.
+- **1013:** the socket's outgoing queue (`PIX_OUTBOUND_QUEUE_SIZE`, 128 messages) is full, or a send takes longer than `PIX_SEND_TIMEOUT_SECONDS` (5). This disconnects a slow client. The server also closes all its sockets with 1013 when the session store fails or restarts ([Design 2.7][d27]). The phone can connect again later.
+- **1001:** the server stops.
 
 ## Testing the photographer's phone without a second phone
 
-`tools/fake_subject.py` is a subject phone made of Python. It joins a room code, answers the WebRTC offer with [aiortc](https://github.com/aiortc/aiortc), exchanges `hello` on the data channels, counts the video frames it receives, receives the photographer's guide image (reassembled from its chunks and checked against the CRC; `--save-guide guide.png` keeps it, as the `mask-png` the app sends, `--have-guide <id>` reports an image it already has), prints every `guide.state`, optionally sends `camera.zoom.set`, and prints the echoed `camera.state` with its delay. It is a development tool and not part of the server; its two dependencies are not in `pyproject.toml`. It can also send a guide move (`--move cx,cy,height`: three steps, then the final value), a brightness index (`--exposure`), and a flash mode (`--flash`), and prints every echo with the delay since the request.
+`tools/fake_subject.py` is a subject phone made of Python. It is a development tool and not part of the server. Its two dependencies are not in `pyproject.toml`. The script does these steps:
+
+- It joins a room code and answers the WebRTC offer with [aiortc](https://github.com/aiortc/aiortc).
+- It exchanges `hello` on the data channels and counts the video frames that it receives.
+- It receives the photographer's guide image, reassembles it from its chunks, and checks it against the CRC. `--save-guide guide.png` keeps the image, as the `mask-png` that the app sends. `--have-guide <id>` reports an image that it already has.
+- It prints every `guide.state`.
+- On request, it sends a zoom (`--zoom`, as `camera.zoom.set`), a guide move (`--move cx,cy,height`: three steps, then the final value), a brightness index (`--exposure`), and a flash mode (`--flash`).
+- It prints every echo, such as the `camera.state` that answers a zoom, with the delay since the request.
 
 ```sh
 pip install websockets aiortc
@@ -81,171 +78,132 @@ python tools/fake_subject.py 482915 --seconds 20 --zoom 2.0
 python tools/fake_subject.py 482915 --move 0.3,0.5,0.9 --exposure 2 --flash AUTO
 ```
 
-`tools/fake_photographer.py` is the other side: it creates a room and prints the code; once a phone joins it sends a test-pattern video, the two data channels, `hello`, `camera.capabilities`, the guide image from `--guide` as the app sends it (`mask-png`, protocol 3: the alpha of a cutout, or a grayscale mask as it is, fitted within 1280 × 720 px) with its `guide.state`, then moves and resizes the guide for `--seconds` as a drag would, `--clear` removes it at the end, and every `camera.zoom.set` is echoed as `camera.state`. Use it to test Subject view with one phone or an emulator: `python tools/fake_photographer.py --guide person.png`, then *Shoot together › Join with a code instead* on the phone (it needs `pillow` as well). It answers brightness and flash requests with `camera.state`, and applies a `guide.move` to its guide, echoing `guide.state` with `by: SUBJECT` and stopping its own guide animation.
+To test the photographer's phone:
 
-Start the server, open Pix on one phone or emulator (an emulator reaches the laptop at `http://10.0.2.2:8000/`), tap *Shoot together*, and pass the code. The phone's live light comes on (TalkBack reads "Live · fake-subject connected"), and the script reports the first video frame, a frame count, and the `camera.state` that answers the zoom request.
+1. Start the server.
+2. Open Pix on one phone or emulator. An emulator reaches the laptop at `http://10.0.2.2:8000/`.
+3. Tap *Shoot together › I'll take the photo › Show a code*.
+4. Give the code to `tools/fake_subject.py`, as in the commands above.
+
+The phone shows its live light, and TalkBack reads "Live · fake-subject connected". The script reports the first video frame, a frame count, and the `camera.state` that answers the zoom request.
+
+`tools/fake_photographer.py` is the other side. It also needs `pillow`. It creates a room and prints the code. When a phone joins, the script does these steps:
+
+1. It sends a test-pattern video, the two data channels, `hello`, and `camera.capabilities`.
+2. It sends the guide image from `--guide` as the app sends it, with its `guide.state`. The image is a `mask-png` of protocol 3: the alpha of a cutout, or a grayscale mask as it is, fitted within 1280 × 720 px.
+3. For `--seconds`, it moves and resizes the guide as a drag would.
+4. With `--clear`, it clears the guide at the end.
+
+The script answers every zoom, brightness, and flash request with `camera.state`. It applies a `guide.move` to its guide and echoes `guide.state` with `by: SUBJECT`. Its own guide animation then stops.
+
+To test Subject view with one phone or an emulator:
+
+1. Run `python tools/fake_photographer.py --guide person.png`.
+2. On the phone, tap *Shoot together › I'll be in the photo*.
+3. Enter the code that the script printed, and tap *Connect*.
 
 ## REST API
 
-The base URL is `http://<laptop-Wi-Fi-IP>:8000/api/v1`.
+On a laptop, the base URL is `http://<laptop-Wi-Fi-IP>:8000/api/v1`. On a server, it is `http://<host>/api/v1`. [Design 2.5.3][d253] gives every endpoint, its body, and its errors. Android's [PixApi.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/PixApi.kt) and [ApiModels.kt](../android/app/src/main/java/com/lastpenguin/pix/core/network/ApiModels.kt) implement the phone's side. An error has the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose template with this id"}}`, but a `413` for a request over 1 MiB has a plain body.
 
-| Endpoint | Result |
-| --- | --- |
-| `POST /pose-suggestions` | Four poses for the scene in English, `{"poses":["Lean your back against the door, cross one ankle, and look at the camera.", …]}`, which the app then sends as four descriptions; with a `description`, that description followed by three variations of it. Asked once per set. |
-| `POST /poses` | One candidate for a pose description, in the scene photo's ratio (3:4, 9:16, or 1:1, whichever is closest to its shape): `{"templateId":null,"image":"<Base64 JPEG>","elapsedMs":9961}`. The app sends four requests in parallel, one per pose: the user's description and its three variations, or the suggested poses. A `templateId` instead of a description answers with that id. |
-| `POST /pose-tips` | How to hold the phone for the candidate the user chose, `{"text":"Zoom in or take a step closer, hold the phone at your chest and keep it level - the body keeps its proportions.","framing":"closer","hold":"chest","height":"keep","angle":"level"}`. The app asks once, when the user takes a candidate, and shows `text` on Camera. |
-| `GET /pose-templates` | `[{"id":"hands_on_hips","label":"Hands on hips"}, …]`: the four default poses `hands_on_hips`, `wave`, `walking`, and `arms_crossed`, for apps from before Iteration 2, which send their ids to `POST /poses`. The current app does not call it. |
-
-`POST /pose-suggestions` takes `multipart/form-data` with `image`, the same photo as `POST /poses`, and an optional `description`, checked as for `POST /poses`. `POST /poses` takes `image` (a JPEG with a long side of at most 1024 px and no EXIF), `seed` (an integer), and either `description`, the pose in Korean or English, or `templateId`. The description is trimmed, each run of whitespace becomes one space, and it may then be 1–100 characters; an empty `description` counts as none. The whole request may be at most 1 MiB; a photo prepared as Design §2.6.3 describes is a few hundred KB. `POST /pose-tips` takes `scene`, the photo sent to `POST /poses`, `candidate`, the chosen candidate within the same limits (the app sends it with a long side of 768 px), `pose`, the pose it was made with, folded and limited like a description, and an optional `language`, `en` or `ko`, the language of the app's screens, which `text` is written in (`en` when it is left out).
+The pose endpoints need no sign-in and take `multipart/form-data`. Each photo must be a JPEG with a long side of at most 1024 px and no EXIF. To try the endpoints without the app:
 
 ```sh
 curl -F "image=@scene.jpg" http://localhost:8000/api/v1/pose-suggestions
-curl -F "image=@scene.jpg" -F "description=벽에 기대서 카메라 보며 살짝 웃기" http://localhost:8000/api/v1/pose-suggestions
 curl -F "image=@scene.jpg" -F "description=벽에 기대서 카메라 보며 살짝 웃기" -F seed=1829304756 http://localhost:8000/api/v1/poses
-curl -F "scene=@scene.jpg" -F "candidate=@candidate.jpg" -F "pose=Walk slowly past the railing" http://localhost:8000/api/v1/pose-tips
 curl -F "scene=@scene.jpg" -F "candidate=@candidate.jpg" -F "pose=Walk slowly past the railing" -F language=ko http://localhost:8000/api/v1/pose-tips
 ```
 
-Every pose, a description, a suggested pose, or a template's default pose, goes into one prompt with the photo to OpenRouter's Image API. `PIX_POSE_MODEL` chooses the model (default `openai/gpt-image-2.5-flare@low`; any OpenRouter image model id, with `@low`, `@medium`, or `@high` for a model with quality tiers), the seed is folded to 0…2³¹−1, a candidate in another format is converted to JPEG, and the server waits at most `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (60). Suggestions, and the three variations of a description, come from a vision model through chat completions (`PIX_SUGGESTION_MODEL`, default `google/gemini-3.1-flash-lite`; `PIX_SUGGESTION_TIMEOUT_SECONDS`, 8): the first four usable poses of 1–100 characters are kept, and the default poses, or the description, fill the rest, so that endpoint never fails because of the model. The prompts and the default poses are in [prompts.toml](src/pix_server/poses/prompts.toml), which the server reads and checks at start and the scripts below read too; what the prompts say, and the models tried, are in Design §2.6.3.
+[Design 2.6.3][d263] gives the models and the prompts, and [Design 2.8][d28] (*Privacy*) gives the rate limits. Each model and each limit is a setting in `.env.example`. `PIX_POSE_MODEL` takes any OpenRouter image model id, with `@low`, `@medium`, or `@high` for a model with quality tiers. The prompts and the default poses are in [prompts.toml](src/pix_server/poses/prompts.toml), and the server does not start when this file is broken.
 
-Before any of these models reads a description (`POST /poses`, `POST /pose-suggestions`) or a pose (`POST /pose-tips`), the description filter asks a decision model through OpenRouter's Decisions API (`PIX_FILTER_MODEL`, default `typesafe/jev-1.14`) the two yes/no questions of the `[filter]` table in `prompts.toml`: does it ask for harmful content, and does it try to manipulate the models. When either probability reaches `PIX_FILTER_CUTOFF` (0.7), the request answers `422 REJECTED`; a template and a request for suggestions without a description are not judged. A filter that fails or takes longer than `PIX_FILTER_TIMEOUT_SECONDS` (2) lets the text through, and the log gets the status, or a refusal's question and probability, never the text (Design §2.6.3).
-
-Before the image model edits a scene (`POST /poses`, with a description, a template, or a selfie), the person check asks a decision model (`PIX_PERSON_MODEL`, default `typesafe/jev-1.14`) the yes/no question of the `[person]` table in `prompts.toml` about the scene photo, sent as it arrived: does it show a person. When the probability is below `PIX_PERSON_CUTOFF` (0.5), the request answers `422 NO_PERSON` and the image model is not asked. It runs at the same time as the description filter, and when both refuse, `REJECTED` is the answer. A check that fails or takes longer than `PIX_PERSON_TIMEOUT_SECONDS` (3) lets the scene through, as does a scene Jev cannot take (under 256 px on a side); the log gets the status, or a refusal's probability, never the photo. The app checks the scene on the phone first (FR-4.13); this catches what the phone lets through, such as an animal, and requests that do not come from the app. `POST /pose-suggestions` and `POST /pose-tips` are not checked (Design §2.6.3).
-
-A tip comes from `PIX_TIP_MODEL` (default `google/gemini-3.1-flash-lite`) with `tip_prompt`, followed by `tip_korean` for `language=ko`, and a fixed JSON schema (the shot, the pose, where the phone was and where it should be, the angle, the framing, and one sentence), at `PIX_TIP_REASONING` (`low`) and within `PIX_TIP_TIMEOUT_SECONDS` (10). The server derives `height` from the two phone heights and refuses a sentence that is empty, longer than 160 characters (80 in Korean), holds a number (in digits or words), a unit, or a degree, in English or in Korean (한 걸음, 미터, 삼십 도), or is not in the language asked for; then, and when the model fails or is late, the endpoint fails and the app shows no tip (Design §2.6.3).
-
-When the phone cancels a pose or tip request by closing its connection (Design §2.6.3), the server stops its call to OpenRouter within a quarter of a second, and OpenRouter does not bill the unfinished image. The app drops a tip request when the user takes another candidate before the tip arrives. A cancelled request still counts toward the rate limit and leaves no line in the access log. A phone that loses its network without closing the connection is not noticed; the timeout (60 s for a pose, 10 s for a tip) ends that call.
-
-Errors have the form `{"error":{"code":"UNKNOWN_TEMPLATE","message":"No pose template with this id"}}`.
-
-| Status and code | Meaning |
-| --- | --- |
-| `400 INVALID_IMAGE` | Not a readable JPEG, a long side over 1024 px, or EXIF metadata; for `POST /pose-tips`, the scene or the candidate. |
-| `400 UNKNOWN_TEMPLATE` | No template has that `templateId`. |
-| `400 INVALID_REQUEST` | A part is missing, `seed` is not an integer, both or neither of `templateId` and `description` were sent, or the description is blank or longer than 100 characters; for `POST /pose-tips`, a part is missing, the pose is blank or longer than 100 characters, or `language` is neither `en` nor `ko`. It replaces FastAPI's default 422, which this API uses for `REJECTED`. |
-| `413` | The request is larger than 1 MiB. It is refused before the upload is read, so it carries Starlette's own body (`Content Too Large`) and not the error shape above. |
-| `422 REJECTED` | The description filter refused the description or pose ("This description was refused", "This pose was refused"), or the image service declined the photo or pose (a content filter or a model refusal), which does not say which, so the message is the same with a description; the app asks for another description or another photo (US-5). For `POST /pose-tips`, the tip model declined the photos. |
-| `422 NO_PERSON` | `POST /poses` only: the person check found no person in the scene photo ("The photo shows no person"); another photo, with the person in it, is needed (FR-4.13). |
-| `429 RATE_LIMITED` | One client address sent more than `PIX_POSE_RATE_LIMIT` (20) requests to the image service within `PIX_POSE_RATE_WINDOW_SECONDS` (3600), or all clients together more than `PIX_POSE_GLOBAL_LIMIT` (500) within `PIX_POSE_GLOBAL_WINDOW_SECONDS` (86400); the message says which. `POST /pose-suggestions` is counted apart, in windows of the same lengths, with `PIX_SUGGESTION_RATE_LIMIT` (10) and `PIX_SUGGESTION_GLOBAL_LIMIT` (500), and `POST /pose-tips` with `PIX_TIP_RATE_LIMIT` (20) and `PIX_TIP_GLOBAL_LIMIT` (1000). Requests refused before that point are not counted, and a request refused by one window is counted in neither. |
-| `503 UNAVAILABLE` | The session store, which counts the rate limit, does not answer. Nothing is sent to the image service. |
-| `502 UPSTREAM_ERROR` | The image service failed, could not be reached, or gave an unreadable answer, or `OPENROUTER_API_KEY` is not set; for `POST /pose-tips`, also an answer that cannot be used. The server log gives OpenRouter's status code, for example 402 when the credits run out, and never the text of its answer. |
-| `504 UPSTREAM_TIMEOUT` | The image service did not answer in time. |
-
-The rate limits are counted in the session store, so every worker counts against the same windows; 20 requests are five sets of four poses, and the global 500 bound what the image service can cost in a day however many addresses send requests. Set a spending limit on the OpenRouter key as well, in OpenRouter's dashboard, as the last bound. The scene photo, the description, the suggested poses, the candidate, and the tip exist only in memory for the duration of the request and are never written to disk or logged (FR-4.9, NFR-13); for suggestions and variations the log says only how many of the model's poses were usable, and for a tip only that it could not be used. The 1 MiB request limit is what keeps an upload in memory: Starlette would write a larger one to a temporary file. OpenRouter bills each generated image.
+For a `502 UPSTREAM_ERROR`, the server log gives OpenRouter's status code, for example 402 when the credits run out. A pose or tip request that the phone cancels still counts toward the rate limit and leaves no line in the access log. When a phone loses its network without closing the connection, the server does not notice, and the timeout ends the call.
 
 ## Accounts and friends
 
-The endpoints, request and response bodies, and error codes are in Design §2.5.3; the code is in [`src/pix_server/accounts/`](src/pix_server/accounts/). Every endpoint below except the four sign-ins, `/auth/check-pix-id`, and `/auth/refresh` needs `Authorization: Bearer <access token>` and answers `401 UNAUTHENTICATED` without it, or with an expired one. Pose generation and room codes need no sign-in (FR-5.1).
-
-| Endpoint | Result |
-| --- | --- |
-| `POST /auth/signup` | `{"pixId","password","displayName"}` → `201 {"accessToken","refreshToken","expiresIn","user"}`. A Pix ID is 4–20 of `a–z 0–9 . _`; a password is 8–64 characters with a letter and a digit, and not the Pix ID; `PIX_ID_INVALID` and `PASSWORD_INVALID` name the broken rule. |
-| `POST /auth/check-pix-id` | `{"pixId"}` → `{"available": true}` or `false`, for *Check* on Sign up and the Pix ID setup; `400 PIX_ID_INVALID` names the broken rule. Sign-up still refuses a Pix ID taken in the meantime. |
-| `POST /auth/login` | `{"pixId","password"}` → `200`, as above, or `401 INVALID_CREDENTIALS` for a wrong password and an unknown Pix ID alike. |
-| `POST /auth/google` | `{"idToken"}` → `200`, as above, or `404 NOT_REGISTERED` when no account uses that Google account; the app then asks whether the person has a Pix account. |
-| `POST /auth/refresh` | `{"refreshToken"}` → `200 {"accessToken","refreshToken","expiresIn"}`; the old refresh token stops working, and one used twice ends the sign-in (`401 INVALID_REFRESH_TOKEN`). |
-| `POST /auth/google/signup` | `{"idToken"}` → `201`, a new account without a Pix ID, named after the Google account. |
-| `PUT /me/google` | `{"idToken"}` → the account, which now signs in with Google too (`409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`). |
-| `PUT /me/password` | `{"password"}` → the account of a Google sign-up, which now signs in with its Pix ID and this password too (`403 PIX_ID_REQUIRED` before it has a Pix ID, `409 PASSWORD_ALREADY_SET`). Changing a password is not offered, and there is no email or password reset. |
-| `DELETE /auth/session` | Ends this phone's sign-in: its refresh token stops working and its device token is deleted. Its access token works until it expires, at most 15 minutes later. |
-| `GET /me`, `PUT /me` | The account, with `hasPassword` and `hasGoogle`; `PUT` sets `pixId`, `displayName`, or both. A password account changes its Pix ID only with its current `password`, which the new Pix ID must not equal (`401 INVALID_CREDENTIALS`, `400 PIX_ID_INVALID`). |
-| `POST /devices` | `{"fcmToken","platform":"android"}` → `204`. |
-| `POST /users/lookup` | `{"pixId"}` → `{"user","relation","requestId"}` for an exact Pix ID, or `404 NOT_FOUND`. |
-| `GET /friend-requests`, `POST /friend-requests`, `POST /friend-requests/{id}/accept`, `…/decline`, `DELETE /friend-requests/{id}` | Received and sent requests; send (`201`, or `200` with the new friend when the other user had already asked); accept; decline; withdraw. |
-| `GET /friends`, `DELETE /friends/{userId}` | `{"friends":[{"id","pixId","displayName","online","inSession"}]}`; remove a friend. |
-
-```sh
-curl -H 'Content-Type: application/json' -d '{"pixId":"dongje.p","password":"sunset2026","displayName":"Dongje"}' http://localhost:8000/api/v1/auth/signup
-curl -H "Authorization: Bearer eyJhbGciOi…" -H 'Content-Type: application/json' -d '{"pixId":"junhyeong.h"}' http://localhost:8000/api/v1/users/lookup
-```
-
-- **Passwords** are hashed with argon2id on a worker thread, and only the hash is stored. They travel over plain HTTP to the course servers, which have no TLS (Design AD-11). Login attempts are not limited for now.
-- **Google ID tokens** are checked against Google's published keys, which the server fetches from Google and keeps for as long as Google allows, and against `PIX_GOOGLE_CLIENT_ID`. Only Google's subject id is stored.
-- **Tokens.** A sign-in gives an access token and a refresh token. The access token is a JWT signed with HS256 and `PIX_JWT_SECRET`, with the claims `iss` (`pix`), `sub` (the user), `sid` (the sign-in), `iat`, and `exp`, `PIX_ACCESS_TOKEN_MINUTES` (15) later; it is checked without the database and not stored. The refresh token is random, stored only as a SHA-256 hash in `sessions`, and lasts `PIX_SESSION_TTL_DAYS` (30) from its last use; each refresh replaces it, and an old one that comes back ends the sign-in. Without `PIX_JWT_SECRET` each process makes its own at start, so access tokens end on a restart (the app refreshes) and several workers would not accept each other's; on the course servers `deploy.sh` makes one in `/opt/pix/jwt-secret`.
-- **Database down.** An account request that cannot reach the database answers `503 UNAVAILABLE`; pose generation and rooms do not use it.
-- **Friend endpoints** answer `403 PIX_ID_REQUIRED` until the caller has a Pix ID, and a user without one cannot be found. A new friend request is pushed to the receiver's phones ([Invitations and push](#invitations-and-push)).
-- **Logs.** No URL carries a Pix ID, because nginx's error log prints a failed request's whole request line; the lookup takes it in the body. Neither the app nor nginx logs a request's query string, and nothing logs a password, a token, or a request body.
-- **Password hashing** runs two at a time per worker; each argon2id hash holds 64 MiB, so a burst of sign-ins waits instead of filling memory.
+The account and friend endpoints are in [`src/pix_server/accounts/`](src/pix_server/accounts/). [Design 2.5.3][d253] gives the endpoints, the bodies, the error codes, and the session tokens. [Design 2.8][d28] (*Accounts*) gives the password hashing and the token settings. Most of these endpoints need `Authorization: Bearer <access token>`.
 
 ## Invitations and push
 
-The flow is Design §2.6.6 and the bodies are in §2.5.3; the code is in [`src/pix_server/invitations/`](src/pix_server/invitations/). Every endpoint except `GET /invitations/{id}` needs a sign-in; inviting also needs a Pix ID.
+The invitation endpoints are in [`src/pix_server/invitations/`](src/pix_server/invitations/). [Design 2.6.6][d266] gives the flow, and [Design 2.5.3][d253] gives the bodies and the errors. The invite link, `http://<host>/i/<id>`, opens a small page whose button passes the invitation to Pix.
 
-| Endpoint | Result |
-| --- | --- |
-| `POST /invitations` | `{"friendId"}` → `201 {"id","to","status","expiresAt","link","sessionId","rejoinToken","iceServers"}`. The session opens at once, with only the photographer's place, which its phone takes with `session.join`; the friend's phones get a push. `403 NOT_FRIENDS` for anyone but a friend, existing or not, and `409 BUSY` while the friend is in a session, a waiting room included. |
-| `GET /invitations/incoming` | `{"invitations":[{"id","from","status","expiresAt"}]}`: the caller's invitations still pending and not expired, newest first, at most 20, which *See their camera* lists so one whose notification was dismissed can still be answered (#188). Declared before `/invitations/{id}`, which would otherwise take `incoming` for an id. |
-| `GET /invitations/{id}` | `{"id","from","status","expiresAt"}`, what the friend's *Invitation* screen shows, without a sign-in. `status` is `PENDING`, `ACCEPTED`, `DECLINED`, `CANCELLED`, or `EXPIRED` from 60 s on. |
-| `POST /invitations/{id}/accept` | The friend: `200 {"sessionId","rejoinToken","iceServers"}`, the subject's place, to take within `PIX_INVITATION_JOIN_SECONDS` (15). The photographer then hears `peer.joined`, as with a room code. |
-| `POST /invitations/{id}/decline` | The friend: `204`; the room ends and the photographer gets `DECLINED`. |
-| `POST /invitations/{id}/cancel` | The photographer: `204`; the room ends. |
+### Push notifications
 
-An answer from anyone but the friend (accept, decline) or the photographer (cancel) is `404 NOT_FOUND`, and any answer to an invitation already answered or expired is `410 INVITATION_GONE`; of two answers at the same moment only one counts. An accept whose room has ended, because the photographer left, is `410` too and leaves the invitation pending. An invitation expires `PIX_INVITATION_TTL_SECONDS` (60) after it was sent, without a write, and rows are deleted a day after they were created.
+The server signs in to FCM as a service account of the app's Firebase project. It uses the account's key file, a secret that never goes into the repository. The setup has these steps:
 
-- **Pushes** are FCM data messages at high priority, so the app writes the notification itself: `{"type":"invitation","invitationId","fromName","expiresAt"}`, which FCM drops after 60 s, and `{"type":"friend.request","requestId","fromName"}` for a new friend request, after a day. They go to every phone the user is signed in on, after the response, so FCM never slows a request; a push that fails is lost, and the invite link remains. A device FCM no longer knows (404) is removed. The log shows FCM's status, never a token.
-- **The invite link** is `http://<host>/i/<id>`. It opens a small page whose button hands the invitation to Pix through `intent://invite/<id>#Intent;scheme=pix;package=com.lastpenguin.pix;end`, because a verified App Link that would open Pix directly needs HTTPS. The page reads nothing from the database and names nobody; any path that is not an invitation id answers `404`.
-- **Setting up push.** The server signs in to FCM as a service account of the app's Firebase project, with its key file, a secret that never goes into the repository. Create the account in the Google Cloud console of the Firebase project with only the role *Firebase Cloud Messaging API Admin*, and add a JSON key. Locally, keep the file outside the repository and set `PIX_FCM_CREDENTIALS_FILE` to its path in `server/.env`. On a server, copy it with `scp` and install it where Compose mounts it, readable only by the app's user (uid 10001), then restart:
+1. In the Google Cloud console of the Firebase project, create the service account with only the role *Firebase Cloud Messaging API Admin*.
+2. Add a JSON key to the account.
+3. Locally, keep the key file outside the repository, and set `PIX_FCM_CREDENTIALS_FILE` to its path in `server/.env`.
+4. On a server, copy the file with `scp`. Install it where Compose mounts it, readable only by the container's user (uid 10001). Then restart the server:
 
-  ```sh
-  sudo install -d -m 700 -o 10001 -g 10001 /opt/pix/secrets
-  sudo install -m 400 -o 10001 -g 10001 fcm-sender.json /opt/pix/secrets/fcm-sender.json && rm fcm-sender.json
-  sudo /opt/pix/repo/server/deploy/deploy.sh restart
-  ```
+   ```sh
+   sudo install -d -m 700 -o 10001 -g 10001 /opt/pix/secrets
+   sudo install -m 400 -o 10001 -g 10001 fcm-sender.json /opt/pix/secrets/fcm-sender.json && rm fcm-sender.json
+   sudo /opt/pix/repo/server/deploy/deploy.sh restart
+   ```
 
-  Without the file the app logs a warning at start and sends no pushes; invitations still work through their link.
+Without the file, the server logs a warning at start and sends no pushes. Invitations still work through their link.
 
 ## Session store
 
-Room state is in Redis and not in the server process (Design §2.7, AD-18): sessions, room codes, recently expired codes, each socket's connection record, and the pose rate limit. The code is in [`src/pix_server/store/`](src/pix_server/store/).
-
-- **Workers.** Each server process is one worker. A room created through one worker can be joined through another, and a signal for a socket on another worker travels over Redis pub/sub. The image runs two workers.
-- **Transitions.** Create, join, rejoin, an invitation's room (open, accept, end), leave, disconnect, and expiry each run as one Lua script inside Redis ([`store/scripts.py`](src/pix_server/store/scripts.py)), so two workers cannot seat two subjects in one room. The caller passes the time in, which is why the tests can move a clock.
-- **Housekeeping.** Every `PIX_CLEANUP_INTERVAL_SECONDS` each worker renews a heartbeat that lasts `PIX_WORKER_TTL_SECONDS` (15), and the one worker that gets a lock for that interval expires rooms and removes empty sessions. A worker whose heartbeat ran out, for example after a crash, loses its sockets in the store, and the other phones get `peer.left` with `CONNECTION_LOST`.
-- **A worker that stops** gives up its sockets at once. Its sessions stay in the store for the usual 60 s, in which a phone that reconnects takes its place again with `session.join` (Design §2.6.7, #118).
-- **Redis down or restarted.** When a worker's call to Redis fails, or it finds that it is no longer registered there (Redis came back empty, or the other workers took it for dead), messages for its sockets may have been lost. It closes all of them with 1013 and registers again: a live session goes on phone to phone, and a waiting room ends on the phone with an error instead of keeping a code that no longer works. Until Redis answers, `/health` answers `503`, new sockets are closed with 1013, and pose requests answer `503 UNAVAILABLE`. A restart loses the open rooms; the workers carry on with new ones.
+[Design 2.7][d27] (*Session store*) gives the Redis keys, the Lua scripts, and the behavior when Redis fails. The code is in [`src/pix_server/store/`](src/pix_server/store/).
 
 | `PIX_REDIS_URL` | Where the rooms are |
 | --- | --- |
-| Not set | Inside the server process, in [fakeredis](https://github.com/cunla/fakeredis-py), which runs the same scripts. This is for one worker on a laptop: nothing to install. fakeredis is a development dependency, so the deployed image does not have it and refuses to start without `PIX_REDIS_URL`. |
-| `redis://<host>:6379/0` | In that Redis. On the course servers [`deploy/docker-compose.yml`](deploy/docker-compose.yml) sets it to its own `redis` service. Locally, `docker run --rm -p 6379:6379 redis:8-alpine` gives one for trying several workers. |
+| Not set | Inside the server process, in [fakeredis](https://github.com/cunla/fakeredis-py), which runs the same scripts. This is for one worker on a laptop, with nothing to install. fakeredis is a development dependency, so the deployed image refuses to start without `PIX_REDIS_URL`. |
+| `redis://<host>:6379/0` | In that Redis. On the servers, [`deploy/docker-compose.yml`](deploy/docker-compose.yml) sets it to its own `redis` service. To try several workers locally, `docker run --rm -p 6379:6379 redis:8-alpine` starts a Redis. |
+
+A Redis restart loses the open rooms. The workers then continue with new rooms.
 
 ## Database
 
-Accounts, sessions (refresh tokens), devices, friend requests, and friendships are in a relational database through SQLAlchemy (Design §2.7). The models are in [`db/models.py`](src/pix_server/db/models.py) and the Alembic migrations in [`db/migrations/`](src/pix_server/db/migrations/).
+[Design 2.7][d27] gives the schema of the database. The server uses it through SQLAlchemy. The models are in [`db/models.py`](src/pix_server/db/models.py), and the Alembic migrations are in [`db/migrations/`](src/pix_server/db/migrations/).
 
 | `PIX_DATABASE_URL` | Where the accounts are |
 | --- | --- |
 | Not set | `sqlite+aiosqlite:///pix.db`, a file in the working directory. For one worker on a laptop. |
-| `postgresql+asyncpg://<user>:<password>@<host>:5432/<db>` | In that PostgreSQL. On the course servers the Compose file sets it to its own `postgres` service. |
+| `postgresql+asyncpg://<user>:<password>@<host>:5432/<db>` | In that PostgreSQL. On the servers, the Compose file sets it to its own `postgres` service. |
 
-- **Migrations run at start.** Every worker brings the schema to the newest revision before it takes requests. On PostgreSQL an advisory lock makes one worker migrate while the others wait, so the two workers of each copy can start together. During a deploy the old copy keeps serving on the new schema, so a revision must not break the code before it: add a column before code uses it, and drop it a release after code stops using it.
-- **A new revision.** Change the models, then from `server/` run `uv run alembic upgrade head` and `uv run alembic revision --autogenerate -m "what changed"` (both use `PIX_DATABASE_URL`, or `pix.db`), read the generated file in `db/migrations/versions/`, and tidy it. `test_database.py` fails while the migrations and the models differ.
+Every worker brings the schema to the newest revision at start, before it takes requests. During a deploy, the old copy keeps serving on the new schema, so a revision must not break the release before it ([Design 2.7][d27]). `test_database.py` fails while the migrations and the models differ. To add a revision, do these steps from `server/`:
+
+1. Change the models.
+2. Run `uv run alembic upgrade head`.
+3. Run `uv run alembic revision --autogenerate -m "what changed"`. Both commands use `PIX_DATABASE_URL`, or `pix.db`.
+4. Read the generated file in `db/migrations/versions/`, and tidy it.
 
 ## Deploy
 
-The server runs on the two course servers, and on a temporary AWS server until the course servers can be reached from outside the campus network (Design §2.8, Hosting and Deployment). Each course server is reachable only through the course's HTTP proxy on port 80, so there is no HTTPS or WSS, and the two cannot reach each other.
+The server runs on the two course servers and on an AWS server ([Design 2.8][d28], *Hosting* and *Deployment*). Each course server is reachable only through the course's HTTP proxy on port 80, and only from the campus network. So the course servers have no HTTPS or WSS, and they cannot reach each other. The AWS server stays on permanently and answers from every network, cellular data included.
 
 | Server | Address | Branch | Use |
 | --- | --- | --- | --- |
-| A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds of the app use it. |
-| B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging; set `pix.serverUrl` to it in a debug build. |
-| AWS (`ap-southeast-2`) | `http://3.105.185.251` | `dev` | Debug builds use it by default; every network reaches it, cellular data included. |
+| A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production. Release builds of the app use it. |
+| B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging. To use it, set `pix.serverUrl` in a debug build. |
+| AWS (`ap-southeast-2`) | `http://3.105.185.251` | `dev` | Debug builds use it by default. Every network reaches it, cellular data included. |
 
-[`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs nginx on port 80, Redis, PostgreSQL, and two copies of the app, `app-blue` and `app-green`, built from the [`Dockerfile`](Dockerfile). One copy serves and the other is stopped; each copy runs two workers, and both copies use the same Redis, whose port is not published and which writes nothing to disk, and the same PostgreSQL, whose port is not published either and whose files are in `/opt/pix/postgres` on the server's own disk, where nothing backs them up yet. nginx forwards `/api/v1/`, `/ws`, and `/health` to the serving copy, answers `/version` with the commit that is live, and answers `404` for everything else, so FastAPI's `/docs` and the app's `/internal` routes are not public. The secrets, that directory, and the routes are what [Changing the deploy files](#changing-the-deploy-files) is about.
+[`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs these services:
+
+- **nginx** on port 80. It forwards `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page) to the serving copy. It answers `/version` with the commit that is live, and `404` for everything else. So FastAPI's `/docs` and the server's `/internal` routes are not public.
+- **`app-blue` and `app-green`**, two copies of the server, built from the [`Dockerfile`](Dockerfile). One copy serves, and the other does not run. Each copy runs two workers.
+- **Redis**, which both copies use. Its port is not published, and it writes nothing to disk.
+- **PostgreSQL**, which both copies use. Its port is not published either. Its files are in `/opt/pix/postgres` on the server's own disk, and nothing makes a backup of them yet.
+
+[Changing the deploy files](#changing-the-deploy-files) is about the secrets, that directory, and the routes.
 
 ### How a deploy happens
 
-GitHub cannot push to the course servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights and is advised against on a public repository. So each course server pulls; the AWS server is deployed from GitHub instead ([The AWS server](#the-aws-server)). A systemd timer runs [`deploy/deploy.sh auto`](deploy/deploy.sh) every minute as root:
+GitHub cannot push to the course servers. SSH goes through a campus-only relay with personal keys. A self-hosted runner needs repository admin rights, and GitHub advises against one on a public repository. So each course server pulls. GitHub deploys the AWS server instead ([The AWS server](#the-aws-server)).
 
-1. It fetches the server's branch. If the commit is already recorded, it stops.
+On a course server, a systemd timer runs [`deploy/deploy.sh auto`](deploy/deploy.sh) every minute as root. The script does these steps:
+
+1. It runs `git fetch` for the server's branch. If the commit is already recorded, it stops.
 2. If the commit does not change `server/`, it records the commit and restarts nothing.
 3. It builds the image. pytest runs as a build stage, so a commit whose tests fail stops here.
-4. It starts the image as the idle copy and waits for the container's health check, which also needs Redis; PostgreSQL has to be healthy before the copy starts, and the copy migrates it as it starts. Redis and PostgreSQL are started with the first copy and are left running by later deploys.
-5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. The two copies share their rooms through Redis, and the app takes its place again after its socket drops (Design §2.6.7, #118), but stopping a copy also closes the sockets of phones with an older app, which cannot; for them the wait stays. After 10 minutes it goes on anyway: sessions that are already live continue, because the video goes phone to phone, and rooms still waiting for a subject end.
-6. It points nginx at the new copy and reloads it, checks `/health` through nginx, and stops the old copy with 70 s for requests in flight (Uvicorn's graceful shutdown is 65 s, longer than a pose request may take).
-7. It records the commit, which `/version` then shows, and deletes images other than the two copies'.
+4. It starts the image as the idle copy and waits for the container's health check, which also needs Redis. PostgreSQL must be healthy before the copy starts, and the copy migrates it at start. The first copy starts Redis and PostgreSQL, and later deploys leave them running.
+5. It waits until the serving copy has no open room, for at most 10 minutes. A room counts until its photographer leaves, or until 60 s after its last socket dropped. [Design 2.8][d28] (*Deployment*) says why the script waits. After 10 minutes, the script continues anyway. Live sessions continue, because the video goes phone to phone, and rooms that still wait for a subject end.
+6. It switches nginx to the new copy, reloads nginx, and checks `/health` through nginx. Then it stops the old copy and gives requests in flight 70 s. Uvicorn's graceful shutdown is 65 s, longer than a pose request may take.
+7. It records the commit, which `/version` then shows, and deletes images other than the two copies' images.
 
-**A change that `deploy.sh` and the Compose file need together**, such as a new variable that `deploy.sh` must pass to Compose, cannot be deployed by the timer the first time: the timer runs the `deploy.sh` of the commit already deployed, and the new Compose file refuses to start without the variable. That try fails safely and is not retried. Deploy once by hand with the new script, taken from the fetched commit (`main` on Server A):
+The timer cannot deploy **a change that `deploy.sh` and the Compose file need together** the first time. An example is a new variable that `deploy.sh` must pass to Compose. The timer runs the `deploy.sh` of the commit that is already deployed, and the new Compose file refuses to start without the variable. That try fails safely, and the timer does not try it again. Deploy once by hand with the new script from the branch's newest commit (`main` on Server A):
 
 ```sh
 sudo git -C /opt/pix/repo fetch -q origin dev
@@ -255,19 +213,21 @@ sudo bash /tmp/pix-deploy.sh deploy
 
 The PR that makes such a change says so.
 
-A failure at any step leaves the serving copy as it was, and the timer does not try that `server/` tree again; fix the branch, or run `deploy.sh deploy` to retry. On GitHub, the [server-image](../.github/workflows/server-image.yml) workflow builds the image and checks the routes through nginx on every pull request, and the [server-deploy](../.github/workflows/server-deploy.yml) workflow waits after a merge until `/version` shows the commit, so a deploy that failed is a red mark on the commit.
+A failure at any step leaves the serving copy as it was, and the timer does not try that `server/` tree again. To try again, fix the branch, or run `deploy.sh deploy`. On every pull request, the [server-image](../.github/workflows/server-image.yml) workflow builds the image and checks the routes through nginx. After a merge, the [server-deploy](../.github/workflows/server-deploy.yml) workflow waits until `/version` shows the commit, so a failed deploy shows as a red mark on the commit. This workflow is now disabled on GitHub, so it does not run.
 
 ### Changing the deploy files
 
-- `deploy.sh` stays runnable by bash 3.2, so it can be tried on macOS with `PIX_HOME` pointing at a scratch directory, and everything in it stays inside functions, because a deploy checks out another version of the file while it runs.
-- [`deploy/pix.sh`](deploy/pix.sh) is not run but sourced ([Operate it](#operate-it)); when a `deploy.sh` command or a container name changes, change it there too.
-- nginx forwards only `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page): a new public route is added to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), and `/internal/*` stays out of it, because `deploy.sh` reads `/internal/stats` inside the container to wait for open rooms before it switches copies. nginx's `pix` log format and the app's `HideQuery` filter leave query strings out of the access logs, and nginx's error log prints a failed request's whole request line, which is why nothing personal (a Pix ID, for one) goes in a path or a query and the lookup is `POST /users/lookup`.
-- `deploy.sh` makes two secrets once and passes them to Compose: PostgreSQL's password (`/opt/pix/db-password`, `PIX_DB_PASSWORD`), which PostgreSQL keeps from when its volume was created, so the file is never regenerated, and the access-token key (`/opt/pix/jwt-secret`, `PIX_JWT_SECRET`). PostgreSQL's files are bind-mounted from `/opt/pix/postgres` (`PIX_POSTGRES_DIR`), not a Docker volume, so `down -v` and volume prunes cannot delete accounts; never delete that directory. Anything that runs this Compose file, the [server-image](../.github/workflows/server-image.yml) workflow included, sets all three.
+- Keep `deploy.sh` runnable by bash 3.2, so you can try it on macOS with `PIX_HOME` set to a scratch directory. Keep everything in it inside functions, because a deploy checks out another version of the file while it runs.
+- Operators source [`deploy/pix.sh`](deploy/pix.sh) and do not run it ([Operate it](#operate-it)). When a `deploy.sh` command or a container name changes, change it in `pix.sh` too.
+- nginx forwards only `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page). Add a new public route to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), but never add `/internal/*` to it. `deploy.sh` reads `/internal/stats` inside the container, to wait for open rooms before it switches copies.
+- nginx's `pix` log format and the server's `HideQuery` filter omit query strings from the access logs. But nginx's error log prints the whole request line of a failed request. So nothing personal, such as a Pix ID, goes in a path or a query, and the lookup is `POST /users/lookup`.
+- `deploy.sh` makes two secrets once and passes them to Compose. One is PostgreSQL's password (`/opt/pix/db-password`, `PIX_DB_PASSWORD`). PostgreSQL keeps the password that it got when it first created its files, so never generate that file again. The other is the access-token key (`/opt/pix/jwt-secret`, `PIX_JWT_SECRET`).
+- PostgreSQL's files are bind-mounted from `/opt/pix/postgres` (`PIX_POSTGRES_DIR`), not kept in a Docker volume. So `down -v` and volume prunes cannot delete accounts. Never delete that directory. Anything that runs this Compose file sets `PIX_DB_PASSWORD`, `PIX_JWT_SECRET`, and `PIX_POSTGRES_DIR`, the [server-image](../.github/workflows/server-image.yml) workflow included.
 - The `test` stage of the [`Dockerfile`](Dockerfile) copies `.env.example` for `tests/test_config.py`, which keeps it in step with `config.py`.
 
 ### Set up a server once
 
-The server needs Docker with the Compose and Buildx plugins (`sudo apt install -y docker.io docker-compose-v2 docker-buildx`). Then, on the server:
+The server needs git, curl, and Docker with the Compose and Buildx plugins (`sudo apt install -y docker.io docker-compose-v2 docker-buildx`). Then, on the server:
 
 ```sh
 sudo git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git /opt/pix/repo
@@ -277,16 +237,32 @@ sudo /opt/pix/repo/server/deploy/deploy.sh deploy    # the first deploy, by hand
 sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 ```
 
-[`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It sets the branch in `/opt/pix/deploy.conf`, keeping any other setting there, creates `/opt/pix/.env` from `.env.example` (readable by root only), and installs the systemd units. Secrets exist only in `/opt/pix/.env`; `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before it is merged, pass it to the first deploy: `deploy.sh deploy feat/2-deploy`.
+[`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It does these steps:
+
+- It sets the branch in `/opt/pix/deploy.conf` and keeps any other setting there.
+- It creates `/opt/pix/.env` from `.env.example`, readable by root only. It keeps an `.env` that exists.
+- It creates `/opt/pix/state/`, and `/opt/pix/secrets/` for the FCM key file ([Push notifications](#push-notifications)).
+- It installs the systemd units.
+
+The API keys and tokens are only in `/opt/pix/.env`. The other secrets are the two files that `deploy.sh` makes and the FCM key file. `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before you merge it, give it to the first deploy: `deploy.sh deploy feat/2-deploy`.
 
 ### The AWS server
 
-The AWS server is set up like a course server, with `setup.sh dev`, but without the timer. GitHub can reach it, so the [server-deploy-aws](../.github/workflows/server-deploy-aws.yml) workflow deploys it after each push to `dev`. The workflow has AWS Systems Manager run the `PixDeploy` document on the server, which waits for any deploy already running there and then runs `deploy.sh deploy`. It shows what `deploy.sh` printed in the run and then checks `/version` at the public address. A failed deploy is a red mark on the commit. *Re-run jobs*, or *Run workflow* on `dev`, tries again, even a `server/` tree that failed before. The workflow signs in with the access key of an IAM user that may run only `PixDeploy` on this one instance, so a leaked key can do no more than deploy `dev` again. The key is a secret of the repository's `aws` environment, which only `dev` may use. The security group needs only port 80 open, plus SSH for operators.
+The AWS server stays on permanently. Its setup is the same as a course server's, with `setup.sh dev`, but without the timer. GitHub can reach it, so the [server-deploy-aws](../.github/workflows/server-deploy-aws.yml) workflow deploys it after each push to `dev`:
 
-Set it up once in the AWS console, in the server's region (`ap-southeast-2`):
+1. The workflow has AWS Systems Manager run the `PixDeploy` document on the server.
+2. `PixDeploy` waits for any deploy that already runs there, and then runs `deploy.sh deploy`.
+3. The workflow shows in the run what `deploy.sh` printed.
+4. The workflow checks `/version` at the public address.
 
-1. **Let Systems Manager reach the server.** Create an IAM role for EC2 with the managed policy `AmazonSSMManagedInstanceCore` and attach it to the instance (*EC2 › Instances › Actions › Security › Modify IAM role*). Ubuntu and Amazon Linux images include the SSM agent. The instance shows as online in *Systems Manager › Fleet Manager* within a few minutes; on Ubuntu, run `sudo snap restart amazon-ssm-agent` if it does not.
-2. **Create the `PixDeploy` document** (*Systems Manager › Documents › Create document › Command or Session*, type *Command*, format YAML), with this content. When a change to `deploy.sh` touches its command or its lock, change the document too:
+A failed deploy shows as a red mark on the commit. *Re-run jobs*, or *Run workflow* on `dev`, tries again, even for a `server/` tree that failed before.
+
+The workflow signs in with the access key of an IAM user. That user may run only `PixDeploy`, and only on this one instance. So a leaked key can do no more than deploy `dev` again. The key is a secret of the repository's `aws` environment, which only `dev` may use. The security group needs only port 80 open, plus SSH for operators.
+
+Do this setup once in the AWS console, in the server's region (`ap-southeast-2`):
+
+1. **Let Systems Manager reach the server.** Create an IAM role for EC2 with the managed policy `AmazonSSMManagedInstanceCore`. Attach the role to the instance (*EC2 › Instances › Actions › Security › Modify IAM role*). Ubuntu and Amazon Linux images include the SSM agent. Within a few minutes, the instance shows as online in *Systems Manager › Fleet Manager*. If it does not, on Ubuntu, run `sudo snap restart amazon-ssm-agent`.
+2. **Create the `PixDeploy` document** with this content. Use *Systems Manager › Documents › Create document › Command or Session*, type *Command*, format YAML. When a change to `deploy.sh` touches its command or its lock, change the document too:
 
    ```yaml
    schemaVersion: "2.2"
@@ -301,7 +277,7 @@ Set it up once in the AWS console, in the server's region (`ap-southeast-2`):
            - /opt/pix/repo/server/deploy/deploy.sh deploy
    ```
 
-3. **Create the IAM user the workflow signs in as**, `pix-github-deploy`, without console access. Give it this inline policy, which lets it run `PixDeploy` on that one instance and read the output:
+3. **Create the IAM user that the workflow signs in as**, `pix-github-deploy`, without console access. Give it this inline policy. The policy lets the user run `PixDeploy` on that one instance and read the output:
 
    ```json
    {
@@ -320,104 +296,97 @@ Set it up once in the AWS console, in the server's region (`ap-southeast-2`):
    }
    ```
 
-   Then create an access key for it (*Security credentials › Create access key*, for an application running outside AWS).
-4. **Store the key in GitHub.** This needs a repository admin. In *Settings › Environments*, create the environment `aws`, limit its deployment branches to `dev`, and add the secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Delete the key from wherever it was passed along.
-5. **Point the workflow at the instance.** Put the instance ID in the workflow's `env`; it is not a secret.
-6. **Turn the timer off on the server** with `sudo systemctl disable --now pix-deploy.timer`, so the workflow is the only thing that deploys and its log shows each build. If the timer stays on, deploys still work, but the run often shows only that the commit was already live.
+   Then create an access key for the user (*Security credentials › Create access key*, for an application running outside AWS).
+4. **Store the key in GitHub.** This step needs a repository admin. In *Settings › Environments*, create the environment `aws`. Limit its deployment branches to `dev`. Add the secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Then delete every other copy of the key.
+5. **Give the workflow the instance ID.** Put it in the workflow's `env` (`AWS_INSTANCE_ID`). It is not a secret.
+6. **Disable the timer on the server** with `sudo systemctl disable --now pix-deploy.timer`. Then only the workflow deploys, and its log shows each build. If the timer stays on, deploys still work. But the run often shows only that the commit was already live.
 
-To replace the key, create a second one, update the two secrets, and then delete the old key. Delete the user when the AWS server is shut down.
+To replace the key:
+
+1. Create a second key.
+2. Update the two secrets.
+3. Delete the old key.
+
+If you delete the AWS instance, also delete the IAM user.
 
 ### Settings
 
-[`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=`, `PIX_GOOGLE_CLIENT_ID=`, or `PIX_TURN_API_TOKEN=`, must be set on every server; every other name is commented and shows the default the app already has, or says where it is set. Uncomment a name in `/opt/pix/.env` only to give a server another value, so a default changed in the code still reaches it.
+[`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=`, `PIX_GOOGLE_CLIENT_ID=`, or `PIX_TURN_API_TOKEN=`, needs a value on every server. Every other name is in a comment. Its line shows the server's default, or says what sets the value. Uncomment a name in `/opt/pix/.env` only to give a server another value. Then a default that changes in the code still reaches the server.
 
-Each deploy and `deploy.sh restart` compare `/opt/pix/.env` with the `.env.example` of the commit being started, and never change either file. They warn about a name the example leaves empty that `.env` has no value for, and about a name `.env` sets that the example does not list, which is probably misspelled, because the app ignores names it does not know. `pix status` shows the result, an operator sees it in one line on logging in, and the app logs which features are off at start. Fill in a value with `pix env`, then `pix restart`. A server set up before 2026-10-15 has every default uncommented in `/opt/pix/.env`, copied from the old example; those lines pin today's values, so delete the ones you did not mean to change.
+Each deploy and each `deploy.sh restart` compare `/opt/pix/.env` with the `.env.example` of the commit that they start. They never change either file. They warn about two kinds of names:
+
+- A name that the example leaves empty and that `.env` has no value for.
+- A name that `.env` sets and that the example does not list. The name is probably misspelled, because the server ignores names that it does not know.
+
+`pix status` shows the result, and an operator sees it in one line at login. The server also logs at start which features are off. To set a value, run `pix env`, then `pix restart`. On a server set up before 2026-10-15, `/opt/pix/.env` has every default uncommented, copied from the old example. Those lines pin the defaults of that time, so delete the lines that you did not mean to change.
 
 ### Operate it
 
-[`deploy/pix.sh`](deploy/pix.sh) gives each account on a server a `pix` command for the operations below. Load it once from your `~/.bashrc`, from the checkout that deploys update, so everyone gets the same version:
+[`deploy/pix.sh`](deploy/pix.sh) gives each account on a server a `pix` command for the operations below. Load it once from your `~/.bashrc`. Load it from the checkout that deploys update, so everyone gets the same version:
 
 ```sh
 echo '[ -f /opt/pix/repo/server/deploy/pix.sh ] && . /opt/pix/repo/server/deploy/pix.sh' >> ~/.bashrc
 ```
 
-`pix help` lists the commands: `pix status`, `pix deploy [ref]`, `pix rollback`, `pix restart`, `pix logs` for the serving copy, `pix nginx`, `pix journal`, `pix build`, `pix timer`, `pix env`, `pix health`, `pix redis`, and `pix db`; `pix status` also lists the settings `/opt/pix/.env` lacks ([Settings](#settings)). They need an account that can use `sudo`. One deployment serves everyone on a server, so tell the team before a rollback, and never edit files in `/opt/pix/repo`, where each deploy checks out its commit.
+`pix help` lists the commands: `pix status`, `pix deploy [ref]`, `pix rollback`, `pix restart`, `pix logs` for the serving copy, `pix nginx`, `pix journal`, `pix build`, `pix timer`, `pix env`, `pix health`, `pix redis`, and `pix db`. `pix status` also lists the settings that `/opt/pix/.env` lacks ([Settings](#settings)). The commands need an account that can use `sudo`. One deployment serves everyone on a server, so tell the team before a rollback. Never edit files in `/opt/pix/repo`, where each deploy checks out its commit.
 
-Without the shortcuts, run these on the server with `sudo`:
+Without the shortcuts, run these commands on the server with `sudo`:
 
 | Command | What it does |
 | --- | --- |
 | `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, the open rooms, and the containers. |
-| `… deploy.sh deploy [ref]` | Deploys a branch or a commit now; the default is the server's branch. It also retries a commit the timer gave up on. |
-| `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without waiting for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
-| `… deploy.sh restart` | Starts the other copy from the same image, for example after editing `/opt/pix/.env`. |
+| `… deploy.sh deploy [ref]` | Deploys a branch or a commit now. The default is the server's branch. It also deploys a commit that the timer stopped trying. |
+| `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without a wait for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
+| `… deploy.sh restart` | Starts the other copy from the same image, for example after you edit `/opt/pix/.env`. |
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
-| `docker logs -n 100 pix-app-blue-1` | The app's log; `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. |
+| `docker logs -n 100 pix-app-blue-1` | The server's log. Use `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. |
 
-A deploy waits at most `MAX_WAIT_SECONDS` (600) for open rooms. Set `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`), or in front of `pix deploy`, to switch without waiting for that one run. To change it for every deploy on a server, the timer's included, put `MAX_WAIT_SECONDS=<seconds>` in `/opt/pix/deploy.conf`; the timer's next run uses it, and a value given in front of a command still wins for that run.
+A deploy waits at most `MAX_WAIT_SECONDS` (600) for open rooms. To switch without a wait for one run, put `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`) or in front of `pix deploy`. To change the limit for every deploy on a server, the timer's included, put `MAX_WAIT_SECONDS=<seconds>` in `/opt/pix/deploy.conf`. The timer's next run uses it. A value in front of a command still wins for that run.
+
+Docker Hub limits anonymous pulls per address, and the course servers share one address. If a build fails with `toomanyrequests`, wait, then run `deploy.sh deploy`. After the first pull, the server keeps the base images in its cache.
 
 ### What the course's proxy does
 
-Measured on Server B on 2026-10-13; nginx and the app are configured for it:
+[Design 2.8][d28] (*Hosting*) gives what we measured on Server B on 2026-10-13. Two results set how nginx and the server work:
 
-- **WebSockets pass and stay open.** One with pings stayed open for 300 s and an idle one for 200 s, although the course cuts a plain HTTP response after 120 s. Uvicorn's ping every 20 s keeps nginx's 75 s read timeout from closing a quiet socket.
-- **The phone's address is the last `X-Forwarded-For` value.** The proxy adds it and passes on whatever the client sent before it. nginx takes the last value only and replaces the header on the way to the app, which Uvicorn trusts (`--forwarded-allow-ips "*"`) because nothing but nginx can reach its port. The rate limit therefore counts per phone address; phones behind one carrier or Wi-Fi gateway still share an address, so limit per user once accounts exist.
-- **A cancelled request does not reach the server.** The proxy keeps its connection open after the phone closes its side, so a pose request the user cancelled is still generated and billed. The rate limit bounds the cost.
-- **Uploads stay small and in memory.** nginx refuses a request over 1 MiB with its own 413 and buffers a smaller one in memory, and it never writes a pose answer to a temporary file (FR-4.9, NFR-13). What the course's proxy does with an upload is outside our control.
-- **Nothing is encrypted in transit.** A scene photo, a password at sign-in, and the access and refresh tokens travel as plain HTTP between the phone and the server (NFR-14).
-
-Docker Hub limits anonymous pulls per address, and the course servers share theirs. If a build fails with `toomanyrequests`, wait and run `deploy.sh deploy`; the base images are cached after the first pull.
+- **Long-lived WebSockets.** The course cuts a plain HTTP response after 120 s, but WebSockets stay open. Uvicorn pings every 20 s, so nginx's 75 s read timeout does not close a quiet socket.
+- **The phone's address.** nginx takes only the last `X-Forwarded-For` value, which the proxy adds, and replaces the header on the way to the server. Uvicorn trusts the header (`--forwarded-allow-ips "*"`), because only nginx can reach its port. So the rate limit counts per phone address. Phones behind one carrier or Wi-Fi gateway still share an address.
 
 ## Lint, format, and test
 
-Run these from `server/` before you push. On every pull request, the [server-lint](../.github/workflows/server-lint.yml) workflow runs the two checks and the [server-test](../.github/workflows/server-test.yml) workflow runs the tests.
+Run these commands from `server/` before you push. On every pull request, the [server-lint](../.github/workflows/server-lint.yml) workflow runs the two checks, and the [server-test](../.github/workflows/server-test.yml) workflow runs the tests.
 
 | Command | What it does |
 | --- | --- |
 | `uv run ruff format .` | Formats Python files with Ruff. |
 | `uv run ruff format --check .` | Fails if a file is not formatted. |
-| `uv run ruff check .` | Ruff lint. Add `--fix` to apply the fixes Ruff can make, such as import order. |
+| `uv run ruff check .` | Ruff lint. Add `--fix` to apply the fixes that Ruff can make, such as import order. |
 | `uv run pytest` | Tests in `tests/`. They run in one process, without a running server, a Redis, a database server, or a phone. |
-| `uv run pytest --cov=pix_server --cov-branch --cov-report=term-missing --cov-report=html` | The same tests with line and branch coverage: a summary in the terminal and `htmlcov/index.html`, with the omit list in `pyproject.toml` and the targets in the [Testing Documentation](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation) (2.1.2–2.1.4). |
+| `uv run pytest --cov=pix_server --cov-branch --cov-report=term-missing --cov-report=html` | The same tests with line and branch coverage. It prints a summary in the terminal and writes `htmlcov/index.html`. The omit list is in `pyproject.toml`. The targets are in the [Testing Documentation][testing] (2.1.2–2.1.4). |
 | `PIX_TEST_REDIS_URL=redis://localhost:6379/0 PIX_TEST_DATABASE_URL=postgresql+asyncpg://pix:pix@localhost:5432/pix uv run pytest` | The same tests on a real Redis and PostgreSQL, which they empty first (Redis's database 0, PostgreSQL's `public` schema). Either variable works alone. CI runs both ways. |
 
 - **Rules.** Ruff rules are in `ruff.toml`: a 120-character line limit and the lint rule sets `E4`, `E7`, `E9`, `F`, and `I`.
-- **Suppressing.** For one line, use `# noqa: <rule>` with a comment that says why. To turn off a rule for some files or for the whole server, add it to `per-file-ignores` or `ignore` in `ruff.toml`.
-- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. The `client`, `settings`, and `clock` fixtures in `tests/conftest.py` give an app whose clock the test moves, so expiry is tested without waiting. `client` also replaces OpenRouter with the fake `image_api`, which records requests and returns what the test sets, so tests never call the real service or need a key; `make_image` builds test photos. The session store in tests is an in-process Redis (fakeredis) that runs the real Lua scripts; `make_registry` starts registries that share it, each standing for one worker, and `outage` switches the store off and on. Each test gets a new SQLite file as its database (`database_url`), which the app migrates as it starts; `google` replaces Google's token check (a token `google:<subject>:<name>` is valid), `fcm_api` replaces Google's token endpoint and FCM and records each push, with a service account key made for the tests (`fcm_key`), `client` hashes passwords with argon2id at its lowest cost, and `sign_up` makes an account and returns its headers. `async def` tests need no marker, and a test fails after 15 seconds.
+- **Suppressing.** For one line, use `# noqa: <rule>` with a comment that says why. To disable a rule for some files or for the whole server, add it to `per-file-ignores` or `ignore` in `ruff.toml`.
+- **Tests.** Put tests in `tests/test_<module>.py`. Add tests in the pull request that writes the code. `async def` tests need no marker, and a test fails after 15 seconds.
+- **Fixtures.** `tests/conftest.py` gives a server whose clock the test moves (`client`, `settings`, `clock`), fakes of OpenRouter, Cloudflare, Google, FCM, and Redis, and a new SQLite file for each test. So tests need no key. `make_image` builds test photos. [Testing 2.1.8][t218] lists each fixture and how a test controls it.
 
-## Compare image-editing models
+## AI scripts
 
-[`scripts/compare_image_edit_apis.py`](scripts/compare_image_edit_apis.py) sends scene photos to image-editing models through [OpenRouter](https://openrouter.ai/) and reports latency, cost, and the resulting images side by side. It is not part of the server, and it does not import `pix_server`.
+The scripts in [`scripts/`](scripts/) try the models and the prompts of the server, and they run the AI module tests. They are not part of the server, and they do not import `pix_server`. Run them from `server/`:
 
-Set `OPENROUTER_API_KEY` in your shell to an OpenRouter key with credits (the script reads the environment only, not `.env`), then run it from `server/` with one or more photos:
+- **Key.** A script reads `OPENROUTER_API_KEY` from the environment. `uv run --env-file .env` passes the key in `server/.env`. You can also export the key in your shell.
+- **Cost.** Each model call costs money on the OpenRouter key, so try a small run first.
+- **Privacy.** The scripts send the photos to OpenRouter and to the model's provider. The results go to `scripts/out/`, which git ignores. Do not commit them.
+- **Prompts.** The scripts read the server's [prompts.toml](src/pix_server/poses/prompts.toml), so a run tries what the server sends.
+- **Options.** The docstring at the top of each script says what it does and what it writes. `--help` lists the options, such as another prompt to try.
+
+### Compare image-editing models
+
+[`compare_image_edit_apis.py`](scripts/compare_image_edit_apis.py) sends scene photos to image-editing models. Its `report.html` shows the latency, the cost, and the images side by side. With no options, each photo goes to the four models of `DEFAULT_MODELS` with the four default poses. That is 16 images per photo, about $0.50 in October 2026. `--list-models` lists the models and their prices, and costs nothing. Use JPEG, PNG, or WebP photos with the whole person in the frame. HEIC does not open.
 
 ```sh
-export OPENROUTER_API_KEY=<your key>
 uv run scripts/compare_image_edit_apis.py photo1.jpg photo2.jpg
-```
 
-With no options, each photo goes to four models with all four default poses: 16 images per photo, which takes about a minute and cost about $0.50 in October 2026. Each photo is first prepared the way the app sends it (upright, long side 1024 px, JPEG quality 85, no EXIF), and the poses for one model are requested in parallel, like the app's four `POST /poses` calls.
-
-The terminal prints one line per image, then a summary table, the total cost, and the report path. Results go to `scripts/out/<timestamp>/`:
-
-| File | Contents |
-| --- | --- |
-| `report.html` | The summary table, then one table per photo: models as rows, the original and each pose as columns. Red marks a failed request or one slower than the server's 60-second upstream timeout. Click an image to see it at full size. |
-| `results.json` | Every request's latency, cost, parameters, and error, plus the prompt and poses used. |
-| `<photo>/<model>/<pose>.*` | The returned images, next to the prepared `scene.jpg`. |
-
-| Option | What it does |
-| --- | --- |
-| `--models ID ...` | Models to compare. Add `@low` or `@medium` to a model that has quality tiers, for example `openai/gpt-image-2@low`. |
-| `--list-models` | Lists every model that can edit an image, with current prices. It needs no key or photo and costs nothing. |
-| `--poses NAME ...` | A subset of `hands_on_hips`, `wave`, `walking`, and `arms_crossed`. |
-| `--pose-text "..."` | A free-text pose in Korean or English (FR-4.8) instead of the default poses. Repeat it for several poses, or four times for one set of a description. |
-| `--prompt "..."` | Another pose prompt to try. It must contain `{pose}`, which is replaced with the pose. |
-| `--concurrency N` | Runs N photo-and-model combinations at once. The default, 1, matches one user generating. |
-| `--out DIR` | The output folder, instead of the timestamped one. |
-| `--timeout S` | Gives up on a request after S seconds. The default is 60. |
-
-```sh
 # Smoke test: one image from one model
 uv run scripts/compare_image_edit_apis.py photo.jpg --models bytedance-seed/seedream-5-0-flash --poses wave
 
@@ -428,14 +397,9 @@ uv run scripts/compare_image_edit_apis.py photos/*.jpg --models google/gemini-3.
 uv run scripts/compare_image_edit_apis.py photo.jpg --pose-text "벽에 기대서 한 손은 주머니에"
 ```
 
-- **Cost.** A run requests photos × models × poses images. Only returned images are billed; failed and timed-out requests are not. If lines show `Insufficient credits`, the OpenRouter account is empty.
-- **Photos.** Use JPEG, PNG, or WebP with the whole person in the frame; HEIC does not open. Each candidate is asked in the model's ratio closest to the photo's; portrait 3:4, 9:16, and 1:1 are the app's frames.
-- **Privacy.** Photos are sent to OpenRouter and the model's provider. `scripts/out/` holds the photos and results and is git-ignored; do not commit them.
-- **Defaults.** The default models are `DEFAULT_MODELS` at the top of the script. The pose prompt and the default poses come from the server's [prompts.toml](src/pix_server/poses/prompts.toml), so a run tries what the server sends; `--prompt` tries another wording without editing it.
+### Compare suggestion models
 
-## Compare suggestion models
-
-[`scripts/compare_suggestion_models.py`](scripts/compare_suggestion_models.py) sends scene photos with the server's suggestion prompt to vision models through OpenRouter's chat completions, each photo to every model at once, and reports for each model how many answers the server could use (four different poses of at most 100 characters), the latency, and the cost. With `--description`, it sends the server's variation prompt for that description instead, and an answer is usable with three variations besides the description. It is not part of the server and does not import `pix_server`. Run it like the script above:
+[`compare_suggestion_models.py`](scripts/compare_suggestion_models.py) sends scene photos with the server's suggestion prompt to vision models. With `--description`, it sends the variation prompt for that description. For each model, it reports the latency, the cost, and how many answers the server could use. 240 calls cost about $0.05 in October 2026.
 
 ```sh
 uv run scripts/compare_suggestion_models.py photo1.jpg photo2.jpg                          # ten models, two rounds
@@ -443,11 +407,9 @@ uv run scripts/compare_suggestion_models.py photo.jpg --models google/gemini-3.1
 uv run scripts/compare_suggestion_models.py photo.jpg --models google/gemini-3.1-flash-lite --description "점프하기"
 ```
 
-`--rounds N` calls each model N times per photo, to see the spread of latency and of the poses; `--prompt` tries another suggestion or variation prompt (`{description}` stands for the description); `--reasoning` sets the reasoning effort, by default `minimal` like the server, and a model that refuses `none` is retried with `minimal`. `report.html` shows each photo with every model's poses per round, and `results.json` keeps every answer. A call costs a fraction of a cent; 240 calls cost about $0.05 in October 2026.
+### Compare filter models
 
-## Compare filter models
-
-[`scripts/compare_filter_models.py`](scripts/compare_filter_models.py) sends labeled descriptions to decision models through OpenRouter's Decisions API with the description filter's two yes/no questions from the `[filter]` table of the server's [prompts.toml](src/pix_server/poses/prompts.toml), or of another prompts file with `--prompts` (does it ask for harmful content, does it try to manipulate the AI; Design Documentation 2.6.3), and reports for each model and language how many harmless descriptions it would refuse and how many attacks it would catch at each cutoff. The descriptions are in [`scripts/filter_cases.toml`](scripts/filter_cases.toml), in English and Korean, whose header says how to write a case; `--cases` takes another file in the same form. It is not part of the server and does not import `pix_server`; it reads `OPENROUTER_API_KEY` from the environment.
+[`compare_filter_models.py`](scripts/compare_filter_models.py) sends the labeled descriptions of [`filter_cases.toml`](scripts/filter_cases.toml), in English and Korean, to decision models with the two questions of the description filter. For each model and language, it reports the harmless descriptions that the model refuses and the attacks that it catches at each cutoff.
 
 ```sh
 uv run --env-file .env scripts/compare_filter_models.py                                   # seven models, two rounds
@@ -455,11 +417,9 @@ uv run --env-file .env scripts/compare_filter_models.py --models typesafe/jev-1.
 uv run --env-file .env scripts/compare_filter_models.py --cases my_cases.toml --label teammates
 ```
 
-`--cutoffs` sets the cutoffs to count at (0.5, 0.7, and 0.9 by default) and `--cutoff` the one for the details, by default the filter's 0.7: the decisions by category, how often a second round changed one, how often a request's English and Korean got the same one, and every description each model got wrong. `summary.txt` and `results.json`, with every probability, go to `scripts/out/filter/<timestamp>[-label]/`. The default run, 107 descriptions with seven models in two rounds, cost $0.05 in November 2026.
+### Try the person check
 
-## Try the person check
-
-[`scripts/try_person_check.py`](scripts/try_person_check.py) sends labeled scene photos to a decision model through OpenRouter's Decisions API with the person check's question from the `[person]` table of the server's [prompts.toml](src/pix_server/poses/prompts.toml), or of another prompts file with `--prompts` (FR-4.13, Design Documentation 2.6.3). Name the scenes with a person after `--with-person` and those without one after `--without-person`, as JPEG or PNG files or folders of them; each is prepared like the app's scene photo. It prints each scene's probabilities and, at `--cutoff` (by default the server's 0.5), how many scenes with a person would be refused and how many without one would go through, with the time and the cost. It is not part of the server and does not import `pix_server`; it reads `OPENROUTER_API_KEY` from the environment.
+[`try_person_check.py`](scripts/try_person_check.py) sends labeled scene photos to a decision model with the question of the person check (FR-4.13). Give the scenes with a person after `--with-person`, and the scenes without one after `--without-person`, as files or folders. At `--cutoff`, it prints how many scenes with a person the check would refuse, and how many scenes without one it would let through.
 
 ```sh
 uv run --env-file .env scripts/try_person_check.py --with-person people/ --without-person empty/
@@ -467,11 +427,9 @@ uv run --env-file .env scripts/try_person_check.py --with-person people/ --witho
 uv run --env-file .env scripts/try_person_check.py --without-person empty/ --prompts my_prompts.toml --label wording2
 ```
 
-`results.json`, with every probability, goes to `scripts/out/person/<timestamp>[-label]/`. 53 scenes in one round cost $0.005 with Jev 1.14 in November 2026; the photos go to OpenRouter as in the other scripts.
+### Try pose tips
 
-## Try pose tips
-
-[`scripts/try_pose_tips.py`](scripts/try_pose_tips.py) tries the tip prompt on scene photos with candidates made once, so the prompt can be changed and run again without paying for new images. It reads `OPENROUTER_API_KEY` from the environment; `uv run --env-file .env` passes the one in `server/.env`.
+[`try_pose_tips.py`](scripts/try_pose_tips.py) tries the tip prompt on scene photos, with candidates that it makes once. So you can change the prompt and run it again without paying for new images.
 
 ```sh
 uv run --env-file .env scripts/try_pose_tips.py candidates photos/*.jpg      # one candidate per scene, made once
@@ -481,13 +439,11 @@ uv run --env-file .env scripts/try_pose_tips.py tips --language ko --label ko # 
 uv run --env-file .env scripts/try_pose_tips.py tips --prompt-file my_prompt.txt --only k01-4 --label try2
 ```
 
-`candidates` and `set` prepare each scene like the app and ask for candidates the way the server does, with its pose and suggestion prompts, model, and ratio, and keep each scene and candidate in `scripts/out/tips/pairs/<name>/`; a pair that exists is never made again. `tips` sends every pair with the server's tip prompt, schema, and reasoning effort, or with `--prompt-file` and `--reasoning`, with the server's `tip_korean` after the prompt for `--language ko`, and writes `results.json`, `report.html`, and contact sheets (`sheet-<n>.png`: the scene, the candidate, the decisions, and the sentence) to `scripts/out/tips/runs/<timestamp>-<label>/`, with the prompt it used. It prints the latency, the reasoning tokens, the sentences with a number or without an angle, and, with `--rounds`, how many pairs got the same decisions every time. `scripts/out/` is git-ignored; the photos go to OpenRouter as in the other scripts.
+### Evaluate the AI modules
 
-## Evaluate the AI modules
+[`eval_poses.py`](scripts/eval_poses.py) runs the AI module tests on the frozen set in [`eval/`](eval/). [Testing 3.1][t31] gives the method, the rules, and the thresholds. `judge` reads `ANTHROPIC_API_KEY` and sends the photos to Anthropic.
 
-[`scripts/eval_poses.py`](scripts/eval_poses.py) runs the AI module tests of the [Testing Documentation](../wiki/Testing-Documentation.md) (3.1) on the frozen set in [`eval/`](eval/): `pose_cases.json`, one scene photo of `eval/scenes/` and one description per case (the photos' sources and licences are in `eval/scenes/SOURCES.md`). `generate` sends each case to a running Pix server twice, with its description and without one, the way the app's `RemotePoseGenerator` does, and keeps every scene, candidate, time, and tip in `scripts/out/eval/<run>/`; `judge` has Claude (`claude-opus-5-5`) check every candidate against the rules of [`eval/rubrics.toml`](eval/rubrics.toml), every set of four poses for being different, and every tip for matching its pose, through the Batch API at half price unless `--now`; `report` gives the metrics of 3.1 for one run or several. It does not import `pix_server`; uv installs the Anthropic SDK for this script alone from the header of the file, and `judge` reads `ANTHROPIC_API_KEY` from the environment.
-
-The server needs limits high enough for a run (100 sets, 400 candidates, 100 tips): start one locally with the key in `server/.env` and a database of its own, then run the steps.
+A run needs a server with high enough limits for 100 sets, 400 candidates, and 100 tips. Start one locally, with the key in `server/.env` and a database of its own. Then run the steps in this order:
 
 ```sh
 mkdir -p scripts/out/eval && PIX_POSE_RATE_LIMIT=5000 PIX_POSE_GLOBAL_LIMIT=5000 PIX_SUGGESTION_RATE_LIMIT=5000 PIX_SUGGESTION_GLOBAL_LIMIT=5000 \
@@ -500,9 +456,15 @@ uv run --env-file .env scripts/eval_poses.py judge run1                        #
 uv run scripts/eval_poses.py report run1 run2 run3                             # each run, then all together
 ```
 
-`generate` makes one set at a time, as one phone would, so the times are a phone's; a set already made is skipped. `judge` sends only what has no verdict with the current rubric (its hash is kept with each verdict), so a changed rubric judges a run again; `--no-wait` sends the batches and stops, and running it again collects them. `report` prints the metrics with 95 % intervals and writes `summary.txt`, `summary.json`, and `report.html`, every set with its candidates and the judge's reasons, those with a broken rule first.
+`judge` sends only what has no verdict with the current rubric, so a changed rubric judges a whole run again. `report` writes `summary.txt`, `summary.json`, and `report.html`.
 
-To check the judge (3.1, *How to trust the judge*): `sample` picks 60 candidates of a judged run, half that the judge failed and half that it passed, into `label.html`; two of us open it in a browser, answer every rule without seeing the judge's verdicts, and download our labels, which are kept in `eval/labels/` as `<run>-<name>.json`. `judge --repeat 3` judges the same 60 twice more, `judge --sample` judges only those 60 (to try a changed rubric on them before judging whole runs again), `sample --by-rubric HASH` splits a new sample by an earlier rubric's verdicts (to check a changed rubric on the cases the old one failed), and `agree` compares our labels with each other and with the judge, and counts the verdicts that changed across the three judgments.
+To check the judge (Testing 3.1, *Judge validation*):
+
+1. `sample` picks 60 candidates of a judged run into `label.html`: half that the judge failed, and half that it passed.
+2. Each labeler opens `label.html` in a browser and answers every rule without the judge's verdicts. Then the labeler downloads the labels.
+3. Keep the labels in `eval/labels/` as `<run>-<name>.json`.
+4. `judge --repeat 3` judges the same 60 candidates twice more.
+5. `agree` compares the labels with each other and with the judge, and counts the verdicts that changed across the three judgments.
 
 ```sh
 uv run scripts/eval_poses.py sample run1 --size 60
@@ -510,7 +472,16 @@ uv run --env-file .env scripts/eval_poses.py judge run1 --repeat 3
 uv run scripts/eval_poses.py agree run2 --labels eval/labels/run2-*.json      # the labels are kept in eval/labels/
 ```
 
-The description filter and the person check are measured on their own held-out sets with the scripts above: `compare_filter_models.py --cases eval/filter_cases.toml` and `try_person_check.py` with `eval/person/with/` and `eval/person/without/` (labels in `eval/person/labels.json`). The phone's person check runs on a device with the app's `PersonCheckEval` (`android/app/src/androidTest/`): install the app and its test APK, push the photos to `/data/local/tmp`, start it with `adb shell am instrument`, and pull `phone.json` (Gradle's `connectedDebugAndroidTest` would uninstall the app and the file with it); `person` puts both checks together, as the app runs them.
+To try a changed rubric, `judge --sample` judges only those 60 candidates. `sample --by-rubric HASH` splits a new sample by an earlier rubric's verdicts, to check the changed rubric on the cases that the old rubric failed.
+
+The filter and the person check have their own held-out sets: `eval/filter_cases.toml`, and the photos of `eval/person/with/` and `eval/person/without/` with their labels in `eval/person/labels.json`. The phone's person check runs on a device with the app's `PersonCheckEval` (`android/app/src/androidTest/`):
+
+1. Install the app and its test APK.
+2. Push the photos to `/data/local/tmp`.
+3. Start the test with `adb shell am instrument`.
+4. Pull `phone.json`.
+
+Do not use Gradle's `connectedDebugAndroidTest`, because it would uninstall the app, and the file with it. `eval_poses.py person` puts both checks together, as the app runs them.
 
 ```sh
 (cd ../android && ./gradlew :app:installDebug :app:installDebugAndroidTest)          # one device connected
@@ -522,4 +493,17 @@ uv run --env-file .env scripts/try_person_check.py --with-person eval/person/wit
 uv run scripts/eval_poses.py person --phone scripts/out/person/phone.json --jev scripts/out/person/<timestamp>-heldout/results.json
 ```
 
-A full run's images cost an estimated $5 through OpenRouter, and its judgments about $7.50 with the Batch API. The judging cost is from the 10-case pilot of 2026-11-05: with direct calls, about $0.030 a pose, $0.018 a tip, and $0.008 a set of suggestions (about 4K input and 0.6K output tokens each, at $4 and $20 per million tokens), and half that in a batch. The photos go to OpenRouter and to Anthropic.
+A full run's images cost an estimated $5 through OpenRouter. Its judgments cost about $7.50 with the Batch API, an estimate from the 10-case pilot of 2026-11-05. In that pilot, with direct calls, the judge cost about $0.030 for a pose, $0.018 for a tip, and $0.008 for a set of suggestions. A batch costs half that.
+
+[design]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation
+[d252]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#252-signaling-protocol-phone--server-websocket
+[d253]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#253-rest-api-phone--server
+[d263]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#263-pose-generation
+[d266]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#266-invitations-and-push-iteration-3
+[d267]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#267-reconnection-and-sessions-across-networks-iteration-3
+[d27]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#27-database
+[d28]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#28-implementation-decisions
+[rs]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications
+[testing]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation
+[t218]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#218-writing-a-test-the-fakes-and-the-pitfalls
+[t31]: https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#31-plan

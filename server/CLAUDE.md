@@ -1,6 +1,6 @@
 # Server context
 
-Rules and pitfalls for working in `server/`. The implemented scope, the protocol, the API, the deploy flow, and the operations are in [README.md](README.md); the settings and their defaults in [config.py](src/pix_server/config.py); the design in the [Design Documentation](../wiki/Design-Documentation.md) (2.5–2.8) and the [Requirements and Specifications](../wiki/Requirements-and-Specifications.md); the tests in the [Testing Documentation](../wiki/Testing-Documentation.md). Recheck those before a change instead of treating this file as the specification.
+Rules and pitfalls for working in `server/`. The setup, the deploy flow, the operations, and the tools are in [README.md](README.md); the settings and their defaults in [config.py](src/pix_server/config.py); the protocol and the API in the [Design Documentation](../wiki/Design-Documentation.md) (2.5), the rest of the design in 2.6–2.8 and the [Requirements and Specifications](../wiki/Requirements-and-Specifications.md); the tests in the [Testing Documentation](../wiki/Testing-Documentation.md). Recheck those before a change instead of treating this file as the specification.
 
 ## Commands and settings
 

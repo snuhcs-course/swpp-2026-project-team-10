@@ -79,6 +79,7 @@
 | 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code; QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*); Figure 1 redrawn; pushes only to signed-in phones (all sections). |
 | 2.48 | 2026-11-06 | Section 1.4 removed: the status of each task is in 2.9, and the later iterations' scope in R&S 4.1. The QR connection's plan moves to *Still open* (1.4, 2.9). |
 | 2.49 | 2026-11-06 | The AWS server stays on: the course servers stay the main hosting, and the AWS server serves other networks (1.1.1, AD-11, 2.8). |
+| 2.50 | 2026-11-06 | The Android README no longer lists every module class, so 2.1 no longer points to it for them (2.1). |
 
 </details>
 
@@ -338,7 +339,7 @@ flowchart TB
 
 *Figure 5. Layers of the Android app. Each layer depends only on the layer below it. The exception: the UI hosts the camera preview (`PreviewView`) and the subject's video view (`SurfaceViewRenderer`) directly.*
 
-**Package layout.** Files marked \* are the shared contracts (`android/README.md`); every other class belongs to the owner in its `Owner:` comment. The tree names the main files; `android/README.md` lists every module class.
+**Package layout.** Files marked \* are the shared contracts (`android/README.md`); every other class belongs to the owner in its `Owner:` comment. The tree names the main files.
 
 ```text
 android/app/src/main/java/com/lastpenguin/pix/

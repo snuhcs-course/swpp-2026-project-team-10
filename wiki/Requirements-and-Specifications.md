@@ -340,7 +340,7 @@ Planned for Iteration 4 (#122).
 
 ### 4.4 User stories and acceptance criteria
 
-Each story lists its scenarios in Given-When-Then form: **Normal** is the expected path, **Failure** an error or a rejected input, and **Edge** an unusual but valid situation. Stories marked "UAT" are the user acceptance test's, with its criteria and scripts in the Testing Documentation (4.2).
+Each story lists its scenarios in Given-When-Then form: **Normal** is the expected path, **Failure** an error or a rejected input, and **Edge** an unusual but valid situation. Stories marked "UAT" are the user acceptance test's, with its criteria and scripts in the Testing Documentation (4.3).
 
 #### US-1 · Take a photo right after opening Pix
 <sub>F1 · FR-1.1–1.14 · It 1–3</sub>

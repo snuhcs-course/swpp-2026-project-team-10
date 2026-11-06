@@ -77,18 +77,18 @@
 | 2.45 | 2026-11-05 | Who takes the photo, before connecting: *Shoot together* asks first, received invitations are listed, and sign-in returns to the screen that opened it (2.1, 2.5.3, 2.6.6, 2.6.8, 2.8, Figure 8b; Iter3-A17, [#188]). |
 | 2.46 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar, the horizon bar, thinner lines, and *Save guide* as a toggle (2.5.1, 2.6.1–2.6.3, 2.6.5, 2.6.8, 2.8; Iter3-A15, [#182]). |
 | 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code; QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*); Figure 1 redrawn; pushes only to signed-in phones (all sections). |
-| 2.48 | 2026-11-06 | The UAT plan done (1.4.2). |
+| 2.48 | 2026-11-06 | Section 1.4 removed: the status of each task is in 2.9, and the later iterations' scope in R&S 4.1. The QR connection's plan moves to *Still open* (1.4, 2.9). |
 
 </details>
 
-Audience: the development team. This page describes Pix's design as built through Iteration 3, and the plan for later iterations (1.4, 2.9). The PR that builds a feature updates its design here. **TBD** and **TODO** mark open decisions. *Still open* below lists each with an owner, who updates this page in the PR that settles it. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications). Testing is described in the [Testing Documentation](Testing-Documentation).
+Audience: the development team. This page describes Pix's design as built through Iteration 3, and the plan for later iterations (2.9; R&S 4.1). The PR that builds a feature updates its design here. **TBD** and **TODO** mark open decisions. *Still open* below lists each with an owner, who updates this page in the PR that settles it. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications). Testing is described in the [Testing Documentation](Testing-Documentation).
 
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | Four prompt templates (FR-4.8) | With a description, four templates around one `{pose}` replace the three variations. The default template reads `{pose}` as the user's request, keeps the face and the clothes, and makes one pose per photo (2.6.3). Open: the templates, and requests such as "two photos saluting and two with hands up" (Iter3-P25, [#125]). | 박재완 | Iteration 4 |
-| Offline QR connection (F9) | The plan of 1.4.2. Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]). | 조성민 | Iteration 4 |
+| Offline QR connection (F9) | The photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]). | 조성민 | Iteration 4 |
 
 **Contents**
 
@@ -96,7 +96,6 @@ Audience: the development team. This page describes Pix's design as built throug
   - [1.1 System Architecture](#11-system-architecture)
   - [1.2 External libraries and services](#12-external-libraries-and-services)
   - [1.3 Architectural decisions](#13-architectural-decisions)
-  - [1.4 Later iterations](#14-later-iterations)
 - [2. Design Details](#2-design-details)
   - [2.1 Android app structure](#21-android-app-structure)
   - [2.2 Class diagrams](#22-class-diagrams)
@@ -314,37 +313,6 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-16 | **Saved guides live in the app's private storage** | Reuse with nothing in the gallery or on the server (FR-3.8, NFR-13). The library (FR-3.11) is this store: up to 100 guides, thumbnails read on demand. | Gallery album; server-side guides |
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom, and one toggle decides: on, gestures edit the guide; off, a pinch zooms. The subject moves the guide (FR-7.2) and zooms too. | A zoom slider; deciding by where the finger lands |
 | AD-18 | **Session state lives in a Redis session store, not in the server process** | Workers share the state, and a new copy takes over during a deploy without losing a waiting room (2.8). The small, short-lived state fits Redis's atomic scripts, expiry, and pub/sub (2.7). Cost: one more service and Lua room transitions; NFR-18's 50 sessions fit in one worker. | One process with in-memory state; routing rooms by code; the relational database |
-
-### 1.4 Later iterations
-
-Iterations 1 to 3 built the structure of Figure 1, whose design is in section 2. A later feature's detailed design is added at the start of the iteration that builds it.
-
-#### 1.4.1 Iteration 2 · 10/11 – 10/25 (midterm presentation 10/21)
-
-Design: section 2, with AD-10 to AD-18. Both Must items were delivered: smooth outlines (FR-2.9, Iter2-P7, [#49]) and zoom without stutter (NFR-19, Iter2-P5, [#47]). Invitations and sessions across networks (Iter2-P15, Iter2-P16) moved to Iteration 3.
-
-#### 1.4.2 Iteration 3 · 10/26 – 11/6 (user test 10/31–11/1, heuristic evaluation 11/4)
-
-The plan from the kickoff of 2026-10-25 (Team Meetings) and the items added during the iteration, with their status on 11/6. Tasks and owners: 2.9.
-
-| Feature | Status | Design |
-|----|----|----|
-| **Pose generation** (FR-4.3, FR-4.6, FR-4.8, FR-4.10, FR-4.11) | Delivered: candidates in the scene photo's ratio (Iter3-P8, [#112]); one at a time (Iter3-P10, [#114], PR [#108]); a tip for the chosen one (Iter3-P11, [#115], PR [#110]), in Korean too (Iter3-A4, [#156]); the description history (Iter3-P24, [#124]). Open: four prompt templates in place of the three variations (Iter3-P25, [#125]). | 2.6.3 |
-| **Shared steps on both phones** (FR-6.14–6.16) | Delivered: guides from the subject's phone, as a mask either way (Iter3-P9, [#113]); its reference thumbnail (Iter3-A1, [#132]); the description, *Pick a pose*, and *Reference confirm* on both phones, the first choice deciding, and *Save guide* on either (Iter3-P16, [#120]); photos on both (Iter3-P17, [#121]). | 2.5.1, 2.6.5 |
-| **Offline connection with a QR code** (F9) | Moved to Iteration 4 (Iter3-P22, [#122]). Plan: the photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). | *Still open* |
-| **Selfie mode** (FR-1.14) | Delivered, in a session too: the front camera, mirrored everywhere, with its own prompts (Iter3-P12, [#116]). | 2.6.3, 2.6.4 |
-| **Guide library** (FR-2.10, FR-3.8, FR-3.11, FR-4.14) | Delivered: up to 100 saved guides, *My library* on *Add a pose guide*, a library screen filtered by source, the ♥ on *Pick a pose*, and screenshots cut to their photo (Iter3-A8, [#170]; Iter3-A9, [#171]; Iter3-A10, [#174]; Iter3-A11, [#177]). Search, situations, and memos come in Iteration 4. | 2.6.1, 2.6.2, 2.6.3, 2.8 |
-| **Settings, language, and tutorial** (F10, FR-3.10) | Delivered: Korean, the phone's language by default (Iter3-P7, [#111]); the settings screen, with the guide's color and thickness and a latency indicator; tips over each screen at first use (Iter3-P23, [#123]). | 2.6.8 |
-| **Invitations and sessions across networks** | Delivered: push with the link fallback, also for friend requests; the TURN relay; `session.join`; reconnection with ICE restart (Iter3-P13, [#117]; Iter3-P14, [#118]; Iter3-P15, [#119]). Phones on cellular data use the AWS server until the course servers open to them. | 2.6.6, 2.6.7, 2.8 |
-| **Checks before pose generation** (FR-4.12, FR-4.13) | Delivered: the description filter and the person check (Iter3-A7, [#165]). | 2.6.3 |
-| **Camera and screen polish** | Delivered: Camera's buttons and preview size (Iter3-A2, [#136]); a light for the scene photo (Iter3-A5, [#158]); the app icon (Iter3-A6, #162); camera animations (Iter3-A12, [#179]); the guide and pose flow (Iter3-A13, [#180]); screen transitions (Iter3-A14, [#181]); Camera's controls after the heuristic evaluation (Iter3-A15, [#182]); choosing who takes the photo (Iter3-A17, [#188]). Moved to Iteration 4: photos and latency closer to the stock camera (Iter3-A16, #183). | 2.1, 2.6.2, 2.6.3, 2.6.8, 2.8 |
-| **The Could items** (FR-7.5, FR-7.7, NFR-19) | Moved to Iteration 4: the remote-control switch and remote focus (Iter2-P17), and the shutter freeze fix (Iter2-P5, with #183). Their messages, `control.permission` and `camera.focus.set`, are defined but unused. | 2.6.5 |
-| **Testing and evaluation** | Done: the user test on the AWS server, six participants, 11/1–11/4; the AI module test (Iter3-P26, #126); the integration tests (Iter3-P27, #127); the UAT plan (Testing Documentation 4.2). Open: integration (Iter3-P28, [#128]); the documents (Iter3-P29, #129). | Testing Documentation 3, 4 |
-
-#### 1.4.3 Iterations 4 and 5 · fixes, polish, and final release
-
-- **Iteration 4:** fixes from the user test and the heuristic evaluation, among them one path per use case and the face or arms marked on the guide (Testing Documentation 4.1). Also the library's search, situations, and memos, and the UAT on 11/16 and 11/18. Moved from Iteration 3: the offline QR connection (F9, [#122]), four prompt templates (FR-4.8, [#125]), the remote-control switch (FR-7.5), remote focus (FR-7.7), and photos and latency closer to the stock camera, with the shutter freeze fix (NFR-19, #183).
-- **Iteration 5:** polish, stability, and performance against the NFR targets, based on UAT feedback; in-class testing on 11/30 and a test with real users on 12/2; the design patterns of section 3.
 
 ## 2. Design Details
 
@@ -3113,14 +3081,14 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 |----|----|----|----|----|
 | A temporary server on AWS for the user test (Iter3-P2) | 박재완 | 10/26 | Done | 2.8 |
 | The documents (PM; Iter3-P3–P5) | 박재완 | 10/26 | Done | — |
-| The Korean translation (Iter3-P7, [#111]) | 박재완 | 10/26 | Done | 1.4.2, 2.8 |
+| The Korean translation (Iter3-P7, [#111]) | 박재완 | 10/26 | Done | 2.8 |
 | Camera's buttons and preview size (Iter3-A2, [#136]) | 박동제 | — | Done | 2.6.2 |
 | Wireframes drawn from the app's screens (Iter3-A3, #141) | 박재완 | — | Done | — |
 | Candidates in the scene photo's ratio (Iter3-P8, [#112]) | 박재완 | 10/30 | Done | 2.6.3 |
 | The mask-only guide transfer both ways, in `GuideImageCodec` and the syncer, with `anchor` and `source`, which the subject keeps for *Save guide* (Iter3-P9, [#113]) | 한준형 | 10/30 | Done | 2.5.1, 2.6.1 |
 | *Pick a pose* one candidate at a time (Iter3-P10, [#114]; PR [#108]) | 박동제 | 10/30 | Done | 2.6.3 |
 | Pose tips (Iter3-P11, [#115]; PR [#110]) | 박동제 | 10/30 | Done | 2.6.3 |
-| Selfie mode, and whether the prompts suit it (Iter3-P12, [#116]) | 박동제 | 10/30 | Done | 1.4.2, 2.6.3, 2.6.4 |
+| Selfie mode, and whether the prompts suit it (Iter3-P12, [#116]) | 박동제 | 10/30 | Done | 2.6.3, 2.6.4 |
 | The reference thumbnail on Subject view, with `guide.reference.*` (Iter3-A1, [#132]) | 박동제 | 10/30 | Done | AD-6, 2.5.1, 2.6.2 |
 | Sessions on different networks, with TURN through Cloudflare (Iter3-P13, [#117]) | 조성민 | 10/30 | Done | 2.6.7 |
 | Reconnection after a short drop, with `session.join` and an ICE restart (Iter3-P14, [#118]) | 조성민 | 10/30 | Done | 2.6.7 |
@@ -3130,7 +3098,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Pose tips in Korean (Iter3-A4, [#156]) | 박동제 | 10/31 | Done | 2.6.3, 2.8 |
 | A light for the scene photo (Iter3-A5, [#158]) | 박동제 | 10/31 | Done | 2.6.3 |
 | The app icon and branding assets (Iter3-A6, #162) | 박재완 | 10/31 | Done | — |
-| The offline QR connection (Iter3-P22, [#122]) | 조성민 | 11/5 | Moved to Iteration 4 | 1.4.2, *Still open* |
+| The offline QR connection (Iter3-P22, [#122]) | 조성민 | 11/5 | Moved to Iteration 4 | *Still open* |
 | The settings screen (Iter3-P23, [#123]) | 조성민 | 11/5 | Done | 2.6.8 |
 | The first-use tutorial (Iter3-P23, [#123]); its tips over each screen (#173) | 한준형; 박재완 (#173) | 11/5 | Done | 2.6.8 |
 | Prompt history on *Generate poses* (Iter3-P24, [#124]) | 박동제 | 11/5 | Done | 2.6.3 |
@@ -3148,7 +3116,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The guide and the pose flow polished (Iter3-A13, [#180]) | 조성민 | 11/6 | Done | 2.5.1, 2.6.3, 2.6.5 |
 | Transitions between screens (Iter3-A14, [#181]) | 조성민 | 11/6 | Done | 2.1 |
 | Camera's controls after the heuristic evaluation (Iter3-A15, [#182]) | 한준형 | 11/6 | Done | 2.6.2, 2.6.8, 2.8 |
-| Camera quality and latency closer to the stock camera (Iter3-A16, #183) | 한준형 | 11/6 | Moved to Iteration 4 | 1.4.2 |
+| Camera quality and latency closer to the stock camera (Iter3-A16, #183) | 한준형 | 11/6 | Moved to Iteration 4 | — |
 | Who takes the photo, chosen before connecting (Iter3-A17, [#188]) | 조성민 | 11/6 | Done | 2.1, 2.6.6 |
 
 **Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:

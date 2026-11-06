@@ -77,7 +77,8 @@
 | 2.52 | 2026-11-05 | The AI module test plan without the metamorphic checks (3.1). |
 | 2.53 | 2026-11-05 | Same-iteration change notes removed from the shared steps' row, IT-9, IT-13, and IT-23 (1.1, 2.1.5). |
 | 2.54 | 2026-11-05 | The AI module test plan: evaluation set, rules, judge, test sets, commands, and thresholds, declared before the first run (3.1). |
-| 2.55 | 2026-11-06 | The UAT plan: five stories, the setup, the judging rules, and a script per story (4.2, 4.3). |
+| 2.55 | 2026-11-06 | The UAT plan: five stories, the setup, the judging rules, and a script per story (4.3, 4.4). |
+| 2.56 | 2026-11-06 | The heuristic evaluation of 11/4: ratings, problems found, and what follows, and its Test Log row; the UAT moves to 4.3 and 4.4 (1, 4, 6). |
 
 </details>
 
@@ -87,7 +88,7 @@ Sections 1–3 **verify** Pix against the R&S and the Design (tests, the AI eval
 
 - Functional: 2 (unit, integration), 4 (UAT).
 - Performance: 2.2.3 (NFR-1 to NFR-12, NFR-19).
-- Usability: the NFR-16 hallway test, the user test (4.1), the heuristic evaluation, 4, 5.
+- Usability: the NFR-16 hallway test, the user test (4.1), the heuristic evaluation (4.2), 4, 5.
 - Acceptance: 4.
 - Security and access control: the NFR-14 and NFR-15 server tests in 2 (non-friend and blocked cases).
 - Compatibility: the NFR-17 device pass (2.2.2), the pairwise device and network table (2.1.6).
@@ -187,8 +188,8 @@ Passing CI is necessary, not sufficient. The reviewer also checks the tests (1.3
 Sections first required in each iteration (sections 2, 3, and 4 stay current in every later iteration):
 
 - **Iteration 2:** 1 Test Responsibility & Schedule; 2 Unit & Integration Testing (plan, first results).
-- **Iteration 3:** 3 AI Module Testing (evaluation set, thresholds, first results); 4.1 Preliminary user test; 4.2 UAT plan. Testing focuses on taking photos with the camera, pose suggestions and the guide, and live sharing. Where latency is tested, and with which limits, is **TBD**.
-- **Iteration 4:** 4.3 UAT results (the UAT on 11/16 and 11/18).
+- **Iteration 3:** 3 AI Module Testing (evaluation set, thresholds, first results); 4.1 Preliminary user test; 4.2 Heuristic evaluation; 4.3 UAT plan. Testing focuses on taking photos with the camera, pose suggestions and the guide, and live sharing. Where latency is tested, and with which limits, is **TBD**.
+- **Iteration 4:** 4.4 UAT results (the UAT on 11/16 and 11/18).
 - **Iteration 5:** 5 Alpha & Beta Testing: in-class testing on 11/30, real user test on 12/2 (plan, execution, results).
 
 ### 1.3 Test quality rules
@@ -732,7 +733,7 @@ Each iteration's run adds a column to the tables below; the run's details are in
 
 ## 4. Acceptance Testing
 
-Acceptance testing checks that Pix does what its users need (validation). The preliminary user test (4.1) was run by the team on its own, before and apart from the course's heuristic evaluation and UAT. The UAT (4.2, 4.3) runs in class in Iteration 4.
+Acceptance testing checks that Pix does what its users need (validation). The preliminary user test (4.1) was run by the team on its own, before and apart from the course's heuristic evaluation (4.2) and UAT. The UAT (4.3, 4.4) runs in class in Iteration 4.
 
 ### 4.1 Preliminary user test (Iteration 3)
 
@@ -781,7 +782,51 @@ A test with users outside the team, run to find problems early. It is separate f
 | Guidance on the background and the camera's tilt for the pose | 1 (P4) | No fix decided |
 | A timer; the shutter on the subject's phone; the guide's color and thickness | 1 each | The guide's color and thickness built ([#163], merged 11/2); no fix decided for the other two |
 
-### 4.2 UAT plan (Fixed in Iteration 3)
+### 4.2 Heuristic evaluation (In-Class, Iteration 3)
+
+The course's heuristic evaluation, held in class on 11/4. Students of other teams used Pix and rated it against Nielsen's ten heuristics.
+
+**Run.** Two rounds on 11/4. Three evaluators: E1 (Team 13) and E2 (Team 5) in the first round, E3 (Team 19) in the second. Each rated every heuristic from 0 (no problem) to 4 (usability catastrophe), with a reason and a suggestion. The app was built from `7b03e9e`.
+
+**Ratings.** "—" is a heuristic left unrated.
+
+| Heuristic | E1 | E2 | E3 |
+|---|---|---|---|
+| Visibility of system status | 0 | 0 | 0 |
+| Match between system and the real world | 1 | 0 | 0 |
+| User control and freedom | 0 | 0 | 0 |
+| Consistency and standards | 1 | 0 | 0 |
+| Error prevention | 0 | — | 0 |
+| Recognition rather than recall | 0 | 1 | 0 |
+| Flexibility and efficiency of use | 2 | — | 0 |
+| Aesthetic and minimalist design | 0 | 0 | 0 |
+| Help users recognize, diagnose, and recover from errors | 0 | 1 | 2 |
+| Help and documentation | 0 | 0 | 1 |
+
+**Summary.**
+
+- No major problem (3) or catastrophe (4). Of 28 ratings, 21 are 0, five are 1 (cosmetic), and two are 2 (minor).
+- The two minor problems: *Generate poses* had two buttons that did the same thing with an empty field (E1), and a request stopped by the daily AI limit failed without saying why, which held up the evaluation (E3).
+- Error messages drew the most comments: two of the three evaluators found that they do not say why something failed or what to do. Iteration 4 gives each case of failure its own message.
+- Praised: the guide, the live session, the horizon bar, and the loading of AI poses always show the state (E1, E3). The screens follow the stock camera's conventions and icons (E2, E3). ✕ and undo lead back from any state, AI generation included, and guides can be saved and reused (E3).
+
+**Problems found and what follows.** Most severe first; suggestions rated 0 last.
+
+| Problem | Heuristic · severity · evaluator | What follows |
+|---|---|---|
+| A request stopped by the daily AI limit showed only *Couldn't create poses*, without the reason, which held up the evaluation | Error recovery · 2 · E3 | Iteration 4: a separate error message for each case of failure. The app already tells the limit apart (HTTP 429) but shows the general message |
+| *Generate 4 poses* and *Skip, suggest poses for me* did the same thing with an empty field | Flexibility and efficiency · 2 · E1 | Built: one button, *Suggest 4 poses* or *Generate 4 poses from this* (Iter3-A13, [#180]) |
+| A refused description only says to try another, not why it was refused or how to write one | Error recovery · 1 · E2 | Iteration 4: a separate error message for each case of failure, as above |
+| The toggle that sets whether a pinch moves the guide or zooms the camera needs a clearer icon | Recognition rather than recall · 1 · E2 | Built: a tap shows *Guide* or *Camera* above the toggle for 3 s (Iter3-A15, [#182]). The icon is unchanged |
+| The horizon bar is thick | Consistency and standards · 1 · E1 | Built: 1.5 dp instead of 3 dp; the grid, the guide, and the focus mark are thinner too (Iter3-A15, [#182]) |
+| Pinch zoom lags behind the camera; a zoom slider would be easier | Match with the real world · 1 · E1 | Iteration 4: latency closer to the stock camera ([#183]). No fix decided for a slider |
+| One fixed tutorial is not enough for this many features; first users could follow a walkthrough | Help and documentation · 1 · E3 | No fix decided |
+| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole |
+| A saved guide could bring back the zoom and flash it was shot with | Flexibility and efficiency · 0 · E3 | No fix decided |
+| The guide's color and thickness could be set automatically for visibility | Additional · 0 · E1 | No fix decided. Both are set in Settings (FR-3.10) |
+| A switch to turn off the horizon bar; a landscape layout | Additional · 0 · E3 | The bar now hides past a 20° tilt (Iter3-A15, [#182]). No fix decided for a switch or a landscape layout |
+
+### 4.3 UAT plan (Fixed in Iteration 3)
 
 The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team follow the scripts below without knowing the code, and judge only what they see.
 
@@ -797,7 +842,7 @@ The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team
 
 **Setup.**
 
-- **Build.** The phones run a debug build of the UAT commit, recorded in 4.3.
+- **Build.** The phones run a debug build of the UAT commit, recorded in 4.4.
 - **Phones.** The phones are the testers' own, with Android 10 or later, and are not chosen yet. Phone A is the photographer's and phone B the subject's. Each is on Wi-Fi or cellular data, as its tester likes. On both, Pix is in Korean with notifications allowed. The scripts below quote Pix's English text.
 - **Accounts.** A is signed in as `test1` (Test Account 1), B as `test2` (Test Account 2). The two are friends. A has not yet agreed to send photos to the AI service.
 - **Photos on A.** R1: one person, full body, with an arm stretched out and the legs apart. R2: a landscape without people. R3: a screenshot of an Instagram post that shows one person.
@@ -864,7 +909,7 @@ The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team
 | 5 | On B, tap the flash button. | A's flash moves to its next state, and both phones show that state. |
 | 6 | Set both phones' toggles to *Camera*. On A and B, pinch the zoom at the same moment, and let go. | Both readouts settle on the same zoom. |
 
-### 4.3 UAT results (Iteration 4)
+### 4.4 UAT results (In-Class, Iteration 4)
 
 To be completed in Iteration 4: the build's commit, the two phones, and for each story, pass or fail, the test date, the tester, and any deviation from the criteria, with the steps that failed.
 
@@ -906,6 +951,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 | 2026-11-06 | 3 | Integration scripts on the phones (IT-1–4, 6, 8, 10–34), from 11/04 | `7b03e9e`, `c842fa1` | 31 of 31 pass; IT-5, 7, and 9 covered by later scripts; IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
 | 2026-11-05 | 3 | AI module tests: three runs of the 50 cases, the judge's validation, the description filter, and the person check on a Galaxy Note20 | `430447f` | Suggestions (78.0 %) and the person check (34.6 % of people refused) fail; the other nine thresholds pass, tips at the threshold (80.0 %) | [3.2](#32-results), [record](#run-2026-11-05-ai-module-tests) |
+| 2026-11-04 | 3 | Heuristic evaluation in class: three evaluators of other teams, Nielsen's ten heuristics | `7b03e9e` | No major problem; two minor: *Generate poses*' two buttons for an empty field, built in Iteration 3, and the daily AI limit's failure without its reason | 4.2 |
 | 2026-11-04 | 3 | User test, 11/1–11/4: six participants outside the team, a Google Form over five scenarios | — | SUS 77.9; no crashes; 5 of 6 say Pix would help; follow-ups for Iteration 4 in 4.1 | 4.1 |
 | 2026-11-04 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `7b03e9e` | 1,471 + 784 tests, 0 failed; app 85.9 % (94.2 / 97.4 / 94.5 / 49.6); server 98.3 % | 2.2.1 (before the run of 11/06) |
 | 2026-10-23 | 2 | Integration scripts on the phones (IT-1, 5–9, 11), from the 10/23 demo and the 10/15 midterm recordings; IT-10 from [#93] | `23c620a` | IT-1, 8 pass; IT-5, 7, 9 pass with a step not run; IT-6, 11 partial; IT-2, 3, 4 not run (Iter2-P15/P16). Timing NFRs not measured; cellular pairs not run | 2.2.2, 2.2.3; [record](#run-2026-10-23-integration-scripts) |
@@ -1957,4 +2003,5 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#180]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/180
 [#181]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/181
 [#182]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/182
+[#183]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/183
 [#188]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/188

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A screen going to or from a live image (Design 2.1): it fades out in the first 35 % of the transition. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <objectAnimator
+        android:duration="@integer/screen_transition_ms"
+        android:interpolator="@android:interpolator/fast_out_slow_in">
+        <propertyValuesHolder
+            android:propertyName="alpha"
+            android:valueType="floatType">
+            <keyframe
+                android:fraction="0"
+                android:value="1" />
+            <keyframe
+                android:fraction="0.35"
+                android:value="0" />
+            <keyframe
+                android:fraction="1"
+                android:value="0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+</set>

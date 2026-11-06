@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -30,9 +30,9 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Account, opened from the account button on Friends (R&S 6.8; FR-5.12, FR-5.14; decided in Iter2-P13, until the
- * settings screen of Iterations 3–4): the name, which can be edited, the Pix ID, *Add Google* or *Add a password* for
- * the way the account cannot sign in yet, and *Sign out*. Owner: Accounts (#54).
+ * Account, opened from the account button on Share my camera (R&S 6.8; FR-5.12, FR-5.14; decided in Iter2-P13, until
+ * the settings screen of Iterations 3–4): the name, which can be edited, the Pix ID, *Add Google* or *Add a password*
+ * for the way the account cannot sign in yet, and *Sign out*. Owner: Accounts (#54).
  */
 class AccountSheet : BottomSheetDialogFragment() {
 

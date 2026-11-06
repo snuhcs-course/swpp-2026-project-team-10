@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The gallery button before a photo is saved: a 24 dp icon centered in the 56 dp thumbnail. -->
+<!-- The gallery button before a photo is saved: an 18 dp icon on translucent glass, as it may lie over the camera's
+     image. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="56dp" android:height="56dp">
+    <item android:width="36dp" android:height="36dp">
         <shape android:shape="rectangle">
-            <solid android:color="@color/pix_surface_2" />
+            <solid android:color="@color/pix_glass" />
         </shape>
     </item>
-    <item android:width="24dp" android:height="24dp" android:drawable="@drawable/ic_photo" android:gravity="center" />
+    <item android:width="18dp" android:height="18dp" android:drawable="@drawable/ic_photo" android:gravity="center" />
 </layer-list>

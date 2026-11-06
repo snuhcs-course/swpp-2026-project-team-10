@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.AccountDto
@@ -68,6 +68,9 @@ private val ERRORS = mapOf(
     "PASSWORD_ALREADY_SET" to AccountError.PASSWORD_ALREADY_SET,
     "NOT_FOUND" to AccountError.NOT_FOUND,
     "INVALID_REQUEST" to AccountError.INVALID_REQUEST,
+    "NOT_FRIENDS" to AccountError.NOT_FRIENDS,
+    "BUSY" to AccountError.BUSY,
+    "INVITATION_GONE" to AccountError.INVITATION_GONE,
     "UNAVAILABLE" to AccountError.UNAVAILABLE,
     "UNAUTHENTICATED" to AccountError.SIGNED_OUT,
     "INVALID_REFRESH_TOKEN" to AccountError.SIGNED_OUT,

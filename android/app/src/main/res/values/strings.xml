@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pix</string>
+    <string name="app_name" translatable="false">Pix</string>
 
     <!-- Common -->
     <string name="cancel">Cancel</string>
     <string name="back">Back</string>
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
-    <string name="same_wifi">Both phones on the same Wi-Fi</string>
     <string name="connecting">Connecting…</string>
-    <string name="couldnt_connect_wifi">Couldn\'t connect. Make sure both phones are on the same Wi-Fi.</string>
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="couldnt_connect">Couldn\'t connect. Check your internet connection and try again.</string>
+    <string name="join_rate_limited">Too many wrong codes from this network. Try again in a few minutes.</string>
+    <string name="mobile_data_notice">The live view uses mobile data.</string>
 
     <!-- Flow 1: Camera -->
     <string name="shoot_together">Shoot together</string>
@@ -18,10 +20,11 @@
     <string name="starting_camera">Starting camera</string>
     <string name="open_settings">Open settings</string>
     <string name="allow_camera">Allow camera</string>
-    <string name="zoom_ratio">%1$s×</string>
+    <string name="zoom_ratio" translatable="false">%1$s×</string>
     <string name="camera_zoom_description">Camera zoom, %1$s times</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
+    <string name="zoom_next_step">Next zoom step</string>
     <string name="camera_grid_description">Camera composition grid</string>
     <string name="camera_level_aligned">Camera is level</string>
     <string name="camera_level_tilted">Tilt camera to align the center bar with the horizontal markers</string>
@@ -31,16 +34,16 @@
     <string name="photo_storage_failed">Couldn\'t write the photo. Check available storage and try again.</string>
     <string name="photo_camera_closed">The camera closed before the photo was taken. Return to the camera and try again.</string>
     <string name="open_last_photo">Open last saved photo in gallery</string>
+    <string name="switch_to_front_camera">Switch to the front camera</string>
+    <string name="switch_to_rear_camera">Switch to the rear camera</string>
     <string name="gallery_unavailable">No app is available to open this photo.</string>
     <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
-    <string name="hint_add_guide">Tap Guide to add a pose</string>
-    <string name="hint_edit_guide">Drag · pinch to resize</string>
     <string name="guide">Guide</string>
     <string name="guide_add_description">Add a pose guide</string>
     <string name="guide_change_description">Change the pose guide</string>
     <string name="shutter">Take photo</string>
     <string name="guide_opacity">Guide opacity</string>
-    <string name="guide_opacity_percent">%1$d%%</string>
+    <string name="guide_opacity_percent" translatable="false">%1$d%%</string>
     <string name="remove_guide">Remove guide</string>
     <string name="hide_guide">Hide guide</string>
     <string name="show_guide">Show guide</string>
@@ -48,18 +51,34 @@
     <!-- Saved guides (FR-3.8): the button on the guide's panel and its notices. -->
     <string name="save_guide">Save guide</string>
     <string name="guide_saved">Guide saved</string>
-    <string name="guide_saved_notice">Guide saved. Use it again from Guide.</string>
+    <string name="guide_saved_notice">Guide saved to My library.</string>
     <string name="guide_saved_oldest_removed_notice">Guide saved. The oldest saved guide was removed to keep %1$d.</string>
-    <string name="guide_already_saved_notice">This guide is already saved. Find it under Guide.</string>
+    <string name="guide_removed_notice">Removed from My library.</string>
+    <string name="guide_shown_label">Guide shown</string>
+    <string name="pinch_mode_guide">Guide</string>
+    <string name="pinch_mode_camera">Camera</string>
+    <string name="pinch_mode_guide_description">Pinch moves the guide</string>
+    <string name="pinch_mode_camera_description">Pinch zooms the camera</string>
     <string name="guide_save_failed_notice">Couldn\'t save the guide. Check the phone\'s storage.</string>
-    <string name="saved_guides_title">Saved guides</string>
-    <string name="saved_guide_description">Saved guide from %1$s</string>
     <string name="delete_saved_guide">Delete saved guide</string>
-    <string name="delete_saved_guide_description">Delete the saved guide from %1$s</string>
     <string name="delete_saved_guide_title">Delete this saved guide?</string>
     <string name="delete_saved_guide_message">It is removed from this phone. A guide on the camera stays there.</string>
     <string name="delete">Delete</string>
     <string name="saved_guide_open_failed">Couldn\'t open the saved guide.</string>
+    <!-- The library (FR-3.11, R&S 6.2): every saved guide, filtered by kind. -->
+    <string name="my_library">My library</string>
+    <string name="library_title">Library</string>
+    <string name="library_title_description">Library, saved guides: %1$d</string>
+    <string name="library_all">All %1$d</string>
+    <string name="library_photos">Photos %1$d</string>
+    <string name="library_generated">AI poses %1$d</string>
+    <string name="library_empty">No saved guides yet</string>
+    <string name="library_empty_body">Save a guide on the camera, or add a photo.</string>
+    <string name="library_empty_filter">No guides of this kind yet</string>
+    <string name="add_photo">Add photo</string>
+    <string name="saved_photo_guide_description">Photo guide saved %1$s</string>
+    <string name="saved_pose_guide_description">AI pose guide saved %1$s</string>
+    <string name="guide_offer_failed">Couldn\'t send the guide</string>
     <string name="reference_photo">Reference photo</string>
     <string name="enlarge_reference">Enlarge</string>
     <string name="shrink_reference">Make smaller</string>
@@ -68,21 +87,34 @@
     <string name="move_reference_bottom_left">Move to the bottom left</string>
     <string name="move_reference_bottom_right">Move to the bottom right</string>
     <string name="edit_guide">Edit guide</string>
+    <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
+    <string name="tip_preparing">Preparing a tip…</string>
+    <string name="tip_failed">Couldn\'t get a tip for this pose</string>
+    <string name="show_tip">Show tip</string>
+    <string name="close_tip">Close tip</string>
     <string name="hint_pinch_zoom">Pinch to zoom</string>
     <string name="flash_off">Flash off</string>
     <string name="flash_auto">Flash auto</string>
     <string name="flash_on">Flash on</string>
+    <string name="scene_light_off">Light off</string>
+    <string name="scene_light_on">Light on</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
-    <string name="aspect_4_3">4:3</string>
-    <string name="aspect_16_9">16:9</string>
-    <string name="aspect_1_1">1:1</string>
+    <string name="aspect_ratios">Aspect ratios</string>
+    <string name="aspect_3_4" translatable="false">3:4</string>
+    <string name="aspect_9_16" translatable="false">9:16</string>
+    <string name="aspect_1_1" translatable="false">1:1</string>
     <string name="brightness">Brightness</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
     <string name="peer_left">%1$s left</string>
     <string name="peer_disconnected">%1$s disconnected</string>
+    <string name="session_photo_saved">Photo saved to your Pix album</string>
+    <string name="session_photo_save_failed">Couldn\'t save %1$s\'s photo</string>
+    <string name="session_photo_not_sent">Couldn\'t send a photo to %1$s</string>
+    <string name="session_photos_not_sent">Couldn\'t send %1$d photos to %2$s</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
+    <string name="remote_guide_notice">%1$s set a pose guide</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_flash_on_notice">%1$s turned the flash on</string>
     <string name="remote_flash_off_notice">%1$s turned the flash off</string>
@@ -90,14 +122,9 @@
 
     <!-- Flow 1: Add a pose guide, Reference confirm, No person found -->
     <string name="add_guide_title">Add a pose guide</string>
-    <string name="add_guide_body">Pix cuts the person out of a photo and shows them on your camera, so you can frame the same pose.</string>
     <string name="replace_guide_title">Replace the pose guide?</string>
-    <string name="replace_guide_body">Choose a new reference, and its guide takes the place of the current one.</string>
     <string name="keep_current_guide">Keep the current guide</string>
-    <string name="upload_reference">Upload a reference</string>
-    <string name="upload_reference_body">A photo from your gallery with one person in it</string>
     <string name="generate_poses">Generate poses here</string>
-    <string name="generate_poses_body">Four pose ideas for this scene, made by AI</string>
     <string name="reference_title">Your reference</string>
     <string name="reference_preview_description">The person from the reference photo</string>
     <string name="finding_person">Finding the person…</string>
@@ -105,6 +132,9 @@
     <string name="couldnt_use_photo">Couldn\'t use this photo. Try another one.</string>
     <string name="use_this_guide">Use this guide</string>
     <string name="choose_another_photo">Choose another photo</string>
+    <string name="cut_from_screenshot">Cut from a screenshot</string>
+    <string name="kept_photo_description">The photo kept from the screenshot</string>
+    <string name="use_whole_image">Use the whole image</string>
     <string name="no_person_title">No person found</string>
     <string name="no_person_message">Pick a photo where one person is clearly visible.</string>
 
@@ -115,56 +145,81 @@
     <string name="consent_agree">Agree and continue</string>
     <string name="not_now">Not now</string>
     <string name="scene_title">Take the scene photo</string>
-    <string name="scene_body">Frame the person and the place, then press the shutter.</string>
     <string name="scene_review_title">Use this photo?</string>
     <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="use_this_photo">Use this photo</string>
     <string name="shoot_again">Shoot again</string>
     <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>
+    <string name="scene_no_person_title">No one in this photo</string>
+    <string name="scene_no_person_body">Poses need a person. Frame them and shoot again.</string>
     <string name="your_photo">Your photo</string>
     <string name="describe_title">Generate poses</string>
-    <string name="describe_body">Describe a pose, or let Pix suggest four for this place</string>
     <string name="describe_label">Describe the pose</string>
     <string name="describe_hint">e.g. Leaning on the wall, one hand in a pocket</string>
-    <string name="description_counter">%1$d/%2$d</string>
+    <string name="description_counter" translatable="false">%1$d/%2$d</string>
     <string name="description_refused">The last set was refused. Try a different description, or another photo.</string>
     <string name="description_rejected_message">The AI service would not create poses for “%1$s” with this photo. Try a different description, or go back to the camera and take another photo.</string>
+    <string name="generation_no_person_message">The AI service found no one in this photo. Take another photo with the person in it.</string>
     <string name="edit_description">Edit description</string>
-    <string name="ideas_label">Ideas</string>
-    <string name="generate_four_poses">Generate 4 poses</string>
-    <string name="skip_suggest_poses">Skip, suggest poses for me</string>
+    <!-- The descriptions used before on Generate poses (FR-4.11): the section, its All / With <name> switch, the line
+         shown when nothing was used with that friend, and the ✕ of an entry, for TalkBack. -->
+    <string name="history_label">Used before</string>
+    <string name="history_all">All</string>
+    <string name="history_with">With %1$s</string>
+    <string name="history_empty_with">Nothing used with %1$s yet</string>
+    <string name="history_delete">Remove “%1$s” from the descriptions used before</string>
+    <!-- The one button of Generate poses (Iter3-A13): its label with an empty field, and with a description. -->
+    <string name="suggest_four_poses">Suggest 4 poses</string>
+    <string name="generate_four_from_description">Generate 4 poses from this</string>
+    <string name="clear_description">Clear the description</string>
     <string name="choosing_poses">Choosing poses…</string>
-    <!-- Idea chips on Generate poses (FR-4.8). Each fills the description field, so keep them under 100 characters
-         and possible anywhere: the image model adds nothing to lean or sit on that the scene does not have. -->
-    <string-array name="pose_ideas">
-        <item>Looking back over my shoulder</item>
-        <item>Walking toward the camera, smiling</item>
-        <item>Hands in pockets, looking up</item>
-        <item>Leaning on something, arms crossed</item>
-        <item>Sitting down, hugging my knees</item>
-        <item>Jumping with both arms up</item>
-    </string-array>
     <string name="scene_photo_description">The photo of the scene the poses are made from</string>
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
     <string name="ready_count">%1$d of %2$d ready</string>
     <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
-    <string name="pick_pose_body">Tap one to use it as the guide</string>
+    <!-- The ✕ at the top of Pick a pose, for TalkBack: it leaves for the camera, while Back goes to Generate poses. -->
+    <string name="close_to_camera">Close, back to Camera</string>
+    <string name="pose_page_counter" translatable="false">%1$d / %2$d</string>
+    <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
     <string name="use_this_pose">Use this pose</string>
     <string name="try_other_poses">Try other poses</string>
+    <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
+    <string name="save_pose">Save this pose to My library</string>
+    <string name="remove_saved_pose">Remove this pose from My library</string>
+    <string name="pose_saved_notice">Pose saved to My library.</string>
+    <string name="pose_removed_notice">Pose removed from My library.</string>
+    <string name="pose_no_person_notice">Couldn\'t find a person in this pose.</string>
+    <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
+    <string name="shared_hint">%1$s sees this too</string>
+    <string name="peer_chose_this_pose">%1$s chose this pose</string>
+    <string name="peer_chose_pose">%1$s chose a pose</string>
+    <string name="peer_closed_poses">%1$s closed the poses</string>
+    <!-- The subject's Generating poses as the photographer's set ends without a candidate (Iter3-A13). -->
+    <string name="peer_stopped_poses">%1$s stopped creating poses</string>
+    <string name="peer_poses_failed">%1$s\'s poses couldn\'t be created</string>
+    <string name="pose_pick_failed">Couldn\'t send your pick</string>
+    <string name="peer_used_guide">%1$s used this guide</string>
+    <string name="peer_closed_reference">%1$s closed the reference</string>
+    <string name="guide_use_failed">Couldn\'t send your choice</string>
+    <string name="peer_typing">%1$s is typing…</string>
+    <string name="peer_closed_describe">%1$s closed Generate poses</string>
+    <string name="describe_go_failed">Couldn\'t send your request</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>
     <string name="generation_failed_message">The request failed or took longer than 60 seconds. Your photo is kept, so you can try again.</string>
 
-    <!-- Flow 3: Friends, Add a friend (R&S 6.4) -->
-    <string name="friends_overline">Friends</string>
-    <string name="friends_subtitle">Invite a friend to see your camera live</string>
+    <!-- Flow 3: Share my camera, with the Pix friends; Add a friend (R&S 6.4, 6.7) -->
+    <string name="share_my_camera">Share my camera</string>
     <string name="account">Account</string>
-    <string name="signed_out_title">Shoot with friends</string>
-    <string name="signed_out_body">Sign in to add friends by their Pix ID and invite them to shoot together.</string>
+    <string name="invite_pix_friend">Invite a Pix friend</string>
+    <string name="invite_pix_friend_body">Once they accept, my camera shows on their phone.</string>
+    <string name="connect_nearby">Connect with someone nearby</string>
+    <string name="connect_nearby_body">No Pix friend or sign-in needed.</string>
+    <string name="show_code">Show a code</string>
+    <string name="show_code_body">They enter this phone\'s 6-digit code</string>
+    <string name="signed_out_body">Sign in to add friends by their Pix ID and invite them.</string>
     <string name="sign_in_to_add_friends">Sign in to add friends</string>
-    <string name="use_room_code_instead">Use a room code instead</string>
-    <string name="use_room_code">Use a room code</string>
     <string name="choose_pix_id_title">Choose your Pix ID</string>
     <string name="choose_pix_id_body">Friends find you by your Pix ID.</string>
     <string name="choose_pix_id">Choose a Pix ID</string>
@@ -175,24 +230,23 @@
     <string name="copy_pix_id">Copy my Pix ID</string>
     <string name="pix_id_copied">Pix ID copied</string>
     <string name="friend_requests">Friend requests</string>
-    <string name="at_pix_id">\@%1$s</string>
+    <string name="at_pix_id" translatable="false">\@%1$s</string>
     <string name="accept">Accept</string>
     <string name="decline">Decline</string>
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="in_session">In a session</string>
     <!-- "Online · @test2" under a friend's name (FR-5.9). -->
-    <string name="friend_status">%1$s · \@%2$s</string>
+    <string name="friend_status" translatable="false">%1$s · \@%2$s</string>
     <string name="invite">Invite</string>
-    <string name="invite_not_yet">Invite %1$s. Not available yet</string>
+    <string name="invite_friend">Invite %1$s</string>
     <string name="remove_friend_title">Remove %1$s?</string>
     <string name="remove_friend_message">You won\'t see each other in your friend lists. You can add each other again later.</string>
     <string name="remove_friend">Remove friend</string>
     <string name="friends_offline">Couldn\'t update your friends. Check your connection.</string>
-    <!-- Sent requests, from "Sent requests · 2" on Friends (FR-5.16). -->
+    <!-- Sent requests, from "Sent requests · 2" on Share my camera (FR-5.16). -->
     <string name="sent_requests_count">Sent requests · %1$d</string>
     <string name="sent_requests_title">Sent requests</string>
-    <string name="sent_requests_subtitle">They become your friends once they accept</string>
     <string name="no_sent_requests_title">No sent requests</string>
     <string name="no_sent_requests_body">Requests you send stay here until they\'re answered</string>
     <string name="withdraw">Withdraw</string>
@@ -235,7 +289,7 @@
     <string name="check">Check</string>
     <string name="check_pix_id_description">Check whether this Pix ID is free</string>
     <string name="checking_pix_id">Checking…</string>
-    <string name="pix_id_available">%1$s is available</string>
+    <string name="pix_id_available">This Pix ID is available</string>
     <string name="sign_up">Sign up</string>
     <string name="pix_id_setup_title">Choose your Pix ID</string>
     <string name="pix_id_setup_body">Friends find you by this ID, so it has no capitals or spaces.</string>
@@ -267,33 +321,168 @@
     <string name="password_added">Password added. You can sign in with your Pix ID now.</string>
     <string name="signed_out">Signed out</string>
 
-    <!-- Flow 6: Room code -->
+    <!-- Flow 6: Who takes the photo, Room code, See their camera (R&S 6.7) -->
+    <string name="who_takes_the_photo">Who takes the photo?</string>
+    <string name="role_photographer">I\'ll take the photo</string>
+    <string name="role_photographer_body">My camera shows on the other phone</string>
+    <string name="role_subject">I\'ll be in the photo</string>
+    <string name="role_subject_body">Watch their camera as you pose</string>
+    <!-- The badge on I'll be in the photo while invitations wait (FR-6.17); short, since it shares the tile's top. -->
+    <plurals name="invitations_waiting">
+        <item quantity="one">%1$d invite</item>
+        <item quantity="other">%1$d invites</item>
+    </plurals>
     <string name="room_code_title">Your room code</string>
-    <string name="room_code_body">Ask your friend to open Pix, tap Shoot together › Use a room code, and join with this code.</string>
-    <string name="room_code_placeholder">––– –––</string>
+    <string name="room_code_body">Enter this code on the phone of the person in the photo</string>
+    <!-- Where the other phone enters it: "Shoot together › I'll be in the photo". -->
+    <string name="room_code_path" translatable="false">%1$s › %2$s</string>
+    <string name="room_code_placeholder" translatable="false">––– –––</string>
     <string name="getting_code">Getting a code…</string>
-    <string name="waiting_for_friend">Waiting for your friend…</string>
-    <string name="friend_joined_connecting">Your friend joined · connecting…</string>
-    <string name="code_expired">The code expired. Tap Use a room code again for a new one.</string>
+    <string name="waiting_to_connect">Waiting to connect…</string>
+    <string name="peer_joined_connecting">They joined · connecting…</string>
+    <string name="code_expired">The code expired. Tap Show a code again for a new one.</string>
     <string name="code_expiry">Expires in 10 min</string>
-    <string name="join_instead">Join with a code instead</string>
-    <string name="join_title">Join with a code</string>
-    <string name="join_body">Enter the 6-digit code shown on your friend\'s camera.</string>
-    <string name="room_code_label">Room code</string>
-    <string name="join">Join</string>
+    <string name="join_title">See their camera</string>
+    <string name="join_body">Enter the code on the photographer\'s phone</string>
+    <string name="join_body_or">Or enter the code on the photographer\'s phone</string>
+    <!-- Where that code comes from: "I'll take the photo › Show a code". -->
+    <string name="join_hint">It shows when they tap %1$s › %2$s.</string>
+    <string name="join">Connect</string>
+    <string name="join_invite_note">Invitations from Pix friends wait here for a minute, even if you miss the notification.</string>
+    <!-- See their camera's received invitations (FR-6.17). -->
+    <string name="received_invitations">Received invitations</string>
+    <string name="accepting_shows_camera">Accepting shows their camera.</string>
+    <!-- The time an invitation has left, 0:48. -->
+    <string name="invitation_time_left" translatable="false">%1$d:%2$02d</string>
+    <string name="accept_invitation_from">Accept %1$s\'s invitation</string>
+    <string name="decline_invitation_from">Decline %1$s\'s invitation</string>
     <string name="session_not_found_title">Session not found</string>
-    <string name="session_not_found_message">Check the code with your friend and try again.</string>
+    <string name="session_not_found_message">Check the code on the photographer\'s phone and try again.</string>
 
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s\'s camera</string>
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
-    <string name="subject_caption">Pinch the video to zoom the photographer\'s camera</string>
+    <string name="subject_video_description">Pinch the video to zoom the photographer\'s camera</string>
     <string name="peer_ended_session">%1$s ended the session</string>
+    <!-- The same, when the session ended before the photographer's name arrived. -->
+    <string name="peer_ended_session_unnamed">The photographer ended the session</string>
     <string name="camera_paused">The photographer\'s camera is paused.</string>
+    <string name="peer_creating_poses">%1$s is creating poses…</string>
+    <string name="peer_picking_pose">%1$s is picking a pose…</string>
+    <string name="peer_checking_guide">%1$s is checking the guide…</string>
+    <string name="peer_describing_pose">%1$s is describing a pose…</string>
     <string name="session_ended">The session has ended.</string>
     <string name="connection_lost_title">Connection lost</string>
-    <string name="connection_lost_message">Video stopped. Check that both phones are on the same Wi-Fi, then reconnect.</string>
+    <string name="connection_lost_message">Video stopped. Check both phones\' internet connection, then reconnect.</string>
     <string name="reconnect">Reconnect</string>
+
+    <!-- Invitations and their push notifications (R&S 6.5, 6.6; FR-5.7, FR-6.1–6.4, FR-6.9). -->
+    <string name="invite_busy">%1$s is in another session</string>
+    <string name="invite_waiting">Waiting for %1$s</string>
+    <string name="invite_sending">Sending the invitation…</string>
+    <string name="invite_waiting_body">%1$s gets a notification. The live view starts when they accept.</string>
+    <string name="invite_accepted_connecting">%1$s accepted · connecting…</string>
+    <string name="invite_link_hint">No notification? Send a link instead.</string>
+    <string name="share_invite_link">Share invite link</string>
+    <string name="copy_link">Copy link</string>
+    <string name="link_copied">Link copied</string>
+    <string name="invite_share_text">Let\'s shoot together in Pix. Open this link to see my camera live: %1$s</string>
+    <string name="cancel_invite">Cancel invite</string>
+    <string name="invite_not_accepted_title">Invite not accepted</string>
+    <string name="invite_not_accepted_message">%1$s declined or didn\'t answer within a minute.</string>
+    <string name="invite_again">Invite again</string>
+    <string name="invitation_title">%1$s wants to show you their camera</string>
+    <string name="invitation_body">You\'ll see the framing and pose guide live.</string>
+    <string name="invitation_loading">Opening the invitation…</string>
+    <string name="invitation_gone_title">This invitation is no longer available</string>
+    <string name="invitation_gone_message">Ask your friend to invite you again.</string>
+    <string name="invitation_sign_in">Sign in to Pix with the account your friend invited, then accept.</string>
+    <string name="invitation_failed_title">Couldn\'t open the invitation</string>
+    <string name="invitation_in_session">You\'re in another session. Leave it first, then accept.</string>
+    <string name="invitation_notification">%1$s invites you to shoot together</string>
+    <string name="friend_request_notification">%1$s sent you a friend request</string>
+    <string name="friend_request_notification_body">Tap to accept or decline.</string>
+    <string name="invitations_channel">Invitations</string>
+    <string name="friend_requests_channel">Friend requests</string>
+
+    <!-- Settings, How to use Pix, About Pix (R&S 6.10; FR-10.1–10.5, FR-3.10, FR-4.2) -->
+    <string name="settings">Settings</string>
+    <string name="settings_section_camera">Camera</string>
+    <string name="settings_base_brightness">Base brightness</string>
+    <string name="settings_base_brightness_body">Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap.</string>
+    <string name="settings_section_guide">Guide</string>
+    <string name="settings_guide_color">Color</string>
+    <string name="settings_guide_thickness">Thickness</string>
+    <string name="guide_color_white">White</string>
+    <string name="guide_color_black">Black</string>
+    <string name="guide_color_yellow">Yellow</string>
+    <string name="guide_color_mint">Mint</string>
+    <string name="guide_color_pink">Pink</string>
+    <string name="guide_thickness_thin">Thin</string>
+    <string name="guide_thickness_normal">Normal</string>
+    <string name="guide_thickness_thick">Thick</string>
+    <string name="settings_latency">Show the delay</string>
+    <string name="settings_latency_body">While you shoot together, both phones show how far the live view lags.</string>
+    <string name="settings_section_general">General</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_phone">Phone\'s language</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_on">On</string>
+    <string name="settings_off">Off</string>
+    <string name="settings_section_privacy">Privacy</string>
+    <string name="settings_ai_consent">AI pose generation</string>
+    <string name="settings_consent_given">Agreed</string>
+    <string name="settings_consent_not_given">Not agreed</string>
+    <string name="settings_consent_body">A scene photo goes to the AI service only after you agree. If you withdraw, Pix asks again before the next one.</string>
+    <string name="settings_withdraw_title">Withdraw your agreement?</string>
+    <string name="settings_withdraw_message">Pix will ask again before it sends the next scene photo for poses.</string>
+    <string name="settings_withdraw">Withdraw</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_account">Pix account</string>
+    <string name="settings_signed_out">Not signed in</string>
+    <string name="settings_section_help">Help</string>
+    <string name="settings_how_to">How to use Pix</string>
+    <string name="settings_about">About Pix</string>
+    <string name="settings_version">Version %1$s</string>
+    <!-- The latency indicator on Camera and Subject view (FR-10.3). -->
+    <string name="latency_value">Delay %1$d ms</string>
+    <string name="latency_unknown">Delay –</string>
+    <string name="help_title">How to use Pix</string>
+    <string name="help_guide_title">Add a pose guide</string>
+    <string name="help_guide_body">Tap Guide and pick a photo of a person. Their outline appears on the camera: drag it to move it, pinch to resize it, and line the person up with it.</string>
+    <string name="help_poses_title">Generate poses</string>
+    <string name="help_poses_body">Tap Guide › Generate poses here and take a photo of the scene. AI makes four poses for that person in that place; the one you pick becomes the guide.</string>
+    <string name="help_together_title">Shoot together</string>
+    <string name="help_together_body">On Shoot together, choose who takes the photo. Invite a Pix friend or show a code to the person in the photo, and their phone shows your camera live, with the same guide.</string>
+    <string name="help_remote_title">From the subject\'s phone</string>
+    <string name="help_remote_body">The person in the photo can zoom, change the brightness and the flash, and move the guide from their own phone. Only the photographer takes the photo.</string>
+    <string name="about_title">About Pix</string>
+    <string name="about_version">Version</string>
+    <string name="about_licenses">Open-source licenses</string>
+
+    <string name="settings_tutorial">Show the tutorial again</string>
+    <string name="settings_tutorial_reset">The tutorial shows again on each screen.</string>
+    <string name="tutorial_got_it">Got it</string>
+    <string name="tutorial_settings">Change the language and the guide\'s look</string>
+    <string name="tutorial_together">Share your camera live with another phone</string>
+    <string name="tutorial_guide">Add a photo or AI pose guide</string>
+    <string name="tutorial_shutter">Only the photo is saved, never the guide</string>
+    <string name="tutorial_switch">Change to the front camera</string>
+    <string name="tutorial_upload">Pix traces the person in your photo</string>
+    <string name="tutorial_generate">AI makes four poses for this place</string>
+    <string name="tutorial_saved">Saved guides wait in My library</string>
+    <string name="tutorial_move">Drag to move, pinch to resize</string>
+    <string name="tutorial_edit">The guide moves only while this is on</string>
+    <string name="tutorial_fade">Fade it or hide it</string>
+    <string name="tutorial_save">Save it to use again</string>
+    <string name="tutorial_scene">Poses start from this photo</string>
+    <string name="tutorial_describe">Write the pose you want</string>
+    <string name="tutorial_suggest">Leave it empty and AI suggests four</string>
+    <string name="tutorial_friend_title">When you\'re the subject</string>
+    <string name="tutorial_friend_zoom">Pinch to zoom the photographer\'s camera</string>
+    <string name="tutorial_friend_brightness">Change the brightness</string>
+    <string name="tutorial_friend_move">Move the guide yourself</string>
+    <string name="tutorial_friend_guide">Choose a guide from this phone</string>
 </resources>

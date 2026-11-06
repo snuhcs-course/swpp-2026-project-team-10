@@ -1,14 +1,24 @@
-// AI-generated with ChatGPT Codex, 2026-10-05, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
-/** The horizon's clockwise Canvas angle; a null reading means its direction is unknown. */
-data class CameraLevel(val angleDegrees: Float, val isLevel: Boolean)
+/**
+ * The horizon's clockwise Canvas angle, [angleDegrees], and whether it is level. [baseDegrees] is how the phone is held
+ * against the screen: 0 upright (portrait on a portrait screen), 90 turned on its side, where the horizon runs along
+ * the screen's long side; the tilt is measured from it (FR-1.10). A null reading means the bar is not shown.
+ */
+data class CameraLevel(val angleDegrees: Float, val isLevel: Boolean, val baseDegrees: Float = 0f)
 
-/** Maps Android's natural-device gravity coordinates into the currently displayed viewfinder. */
+/** Past this tilt from upright or from sideways, the bar hides: it would only get in the way (FR-1.10). */
+internal const val MAX_LEVEL_TILT_DEGREES = 20f
+
+/**
+ * Maps Android's natural-device gravity coordinates into the currently displayed viewfinder, and decides whether the
+ * phone is held upright or on its side from the nearer of the two.
+ */
 internal fun cameraLevelFromGravity(
     x: Float,
     y: Float,
@@ -30,15 +40,26 @@ internal fun cameraLevelFromGravity(
     if (magnitudeSquared < 1.0 || sqrt(planeSquared / magnitudeSquared) < 0.2) return null
 
     val roll = Math.toDegrees(atan2(screenX.toDouble(), screenY.toDouble())).toFloat()
-    // A horizon is a line, so upside-down portrait has the same level position as upright.
+    // A horizon is a line, so upside-down portrait has the same level position as upright, and either side the same
+    // as the other: the angle is folded into -90..90.
     val angle = when {
         roll > 90f -> roll - 180f
         roll < -90f -> roll + 180f
         roll == 0f -> 0f
         else -> roll
     }
+    val sideways = abs(angle) > 45f
+    val base = if (sideways) 90f else 0f
+    val tilt = if (!sideways) {
+        angle
+    } else if (angle > 0f) {
+        angle - 90f
+    } else {
+        angle + 90f
+    }
+    if (abs(tilt) > MAX_LEVEL_TILT_DEGREES) return null
     val threshold = if (wasLevel) 3f else 2f
-    return CameraLevel(angle, abs(angle) <= threshold)
+    return CameraLevel(if (sideways && angle < 0f) angle + 180f else angle, abs(tilt) <= threshold, base)
 }
 
 /** Smooth vectors before deriving an angle so the +/-180-degree boundary cannot average to zero. */

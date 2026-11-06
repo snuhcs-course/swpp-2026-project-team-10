@@ -1,10 +1,11 @@
-# AI-generated with Claude Code, 2026-10-23, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
 """One pose candidate per call through OpenRouter's Image API."""
 
 import asyncio
 import base64
 import io
 import logging
+import math
 from http import HTTPStatus
 
 import httpx2
@@ -19,10 +20,13 @@ API_URL = "https://openrouter.ai/api/v1/images"
 MAX_SCENE_SIDE = 1024
 SEED_LIMIT = 2**31  # the app sends a 64-bit value, and a model such as Seedream rejects seeds above 2**31 - 1
 RESULT_JPEG_QUALITY = 90
+# The app's portrait frames (R&S FR-1.13), as OpenRouter names them, with their width / height.
+ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
 
 
-def check_scene(data: bytes) -> None:
-    """Accept only what the app sends (Design Documentation 2.5.3): a JPEG, long side at most 1024 px, no EXIF."""
+def check_scene(data: bytes) -> tuple[int, int]:
+    """Accept only what the app sends (Design Documentation 2.5.3): a JPEG, long side at most 1024 px, no EXIF.
+    Returns its width and height."""
     try:
         with Image.open(io.BytesIO(data), formats=["JPEG"]) as image:
             if max(image.size) > MAX_SCENE_SIDE:
@@ -31,8 +35,16 @@ def check_scene(data: bytes) -> None:
             if image.getexif():
                 raise ApiError(400, "INVALID_IMAGE", "The image must not contain EXIF metadata")
             image.load()
+            return image.size
     except (OSError, Image.DecompressionBombError) as exc:
         raise ApiError(400, "INVALID_IMAGE", "The image must be a readable JPEG") from exc
+
+
+def aspect_ratio(size: tuple[int, int]) -> str:
+    """The ratio the candidates are asked in: the app's frame closest to the scene's shape (FR-4.3). The phone rounds
+    the scene's size, so it is seldom exactly one of them; a landscape scene, which the app never sends, gets 1:1."""
+    width, height = size
+    return min(ASPECT_RATIOS, key=lambda name: abs(math.log(width / height / ASPECT_RATIOS[name])))
 
 
 def status_phrase(status: int) -> str:
@@ -57,8 +69,9 @@ class PoseGenerator:
         self._settings = settings
         self._http = http
 
-    async def generate(self, scene: bytes, prompt: str, seed: int) -> bytes:
-        """Return the candidate as JPEG bytes, or raise the ApiError the endpoint should answer with."""
+    async def generate(self, scene: bytes, prompt: str, seed: int, ratio: str) -> bytes:
+        """Return the candidate as JPEG bytes in `ratio` (one of ASPECT_RATIOS), or raise the ApiError the endpoint
+        should answer with."""
         key = self._settings.openrouter_api_key
         if key is None or not key.get_secret_value():
             logger.error("OPENROUTER_API_KEY is not set, so poses cannot be generated")
@@ -75,7 +88,7 @@ class PoseGenerator:
                     "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(scene).decode()},
                 }
             ],
-            "aspect_ratio": "3:4",  # every scene, whatever its ratio; the scene's own ratio comes later (Design 2.6.3)
+            "aspect_ratio": ratio,
             "resolution": "1K",
             "seed": seed % SEED_LIMIT,
         }

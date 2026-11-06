@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import kotlinx.coroutines.flow.SharedFlow
@@ -44,6 +44,12 @@ interface AuthRepository {
 
     /** 1–30 characters after trimming. */
     suspend fun setDisplayName(displayName: String): Result<Account>
+
+    /**
+     * Reads the account again from the server, where another phone signed in to it may have changed it; [state] then
+     * shows it. Fails with OFFLINE or SIGNED_OUT, and the phone keeps the account it had.
+     */
+    suspend fun refreshAccount(): Result<Unit>
 
     /**
      * An access token that is not about to expire, refreshed first if needed, or null when signed out or offline.

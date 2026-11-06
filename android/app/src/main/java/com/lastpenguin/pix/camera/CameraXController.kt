@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -19,6 +19,7 @@ import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState as CameraXState
 import androidx.camera.core.FocusMeteringAction
@@ -83,13 +84,29 @@ class CameraXController(
     private val _state = MutableStateFlow(CameraState(zoom = 1f))
     override val state: StateFlow<CameraState> = _state.asStateFlow()
 
-    // The primary rear camera's exposure, flash, and focus support, read once like the zoom plan.
+    // The camera chosen (FR-1.14); a binding keeps the one it was started with until it is replaced.
+    private var chosenFacing = CameraFacing.BACK
+    private val _facing = MutableStateFlow(chosenFacing)
+    override val facing: StateFlow<CameraFacing> = _facing.asStateFlow()
+
+    private val _hasFrontCamera = MutableStateFlow(false)
+    override val hasFrontCamera: StateFlow<Boolean> = _hasFrontCamera.asStateFlow()
+
+    // The chosen camera's exposure, flash, and focus support, read once per camera like the zoom plan.
     private var controls: Controls? = null
+
+    // The camera the zoom plan and the controls were read for; another one reads them again.
+    private var discoveredFor: CameraFacing? = null
 
     // Kept across rebinds and lens switches, like retainedZoom: CameraX starts every binding without them.
     private var aspect = AspectRatio.R4_3
     private var retainedExposure = 0
     private var flash = FlashMode.OFF
+
+    // The light for the scene photo (setTorch). CameraX turns it off whenever the camera closes, so it is kept here;
+    // only the answer to the newest request since the camera opened is published.
+    private var torch = false
+    private var torchRequest = 0
 
     // Whether the bound lens has a flash; a separately exposed ultrawide may not.
     private var lensHasFlash = true
@@ -139,7 +156,7 @@ class CameraXController(
 
     /** [lens] is where a lens switch is heading; without it, the lens follows the zoom to restore. */
     private fun startBinding(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider, lens: ZoomLens? = null) {
-        val current = Binding(owner, surfaceProvider)
+        val current = Binding(owner, surfaceProvider, chosenFacing)
         binding = current
         current.lifecycleObserver = LifecycleEventObserver { _, event ->
             if (binding !== current) return@LifecycleEventObserver
@@ -156,6 +173,7 @@ class CameraXController(
                     pendingZoom = null
                     pendingFinal = true
                     current.frames.clear()
+                    torchOff()
                     refreshStatus(current)
                 }
 
@@ -181,8 +199,14 @@ class CameraXController(
                 try {
                     val cameraProvider = future.get()
                     provider = cameraProvider
-                    if (controls == null) discoverControls(cameraProvider)
-                    if (zoomPlan == null) discoverZoomPlan(cameraProvider)
+                    if (discoveredFor != current.facing) {
+                        discoveredFor = current.facing
+                        controls = null
+                        zoomPlan = null
+                        ultrawideSelector = null
+                    }
+                    if (controls == null) discoverControls(cameraProvider, current.facing)
+                    if (zoomPlan == null) discoverZoomPlan(cameraProvider, current.facing)
                     val plan = checkNotNull(zoomPlan)
                     val requested = plan.clamp(pendingZoom ?: retainedZoom)!!
                     val target = lens?.takeIf { it == ZoomLens.PRIMARY || plan.ultrawide != null }
@@ -206,16 +230,30 @@ class CameraXController(
         }
     }
 
-    private fun discoverZoomPlan(cameraProvider: ProcessCameraProvider) {
+    private fun discoverZoomPlan(cameraProvider: ProcessCameraProvider, facing: CameraFacing) {
         val infos = cameraProvider.availableCameraInfos
-        val primary = CameraSelector.DEFAULT_BACK_CAMERA.filter(infos).firstOrNull()
-            ?: error("No rear camera is available")
+        _hasFrontCamera.value = CameraSelector.DEFAULT_FRONT_CAMERA.filter(infos).isNotEmpty()
+        val primary = facing.selector.filter(infos).firstOrNull()
+            ?: error("No ${facing.name.lowercase()} camera is available")
         primarySelector = primary.cameraSelector
-        val primaryState = checkNotNull(primary.zoomState.value) { "Rear camera has no zoom range" }
+        val primaryState = checkNotNull(primary.zoomState.value) { "The ${facing.name.lowercase()} camera has no zoom" }
         val primaryRange = checkNotNull(LensZoomRange.create(1f, primaryState.minZoomRatio, primaryState.maxZoomRatio))
         // A logical camera may already expose zoom-out. Prefer that route wherever supported;
-        // otherwise use only independently selectable rear lenses, never nested physicalCameraInfos.
-        val ultrawide = infos.mapNotNull { info ->
+        // otherwise use only independently selectable rear lenses, never nested physicalCameraInfos. The front camera
+        // zooms on its own lens only (FR-1.14).
+        val ultrawide = if (facing == CameraFacing.FRONT) null else findUltrawide(infos, primary, primaryRange)
+        ultrawideSelector = ultrawide?.first
+        zoomPlan = CameraZoomPlan(primaryRange, ultrawide?.second)
+        publishCapabilities()
+    }
+
+    /** The widest rear lens that CameraX exposes apart from [primary] and whose range joins the primary's, if any. */
+    private fun findUltrawide(
+        infos: List<CameraInfo>,
+        primary: CameraInfo,
+        primaryRange: LensZoomRange,
+    ): Pair<CameraSelector, LensZoomRange>? =
+        infos.mapNotNull { info ->
             try {
                 if (info === primary || info.lensFacing != CameraSelector.LENS_FACING_BACK) return@mapNotNull null
                 val intrinsic = info.intrinsicZoomRatio
@@ -230,17 +268,14 @@ class CameraXController(
                 null
             }
         }.minByOrNull { it.second.minZoom }
-        ultrawideSelector = ultrawide?.first
-        zoomPlan = CameraZoomPlan(primaryRange, ultrawide?.second)
-        publishCapabilities()
-    }
 
     private fun bindUseCases(
         cameraProvider: ProcessCameraProvider,
         current: Binding,
         surfaceProvider: Preview.SurfaceProvider,
     ) {
-        // Pix is portrait-only. All outputs describe the same field of view, cut from the sensor's 4:3 (AD-10).
+        // Pix is portrait-only. All outputs describe the same field of view, cut from the sensor's 4:3 (AD-10). The
+        // preview mirrors the front camera by itself (CameraX's default); photos and frames are mirrored to match.
         val rotation = Surface.ROTATION_0
         val ratio = this.aspect
         current.aspect = ratio
@@ -321,17 +356,21 @@ class CameraXController(
                     current.zoomRequestId++
                     current.requestedNative = null
                 }
+                val opened = open && !current.open
                 current.open = open
+                if (!open) torchOff()
                 // CameraX can wait for another camera client without attaching an error.
                 // Keep retry/settings guidance visible while waiting; a later OPEN recovers automatically.
                 current.failed = state.error != null || state.type == CameraXState.Type.PENDING_OPEN
                 if (!current.open || current.failed) current.frames.clear()
                 state.error?.let {
                     Log.w(TAG, "Camera state error ${it.code}", it.cause)
-                    if (recoverPrimary(current)) return@Observer
+                    // A failing ultrawide or front camera gives the primary rear camera back, opened or not.
+                    if (recoverPrimary(current) || recoverRear(current)) return@Observer
                 }
                 restoreZoomIfNeeded(current)
                 restoreExposureIfNeeded(current)
+                if (opened && torch) applyTorch(current)
                 refreshStatus(current)
             }
         }
@@ -468,13 +507,14 @@ class CameraXController(
                 finished = true
                 current.capturesInFlight--
                 drainZoom(current)
-                applyAspectRatio(current)
+                rebindIfChanged(current)
             }
             try {
                 extendTrace()
                 Timings.mark("camera.capture.start")
                 capture.takePicture(
-                    photoSaver.outputOptions(),
+                    // As the mirrored preview showed it, so the photo matches the guide placed on it (FR-1.14).
+                    photoSaver.outputOptions(mirrored = current.facing == CameraFacing.FRONT),
                     mainExecutor,
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
@@ -531,10 +571,12 @@ class CameraXController(
             val current = binding ?: return@execute
             val camera = current.camera ?: return@execute
             if (_status.value != CameraStatus.READY) return@execute
-            // The preview's buffer, its viewport crop, and its turn to upright locate the frame on the sensor.
+            // The preview's buffer, its viewport crop, and its turn to upright locate the frame on the sensor. The
+            // front camera's preview is mirrored, so the point tapped is on the other side of what the camera sees.
             val info = current.preview?.resolutionInfo ?: return@execute
             val crop = info.cropRect
-            val point = frameToBuffer(x, y, info.rotationDegrees, crop.left, crop.top, crop.width(), crop.height())
+            val seenX = if (current.facing == CameraFacing.FRONT) 1f - x else x
+            val point = frameToBuffer(seenX, y, info.rotationDegrees, crop.left, crop.top, crop.width(), crop.height())
                 ?: return@execute
             val factory = SurfaceOrientedMeteringPointFactory(
                 info.resolution.width.toFloat(),
@@ -577,22 +619,98 @@ class CameraXController(
     /** The flash mode photos are taken with: the chosen one, or off on a lens without a flash. */
     private fun appliedFlash(): FlashMode = if (lensHasFlash) flash else FlashMode.OFF
 
+    override fun setTorch(on: Boolean) {
+        mainExecutor.execute {
+            // Asked again when the camera did not apply the last request, so a light left on can still be turned off.
+            if (on == torch && on == _state.value.torch) return@execute
+            torch = on
+            binding?.let(::applyTorch)
+        }
+    }
+
+    /**
+     * The kept light on an open camera with a flash; a closed one gets it when it opens again. The state says it is on
+     * only once CameraX has applied it, so the scene photo is never taken before the light is as chosen. A request that
+     * fails on an open camera leaves the state as it was and is asked once more while [retry]; [setTorch] asks again
+     * after that, because the kept light then still differs from the state.
+     */
+    private fun applyTorch(current: Binding, retry: Boolean = true) {
+        val camera = current.camera ?: return
+        if (!current.open || current.failed || !camera.cameraInfo.hasFlashUnit()) return
+        val on = torch
+        val request = ++torchRequest
+        try {
+            val applied = camera.cameraControl.enableTorch(on)
+            applied.addListener({
+                // A request dropped because the camera closed is answered by torchOff.
+                if (binding !== current || request != torchRequest || !current.open) return@addListener
+                when {
+                    runCatching { applied.get() }.isSuccess -> _state.update { it.copy(torch = on) }
+                    retry -> applyTorch(current, retry = false)
+                    else -> Log.w(TAG, "The camera did not turn the light ${if (on) "on" else "off"}")
+                }
+            }, mainExecutor)
+        } catch (error: Exception) {
+            Log.w(TAG, "Torch request could not start", error)
+        }
+    }
+
+    /**
+     * The camera closed, or the binding went: CameraX has turned the light off, and an answer still on its way is from
+     * before, so it must not say the light is on after the camera opens again.
+     */
+    private fun torchOff() {
+        torchRequest++
+        _state.update { it.copy(torch = false) }
+    }
+
     override fun setAspectRatio(ratio: AspectRatio) {
         mainExecutor.execute {
             if (ratio == aspect) return@execute
             aspect = ratio
             _state.update { it.copy(aspect = ratio) }
-            binding?.let(::applyAspectRatio)
+            binding?.let(::rebindIfChanged)
         }
     }
 
-    /** Rebinds when the viewport differs from the chosen ratio, once no photo is being saved. */
-    private fun applyAspectRatio(current: Binding) {
+    override fun setFacing(facing: CameraFacing) {
+        mainExecutor.execute {
+            if (facing == chosenFacing) return@execute
+            if (facing == CameraFacing.FRONT && !_hasFrontCamera.value) return@execute
+            chooseFacing(facing)
+            binding?.let(::rebindIfChanged)
+        }
+    }
+
+    /** The other camera has its own zoom range, exposure steps, and flash: they are read again, from 1x and 0 EV. */
+    private fun chooseFacing(facing: CameraFacing) {
+        chosenFacing = facing
+        _facing.value = facing
+        retainedZoom = 1f
+        pendingZoom = null
+        pendingFinal = true
+        retainedExposure = 0
+        _capabilities.value = null
+        _zoom.value = 1f
+        _state.update { it.copy(zoom = 1f, exposure = 0) }
+    }
+
+    /**
+     * Rebinds when the binding's camera or its viewport's ratio differs from the chosen one, once no photo is being
+     * saved. The zoom and the latest pinch target carry over, as for a lens switch; another camera reads its own
+     * lenses and controls first (startBinding).
+     */
+    private fun rebindIfChanged(current: Binding) {
+        if (binding !== current || current.capturesInFlight > 0) return
+        val facingChanged = current.facing != chosenFacing
         // A binding still waiting for the camera provider builds its viewport with the chosen ratio anyway.
-        if (binding !== current || current.camera == null || current.aspect == aspect) return
-        if (current.capturesInFlight > 0) return
-        Timings.mark("camera.aspect", aspect.name)
-        // As for a lens switch: the zoom and the latest pinch target carry over to the new binding.
+        val aspectChanged = current.camera != null && current.aspect != aspect
+        if (!facingChanged && !aspectChanged) return
+        if (facingChanged) {
+            Timings.mark("camera.facing", chosenFacing.name)
+        } else {
+            Timings.mark("camera.aspect", aspect.name)
+        }
         releaseBinding(preserveZoomPlan = true)
         startBinding(current.owner, current.surfaceProvider)
     }
@@ -649,9 +767,8 @@ class CameraXController(
         refreshStatus(current)
     }
 
-    private fun discoverControls(cameraProvider: ProcessCameraProvider) {
-        val info =
-            CameraSelector.DEFAULT_BACK_CAMERA.filter(cameraProvider.availableCameraInfos).firstOrNull() ?: return
+    private fun discoverControls(cameraProvider: ProcessCameraProvider, facing: CameraFacing) {
+        val info = facing.selector.filter(cameraProvider.availableCameraInfos).firstOrNull() ?: return
         val exposure = info.exposureState
         val supported = exposure.isExposureCompensationSupported
         val center = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
@@ -677,7 +794,9 @@ class CameraXController(
                 return
             }
             if (_status.value != CameraStatus.READY) mainExecutor.execute { refreshStatus(current) }
-            if (binding === current && _status.value == CameraStatus.READY) frameSink?.onFrame(frame)
+            if (binding === current && _status.value == CameraStatus.READY) {
+                frameSink?.onFrame(frame, mirrored = current.facing == CameraFacing.FRONT)
+            }
         } catch (error: Exception) {
             Log.e(TAG, "Could not process camera frame", error)
         } finally {
@@ -763,10 +882,22 @@ class CameraXController(
 
     private fun failBinding(current: Binding, error: Exception) {
         if (binding !== current) return
-        Log.e(TAG, "Could not bind rear camera", error)
-        if (recoverPrimary(current)) return
+        Log.e(TAG, "Could not bind the ${current.facing.name.lowercase()} camera", error)
+        if (recoverPrimary(current) || recoverRear(current)) return
         releaseBinding()
         publishStatus(CameraStatus.UNAVAILABLE)
+    }
+
+    /**
+     * A front camera that cannot be bound, or that fails once open, gives the rear one back rather than no camera at
+     * all (FR-1.14). The rear camera that fails too stays UNAVAILABLE, with no switch back.
+     */
+    private fun recoverRear(current: Binding): Boolean {
+        if (binding !== current || current.facing != CameraFacing.FRONT) return false
+        Log.w(TAG, "Front camera unavailable; restoring the rear camera")
+        chooseFacing(CameraFacing.BACK)
+        rebindIfChanged(current)
+        return true
     }
 
     private fun recoverPrimary(current: Binding): Boolean {
@@ -786,6 +917,7 @@ class CameraXController(
         val current = binding ?: return
         binding = null
         current.active = false
+        torchOff()
         publishStatus(if (preserveZoomPlan) CameraStatus.STARTING else CameraStatus.IDLE)
         if (!preserveZoomPlan) {
             _capabilities.value = null
@@ -805,8 +937,13 @@ class CameraXController(
         current.executor?.shutdown()
     }
 
-    private class Binding(val owner: LifecycleOwner, var surfaceProvider: Preview.SurfaceProvider) {
-        val frames = CameraFrameCache()
+    private class Binding(
+        val owner: LifecycleOwner,
+        var surfaceProvider: Preview.SurfaceProvider,
+        /** The camera this binding opens, fixed for its life: choosing another replaces the binding. */
+        val facing: CameraFacing,
+    ) {
+        val frames = CameraFrameCache(mirrored = facing == CameraFacing.FRONT)
 
         @Volatile
         var active = owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
@@ -839,7 +976,7 @@ class CameraXController(
         var restoringExposure = false
     }
 
-    /** The primary rear camera's controls besides zoom (Design 2.3). */
+    /** The chosen camera's controls besides zoom (Design 2.3). */
     private class Controls(
         val exposureRange: IntRange,
         val exposureStep: Float,
@@ -868,6 +1005,12 @@ class CameraXController(
          */
         fun analysisSize(ratio: AspectRatio): Size =
             if (ratio == AspectRatio.R16_9) Size(1280, 960) else Size(960, 720)
+
+        val CameraFacing.selector: CameraSelector
+            get() = when (this) {
+                CameraFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+                CameraFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+            }
 
         val FlashMode.captureMode: Int
             get() = when (this) {

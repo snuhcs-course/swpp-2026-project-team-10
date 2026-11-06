@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -6,7 +6,6 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Log
-import androidx.core.graphics.createBitmap
 import com.lastpenguin.pix.core.Timings
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -14,8 +13,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * [ReferenceGuideMaker] on the device: load, segment, smooth, crop, outline (Design 2.6.1).
- * Owner: PM (#5).
+ * [ReferenceGuideMaker] on the device: load, cut a screenshot to its photo, segment, smooth, crop, outline (Design
+ * 2.6.1).
+ * Owner: PM (#5); the screenshot's cut #174.
  */
 class MlKitReferenceGuideMaker(
     private val context: Context,
@@ -23,8 +23,8 @@ class MlKitReferenceGuideMaker(
     private val outlineExtractor: OutlineExtractor,
 ) : ReferenceGuideMaker {
 
-    override suspend fun make(source: Uri): Result<ReferenceGuide> =
-        timed(GuideSource.GALLERY) { build(decode(source), GuideSource.GALLERY) }
+    override suspend fun make(source: Uri, wholeImage: Boolean): Result<ReferenceGuide> =
+        timed(GuideSource.GALLERY) { fromPicked(decode(source), wholeImage) }
 
     override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> =
         timed(source) { build(bitmap, source) }
@@ -45,7 +45,7 @@ class MlKitReferenceGuideMaker(
             Timings.mark(
                 "seg.end",
                 result.fold(
-                    onSuccess = { "${it.cutout.width}x${it.cutout.height}" },
+                    onSuccess = { "${it.mask.width}x${it.mask.height}" },
                     onFailure = { it::class.simpleName },
                 ),
             )
@@ -61,10 +61,32 @@ class MlKitReferenceGuideMaker(
         }
 
     /**
+     * Step 1 after loading: a screenshot of a feed post is cut to its photo (FR-2.10), unless [wholeImage], and the
+     * guide is made from the photo alone, so its outline, its start, and its thumbnail are the post's. The guide keeps
+     * the screenshot, small, and where the photo was in it.
+     */
+    private suspend fun fromPicked(image: Bitmap, wholeImage: Boolean): ReferenceGuide {
+        if (wholeImage) return build(image, GuideSource.GALLERY)
+        Timings.mark("cut.start")
+        val photo = image.screenshotPhoto()
+        Timings.mark("cut.end", photo?.let { "${it.width}x${it.height}" } ?: "whole")
+        if (photo == null) return build(image, GuideSource.GALLERY)
+        val cut = Bitmap.createBitmap(image, photo.left, photo.top, photo.width, photo.height)
+        val crop = PhotoCrop(shrink(image, CROP_ORIGINAL_LONG_SIDE), photo.relativeTo(image.width, image.height))
+        return build(cut, GuideSource.GALLERY).copy(crop = crop)
+    }
+
+    private fun Bitmap.screenshotPhoto(): PixelRect? {
+        val pixels = IntArray(width * height)
+        getPixels(pixels, 0, width, 0, 0, width, height)
+        return findScreenshotPhoto(pixels, width, height)
+    }
+
+    /**
      * Steps 2–5 on an upright image: segment, smooth the mask, crop to the person plus 2% and keep where that crop
      * lies as the anchor (FR-3.1), and outline; a small copy of the photo is kept for the thumbnail (FR-3.9). The
-     * cutout's alpha is the smoothed mask, so the subject, which rebuilds the outline from it, draws the same line
-     * (FR-2.9).
+     * guide keeps the smoothed mask alone, none of the photo's pixels, so the subject, which rebuilds the outline from
+     * it, draws the same line (FR-2.9, AD-15).
      */
     private suspend fun build(input: Bitmap, source: GuideSource): ReferenceGuide {
         val bitmap = prepare(input)
@@ -77,24 +99,18 @@ class MlKitReferenceGuideMaker(
         // Smoothing drops specks, so a photo with nothing but specks has no person after all.
         val area = foregroundBounds(field, width, height) ?: throw NoPersonFoundException()
         val crop = cropWithMargin(PixelRect(area.left, area.top, area.right, area.bottom), width, height)
-        val colors = IntArray(crop.width * crop.height)
-        bitmap.getPixels(colors, 0, crop.width, crop.left, crop.top, crop.width, crop.height)
-        val alpha = IntArray(colors.size)
+        val alpha = IntArray(crop.width * crop.height)
         for (y in 0 until crop.height) {
             for (x in 0 until crop.width) {
-                val k = y * crop.width + x
-                alpha[k] = smoothedAlpha(field[(crop.top + y) * width + crop.left + x], radius)
-                colors[k] = (colors[k] and 0x00FFFFFF) or (alpha[k] shl 24)
+                alpha[y * crop.width + x] = smoothedAlpha(field[(crop.top + y) * width + crop.left + x], radius)
             }
         }
-        val cutout = createBitmap(crop.width, crop.height).apply {
-            setPixels(colors, 0, crop.width, 0, 0, crop.width, crop.height)
-        }
+        val mask = MaskPixels(crop.width, crop.height, alpha).toMaskBitmap()
         val outline = outlineExtractor.extract(alpha, crop.width, crop.height, outlineStrokePx(crop.height))
         Timings.mark("smooth.end", "r=$radius")
         return ReferenceGuide(
             id = UUID.randomUUID().toString(),
-            cutout = cutout,
+            mask = mask,
             outline = outline,
             aspect = crop.width.toFloat() / crop.height,
             source = source,

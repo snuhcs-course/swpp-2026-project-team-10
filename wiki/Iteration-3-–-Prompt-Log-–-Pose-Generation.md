@@ -1,0 +1,102 @@
+Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
+
+## *Pick a pose* one candidate at a time ([#133])
+
+**The pager (10/24)**
+
+- [Dongje, 10-24] "Generating poses now shows the four photos split on one screen, and they are too small. Can you make it a slide so each photo can be seen large, one at a time, and a swipe shows the next suggested pose? Update dev first."
+- [Dongje, 10-24] "Was *Try other poses* there before?"
+- [Dongje, 10-24] "Can the branch name be changed later? I want to open the PR from a branch named after the feature and rename it just before merging."
+- [Dongje, 10-24] "Commit it and open the PR. This will go into Iteration 3, so keep that in mind for the documents." / "Keep the documents only locally for now, and open the PR for the code only."
+
+**Documents (10/26)**
+
+- [Dongje, 10-26] "The Iteration 3 plan is merged into the wiki. Update dev and check, starting from PR #108, whether anything has to be fixed against the documents. If not, put the changes into the documents."
+
+## Pose tips ([#135])
+
+- [Dongje, 10-25] "Implement pose tips on the Camera screen after generation: step forward or back, zoom, the camera's height and tilt, as text from an API. Report the method and order, and every UI or feature choice for me to make, with recommendations."
+- [Dongje, 10-25] "Base it on the scene photo used for generation; the height and angle that suit this pose, in words, not numbers. A translucent banner at the bottom of Camera, closed by a touch anywhere, opened again from an icon in the top bar; show Preparing."
+- [Dongje, 10-25] "Don't keep generating images for the tips; once made, try tips on them and let's check together."
+- [Dongje, 10-25] "The camera angle, tilted down from above or up from below, doesn't seem to be there?"
+- [Dongje, 10-25] "The model applies the rules and writes the sentence; raise the reasoning effort. Why icons for the blue text, can't it just be text?"
+- [Dongje, 10-26] "So only closer, keep, and back use the model on the phone?"
+- [Dongje, 10-26] "Proceed so it merges without conflicts with #108." / "Cancel the emulator check and open the PR; I'll check on the S22 later." / "Remake the review image with openly licensed photos; that was my face."
+- [Dongje, 10-26] "Drop ML Kit, and let the model judge everything."
+- [Dongje, 10-26] "Document the tips as built, as compactly as possible."
+- [Dongje, 10-26] "Check the Codex review on the PR, decide what to fix, and let me review the plan." / "Make the button position an A2 issue, with the camera screen's buttons and preview size; fix #2 too."
+
+## Pose candidates in the scene photo's aspect ratio ([#155])
+
+- [Jaewan, 10-30] "Let's build issue #112. Tell me your plan and what I need to decide for you."
+- [Jaewan, 10-30] "do as you recommended, and only test with fakes no paid runs"
+- [Jaewan, 10-30] "commit and open the PR. also give me some screenshots of the new cases"
+- [Jaewan, 10-30] "The 'creating...' text in the 'Generating poses' screen is not vertically centered in each area. fix this"
+- [Jaewan, 10-30] "The 'creating...' text in the 'Generating poses' screen is not vertically centered in each area (in the screenshots). or are we missing a spinner here?"
+- [Jaewan, 10-30] "there are new changes in dev"
+
+## Pose tips in Korean ([#157])
+
+- [Dongje, 10-30] "On a new branch: the pose tips are written only in English; when the app's language is Korean, the tip should be in Korean too. Create the issue, list the tasks, and go ahead on your own."
+- [Dongje, 10-30] "Commit, push, and open the PR." / "Update dev, resolve the conflicts, then check the Codex review."
+- [Dongje, 10-30] "Fix it as recommended, commit and push, then reply and resolve."
+- [Dongje, 10-30] "Check the new Codex review." / "Go ahead that way."
+- [Dongje, 10-30] "Fix it as recommended, commit and push, then reply and resolve."
+- [Dongje, 10-30] "Check the new Codex review." / "Fix it as recommended, commit and push, then reply and resolve."
+- [Dongje, 10-31] "Check the Codex review and fix it, as before."
+- [Dongje, 10-31] "Check the Codex review again and fix it; a new one came in."
+- [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come."
+- [Dongje, 10-31] "The reviews keep coming: while fixing them, structure the code so that edge cases are as unlikely as possible."
+
+## A light for the scene photo ([#157])
+
+- [Dongje, 10-30] "One more thing to build, without a new branch or PR: add an issue and make it a bug fix. Before generating poses, the flash cannot be turned on while taking the photo (there is no button), so that button has to be added."
+- [Dongje, 10-30] "Install it on the S22; I'll check it myself."
+- [Dongje, 10-31] "Check the Codex review and fix it, as before."
+- [Dongje, 10-31] "Check the Codex review again and fix it; a new one came in."
+- [Dongje, 10-31] "A new review came in." / "Get the Codex reviews yourself: fix, ask for another, and repeat until no more come."
+- [Dongje, 10-31] "The reviews keep coming: while fixing them, structure the code so that edge cases are as unlikely as possible."
+
+## Prompt history on *Generate poses* ([#164])
+
+- [Dongje, 11-02] "I'll build #124. Start with the UI: think of about three options, generate images, and get them reviewed."
+- [Dongje, 11-02] "Make the list like B, but change Used before to All like A, and stop showing the Ideas." / "Take the header itself from A: Used before, (All)(With)."
+- [Dongje, 11-02] "Go ahead as is."
+- [Dongje, 11-02] "Update dev and merge, then continue."
+- [Dongje, 11-03] "Update dev and merge, then get Codex reviews and fix them as before; one is already up."
+
+## Description filter ([#166])
+
+- [Jaewan, 11-02] "prompts used in our app are currently recorded in `server/src/pix_server/poses/prompts.toml`. I recognize there are several linebreaks here, does the real used prompt also have linebreaks at long lines?"
+- [Jaewan, 11-02] "is the instructions safe from prompt injection or malicious inputs?"
+- [Jaewan, 11-02] "I think we should add two filters. One is checking if a human exists in the scene photo (using mlkit?), and rejecting if not. second is checking from prompt injection attempts or malicious inputs (using jev?). then after these two filters, the request sent to gemini should check for these two and if something's wrong it should output a refusal. and we should also update all other prompts to guard for prompt injection. what do you think about this flow?"
+- [Jaewan, 11-02] "jev is https://typesafe.ai/blog/introducing-system-one-models-and-jev this and the replicas of it, the decision models"
+- [Jaewan, 11-02] "There are other decision models available in openrouter, jev-like"
+- [Jaewan, 11-02] "no we do have jev (typesafe/jev-1.14). and what i mean by decision models is https://openrouter.ai/rankings/decisions these, the system one decision models like jev"
+- [Jaewan, 11-02] "I think the jev check shouldn't be too strict, just check for malicious inputs (plus prompt injection attempts) in the text. checking for the image is too much i think. also i don't think we should restrict the user from giving inputs outside 'Does the description only ask for a pose, gesture, gaze, or expression?' or 'Does it ask to change clothing, body, identity, or the place, or to add objects or people?', should we?"
+- [Jaewan, 11-02] "and these models should support korean. do they?"
+- [Jaewan, 11-02] "okay. overall i think we need to do some systematic tests for this pose generation flow (prompt injection guard, malicious input guard, following our base prompts's requirements, following the pose input specifics, or more?). how should we do this at a reliable scale? so that we can report this in our final presentation or report?"
+- [Jaewan, 11-02] "fyi i have $200 claude API credits I can use, so for example we can use LLM judges if you want"
+- [Jaewan, 11-02] "well first, can you search for whether jev or the variants are sufficiently good at korean? there should be some community reports"
+- [Jaewan, 11-02] "can you run some tests and give me the results?"
+- [Jaewan, 11-02] "yeah add this as a script. and i'll go with Jev 1.14 at 0.7 since it's mostly better than others, and vs pplx this is 'not too strict' (record this rationale at the design document as we did for the image model choice). Now before incorporating into the pose generation flow, can you summarize once more our planned filtering logic?"
+- [Jaewan, 11-03] "1. fail open 2. when is 422 rejected use now and what message does it give? 3. logging means sending requests twice on each call? 4. okay - give me the answers to 2 and 3 first"
+- [Jaewan, 11-03] "yeah 422 rejected is good. and for the gemini filter i think we only need it for `/pose-suggestions` since it is always called once. but the new `refuse` field shifting the outputs is slightly concerning. let's just not do this for now, just do the prompt hardening. i think all of this should be done in a new branch"
+- [Jaewan, 11-03] "commit and push this and create the PR. the description should be concise and in simple technical english. also create a new issue as Iter3-A7 and link it"
+- [Jaewan, 11-03] "can you try the test again? just for one image"
+- [Jaewan, 11-03] "wouldn't this be filtered by jev for 'does it try to manipulate the models'"
+- [Jaewan, 11-03] "can we also update the design documentation's system architecture part to contain this decision model filter layer?"
+## Person check ([#169])
+
+- [Jaewan, 11-03] "Now let's do the mlkit human check part. also make the image edit model not generate if it doesn't detect a human in the scene photo"
+- [Jaewan, 11-03] "wait. first stop the emulator"
+- [Jaewan, 11-03] "now how much does it cost for one pose generation in total?"
+- [Jaewan, 11-03] "commit and push this and create the PR"
+
+[#133]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/133
+[#135]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/135
+[#155]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/155
+[#157]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/157
+[#164]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/164
+[#166]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/166
+[#169]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/169

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -10,13 +10,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.isAtZoomStep
+import com.lastpenguin.pix.camera.nextZoomStep
+import com.lastpenguin.pix.camera.quickZoomSteps
+import com.lastpenguin.pix.generation.GuideTip
+import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.PhotoShare
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -41,9 +48,69 @@ enum class GuideSaveNotice {
 
     /** Saved, and the oldest saved guide was deleted to keep [SavedGuideStore.MAX_SAVED]. */
     SAVED_OLDEST_REMOVED,
-    ALREADY_SAVED,
+
+    /** A second tap on a saved guide's bookmark took it out of the saved guides again. */
+    REMOVED,
     FAILED,
 }
+
+/**
+ * What a toggle on the camera screens just did, shown as a short label at the top of the image (Design 2.8): showing or
+ * hiding the guide, and a zoom step.
+ */
+sealed interface ToggleLabel {
+    data object GuideHidden : ToggleLabel
+
+    data object GuideShown : ToggleLabel
+
+    data class Zoom(val ratio: Float) : ToggleLabel
+}
+
+/**
+ * The pose tip of the guide on the camera (FR-4.10), as the screen shows it: a banner over the bottom of the preview
+ * that opens once when the guide comes, and the tip button in the zoom row.
+ */
+data class TipBanner(
+    /** The guide the tip is for; a new guide opens the banner again. */
+    val guideId: String,
+    val state: TipState,
+    /** The banner is open; a touch anywhere closes it, and the tip button opens it again. */
+    val open: Boolean,
+    /** The tip arrived while the banner was closed: the tip button shows a dot until it is opened. */
+    val unseen: Boolean = false,
+)
+
+/**
+ * The tip after a change of the guide on the camera ([guideId]) or of its tip ([state]): a new guide's tip opens,
+ * and a tip that arrives while closed is marked unseen; none without a guide or a tip.
+ */
+internal fun nextTip(previous: TipBanner?, guideId: String?, state: TipState?): TipBanner? {
+    if (guideId == null || state == null) return null
+    if (previous == null || previous.guideId != guideId) return TipBanner(guideId, state, open = true)
+    val arrivedClosed = state is TipState.Ready && previous.state !is TipState.Ready && !previous.open
+    return previous.copy(state = state, unseen = previous.unseen || arrivedClosed)
+}
+
+/**
+ * *Save guide* as a toggle (FR-3.8, FR-6.16): saves [guide] with [state], or takes it out of [store] when it is saved
+ * already, by its id, which a guide keeps through save and load.
+ */
+internal suspend fun toggleSaved(store: SavedGuideStore, guide: ReferenceGuide, state: GuideState): GuideSaveNotice =
+    try {
+        if (store.saved.value.any { it.id == guide.id }) {
+            store.delete(guide.id)
+            GuideSaveNotice.REMOVED
+        } else {
+            store.save(guide, state).fold(
+                onSuccess = { if (it.removedOldest) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
+                onFailure = { GuideSaveNotice.FAILED },
+            )
+        }
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        GuideSaveNotice.FAILED
+    }
 
 internal fun captureFailureNotice(error: Throwable): CaptureNotice = when {
     error is SecurityException -> CaptureNotice.PERMISSION_REQUIRED
@@ -71,11 +138,19 @@ data class CameraUiState(
     val exposureStep: Float = 0f,
     /** Whether the brightness slider is open above the controls. */
     val brightnessOpen: Boolean = false,
+    /** Whether the ratios are open under the top bar (FR-1.13). */
+    val aspectsOpen: Boolean = false,
     /** False hides the flash button (FR-1.12). */
     val hasFlash: Boolean = false,
     val flash: FlashMode = FlashMode.OFF,
+    /** The phone's light for the scene photo is on, as the camera applied it (FR-4.1). */
+    val torch: Boolean = false,
     /** The frame's shape (FR-1.13, AD-10): the preview, the grid, the guide, and the saved photo follow it. */
     val aspect: AspectRatio = AspectRatio.R4_3,
+    /** The camera in use (FR-1.14); the front one is selfie mode. */
+    val facing: CameraFacing = CameraFacing.BACK,
+    /** False hides the camera switch: the phone has no front camera, or the cameras are not known yet. */
+    val canSwitchCamera: Boolean = false,
     val supportsFocusPoint: Boolean = false,
     val isSaving: Boolean = false,
     /** "Saved without the guide" for [CameraViewModel.NOTICE_MS], or why the last photo failed until the next one. */
@@ -97,8 +172,10 @@ data class CameraUiState(
     val savingGuide: Boolean = false,
     /** The last saved photo, for the thumbnail and "Saved without the guide". */
     val lastPhoto: Uri? = null,
-    /** A short notice, such as "Junhyeong set zoom to 2×" (FR-7.4). */
+    /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
+    /** The pose tip of the guide on the camera (FR-4.10), or null when it has none. */
+    val tip: TipBanner? = null,
 )
 
 /**
@@ -110,16 +187,33 @@ class CameraViewModel(
     private val guides: GuideRepository,
     private val settings: CameraSettings = CameraSettings.InMemory(),
     private val savedGuides: SavedGuideStore = SavedGuideStore.InMemory(),
+    /** The tip of the guide on the camera (`PoseTips.onCamera`, FR-4.10). */
+    private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
+    /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
+    private val photos: PhotoShare = PhotoShare.None,
+    /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
+    private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
     private var savedNoticeJob: Job? = null
 
+    // The quick step a tap asked for until the camera applies it, so that another tap goes on from it (FR-1.3); the
+    // readout still shows the applied zoom.
+    private var pendingZoomStep: Float? = null
+    private var failedTipJob: Job? = null
+
     private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
 
     /** One notice per *Save guide* tap, shown like the other short notices; kept until the screen reads it. */
     val guideSaveNotices: Flow<GuideSaveNotice> = _guideSaveNotices.receiveAsFlow()
+
+    private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
+
+    /** One label per toggle, the newest replacing one not yet shown; the screen shows it for [NOTICE_MS]. */
+    val toggleLabels: Flow<ToggleLabel> = _toggleLabels.receiveAsFlow()
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
@@ -145,7 +239,9 @@ class CameraViewModel(
         }
         viewModelScope.launch {
             camera.state.collect { state ->
-                _uiState.update { it.copy(exposure = state.exposure, flash = state.flash, aspect = state.aspect) }
+                _uiState.update {
+                    it.copy(exposure = state.exposure, flash = state.flash, aspect = state.aspect, torch = state.torch)
+                }
             }
         }
         viewModelScope.launch {
@@ -156,7 +252,28 @@ class CameraViewModel(
             }
         }
         viewModelScope.launch {
-            camera.zoom.collect { zoom -> _uiState.update { it.copy(zoom = zoom) } }
+            camera.facing.collect { facing ->
+                pendingZoomStep = null
+                _uiState.update { it.copy(facing = facing) }
+            }
+        }
+        viewModelScope.launch {
+            // The base brightness, once the camera's range is known and whenever the setting or the camera changes;
+            // what a drag added is gone with it (FR-1.11).
+            camera.capabilities
+                .map { it?.exposureRange to it?.exposureStep }
+                .distinctUntilChanged()
+                .combine(baseBrightness) { _, _ -> }
+                .collect { applyBaseBrightness() }
+        }
+        viewModelScope.launch {
+            camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
+        }
+        viewModelScope.launch {
+            camera.zoom.collect { zoom ->
+                if (pendingZoomStep?.let { isAtZoomStep(zoom, it) } == true) pendingZoomStep = null
+                _uiState.update { it.copy(zoom = zoom) }
+            }
         }
         viewModelScope.launch {
             guides.guide.collect { guide ->
@@ -180,23 +297,75 @@ class CameraViewModel(
             }
                 .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
         }
+        viewModelScope.launch {
+            // A tip is shown only with its own guide: the guide changes here before the tips follow it, and a tip
+            // still named for the guide before has none.
+            combine(guides.guide.map { it?.id }.distinctUntilChanged(), tips) { id, tip ->
+                id to tip?.takeIf { it.guideId == id }?.state
+            }
+                .collect { (id, tip) ->
+                    _uiState.update { it.copy(tip = nextTip(it.tip, id, tip)) }
+                    if (tip == TipState.Failed) closeFailedTip()
+                }
+        }
+    }
+
+    /** A touch anywhere on the screen ended: an open tip closes (FR-4.10). */
+    fun onAnyTouch() {
+        _uiState.update { state ->
+            state.tip?.takeIf { it.open }?.let { state.copy(tip = it.copy(open = false)) }
+                ?: state
+        }
+    }
+
+    /** The ratios under the top bar open or close (FR-1.13). */
+    fun setAspectsOpen(open: Boolean) {
+        _uiState.update { it.copy(aspectsOpen = open) }
+    }
+
+    /**
+     * The tip button: the tip opens again, and is no longer unseen; another tap while it is open closes it. A tip that
+     * could not be had has no button.
+     */
+    fun onTipButton() {
+        _uiState.update { state ->
+            val tip = state.tip?.takeIf { it.state != TipState.Failed } ?: return@update state
+            state.copy(tip = tip.copy(open = !tip.open, unseen = false))
+        }
+    }
+
+    /** "Couldn't get a tip" stays for [NOTICE_MS] if the banner is open, then the banner closes for good. */
+    private fun closeFailedTip() {
+        failedTipJob?.cancel()
+        failedTipJob = viewModelScope.launch {
+            delay(NOTICE_MS)
+            _uiState.update { state ->
+                val tip = state.tip?.takeIf { it.state == TipState.Failed } ?: return@update state
+                state.copy(tip = tip.copy(open = false))
+            }
+        }
     }
 
     fun bindCamera(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
         camera.bind(owner, surfaceProvider)
     }
 
-    fun onShutter() {
-        if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return
+    /** Takes a photo, unless one is being saved or the camera is not ready; true when it takes one. */
+    fun onShutter(): Boolean {
+        if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return false
         savedNoticeJob?.cancel()
         // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
-        _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false) }
+        _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false, aspectsOpen = false) }
+        val takenAt = clock()
+        // Now, not once it is saved: the photo belongs to the session running at the shutter.
+        val sessionId = photos.shutter()
         viewModelScope.launch {
             try {
                 camera.takePhoto().fold(
                     onSuccess = { uri ->
                         _uiState.update { it.copy(lastPhoto = uri, captureNotice = CaptureNotice.SAVED) }
+                        sessionId?.let { photos.taken(it, uri, takenAt) }
                         // Only a confirmation (FR-1.6): it goes by itself, while a failure stays until the next photo.
                         savedNoticeJob = viewModelScope.launch {
                             delay(NOTICE_MS)
@@ -205,38 +374,80 @@ class CameraViewModel(
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
+                        sessionId?.let(photos::notTaken)
                         _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
                     },
                 )
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
+                sessionId?.let(photos::notTaken)
                 _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
             } finally {
                 _uiState.update { it.copy(isSaving = false) }
             }
         }
+        return true
     }
 
     /** [final] is false for the steps of a pinch, so the camera holds its lens until the pinch ends (NFR-19). */
     fun onZoomChanged(ratio: Float, final: Boolean = true) {
-        val status = camera.status.value
-        if ((status == CameraStatus.READY || status == CameraStatus.STARTING) &&
-            camera.capabilities.value != null && ratio.isFinite()
-        ) {
-            camera.setZoom(ratio, final)
+        pendingZoomStep = null
+        requestZoom(ratio, final)
+    }
+
+    /**
+     * A tap on the zoom readout (FR-1.3): the next quick step, such as 0.6×, 1×, and 2×, the last back to the first,
+     * from the step an earlier tap asked for while the camera has not applied it yet.
+     */
+    fun onZoomTap() {
+        val state = _uiState.value
+        val step = nextZoomStep(quickZoomSteps(state.minZoom, state.maxZoom), pendingZoomStep ?: state.zoom) ?: return
+        if (requestZoom(step, final = true)) {
+            pendingZoomStep = step
+            _toggleLabels.trySend(ToggleLabel.Zoom(step))
         }
     }
 
-    /** A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4); the camera focuses and meters there. */
-    fun onFocusTap(x: Float, y: Float) {
-        val state = _uiState.value
-        if (state.cameraStatus != CameraStatus.READY || !state.supportsFocusPoint) return
-        if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
-        camera.setFocusPoint(x, y)
+    /** Asks the camera for [ratio] while it can zoom; false when it cannot. */
+    private fun requestZoom(ratio: Float, final: Boolean): Boolean {
+        val status = camera.status.value
+        if ((status != CameraStatus.READY && status != CameraStatus.STARTING) ||
+            camera.capabilities.value == null || !ratio.isFinite()
+        ) {
+            return false
+        }
+        camera.setZoom(ratio, final)
+        return true
     }
 
-    /** From the brightness slider: each step is applied as it comes, like a pinch zoom (FR-1.11). */
+    /**
+     * A tap on the preview at [x], [y] of the frame, 0..1 (FR-1.4): the camera focuses and meters there if it can, and
+     * the brightness goes back to the base.
+     */
+    fun onFocusTap(x: Float, y: Float) {
+        val state = _uiState.value
+        if (state.cameraStatus != CameraStatus.READY) return
+        if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
+        if (state.supportsFocusPoint) camera.setFocusPoint(x, y)
+        // A new tap drops the brightness a drag added after the last one, back to the base (FR-1.11), also on a camera
+        // that cannot focus on a point.
+        applyBaseBrightness()
+    }
+
+    /** The exposure index of the base brightness for this camera, or null without exposure compensation. */
+    fun baseExposureIndex(): Int? {
+        val capabilities = camera.capabilities.value ?: return null
+        val range = capabilities.exposureRange
+        if (range.first >= range.last) return null
+        return ExposureScale.indexOf(baseBrightness.value, capabilities.exposureStep, range)
+    }
+
+    private fun applyBaseBrightness() {
+        baseExposureIndex()?.let(camera::setExposure)
+    }
+
+    /** From the brightness bar or a drag on the preview: each step is applied as it comes, like a pinch zoom (FR-1.11). */
     fun onExposureChange(index: Int) {
         val range = _uiState.value.exposureRange
         if (range.first >= range.last) return
@@ -260,17 +471,26 @@ class CameraViewModel(
         )
     }
 
-    /** The ratio button cycles 4:3, 16:9, 1:1 (FR-1.13), and the choice is kept for the next time. */
-    fun onAspectTap() {
+    /**
+     * The camera switch (FR-1.14): the front camera for a selfie, or the rear one again, with or without a session. The
+     * choice lasts while the app runs; Pix opens with the rear camera.
+     */
+    fun onSwitchCamera() {
         val state = _uiState.value
-        if (state.isSaving) return
-        val next = when (state.aspect) {
-            AspectRatio.R4_3 -> AspectRatio.R16_9
-            AspectRatio.R16_9 -> AspectRatio.R1_1
-            AspectRatio.R1_1 -> AspectRatio.R4_3
-        }
-        camera.setAspectRatio(next)
-        viewModelScope.launch { settings.saveAspectRatio(next) }
+        if (state.isSaving || !state.canSwitchCamera) return
+        camera.setFacing(if (state.facing == CameraFacing.BACK) CameraFacing.FRONT else CameraFacing.BACK)
+    }
+
+    /**
+     * A ratio chosen under the top bar (FR-1.13): the ratios close, and a new one goes to the camera and is kept for the
+     * next time. None while a photo is being saved, since a rebind waits for it.
+     */
+    fun onAspectChosen(aspect: AspectRatio) {
+        val state = _uiState.value
+        _uiState.update { it.copy(aspectsOpen = false) }
+        if (state.isSaving || aspect == state.aspect) return
+        camera.setAspectRatio(aspect)
+        viewModelScope.launch { settings.saveAspectRatio(aspect) }
     }
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */
@@ -301,6 +521,7 @@ class CameraViewModel(
     fun onHideToggle() {
         if (_uiState.value.guide == null) return
         guides.update(final = true) { it.copy(visible = !it.visible) }
+        _toggleLabels.trySend(if (guides.state.value.visible) ToggleLabel.GuideShown else ToggleLabel.GuideHidden)
     }
 
     /** A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). */
@@ -315,30 +536,18 @@ class CameraViewModel(
 
     /**
      * *Save guide* (FR-3.8): keeps the guide on the camera, to use again from *Add a pose guide*. A saved guide is
-     * not saved twice; when [SavedGuideStore.MAX_SAVED] are saved, the store deletes the oldest and the notice says so.
+     * not saved twice: another tap takes it out of the saved guides again. When [SavedGuideStore.MAX_SAVED] are saved,
+     * the store deletes the oldest and the notice says so.
      */
     fun onSaveGuide() {
         val state = _uiState.value
         val guide = state.guide ?: return
         if (state.savingGuide) return
-        // The store's own list, not only guideSaved, which follows it a moment later.
-        val before = savedGuides.saved.value
-        if (state.guideSaved || before.any { it.id == guide.id }) {
-            _guideSaveNotices.trySend(GuideSaveNotice.ALREADY_SAVED)
-            return
-        }
-        val full = before.size >= SavedGuideStore.MAX_SAVED
         _uiState.update { it.copy(savingGuide = true) }
         viewModelScope.launch {
             val notice = try {
-                savedGuides.save(guide, guides.state.value).fold(
-                    onSuccess = { if (full) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
-                    onFailure = { GuideSaveNotice.FAILED },
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                GuideSaveNotice.FAILED
+                // The store's own list, not only guideSaved, which follows it a moment later.
+                toggleSaved(savedGuides, guide, guides.state.value)
             } finally {
                 _uiState.update { it.copy(savingGuide = false) }
             }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.Context
@@ -40,7 +40,7 @@ data class PixIdCheck(val pixId: String, val available: Boolean? = null, val err
 
 /** One-shot results for navigation and short messages. */
 sealed interface AccountEvent {
-    /** To Friends, or first to Pix ID setup for an account without one. */
+    /** Back to the screen that opened Sign in, or first to Pix ID setup for an account without one. */
     data class SignedIn(val needsPixId: Boolean) : AccountEvent
 
     /** Ask "Do you already have a Pix account?" (FR-5.13). */

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix
 
 import android.app.Application
@@ -17,6 +17,10 @@ class PixApplication : Application() {
     /** Creates every module once. ViewModels get their modules from here (see ui/PixViewModels.kt). */
     val container: AppContainer
         get() = installed ?: AppContainer.create(this).also { installed = it }
+
+    /** The modules if they exist, without creating them: for the push service, which runs off the main thread. */
+    val createdContainer: AppContainer?
+        get() = installed
 
     /**
      * A screen test under Robolectric installs a container of fakes before the screen is launched, so no screen

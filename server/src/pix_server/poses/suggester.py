@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
 """Four poses for a scene from a vision model, through OpenRouter's chat completions (Design Documentation 2.6.3):
 suggested poses, or a description and three variations of it."""
 
@@ -52,10 +52,11 @@ def usable_poses(answer: str) -> list[str]:
     return usable[:POSE_COUNT]
 
 
-def with_default_poses(poses: list[str]) -> list[str]:
-    """Tops `poses` up to POSE_COUNT with the default poses, in the file's order."""
+def with_default_poses(poses: list[str], selfie: bool = False) -> list[str]:
+    """Tops `poses` up to POSE_COUNT with the default poses, or the selfie ones for a selfie, in the file's order."""
     taken = {pose.casefold() for pose in poses}
-    defaults = [default.pose for default in DEFAULT_POSES.values() if default.pose.casefold() not in taken]
+    candidates = PROMPTS.selfie.default_poses if selfie else [default.pose for default in DEFAULT_POSES.values()]
+    defaults = [pose for pose in candidates if pose.casefold() not in taken]
     return (poses + defaults)[:POSE_COUNT]
 
 
@@ -64,20 +65,22 @@ class PoseSuggester:
         self._settings = settings
         self._http = http
 
-    async def suggest(self, scene: bytes) -> list[str]:
+    async def suggest(self, scene: bytes, selfie: bool = False) -> list[str]:
         """POSE_COUNT poses for the scene: the model's usable poses, topped up with the default poses. A model that
-        fails, answers late, or answers something unusable still gives a full set, so this never raises for it."""
-        poses = await self._ask(scene, PROMPTS.suggestion)
+        fails, answers late, or answers something unusable still gives a full set, so this never raises for it. A
+        selfie's scene gets the selfie prompt and the selfie default poses (FR-1.14)."""
+        poses = await self._ask(scene, PROMPTS.selfie.suggestion if selfie else PROMPTS.suggestion)
         if len(poses) < POSE_COUNT:
             # Only the count: the poses describe the person in the photo (Design Documentation 2.8, Privacy).
             logger.warning("%d of %d suggested poses usable; the default poses fill the rest", len(poses), POSE_COUNT)
-        return with_default_poses(poses)
+        return with_default_poses(poses, selfie)
 
-    async def vary(self, scene: bytes, description: str) -> list[str]:
+    async def vary(self, scene: bytes, description: str, selfie: bool = False) -> list[str]:
         """POSE_COUNT poses for a description: the description itself, as checked_pose folds it, then the model's
-        variations of it. The description fills in for any variation the model could not give, so this never raises
-        for the model either; a description that checked_pose refuses raises ApiError before any call."""
-        prompt = variation_prompt(description)
+        variations of it, from the selfie prompt for a selfie's scene. The description fills in for any variation the
+        model could not give, so this never raises for the model either; a description that checked_pose refuses
+        raises ApiError before any call."""
+        prompt = variation_prompt(description, selfie)
         description = one_line(description)
         wanted = POSE_COUNT - 1
         variations = [pose for pose in await self._ask(scene, prompt) if pose.casefold() != description.casefold()]

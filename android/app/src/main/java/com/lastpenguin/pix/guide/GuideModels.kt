@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-18, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -8,21 +8,22 @@ enum class GuideSource { GALLERY, GENERATED }
 
 /** The person taken from a reference photo (Design 2.3). */
 data class ReferenceGuide(
-    /** UUID; the subject uses it to tell whether it already has the image. */
+    /** UUID; the subject uses it to tell whether it already has the mask. */
     val id: String,
     /**
-     * ARGB_8888, person only, transparent background, cropped to the person. Never drawn as the guide, which is an
-     * outline only (FR-2.2, AD-15); it is sent to the subject until the mask alone is sent (Design 2.6.1, 2.9).
+     * ALPHA_8, the smoothed mask (Design 2.6.1, step 4), cropped to the person: opaque is the person. It holds none of
+     * the reference's pixels, and it is what the other phone receives (`mask-png`, AD-6, AD-15). Never drawn as the
+     * guide, which is an outline only (FR-2.2).
      */
-    val cutout: Bitmap,
-    /** Same size as [cutout]; light stroke, about 8 px (3 dp) on screen. */
+    val mask: Bitmap,
+    /** Same size as [mask]; light stroke, about 5.3 px (2 dp) on screen. */
     val outline: Bitmap,
-    /** cutout width / height. */
+    /** mask width / height. */
     val aspect: Float,
     val source: GuideSource,
     /**
-     * The cutout's box in the reference photo, where a new guide starts (FR-3.1). null on the subject, whose guide
-     * takes its place from the photographer's `guide.state`.
+     * The mask's box in the reference photo, where a new guide starts (FR-3.1). The subject's mirror gets it with the
+     * image for its *Save guide* (FR-6.16), but places the guide from the photographer's `guide.state`.
      */
     val anchor: NormalizedRect? = null,
     /**
@@ -30,9 +31,24 @@ data class ReferenceGuide(
      * Never sent to the subject and never drawn as the guide; null on the subject.
      */
     val reference: Bitmap? = null,
+    /**
+     * The picked image this guide was cut from, and where (FR-2.10): a screenshot of a feed post cut to its photo, which
+     * [mask], [anchor], and [reference] are made from. Null when the image was used whole, and for a generated pose.
+     * Stays on this phone: never sent and not saved.
+     */
+    val crop: PhotoCrop? = null,
+)
+
+/** A picked image and the part of it a guide was made from (FR-2.10). */
+data class PhotoCrop(
+    /** The whole picked image, long side at most 1024 px. */
+    val original: Bitmap,
+    /** The part kept, as fractions of [original]. */
+    val photo: NormalizedRect,
 )
 
 /** A box as fractions of an image's width and height, right and bottom exclusive (FR-3.1). */
+@Serializable
 data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val height: Float get() = bottom - top
     val centerX: Float get() = (left + right) / 2f

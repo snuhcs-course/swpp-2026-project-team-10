@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Guide button: a glass circle with a guide-colored ring once a guide is on the camera (activated). -->
+<!-- The Guide button: a translucent glass circle, as it may lie over the camera's image, with a guide-colored ring
+     once a guide is on the camera (activated). -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#1FFFFFFF">
     <item android:id="@android:id/mask">
         <shape android:shape="oval">
@@ -10,13 +11,13 @@
         <selector>
             <item android:state_activated="true">
                 <shape android:shape="oval">
-                    <solid android:color="@color/pix_surface_2" />
+                    <solid android:color="@color/pix_glass" />
                     <stroke android:width="1.5dp" android:color="@color/pix_guide_stroke" />
                 </shape>
             </item>
             <item>
                 <shape android:shape="oval">
-                    <solid android:color="@color/pix_surface_2" />
+                    <solid android:color="@color/pix_glass" />
                     <stroke android:width="1dp" android:color="@color/pix_glass_stroke" />
                 </shape>
             </item>

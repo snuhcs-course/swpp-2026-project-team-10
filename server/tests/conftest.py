@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 import asyncio
 import base64
 import io
@@ -10,7 +10,10 @@ import fakeredis
 import httpx2
 import pytest
 import redis
+import uvicorn
 from argon2 import PasswordHasher
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import text
@@ -43,6 +46,16 @@ def encode_image(image_format: str = "JPEG", size: tuple[int, int] = (768, 1024)
     return buffer.getvalue()
 
 
+TIP = {
+    "shot": "full body",
+    "pose": "standing",
+    "camera_now": "chest",
+    "camera_best": "waist",
+    "angle": "up",
+    "framing": "closer",
+    "text": "Zoom in or take a step closer, hold the phone at your waist and tilt it up a little - the legs look longer.",
+}
+
 SUGGESTED_POSES = [
     "Lean one shoulder on the door and smile at the camera",
     "Walk toward the camera and look to the side",
@@ -54,16 +67,30 @@ SUGGESTED_POSES = [
 class ImageApi:
     """Stands in for OpenRouter. The Image API records each request in `requests` and answers with `status` and
     `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
-    `suggestion_status` and `suggestion_body` after `suggestion_delay`."""
+    `suggestion_status` and `suggestion_body` after `suggestion_delay`, except tip requests (the `tip` schema), which
+    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. The Decisions API records the
+    description filter's requests in `filter_requests` and answers with `filter_status` and `filter_body` after
+    `filter_delay`, by default probabilities that let every description through; the person check's (the `person`
+    question) go to `person_requests` and get `person_status` and `person_body` after `person_delay`, by default a
+    person found. `cancelled` is set when a call is cancelled while it waits for its answer."""
 
     def __init__(self) -> None:
         self.requests: list[httpx2.Request] = []
         self.suggestion_requests: list[httpx2.Request] = []
+        self.tip_requests: list[httpx2.Request] = []
+        self.filter_requests: list[httpx2.Request] = []
+        self.person_requests: list[httpx2.Request] = []
         self.delay = 0.0
         self.suggestion_delay = 0.0
+        self.tip_delay = 0.0
+        self.filter_delay = 0.0
+        self.person_delay = 0.0
         self.cancelled = asyncio.Event()
         self.returns(encode_image())
         self.suggests(SUGGESTED_POSES)
+        self.tips(TIP)
+        self.judges(malicious=0.02, injection=0.02)
+        self.sees(person=0.97)
 
     def returns(self, image: bytes) -> None:
         self.status = 200
@@ -85,6 +112,57 @@ class ImageApi:
         self.suggestion_status = status
         self.suggestion_body = {"error": {"code": status, "message": message}}
 
+    def tips(self, fields: dict) -> None:
+        self.tip_answers(json.dumps(fields))
+
+    def tip_answers(self, content: object) -> None:
+        """The tip model's message, as written; `tips` writes the JSON the schema asks for."""
+        self.tip_status = 200
+        self.tip_body: object = {"choices": [{"message": {"role": "assistant", "content": content}}]}
+
+    def tip_fails(self, status: int, message: str = "Provider returned error") -> None:
+        self.tip_status = status
+        self.tip_body = {"error": {"code": status, "message": message}}
+
+    def judges(self, malicious: float, injection: float) -> None:
+        """The filter's probability of yes for each question, in the Decisions API's shape."""
+        self.filter_status = 200
+        self.filter_body: object = {
+            "id": "gen-dec-test",
+            "model": "typesafe/jev-1.14-20261014",
+            "answers": {
+                "malicious": {"type": "noul", "noul": malicious},
+                "injection": {"type": "noul", "noul": injection},
+            },
+            "usage": {"input_tokens": 300, "output_tokens": 0, "cost": 0.00003},
+        }
+
+    def filter_fails(self, status: int, message: str = "Provider returned error") -> None:
+        self.filter_status = status
+        self.filter_body = {"error": {"code": status, "message": message}}
+
+    def sees(self, person: float) -> None:
+        """The person check's probability of yes, in the Decisions API's shape."""
+        self.person_status = 200
+        self.person_body: object = {
+            "id": "gen-dec-test",
+            "model": "typesafe/jev-1.14-20261014",
+            "answers": {"person": {"type": "noul", "noul": person}},
+            "usage": {"input_tokens": 1200, "output_tokens": 0, "cost": 0.0001},
+        }
+
+    def person_fails(self, status: int, message: str = "Provider returned error") -> None:
+        self.person_status = status
+        self.person_body = {"error": {"code": status, "message": message}}
+
+    @property
+    def person_payloads(self) -> list[dict]:
+        return [json.loads(request.content) for request in self.person_requests]
+
+    @property
+    def filter_payloads(self) -> list[dict]:
+        return [json.loads(request.content) for request in self.filter_requests]
+
     @property
     def payloads(self) -> list[dict]:
         return [json.loads(request.content) for request in self.requests]
@@ -93,18 +171,102 @@ class ImageApi:
     def suggestion_payloads(self) -> list[dict]:
         return [json.loads(request.content) for request in self.suggestion_requests]
 
+    @property
+    def tip_payloads(self) -> list[dict]:
+        return [json.loads(request.content) for request in self.tip_requests]
+
     async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/api/alpha/decisions" and "person" in json.loads(request.content)["questions"]:
+            self.person_requests.append(request)
+            await self.wait(self.person_delay)
+            return httpx2.Response(self.person_status, json=self.person_body)
+        if request.url.path == "/api/alpha/decisions":
+            self.filter_requests.append(request)
+            await self.wait(self.filter_delay)
+            return httpx2.Response(self.filter_status, json=self.filter_body)
+        schema = json.loads(request.content or b"{}").get("response_format", {}).get("json_schema", {})
+        if request.url.path == "/api/v1/chat/completions" and schema.get("name") == "tip":
+            self.tip_requests.append(request)
+            await self.wait(self.tip_delay)
+            return httpx2.Response(self.tip_status, json=self.tip_body)
         if request.url.path == "/api/v1/chat/completions":
             self.suggestion_requests.append(request)
-            await asyncio.sleep(self.suggestion_delay)
+            await self.wait(self.suggestion_delay)
             return httpx2.Response(self.suggestion_status, json=self.suggestion_body)
         self.requests.append(request)
+        await self.wait(self.delay)
+        return httpx2.Response(self.status, json=self.body)
+
+    async def wait(self, seconds: float) -> None:
         try:
-            await asyncio.sleep(self.delay)
+            await asyncio.sleep(seconds)
         except asyncio.CancelledError:
             self.cancelled.set()
             raise
+
+
+class TurnApi:
+    """Stands in for Cloudflare's TURN API. It records each request in `requests` and answers with `status` and `body`
+    after `delay`; `servers` is what a working API answers, in Cloudflare's shape."""
+
+    def __init__(self) -> None:
+        self.requests: list[httpx2.Request] = []
+        self.delay = 0.0
+        self.servers = [
+            {"urls": ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:443"]},
+            {
+                "urls": [
+                    "turn:turn.cloudflare.com:3478?transport=udp",
+                    "turn:turn.cloudflare.com:80?transport=tcp",
+                    "turns:turn.cloudflare.com:443?transport=tcp",
+                ],
+                "username": "test-turn-username",
+                "credential": "test-turn-credential",
+            },
+        ]
+        self.status = 201
+        self.body: object = {"iceServers": self.servers}
+
+    async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        await asyncio.sleep(self.delay)
         return httpx2.Response(self.status, json=self.body)
+
+
+class FcmApi:
+    """Stands in for Google's token endpoint and Firebase Cloud Messaging. It records each request for an access token
+    in `token_requests` and each push in `pushes`, as FCM's `message` with the request's `authorization` header. A
+    device token in `unregistered` answers 404, as FCM does once the app is gone; `status` answers every other push,
+    `token_status` every token request, and both wait `delay` first."""
+
+    def __init__(self) -> None:
+        self.token_requests: list[httpx2.Request] = []
+        self.pushes: list[dict] = []
+        self.unregistered: set[str] = set()
+        self.status = 200
+        self.token_status = 200
+        self.delay = 0.0
+
+    async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        await asyncio.sleep(self.delay)
+        if request.url.path == "/token":
+            self.token_requests.append(request)
+            if self.token_status != 200:
+                return httpx2.Response(self.token_status, json={"error": "invalid_grant"})
+            return httpx2.Response(200, json={"access_token": "test-fcm-access", "expires_in": 3599})
+        message = json.loads(request.content)["message"]
+        self.pushes.append({**message, "authorization": request.headers["authorization"], "url": str(request.url)})
+        if message["token"] in self.unregistered:
+            return httpx2.Response(404, json={"error": {"status": "NOT_FOUND"}})
+        return httpx2.Response(self.status, json={"name": "projects/pix-test/messages/1"})
+
+
+@dataclass(frozen=True)
+class FcmKey:
+    """A service account key file as the Google Cloud console gives one, with a key made for the tests."""
+
+    path: str
+    public_pem: bytes
 
 
 class FakeGoogle:
@@ -153,6 +315,41 @@ def image_api():
 
 
 @pytest.fixture
+def turn_api():
+    return TurnApi()
+
+
+@pytest.fixture
+def fcm_api():
+    return FcmApi()
+
+
+@pytest.fixture(scope="session")
+def fcm_key(tmp_path_factory):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+    path = tmp_path_factory.mktemp("fcm") / "fcm-sender.json"
+    path.write_text(
+        json.dumps(
+            {
+                "type": "service_account",
+                "project_id": "pix-test",
+                "private_key_id": "test-key-id",
+                "private_key": private_pem.decode(),
+                "client_email": "pix-fcm-sender@pix-test.iam.gserviceaccount.com",
+                "token_uri": "https://oauth2.googleapis.com/token",
+            }
+        )
+    )
+    public_pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return FcmKey(path=str(path), public_pem=public_pem)
+
+
+@pytest.fixture
 def database_url(tmp_path):
     """A new SQLite file per test, or, with PIX_TEST_DATABASE_URL set, that PostgreSQL emptied first, which shows
     that the migrations and queries behave the same on the servers' database."""
@@ -164,7 +361,7 @@ def database_url(tmp_path):
 
 
 @pytest.fixture
-def settings(database_url):
+def settings(database_url, fcm_key):
     return Settings(
         _env_file=None,
         database_url=database_url,
@@ -189,8 +386,24 @@ def settings(database_url):
         suggestion_timeout_seconds=8,
         suggestion_rate_limit=10,
         suggestion_global_limit=500,
+        tip_model="z-ai/glm-5.3-flash",
+        tip_reasoning="low",
+        tip_timeout_seconds=10,
+        tip_rate_limit=20,
+        tip_global_limit=1000,
+        filter_model="perplexity/pplx-decider-v1.2",
+        filter_cutoff=0.7,
+        filter_timeout_seconds=2,
         join_failure_limit=10,
         join_failure_window_seconds=600,
+        turn_key_id="test-turn-key",
+        turn_api_token="test-turn-token",
+        turn_ttl_seconds=14400,
+        turn_timeout_seconds=3,
+        invitation_ttl_seconds=60,
+        invitation_join_seconds=15,
+        fcm_credentials_file=fcm_key.path,
+        fcm_timeout_seconds=5,
     )
 
 
@@ -266,16 +479,40 @@ async def make_registry(settings, clock, open_store):
 
 
 @pytest.fixture
+async def live_server(settings, image_api, turn_api, fcm_api, unused_tcp_port, open_store):
+    """Serves the app on a real socket and gives its address, for a test that closes a connection in the middle of a
+    request, which the test client cannot."""
+    app = create_app(
+        settings,
+        image_api=httpx2.MockTransport(image_api),
+        turn_api=httpx2.MockTransport(turn_api),
+        fcm_api=httpx2.MockTransport(fcm_api),
+        redis=open_store,
+    )
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=unused_tcp_port, log_level="warning"))
+    serving = asyncio.create_task(server.serve())
+    try:
+        while not server.started:
+            await asyncio.sleep(0.01)
+        yield f"http://127.0.0.1:{unused_tcp_port}"
+    finally:
+        server.should_exit = True
+        await serving
+
+
+@pytest.fixture
 def google():
     return FakeGoogle()
 
 
 @pytest.fixture
-def client(settings, clock, image_api, open_store, google):
+def client(settings, clock, image_api, turn_api, fcm_api, open_store, google):
     app = create_app(
         settings,
         clock=clock,
         image_api=httpx2.MockTransport(image_api),
+        turn_api=httpx2.MockTransport(turn_api),
+        fcm_api=httpx2.MockTransport(fcm_api),
         redis=open_store,
         google=google,
         # Real argon2id at the lowest cost, so a test hashes in microseconds.

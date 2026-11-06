@@ -11,7 +11,7 @@ import androidx.core.graphics.createBitmap
 /**
  * Draws the person's outline from a mask (Design 2.6.1, step 5): the 0.5 level of the alpha channel traced to a line,
  * rounded, and drawn with an anti-aliased round stroke. The mask is already smooth (step 4); the subject runs the same
- * step on the received cutout's alpha, so both phones draw the same line.
+ * step on the received mask, so both phones draw the same line.
  * Owner: PM (#5).
  */
 class OutlineExtractor {
@@ -19,7 +19,7 @@ class OutlineExtractor {
     fun extract(mask: Bitmap, strokePx: Float): Bitmap {
         val width = mask.width
         val height = mask.height
-        // getPixels works for ALPHA_8 masks and ARGB_8888 cutouts alike; only the alpha byte is used.
+        // getPixels works for ALPHA_8 masks and ARGB_8888 bitmaps alike; only the alpha byte is used.
         val pixels = IntArray(width * height)
         mask.getPixels(pixels, 0, width, 0, 0, width, height)
         return extract(IntArray(pixels.size) { pixels[it] ushr 24 }, width, height, strokePx)

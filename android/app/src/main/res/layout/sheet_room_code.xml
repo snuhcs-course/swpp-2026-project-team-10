@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Room code, photographer (R&S 6.7, FR-8.1, FR-8.4, FR-8.5). -->
+<!-- Room code, photographer (R&S 6.7, FR-8.1, FR-8.4, FR-8.5): the code, and where the other phone enters it. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -49,56 +49,50 @@
         android:textAppearance="@style/TextAppearance.Pix.Label"
         android:textColor="@color/pix_text" />
 
-    <TextView
+    <!-- Which phone enters the code, and where, in a box of its own under the code's status. -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:gravity="center"
-        android:lineSpacingMultiplier="1.2"
-        android:text="@string/room_code_body"
-        android:textAppearance="@style/TextAppearance.Pix.Body" />
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_list_card"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp">
 
-    <LinearLayout
+        <TextView
+            android:id="@+id/joinSteps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/room_code_body"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text" />
+
+        <!-- "Shoot together › I'll be in the photo", set by RoomCodeSheet from the buttons' own labels. -->
+        <TextView
+            android:id="@+id/whereText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/expiryNote"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:drawableStartCompat="@drawable/ic_wifi_small"
-            android:drawablePadding="6dp"
-            app:drawableTint="@color/pix_text_faint"
-            android:gravity="center_vertical"
-            android:text="@string/same_wifi"
-            android:textAppearance="@style/TextAppearance.Pix.Caption" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
-            app:drawableStartCompat="@drawable/ic_clock_small"
-            android:drawablePadding="6dp"
-            app:drawableTint="@color/pix_text_faint"
-            android:gravity="center_vertical"
-            android:text="@string/code_expiry"
-            android:textAppearance="@style/TextAppearance.Pix.Caption" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/joinInsteadButton"
-        style="@style/Widget.Pix.Button.Secondary"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/join_instead" />
+        app:drawableStartCompat="@drawable/ic_clock_small"
+        android:drawablePadding="6dp"
+        app:drawableTint="@color/pix_text_faint"
+        android:gravity="center_vertical"
+        android:text="@string/code_expiry"
+        android:textAppearance="@style/TextAppearance.Pix.Caption" />
 
     <Button
         android:id="@+id/cancelButton"
-        style="@style/Widget.Pix.Button.Text"
+        style="@style/Widget.Pix.Button.Secondary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="20dp"
         android:text="@string/cancel" />
 </LinearLayout>

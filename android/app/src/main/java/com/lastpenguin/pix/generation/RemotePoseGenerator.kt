@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -22,6 +22,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 
@@ -40,22 +41,30 @@ class RemotePoseGenerator(
     private val imageDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : PoseGenerator {
 
-    override fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent> = channelFlow {
-        // Encoded once and sent with every request.
+    override fun generate(
+        scene: Bitmap,
+        request: PoseRequest,
+        seed: Long,
+        selfie: Boolean,
+    ): Flow<GenerationEvent> = channelFlow {
+        // Encoded once and sent with every request, with `selfie` for a selfie's scene only.
         val photo = withContext(imageDispatcher) { images.encodeScene(scene) }
-        val imagePart = MultipartBody.Part.createFormData("image", "scene.jpg", photo.toRequestBody(JPEG))
-        // One seed for the set gives each pose a seed of its own, in the order of the poses (Design 2.6.3, step 2).
+        val parts = Parts(
+            MultipartBody.Part.createFormData("image", "scene.jpg", photo.toRequestBody(JPEG)),
+            if (selfie) "true".toRequestBody(TEXT) else null,
+        )
+        // One seed for the set gives each pose a seed of its own, in the order of the poses (Design 2.6.3, step 3).
         val seeds = Random(seed)
         var written: Deferred<CandidateEvent>? = null
         val texts = when (request) {
             is PoseRequest.Described -> {
                 // The description as written goes out at once, so its candidate does not wait for the variations.
                 val writtenSeed = seeds.nextLong(0, Long.MAX_VALUE)
-                written = async { request(imagePart, PlannedPose("pose-1", request.text), writtenSeed) }
-                listOf(request.text) + vary(imagePart, request.text)
+                written = async { request(parts, PlannedPose("pose-1", request.text), writtenSeed) }
+                listOf(request.text) + vary(parts, request.text)
             }
 
-            PoseRequest.Suggested -> suggest(imagePart)
+            PoseRequest.Suggested -> suggest(parts)
         }
         val poses = texts.mapIndexed { index, text -> PlannedPose("pose-${index + 1}", text) }
         send(GenerationEvent.Planned(poses))
@@ -64,17 +73,20 @@ class RemotePoseGenerator(
         written?.let { launch { send(it.await()) } }
         for (pose in poses.drop(if (written != null) 1 else 0)) {
             val poseSeed = seeds.nextLong(0, Long.MAX_VALUE)
-            launch { send(request(imagePart, pose, poseSeed)) }
+            launch { send(request(parts, pose, poseSeed)) }
         }
     }
+
+    /** What every request of a set sends besides its pose: the scene, and whether it is a selfie. */
+    private class Parts(val image: MultipartBody.Part, val selfie: RequestBody?)
 
     /**
      * The server's poses for the scene; it answers with its default poses when its model fails, so a failure here is
      * the connection or the server itself. Throws an [IOException] or an [HttpException].
      */
-    private suspend fun suggest(image: MultipartBody.Part): List<String> {
+    private suspend fun suggest(parts: Parts): List<String> {
         val answer = try {
-            withTimeoutOrNull(timeoutMs) { api.suggestPoses(image, null) }
+            withTimeoutOrNull(timeoutMs) { api.suggestPoses(parts.image, null, parts.selfie) }
                 ?: throw SocketTimeoutException("The server did not suggest poses in time")
         } catch (error: CancellationException) {
             throw error
@@ -92,11 +104,11 @@ class RemotePoseGenerator(
      * description's own request is already on its way, so nothing here ends the run: for any variation the server
      * does not give in [VARIATION_TIMEOUT_MS], or at all, the description is sent again.
      */
-    private suspend fun vary(image: MultipartBody.Part, description: String): List<String> {
+    private suspend fun vary(parts: Parts, description: String): List<String> {
         val wanted = POSE_COUNT - 1
         val variations = try {
             val answer = withTimeoutOrNull(VARIATION_TIMEOUT_MS) {
-                api.suggestPoses(image, description.toRequestBody(TEXT))
+                api.suggestPoses(parts.image, description.toRequestBody(TEXT), parts.selfie)
             }
             if (answer == null) Log.w(TAG, "variations: no answer within $VARIATION_TIMEOUT_MS ms")
             answer?.poses.orEmpty().drop(1).filter { it.isNotBlank() }.take(wanted)
@@ -109,10 +121,15 @@ class RemotePoseGenerator(
         return variations + List(wanted - variations.size) { description }
     }
 
-    private suspend fun request(image: MultipartBody.Part, pose: PlannedPose, seed: Long): CandidateEvent {
+    private suspend fun request(parts: Parts, pose: PlannedPose, seed: Long): CandidateEvent {
         val event = withTimeoutOrNull(timeoutMs) {
             try {
-                val answer = api.createPose(image, pose.text.toRequestBody(TEXT), seed.toString().toRequestBody(TEXT))
+                val answer = api.createPose(
+                    parts.image,
+                    pose.text.toRequestBody(TEXT),
+                    seed.toString().toRequestBody(TEXT),
+                    parts.selfie,
+                )
                 val candidate = withContext(imageDispatcher) {
                     images.decodeCandidate(Base64.getDecoder().decode(answer.image))
                 }
@@ -126,8 +143,9 @@ class RemotePoseGenerator(
                 throw error
             } catch (error: Exception) {
                 // The pose itself stays out of the log: it can be the user's own words.
-                Log.w(TAG, "${pose.id}: ${describe(error)}")
-                CandidateEvent.Failed(pose.id, errorOf(error))
+                val body = errorBody(error)
+                Log.w(TAG, "${pose.id}: ${describe(error, body)}")
+                CandidateEvent.Failed(pose.id, errorOf(error, body))
             }
         }
         return event ?: CandidateEvent.Failed(pose.id, GenerationError.TIMEOUT).also {
@@ -135,11 +153,14 @@ class RemotePoseGenerator(
         }
     }
 
-    /** The statuses of Design 2.5.3; anything else from the server, such as a rejected photo, is a server error. */
-    private fun errorOf(error: Exception): GenerationError = when (error) {
+    /**
+     * The statuses of Design 2.5.3, and for 422 its code: no person in the scene photo (FR-4.13), or a refused
+     * description. Anything else from the server, such as a rejected photo, is a server error.
+     */
+    private fun errorOf(error: Exception, body: ApiErrorBody?): GenerationError = when (error) {
         is HttpException -> when (error.code()) {
             429 -> GenerationError.RATE_LIMITED
-            422 -> GenerationError.REJECTED
+            422 -> if (body?.error?.code == NO_PERSON) GenerationError.NO_PERSON else GenerationError.REJECTED
             504 -> GenerationError.TIMEOUT
             else -> GenerationError.SERVER
         }
@@ -152,12 +173,16 @@ class RemotePoseGenerator(
         else -> GenerationError.SERVER
     }
 
-    /** For logcat: the status with the server's error code and message, which name a rejected photo's problem. */
-    private fun describe(error: Exception): String {
-        if (error !is HttpException) return error.toString()
-        val body = runCatching {
-            error.response()?.errorBody()?.string()?.let { errorJson.decodeFromString<ApiErrorBody>(it) }
+    /** The server's error body, read once, since a response body can be read only once; null if there is none. */
+    private fun errorBody(error: Exception): ApiErrorBody? = (error as? HttpException)?.let { http ->
+        runCatching {
+            http.response()?.errorBody()?.string()?.let { errorJson.decodeFromString<ApiErrorBody>(it) }
         }.getOrNull()
+    }
+
+    /** For logcat: the status with the server's error code and message, which name a rejected photo's problem. */
+    private fun describe(error: Exception, body: ApiErrorBody? = errorBody(error)): String {
+        if (error !is HttpException) return error.toString()
         return listOfNotNull("HTTP ${error.code()}", body?.error?.code, body?.error?.message).joinToString(" ")
     }
 
@@ -172,6 +197,9 @@ class RemotePoseGenerator(
         const val VARIATION_TIMEOUT_MS = 10_000L
 
         private const val TAG = "PixPoses"
+
+        /** The 422 code of a scene photo in which the server found no one (Design 2.5.3). */
+        private const val NO_PERSON = "NO_PERSON"
         private val JPEG = "image/jpeg".toMediaType()
         private val TEXT = "text/plain".toMediaType()
         private val errorJson = Json { ignoreUnknownKeys = true }

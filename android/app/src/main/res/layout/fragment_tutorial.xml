@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The first-use tutorial over a screen (FR-10.4): the dimming, the rings, and the captions, which CoachMarkLayout adds
+     and places, and Got it, which it places where nothing else is. -->
+<com.lastpenguin.pix.ui.settings.CoachMarkLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Named in full: a dialog's inflater swaps in a MaterialButton only under an AppCompat activity. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/gotItButton"
+        style="@style/Widget.Pix.Button.Small"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/tutorial_got_it" />
+</com.lastpenguin.pix.ui.settings.CoachMarkLayout>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Whether the screens show Korean: true in values-ko. The pose tip is asked for in that language (FR-10.2). -->
+    <bool name="screens_in_korean">false</bool>
+</resources>

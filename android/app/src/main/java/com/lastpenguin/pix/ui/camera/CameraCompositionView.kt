@@ -1,15 +1,21 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.frameAspect
 
-/** Viewfinder-only composition aids. Never consumes gestures or enters captured/streamed frames. */
+/**
+ * Viewfinder-only composition aids. Never consumes gestures or enters captured/streamed frames. The lines are thin so
+ * that they do not compete with the photo, and each has a dark outline so it still shows on a bright scene (Design 2.8).
+ */
 class CameraCompositionView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -17,19 +23,19 @@ class CameraCompositionView @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(135, 255, 255, 255)
-        strokeWidth = density * 0.75f
+        strokeWidth = density * GRID_DP
     }
     private val gridOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(50, 0, 0, 0)
-        strokeWidth = density * 1.5f
+        strokeWidth = density * GRID_OUTLINE_DP
     }
     private val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeWidth = density * 3f
+        strokeWidth = density * BAR_DP
         strokeCap = Paint.Cap.ROUND
     }
     private val barOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(140, 0, 0, 0)
-        strokeWidth = density * 4.5f
+        strokeWidth = density * BAR_OUTLINE_DP
         strokeCap = Paint.Cap.ROUND
     }
     private val levelColor = context.getColor(R.color.camera_level_aligned)
@@ -42,6 +48,14 @@ class CameraCompositionView @JvmOverloads constructor(
             if (field == value) return
             field = value
             frame = fitViewfinderFrame(width.toFloat(), height.toFloat(), value)
+            invalidate()
+        }
+
+    /** Darkens the camera's image outside the frame, as 1:1 shows inside the 4:3 area (R&S 6.2). */
+    var dimOutside: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
             invalidate()
         }
 
@@ -78,6 +92,7 @@ class CameraCompositionView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (frame.width == 0f || frame.height == 0f) return
+        if (dimOutside) dimOutsideFrame(canvas, width.toFloat(), height.toFloat(), frame)
         val clipped = canvas.save()
         canvas.clipRect(frame.left, frame.top, frame.right, frame.bottom)
         // Two lines in each direction create nine identically sized cells inside the image only.
@@ -96,14 +111,18 @@ class CameraCompositionView @JvmOverloads constructor(
     private fun drawLevel(canvas: Canvas, value: CameraLevel) {
         val cx = frame.centerX
         val cy = frame.centerY
-        val cellWidth = frame.width / 3f
+        // Held on its side, the horizon runs along the frame's long side, and the bar with it (FR-1.10).
+        val span = (if (value.baseDegrees == 0f) frame.width else frame.height) / 3f
         bar.color = if (value.isLevel) levelColor else Color.WHITE
+        val held = canvas.save()
+        canvas.rotate(value.baseDegrees, cx, cy)
         // Fixed short wings mark the target horizon; the middle segment follows gravity.
-        drawBar(canvas, cx - cellWidth * 0.44f, cy, cx - cellWidth * 0.34f, cy)
-        drawBar(canvas, cx + cellWidth * 0.34f, cy, cx + cellWidth * 0.44f, cy)
+        drawBar(canvas, cx - span * 0.44f, cy, cx - span * 0.34f, cy)
+        drawBar(canvas, cx + span * 0.34f, cy, cx + span * 0.44f, cy)
+        canvas.restoreToCount(held)
         val rotated = canvas.save()
-        canvas.rotate(if (value.isLevel) 0f else value.angleDegrees, cx, cy)
-        drawBar(canvas, cx - cellWidth * 0.30f, cy, cx + cellWidth * 0.30f, cy)
+        canvas.rotate(if (value.isLevel) value.baseDegrees else value.angleDegrees, cx, cy)
+        drawBar(canvas, cx - span * 0.30f, cy, cx + span * 0.30f, cy)
         canvas.restoreToCount(rotated)
     }
 
@@ -111,4 +130,37 @@ class CameraCompositionView @JvmOverloads constructor(
         canvas.drawLine(x1, y1, x2, y2, barOutline)
         canvas.drawLine(x1, y1, x2, y2, bar)
     }
+}
+
+private const val GRID_DP = 0.5f
+private const val GRID_OUTLINE_DP = 1f
+private const val BAR_DP = 1.5f
+private const val BAR_OUTLINE_DP = 2.5f
+private const val DIM_ALPHA = 153
+private val outsideDim = Paint().apply { color = Color.argb(DIM_ALPHA, 0, 0, 0) }
+
+/** Darkens [canvas], [width] by [height], outside [frame], as 1:1 shows inside the 4:3 area (R&S 6.2). */
+internal fun dimOutsideFrame(canvas: Canvas, width: Float, height: Float, frame: ViewfinderFrame) {
+    canvas.drawRect(0f, 0f, width, frame.top, outsideDim)
+    canvas.drawRect(0f, frame.bottom, width, height, outsideDim)
+    canvas.drawRect(0f, frame.top, frame.left, frame.bottom, outsideDim)
+    canvas.drawRect(frame.right, frame.top, width, frame.bottom, outsideDim)
+}
+
+/**
+ * The preview's last [bitmap] as the Camera screen holds it while the camera rebinds: of a 1:1 [aspect], the 4:3 area
+ * with the outside dimmed as the live view showed it, because the overlay that dims it goes with the old ratio; of
+ * the others, as it is (the still is clipped to their frame). It is drawn pixel for pixel where the preview was, so it
+ * has no density, which would scale it when the display's size setting differs from the one the bitmap was made for.
+ */
+internal fun heldFrame(bitmap: Bitmap, aspect: AspectRatio): Bitmap {
+    val dim = aspect.previewAspect != aspect.frameAspect
+    val held = if (!dim || bitmap.isMutable) bitmap else bitmap.copy(Bitmap.Config.ARGB_8888, true)
+    if (dim) {
+        val width = held.width.toFloat()
+        val height = held.height.toFloat()
+        dimOutsideFrame(Canvas(held), width, height, fitViewfinderFrame(width, height, aspect.frameAspect))
+    }
+    held.density = Bitmap.DENSITY_NONE
+    return held
 }

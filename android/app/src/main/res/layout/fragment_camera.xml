@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Camera, Camera + guide, Photo saved, the scene photo for poses, and the photographer's side of a session
-     (R&S 6.2, 6.3, 6.5). The preview, in the chosen aspect ratio, sits between the top bar and the controls, so
-     only the transient chips and the guide's and brightness panels ever cover the photo. -->
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     (R&S 6.2, 6.3, 6.5). The preview fills the screen's width right below the top bar, 4:3 and 1:1 in the same 4:3
+     area, and a taller one reaches down under the controls (previewArea, placed in code). The zoom row, the panels
+     above the shutter, and the controls lie above it. The root tells the screen when a touch anywhere ends, which
+     closes the pose tip (FR-4.10). -->
+<com.lastpenguin.pix.ui.camera.TouchWatchingLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -12,14 +14,17 @@
         android:id="@+id/topBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:minHeight="64dp"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp"
+        android:minHeight="52dp"
+        android:outlineProvider="none"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="0dp"
+        android:translationZ="1dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Flash (FR-1.12) and the aspect ratio (FR-1.13); each tap moves to the next choice. -->
+        <!-- Flash (FR-1.12), whose tap moves to the next choice, and the aspect ratio (FR-1.13), whose tap opens the
+             ratios under the bar. -->
         <LinearLayout
             android:id="@+id/cameraSettings"
             android:layout_width="wrap_content"
@@ -31,10 +36,9 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/flashButton"
-                style="@style/Widget.Pix.Button.Glass.Icon"
+                style="@style/Widget.Pix.Button.Icon.TopBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
                 android:contentDescription="@string/flash_off"
                 android:visibility="gone"
                 app:icon="@drawable/ic_flash_off"
@@ -42,33 +46,12 @@
 
             <Button
                 android:id="@+id/aspectButton"
-                style="@style/Widget.Pix.Button.Glass"
+                style="@style/Widget.Pix.Button.Text.TopBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="56dp"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:text="@string/aspect_4_3" />
-        </LinearLayout>
+                android:text="@string/aspect_3_4" />
 
-        <!-- Shown while a subject is connected (FR-6.8). -->
-        <TextView
-            android:id="@+id/liveBadge"
-            style="@style/Widget.Pix.Chip.Live"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:visibility="gone"
-            app:layout_constrainedWidth="true"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/topBarActions"
-            app:layout_constraintHorizontal_bias="0"
-            app:layout_constraintStart_toEndOf="@id/cameraSettings"
-            app:layout_goneMarginStart="0dp"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:text="Live · Junhyeong connected"
-            tools:visibility="visible" />
+        </LinearLayout>
 
         <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3). -->
         <TextView
@@ -81,6 +64,7 @@
             android:accessibilityLiveRegion="polite"
             android:text="@string/scene_title"
             android:textAppearance="@style/TextAppearance.Pix.Header"
+            android:textSize="14sp"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/topBarActions"
@@ -88,14 +72,38 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_goneMarginStart="0dp" />
 
+        <!-- The latency indicator during a session, when Settings turns it on (FR-10.3). -->
+        <TextView
+            android:id="@+id/latencyChip"
+            style="@style/Widget.Pix.Chip.Small"
+            android:layout_marginEnd="8dp"
+            android:accessibilityLiveRegion="none"
+            android:visibility="gone"
+            app:drawableStartCompat="@drawable/ic_status_dot"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/topBarActions"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="@string/latency_value"
+            tools:visibility="visible" />
+
         <LinearLayout
             android:id="@+id/topBarActions"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:gravity="center_vertical"
             tools:ignore="ButtonOrder"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Settings (FR-10.1); like Shoot together, not during a session or the scene photo. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/settingsButton"
+                style="@style/Widget.Pix.Button.Icon.TopBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/settings"
+                app:icon="@drawable/ic_settings" />
 
             <Button
                 android:id="@+id/shootTogetherButton"
@@ -125,16 +133,72 @@
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- The ratios, opened from the ratio in the top bar (FR-1.13): each drawn in its own shape, the chosen one bright.
+         A choice, a touch anywhere else, or Back closes them. -->
+    <LinearLayout
+        android:id="@+id/aspectPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="4dp"
+        android:accessibilityPaneTitle="@string/aspect_ratios"
+        android:background="@drawable/bg_aspect_panel"
+        android:orientation="horizontal"
+        android:outlineProvider="none"
+        android:paddingHorizontal="8dp"
+        android:translationZ="2dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        tools:visibility="visible">
+
+        <FrameLayout
+            android:id="@+id/aspect916Option"
+            style="@style/Widget.Pix.AspectOption">
+
+            <TextView
+                style="@style/Widget.Pix.AspectOption.Shape"
+                android:layout_width="22dp"
+                android:layout_height="29dp"
+                android:text="@string/aspect_9_16" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/aspect34Option"
+            style="@style/Widget.Pix.AspectOption">
+
+            <TextView
+                style="@style/Widget.Pix.AspectOption.Shape"
+                android:layout_width="22dp"
+                android:layout_height="25dp"
+                android:text="@string/aspect_3_4" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/aspect11Option"
+            style="@style/Widget.Pix.AspectOption">
+
+            <TextView
+                style="@style/Widget.Pix.AspectOption.Shape"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:text="@string/aspect_1_1" />
+        </FrameLayout>
+    </LinearLayout>
+
     <FrameLayout
         android:id="@+id/previewContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:layout_marginTop="48dp"
+        android:layout_marginBottom="152dp"
         android:background="@color/pix_ground"
         android:splitMotionEvents="false"
-        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topBar">
+        app:layout_constraintTop_toTopOf="parent">
 
         <androidx.camera.view.PreviewView
             android:id="@+id/previewView"
@@ -142,13 +206,37 @@
             android:layout_height="match_parent"
             android:background="@color/pix_ground" />
 
-        <!-- The last frame, held while the camera rebinds for a new ratio or lens (PreviewHold, Design 2.6.2, 2.6.5). -->
+        <!-- The ground behind a held frame, so that nothing of the rebinding preview shows while the frame turns over for
+             the other camera; it goes as the held frame starts to fade. -->
+        <View
+            android:id="@+id/stillGround"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/pix_ground"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
+        <!-- The last frame, held while the camera rebinds for a new ratio or lens (PreviewHold, Design 2.6.2, 2.6.5). It is
+             drawn at its own size from the top left, where the preview was, and for a new ratio its matrix moves it with
+             the scene to where the new ratio shows it. The ground covers what it does not, and the preview under it. -->
         <ImageView
             android:id="@+id/aspectStill"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@color/pix_ground"
             android:importantForAccessibility="no"
-            android:scaleType="fitCenter"
+            android:scaleType="matrix"
+            android:visibility="gone" />
+
+        <!-- Dims the held frame, blurred where Android can, while the camera rebinds for a new ratio or the other camera,
+             and the preview for a moment at the shutter (Design 2.6.2). Under the grid and the guide. -->
+        <View
+            android:id="@+id/previewScrim"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0"
+            android:background="@color/pix_ground"
+            android:importantForAccessibility="no"
             android:visibility="gone" />
 
         <com.lastpenguin.pix.guide.GuideOverlayView
@@ -174,6 +262,18 @@
             android:background="@drawable/bg_focus_ring"
             android:importantForAccessibility="no"
             android:visibility="gone" />
+
+        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused; a drag up on it or on the preview adds to
+             the base brightness from Settings until the next tap. It fades out after a few seconds without a touch
+             (Design 2.8). 48 dp wide for the touch (NFR-16); placed in code. -->
+        <com.lastpenguin.pix.ui.camera.ExposureBarView
+            android:id="@+id/exposureBar"
+            android:layout_width="48dp"
+            android:layout_height="128dp"
+            android:layout_gravity="top|left"
+            android:visibility="gone"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible" />
 
         <ProgressBar
             android:id="@+id/cameraProgress"
@@ -224,10 +324,23 @@
             android:gravity="center_horizontal"
             android:orientation="vertical">
 
+            <!-- What a toggle just did, such as "Guide hidden", "2×", or "Saved to My library", for a few seconds; a new
+                 toggle replaces it at once, and TalkBack reads it (Design 2.8). The hint steps aside meanwhile. -->
+            <TextView
+                android:id="@+id/toggleLabel"
+                style="@style/Widget.Pix.Chip.Small"
+                android:layout_marginBottom="8dp"
+                android:accessibilityLiveRegion="polite"
+                android:textSize="13sp"
+                android:visibility="gone"
+                tools:drawableStartCompat="@drawable/ic_visibility_off_small"
+                tools:text="@string/hint_guide_hidden"
+                tools:visibility="visible" />
+
             <!-- Saving, Photo saved, or why a photo failed (FR-1.6). -->
             <TextView
                 android:id="@+id/captureStatus"
-                style="@style/Widget.Pix.Chip"
+                style="@style/Widget.Pix.Chip.Small"
                 android:layout_marginBottom="8dp"
                 android:accessibilityLiveRegion="polite"
                 android:visibility="gone"
@@ -235,141 +348,27 @@
                 tools:text="@string/photo_saved"
                 tools:visibility="visible" />
 
+            <!-- What the screen does not show by itself: a hidden guide, or that a pinch zooms (Design 2.6.8). -->
             <TextView
                 android:id="@+id/hintText"
-                style="@style/Widget.Pix.Chip"
-                app:drawableStartCompat="@drawable/ic_target_small"
-                app:drawableTint="@color/pix_accent"
-                android:text="@string/hint_add_guide" />
-        </LinearLayout>
-
-        <!-- Over the bottom of the preview: remote action notices, then the guide's controls. -->
-        <LinearLayout
-            android:id="@+id/bottomOverlays"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <!-- Remote action notice, such as "Junhyeong set zoom to 2×" (FR-7.4). -->
-            <TextView
-                android:id="@+id/noticeText"
-                style="@style/Widget.Pix.Chip"
-                android:minHeight="40dp"
-                android:visibility="gone"
-                tools:text="Junhyeong set zoom to 2×"
+                style="@style/Widget.Pix.Chip.Small"
+                android:visibility="invisible"
+                tools:drawableStartCompat="@drawable/ic_zoom_small"
+                tools:text="@string/hint_pinch_zoom"
                 tools:visibility="visible" />
-
-            <!-- Brightness (FR-1.11), opened from the button beside the zoom readout; the value is in EV. -->
-            <LinearLayout
-                android:id="@+id/brightnessPanel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_glass_panel"
-                android:gravity="center_vertical"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:visibility="gone"
-                tools:visibility="visible">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:importantForAccessibility="no"
-                    android:src="@drawable/ic_brightness"
-                    app:tint="@color/pix_text_soft" />
-
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/brightnessSlider"
-                    style="@style/Widget.Pix.Slider"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/brightness"
-                    android:enabled="false"
-                    android:value="1"
-                    android:valueFrom="1"
-                    android:valueTo="2" />
-
-                <TextView
-                    android:id="@+id/brightnessValue"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="end"
-                    android:importantForAccessibility="no"
-                    android:minWidth="40dp"
-                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
-                    tools:text="+0.7" />
-            </LinearLayout>
-
-            <!-- Shown while a guide is on the camera (R&S 6.2, Camera + guide). -->
-            <LinearLayout
-                android:id="@+id/guideControls"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_glass_panel"
-                android:gravity="center_vertical"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp"
-                android:visibility="gone"
-                tools:visibility="visible">
-
-                <!-- Hide / Show (FR-3.6): the guide goes away for a moment and comes back where it was. -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/hideGuideButton"
-                    style="@style/Widget.Pix.Button.Icon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/hide_guide"
-                    app:icon="@drawable/ic_visibility_off" />
-
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/opacitySlider"
-                    style="@style/Widget.Pix.Slider.Guide"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="0dp"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/guide_opacity"
-                    android:enabled="false"
-                    android:value="0.5"
-                    android:valueFrom="0.1"
-                    android:valueTo="0.9" />
-
-                <TextView
-                    android:id="@+id/opacityValue"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="end"
-                    android:importantForAccessibility="no"
-                    android:minWidth="34dp"
-                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
-                    android:textColor="@color/slider_value_text"
-                    tools:text="50%" />
-
-                <!-- Save guide (FR-3.8): filled once the guide on the camera is saved. -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/saveGuideButton"
-                    style="@style/Widget.Pix.Button.Icon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/save_guide"
-                    app:icon="@drawable/ic_bookmark" />
-
-                <Button
-                    android:id="@+id/removeGuideButton"
-                    style="@style/Widget.Pix.Button.Icon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/remove_guide"
-                    app:icon="@drawable/ic_close" />
-            </LinearLayout>
         </LinearLayout>
+
+        <!-- A subject is watching this camera (FR-6.8): a blinking red light at the image's top right, placed in code. -->
+        <com.lastpenguin.pix.ui.camera.LiveDotView
+            android:id="@+id/liveDot"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="top|left"
+            android:accessibilityLiveRegion="polite"
+            android:importantForAccessibility="yes"
+            android:visibility="gone"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible" />
 
         <LinearLayout
             android:id="@+id/cameraMessagePanel"
@@ -425,55 +424,200 @@
         </LinearLayout>
     </FrameLayout>
 
+    <!-- Right above the shutter's row: remote action notices, the pose tip, and the guide's controls. In
+         the space below the image when they fit there, and over the image when it reaches the controls (R&S 6.2). -->
     <LinearLayout
-        android:id="@+id/bottomPanel"
+        android:id="@+id/bottomOverlays"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:outlineProvider="none"
+        android:paddingHorizontal="12dp"
+        android:paddingBottom="8dp"
+        android:translationZ="1dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- The brightness button, the applied zoom (FR-1.3), which a pinch on the preview changes, and the
-             guide-edit mode toggle; the same row as Subject view. The readout keeps the Zoom in / Zoom out
-             accessibility actions. -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="48dp">
+        <!-- Remote action notice, such as "Joonhyung set zoom to 2×" (FR-7.4). -->
+        <TextView
+            android:id="@+id/noticeText"
+            style="@style/Widget.Pix.Chip.Small"
+            android:visibility="gone"
+            tools:text="Joonhyung set zoom to 2×"
+            tools:visibility="visible" />
 
-            <!-- Opens the brightness slider over the preview (FR-1.11); checked while it is open. -->
+        <!-- How to hold the phone for a generated pose (FR-4.10): open once when its guide comes, "Preparing a
+             tip…" until the tip arrives; a touch anywhere closes it, and the tip button in the top bar opens it
+             again. Translucent, so the preview shows through. -->
+        <LinearLayout
+            android:id="@+id/tipBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:accessibilityLiveRegion="polite"
+            android:background="@drawable/bg_glass_panel"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="48dp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_lightbulb"
+                app:tint="@color/pix_accent" />
+
+            <TextView
+                android:id="@+id/tipText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:textAppearance="@style/TextAppearance.Pix.Body"
+                tools:text="Zoom in or take a step closer, hold the phone at your chest and keep it level - the body keeps its proportions." />
+        </LinearLayout>
+
+        <!-- Shown while a guide is on the camera (R&S 6.2, Camera + guide). -->
+        <LinearLayout
+            android:id="@+id/guideControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_glass_panel"
+            android:gravity="center_vertical"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- Hide / Show (FR-3.6): the guide goes away for a moment and comes back where it was. -->
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/brightnessButton"
+                android:id="@+id/hideGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="start|center_vertical"
-                android:checkable="true"
-                android:contentDescription="@string/brightness"
-                android:visibility="gone"
-                app:backgroundTint="@color/brightness_button_background"
-                app:icon="@drawable/ic_brightness"
-                app:iconTint="@color/brightness_button_icon"
-                tools:visibility="visible" />
+                android:contentDescription="@string/hide_guide"
+                app:icon="@drawable/ic_visibility_off" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/opacitySlider"
+                style="@style/Widget.Pix.Slider.Guide"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="0dp"
+                android:layout_weight="1"
+                android:contentDescription="@string/guide_opacity"
+                android:enabled="false"
+                android:value="0.5"
+                android:valueFrom="0.1"
+                android:valueTo="0.9" />
 
             <TextView
-                android:id="@+id/zoomReadout"
+                android:id="@+id/opacityValue"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_gravity="center"
-                android:background="@drawable/bg_zoom_readout"
-                android:focusable="true"
-                android:gravity="center"
-                android:importantForAccessibility="yes"
-                android:minWidth="56dp"
-                android:paddingHorizontal="12dp"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:importantForAccessibility="no"
+                android:minWidth="34dp"
                 android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
-                android:textColor="@color/zoom_readout_text"
-                android:textSize="14sp"
-                tools:text="1.0×" />
+                android:textColor="@color/slider_value_text"
+                tools:text="50%" />
+
+            <!-- Save guide (FR-3.8): filled once the guide on the camera is saved. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/saveGuideButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/save_guide"
+                app:icon="@drawable/ic_bookmark" />
+
+            <Button
+                android:id="@+id/removeGuideButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/remove_guide"
+                app:icon="@drawable/ic_close" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- The applied zoom (FR-1.3), which a pinch on the preview changes, the pose tip's button, and the guide-edit
+         mode toggle, over the bottom of the image whatever the ratio, above the panels below when they reach into it
+         (placed in code); the same row as Subject view, which has no tip and keeps a brightness button, since the base
+         brightness is in Settings here (FR-1.11). The readout keeps the Zoom in / Zoom out accessibility actions. -->
+    <FrameLayout
+        android:id="@+id/zoomRow"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:outlineProvider="none"
+        android:paddingHorizontal="12dp"
+        android:translationZ="1dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/zoomReadout"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_zoom_readout"
+            android:focusable="true"
+            android:gravity="center"
+            android:importantForAccessibility="yes"
+            android:minWidth="48dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="10dp"
+            android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+            android:textColor="@color/zoom_readout_text"
+            android:textSize="11sp"
+            tools:text="1.0×" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:gravity="center_vertical">
+
+            <!-- Opens the pose tip again while the guide on the camera has one (FR-4.10); the dot says a tip came
+                 while the banner was closed. Beside the guide's own button, so the top bar fits any phone. -->
+            <FrameLayout
+                android:id="@+id/tipButtonFrame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/tipButton"
+                    style="@style/Widget.Pix.Button.Icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/show_tip"
+                    app:icon="@drawable/ic_lightbulb" />
+
+                <ImageView
+                    android:id="@+id/tipDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="7dp"
+                    android:layout_marginEnd="6dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_status_dot"
+                    android:visibility="gone"
+                    app:tint="@color/pix_accent"
+                    tools:visibility="visible" />
+            </FrameLayout>
 
             <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. -->
             <com.google.android.material.button.MaterialButton
@@ -482,21 +626,51 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
-                android:layout_gravity="end|center_vertical"
                 android:contentDescription="@string/edit_guide"
                 android:visibility="gone"
                 app:backgroundTint="@color/edit_guide_background"
                 app:icon="@drawable/ic_move"
                 app:iconTint="@color/edit_guide_icon"
                 tools:visibility="visible" />
-        </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
 
-        <!-- Guide, shutter, and the last photo, in thirds and on one center line; the Guide label hangs below (R&S 6.2). -->
+    <!-- Over the guide-edit mode toggle, for a few seconds after a tap: what a pinch moves now, Guide or Camera
+         (Design 2.8). Moved with the zoom row in code. -->
+    <TextView
+        android:id="@+id/pinchModeLabel"
+        style="@style/Widget.Pix.Chip.Small"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="4dp"
+        android:accessibilityLiveRegion="polite"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/zoomRow"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:text="@string/pinch_mode_guide"
+        tools:visibility="visible" />
+
+    <LinearLayout
+        android:id="@+id/bottomPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="18dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- Guide, shutter, and the last photo, in thirds and on one center line; the Guide label hangs below. The
+             shutter keeps its size and place whatever the ratio (R&S 6.2). -->
         <LinearLayout
             android:id="@+id/captureControls"
             android:layout_width="match_parent"
-            android:layout_height="104dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="88dp"
             android:baselineAligned="false"
             android:gravity="center_vertical">
 
@@ -520,19 +694,20 @@
                     tools:ignore="UselessParent">
 
                     <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:background="@drawable/bg_guide_button"
                         android:duplicateParentState="true"
                         android:importantForAccessibility="no"
-                        android:scaleType="center"
+                        android:padding="10dp"
+                        android:scaleType="fitCenter"
                         android:src="@drawable/ic_guide"
                         app:tint="@color/guide_button_icon" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="16dp"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="4dp"
                         android:duplicateParentState="true"
                         android:gravity="center"
                         android:includeFontPadding="false"
@@ -550,34 +725,79 @@
 
                 <ImageButton
                     android:id="@+id/shutterButton"
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
                     android:layout_gravity="center"
                     android:background="@drawable/bg_shutter"
                     android:contentDescription="@string/shutter" />
             </FrameLayout>
 
+            <!-- A third of the row, as for Guide and the shutter: the camera switch next to the shutter, then the
+                 gallery button; the gallery button alone keeps the middle on a phone without a front camera. -->
             <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1">
+                android:layout_weight="1"
+                tools:ignore="UselessParent">
 
-                <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/galleryButton"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:background="@color/pix_surface_2"
-                    android:clickable="true"
-                    android:contentDescription="@string/open_last_photo"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:padding="1dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/gallery_placeholder"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
-                    app:strokeColor="#B3FFFFFF"
-                    app:strokeWidth="2dp" />
+                    android:orientation="horizontal">
+
+                    <!-- The camera switch (FR-1.14): a 40 dp glass circle in a 48 dp touch area (NFR-16). -->
+                    <FrameLayout
+                        android:id="@+id/switchCameraButton"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="4dp"
+                        android:clickable="true"
+                        android:contentDescription="@string/switch_to_front_camera"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_guide_button"
+                            android:duplicateParentState="true"
+                            android:importantForAccessibility="no"
+                            android:padding="9dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_switch_camera"
+                            app:tint="@color/guide_button_icon" />
+                    </FrameLayout>
+
+                    <!-- The last photo: a 40 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps; the
+                         thumbnail shows its pressed state. -->
+                    <FrameLayout
+                        android:id="@+id/galleryButton"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:clickable="true"
+                        android:contentDescription="@string/open_last_photo"
+                        android:focusable="true">
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/galleryThumbnail"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_gravity="center"
+                            android:background="@color/pix_glass"
+                            android:duplicateParentState="true"
+                            android:foreground="?attr/selectableItemBackground"
+                            android:importantForAccessibility="no"
+                            android:padding="1dp"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/gallery_placeholder"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
+                            app:strokeColor="#80FFFFFF"
+                            app:strokeWidth="1.5dp" />
+                    </FrameLayout>
+                </LinearLayout>
             </FrameLayout>
         </LinearLayout>
 
@@ -585,8 +805,7 @@
         <LinearLayout
             android:id="@+id/sceneReviewControls"
             android:layout_width="match_parent"
-            android:layout_height="104dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="88dp"
             android:gravity="center_vertical"
             android:visibility="gone"
             tools:ignore="ButtonStyle">
@@ -608,4 +827,4 @@
                 android:text="@string/use_this_photo" />
         </LinearLayout>
     </LinearLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+</com.lastpenguin.pix.ui.camera.TouchWatchingLayout>

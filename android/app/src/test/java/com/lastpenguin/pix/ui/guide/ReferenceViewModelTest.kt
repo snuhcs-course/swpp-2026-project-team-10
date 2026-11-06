@@ -1,9 +1,15 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.generation.GuideTip
+import com.lastpenguin.pix.generation.PoseTip
+import com.lastpenguin.pix.generation.PoseTipper
+import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.TipSource
+import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -12,15 +18,23 @@ import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
+import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.session.ConfirmShare
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SubjectGuideTarget
+import com.lastpenguin.pix.session.SubjectUse
 import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -30,6 +44,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -69,12 +84,80 @@ class ReferenceViewModelTest {
     }
 
     @Test
+    fun onCandidatePicked_withTheGuideItsHeartSaved_goesOnWithIt_withoutCuttingAgain() = runTest {
+        val saved = guide()
+
+        model.onCandidatePicked(bitmap(), saved = saved)
+        runCurrent()
+
+        assertEquals(emptyList<GuideSource>(), maker.sources)
+        assertEquals(ReferenceUiState.Ready(saved), model.uiState.value)
+    }
+
+    @Test
     fun replacing_guideOnTheCamera_isTrueOnlyThen() = runTest {
         assertEquals(false, model.replacing)
 
         guides.guide.value = guide()
 
         assertEquals(true, model.replacing)
+    }
+
+    @Test
+    fun openFor_subject_sendsTheGuideAndSavedGuidesToThePhotographerInstead() = runTest {
+        val target = FakeTarget()
+        val saved = SavedGuideStore.InMemory()
+        val subjectModel = ReferenceViewModel(maker, guides, saved, subject = target)
+        store.put("subject-reference", subjectModel)
+        subjectModel.openFor(fromSubject = true)
+        assertEquals(true, subjectModel.forSubject)
+        assertEquals(false, subjectModel.replacing)
+        target.current = guide()
+        assertEquals(true, subjectModel.replacing)
+
+        val made = guide()
+        subjectModel.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(made))
+        runCurrent()
+        subjectModel.onUseGuide()
+        val kept = guide()
+        saved.save(kept, GuideState()).getOrThrow()
+        subjectModel.onUseSaved(kept.id)
+        runCurrent()
+
+        assertEquals(listOf(made.id, kept.id), target.offered.map { it.id })
+        assertNull(guides.stored)
+    }
+
+    @Test
+    fun openFor_cameraOrNoTarget_keepsTheGuideOnThisPhone() = runTest {
+        model.openFor(fromSubject = true)
+        assertEquals(false, model.forSubject)
+
+        val target = FakeTarget()
+        val subjectModel = ReferenceViewModel(maker, guides, subject = target)
+        store.put("camera-reference", subjectModel)
+        subjectModel.openFor(fromSubject = true)
+        subjectModel.openFor(fromSubject = false)
+        val made = guide()
+        subjectModel.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(made))
+        runCurrent()
+        subjectModel.onUseGuide()
+
+        assertSame(made, guides.stored)
+        assertEquals(emptyList<ReferenceGuide>(), target.offered)
+    }
+
+    private class FakeTarget : SubjectGuideTarget {
+        override var current: ReferenceGuide? = null
+        val offered = mutableListOf<ReferenceGuide>()
+
+        override fun offer(guide: ReferenceGuide) {
+            offered += guide
+        }
     }
 
     @Test
@@ -165,9 +248,251 @@ class ReferenceViewModelTest {
         assertEquals(ReferenceUiState.Ready(second), model.uiState.value)
     }
 
+    @Test
+    fun onCandidatePicked_withItsSceneAndPose_asksForItsTipOnceThePersonIsFound() = runTest {
+        val tipper = RecordingTipper()
+        val model = withTips(tipper)
+        val candidate = bitmap()
+        val scene = bitmap()
+        val guide = guide()
+
+        model.onCandidatePicked(candidate, TipSource(scene, "Walk past the railing"))
+        runCurrent()
+        assertEquals(emptyList<String>(), tipper.poses)
+        maker.finish(Result.success(guide))
+        runCurrent()
+
+        assertEquals(ReferenceUiState.Ready(guide), model.uiState.value)
+        assertEquals(listOf("Walk past the railing"), tipper.poses)
+        assertSame(scene, tipper.scenes.single())
+        assertSame(candidate, tipper.candidates.single())
+    }
+
+    @Test
+    fun onCandidatePicked_withoutItsSource_orWithoutAPerson_asksForNoTip() = runTest {
+        val tipper = RecordingTipper()
+        val model = withTips(tipper)
+
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+        maker.finish(Result.failure(NoPersonFoundException()))
+        runCurrent()
+
+        assertEquals(ReferenceUiState.NoPersonFound, model.uiState.value)
+        assertEquals(emptyList<String>(), tipper.poses)
+    }
+
+    @Test
+    fun leavingWithoutUsingTheGuide_stopsTheAskForItsTip() = runTest {
+        val tipper = RecordingTipper(waits = true)
+        val model = withTips(tipper)
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        model.onConfirmLeft()
+        runCurrent()
+
+        assertEquals(listOf("Wave"), tipper.cancelled)
+    }
+
+    @Test
+    fun anotherPhotoInPlaceOfTheGeneratedGuide_stopsTheAskForItsTip() = runTest {
+        val tipper = RecordingTipper(waits = true)
+        val model = withTips(tipper)
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        // A photo without a tip of its own; one from the gallery is in ReferenceConfirmFragmentTest, as a JVM Uri is null.
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+
+        assertEquals(listOf("Wave"), tipper.cancelled)
+    }
+
+    @Test
+    fun leavingAfterUseThisGuide_keepsItsTip_thoughTheGuideIsNotOnCameraForThePoseTipsYet() = runTest {
+        val tipper = RecordingTipper(waits = true)
+        val camera = InMemoryGuideRepository()
+        val tips = PoseTips(tipper, camera.guide, backgroundScope)
+        val model = ReferenceViewModel(maker, camera, tips = tips)
+        val guide = guide()
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+        maker.finish(Result.success(guide))
+        runCurrent()
+
+        // The tips follow the guide on their own scope, after the screen is left.
+        model.onUseGuide()
+        model.onConfirmLeft()
+        runCurrent()
+
+        assertEquals(emptyList<String>(), tipper.cancelled)
+        assertEquals(GuideTip(guide.id, TipState.Preparing), tips.onCamera.value)
+    }
+
+    @Test
+    fun leavingWhileThePersonIsBeingFound_stopsIt_andAsksForNoTip() = runTest {
+        val tipper = RecordingTipper(waits = true)
+        val model = withTips(tipper)
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+
+        model.onConfirmLeft()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        assertEquals(ReferenceUiState.Idle, model.uiState.value)
+        assertEquals(emptyList<String>(), tipper.poses)
+    }
+
+    private fun TestScope.withTips(tipper: PoseTipper) =
+        ReferenceViewModel(maker, guides, tips = PoseTips(tipper, guides.guide, backgroundScope))
+
+    /** Answers at once, or, with [waits], only when its ask is cancelled, which [cancelled] records by pose. */
+    private class RecordingTipper(private val waits: Boolean = false) : PoseTipper {
+        val scenes = mutableListOf<Bitmap>()
+        val candidates = mutableListOf<Bitmap>()
+        val poses = mutableListOf<String>()
+        val cancelled = mutableListOf<String>()
+
+        override suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip> {
+            scenes += scene
+            candidates += candidate
+            poses += pose
+            if (waits) {
+                try {
+                    awaitCancellation()
+                } catch (error: CancellationException) {
+                    cancelled += pose
+                    throw error
+                }
+            }
+            return Result.success(PoseTip("Hold the phone at your chest and keep it level."))
+        }
+    }
+
+    // ---- the Reference confirm on both phones (FR-6.15, Design 2.6.5) ------------------------------------------
+    // Partitions: a chosen pose's confirm shared from FINDING to READY and ended by Use this guide; Back, No person
+    // found, and an unusable photo close it, once; the subject's use of the outline on screen sets the guide once and
+    // keeps its tip; a use while finding, of another outline or confirm, or after the guide was used does nothing.
+    // Choose another photo and a photo from Add a pose guide need a Uri: ReferenceConfirmFragmentTest.
+
+    @Test
+    fun aChosenPose_isSharedFromFindingToReady_andUseThisGuideEndsIt() = runTest {
+        val confirms = FakeConfirms()
+        val model = withConfirms(confirms)
+        val guide = guide()
+
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        assertEquals(true, model.sharing.value)
+        maker.finish(Result.success(guide))
+        runCurrent()
+        model.onUseGuide()
+
+        assertEquals(listOf("open", "ready ${guide.id}", "used ${guide.id} PHOTOGRAPHER"), confirms.calls)
+        assertEquals(1, confirms.ids.size)
+        assertEquals(false, model.sharing.value)
+        assertSame(guide, guides.stored)
+    }
+
+    @Test
+    fun backNoPersonOrAnUnusablePhoto_closesTheSharedConfirm() = runTest {
+        val confirms = FakeConfirms()
+        val model = withConfirms(confirms)
+
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        model.onConfirmLeft()
+        maker.pending.clear()
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.failure(NoPersonFoundException()))
+        runCurrent()
+        model.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.failure(IOException("Unreadable photo")))
+        runCurrent()
+        model.onConfirmLeft()
+
+        assertEquals(listOf("open", "close", "open", "close", "open", "close"), confirms.calls)
+        assertEquals(3, confirms.ids.size)
+        assertEquals(false, model.sharing.value)
+    }
+
+    @Test
+    fun theSubjectsUseOfTheOutlineOnScreen_setsTheGuideOnce_andKeepsItsTip() = runTest {
+        val confirms = FakeConfirms()
+        val tipper = RecordingTipper(waits = true)
+        val tips = PoseTips(tipper, guides.guide, backgroundScope)
+        val model = ReferenceViewModel(maker, guides, tips = tips, confirms = confirms)
+        store.put("shared-reference", model)
+        val used = mutableListOf<Unit>()
+        backgroundScope.launch { model.usedBySubject.collect { used += it } }
+        val guide = guide()
+        model.onCandidatePicked(bitmap(), TipSource(bitmap(), "Wave"))
+        runCurrent()
+        val id = confirms.ids.single()
+
+        // While the person is being found, and for another outline or confirm: nothing.
+        confirms.uses.emit(SubjectUse(id, guide.id))
+        runCurrent()
+        maker.finish(Result.success(guide))
+        runCurrent()
+        confirms.uses.emit(SubjectUse(id, "guide-other"))
+        confirms.uses.emit(SubjectUse("another", guide.id))
+        runCurrent()
+        assertNull(guides.stored)
+
+        confirms.uses.emit(SubjectUse(id, guide.id))
+        runCurrent()
+        model.onUseGuide()
+        model.onConfirmLeft()
+        confirms.uses.emit(SubjectUse(id, guide.id))
+        runCurrent()
+
+        assertSame(guide, guides.stored)
+        assertEquals(ReferenceUiState.Idle, model.uiState.value)
+        assertEquals(listOf("open", "ready ${guide.id}", "used ${guide.id} SUBJECT"), confirms.calls)
+        assertEquals(1, used.size)
+        assertTrue(tipper.cancelled.isEmpty())
+    }
+
+    private fun withConfirms(confirms: FakeConfirms): ReferenceViewModel =
+        ReferenceViewModel(maker, guides, confirms = confirms).also { store.put("shared-reference", it) }
+
+    /** Records what the confirm told the subject's phone; [uses] are the subject's, as the syncer passes them on. */
+    private class FakeConfirms : ConfirmShare {
+        override val uses = MutableSharedFlow<SubjectUse>()
+        val calls = mutableListOf<String>()
+        val ids = mutableSetOf<String>()
+
+        override fun open(confirmId: String) = record(confirmId, "open")
+
+        override fun finding(confirmId: String) = record(confirmId, "finding")
+
+        override fun ready(confirmId: String, guide: ReferenceGuide) = record(confirmId, "ready ${guide.id}")
+
+        override fun used(confirmId: String, guideId: String, by: Role) = record(confirmId, "used $guideId $by")
+
+        override fun close(confirmId: String) = record(confirmId, "close")
+
+        private fun record(confirmId: String, call: String) {
+            ids += confirmId
+            calls += call
+        }
+    }
+
     private fun guide() = ReferenceGuide(
         id = "guide-${guideCount++}",
-        cutout = bitmap(),
+        mask = bitmap(),
         outline = bitmap(),
         aspect = 0.5f,
         source = GuideSource.GENERATED,
@@ -179,7 +504,7 @@ class ReferenceViewModelTest {
         val pending = ArrayDeque<CompletableDeferred<Result<ReferenceGuide>>>()
         val sources = mutableListOf<GuideSource>()
 
-        override suspend fun make(source: Uri): Result<ReferenceGuide> = next(GuideSource.GALLERY)
+        override suspend fun make(source: Uri, wholeImage: Boolean): Result<ReferenceGuide> = next(GuideSource.GALLERY)
 
         override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> = next(source)
 

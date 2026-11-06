@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """Session state shared by every server process, kept in Redis (Design Documentation 2.7, AD-18).
 
 Each server process is one worker with its own id. The store runs the room transitions as scripts, carries
@@ -75,7 +75,21 @@ class SessionStore:
         self._pubsub = None
         self._scripts = {
             name: redis.register_script(getattr(scripts, name))
-            for name in ("BEAT", "CONNECT", "CREATE", "JOIN", "ROUTE", "LEAVE", "DISCONNECT", "RELEASE", "STATS")
+            for name in (
+                "BEAT",
+                "CONNECT",
+                "CREATE",
+                "JOIN",
+                "REJOIN",
+                "INVITE",
+                "ACCEPT_INVITATION",
+                "END_INVITATION",
+                "ROUTE",
+                "LEAVE",
+                "DISCONNECT",
+                "RELEASE",
+                "STATS",
+            )
         }
         self._register = redis.register_script(scripts.REGISTER)
         self._rate_limit = redis.register_script(scripts.RATE_LIMIT)
@@ -141,16 +155,48 @@ class SessionStore:
         """Registers a socket; one with a signed-in `user` makes that user online (FR-5.9)."""
         return _deliveries(await self._run("CONNECT", connection, user or ""))
 
-    async def create(self, connection: str, session_id: str, code: str) -> tuple[str, list[Delivery]]:
-        status, out = await self._run("CREATE", connection, session_id, code)
+    async def create(self, connection: str, session_id: str, code: str, token_hash: str) -> tuple[str, list[Delivery]]:
+        """Opens a room; `token_hash` is the hash of the photographer's rejoin token."""
+        status, out = await self._run("CREATE", connection, session_id, code, token_hash)
         return status, _deliveries(out)
 
-    async def join(self, connection: str, code: str, failures: Window | None = None) -> tuple[str, str, list[Delivery]]:
-        """Seats a subject. A wrong code counts in `failures`, and while that window is full every join answers
-        RATE_LIMITED."""
+    async def join(
+        self, connection: str, code: str, token_hash: str, failures: Window | None = None
+    ) -> tuple[str, str, list[Delivery]]:
+        """Seats a subject, whose rejoin token has the hash `token_hash`. A wrong code counts in `failures`, and while
+        that window is full every join answers RATE_LIMITED."""
         limits = [failures.key, str(failures.limit), f"{failures.seconds:.6f}"] if failures else ["", "0", "0"]
-        status, session_id, out = await self._run("JOIN", connection, code, *limits, uuid4().hex)
+        status, session_id, out = await self._run("JOIN", connection, code, *limits, uuid4().hex, token_hash)
         return status, session_id, _deliveries(out)
+
+    async def rejoin(
+        self, connection: str, session_id: str, token_hash: str, keep: bool
+    ) -> tuple[str, str, list[Delivery]]:
+        """Gives the place whose rejoin token has the hash `token_hash` to `connection`: `(status, role, deliveries)`.
+        `keep` says the phone keeps its peer connection, so the other phone hears `peer.rejoined`, not `peer.joined`."""
+        status, role, out = await self._run("REJOIN", connection, session_id, token_hash, "1" if keep else "0")
+        return status, role, _deliveries(out)
+
+    async def invite(self, session_id: str, token_hash: str, invitation: str, expires_at: float) -> list[Delivery]:
+        """Opens an invitation's room, with nobody in it and no code; `token_hash` is the hash of the photographer's
+        rejoin token. It expires at `expires_at` unless the friend has taken its place."""
+        return _deliveries(await self._run("INVITE", session_id, token_hash, invitation, f"{expires_at:.6f}"))
+
+    async def accept_invitation(self, session_id: str, token_hash: str, deadline: float) -> tuple[bool, list[Delivery]]:
+        """Opens the subject's place of an invitation's room to the rejoin token with the hash `token_hash`, to be taken
+        by `deadline`. False when the room has ended or has a subject already."""
+        status, out = await self._run("ACCEPT_INVITATION", session_id, token_hash, f"{deadline:.6f}")
+        return status == "OK", _deliveries(out)
+
+    async def end_invitation(self, session_id: str, notice: str = "") -> list[Delivery]:
+        """Removes the room of an invitation nobody accepted; the photographer hears the error `notice`, if any."""
+        return _deliveries(await self._run("END_INVITATION", session_id, notice))
+
+    async def seated(self, session_id: str, connection: str) -> bool:
+        """Whether `connection` still holds the subject's place in the session and its photographer is still there.
+        One read of one hash, so it changes nothing and needs no script."""
+        photographer, subject = await self.redis.hmget(f"session:{session_id}", "photographer", "subject")
+        return bool(photographer) and subject == connection
 
     async def route(self, connection: str, sdp_type: str) -> tuple[str, str, str, str, list[Delivery]]:
         """Finds where a signal goes: `(status, expected SDP type, connection, worker, deliveries)`."""

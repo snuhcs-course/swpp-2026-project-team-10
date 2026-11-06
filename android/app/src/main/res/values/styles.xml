@@ -1,38 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall;
-     radius 999 for chips and pills, 16 for buttons and cards, 28 for sheets. -->
-<resources>
+<!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, and the
+     camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that; radius 999 for chips and pills,
+     16 for buttons and cards, 28 for sheets. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Type: Manrope for the UI, DM Mono for the room code. -->
+    <!-- Type: Manrope for the UI (Pretendard on a phone in Korean: the @font/pix_* aliases), DM Mono for the room code. -->
+    <!-- Every text appearance breaks Korean between words (phrase, Android 13+); before 13, Android breaks inside them. -->
     <style name="TextAppearance.Pix.Title" parent="TextAppearance.Material3.HeadlineSmall">
-        <item name="android:fontFamily">@font/manrope_extrabold</item>
-        <item name="fontFamily">@font/manrope_extrabold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_extrabold</item>
+        <item name="fontFamily">@font/pix_extrabold</item>
         <item name="android:textSize">24sp</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <style name="TextAppearance.Pix.SheetTitle" parent="TextAppearance.Material3.TitleLarge">
-        <item name="android:fontFamily">@font/manrope_extrabold</item>
-        <item name="fontFamily">@font/manrope_extrabold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_extrabold</item>
+        <item name="fontFamily">@font/pix_extrabold</item>
         <item name="android:textSize">22sp</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <style name="TextAppearance.Pix.Header" parent="TextAppearance.Material3.TitleMedium">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">18sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <style name="TextAppearance.Pix.Action" parent="TextAppearance.Material3.LabelLarge">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">16sp</item>
         <item name="android:letterSpacing">0</item>
+    </style>
+
+    <!-- A caption of the first-use tutorial over the dimmed screen (FR-10.4). -->
+    <style name="TextAppearance.Pix.Tutorial" parent="TextAppearance.Pix.Action">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:lineSpacingMultiplier">1.08</item>
     </style>
 
     <style name="TextAppearance.Pix.Action.Small">
@@ -40,16 +53,18 @@
     </style>
 
     <style name="TextAppearance.Pix.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
-        <item name="android:fontFamily">@font/manrope_medium</item>
-        <item name="fontFamily">@font/manrope_medium</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_medium</item>
+        <item name="fontFamily">@font/pix_medium</item>
         <item name="android:textSize">15sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_soft</item>
     </style>
 
     <style name="TextAppearance.Pix.Body" parent="TextAppearance.Material3.BodyMedium">
-        <item name="android:fontFamily">@font/manrope_medium</item>
-        <item name="fontFamily">@font/manrope_medium</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_medium</item>
+        <item name="fontFamily">@font/pix_medium</item>
         <item name="android:textSize">14sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_muted</item>
@@ -60,21 +75,23 @@
     </style>
 
     <style name="TextAppearance.Pix.Label" parent="TextAppearance.Material3.LabelMedium">
-        <item name="android:fontFamily">@font/manrope_semibold</item>
-        <item name="fontFamily">@font/manrope_semibold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_semibold</item>
+        <item name="fontFamily">@font/pix_semibold</item>
         <item name="android:textSize">13sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_soft</item>
     </style>
 
     <style name="TextAppearance.Pix.Label.Bold">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
     </style>
 
     <style name="TextAppearance.Pix.Caption" parent="TextAppearance.Material3.LabelSmall">
-        <item name="android:fontFamily">@font/manrope_bold</item>
-        <item name="fontFamily">@font/manrope_bold</item>
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_bold</item>
+        <item name="fontFamily">@font/pix_bold</item>
         <item name="android:textSize">12sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text_muted</item>
@@ -120,7 +137,7 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
-    <!-- A small button inside a row, such as Invite and Accept on Friends. -->
+    <!-- A small button inside a row, such as Invite and Accept on Share my camera. -->
     <style name="Widget.Pix.Button.Small">
         <item name="android:minHeight">40dp</item>
         <item name="android:minWidth">0dp</item>
@@ -147,7 +164,7 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
-    <!-- An outlined button inside a row, such as Invite on Friends while invitations are not built (Iter2-P15). -->
+    <!-- An outlined button inside a row, such as Invite on Share my camera while invitations are not built (Iter2-P15). -->
     <style name="Widget.Pix.Button.Secondary.Small">
         <item name="android:minHeight">40dp</item>
         <item name="android:minWidth">0dp</item>
@@ -183,22 +200,25 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Header</item>
     </style>
 
+    <!-- A pill in the camera screens' top bar, such as Shoot together: 36 dp of glass in the middle of the bar's 48 dp,
+         with a 52 dp touch height whose last 4 dp reach over the image's top edge. -->
     <style name="Widget.Pix.Button.Glass" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="android:minHeight">48dp</item>
-        <item name="android:insetTop">2dp</item>
-        <item name="android:insetBottom">2dp</item>
-        <item name="android:paddingStart">14dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="cornerRadius">22dp</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">6dp</item>
+        <item name="android:insetBottom">10dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">13dp</item>
+        <item name="cornerRadius">18dp</item>
         <item name="backgroundTint">@color/pix_glass</item>
         <item name="strokeColor">@color/pix_glass_stroke</item>
         <item name="strokeWidth">1dp</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="iconTint">@color/button_secondary_text</item>
-        <item name="iconSize">20dp</item>
-        <item name="iconPadding">8dp</item>
+        <item name="iconSize">16dp</item>
+        <item name="iconPadding">6dp</item>
         <item name="rippleColor">#1FFFFFFF</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <style name="Widget.Pix.Button.Glass.Danger">
@@ -207,22 +227,81 @@
         <item name="iconTint">@color/button_danger_text</item>
     </style>
 
-    <!-- A glass button with only an icon, such as Flash in the top bar. -->
-    <style name="Widget.Pix.Button.Glass.Icon">
-        <item name="android:minWidth">48dp</item>
-        <item name="android:paddingStart">14dp</item>
-        <item name="android:paddingEnd">14dp</item>
-        <item name="iconPadding">0dp</item>
-        <item name="iconGravity">textStart</item>
-    </style>
-
-    <!-- An icon-only round button, such as Remove guide. -->
+    <!-- An icon-only round button, such as Remove guide: a 40 dp shape in a 48 x 48 dp touch area. -->
     <style name="Widget.Pix.Button.Icon" parent="Widget.Material3.Button.IconButton">
         <item name="android:minWidth">48dp</item>
         <item name="android:minHeight">48dp</item>
-        <item name="iconSize">20dp</item>
+        <item name="android:insetTop">4dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <!-- 2 dp less than Material's, as the insets grew: at a large font a button stays as tall as before. -->
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:paddingStart">11dp</item>
+        <item name="android:paddingEnd">11dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconSize">18dp</item>
         <item name="iconTint">@color/button_secondary_text</item>
         <item name="rippleColor">#1FFFFFFF</item>
+    </style>
+
+    <!-- An icon button over a photo, such as the ♥ on Pick a pose: the round shape in glass, so it shows on any photo. -->
+    <style name="Widget.Pix.Button.Icon.OnPhoto">
+        <item name="backgroundTint">@color/pix_glass</item>
+        <item name="strokeColor">@color/pix_glass_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <!-- The top bar's flash: an icon without a shape, like the brightness button, in the middle of the bar's 44 dp,
+         with a 48 x 48 dp touch area whose last 4 dp reach over the image's top edge. -->
+    <style name="Widget.Pix.Button.Icon.TopBar">
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:paddingStart">13dp</item>
+        <item name="android:paddingEnd">13dp</item>
+        <item name="iconSize">16dp</item>
+    </style>
+
+    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text, in a 48 x 52 dp
+         touch area that adds 8 dp after the label and 4 dp below the bar, so the label stays where it was. -->
+    <style name="Widget.Pix.Button.Text.TopBar">
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:textColor">@color/button_secondary_text</item>
+        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <!-- A ratio in the ratios under the top bar (FR-1.13): a touch area as tall as the panel, sharing its width with the
+         other ratios, around the ratio's shape. Selection is View.isSelected. -->
+    <style name="Widget.Pix.AspectOption" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- The ratio's shape with its label inside, in its option's state; the size is the ratio's own. -->
+    <style name="Widget.Pix.AspectOption.Shape" parent="">
+        <item name="android:layout_gravity">center</item>
+        <item name="android:background">@drawable/bg_aspect_option</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Caption</item>
+        <item name="android:fontFamily">@font/pix_semibold</item>
+        <item name="fontFamily">@font/pix_semibold</item>
+        <item name="android:textColor">@color/aspect_option</item>
+        <item name="android:textSize">8sp</item>
     </style>
 
     <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->
@@ -238,6 +317,12 @@
         <item name="android:textColor">@color/segment_text</item>
         <item name="rippleColor">#14FFFFFF</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label.Bold</item>
+    </style>
+
+    <!-- The switch in a section's header, such as All / With <name> over the descriptions used before (FR-4.11). -->
+    <style name="Widget.Pix.Button.Segment.Small">
+        <item name="android:minHeight">32dp</item>
+        <item name="cornerRadius">14dp</item>
     </style>
 
     <!-- Sliders: a thin track and a round thumb, like the zoom and opacity controls of a camera. -->
@@ -284,16 +369,14 @@
     </style>
 
     <!-- "Live · <name> connected" (FR-6.8) and "<name>'s camera". -->
-    <style name="Widget.Pix.Chip.Live">
-        <item name="android:minHeight">44dp</item>
-        <item name="android:background">@drawable/bg_chip_live</item>
-        <item name="android:paddingStart">12dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="drawableStartCompat">@drawable/ic_live_dot</item>
-        <item name="android:maxLines">1</item>
-        <item name="android:ellipsize">end</item>
-        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
-        <item name="android:textColor">@color/pix_text</item>
+    <!-- A chip over the camera's image, the size of the top bar's pills: hints, notices, and what just happened. -->
+    <style name="Widget.Pix.Chip.Small">
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">11dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+        <item name="android:drawablePadding">5dp</item>
+        <item name="android:textSize">11sp</item>
     </style>
 
     <style name="Widget.Pix.Header.Back" parent="">
@@ -330,8 +413,9 @@
         <item name="android:textCursorDrawable">@null</item>
     </style>
 
-    <!-- An idea chip on Generate poses (FR-4.8): a short pose that fills the description field when tapped. -->
-    <style name="Widget.Pix.IdeaChip" parent="Widget.Material3.Chip.Suggestion">
+    <!-- A description used before, on Generate poses (FR-4.11): it fills the description field when tapped, and its
+         ✕ removes it from the history. -->
+    <style name="Widget.Pix.HistoryChip" parent="Widget.Material3.Chip.Suggestion">
         <item name="chipBackgroundColor">@color/pix_surface_2</item>
         <item name="chipStrokeColor">@color/pix_outline</item>
         <item name="chipStrokeWidth">1dp</item>
@@ -339,6 +423,10 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
         <item name="android:textColor">@color/pix_text_soft</item>
         <item name="rippleColor">#14FFFFFF</item>
+        <item name="closeIconVisible">true</item>
+        <item name="closeIcon">@drawable/ic_close</item>
+        <item name="closeIconTint">@color/pix_text_muted</item>
+        <item name="closeIconSize">16dp</item>
     </style>
 
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">
@@ -403,7 +491,11 @@
         <item name="android:lineSpacingMultiplier">1.2</item>
     </style>
 
+    <!-- Material's 12 dp set again as start and end: the theme's materialButtonStyle gives every button 20 dp there,
+         which would win over the left and right of Material's dialog style. -->
     <style name="Widget.Pix.Button.Dialog" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
         <item name="android:textColor">@color/button_text_text</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
     </style>

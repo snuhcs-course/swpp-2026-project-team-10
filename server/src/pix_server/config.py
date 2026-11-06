@@ -1,5 +1,7 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
 """Environment configuration for the Pix server."""
+
+from typing import Literal
 
 from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -52,9 +54,60 @@ class Settings(BaseSettings):
     # Suggestion requests, counted apart from pose requests in windows of the same lengths.
     suggestion_rate_limit: PositiveInt = 10
     suggestion_global_limit: PositiveInt = 500
+    # An OpenRouter model that takes images and answers in text; it says how to hold the phone for the chosen candidate
+    # (Design Documentation 2.6.3).
+    tip_model: str = "google/gemini-3.1-flash-lite"
+    # A little thinking caught more of the prompt's rules on 2026-10-25 for 0.4 s more; "medium" was slower and less
+    # consistent.
+    tip_reasoning: Literal["minimal", "low", "medium", "high"] = "low"
+    # The app asks when the user takes a candidate and shows the tip on Camera; it took 2-3.5 s on 2026-10-25.
+    tip_timeout_seconds: PositiveFloat = 10
+    # Tip requests, counted apart from poses and suggestions in windows of the same lengths.
+    tip_rate_limit: PositiveInt = 20
+    tip_global_limit: PositiveInt = 1000
+    # An OpenRouter decision model; it judges every description and pose before the other models read it (Design
+    # Documentation 2.6.3).
+    filter_model: str = "typesafe/jev-1.14"
+    # A description is refused when the probability that it asks for harmful content, or that it tries to manipulate
+    # the models, reaches this; at 0.7 Jev 1.14 refused no harmless description and caught every harmful one on
+    # 2026-11-02, also in Korean.
+    filter_cutoff: float = Field(default=0.7, gt=0, le=1)
+    # After this the description goes through unjudged, so a slow filter never holds up a pose; Jev answered within
+    # 0.5 s on 2026-11-02.
+    filter_timeout_seconds: PositiveFloat = 2
+    # An OpenRouter decision model that takes images; it checks that the scene photo of every pose request shows a
+    # person before the image model is asked (FR-4.13, Design Documentation 2.6.3).
+    person_model: str = "typesafe/jev-1.14"
+    # A pose request is refused when the probability that its scene shows a person is below this; Jev 1.14 gave every
+    # scene with a person 0.96 or more on 2026-11-03, and empty scenes, statues, a dog, and a mannequin 0.36 or less.
+    person_cutoff: float = Field(default=0.5, gt=0, le=1)
+    # After this the scene goes through unchecked; Jev answered in 0.7 s (median) and 2.7 s at most on 2026-11-03.
+    person_timeout_seconds: PositiveFloat = 3
 
     # Wrong room codes one client address may send within the window; then its joins are refused until the oldest
     # leaves the window, so codes cannot be guessed. High, because phones on one Wi-Fi or carrier address share it,
     # and a room can be taken only in the seconds before the friend joins it.
     join_failure_limit: PositiveInt = 100
     join_failure_window_seconds: PositiveFloat = 600
+
+    # Cloudflare Realtime TURN (Design Documentation 2.6.7, AD-14): the TURN key's id and API token from the Cloudflare
+    # dashboard. While either is unset, each phone gets Cloudflare's STUN server only, so sessions across networks
+    # often fail to connect.
+    turn_key_id: str | None = None
+    turn_api_token: SecretStr | None = None
+    # How long a phone's TURN credentials last. The relay stops when they expire, so this is longer than any session.
+    turn_ttl_seconds: PositiveInt = 14400
+    # After this the phone gets STUN only, so a slow TURN API never holds up a room.
+    turn_timeout_seconds: PositiveFloat = 3
+
+    # Invitations (Design Documentation 2.6.6): how long the friend has to answer (FR-6.3; 60 s since 2026-10-29, as
+    # 30 s was too short to send the link through a messenger), and how long after accepting the friend's phone has to
+    # take its place before the room expires.
+    invitation_ttl_seconds: PositiveFloat = 60
+    invitation_join_seconds: PositiveFloat = 15
+    # The key file of a service account that may send Firebase Cloud Messaging for the app's Firebase project (AD-13).
+    # While it is unset or unreadable, invitations and friend requests send no push; an invitation still reaches the
+    # friend through its link. On a server the Compose file sets the path inside the container.
+    fcm_credentials_file: str | None = None
+    # A push that takes longer is given up.
+    fcm_timeout_seconds: PositiveFloat = 5

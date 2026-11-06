@@ -23,78 +23,85 @@
         android:text="@string/add_guide_title"
         android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
 
-    <TextView
-        android:id="@+id/bodyText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="4dp"
-        android:layout_marginTop="6dp"
-        android:lineSpacingMultiplier="1.2"
-        android:text="@string/add_guide_body"
-        android:textAppearance="@style/TextAppearance.Pix.Body" />
-
+    <!-- My library (FR-3.8, FR-3.11): Add photo, then the newest saved guides; All opens the library. -->
     <LinearLayout
-        android:id="@+id/uploadButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:background="@drawable/bg_option_card"
-        android:clickable="true"
-        android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="88dp"
-        android:padding="16dp">
+        android:minHeight="48dp">
 
-        <FrameLayout
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:background="@drawable/bg_icon_tile">
-
-            <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_gravity="center"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_image"
-                app:tint="@color/pix_text" />
-        </FrameLayout>
-
-        <LinearLayout
+        <TextView
+            android:id="@+id/libraryTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
+            android:layout_marginHorizontal="4dp"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:accessibilityHeading="true"
+            android:text="@string/my_library"
+            android:textAppearance="@style/TextAppearance.Pix.Header" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/upload_reference"
-                android:textAppearance="@style/TextAppearance.Pix.Action"
-                android:textColor="@color/pix_text" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="@string/upload_reference_body"
-                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-        </LinearLayout>
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_marginStart="8dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_chevron_right"
-            app:tint="@color/pix_text_faint" />
+        <Button
+            android:id="@+id/libraryAllButton"
+            style="@style/Widget.Pix.Button.Text.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
     </LinearLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/savedGuidesScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/addPhotoTile"
+                android:layout_width="84dp"
+                android:layout_height="112dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_add_photo_tile"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_plus"
+                    app:tint="@color/pix_text_soft" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/add_photo"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textColor="@color/pix_text_muted" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/savedGuidesList"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
     <LinearLayout
         android:id="@+id/generateButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="20dp"
         android:background="@drawable/bg_option_card"
         android:clickable="true"
         android:focusable="true"
@@ -116,27 +123,14 @@
                 app:tint="@color/pix_on_accent" />
         </FrameLayout>
 
-        <LinearLayout
+        <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/generate_poses"
-                android:textAppearance="@style/TextAppearance.Pix.Action"
-                android:textColor="@color/pix_text" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="@string/generate_poses_body"
-                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-        </LinearLayout>
+            android:text="@string/generate_poses"
+            android:textAppearance="@style/TextAppearance.Pix.Action"
+            android:textColor="@color/pix_text" />
 
         <ImageView
             android:layout_width="20dp"
@@ -146,33 +140,6 @@
             android:src="@drawable/ic_chevron_right"
             app:tint="@color/pix_text_faint" />
     </LinearLayout>
-
-    <!-- Saved guides (FR-3.8), newest first, hidden while there are none: a tap uses one, its ✕ deletes it. -->
-    <TextView
-        android:id="@+id/savedGuidesTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="4dp"
-        android:layout_marginTop="20dp"
-        android:accessibilityHeading="true"
-        android:text="@string/saved_guides_title"
-        android:textAppearance="@style/TextAppearance.Pix.Header"
-        android:visibility="gone" />
-
-    <HorizontalScrollView
-        android:id="@+id/savedGuidesScroll"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:scrollbars="none"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:id="@+id/savedGuidesList"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal" />
-    </HorizontalScrollView>
 
     <Button
         android:id="@+id/cancelButton"

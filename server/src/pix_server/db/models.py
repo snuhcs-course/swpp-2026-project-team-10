@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """Tables of the account database (Design Documentation 2.7). A change here needs an Alembic revision."""
 
 import secrets
@@ -132,4 +132,21 @@ class Friendship(Base):
 
     user_a: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     user_b: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
+
+
+class Invitation(Base):
+    """An invitation to shoot together (Iteration 3). Its session is opened with it, in the session store. A pending
+    invitation past `expires_at` has expired, without a write; rows are deleted a day after they were created."""
+
+    __tablename__ = "invitations"
+    __table_args__ = (Index("ix_invitations_created_at", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    from_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    to_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    # PENDING, ACCEPTED, DECLINED, or CANCELLED.
+    status: Mapped[str] = mapped_column(String)
+    session_id: Mapped[str] = mapped_column(String)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime)

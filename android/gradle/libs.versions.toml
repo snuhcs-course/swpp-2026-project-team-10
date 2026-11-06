@@ -14,6 +14,8 @@ lifecycle = "2.9.2"
 navigation = "2.9.5"
 camerax = "1.6.2"
 mlkitSubjectSegmentation = "16.0.0-beta1"
+mlkitPoseDetection = "18.0.0-beta5"
+mlkitFaceDetection = "16.1.7"
 coroutines = "1.10.2"
 serializationJson = "1.9.0"
 okhttp = "4.12.0"
@@ -24,8 +26,13 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 # WebRTC prebuilt (Design 1.2): a maintained libwebrtc build that keeps the org.webrtc package.
 webrtc = "137.7151.01"
+# Push notifications for invitations and friend requests (Design 1.2, 2.6.6): Firebase Cloud Messaging only.
+firebaseBom = "34.0.0"
+googleServices = "4.4.3"
 junit = "4.13.2"
 androidxTestJunit = "1.3.0"
+# Runs the instrumented code of src/androidTest on a device; the AndroidX Test release of androidxTestJunit.
+androidxTestRunner = "1.7.0"
 # Runs View, Canvas, and touch tests on the JVM (Android SDK 36 support needs 4.16+).
 robolectric = "4.17"
 # Formatting and style checks: Spotless runs ktlint (see build.gradle.kts and .editorconfig).
@@ -56,6 +63,8 @@ androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", 
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
+mlkit-pose-detection = { group = "com.google.mlkit", name = "pose-detection", version.ref = "mlkitPoseDetection" }
+mlkit-face-detection = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkitFaceDetection" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
@@ -68,11 +77,15 @@ androidx-credentials = { group = "androidx.credentials", name = "credentials", v
 androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

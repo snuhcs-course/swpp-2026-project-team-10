@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.graphics.Rect
@@ -14,7 +14,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /*
  * The analysis frame copy behind grabFrame (FR-4.1): no frame, a frame, a frame with an empty crop, a snapshot that
- * is independent of later frames, clear; the snapshot's upright bitmap at rotation 0 and 90 with the crop applied.
+ * is independent of later frames, clear; the snapshot's upright bitmap at rotation 0 and 90 with the crop applied, and
+ * a front camera's, which is also flipped left to right once upright (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -76,5 +77,28 @@ class CameraFrameCacheTest {
         assertEquals(2 to 4, rotated.width to rotated.height)
         assertEquals(0xff000000.toInt(), rotated.getPixel(1, 3))
         assertNotNull(rotated)
+    }
+
+    @Test
+    fun aFrontCamerasUprightBitmap_isTurnedThenFlippedLeftToRight() {
+        // A 4×2 buffer, its top row black and its bottom row white. Turned 90° clockwise, the bottom row is the
+        // image's left column; the mirror then puts it on the right, as the front camera's preview shows it.
+        val rows = ByteArray(8) { (if (it < 4) 16 else 235).toByte() }
+        val chroma = ByteArray(2) { 128.toByte() }
+        val frame = { FakeImageProxy(4, 2, rows, chroma, chroma.copyOf(), rotation = 90) }
+        val plain = CameraFrameCache().apply { update(frame()) }
+        val mirrored = CameraFrameCache(mirrored = true).apply { update(frame()) }
+
+        val seen = checkNotNull(plain.snapshot()).toUprightBitmap()
+        val shown = checkNotNull(mirrored.snapshot()).toUprightBitmap()
+
+        assertEquals(2 to 4, shown.width to shown.height)
+        assertEquals(listOf(WHITE, BLACK), listOf(seen.getPixel(0, 0), seen.getPixel(1, 0)))
+        assertEquals(listOf(BLACK, WHITE), listOf(shown.getPixel(0, 0), shown.getPixel(1, 0)))
+    }
+
+    private companion object {
+        const val WHITE = 0xffffffff.toInt()
+        const val BLACK = 0xff000000.toInt()
     }
 }

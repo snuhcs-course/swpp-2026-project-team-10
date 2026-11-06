@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -8,16 +8,19 @@ import androidx.lifecycle.LifecycleOwner
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +31,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.EglBase
 import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
+
+/** The shutter and the saved photo at once, as the Camera screen does when the save takes no time. */
+fun PhotoShare.shoot(uri: Uri, takenAt: Long) {
+    shutter()?.let { taken(it, uri, takenAt) }
+}
 
 /** A session that records what is sent and lets a test deliver incoming messages. */
 class FakeSessionManager : SessionManager {
@@ -43,6 +51,12 @@ class FakeSessionManager : SessionManager {
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
 
+    private val _path = MutableStateFlow<IcePath?>(null)
+    override val path: StateFlow<IcePath?> = _path.asStateFlow()
+
+    private val _latencyMs = MutableStateFlow<Int?>(null)
+    override val latencyMs: StateFlow<Int?> = _latencyMs.asStateFlow()
+
     val sent = mutableListOf<SessionMessage>()
     val frameSink = CameraFrameSource()
 
@@ -57,17 +71,43 @@ class FakeSessionManager : SessionManager {
         sent += message
     }
 
+    /** Whether a reader listens, for a test on real threads that must not deliver into nothing. */
+    val hasReaders: Boolean get() = _incoming.subscriptionCount.value > 0
+
+    /** Set to hold [sendBulk] as a full channel or a reconnect would; what it completes with is what it returns. */
+    var bulkGate: CompletableDeferred<Boolean>? = null
+
+    override suspend fun sendBulk(message: SessionMessage): Boolean {
+        val open = bulkGate?.await() ?: true
+        if (open) sent += message
+        return open
+    }
+
     override fun videoSink(): FrameSink = frameSink
 
     /** Every `leave`, with its reason, so a screen test can see a cancelled room or a left session. */
     val leaves = mutableListOf<EndReason>()
 
+    /** Set to have `leave` end the session, as the real one does before it returns. */
+    var endsOnLeave = false
+
     override suspend fun leave(reason: EndReason) {
         leaves += reason
+        if (endsOnLeave) _state.value = SessionState.Ended(reason)
     }
 
     fun setState(state: SessionState) {
         _state.value = state
+    }
+
+    /** The link's statistics read a new candidate pair, or none. */
+    fun setPath(path: IcePath?) {
+        _path.value = path
+    }
+
+    /** The pings measured a new delay, or none. */
+    fun setLatency(ms: Int?) {
+        _latencyMs.value = ms
     }
 
     /** The session kept a `camera.state` whose `incoming` emission this screen did not see. */
@@ -151,6 +191,13 @@ class FakeCameraController(
     val exposureRequests = mutableListOf<Int>()
     val flashRequests = mutableListOf<FlashMode>()
 
+    /**
+     * Each light request, and the light kept, flash or not, like the controller's; [state]'s `torch` follows at once on
+     * a camera with a flash that [applies].
+     */
+    val torchRequests = mutableListOf<Boolean>()
+    var torchOn = false
+
     override fun setExposure(index: Int) {
         exposureRequests += index
         val range = _capabilities.value?.exposureRange ?: 0..0
@@ -162,7 +209,25 @@ class FakeCameraController(
         if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(flash = mode)
     }
 
+    override fun setTorch(on: Boolean) {
+        torchRequests += on
+        torchOn = on
+        if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(torch = on)
+    }
+
     override fun setAspectRatio(ratio: AspectRatio) = Unit
+
+    /** The camera chosen (FR-1.14); a phone with a front camera unless a test says otherwise. */
+    override val facing = MutableStateFlow(CameraFacing.BACK)
+    override val hasFrontCamera = MutableStateFlow(true)
+
+    /** Every camera asked for, in order. */
+    val facingRequests = mutableListOf<CameraFacing>()
+
+    override fun setFacing(facing: CameraFacing) {
+        facingRequests += facing
+        if (facing == CameraFacing.BACK || hasFrontCamera.value) this.facing.value = facing
+    }
 
     /** When set, [takePhoto] saves to it; otherwise saving fails, as it does without a camera. */
     var photo: Uri? = null
@@ -223,18 +288,18 @@ class FakeRemoteVideo : RemoteVideo {
         sinks -= sink
     }
 
-    /** Delivers one frame to every attached sink, as the photographer's video would. */
-    fun deliverFrame() {
-        val frame = VideoFrame(FakeFrameBuffer, 0, 0L)
+    /** Delivers one frame, [width] by [height] as shown, to every attached sink, as the photographer's video would. */
+    fun deliverFrame(width: Int = 4, height: Int = 4) {
+        val frame = VideoFrame(FakeFrameBuffer(width, height), 0, 0L)
         sinks.toList().forEach { it.onFrame(frame) }
         frame.release()
     }
 
-    /** A 4×4 buffer that never touches native memory, so a frame can exist on the JVM. */
-    private object FakeFrameBuffer : VideoFrame.Buffer {
-        override fun getWidth(): Int = 4
+    /** A buffer that never touches native memory, so a frame can exist on the JVM. */
+    private class FakeFrameBuffer(private val width: Int, private val height: Int) : VideoFrame.Buffer {
+        override fun getWidth(): Int = width
 
-        override fun getHeight(): Int = 4
+        override fun getHeight(): Int = height
 
         override fun toI420(): VideoFrame.I420Buffer? = null
 
@@ -263,14 +328,22 @@ fun fakeBitmap(): Bitmap {
 fun fakeGuide(id: String, aspect: Float = 0.5f): ReferenceGuide =
     ReferenceGuide(id, fakeBitmap(), fakeBitmap(), aspect, GuideSource.GALLERY)
 
-/** Encodes a guide as its id's bytes and decodes any bytes into a guide, with no graphics. */
-class FakeGuideImageCodec : GuideImageCodec {
+/**
+ * Encodes a guide as its id's bytes and decodes any bytes into a guide, with no graphics; a screen test that draws the
+ * decoded guide passes [decodeAs] with real bitmaps, which Robolectric's native graphics need.
+ */
+class FakeGuideImageCodec(private val decodeAs: (guideId: String) -> ReferenceGuide = { fakeGuide(it) }) :
+    GuideImageCodec {
     val encoded = mutableListOf<String>()
     val decoded = mutableListOf<String>()
     var decodes = true
 
+    /** Runs while an image is encoded, as a guide from the other phone could arrive meanwhile. */
+    var onEncode: (ReferenceGuide) -> Unit = {}
+
     override fun encode(guide: ReferenceGuide): EncodedGuideImage {
         encoded += guide.id
+        onEncode(guide)
         return EncodedGuideImage(
             guide.id,
             "fake",
@@ -285,6 +358,72 @@ class FakeGuideImageCodec : GuideImageCodec {
 
     override fun decode(guideId: String, format: String, bytes: ByteArray): ReferenceGuide? {
         decoded += guideId
-        return if (decodes && format == "fake") fakeGuide(guideId) else null
+        return if (decodes && format == "fake") decodeAs(guideId) else null
+    }
+}
+
+/** Encodes a guide's reference as its id's bytes when it has one, and decodes any `fake` bytes, with no graphics. */
+class FakeGuideReferenceCodec : GuideReferenceCodec {
+    val encoded = mutableListOf<String>()
+    val decoded = mutableListOf<String>()
+
+    /** Runs while a reference is encoded, as a change on the photographer's phone could meanwhile. */
+    var onEncode: (ReferenceGuide) -> Unit = {}
+
+    override fun encode(guide: ReferenceGuide): EncodedGuideReference? {
+        if (guide.reference == null) return null
+        encoded += guide.id
+        onEncode(guide)
+        return EncodedGuideReference(guide.id, "fake", 8, 12, "reference:${guide.id}".toByteArray() + ByteArray(12_000))
+    }
+
+    override fun decode(format: String, bytes: ByteArray): Bitmap? {
+        if (format != "fake") return null
+        decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
+        return fakeBitmap()
+    }
+}
+
+/**
+ * Encodes a candidate as its id's bytes and decodes any `fake` bytes, with no graphics; a screen test that draws the
+ * decoded image passes [decodeAs] with a real bitmap, as for [FakeGuideImageCodec].
+ */
+class FakePoseCandidateCodec(private val decodeAs: () -> Bitmap = { fakeBitmap() }) : PoseCandidateCodec {
+    val encoded = mutableListOf<String>()
+    val decoded = mutableListOf<String>()
+    var encodes = true
+    var decodes = true
+
+    /** Runs while a candidate is encoded, as the set could change on the photographer's phone meanwhile. */
+    var onEncode: (String) -> Unit = {}
+
+    override fun encode(poseId: String, image: Bitmap): EncodedPoseCandidate? {
+        if (!encodes) return null
+        encoded += poseId
+        onEncode(poseId)
+        return EncodedPoseCandidate(poseId, "fake", 6, 8, "candidate:$poseId".toByteArray() + ByteArray(20_000))
+    }
+
+    override fun decode(format: String, bytes: ByteArray): Bitmap? {
+        if (format != "fake" || !decodes) return null
+        decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
+        return decodeAs()
+    }
+}
+
+/**
+ * Finds a person in every scene photo unless a test sets [found]; with a [gate], the answer waits until the test
+ * completes it, and with [failure], the check throws it. Records the photos it looked at.
+ */
+class FakePersonDetector(var found: Boolean = true) : PersonDetector {
+    val checked = mutableListOf<Bitmap>()
+    var gate: CompletableDeferred<Unit>? = null
+    var failure: Exception? = null
+
+    override suspend fun findsPerson(scene: Bitmap): Boolean {
+        checked += scene
+        gate?.await()
+        failure?.let { throw it }
+        return found
     }
 }

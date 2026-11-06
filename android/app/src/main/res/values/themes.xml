@@ -61,6 +61,21 @@
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.Pix.MaterialAlertDialog</item>
     </style>
 
+    <!-- The first-use tutorial (FR-10.4): a see-through dialog over the whole screen, its own dimming drawn by
+         CoachMarkLayout, over a screen, camera and sheets too. The window comes and goes at once: TutorialFragment
+         fades its view, in 200 ms and not with the phone's animations off (Design 2.6.8). -->
+    <style name="Theme.Pix.Tutorial">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
     <style name="ThemeOverlay.Pix.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/Widget.Pix.BottomSheet</item>
         <item name="android:backgroundDimAmount">0.66</item>

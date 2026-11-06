@@ -1,25 +1,34 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
+    // Reads app/google-services.json, the app's Firebase project, for push notifications (Design 2.6.6).
+    alias(libs.plugins.google.services)
     jacoco
 }
 
 // The Pix server (Design 2.8, Hosting and Configuration). Release builds use Server A, which runs main.
-// Debug builds use `pix.serverUrl` from local.properties (never committed) or -Ppix.serverUrl=...: Server B, which
-// runs dev (`http://swpp26t10.147-46-242-174.sslip.io/`), or a laptop on the test Wi-Fi
-// (`http://192.168.0.10:8000/`). Their default, 10.0.2.2, is the host machine as seen from the emulator.
+// Debug builds default to the AWS server, which runs dev and, unlike the course servers, answers from any network,
+// cellular data included. To use another server, set `pix.serverUrl` in local.properties (never committed) or pass
+// -Ppix.serverUrl=...: a laptop on the test Wi-Fi (`http://192.168.0.10:8000/`), or the host machine as seen from the
+// emulator (`http://10.0.2.2:8000/`).
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
 val debugServerUrl: String = providers.gradleProperty("pix.serverUrl").orNull
     ?: localProperties.getProperty("pix.serverUrl")
-    ?: "http://10.0.2.2:8000/"
+    ?: "http://3.105.185.251/"
 val releaseServerUrl = "http://swpp26t10.147-46-242-169.sslip.io/"
+
+// Debug builds only: `pix.relayOnly=true` makes WebRTC use the TURN relay even when a direct path exists, so the relay
+// can be tried and measured on one Wi-Fi (Design 2.6.7).
+val debugRelayOnly: Boolean = (
+    providers.gradleProperty("pix.relayOnly").orNull ?: localProperties.getProperty("pix.relayOnly")
+    )?.toBoolean() ?: false
 
 // The web OAuth client of the team's Google Cloud project "Pix" (Design 2.8, Configuration). The app asks Google for
 // ID tokens addressed to it, and both servers check them against the same ID in `PIX_GOOGLE_CLIENT_ID`. It is not a
@@ -39,11 +48,16 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
+        buildConfigField("boolean", "RELAY_ONLY", "false")
+        // Instrumented code on a phone or emulator (src/androidTest): so far only the person check's measurement for the
+        // AI module tests (Testing Documentation 3.1), which needs the device's ML Kit.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         debug {
             buildConfigField("String", "SERVER_URL", "\"$debugServerUrl\"")
+            buildConfigField("boolean", "RELAY_ONLY", "$debugRelayOnly")
         }
         release {
             buildConfigField("String", "SERVER_URL", "\"$releaseServerUrl\"")
@@ -55,6 +69,11 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+    androidResources {
+        // English and Korean (FR-10.2), from the values folders and res/resources.properties, so the phone's
+        // per-app language setting (Android 13+) offers both.
+        generateLocaleConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -151,6 +170,10 @@ dependencies {
     // Reference guide (#5): on-device person segmentation, model from Google Play services.
     implementation(libs.mlkit.subject.segmentation)
 
+    // The person check of the scene photo (Iter3-A7, FR-4.13): bundled models, so it works offline and at first use.
+    implementation(libs.mlkit.pose.detection)
+    implementation(libs.mlkit.face.detection)
+
     // Pose generation (#7): the remembered consent (FR-4.2), and candidate cells that keep the frame's 3:4 ratio.
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.constraintlayout)
@@ -159,6 +182,10 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+
+    // Invitations and friend requests (#119): push notifications through Firebase Cloud Messaging only.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.
@@ -174,4 +201,6 @@ dependencies {
     // A real HTTP server on the JVM for the token refresh path, which lives in OkHttp's interceptor and
     // authenticator, and for the signaling socket's client.
     testImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

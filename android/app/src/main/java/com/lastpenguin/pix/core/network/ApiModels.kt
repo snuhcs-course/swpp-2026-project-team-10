@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
 package com.lastpenguin.pix.core.network
 
+import com.lastpenguin.pix.session.signaling.IceServer
 import kotlinx.serialization.Serializable
 
 // REST payloads (Design 2.5.3). Field names match the server's JSON.
@@ -15,6 +16,20 @@ data class PoseResponseDto(
     val templateId: String? = null,
     val image: String, // Base64 JPEG
     val elapsedMs: Long,
+)
+
+/**
+ * `POST /pose-tips`: [text] is what the app shows. The rest says the same in fields: `framing` (`closer`, `back`,
+ * `keep`), `hold` (where to hold the phone: `crouching`, `waist`, `chest`, `eye`, `above head`), `height` against
+ * the scene (`raise`, `lower`, `keep`), and `angle` (`up`, `level`, `down`).
+ */
+@Serializable
+data class PoseTipDto(
+    val text: String,
+    val framing: String,
+    val hold: String,
+    val height: String,
+    val angle: String,
 )
 
 @Serializable
@@ -122,3 +137,39 @@ data class SentRequestDto(
 /** `POST /friend-requests/{id}/accept`. */
 @Serializable
 data class AcceptedRequestDto(val friend: FriendDto)
+
+/** `POST /devices`: this phone's FCM token for the sign-in; [platform] is always `android`. */
+@Serializable
+data class DeviceBody(val fcmToken: String, val platform: String)
+
+@Serializable
+data class InviteBody(val friendId: String)
+
+/** `POST /invitations` (Design 2.5.3): the invitation and the photographer's place in the session it opened. */
+@Serializable
+data class SentInvitationDto(
+    val id: String,
+    val to: UserDto,
+    val status: String,
+    val expiresAt: Long,
+    val link: String,
+    val sessionId: String,
+    val rejoinToken: String,
+    val iceServers: List<IceServer> = emptyList(),
+)
+
+/** `GET /invitations/{id}`, which needs no sign-in: who invites, and the invitation's status. */
+@Serializable
+data class OpenedInvitationDto(val id: String, val from: UserDto, val status: String, val expiresAt: Long)
+
+/** `GET /invitations/incoming`: the caller's pending invitations that have not expired, newest first. */
+@Serializable
+data class IncomingInvitationsDto(val invitations: List<OpenedInvitationDto> = emptyList())
+
+/** `POST /invitations/{id}/accept`: the friend's place in the session. */
+@Serializable
+data class SessionPlaceDto(
+    val sessionId: String,
+    val rejoinToken: String,
+    val iceServers: List<IceServer> = emptyList(),
+)

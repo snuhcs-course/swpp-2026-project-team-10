@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import android.content.Context
@@ -78,6 +78,10 @@ class AuthTokens(
     private var current: StoredSignIn? = null
     private val loaded = CompletableDeferred<Unit>()
 
+    // Counts the writes of the kept account but new tokens, so a read from the server that one of them overtook is
+    // dropped, also when the write left the account as it was: its answer is still the newer one.
+    private var accountWrites = 0L
+
     init {
         scope.launch {
             lock.withLock {
@@ -103,6 +107,23 @@ class AuthTokens(
             if (signIn != null && signIn.user.id == user.id) set(signIn.copy(user = user))
         }
         return user.toAccount()
+    }
+
+    /**
+     * The account as [read] from the server, where another phone signed in to it may have changed it; the tokens stay.
+     * Ignored like [update], and also when the account changed on this phone while the read was on its way, because
+     * that change's answer is the newer one. The lock is not held during [read], which may refresh the tokens.
+     */
+    suspend fun reload(read: suspend () -> AccountDto) {
+        loaded.await()
+        val before = lock.withLock { accountWrites }
+        val user = read()
+        lock.withLock {
+            val signIn = current ?: return@withLock
+            if (accountWrites != before || signIn.user.id != user.id) return@withLock
+            // The same account is not written again, though Friends reads it every 10 s.
+            if (signIn.user != user) set(signIn.copy(user = user))
+        }
     }
 
     suspend fun clear() {
@@ -146,11 +167,13 @@ class AuthTokens(
                 refreshToken = tokens.refreshToken,
                 accessExpiresAt = expiry(tokens.expiresIn),
             ),
+            newTokensOnly = true,
         )
         tokens.accessToken
     }
 
-    private suspend fun set(signIn: StoredSignIn?) {
+    private suspend fun set(signIn: StoredSignIn?, newTokensOnly: Boolean = false) {
+        if (!newTokensOnly) accountWrites++
         current = signIn
         store.save(signIn)
         publish()

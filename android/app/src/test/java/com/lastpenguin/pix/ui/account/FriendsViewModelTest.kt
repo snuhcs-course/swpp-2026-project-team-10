@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import androidx.lifecycle.ViewModelStore
@@ -36,9 +36,11 @@ import org.junit.Before
 import org.junit.Test
 
 /*
- * Partitions for Friends, Add a friend, and Sent requests (FR-5.4–5.10, FR-5.16, US-7, US-8). Refreshing: signed out, signed in without a Pix
- * ID (never), with one (at once, then every 10 s), a failed refresh (offline shown) and a later good one, signing out
- * (stops). Search: found, not found, failed, blank input, capitals and spaces. On the result: Add (Requested with its
+ * Partitions for Friends, Add a friend, and Sent requests (FR-5.4–5.10, FR-5.16, US-7, US-8). Refreshing: signed out
+ * (nothing), signed in without a Pix ID (the account every 10 s, never the lists), with one (both at once, then every
+ * 10 s), the account changed on another phone (a new name shown; a Pix ID chosen there brings the lists at once), the
+ * account read failing (the lists still refreshed, not offline), a failed refresh (offline shown) and a later good one,
+ * signing out (stops). Search: found, not found, failed, blank input, capitals and spaces. On the result: Add (Requested with its
  * id, or Friends when they had asked), Accept for INCOMING, Withdraw for REQUESTED, a button that does not match the
  * relation (ignored), a failure (the result stays, an event). Requests: accept and decline (disabled while answered),
  * a failure (event). Sent requests: in the state; Withdraw (disabled while it runs, a second tap ignored), a failure
@@ -82,12 +84,27 @@ class FriendsViewModelTest {
 
     private fun refreshes() = repository.calls.count { it == "refresh" }
 
+    private fun accountReads() = auth.calls.count { it == "refreshAccount" }
+
     @Test
-    fun refreshing_signedOutOrWithoutAPixId_neverAsks() = runTest {
+    fun refreshing_signedOut_asksNothing() = runTest {
         keepRefreshing()
-        auth.signInAs(auth.account.copy(pixId = null))
         advanceTimeBy(30_000)
 
+        assertEquals(0, accountReads())
+        assertEquals(0, refreshes())
+    }
+
+    @Test
+    fun refreshing_withoutAPixId_readsTheAccountEveryTenSecondsButNeverTheLists() = runTest {
+        auth.signInAs(auth.account.copy(pixId = null))
+        keepRefreshing()
+        assertEquals(1, accountReads())
+
+        advanceTimeBy(FriendsViewModel.REFRESH_INTERVAL_MS)
+        runCurrent()
+
+        assertEquals(2, accountReads())
         assertEquals(0, refreshes())
     }
 
@@ -95,13 +112,51 @@ class FriendsViewModelTest {
     fun refreshing_withAPixId_asksAtOnceThenEveryTenSeconds() = runTest {
         auth.signInAs(auth.account)
         keepRefreshing()
+        assertEquals(1, accountReads())
         assertEquals(1, refreshes())
 
         advanceTimeBy(FriendsViewModel.REFRESH_INTERVAL_MS - 1)
         assertEquals(1, refreshes())
         advanceTimeBy(1)
         runCurrent()
+        assertEquals(2, accountReads())
         assertEquals(2, refreshes())
+    }
+
+    @Test
+    fun refreshing_aNameChangedOnAnotherPhone_isShownByTheNextRead() = runTest {
+        auth.signInAs(auth.account)
+        keepRefreshing()
+
+        auth.onServer = auth.account.copy(displayName = "New Name")
+        advanceTimeBy(FriendsViewModel.REFRESH_INTERVAL_MS)
+        runCurrent()
+
+        val shown = model.uiState.value.auth as AuthState.SignedIn
+        assertEquals("New Name", shown.account.displayName)
+    }
+
+    @Test
+    fun refreshing_aPixIdChosenOnAnotherPhone_bringsTheListsAtOnce() = runTest {
+        auth.signInAs(auth.account.copy(pixId = null))
+        auth.onServer = auth.account.copy(pixId = "test1")
+
+        keepRefreshing()
+
+        assertEquals("test1", (model.uiState.value.auth as AuthState.SignedIn).account.pixId)
+        assertEquals(1, refreshes())
+    }
+
+    @Test
+    fun refreshing_theAccountReadFailing_stillRefreshesTheLists() = runTest {
+        auth.signInAs(auth.account)
+        auth.failures["refreshAccount"] = AccountException(AccountError.OFFLINE)
+
+        keepRefreshing()
+
+        assertEquals(1, refreshes())
+        assertEquals(AuthState.SignedIn(auth.account), model.uiState.value.auth)
+        assertFalse(model.uiState.value.offline)
     }
 
     @Test

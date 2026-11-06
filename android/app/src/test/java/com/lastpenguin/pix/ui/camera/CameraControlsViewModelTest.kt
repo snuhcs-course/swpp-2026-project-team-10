@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelStore
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
@@ -23,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -40,8 +42,10 @@ import org.junit.Test
 /*
  * Partitions.
  * Flash: a phone with a flash (each of off, auto, on is followed by the next) and without one (the tap is ignored).
- * Aspect ratio: each ratio is followed by the next and saved; a tap while a photo is saved is ignored; a saved ratio
- * is restored at start, and none leaves the default; a ratio change re-clamps a guide and sends a final change.
+ * Aspect ratio (chosen from the ratios under the top bar since Iter3-A12; before, each tap moved to the next): each
+ * ratio chosen goes to the camera, is saved, and closes the ratios; the ratio the camera has only closes them; a choice
+ * while a photo is saved is ignored, and the shutter closes the ratios; a saved ratio is restored at start, and none
+ * leaves the default; a ratio change re-clamps a guide and sends a final change.
  * Exposure: an index inside the range, beyond each end (clamped), and a camera without compensation (ignored); the
  * brightness slider opens only with compensation.
  * Focus: a tap inside the frame on a ready camera that supports it; a camera that is not ready, a camera without a
@@ -99,26 +103,43 @@ class CameraControlsViewModelTest {
     }
 
     @Test
-    fun onAspectTap_eachRatio_movesToTheNextAndSavesIt() = runTest(dispatcher) {
+    fun onAspectChosen_eachRatio_goesToTheCameraIsSaved_andClosesTheRatios() = runTest(dispatcher) {
         start()
         runCurrent()
 
-        repeat(3) {
-            model.onAspectTap()
+        for (aspect in listOf(AspectRatio.R1_1, AspectRatio.R16_9, AspectRatio.R4_3)) {
+            model.setAspectsOpen(true)
+            model.onAspectChosen(aspect)
             runCurrent()
+            assertFalse(model.uiState.value.aspectsOpen)
         }
 
-        assertEquals(listOf(AspectRatio.R16_9, AspectRatio.R1_1, AspectRatio.R4_3), camera.aspectRequests)
+        assertEquals(listOf(AspectRatio.R1_1, AspectRatio.R16_9, AspectRatio.R4_3), camera.aspectRequests)
         assertEquals(AspectRatio.R4_3, settings.aspectRatio())
     }
 
     @Test
-    fun onAspectTap_whileAPhotoIsSaved_isIgnored() = runTest(dispatcher) {
+    fun onAspectChosen_theRatioTheCameraHas_onlyClosesTheRatios() = runTest(dispatcher) {
         start()
         runCurrent()
-        model.onShutter()
+        model.setAspectsOpen(true)
 
-        model.onAspectTap()
+        model.onAspectChosen(AspectRatio.R4_3)
+        runCurrent()
+
+        assertTrue(camera.aspectRequests.isEmpty())
+        assertFalse(model.uiState.value.aspectsOpen)
+    }
+
+    @Test
+    fun onAspectChosen_whileAPhotoIsSaved_isIgnored_andTheShutterClosesTheRatios() = runTest(dispatcher) {
+        start()
+        runCurrent()
+        model.setAspectsOpen(true)
+        model.onShutter()
+        assertFalse(model.uiState.value.aspectsOpen)
+
+        model.onAspectChosen(AspectRatio.R16_9)
         runCurrent()
 
         assertTrue(camera.aspectRequests.isEmpty())
@@ -154,12 +175,12 @@ class CameraControlsViewModelTest {
         runCurrent()
 
         // 4:3 → 16:9: the guide is a wider part of the narrower frame, so -.14 stays allowed.
-        model.onAspectTap()
+        model.onAspectChosen(AspectRatio.R16_9)
         runCurrent()
         assertEquals(-0.14f, guides.state.value.cx, EPSILON)
 
         // 16:9 → 1:1: height .7 at aspect .5 is only .35 of the frame's width, so the center moves in to -.105.
-        model.onAspectTap()
+        model.onAspectChosen(AspectRatio.R1_1)
         runCurrent()
 
         assertEquals(-0.105f, guides.state.value.cx, EPSILON)
@@ -177,7 +198,59 @@ class CameraControlsViewModelTest {
         model.onExposureChange(-40)
         model.onExposureChange(40)
 
-        assertEquals(listOf(3, -12, 12), camera.exposureRequests)
+        // The first is the base brightness (0 EV), set once the range is known.
+        assertEquals(listOf(0, 3, -12, 12), camera.exposureRequests)
+    }
+
+    @Test
+    fun theBaseBrightness_isSetWhenTheRangeIsKnown_whenItChanges_andAtEachTapToFocus() = runTest(dispatcher) {
+        // 1/6 EV per index.
+        val base = MutableStateFlow(1f)
+        model = CameraViewModel(camera, guides, settings, baseBrightness = base)
+        store.put("camera", model)
+        runCurrent()
+        assertEquals(listOf(6), camera.exposureRequests)
+
+        // A drag adds to it, and a tap to focus takes that away again.
+        model.onExposureChange(9)
+        model.onFocusTap(0.5f, 0.5f)
+        assertEquals(listOf(6, 9, 6), camera.exposureRequests)
+
+        base.value = -0.5f
+        runCurrent()
+        assertEquals(-3, camera.exposureRequests.last())
+
+        // Another camera's range: the base again, clamped to it.
+        base.value = 2f
+        runCurrent()
+        camera.capabilities.value = capabilities(exposureRange = -4..4)
+        runCurrent()
+        assertEquals(4, camera.exposureRequests.last())
+    }
+
+    @Test
+    fun aTapOnACameraThatCannotFocusOnAPoint_stillTakesTheBrightnessBackToTheBase() = runTest(dispatcher) {
+        camera.capabilities.value = capabilities(supportsFocusPoint = false)
+        model = CameraViewModel(camera, guides, settings, baseBrightness = MutableStateFlow(0.5f))
+        store.put("camera", model)
+        runCurrent()
+        model.onExposureChange(8)
+
+        model.onFocusTap(0.5f, 0.5f)
+
+        assertTrue(camera.focusRequests.isEmpty())
+        assertEquals(listOf(3, 8, 3), camera.exposureRequests)
+    }
+
+    @Test
+    fun theBaseBrightness_withoutExposureCompensation_setsNothing() = runTest(dispatcher) {
+        camera.capabilities.value = capabilities(exposureRange = 0..0)
+        model = CameraViewModel(camera, guides, settings, baseBrightness = MutableStateFlow(1f))
+        store.put("camera", model)
+        runCurrent()
+        model.onFocusTap(0.5f, 0.5f)
+
+        assertTrue(camera.exposureRequests.isEmpty())
     }
 
     @Test
@@ -280,6 +353,7 @@ class CameraControlsViewModelTest {
             flashRequests += mode
             state.update { it.copy(flash = mode) }
         }
+        override fun setTorch(on: Boolean) = Unit
         override fun setAspectRatio(ratio: AspectRatio) {
             aspectRequests += ratio
             state.update { it.copy(aspect = ratio) }
@@ -289,6 +363,9 @@ class CameraControlsViewModelTest {
         override suspend fun takePhoto(): Result<Uri> = awaitCancellation()
         override suspend fun grabFrame(): Result<Bitmap> = Result.failure(UnsupportedOperationException())
         override fun setFrameSink(sink: FrameSink?) = Unit
+        override val facing: StateFlow<CameraFacing> = MutableStateFlow(CameraFacing.BACK)
+        override val hasFrontCamera: StateFlow<Boolean> = MutableStateFlow(false)
+        override fun setFacing(facing: CameraFacing) = Unit
     }
 
     private companion object {

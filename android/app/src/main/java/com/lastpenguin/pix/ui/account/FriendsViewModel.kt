@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import androidx.lifecycle.ViewModel
@@ -67,8 +67,8 @@ sealed interface FriendsEvent {
 
 /**
  * Friends, Add a friend, and Sent requests (R&S 6.4; FR-5.4–5.10, FR-5.16, US-7, US-8), shared by all three (activity
- * scope). Without push, which comes with invitations (Iter2-P15), Friends and Sent requests keep the lists fresh with
- * [keepRefreshing] while they are shown. Owner: Accounts (#54).
+ * scope). Without push, which comes with invitations (Iter2-P15), Friends and Sent requests keep the lists and the
+ * account fresh with [keepRefreshing] while they are shown. Owner: Accounts (#54).
  */
 class FriendsViewModel(private val auth: AuthRepository, private val repository: FriendsRepository) : ViewModel() {
 
@@ -96,18 +96,21 @@ class FriendsViewModel(private val auth: AuthRepository, private val repository:
     }
 
     /**
-     * Refreshes the lists every [REFRESH_INTERVAL_MS] while the user is signed in with a Pix ID, the only users who
-     * have friends. Runs until cancelled; Friends and Sent requests run it while started.
+     * Every [REFRESH_INTERVAL_MS] while someone is signed in, reads the account again, which another phone signed in to
+     * it may have changed, and, while it has a Pix ID, the lists: only users with a Pix ID have friends. A Pix ID that
+     * arrives brings the lists at once. Runs until cancelled; Friends and Sent requests run it while started.
      */
     suspend fun keepRefreshing() {
         auth.state
-            .map { (it as? AuthState.SignedIn)?.account?.takeIf { account -> account.pixId != null }?.userId }
+            .map { state -> (state as? AuthState.SignedIn)?.account?.let { it.userId to (it.pixId != null) } }
             .distinctUntilChanged()
-            .collectLatest { userId ->
+            .collectLatest { signedIn ->
                 offline.value = false
-                if (userId == null) return@collectLatest
+                val (_, hasPixId) = signedIn ?: return@collectLatest
                 while (true) {
-                    offline.value = repository.refresh().isFailure
+                    // A failure keeps the account the phone has; the lists say whether the server answers.
+                    auth.refreshAccount()
+                    if (hasPixId) offline.value = repository.refresh().isFailure
                     delay(REFRESH_INTERVAL_MS)
                 }
             }

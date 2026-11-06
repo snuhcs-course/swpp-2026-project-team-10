@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex, 2026-10-04, reviewed by Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -8,9 +8,10 @@ import androidx.camera.core.ImageProxy
 
 /**
  * One bounded, reusable copy of the analysis planes. No ImageProxy or camera-owned buffer is retained.
- * Bitmaps and independent plane copies are allocated only when grabFrame is requested.
+ * Bitmaps and independent plane copies are allocated only when grabFrame is requested. [mirrored] is true for the
+ * front camera, whose frames come as the camera sees the scene while its preview is a mirror (FR-1.14).
  */
-internal class CameraFrameCache {
+internal class CameraFrameCache(private val mirrored: Boolean = false) {
     private var planes: List<YuvPlane> = emptyList()
     private var crop = Rect()
     private var rotation = 0
@@ -47,6 +48,7 @@ internal class CameraFrameCache {
             crop.width(),
             crop.height(),
             rotation,
+            mirrored,
         )
     }
 
@@ -64,13 +66,18 @@ internal data class CameraFrameSnapshot(
     val width: Int,
     val height: Int,
     val rotation: Int,
+    /** Flipped left to right once upright, as the front camera's preview shows the scene. */
+    val mirrored: Boolean = false,
 ) {
     fun toUprightBitmap(): Bitmap {
         val pixels = yuvToArgb(planes, left, top, width, height)
         val cropped = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
-        if (rotation == 0) return cropped
+        if (rotation == 0 && !mirrored) return cropped
         try {
-            val transform = Matrix().apply { postRotate(rotation.toFloat()) }
+            val transform = Matrix().apply {
+                postRotate(rotation.toFloat())
+                if (mirrored) postScale(-1f, 1f)
+            }
             return Bitmap.createBitmap(cropped, 0, 0, width, height, transform, true)
         } finally {
             cropped.recycle()

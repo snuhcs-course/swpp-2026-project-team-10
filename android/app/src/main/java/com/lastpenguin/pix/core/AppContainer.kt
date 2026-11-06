@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-23, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -13,10 +13,13 @@ import com.lastpenguin.pix.account.CredentialManagerGoogleIdTokens
 import com.lastpenguin.pix.account.DataStoreSignInStore
 import com.lastpenguin.pix.account.FriendsRepository
 import com.lastpenguin.pix.account.GoogleIdTokens
+import com.lastpenguin.pix.account.InvitationManager
 import com.lastpenguin.pix.account.OkHttpPresenceSockets
 import com.lastpenguin.pix.account.PresenceConnection
+import com.lastpenguin.pix.account.PushTokenRegistrar
 import com.lastpenguin.pix.account.RemoteAuthRepository
 import com.lastpenguin.pix.account.RemoteFriendsRepository
+import com.lastpenguin.pix.account.RemoteInvitationManager
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
@@ -28,9 +31,19 @@ import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixApi
 import com.lastpenguin.pix.core.network.PixAuthApi
 import com.lastpenguin.pix.generation.DataStoreGenerationConsent
+import com.lastpenguin.pix.generation.DataStorePromptHistory
 import com.lastpenguin.pix.generation.GenerationConsent
+import com.lastpenguin.pix.generation.MlKitPersonSignals
+import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseTipper
+import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.RemotePoseGenerator
+import com.lastpenguin.pix.generation.RemotePoseTipper
+import com.lastpenguin.pix.generation.RuleBasedPersonDetector
+import com.lastpenguin.pix.generation.ScreenLanguages
+import com.lastpenguin.pix.generation.followSubjectSets
 import com.lastpenguin.pix.guide.FileSavedGuideStore
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -39,19 +52,35 @@ import com.lastpenguin.pix.guide.OutlineExtractor
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.guide.SubjectSegmenter
+import com.lastpenguin.pix.push.FirebasePushTokens
 import com.lastpenguin.pix.session.CameraFrameSource
+import com.lastpenguin.pix.session.ConfirmSyncer
+import com.lastpenguin.pix.session.ContentPhotoReader
+import com.lastpenguin.pix.session.DataStoreMobileDataNotice
+import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.JpegGuideReferenceCodec
+import com.lastpenguin.pix.session.JpegPoseCandidateCodec
+import com.lastpenguin.pix.session.MaskGuideImageCodec
+import com.lastpenguin.pix.session.MirrorReference
+import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.OkHttpSignalingClient
+import com.lastpenguin.pix.session.PhotoSyncer
+import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
+import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.WebRtcRuntime
-import com.lastpenguin.pix.session.WebpGuideImageCodec
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.signalingUrl
+import com.lastpenguin.pix.settings.AndroidAppLanguage
+import com.lastpenguin.pix.settings.AppLanguage
+import com.lastpenguin.pix.settings.AppSettings
+import com.lastpenguin.pix.settings.DataStoreAppSettings
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -84,22 +113,53 @@ class AppContainer(
      * the first one, is never moved.
      */
     val mirrorGuideRepository: GuideRepository,
+    /** The subject's copy of the photographer's reference photo, for Subject view's thumbnail (FR-3.9). */
+    val mirrorReference: MirrorReference,
     val referenceGuideMaker: ReferenceGuideMaker,
     /** Guides kept to use again, in the app's private files only (FR-3.8, AD-16, NFR-13). */
     val savedGuideStore: SavedGuideStore,
     // ---- Pose generation (#7) ---------------------------------------------------
     val poseGenerator: PoseGenerator,
+    /** Looks for a person in the scene photo before anything is sent (FR-4.13). */
+    val personDetector: PersonDetector,
+    /** How to hold the phone for a generated pose (FR-4.10). */
+    val poseTipper: PoseTipper,
+    /** The tip of the guide on Camera, asked for with [poseTipper]. */
+    val poseTips: PoseTips,
     val generationConsent: GenerationConsent,
+    /** The descriptions used before, on this phone only (FR-4.11, NFR-13). */
+    val promptHistory: PromptHistory,
     // ---- Accounts and friends (#54) ---------------------------------------------
     val authRepository: AuthRepository,
     val friendsRepository: FriendsRepository,
     val googleIdTokens: GoogleIdTokens,
+    // ---- Invitations and push (#119) --------------------------------------------
+    val invitationManager: InvitationManager,
     // ---- Session, guide sync, remote zoom (#8, #9, #10) -------------------------
     val sessionManager: SessionManager,
     /** The photographer's live video for the Subject view. */
     val remoteVideo: RemoteVideo,
     val guideSyncer: GuideSyncer,
+    /** The photographer's candidates on the subject's *Pick a pose* (FR-6.15, Design 2.6.5). */
+    val poseSyncer: PoseSyncer,
+    /** The outline on the photographer's Reference confirm on the subject's *Your reference* (FR-6.15, Design 2.6.5). */
+    val confirmSyncer: ConfirmSyncer,
+    /** The photographer's *Generate poses* on the subject's, where both write the description (FR-6.15, Design 2.6.5). */
+    val descriptionSyncer: DescriptionSyncer,
+    /** Each photo taken in a session, for the subject's "Pix" album (FR-6.14, Design 2.6.5). */
+    val photoSyncer: PhotoSyncer,
     val remoteControlHandler: RemoteControlHandler,
+    /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
+    val mobileDataNotice: MobileDataNotice,
+    // ---- Settings (#123) ---------------------------------------------------------
+    /** The guide's look and the latency indicator from the settings screen (FR-10.1). */
+    val appSettings: AppSettings,
+    /** Pix's own language, which Android keeps (FR-10.2). */
+    val appLanguage: AppLanguage,
+    /** The screens' language for the text the server writes (FR-10.2); none in tests, whose tips stay in English. */
+    val screenLanguages: ScreenLanguages? = null,
+    /** Registers this phone's push token; none in tests, which have no Firebase. */
+    val pushTokenRegistrar: PushTokenRegistrar? = null,
 ) {
     companion object {
         /** Like the session's socket, so the course's proxy never sees it idle. */
@@ -112,6 +172,7 @@ class AppContainer(
             val guideRepository: GuideRepository =
                 InMemoryGuideRepository { cameraController.state.value.aspect.frameAspect }
             val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository { NARROWEST_FRAME_ASPECT }
+            val mirrorReference = MirrorReference()
 
             /** Work that outlives every screen: loading the sign-in, presence, reading the saved guides. */
             val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -158,42 +219,87 @@ class AppContainer(
                 appScope,
             ).start()
 
+            // Pushes for invitations and friend requests reach this phone once someone signs in (Design 2.6.6).
+            val pushTokenRegistrar =
+                PushTokenRegistrar(accountApi, authRepository.state, FirebasePushTokens(), appScope).also { it.start() }
+
             val frameSource = CameraFrameSource()
             val rtcSessionManager = RtcSessionManager(
                 signaling = OkHttpSignalingClient(),
+                // A session's socket counts as signed in, so friends see "In a session" and an invitation to this
+                // phone is BUSY meanwhile (FR-6.9).
+                accessToken = authRepository::freshAccessToken,
                 // Loads the native WebRTC library on the first session, not at app start.
-                peers = WebRtcRuntime(appContext, frameSource),
+                peers = WebRtcRuntime(appContext, frameSource, relayOnly = BuildConfig.RELAY_ONLY),
                 frameSource = frameSource,
                 codec = MessageCodec(),
                 router = ChannelRouter(),
                 serverUrl = BuildConfig.SERVER_URL,
                 identity = SessionIdentity.of(appContext, BuildConfig.VERSION_NAME),
                 haveGuideId = { mirrorGuideRepository.guide.value?.id },
+                haveReferenceId = { mirrorReference.reference.value?.guideId },
             )
-            val guideSyncer =
-                GuideSyncer(rtcSessionManager, guideRepository, mirrorGuideRepository, WebpGuideImageCodec())
+            val guideSyncer = GuideSyncer(
+                rtcSessionManager,
+                guideRepository,
+                mirrorGuideRepository,
+                MaskGuideImageCodec(),
+                JpegGuideReferenceCodec(),
+                mirrorReference,
+            )
+            val referenceGuideMaker: ReferenceGuideMaker =
+                MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
+            // The tip is written in the screens' language, and asked again when it changes while Pix runs (FR-10.2).
+            val screenLanguages = ScreenLanguages(appContext)
+            val screenLanguage = screenLanguages.current
+            val poseTipper: PoseTipper = RemotePoseTipper(pixApi, language = { screenLanguage.value })
+            val descriptionSyncer = DescriptionSyncer(rtcSessionManager, JpegPoseCandidateCodec())
+            val poseSyncer = PoseSyncer(rtcSessionManager, JpegPoseCandidateCodec())
+            // As the subject, each set the photographer starts is this phone's history too (FR-4.11), whichever
+            // screen is in front, once the server accepted its description.
+            val promptHistory = DataStorePromptHistory(appContext, appScope)
+            promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, appScope)
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,
-                referenceGuideMaker =
-                    MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor()),
+                mirrorReference = mirrorReference,
+                referenceGuideMaker = referenceGuideMaker,
                 savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
+                personDetector = RuleBasedPersonDetector(MlKitPersonSignals()),
+                poseTipper = poseTipper,
+                poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage),
                 generationConsent = DataStoreGenerationConsent(appContext),
+                promptHistory = promptHistory,
                 authRepository = authRepository,
                 friendsRepository = RemoteFriendsRepository(accountApi, authRepository.state, appScope),
                 googleIdTokens = CredentialManagerGoogleIdTokens(BuildConfig.GOOGLE_SERVER_CLIENT_ID),
+                invitationManager = RemoteInvitationManager(accountApi),
                 sessionManager = rtcSessionManager,
                 remoteVideo = rtcSessionManager,
                 guideSyncer = guideSyncer,
+                poseSyncer = poseSyncer,
+                confirmSyncer = ConfirmSyncer(rtcSessionManager, MaskGuideImageCodec()),
+                descriptionSyncer = descriptionSyncer,
+                photoSyncer = PhotoSyncer(
+                    rtcSessionManager,
+                    ContentPhotoReader(appContext.contentResolver),
+                    PhotoSaver(appContext),
+                    File(appContext.cacheDir, "session-photos"),
+                ),
                 remoteControlHandler = RemoteControlHandler(
                     rtcSessionManager,
                     cameraController,
                     guideRepository,
                     attributeGuideChanges = guideSyncer::attribute,
                 ),
+                mobileDataNotice = DataStoreMobileDataNotice(appContext),
+                appSettings = DataStoreAppSettings(appContext, appScope),
+                appLanguage = AndroidAppLanguage(),
+                screenLanguages = screenLanguages,
+                pushTokenRegistrar = pushTokenRegistrar,
             )
         }
     }

@@ -1,10 +1,10 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """Exact-match lookup, friend requests, and the friend list with presence (Design Documentation 2.5.3, R&S
 FR-5.5–5.10). Only users with a Pix ID take part: nobody can be found or added before choosing one."""
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.dialects import postgresql, sqlite
@@ -15,9 +15,13 @@ from pix_server.accounts.rules import normalize_pix_id
 from pix_server.accounts.schemas import FriendOut, UserOut
 from pix_server.db.models import FriendRequest, Friendship, User, new_id
 from pix_server.errors import ApiError
+from pix_server.invitations.push import push_to_user
 from pix_server.store import SessionStore
 
 router = APIRouter(prefix="/api/v1")
+
+# FCM drops a friend request's push that it cannot deliver within a day; the request still shows on Friends.
+REQUEST_PUSH_TTL_SECONDS = 86_400
 
 
 async def member(caller: SignedIn) -> Caller:
@@ -188,10 +192,15 @@ async def friend_requests(caller: Member, db: Database) -> FriendRequests:
 
 @router.post("/friend-requests", status_code=201)
 async def send_friend_request(
-    body: NewFriendRequest, request: Request, response: Response, caller: Member, db: Database
+    body: NewFriendRequest,
+    request: Request,
+    response: Response,
+    background: BackgroundTasks,
+    caller: Member,
+    db: Database,
 ) -> OutgoingRequest | NewFriend:
-    """Sends a request (FR-5.6). If the other user has already asked the caller, this accepts their request
-    instead, and the answer is the new friend with `200`."""
+    """Sends a request (FR-5.6), and a push to the other user's phones after answering (FR-5.7). If the other user has
+    already asked the caller, this accepts their request instead, and the answer is the new friend with `200`."""
     me = caller.user.id
     if body.userId == me:
         raise ApiError(400, "INVALID_REQUEST", "You cannot add yourself")
@@ -221,6 +230,8 @@ async def send_friend_request(
     # `lock_pair` holds the two users, so no other request between them can be saved between the checks above and
     # this insert; the pair's unique constraint is the database's own guard.
     await db.commit()
+    push = {"type": "friend.request", "requestId": sent.id, "fromName": caller.user.display_name}
+    background.add_task(push_to_user, request.app, other_id, push, REQUEST_PUSH_TTL_SECONDS)
     return OutgoingRequest(id=sent.id, to=UserOut.of(other), createdAt=millis(sent.created_at))
 
 

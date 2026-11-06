@@ -1,0 +1,352 @@
+[
+  {
+    "file": "with/near-01.jpg",
+    "label": "with",
+    "category": "near",
+    "source": "File:Pixie Cut (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "with/near-02.jpg",
+    "label": "with",
+    "category": "near",
+    "source": "File:Man with a white beard and glasses, by Angelina Litvin, 2015-10-05 (Unsplash).jpg",
+    "notes": "black and white"
+  },
+  {
+    "file": "with/near-03.jpg",
+    "label": "with",
+    "category": "near",
+    "source": "File:Portrait of a man (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "with/near-04.jpg",
+    "label": "with",
+    "category": "near",
+    "source": "File:Woman in the Desert (Unsplash).jpg",
+    "notes": "face covered by a scarf up to the eyes"
+  },
+  {
+    "file": "with/full-01.jpg",
+    "label": "with",
+    "category": "full",
+    "source": "File:Man in front of brick wall (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "with/full-02.jpg",
+    "label": "with",
+    "category": "full",
+    "source": "File:Los Angeles woman in white (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "with/full-03.jpg",
+    "label": "with",
+    "category": "full",
+    "source": "File:Businessman leaving the office (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "with/full-04.jpg",
+    "label": "with",
+    "category": "full",
+    "source": "File:Caught In The Middle (Unsplash).jpg",
+    "notes": "walking, seen in profile"
+  },
+  {
+    "file": "with/far-01.jpg",
+    "label": "with",
+    "category": "far",
+    "source": "File:Man and his dog (Unsplash).jpg",
+    "notes": "person about 6% of the frame height, walking a dog on a snowfield"
+  },
+  {
+    "file": "with/far-02.jpg",
+    "label": "with",
+    "category": "far",
+    "source": "File:Lonely Beach Walk (Unsplash).jpg",
+    "notes": "person about 5% of the frame height on a dark beach"
+  },
+  {
+    "file": "with/far-03.jpg",
+    "label": "with",
+    "category": "far",
+    "source": "File:Hiking in the Swiss Alps (Unsplash).jpg",
+    "notes": "person about 16% of the frame height on a snowfield"
+  },
+  {
+    "file": "with/far-04.jpg",
+    "label": "with",
+    "category": "far",
+    "source": "File:Hiking Alone (Unsplash).jpg",
+    "notes": "person about 16% of the frame height near the bottom edge"
+  },
+  {
+    "file": "with/behind-01.jpg",
+    "label": "with",
+    "category": "behind",
+    "source": "File:Looking Yonder (Unsplash).jpg",
+    "notes": "seen from behind, hood up, no face"
+  },
+  {
+    "file": "with/behind-02.jpg",
+    "label": "with",
+    "category": "behind",
+    "source": "File:Man in hat facing away (Unsplash).jpg",
+    "notes": "back and side of the head under a hat, no face"
+  },
+  {
+    "file": "with/behind-03.jpg",
+    "label": "with",
+    "category": "behind",
+    "source": "File:Person hiking on trail - Lula Lake Land Trust (Unsplash).jpg",
+    "notes": "back view with backpack and beanie, no face"
+  },
+  {
+    "file": "with/sitting-01.jpg",
+    "label": "with",
+    "category": "sitting",
+    "source": "File:Chris Benson 2017-03-13 (Unsplash).jpg",
+    "notes": "crouching with the head down and a hand over the face"
+  },
+  {
+    "file": "with/sitting-02.jpg",
+    "label": "with",
+    "category": "sitting",
+    "source": "File:Desert Chic (Unsplash).jpg",
+    "notes": "crouching"
+  },
+  {
+    "file": "with/sitting-03.jpg",
+    "label": "with",
+    "category": "sitting",
+    "source": "File:Woman sitting on curb (Unsplash).jpg",
+    "notes": "sitting on a ledge at the side of the frame"
+  },
+  {
+    "file": "with/selfie-01.jpg",
+    "label": "with",
+    "category": "selfie",
+    "source": "File:Cairns home selfie.jpg",
+    "notes": ""
+  },
+  {
+    "file": "with/selfie-02.jpg",
+    "label": "with",
+    "category": "selfie",
+    "source": "File:I badly need a day off selfie (39596221834).jpg",
+    "notes": ""
+  },
+  {
+    "file": "with/partial-01.jpg",
+    "label": "with",
+    "category": "partial",
+    "source": "File:Redd Angelo 2015-03-17 (Unsplash Iz1N50DpSDs).jpg",
+    "notes": "only the legs and a hand are in the frame"
+  },
+  {
+    "file": "with/partial-02.jpg",
+    "label": "with",
+    "category": "partial",
+    "source": "File:Working man behind a mug (Unsplash).jpg",
+    "notes": "behind a mug and a laptop, lower body hidden by the table"
+  },
+  {
+    "file": "with/lowlight-01.jpg",
+    "label": "with",
+    "category": "lowlight",
+    "source": "File:Shadow obscures male face (Unsplash).jpg",
+    "notes": "head and shoulders almost black, face not visible"
+  },
+  {
+    "file": "with/lowlight-02.jpg",
+    "label": "with",
+    "category": "lowlight",
+    "source": "File:Neon Shadows (Unsplash).jpg",
+    "notes": "night, dark silhouette from behind against a lit sign"
+  },
+  {
+    "file": "with/group-01.jpg",
+    "label": "with",
+    "category": "group",
+    "source": "File:Stockholm man with headphones (Unsplash).jpg",
+    "notes": "main person close, blurred crowd behind"
+  },
+  {
+    "file": "with/group-02.jpg",
+    "label": "with",
+    "category": "group",
+    "source": "File:Man on Venice boardwalk (Unsplash).jpg",
+    "notes": "main person from behind among a crowd"
+  },
+  {
+    "file": "without/empty-01.jpg",
+    "label": "without",
+    "category": "empty",
+    "source": "File:Quiet Back Alley (Unsplash).jpg",
+    "notes": "fog"
+  },
+  {
+    "file": "without/empty-02.jpg",
+    "label": "without",
+    "category": "empty",
+    "source": "File:Bench Accounting 2015-12-04 (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "without/empty-03.jpg",
+    "label": "without",
+    "category": "empty",
+    "source": "File:Empty park bench at dusk (Unsplash).jpg",
+    "notes": "dusk"
+  },
+  {
+    "file": "without/empty-04.jpg",
+    "label": "without",
+    "category": "empty",
+    "source": "File:Desolate boardwalk (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "without/empty-05.jpg",
+    "label": "without",
+    "category": "empty",
+    "source": "File:Empty subway platform (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "without/empty-06.jpg",
+    "label": "without",
+    "category": "empty",
+    "source": "File:Level D1 Concrete Staircase (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "without/statue-01.jpg",
+    "label": "without",
+    "category": "statue",
+    "source": "File:Statue of Liberty (Unsplash).jpg",
+    "notes": "large realistic face"
+  },
+  {
+    "file": "without/statue-02.jpg",
+    "label": "without",
+    "category": "statue",
+    "source": "File:Golden statue in Milan (Unsplash).jpg",
+    "notes": "full human figure with open arms"
+  },
+  {
+    "file": "without/statue-03.jpg",
+    "label": "without",
+    "category": "statue",
+    "source": "File:Outdoor Buddha statue (Unsplash).jpg",
+    "notes": "stone bust with a face"
+  },
+  {
+    "file": "without/statue-04.jpg",
+    "label": "without",
+    "category": "statue",
+    "source": "File:Marble Portrait Bust of a Woman with a Scroll MET 098A CAT56R8.jpg",
+    "notes": "marble bust with a frontal face"
+  },
+  {
+    "file": "without/statue-05.jpg",
+    "label": "without",
+    "category": "statue",
+    "source": "File:Lopende man, BK-16083.jpg",
+    "notes": "full-length bronze figure of a walking man"
+  },
+  {
+    "file": "without/mannequin-01.jpg",
+    "label": "without",
+    "category": "mannequin",
+    "source": "File:Mannequin oxford st window (Unsplash).jpg",
+    "notes": "very lifelike face, wig and make-up"
+  },
+  {
+    "file": "without/mannequin-02.jpg",
+    "label": "without",
+    "category": "mannequin",
+    "source": "File:Mannequin,Advertising and shop window,A clothing store in Nishapur 08.jpg",
+    "notes": "lifelike male head with a wig"
+  },
+  {
+    "file": "without/mannequin-03.jpg",
+    "label": "without",
+    "category": "mannequin",
+    "source": "File:Mannequin in the shop window. Paris, France.jpg",
+    "notes": "headless seated mannequin in clothes"
+  },
+  {
+    "file": "without/mannequin-04.jpg",
+    "label": "without",
+    "category": "mannequin",
+    "source": "File:Female mannequins at a shop near Yizhong Street, Taichung 20081009.jpg",
+    "notes": "two full-figure mannequins with painted faces"
+  },
+  {
+    "file": "without/animal-01.jpg",
+    "label": "without",
+    "category": "animal",
+    "source": "File:Farm Dog in the Rain (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "without/animal-02.jpg",
+    "label": "without",
+    "category": "animal",
+    "source": "File:Ottawa dog (Unsplash).jpg",
+    "notes": "frontal face"
+  },
+  {
+    "file": "without/animal-03.jpg",
+    "label": "without",
+    "category": "animal",
+    "source": "File:Startled blue-eyed cat (Unsplash).jpg",
+    "notes": ""
+  },
+  {
+    "file": "without/animal-04.jpg",
+    "label": "without",
+    "category": "animal",
+    "source": "File:Portrait of an Ape (Unsplash).jpg",
+    "notes": "gorilla face and hand, human-like pose"
+  },
+  {
+    "file": "without/drawn-01.jpg",
+    "label": "without",
+    "category": "drawn",
+    "source": "File:Street Art @ Sant Martí, Barcelona - 2.jpg",
+    "notes": "painted mural of a human face"
+  },
+  {
+    "file": "without/drawn-02.jpg",
+    "label": "without",
+    "category": "drawn",
+    "source": "File:Face on a Wall - panoramio.jpg",
+    "notes": "cartoon character with face and hands on a wall"
+  },
+  {
+    "file": "without/drawn-03.jpg",
+    "label": "without",
+    "category": "drawn",
+    "source": "File:Pedestrian crossing sign in Kyiv at Olesia Honchara Street.jpg",
+    "notes": "pedestrian pictogram on a road sign"
+  },
+  {
+    "file": "without/toy-01.jpg",
+    "label": "without",
+    "category": "toy",
+    "source": "File:Realistic Doll (Unsplash).jpg",
+    "notes": "ball-jointed doll with a realistic face"
+  },
+  {
+    "file": "without/toy-02.jpg",
+    "label": "without",
+    "category": "toy",
+    "source": "File:Minifigure in Offroad.jpg",
+    "notes": "toy figure on a toy motorbike"
+  }
+]

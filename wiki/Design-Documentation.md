@@ -1,51 +1,100 @@
-## Document Revision History
+<details>
+<summary><b>Document Revision History</b></summary>
 
 | Version | Date | Key changes |
-|----|----|----|
-| 0.1 | 2026-09-30 | Initial draft: system architecture, external libraries, architectural decisions, Android app structure and module interfaces, class diagrams, data models, state machines, protocols and APIs, algorithms, database schema, implementation decisions, module ownership, and the Iteration 1 build order. The shared contracts (interfaces, models, messages, API) are also in `android/`. |
-| 0.2 | 2026-09-30 | Iteration 1 design developed: a JSON example for every data channel message, signaling message, and REST endpoint (2.5); the Iteration 1 test setup, with both phones and the server (a laptop) on the same Wi-Fi (Figure 1); the remote zoom flow (Figure 3); guide sync and remote control as separate modules (2.9). Added the plan for Iterations 2–5 with the target architecture (1.4): friends and invitations, cellular connections, more remote controls, saved guides, an offline connection with a QR code, and guides that keep the background. The photographer takes every photo. |
-| 0.3 | 2026-10-04 | Pose generation as built: the image-editing API is OpenRouter's Image API with the model as a server setting, and the selection result is recorded (2.6.3); a prompt that lets the model re-place the person (2.6.3); the server validates the scene photo and does not resize it (1.1.2, 2.2); `400 INVALID_REQUEST` and a 1 MiB request limit (2.5.3); a 30 s upstream timeout, and the server cancels the image API call when the phone disconnects (2.6.3, 2.8); rate limiting per client address (2.8). |
-| 0.4 | 2026-10-05 | Remote zoom as built: the subject pinches the live view instead of tapping zoom chips (Figure 3, Figure 7, 2.6.5), and `CameraCapabilities.zoomStops` stays in the contract for later subject controls (2.3, 2.5.1, 2.6.2); `camera.zoom.set` carries `final`, with pinch steps on the realtime channel at most every 50 ms and the last value on the reliable channel (2.5.1); every applied zoom is echoed as `camera.state`, only a final request shows the remote-action notice, and the subject ignores echoes while its pinch is in progress (2.6.5); `SessionManager` keeps the last `camera.capabilities` and the last echoed zoom for a Subject view that opens late (2.1); *Remote control* owns pinch zoom on Subject view (2.9). |
-| 0.5 | 2026-10-06 | Camera and Subject view use single-value zoom sliders with hardware endpoint labels and keyboard/accessibility support. Preview and live-video pinches no longer zoom the camera; guide drag/pinch remains. Dragging keeps the thumb under the user's control despite asynchronous observations, supports lens switching, and finishes on release, cancellation, or pause; the existing remote step/final protocol is unchanged (Figure 3, 2.5.1, 2.6.2, 2.6.5). |
-| 0.6 | 2026-10-06 | Pose generation: the user takes the scene photo with the Camera screen's shutter and confirms it before anything is sent (1.1.3, 2.2, 2.6.3). One 30 s limit covers a whole generation run, and the app discards the scene photo and the other candidates after *Use this pose* (2.6.3, 2.8). |
-| 0.7 | 2026-10-07 | Measurement as built: both phones ping every 2 s, the phone that receives a `ping` logs `ping.received` with its `ts`, and the sender's `rtt` line carries the same `ts`. Matching the two lines gives the difference between the phones' `Timings` clocks, `t(ping.received) − t(rtt) + rtt/2`, so cross-phone latencies such as guide sync can be read from the two logs (2.5.1, 2.8). |
-| 0.8 | 2026-10-09 | Final version for Iteration 1, synced with the current build and the team's decisions. The WebRTC build is decided: `io.github.webrtc-sdk:android` 137.7151.01 (header, 1.2). DataStore keeps only the generation consent (1.2). `CameraController.status` (2.1) and `PeerInfo.haveGuideId` (2.3) are added. When the subject leaves or drops, the photographer's phone goes back to `Waiting` with the same code (2.4). The remote zoom notice shows for 3 s on the Camera screen instead of as a toast (2.6.5), and the use of `camera.state`'s `by` field is corrected (2.5.1). The owners of the app shell and guide sync are corrected (2.9), and the repository tree shows `wiki/` (2.10). This entry also records the composition grid and horizon bar (2.6.2) and ultrawide zoom routing (2.6.5), added on 2026-10-05. |
-| 1.0 | 2026-10-13 | First version for Iteration 2; Iteration 2 versions start at 1.0 and count up by one minor step per change: 1.1, 1.2, …, 1.9, 1.10, 1.11, and so on. Iteration 2 design, from the kickoff on 2026-10-09 (Team Meetings) and the schedule of 2026-10-11, written before feature work ([#45], Iter2-P3). Task IDs use the issue numbering `Iter2-Pn` (the schedule's P21–P44 minus 20). Architecture: the server on a public host with HTTPS and WSS, a database, Firebase Cloud Messaging for invitations, and a TURN relay on the same host (1.1, 1.2, AD-11–AD-14, 1.4). Camera: brightness, flash, and aspect ratios 4:3, 16:9, and 1:1; the zoom slider is replaced by pinch zoom with a guide-edit mode toggle (AD-10, AD-17, 2.1, 2.3, 2.6.2, 2.6.5). Guide: outline only, never the reference's pixels; the photographer smooths the mask once and sends only that mask; the guide starts where the person stands in the reference; a reference thumbnail; saved guides in private storage (AD-6, AD-15, AD-16, 2.1, 2.3, 2.5.1, 2.6.1, 2.6.2, 2.8). New module interfaces and models for accounts, friends, invitations, camera controls, and saved guides (2.1, 2.3); session states for invitations and reconnection (2.4); new data channel messages, signaling, and REST endpoints with a JSON example each (2.5); pose descriptions and idea chips (2.6.3); invitations and push, reconnection (2.6.6, 2.6.7); the database schema (2.7); Iteration 2 owners and build order (2.9). The details each owner settles while building are listed under *Still open* and as **TODO** in their sections, and come back in later versions. |
-| 1.1 | 2026-10-13 | Hosting decided (Iter2-P4, [#46]). The server runs on the two course-provided servers, which are reachable only through the course's HTTP proxy on port 80, so it speaks HTTP and WS instead of HTTPS and WSS (AD-11, 1.1, 2.5.2, 2.5.3, 2.8). The TURN relay is Cloudflare's managed service instead of coturn on the server host, which cannot open the ports (AD-14, 1.1.2, 1.2, 2.2, 2.5.2). Session state moves from the server process to a Redis session store, so the server can run several workers and a deploy loses no room (AD-18, 1.1.2, 2.2, 2.7). Deploys are blue-green behind nginx and pulled by each server (2.8, Hosting and Deployment). The invite link cannot be a verified App Link without HTTPS (2.6.6, Still open). Figure 4 is redrawn for these decisions. |
-| 1.2 | 2026-10-14 | Smooth outlines as built (Iter2-P7, [#49]). The mask is blurred by 0.8 % of the person's height, regions under 1 % of the foreground are dropped, and holes under 0.2 % are filled; the outline is the mask's 0.5 level traced between pixels, rounded, and drawn as a white anti-aliased line about 3 dp wide with no fill (header, 2.3, 2.6.1). The segmenter returns only the confidence mask, and until the mask-only transfer the cutout carries the smoothed mask as its alpha (2.6.1). Lines for arms and legs in front of the body are out of scope, with what Iter2-P7 tried, and ML Kit Pose Detection leaves the library list (1.2, 2.6.1, 2.9). |
-| 1.3 | 2026-10-14 | Session store built (Iter2-A2, [#73]). Sessions, room codes, and the pose rate limit are in Redis, and each copy of the app runs two workers (2.7; 2.8, Hosting). The key layout, the sweeper, failure handling, and the test setup as built (2.7). fakeredis runs the same Lua scripts in tests and on a laptop without Redis (1.2, 2.7). A pose request that the store cannot count answers `503 UNAVAILABLE` (2.5.3). A deploy still waits for open rooms until phones can rejoin a room (2.8, Deployment). The *Session store rollout* row of Still open is closed. |
-| 1.4 | 2026-10-14 | Guide-edit mode defaults decided and pinch zoom as built (Iter2-P6, [#48]): the mode turns on when a guide is added and off on the shutter or when the guide is hidden or removed; Subject view starts with it off and shows its toggle with guide moves (Iter2-P17); with the mode on, the overlay takes every touch inside the camera image; the toggle sits beside the zoom readout (Decided, 2.6.2). |
-| 1.5 | 2026-10-15 | Accounts and friends server built (Iter2-P8, [#50]). Sign-up and sign-in with a Pix ID and a password are added next to Google (decided 2026-10-15): a password account can add Google, an account made with Google can add a password once it has a Pix ID, and a Google sign-in that no account uses answers `NOT_REGISTERED`, so the app can offer to connect an existing Pix account first (AD-12 revised; 1.1, 1.2, 2.1, 2.3, 2.5.3). Passwords are argon2id hashes and need 8–64 characters with a letter and a digit; login attempts are not limited for now (2.8, Accounts). New endpoints `POST /auth/signup`, `POST /auth/login`, `POST /auth/google/signup`, `DELETE /auth/session`, `PUT /me/google`, `PUT /me/password`, `GET /friend-requests`, and `DELETE /friend-requests/{id}`; the sign-in requests no longer carry `deviceName`, which nothing used; a lookup returns the pending request's ID; the friend endpoints need a Pix ID (2.5.3). The database is PostgreSQL in the Compose file with its password made by `deploy.sh`, and a SQLite file on a laptop and in tests; every worker migrates at start (2.7; 2.8, Hosting, Configuration). Presence as built: a signed-in socket records its user (2.5.2, 2.7). No URL carries a Pix ID: the lookup is `POST /users/lookup`, and the access logs leave out query strings (2.8, Privacy). A sign-in gives an access token, a JWT that lasts 15 minutes and is checked without the database, and a refresh token that lasts 30 days from its last use, is stored only as a hash, and is replaced on every refresh; a refresh token used twice ends the sign-in, and sign-out ends it at once (decided 2026-10-15; `POST /auth/refresh`; 2.5.3, 2.7, 2.8, Accounts). PostgreSQL keeps its files in `/opt/pix/postgres` on the server's disk, and an account request that cannot reach it answers `503 UNAVAILABLE` (2.7, 2.8). The endpoints that need no account get abuse limits: a global pose window, 500 requests in 24 hours over all clients, next to the per-address one, and at most 100 wrong room codes per address in 10 minutes, after which joins answer `RATE_LIMITED` (2.5.2, 2.7; 2.8, Privacy). The *Database engine* and *Session token lifetime* rows of Still open are closed: PostgreSQL, and 30 days. Still open gains the decisions the app side leaves: the sign-in screens, the account actions, the Google sign-in setup, and the tokens on the phone (Iter2-P13), and the wrong-code message on *Join* (Iter2-P16). |
-| 1.6 | 2026-10-15 | Camera controls as built (Iter2-P10, [#51]). The flash and aspect-ratio buttons are in the Camera screen's top bar, a brightness button beside the zoom readout opens the brightness slider, and a tap on the preview focuses there; there is no *detail settings* panel (Decided, 2.6.2). Each ratio is cut from the middle of the sensor's 4:3, the saved JPEG already has that crop, and the preview is clipped to the frame (AD-10, 2.6.2). `CameraXController` keeps the exposure, the flash, and the ratio across rebinds and lens switches, and the ratio across app starts (2.8). The ratio can change during a session: `camera.state` carries the exposure, the flash, and the ratio and is sent whenever one changes, `camera.capabilities` sends the new fields, `SessionManager.peerZoom` becomes `peerCamera`, and Subject view fits its grid and guide to the ratio; the stream keeps the frame's shape up to 1280×720 pixels (2.1, 2.5.1, 2.6.4). The *Aspect-ratio cropping* and *Zoom slider in a detail panel* rows of Still open are closed. |
-| 1.7 | 2026-10-16 | Guide controls as built (Iter2-P11, [#52]). The guide is an outline only on both phones and on *Reference confirm*, which shows it on a dark neutral card, and `GuideStyle` is gone from the code too (Decided, 2.3, 2.6.2). *Hide* / *Show* sets `visible` with a final change, ends guide-edit mode, and shows the hint "Guide hidden"; there is no *Replace* button: with a guide on the camera, *Guide* opens *Add a pose guide* as "Replace the pose guide?" (2.6.2). A new guide starts from its `anchor`, the box of the person and its 2 % margin in the reference: the box's height fraction and center are kept in any frame ratio, then clamped; the height limits stay 0.21–2.1 of the frame height for every start, and the outline is about 3 dp wide only at the default height (2.3, 2.6.1, 2.6.2). The subject takes the start from `guide.state`, so `anchor` leaves `guide.image.begin` (2.5.1, 2.9). The reference thumbnail sits in a corner of the preview: a tap enlarges it to half the preview's width and another makes it small, and a drag drops it into the nearest corner, above the guide's controls (2.6.2). The *Starting position mapping* and *Reference confirm background* rows of Still open are closed, and the mask-only transfer is 조성민's, in Guide sync (2.9). |
-| 1.8 | 2026-10-16 | Remote brightness, flash, and guide moves as built (Iter2-P17, [#57]): the subject's requests of 2.5.1 as messages (`guide.move`, `camera.exposure.set`, `camera.flash.set`; `camera.focus.set` and `control.permission` defined but not yet handled), `guide.state` with `by`, the subject's own guide clamped for the photographer's frame with echoes held until the gesture ends, unchanged echoes for a camera without a range or a flash, and the notices (2.6.5, 2.9); the protocol version is 2 from this change (2.5.1). |
-| 1.9 | 2026-10-18 | Subject view's video fitted to the frame (Iter2-A4, [#86]). The subject's `SurfaceViewRenderer` wraps its content and is centered, so it measures itself to the video's shape and covers the rectangle the grid and the guide fit. At `match_parent` the renderer cropped every frame to the view's shape despite aspect-fit scaling, so the guide lay on another part of the scene than on the photographer's phone: about 6 % off at 4:3, 26 % at 16:9, and 41 % at 1:1. A pinch anywhere in the video area, the margins around the video included, zooms (2.6.4). *Still open* gains whether Subject view also shows the reference thumbnail. |
-| 1.10 | 2026-10-21 | Pose descriptions and suggested poses (Iter2-P12, [#53]). Every candidate is generated with one prompt, whose pose is the user's description or, without one, one of four poses that a vision model suggests for the scene through the new `POST /pose-suggestions`; the template prompt is gone, and the four predefined poses stay as the default poses when the suggestion model fails and for apps from before Iteration 2, which still call `GET /pose-templates` (2.5.3, 2.6.3). The prompt lets the model frame the person closer or from a slightly different height, never wider than the scene photo (2.6.3). The suggestion model, Gemini 3.1 Flash Lite, was chosen from ten on 2026-10-21 with `compare_suggestion_models.py` (2.6.3). `POST /poses` takes a `description` of 1–100 characters after trimming, answers it with `"templateId": null`, and answers `422 REJECTED` when the service refuses it, with the same message as for a template, because the service does not say whether it refused the photo or the text; the app names its four requests `pose-1` … `pose-4`, and the `candidateId` the server was to echo is dropped (2.3, 2.5.3). The app: *Generate poses* between *Use this photo* and Generating poses, with idea chips from string resources (`GET /pose-ideas` and `PoseGenerator.ideas()` are dropped), `PoseGenerator.generate(scene, request, seed)` reporting the poses before the candidates, and, when the service rejected every pose of a description, *Couldn't create poses* asking for a different description or another photo, with *Edit description*, which goes back to *Generate poses* with the text kept, as *Try other poses* on *Pick a pose* now does too (2.1–2.3, 2.6.3). With a description, the same vision model writes three variations of it for the scene (`POST /pose-suggestions` with a `description`), so the four candidates differ instead of repeating one pose; the description's own request goes out at once (2.1, 2.5.3, 2.6.3). The prompts and the default poses are data in `server/src/pix_server/poses/prompts.toml`, which the server checks when it starts and both comparison scripts read (2.6.3). Suggestion requests have rate limits of their own (2.8). A run, and each call to the image API, may now take 60 s instead of 30 s (2.6.3, 2.8). 2.6.3 keeps the decisions and their reasons, without the test logs. The pose ideas leave *Still open*. |
-| 1.11 | 2026-10-21 | Sign-in, Pix ID, and Friends screens as built (Iter2-P13, [#54]). The four *Still open* rows of Iter2-P13 are decided (Decided): *Shoot together* opens *Friends*, which, signed out, offers *Sign in to add friends* and *Use a room code instead*; one *Sign in* screen with *Continue with Google* and *Sign up*; an *Account* sheet from the account button on *Friends*; the team's Google Cloud project with the web client ID in the app's build script; the tokens in DataStore without Keystore encryption and out of backups and device transfers. The contracts follow the server (2.1, 2.3, 2.5.3): `PixAuthApi` holds the sign-in endpoints and `PixAccountApi` those with a token, each on its own HTTP client, so a refresh never waits behind the calls that wait for it; `AuthRepository.state` is an `AuthState`, and the tokens stay in `AuthTokens`; `setDisplayName` and `freshAccessToken` are added; `Friend.inSession`, `PixUser`, `RequestOutcome`, and one `AccountError` with `AccountException` replace `PixIdError` and `PasswordError`. Presence: the app holds one signed-in signaling socket while Pix is in front (2.5.2). Without push (Iter2-P15), *Friends* refreshes its lists every 10 s while it is shown (2.8). |
-| 1.12 | 2026-10-22 | *Check* and *Sent requests* (Iter2-P13, [#54]; R&S FR-5.15, FR-5.16). New endpoint `POST /auth/check-pix-id`, without a token: whether a sign-up could take a Pix ID now, with the Pix ID in the body and `400 PIX_ID_INVALID` as at sign-up; sign-up and `PUT /me` still answer `409 PIX_ID_TAKEN` for a Pix ID taken in the meantime (2.5.3). Contracts (2.1, 2.3): `AuthRepository.isPixIdAvailable`, on `PixAuthApi`; `FriendsRepository.sentRequests` with the new `SentRequest`, from the `outgoing` list that `GET /friend-requests` already answered, and `cancel` takes a withdrawn request off it, also when the server answers `404`. *Sent requests* is a screen of its own from *Friends* that refreshes like it. Whether a Pix ID exists is not secret: the lookup and the check tell it, and neither is limited for now (2.5.3; 2.8, Accounts). The room code sheet from *Friends* floats over *Camera*, so the camera already streams when the subject joins, and *Cancel* goes back to *Camera* (Decided, Iter2-P13). *In a session* does not show until a session's socket carries the token ([#55], [#56]; 2.5.2, 2.5.3). |
-| 1.13 | 2026-10-22 | Zoom without stutter as built (Iter2-P5, [#47]; 2.6.5). `CameraController.setZoom` takes `final` and applies only the newest request, once per display frame and never the same native ratio twice; during a pinch, the photographer's or the subject's, the bound lens stays until the ratio is 5 % past the primary's minimum, and the pinch's last value settles on its own lens, also when the subject's last value never comes (the handler ends it when it stops); a new binding's zoom is published only once restored; the Camera screen keeps the last frame, the grid, and the guide on screen without the spinner from the moment the camera leaves `READY` for `STARTING` until it is `READY` again with the preview streaming, as it already did for a ratio change (`PreviewHold`, 2.6.2). `Timings` marks and `android/scripts/zoom_timings.py` measure it in debug builds (2.1, 2.6.5, 2.8). Still open: *Zoom stutter cause* becomes what is left after the measured numbers. |
-| 1.14 | 2026-10-23 | Saved guides as built (Iter2-P18, [#58]; 2.8, *Guide store*): until the mask-only transfer, the store keeps the cutout as `cutout.webp` in place of `mask.png`, and `meta.json` also keeps the source and an `order` that sorts the list. The contract file `SavedGuideStore.kt` adds the limit as `MAX_SAVED` and `SavedGuideStore.InMemory` for tests. |
-| 1.15 | 2026-10-23 | Synced with the code on `dev` after [#96]; no decision changes, the text now says what is built. Components and flows (1.1.2, 1.1.3): the pose-suggestion model as a component, presence and wrong-code counts in the signaling hub, saved guides and DataStore on the photographer's phone, the suggestion step in pose generation, the guide image in guide sync, and NV21 frames in the live view. Libraries (1.2): Activity KTX, ConstraintLayout, Lifecycle Process, `websockets`, and OpenRouter's chat completions; the Google ID token is sent a second time only to add Google after `NOT_REGISTERED` (also AD-12). AD-6 notes that the cutout still travels until the mask-only transfer; AD-17 records that the zoom slider does not return. Figure 4 is redrawn with Google sign-in, OpenRouter's two models, nginx, presence, saved guides, and the built database and session store; only push and the relay stay dashed. Structure (2.1, 2.2): Figure 5's screens and managers, the package tree with the implementation files and without the not-yet-written `InvitationManager` contract, one shared ViewModel per flow, `CameraSettings`, `SavedGuideStore`'s `InMemory` and `MAX_SAVED`, the `READY` rule, `MaskSmoothing.kt` in place of a `MaskSmoother` class, and the real method names in Figures 6 and 7; the client timeout in Figure 8 is 60 s; the server's `signaling` module keeps only sockets. Sessions (2.3, 2.4, 2.5.1): the Iteration 2 session additions are marked as not in code yet; `Connected` waits for `hello`; the end reasons, the 10 s grace before a lost link, and the 60 s background limit; stale `seq` is dropped for five types on both channels; `hello`'s name is the device name; `camera.capabilities` is resent on change; `camera.state` follows each applied zoom with a final value 100 ms later; one `zoom.echo` mark. Signaling and REST (2.5.2, 2.5.3): the token is checked without the database, the presence socket's pings, every error and close code, when a room code expires, the framework's `404`/`405`/`500`, and `POST /devices` after sign-out. Algorithms (2.6): the 60 s wait for the segmentation model, "Creating…" for a description, the 3:4 output the server asks for, the analysis buffer and NV21 crop, the echo timeout and attribution window, and which zoom marks are debug-only; *Save guide* on the guide's panel (2.6.2). Database (2.7): the suggestion rate-limit keys, the friendships key, and which requests answer `503` without Redis. Decisions (2.8): shared ViewModels and result channels, the saved-guide store's files, thumbnails, cleanup, backup exclusion, and that a used saved guide starts at its anchor; message rate, backpressure, timeouts, the `stats` line, the 10 s friends refresh, and the settings and nginx routes that come with invitations. Ownership (2.9, 2.10, 3): the Redis store and saved guides as built, the Iteration 1 slider on Subject view, how the Iteration 2 contracts were added, the repository tree, and the Adapter and Strategy rows. Iteration 1 leftovers removed where Iteration 2 had not replaced them: the Iteration 1 architecture figure and its drawing are deleted and Figure 1 in 1.1.1 is the architecture as built (which 1.4 showed as Figure 4); 1.1.1, the signaling module row, the base URLs of 2.5.2 and 2.5.3, the `zoom` and `cutout` comments, 2.7's database and delivery notes, and 2.9 (the Iteration 1 build order) read as things are now. The zoom stutter's measurement on the S23 Ultra is recorded (2.6.5, 2.9, *Still open*); the S21 numbers come with IT-10. Invitations (Iter2-P15), sessions across networks (Iter2-P16), and the four Could items were not built in Iteration 2 and move to Iteration 3 (1.4.1, 1.4.2, 2.6.5–2.6.7, 2.9, *Still open*); their design stays as written. No decision changed. |
-| 1.16 | 2026-10-23 | Integration of the Iteration 2 features (Iter2-P22, [#60], [#99]): the Lifecycle row of 2.8 says when Subject view shows "Connecting…" and when "camera paused" (the first frame, then a 2 s stall), after the integration run showed the notice before the first video. No other design change; the Iteration 2 flows run from one `dev` build with the real modules (Testing Documentation 2.2.2). |
-| 1.17 | 2026-10-23 | The thirteen *Decided* paragraphs at the top of the page are removed for the Iteration 2 submission: every decision they recorded is in the section it belongs to and in the revision rows that introduced it, and *Still open* keeps the items that are not decided. No design change. |
+|---|---|---|
+| 0.1 | 2026-09-30 | Initial draft of every section, with the Iteration 1 build order and the shared contracts in `android/`. |
+| 0.2 | 2026-09-30 | Iteration 1 design: JSON examples for every message and endpoint, the same-Wi-Fi setup, remote zoom, and the module split; the plan for Iterations 2–5 (1.4, 2.5, 2.9, Figures 1, 3). |
+| 0.3 | 2026-10-04 | Pose generation as built: OpenRouter's Image API, scene validation, a 1 MiB request limit, a 30 s timeout, and a per-address rate limit (2.5.3, 2.6.3, 2.8). |
+| 0.4 | 2026-10-05 | Remote zoom as built: the subject pinches the live view, and every applied zoom is echoed in `camera.state` (2.5.1, 2.6.5). |
+| 0.5 | 2026-10-06 | Zoom sliders on Camera and Subject view replace pinch zoom; the remote zoom protocol is unchanged (2.6.2, 2.6.5). |
+| 0.6 | 2026-10-06 | The scene photo is taken with Camera's shutter and confirmed before it is sent; one 30 s limit covers a generation run (2.6.3). |
+| 0.7 | 2026-10-07 | Measurement as built: the `ping.received` and `rtt` lines give the clock offset for latencies across phones (2.5.1, 2.8). |
+| 0.8 | 2026-10-09 | Final Iteration 1 version, synced with the build: the WebRTC library, the subject leaving, the zoom notice, grid, horizon bar, ultrawide zoom, and owners (1.2, 2.4, 2.6.2, 2.6.5, 2.9). |
+| 1.0 | 2026-10-13 | First Iteration 2 version, from the 10/09 kickoff: public host, push invitations, TURN, camera controls, outline-only and saved guides, accounts, friends, and reconnection (AD-6, AD-10–AD-17, 2.1–2.7, 2.9; Iter2-P3, [#45]). |
+| 1.1 | 2026-10-13 | Hosting decided: the course servers over HTTP and WS, Cloudflare's managed TURN, a Redis session store, and blue-green deploys (AD-11, AD-14, AD-18, 2.8, Figure 4; Iter2-P4, [#46]). |
+| 1.2 | 2026-10-14 | Smooth outlines as built: the mask is blurred, cleaned, and traced as a 3 dp white line; limb lines and ML Kit Pose Detection dropped (1.2, 2.6.1; Iter2-P7, [#49]). |
+| 1.3 | 2026-10-14 | Session store built: rooms, codes, and the rate limit in Redis, two workers per copy, fakeredis in tests, and `503 UNAVAILABLE` (2.5.3, 2.7, 2.8; Iter2-A2, [#73]). |
+| 1.4 | 2026-10-14 | Guide-edit mode and pinch zoom as built: when the mode turns on and off, and that it takes every touch on the image (2.6.2; Iter2-P6, [#48]). |
+| 1.5 | 2026-10-15 | Accounts and friends server built: Pix ID sign-up next to Google, account and friend endpoints, PostgreSQL, access and refresh tokens, and privacy limits (AD-12, 2.5.3, 2.7, 2.8; Iter2-P8, [#50]). |
+| 1.6 | 2026-10-15 | Camera controls as built: flash, ratio, brightness, and tap to focus; each ratio is a center crop, and Subject view follows ratio changes (AD-10, 2.5.1, 2.6.2, 2.6.4; Iter2-P10, [#51]). |
+| 1.7 | 2026-10-16 | Guide controls as built: outline only, *Hide* / *Show*, replacing through *Guide*, a start from the reference's `anchor`, and the movable thumbnail (2.3, 2.6.1, 2.6.2, 2.9; Iter2-P11, [#52]). |
+| 1.8 | 2026-10-16 | Remote brightness, flash, and guide moves as built: the subject's requests, `guide.state` with `by`, the notices, and protocol version 2 (2.5.1, 2.6.5; Iter2-P17, [#57]). |
+| 1.9 | 2026-10-18 | Subject view's video fitted to the frame, so the guide covers the same part of the scene on both phones (2.6.4; Iter2-A4, [#86]). |
+| 1.10 | 2026-10-21 | Pose descriptions and suggested poses: one prompt per candidate, `POST /pose-suggestions`, *Generate poses*, `prompts.toml`, and a 60 s limit (2.5.3, 2.6.3, 2.8; Iter2-P12, [#53]). |
+| 1.11 | 2026-10-21 | Sign-in, Pix ID, and Friends screens as built: *Shoot together* opens *Friends*, the *Account* sheet, stored tokens, presence, and a 10 s refresh (2.1, 2.3, 2.5.2, 2.5.3, 2.8; Iter2-P13, [#54]). |
+| 1.12 | 2026-10-22 | *Check* and *Sent requests*: `POST /auth/check-pix-id`, the sent-requests list, and the room code sheet over *Camera* (2.1, 2.3, 2.5.3; Iter2-P13, [#54]). |
+| 1.13 | 2026-10-22 | Zoom without stutter as built: the newest zoom once per frame, the lens held during a pinch, and the last frame kept during a rebind (2.6.2, 2.6.5, 2.8; Iter2-P5, [#47]). |
+| 1.14 | 2026-10-23 | Saved guides as built: the store's files and its size limit (2.8; Iter2-P18, [#58]). |
+| 1.15 | 2026-10-23 | Synced with `dev` after [#96]: every section describes the build, Figure 4 redrawn, and invitations and Could items moved to Iteration 3 (1.1–2.10). |
+| 1.16 | 2026-10-23 | Iteration 2 integration: when Subject view shows "Connecting…" and when "camera paused" (2.8; Iter2-P22, [#60], [#99]). |
+| 1.17 | 2026-10-23 | The *Decided* paragraphs at the top removed; each decision is in its own section. |
+| 2.0 | 2026-10-26 | Iteration 3 plan from the kickoff; current design only (1.4.2, 2.9). |
+| 2.1 | 2026-10-26 | *Pick a pose* shows one candidate at a time, as built (2.6.3; Iter3-P10, [#114], [#108]). |
+| 2.2 | 2026-10-26 | TURN credentials from the server: each phone gets its own from Cloudflare, with Cloudflare's STUN server as the fallback, and the TURN settings (2.2, 2.5.2, 2.6.7, 2.8; Iter3-P13, [#117]). |
+| 2.3 | 2026-10-26 | Pose tips as built: `POST /pose-tips` and the tip on Camera (1.1.2, 2.1, 2.5.3, 2.6.3, 2.7; Iter3-P11, [#115], [#110]). |
+| 2.4 | 2026-10-26 | Camera and Subject view layout: the preview below the top bar, a fixed shutter, zoom over the image, a live dot, and 48 dp targets (2.3, 2.5.1, 2.6.2, NFR-16; Iter3-A2, [#136]). |
+| 2.5 | 2026-10-26 | Sessions across networks in the app: the mobile-data notice, a relay-only debug option, the wrong-code message, and the AWS server for debug builds (1.4.2, 2.1, 2.3, 2.5.2, 2.6.7, 2.8; Iter3-P13, [#117]). |
+| 2.6 | 2026-10-27 | The Korean translation as built: strings picked by the phone's language, the per-app language on Android 13+, and Pretendard (2.8; Iter3-P7, [#111]). |
+| 2.7 | 2026-10-27 | The reference thumbnail on Subject view: a copy of the reference photo, at most 512 px, goes once per guide to the subject (AD-6, AD-15, 2.1, 2.3, 2.5.1, 2.6.2; Iter3-A1, [#132]). |
+| 2.8 | 2026-10-28 | One account on several phones: each phone reads its account with `GET /me` every 10 s, so changes from another phone show (2.1, 2.5.3, 2.8). |
+| 2.9 | 2026-10-28 | The mask-only guide transfer in either direction, protocol version 3, and a guide made on the subject's phone adopted by the photographer (AD-6, AD-7, 2.1, 2.3, 2.5.1, 2.6.1, 2.6.2, 2.6.5, 2.8; Iter3-P9, [#113]). |
+| 2.10 | 2026-10-28 | Reconnection after a short drop: the reconnecting state, rejoin tokens, `peer.rejoined`, an ICE restart, drop detection, and timeouts, with fixes from the first two-phone run (2.1, 2.3, 2.4, 2.5.2, 2.6.7, 2.7, 2.8, Figures 3c, 9; Iter3-P14, [#118]). |
+| 2.11 | 2026-10-29 | The AWS server deployed from GitHub through AWS Systems Manager (2.8, 2.10). |
+| 2.12 | 2026-10-29 | Invitations and push on the server: an invitation opens its session when sent, both phones join with `session.join`, FCM pushes, and the invite link (1.1.2, 1.1.3, 1.2, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, Figure 3b; Iter3-P15, [#119]). |
+| 2.13 | 2026-10-29 | *Pick a pose* on both phones, where the first *Use this pose* to reach the photographer decides, and *Save guide* on Subject view (AD-7, 2.1, 2.3, 2.5.1, 2.6.5; Iter3-P16, [#120]). |
+| 2.14 | 2026-10-29 | *Reference confirm* on both phones: the subject sees *Your reference*, and the first *Use this guide* to reach the photographer decides (AD-7, 2.1, 2.5.1, 2.6.5, 2.6.7; Iter3-P16, [#120]). |
+| 2.15 | 2026-10-29 | *Generate poses* on both phones: the subject gets a copy of the scene photo, one phone types at a time, and either phone starts the set (AD-7, 2.1, 2.5.1, 2.6.5, 2.6.7; Iter3-P16, [#120]). |
+| 2.16 | 2026-10-29 | Fixes after Codex's review of PR #151: copies too large for the subject are made again smaller or left out, and stale step ends are ignored (2.5.1, 2.6.5). |
+| 2.17 | 2026-10-30 | Fixes after Codex's second review of PR #151: no *Pick a pose* without copies, and shared steps wait until *Add a pose guide* closes (2.6.5). |
+| 2.18 | 2026-10-30 | Selfie mode as built: the front camera, mirrored in photos and streamed video, selfie prompts, and no pose tip for a selfie (1.4.2, 2.1, 2.5.3, 2.6.3, 2.6.4; Iter3-P12, [#116]). |
+| 2.19 | 2026-10-30 | Invitations in the app: push tokens, invitation states and end reasons, a 60 s lifetime, push notifications, and fixes after the reviews (1.1.2, 2.1, 2.3, 2.4, 2.5.2, 2.5.3, 2.6.6, 2.6.7, 2.8, Figures 3b, 5, 8b; Iter3-P15, [#119]). |
+| 2.20 | 2026-10-30 | Candidates in the scene photo's ratio: the server asks for 3:4, 9:16, or 1:1, and the screens show each photo whole (2.5.3, 2.6.3; Iter3-P8, [#112]). |
+| 2.21 | 2026-10-30 | Pose tips in Korean: the app sends its screens' language, and the server writes a Korean tip with a check for numbers and units (2.5.3, 2.6.3, 2.8; Iter3-A4, [#156]). |
+| 2.22 | 2026-10-30 | A light for the scene photo: the light stays on while the scene is framed, and a shot waits until the light is as chosen (2.1, 2.6.3; Iter3-A5, [#158]). |
+| 2.23 | 2026-10-31 | Session photos on both phones: photos go in chunks behind other reliable messages, paced by `photo.ack`, and resume after a short drop (2.1, 2.5.1, 2.6.5, 2.6.7, 2.8; Iter3-P17, [#121]). |
+| 2.24 | 2026-10-31 | Fixes after Codex's review of PR #159: session photo notices wait until shown, one at a time, and keep an ended session's name (2.6.5). |
+| 2.25 | 2026-11-02 | Fixes after Codex's second review of PR #159: a photo belongs to the session at its shutter, and the subject handles photo messages in their own coroutine (2.6.5). |
+| 2.26 | 2026-11-02 | The settings screen: the gear on Camera, stored settings and language, the guide's color and thickness, the latency indicator, and withdrawing the AI agreement (1.4.2, 2.1, 2.6.8, 2.8, 2.9; Iter3-P23, [#123]). |
+| 2.27 | 2026-11-02 | Fixes after Codex's review of PR #163: the AI agreement row, the screens' language on Android 10–12, and a light backing behind a black outline (2.6.8, 2.8). |
+| 2.28 | 2026-11-03 | The description filter: a moderation model judges every description and pose, refuses with `422 REJECTED`, and every prompt says user text is never an instruction (1.1.1–1.1.3, 2.5.3, 2.6.3, 2.8, Figure 1; Iter3-A7, [#165]). |
+| 2.29 | 2026-11-03 | The first-use tutorial: slides drawn in `wiki/design/tutorial/` in both languages, opened by Camera and from Settings (2.1, 2.6.8; Iter3-P23, [#123]). |
+| 2.30 | 2026-11-03 | Prompt history on *Generate poses*: past descriptions kept on the phone, recorded on both phones with the invitation's friend; the idea chips removed (2.1, 2.2, 2.5.1, 2.6.3, 2.6.5; Iter3-P24, [#124]). |
+| 2.31 | 2026-11-03 | Fixes after Codex's review of PR #164: an empty start text for suggested poses, history reads retried, no history in backups, and long names cut (2.5.1, 2.6.3). |
+| 2.32 | 2026-11-03 | Fix after Codex's second review of PR #164: the reconnecting state keeps the invitation's friend for the prompt history (2.1, 2.6.3). |
+| 2.33 | 2026-11-03 | Fewer words on the screens: hints the tutorial covers removed, Camera's hint chip narrowed, and one "… sees this too" on shared screens (2.6.5, 2.6.8; Iter3-P23, [#123]). |
+| 2.34 | 2026-11-03 | The person check: ML Kit on the phone before *Use this photo*, and the server before the image model, with `422 NO_PERSON` (1.1.1–1.1.3, 1.2, 2.1, 2.3, 2.5.3, 2.6.3, 2.8, Figures 1, 8; Iter3-A7, [#165]). |
+| 2.35 | 2026-11-03 | The tutorial on each screen: tips around the live screen's own controls on first open, the slides removed, and a reset (2.1, 2.6.8; Iter3-P23, [#123]). |
+| 2.36 | 2026-11-04 | Fixes after Codex's review of PR #173: due tips wait under other screens, guide tips need a visible guide, and Subject view's tips wait for pose steps (2.6.8). |
+| 2.37 | 2026-11-04 | The guide library: *My library* on *Add a pose guide*, a library screen with filters, 100 saved guides, and its tutorial tips (AD-16, 1.4.2, 2.1, 2.3, 2.6.2, 2.6.8, 2.8, 2.9; Iter3-A8, [#170]). |
+| 2.38 | 2026-11-04 | A generated pose saved with ♥ on both phones' *Pick a pose*, and *Use this pose* goes on with the saved guide (1.4.2, 2.6.3, 2.9, Figure 6; Iter3-A9, [#171]). |
+| 2.39 | 2026-11-04 | Fix after Codex's review of PR #175: a save reports whether it deleted the oldest guide, decided under the store's lock (2.1, 2.3, 2.6.2, 2.6.3, 2.8). |
+| 2.40 | 2026-11-04 | A screenshot cut to its photo: finding the photo, tuned on 20 screenshots, and the cut on *Reference confirm* (2.1, 2.3, 2.6.1; Iter3-A10, [#174]). |
+| 2.41 | 2026-11-04 | Screenshots from other apps: scrollbars, one-color margins, the photo's size and shape, and shared post cards, checked on 48 screenshots (2.6.1; Iter3-A11, [#177]). |
+| 2.42 | 2026-11-05 | Changes on screen: the held frame moves and fades on a ratio change, shutter effects, `photo.shutter`, and a ratio row under the top bar (2.2, 2.5.1, 2.6.2, 2.6.4, 2.6.7; Iter3-A12, [#179]). |
+| 2.43 | 2026-11-05 | Transitions between screens: a fade to and from Camera and Subject view, a shared-axis slide elsewhere, and fading tutorial tips (2.1, 2.6.8; Iter3-A14, [#181]). |
+| 2.44 | 2026-11-05 | The guide and pose flow: one *Generate poses* button, *Generating poses* on the subject's phone too, and fades for guides, outlines, and candidates (2.2, 2.5.1, 2.6.1–2.6.3, 2.6.5; Iter3-A13, [#180]). |
+| 2.45 | 2026-11-05 | Who takes the photo, before connecting: *Shoot together* asks first, received invitations are listed, and sign-in returns to the screen that opened it (2.1, 2.5.3, 2.6.6, 2.6.8, 2.8, Figure 8b; Iter3-A17, [#188]). |
+| 2.46 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar, the horizon bar, thinner lines, and *Save guide* as a toggle (2.5.1, 2.6.1–2.6.3, 2.6.5, 2.6.8, 2.8; Iter3-A15, [#182]). |
+| 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code. QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*). Figure 1 redrawn; pushes only to signed-in phones. Section 1.4 removed: the task status is in 2.9, the later scope in R&S 4.1, and the QR plan in *Still open*. The AWS server stays on beside the course servers, for other networks (all sections). |
 
-Audience: the development team. This page describes the design of Iterations 1 and 2 in detail; each later iteration adds the design for the features it builds (1.4). **TBD** and **TODO** mark open decisions: *Still open* below lists them with an owner, and each owner updates this page in the PR that settles one. Requirement IDs (FR-, NFR-) refer to the Requirements and Specifications page (v1.9). Testing plans will be in the Testing Documentation.
+</details>
+
+Audience: the development team. This page describes Pix's design as built through Iteration 3, and the plan for later iterations (2.9; R&S 4.1). The PR that builds a feature updates its design here. **TBD** and **TODO** mark open decisions. *Still open* below lists each with an owner, who updates this page in the PR that settles it. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications). Testing is described in the [Testing Documentation](Testing-Documentation).
 
 **Still open**
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
-| Zoom stutter: what is left | Built in Iter2-P5 (2.6.5) and measured on the S23 Ultra on 2026-10-22: no stutter before or after, 30 fps (the most it offers apps), and no lens switch, because it zooms to 0.6× natively. Open on the S21, the only test phone with a separate ultrawide, where the lens switch and the held frame can be seen: its before and after numbers (Testing Documentation IT-10, NFR-19), and `PreviewView` in `PERFORMANCE` mode (`SurfaceView`) only if its preview still stutters. The shutter freeze stays Could. Was: lens rebinding, the rate of `setZoomRatio` calls, or the stream during zoom, measured first on the Galaxy S21 | 조성민 (Iter2-P5) | 10/24, with IT-10 |
-| Invite link format | A verified Android App Link needs HTTPS, which the course servers do not have (AD-11). Proposal: `http://<host>/i/<invitationId>` opens a small page from nginx that hands over to Pix through a custom scheme (`pix://i/<invitationId>`) and otherwise says to install Pix (2.6.6). Not decided in Iteration 2: invitations (Iter2-P15) were not built and move to Iteration 3 (2026-10-23) | 박재완 with 조성민 (Iter2-P15, Iteration 3) | With the Iteration 3 plan |
-| Wrong-code message on *Join* | The server answers `room.join` with `RATE_LIMITED` after 100 wrong codes from one address in 10 minutes (2.5.2); the app shows "Couldn't connect…" for any code it does not know. The count is per network address, so phones on one Wi-Fi or behind one carrier address share it. Proposal: "Too many wrong codes from this network. Try again in a few minutes." on *Join with code* Not decided in Iteration 2: the message is in the room-code flow, which stays as built, and the sessions-across-networks work (Iter2-P16) moves to Iteration 3 (2026-10-23) | 조성민 (Iter2-P16, Iteration 3) | With the Iteration 3 plan |
-| Reference thumbnail on Subject view | Whether the subject's phone also shows the guide's reference photo in a corner, the same as the photographer's thumbnail (FR-3.9), so the subject sees the pose to copy. It needs the photo on the subject's phone, which AD-6 and AD-15 now rule out (only the smoothed mask travels, 2.5.1), so it starts with that decision. Proposal: send a copy with its long side at most 512 px once per guide, used only for the thumbnail. Iteration 2 or later, not decided | 박동제 with 조성민 (guide sync) | With the Iteration 3 plan |
+| Four prompt templates (FR-4.8) | With a description, four templates around one `{pose}` replace the three variations. The default template reads `{pose}` as the user's request, keeps the face and the clothes, and makes one pose per photo (2.6.3). Open: the templates, and requests such as "two photos saluting and two with hands up" (Iter3-P25, [#125]). | 박재완 | Iteration 4 |
+| Offline QR connection (F9) | The photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]). | 조성민 | Iteration 4 |
+
 **Contents**
 
 - [1. System Design](#1-system-design)
   - [1.1 System Architecture](#11-system-architecture)
   - [1.2 External libraries and services](#12-external-libraries-and-services)
   - [1.3 Architectural decisions](#13-architectural-decisions)
-  - [1.4 Later iterations](#14-later-iterations)
 - [2. Design Details](#2-design-details)
   - [2.1 Android app structure](#21-android-app-structure)
   - [2.2 Class diagrams](#22-class-diagrams)
@@ -65,48 +114,48 @@ Audience: the development team. This page describes the design of Iterations 1 a
 
 #### 1.1.1 High-level architecture
 
-Pix is one Android app that runs in two roles, **photographer** and **subject**, plus a small **Pix server**. The system separates a **control plane** from a **media plane**:
+Pix is one Android app in two roles, **photographer** and **subject**, plus a small **Pix server**. A control plane and a media plane are kept apart:
 
-- **Control plane (client-server).** The server connects the two phones (signaling), keeps accounts, friends, and invitations, sends push notifications, and forwards pose-generation requests to the external API. It runs on the course-provided servers behind nginx, which every network can reach over HTTP and WS on port 80 (AD-11).
-- **Media plane (peer-to-peer).** The live video and all control messages go directly between the two phones over WebRTC. When no direct path exists, for example on cellular data, the packets go through a managed TURN relay, still encrypted end to end (AD-14).
+- **Control plane (client-server).** The server connects the phones (signaling), keeps accounts, friends, and invitations, and sends push notifications. It forwards pose requests to external models once a decision model has checked the text and the scene photo (2.6.3). It runs behind nginx on the course servers, over HTTP and WS on port 80, and on an AWS server (AD-11, 2.8).
+- **Media plane (peer-to-peer).** The live video and all messages between the phones go directly over WebRTC. Without a direct path, as often on cellular data, a managed TURN relay forwards the still-encrypted packets (AD-14).
 
 ![Architecture](images/design_target_architecture.png)
 
-*Figure 1. High-level architecture. The two phones talk to each other over WebRTC and to the Pix server over HTTP and WS on port 80; the server keeps accounts and friends in a database and sessions in a session store, asks the image and vision models through OpenRouter, and keeps saved guides on the phone. The dashed parts, push notifications and the relay, were not built in Iteration 2 (Iter2-P15, Iter2-P16, moved to Iteration 3 on 2026-10-23); the relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18). Updated 2026-10-23 to the parts built so far.*
+*Figure 1. High-level architecture. The phones talk to each other over WebRTC and to the Pix server over HTTP and WS on port 80. Through OpenRouter, a decision model checks each text and scene photo before the vision and image models see it. Saved guides stay on the phone. Push notifications and the relay, drawn dashed, are built (Iter3-P13, Iter3-P15). The relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18).*
 
 #### 1.1.2 Components and interfaces
 
-| Component | Runs on | Responsibility | Interfaces |
-|----|----|----|----|
-| **Pix app, photographer role** | Android | Owns the camera: zoom, focus, exposure, flash, and aspect ratio. Builds, smooths, and edits the guide, saves guides in the app's private storage and loads them again, captures photos, requests pose generation, streams video, and applies remote commands. Signs in with a Pix ID and a password or with Google, keeps friends, and sends invitations. | CameraX; ML Kit; WebRTC (sends video); data channels; REST; signaling; app private files and DataStore; Credential Manager; FCM token |
-| **Pix app, subject role** | Android | Shows the live video with a locally drawn copy of the guide, and sends zoom, brightness, flash, and guide-move requests. Receives invitations as push notifications or links. | WebRTC (receives video); data channels; signaling; FCM |
-| **Signaling hub** | Pix server | Creates room-code sessions and relays SDP offers, answers, and ICE candidates. It never sees media. A socket opened with an access token marks its user online (presence, FR-5.9), and wrong room codes are counted per network address. | WebSocket, JSON (2.5.2); session store |
-| **Pose proxy** | Pix server | Holds the API key, validates the scene photo, asks a vision model for four poses when the user wrote none, or for three variations of a description (It 2), calls the image-editing API with one prompt around the pose, enforces the 60 s upstream timeout and rate limits, and cancels the upstream call when the phone drops the request. | REST `POST /api/v1/pose-suggestions`, `POST /api/v1/poses`, and, for apps before Iteration 2, `GET /api/v1/pose-templates` (2.5.3) |
-| **Account and friends API** (It 2) | Pix server | Signs users up and in with a Pix ID and a password or with Google, and issues session tokens; Pix IDs; exact-match lookup; friend requests, friendships, online presence; device tokens for push. | REST `/auth`, `/me`, `/users`, `/friend-requests`, `/friends`, `/devices` (2.5.3); database (2.7); session store (presence) |
-| **Invitation service** (It 2) | Pix server | Creates, accepts, declines, cancels, and expires invitations (30 s); sends the push through FCM; mints the invite link; hands an accepted invitation a `sessionId` in the signaling hub (AD-8). | REST `/invitations` (2.5.3); FCM; signaling hub |
-| **TURN relay** (It 2) | External (Cloudflare) | Forwards encrypted media when the phones cannot connect directly. Credentials are short-lived; the Pix server requests them from Cloudflare for each session. | Cloudflare Realtime TURN; its `iceServers` passed on in signaling (2.5.2) |
-| **Database** (It 2) | Server host | PostgreSQL: users, sign-in sessions, spent refresh tokens, devices, friend requests, friendships, and, with Iter2-P15, invitations (2.7). | SQL through the server only |
-| **Session store** (It 2) | Server host | Sessions, room codes, presence, the rate-limit windows of poses and pose suggestions, and the wrong room codes per address, shared by every server process, and the channel that carries signals between them (AD-18, 2.7). | Redis, through the server only |
-| **Firebase Cloud Messaging** | External | Delivers invitation and friend-request notifications to a phone even when Pix is closed. | FCM HTTP v1 API from the server; Firebase SDK in the app |
-| **Google sign-in** | External | Identifies a user who signs in with Google; the server verifies the ID token and never stores it. | Credential Manager in the app; token verification on the server |
-| **Pose-suggestion model** (It 2) | External | Suggests four poses for the scene, or three variations of the user's description (2.6.3). | OpenRouter's chat completions API (`POST https://openrouter.ai/api/v1/chat/completions`); the model is a server setting, `google/gemini-3.1-flash-lite` by default (2.6.3) |
-| **Image-editing API** | External | Generates the same person in the same scene with a different pose. | OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`); the model is a server setting, `openai/gpt-image-2.5-flare@low` by default (2.6.3) |
+| Component | Responsibility | Interfaces |
+|----|----|----|
+| **Pix app, photographer role** (Android) | Owns the camera. Makes and saves guides, takes photos, requests poses, and streams video. Applies the subject's requests. Signs in, keeps friends, and invites them. | CameraX; ML Kit; WebRTC; REST; signaling; MediaStore; app files; DataStore; Credential Manager; FCM |
+| **Pix app, subject role** (Android) | Shows the live video under its own copy of the guide. Requests camera changes, guide moves, guides, and pose steps (AD-7). Saves the session's photos and guides. Gets invitations by push, link, or *See their camera*. | WebRTC; REST; signaling; ML Kit; MediaStore; app files; FCM |
+| **Signaling hub** (Pix server) | Creates room-code sessions; relays SDP and ICE, never media; gives each phone its `iceServers` and a rejoin token. A socket with an access token marks its user online (FR-5.9). Counts wrong room codes per address. | WebSocket, JSON (2.5.2); session store |
+| **Pose proxy** (Pix server) | Holds the API key and validates the scene photo. Refuses harmful or manipulative text and scenes without a person. Gets four poses or three variations, a candidate per pose, and a tip for the chosen one. Applies timeouts (60 s per image) and rate limits, and cancels the upstream call when the phone drops. | REST `POST /api/v1/pose-suggestions`, `/poses`, `/pose-tips`; `GET /api/v1/pose-templates` for apps before Iteration 2 (2.5.3) |
+| **Account and friends API** (Pix server) | Sign-up and sign-in with a Pix ID and a password or with Google; tokens; exact-match lookup; friend requests, friendships, presence; push device tokens. | REST `/auth`, `/me`, `/users`, `/friend-requests`, `/friends`, `/devices` (2.5.3) |
+| **Invitation service** (Pix server) | Creates, lists, answers, cancels, and expires invitations (60 s); sends the push; mints the invite link; opens the session in the signaling hub (AD-8). | REST `/invitations`; page `/i/{id}` (2.6.6); FCM |
+| **TURN relay** (Cloudflare) | Forwards encrypted media when no direct path exists, with short-lived credentials that the Pix server gets for each phone. | Cloudflare Realtime TURN; `iceServers` (2.5.2) |
+| **Database** (server host) | PostgreSQL: users, sign-in sessions, spent refresh tokens, devices, friend requests, friendships, invitations (2.7). | SQL, through the server only |
+| **Session store** (server host) | Redis: sessions, room codes, presence, rate-limit windows, wrong-code counts; pub/sub between server processes (AD-18, 2.7). | Redis, through the server only |
+| **Firebase Cloud Messaging** (external) | Invitation and friend-request notifications, even with Pix closed. | FCM HTTP v1 API; Firebase SDK |
+| **Google sign-in** (external) | Identifies a Google user; the server verifies the ID token and never stores it. | Credential Manager; token check on the server |
+| **OpenRouter models** (external) | A vision model suggests four poses or three variations of a description, and writes the tip. A decision model runs the description filter on every description and pose, and the person check on every `POST /poses` scene. An image-editing model makes the same person in the same scene in another pose (2.6.3). | Chat completions, `POST https://openrouter.ai/api/v1/chat/completions` (`PIX_SUGGESTION_MODEL`, `PIX_TIP_MODEL`; default `google/gemini-3.1-flash-lite`); Decisions API, `POST https://openrouter.ai/api/alpha/decisions` (`PIX_FILTER_MODEL`, `PIX_PERSON_MODEL`; default `typesafe/jev-1.14`); Image API, `POST https://openrouter.ai/api/v1/images` (`PIX_POSE_MODEL`; default `openai/gpt-image-2.5-flare@low`) |
 
 #### 1.1.3 Key data flows
 
 | Flow | Path | Transport | Latency budget |
 |----|----|----|----|
-| **Reference photo → guide** | Photo picker → downscale → ML Kit segmentation → mask smoothing → person box and outline → guide store | On device only | ≤ 2 s (NFR-3) |
-| **Pose generation** | Scene photo the user takes and confirms → JPEG (resized on the phone, EXIF removed) → Generate poses → `POST /pose-suggestions` (four suggested poses, or three variations of a description, whose own request goes out at once) → 4 parallel `POST /poses` → pose proxy → image API → candidates → reference flow | HTTP to the Pix server, HTTPS from it to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
-| **Session setup** | Room code → signaling → SDP and ICE exchange → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
-| **Live view** | CameraX frames → NV21 (`NV21Buffer`) → WebRTC encoder → peer → subject renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi (NFR-5) |
-| **Guide sync** | Guide store (photographer) → `guide.image.*` chunks (once per guide) and `guide.state` → subject's guide store → overlay | Data channel | ≤ 0.3 s (NFR-7) |
-| **Remote zoom** | Subject → `camera.zoom.set` → clamp → CameraX → echo of the applied zoom | Data channel | ≤ 0.5 s (NFR-7) |
-| **Remote brightness, flash, guide move** (It 2) | Subject → `camera.exposure.set` / `camera.flash.set` / `guide.move` → apply → echo in `camera.state` / `guide.state` | Data channel | ≤ 0.5 s (NFR-7) |
-| **Sign-in** (It 2) | Pix ID and password → `POST /auth/login` (or `/auth/signup`), or Credential Manager → Google ID token → `POST /auth/google` → access and refresh tokens kept in DataStore; a signed-in phone in front holds a signaling socket for presence | HTTP, WebSocket | — |
-| **Invitation** (It 2) | *Invite* → `POST /invitations` → database → FCM push (or a shared link) → `POST /invitations/{id}/accept` → `sessionId` to both phones → session setup as with a room code | HTTP, FCM, then WebSocket and WebRTC | Push ≤ 5 s, live view ≤ 10 s after Accept (NFR-9) |
-| **Reconnection** (It 2) | ICE disconnected → ICE restart through signaling → connected, or *Connection lost* after 10 s | WebSocket, WebRTC | ≤ 10 s (NFR-11) |
-| **Saved guide** (It 2) | Guide store → app private storage → guide store | On device only | — |
+| **Reference photo → guide** | Photo → downscale → screenshot cut (FR-2.10) → ML Kit segmentation → mask smoothing → person box and outline → guide store | On device | ≤ 2 s (NFR-3) |
+| **Pose generation** | Scene photo → person check on the phone → *Use this photo* → resized JPEG, no EXIF → `POST /pose-suggestions` (filter) → four parallel `POST /poses` (filter, person check) → image model → candidates → reference flow → `POST /pose-tips`. A description's own `POST /poses` starts at once. | HTTP to the server, HTTPS to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
+| **Session setup** | Room code or invitation → signaling → SDP and ICE → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
+| **Live view** | CameraX frames → NV21 (`NV21Buffer`), cropped to the frame → H.264 or VP8 → subject's renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi, ≤ 0.8 s on cellular or relay (NFR-5) |
+| **Guide sync** | Guide store → `guide.image.*` (the mask, once per guide), `guide.reference.*` (thumbnail photo), `guide.state` → the other phone's mirror → overlay. The photographer adopts a guide made on the subject's phone. | Data channel | ≤ 0.3 s (NFR-7) |
+| **Remote control** | Subject → `camera.zoom.set`, `camera.exposure.set`, `camera.flash.set`, or `guide.move` → clamp and apply → echo in `camera.state` or `guide.state` | Data channel | ≤ 0.5 s (NFR-7) |
+| **Shared pose steps** | `pose.description.*` from both phones → generation on the photographer's phone → `pose.planned`, `pose.candidate.*`, `pose.step` → first `pose.pick` decides → `guide.confirm.*` → first `guide.confirm.use` decides (2.6.5) | Data channel | — |
+| **Session photo** | Shutter → `photo.shutter` → saved in Pictures/Pix → `photo.begin`, `.chunk`, `.end`, paced by `photo.ack` → subject's Pictures/Pix → `photo.saved` | Data channel | — |
+| **Sign-in** | Pix ID and password → `POST /auth/login` or `/auth/signup`, or Google ID token → `POST /auth/google` → tokens in DataStore. A signed-in phone in front holds a signaling socket for presence. | HTTP, WebSocket | — |
+| **Invitation** | `POST /invitations` → session with the photographer's place → push, link, or *See their camera* → `POST /invitations/{id}/accept` → the friend's place → both phones `session.join` → session setup | HTTP, FCM, WebSocket, WebRTC | Push ≤ 5 s; live view ≤ 10 s after *Accept* (NFR-9) |
+| **Reconnection** | ICE disconnected → `Reconnecting` on both phones → each `session.join` over a new socket → the photographer's ICE restart on the same connection → connected, or *Connection lost* after 10 s | WebSocket, WebRTC | ≤ 10 s (NFR-11) |
+| **Saved guide** | Guide store ↔ app private storage; the library reads thumbnails on demand (2.8) | On device | — |
 
 #### 1.1.4 Main sequences
 
@@ -119,10 +168,10 @@ sequenceDiagram
   participant SV as Signaling hub
   participant S as Subject app
   P->>SV: room.create
-  SV-->>P: room.created (code, sessionId, iceServers)
+  SV-->>P: room.created (code, sessionId, iceServers, rejoinToken)
   Note over P: shows the 6-digit code
   S->>SV: room.join (code)
-  SV-->>S: session.joined (sessionId, role SUBJECT)
+  SV-->>S: session.joined (sessionId, role SUBJECT, iceServers, rejoinToken)
   SV-->>P: peer.joined
   P->>SV: signal (offer SDP)
   SV->>S: signal (offer SDP)
@@ -130,7 +179,7 @@ sequenceDiagram
   SV->>P: signal (answer SDP)
   Note over P,S: ICE candidates are relayed the same way
   P-)S: data channels open, then hello and camera.capabilities
-  P-)S: guide.image chunks and guide.state
+  P-)S: guide.image chunks, guide.state, guide.reference chunks
   P-)S: video track
 ```
 
@@ -143,7 +192,7 @@ sequenceDiagram
   participant S as Subject app
   participant P as Photographer app
   participant C as CameraX
-  Note over S: pinches the live video (It 1: drags the slider), the readout follows at once
+  Note over S: pinches the live video, the readout follows at once
   S->>P: camera.zoom.set (ratio 1.6), a step at most every 50 ms
   Note over P: clamps to [minZoom, maxZoom]
   P->>C: setZoomRatio(1.6)
@@ -152,13 +201,13 @@ sequenceDiagram
   S->>P: camera.zoom.set (ratio 2.0, final)
   P->>C: setZoomRatio(2.0)
   P-->>S: camera.state (zoom 2.0, by SUBJECT, final)
-  Note over P: shows "Junhyeong set zoom to 2×"
+  Note over P: shows "Joonhyung set zoom to 2×"
   Note over S: snaps to the applied zoom
 ```
 
-*Figure 3. The photographer's phone applies each request and echoes the value it applied, so both phones end on the same zoom. Only the photographer takes photos.*
+*Figure 3. The photographer's phone applies each request and echoes the applied value, so both phones end on the same zoom. Only the photographer takes photos.*
 
-**Invitation (Iteration 2)**
+**Invitation (Iteration 3)**
 
 ```mermaid
 sequenceDiagram
@@ -168,122 +217,101 @@ sequenceDiagram
   participant F as FCM
   participant S as Subject app
   P->>SV: POST /invitations (friendId)
-  SV-->>P: 201 (invitationId, link, expiresAt)
-  SV->>F: push (invitationId, from)
+  Note over SV: opens the session with the photographer's place
+  SV-->>P: 201 (id, link, expiresAt, sessionId, rejoinToken, iceServers)
+  SV->>F: push (invitationId, fromName, expiresAt)
+  P->>SV: session.join (sessionId, rejoin false, rejoinToken)
   F-->>S: notification, even with Pix closed
   alt the push did not arrive
     Note over P: Share invite link (share sheet) or Copy link
     Note over S: opens the link, same Invitation screen
   end
   S->>SV: POST /invitations/{id}/accept
-  SV-->>S: 200 (sessionId, iceServers)
-  SV-->>P: invitation.accepted (sessionId, iceServers) over the WebSocket
-  Note over P,S: both join the session with session.join, then Figure 2 from step 7
+  SV-->>S: 200 (sessionId, rejoinToken, iceServers)
+  S->>SV: session.join (sessionId, rejoin false, rejoinToken)
+  SV-->>P: peer.joined
+  Note over P,S: then Figure 2 from the photographer's offer
 ```
 
-*Figure 3b. An accepted invitation yields a `sessionId`, so the session code is shared with room codes (AD-8). The server expires an invitation 30 s after it is created.*
+*Figure 3b. Sending an invitation opens its session, and each phone takes its place with the token it got over REST (AD-8). A friend who comes first is announced when the photographer comes. A decline (`DECLINED`) or no answer in 60 s (`EXPIRED`) ends the session with an error to the photographer.*
 
-**Reconnection (Iteration 2)**
+**Reconnection (Iteration 3)**
 
 ```mermaid
 sequenceDiagram
   participant S as Subject app
   participant SV as Pix server
   participant P as Photographer app
-  Note over S: network changes, ICE state DISCONNECTED
+  Note over S,P: the subject's network drops, ICE state DISCONNECTED on both phones
   S->>S: SessionState Reconnecting (10 s budget)
-  S->>SV: session.join (sessionId, rejoin)
+  P->>P: SessionState Reconnecting (10 s budget), takes its place again over a new socket
+  S->>SV: session.join (sessionId, rejoin, rejoinToken) over a new socket
+  SV-->>S: session.joined
   SV-->>P: peer.rejoined
-  P->>SV: signal (offer with ICE restart)
+  P->>SV: signal (offer with new ICE credentials)
   SV->>S: signal (offer)
   S->>SV: signal (answer)
   SV->>P: signal (answer)
-  Note over P,S: ICE connected again, channels reopen, hello repeated
+  Note over P,S: ICE connected again on the same connection, whose channels stayed open
   Note over S: or, after 10 s, Connection lost
 ```
 
-*Figure 3c. A short drop recovers without a new invitation (FR-6.12, NFR-11). The photographer always creates the offer, so it also starts the ICE restart.*
+*Figure 3c. A short drop recovers without a new invitation (FR-6.12, NFR-11). The photographer creates every offer, so it also starts the ICE restart.*
 
 #### 1.1.5 Architectural patterns
 
-- **System level: client-server plus peer-to-peer.** The server handles discovery and AI calls. Real-time media never passes through our application code on the server.
-- **App level: MVVM with unidirectional data flow.** Fragments with XML layouts (ViewBinding) render immutable UI state from a ViewModel (`StateFlow`) and send user events back to it. ViewModels call repositories and managers, which wrap CameraX, ML Kit, WebRTC, and the network. This keeps camera and network code out of the UI, so each part can be tested and replaced on its own.
-- **Single source of truth per session.** The photographer's phone owns the camera state and the guide state. The subject's phone keeps a mirror that is updated only by messages. Subject actions are *requests* that the photographer applies and then confirms.
+- **System: client-server plus peer-to-peer.** The server handles discovery and AI calls. Real-time media never passes through our server code.
+- **App: MVVM with unidirectional data flow.** Fragments with XML layouts (ViewBinding) render immutable state from a ViewModel's `StateFlow` and send user events back. ViewModels call repositories and managers that wrap CameraX, ML Kit, WebRTC, and the network, so each part is tested and replaced alone.
+- **Single source of truth per session.** The photographer's phone owns the camera and guide state. The subject's phone keeps a mirror that only messages update, and its actions are requests (AD-7).
 
 ### 1.2 External libraries and services
 
-| Library / service | Used for | Where |
+App versions are from `android/gradle/libs.versions.toml`; server versions are the minimums in `server/pyproject.toml`. The external services are in 1.1.2.
+
+| Library | Used for | Where |
 |----|----|----|
-| Kotlin, Coroutines, Flow | Language; background work; streams of state and messages | App |
-| AppCompat, Material Components, Fragment, Activity KTX, ConstraintLayout, Navigation component, ViewBinding, Lifecycle ViewModel, Lifecycle Process | XML screens, the navigation graph, state that survives rotation; whether Pix is in front, for presence (`ProcessLifecycleOwner`) | App |
-| CameraX 1.6 (`core`, `camera2`, `lifecycle`, `view` for PreviewView) | Preview, ImageCapture, ImageAnalysis (frames for streaming), zoom | App |
-| ML Kit Subject Segmentation (Google Play services) | On-device confidence mask of the person, smoothed into the guide mask and outline | App |
-| WebRTC for Android (`io.github.webrtc-sdk:android` 137.7151.01, a maintained prebuilt) | Peer connection, H.264/VP8 video, two data channels, ICE | App |
-| OkHttp (+ Retrofit for REST) | WebSocket signaling and HTTP requests | App |
-| kotlinx.serialization (JSON) | Data channel, signaling, and REST payloads | App |
-| Jetpack DataStore | Small preferences: consent given; from Iteration 2 the access and refresh tokens, the user's Pix ID, the FCM token, and the last aspect ratio | App |
-| Credential Manager with Google Identity (It 2) | Google sign-in on the phone; the ID token goes to the server once, and a second time only to add Google to an existing account after `NOT_REGISTERED` (FR-5.13) | App |
-| Firebase Messaging SDK (It 2) | Receives invitation and friend-request pushes, including when Pix is closed; gives the device token | App |
-| `google-auth` (Python) (It 2) | Verifies Google ID tokens on the server, against Google's published keys | Server |
-| `argon2-cffi` (It 2) | Hashes passwords with argon2id (2.8, Accounts) | Server |
-| `PyJWT` (It 2) | Signs and checks the access tokens (JWT, HS256; 2.5.3, 2.8) | Server |
-| SQLAlchemy 2 (asyncio), Alembic, asyncpg, and aiosqlite (It 2) | Schema, migrations, and queries for users, sessions, devices, friends, and invitations, on PostgreSQL through asyncpg or on a SQLite file through aiosqlite (2.7) | Server |
-| `firebase-admin` or FCM HTTP v1 through `httpx2` (It 2) | Sends push notifications | Server |
-| Docker, Docker Compose, nginx, PostgreSQL 18 (It 2) | Running the server, the session store, and the database on the course servers; nginx is the reverse proxy on port 80 and switches between the two copies of the app during a deploy (2.8) | Host |
-| Redis, with `redis-py` on the server (It 2) | Session store: sessions, room codes, presence, and rate-limit windows shared by every server process, and pub/sub for signals between them (AD-18, 2.7) | Host, Server |
-| fakeredis, with `lupa` for its Lua (It 2) | An in-process Redis that runs the store's scripts: the server's tests, and a laptop that runs the server without Redis. A development dependency only (2.7) | Server |
-| Cloudflare Realtime TURN (It 2) | Managed TURN relay; the server requests short-lived credentials for each session through its API (AD-14) | External |
-| FastAPI, Uvicorn with `websockets`, pydantic-settings, python-multipart, httpx2, Pillow (Python) | The server app, which serves WebSocket signaling and the REST API from the same process, in one or more workers (AD-18); settings from environment variables; multipart uploads; calls to OpenRouter (the image and suggestion models) and to Google's published keys; checking the scene photo and converting candidates to JPEG | Server |
-| OpenRouter Image API | Pose candidate generation with an image-editing model chosen by a server setting (2.6.3) | Server |
-| OpenRouter chat completions (It 2) | Suggested poses and variations of a description, from a vision model chosen by a server setting (2.6.3) | Server |
+| Kotlin 2.2, Coroutines 1.10, Flow, kotlinx.serialization 1.9 | Language; background work and streams; JSON for messages and REST | App |
+| AppCompat 1.7, Material Components 1.12, Fragment 1.8, Activity KTX 1.10, ConstraintLayout 2.2, Navigation 2.9, Lifecycle 2.9, ViewBinding | XML screens, navigation, ViewModels; `ProcessLifecycleOwner` for presence and the 60 s background limit | App |
+| CameraX 1.6.2 (`core`, `camera2`, `lifecycle`, `view`) | Preview, capture, frames for streaming, zoom, focus, exposure, flash, torch | App |
+| ML Kit Subject Segmentation 16.0.0-beta1 (Google Play services) | The person's confidence mask for the guide (2.6.1) | App |
+| ML Kit Pose Detection 18.0.0-beta5 and Face Detection 16.1.7, bundled | The person check on the phone, before anything is sent (2.6.3) | App |
+| WebRTC for Android 137.7151.01 (`io.github.webrtc-sdk:android`, a maintained prebuilt) | Peer connection, H.264 or VP8 video, two data channels, ICE | App |
+| OkHttp 4.12, Retrofit 2.11 | WebSocket signaling; REST | App |
+| Jetpack DataStore 1.1 | The sign-in, the aspect ratio, the AI agreement, the descriptions used before (FR-4.11), and most settings (2.6.8) | App |
+| Credential Manager 1.5, Google ID 1.1 | Google sign-in. The ID token goes to the server once, and again only after `NOT_REGISTERED` (FR-5.13). | App |
+| Firebase Messaging (Firebase BoM 34.0) | Pushes, also with Pix closed; the device token | App |
+| Manrope, Pretendard, DM Mono (bundled fonts) | UI text, Korean text, the room code (2.8) | App |
+| FastAPI 0.142, Uvicorn 0.54 with `websockets`, pydantic-settings, python-multipart, Pillow 12 (Python 3.11) | Signaling and REST in one process, in one or more workers (AD-18); settings; uploads; checking scene photos and converting candidates to JPEG | Server |
+| `httpx2` 2.13 | Calls to OpenRouter, Cloudflare, FCM, and Google's published keys | Server |
+| `google-auth` 2.62 | Checks Google ID tokens; signs the FCM service-account request, so `firebase-admin` is not needed | Server |
+| `argon2-cffi` 25.1, `PyJWT` 2.15 | argon2id password hashes; access tokens (JWT, HS256) (2.5.3, 2.8) | Server |
+| SQLAlchemy 2.1 (asyncio), Alembic 1.20, asyncpg, aiosqlite | Schema, migrations, and queries on PostgreSQL or a SQLite file (2.7) | Server |
+| Redis 8, `redis-py` 8.1 | The session store and pub/sub between server processes (AD-18, 2.7) | Host, Server |
+| fakeredis 2.39 with `lupa` | An in-process Redis that runs the store's Lua, for tests and a laptop; development only (2.7) | Server |
+| Docker Compose, nginx 1.30, PostgreSQL 18 | Hosting on the course servers; nginx on port 80 switches between the two app copies during a deploy (2.8) | Host |
 
 ### 1.3 Architectural decisions
 
 | ID | Decision | Why | Rejected alternative |
 |----|----|----|----|
-| AD-1 | **Generate poses with an external image-editing API, called through our server** | On-device generative models have no supported Android path and are too heavy for the semester. Calling through the server keeps the API key out of the app and lets us switch vendors or rate-limit in one place. Cost: network dependency and per-request fees, so generation runs only on request. | On-device model (DreamLite); calling the API directly from the app |
-| AD-2 | **Segment the reference on the device (ML Kit)** | Fast (≤ 2 s), free, works offline, and the reference photo never leaves the phone (FR-2.6). It runs once per reference. | Segmentation on the server or inside the image API |
-| AD-3 | **Peer-to-peer media with WebRTC; the server only does signaling** | Lowest latency for the live view, no media-server cost, end-to-end encryption. WebRTC also provides congestion control and adaptive quality (NFR-6). | Media server (SFU); sending JPEG frames over WebSocket |
-| AD-4 | **CameraX is the only camera owner and feeds frames to WebRTC** | Only one client can open the camera. CameraX gives us capture, zoom, focus, and exposure for remote control, and one viewport for preview, capture, and streaming, so all three show the same framing. | WebRTC's built-in camera capturer |
-| AD-5 | **Two data channels: *realtime* (unordered, no retransmission) and *reliable* (ordered)** | Continuous values (guide position, zoom) need only the latest value, and retransmitting stale ones adds lag. Images, commands, and results must arrive exactly once. Both reuse the existing peer connection, so there is no server round trip. | One reliable channel; relaying messages through the server |
-| AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp on the subject's phone. It never enters the video or the saved photo. Updates are a few bytes. From Iteration 2 the photographer sends the smoothed mask, not the cutout, so both phones draw the same outline and no reference pixels travel (2026-10-12). Until that transfer is built (2.9, Guide sync), the cutout travels as WebP, its alpha the smoothed mask. | Burning the overlay into the video stream; mirroring the photographer's screen |
-| AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | Avoids conflicting edits: subject actions are requests; the photographer applies them in arrival order and echoes the applied value, so the later change wins and both phones agree (FR-7.6). From Iteration 2 the subject's requests cover brightness, flash, and guide moves as well as zoom, with the same pattern. | Shared editing on both phones |
-| AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Iteration 1 tested the riskiest part (streaming and sync) without accounts. In Iteration 2 only the entry point is added: an accepted invitation yields a `sessionId`, just like a room code does, and the signaling, peer connection, and reconnection code is shared. | Building accounts and invitations first |
-| AD-9 | **One app for both roles** | Friends swap roles between shots. One codebase and one install, with the role chosen per session. | A separate viewer app for the subject |
-| AD-10 | **One frame in the chosen aspect ratio (4:3, 16:9, or 1:1), shown whole (fit) on both phones** | Revised 2026-10-09; Iteration 1 used a fixed 3:4. The user picks the ratio; 16:9 fits Instagram stories without cropping. Preview, capture, and stream share one CameraX `ViewPort`, so what you see is what is captured, and showing the whole frame on both phones keeps guide coordinates identical. The other ratios are cut from the middle of the sensor's 4:3: 16:9 keeps the full height and drops the sides, and 1:1 keeps the full width and drops the top and bottom (2.6.2). | Fixed 3:4; full-screen 9:16 with cropping |
-| AD-11 | **The server runs on the course-provided servers with Docker and nginx, over HTTP and WS** | Revised 2026-10-13. Sessions across networks need a server both phones can reach. The course servers are reachable only through the course's HTTP proxy on port 80: no other port is open and there is no TLS, so the server speaks HTTP and WS and NFR-14 is revised with it. Server A runs `main` as production and Server B runs `dev` as staging; the two cannot reach each other, so each has its own database and session store. Containers keep the setup portable to another host. GitHub hosting serves only static pages. | AWS (cost, and the course servers are enough once the relay is a managed service); a TLS front such as a Cloudflare Tunnel (needs a domain and the course's approval; to revisit if `ws://` proves unreliable on cellular networks); GitHub-hosted server; a laptop with port forwarding |
-| AD-12 | **Sign-in with Google; the server issues its own session token.** Revised 2026-10-15: **also a Pix ID and a password** | One tap on every Android phone, no password to store, and the team already decided on it (2026-10-09). The server verifies the ID token once and keeps only the Google subject ID; the app keeps a Pix session token, so a Google token is never stored, and is sent again only to add it to an existing account after `NOT_REGISTERED` (FR-5.13). *Revised 2026-10-15 (Iter2-P8):* the team also wants an ordinary sign-up, so a person can use Pix without a Google account. The Pix ID is the login name, with no email, and either kind of account can add the other way to sign in; a Google sign-in that no account uses offers to connect an existing account before it creates one. The password crosses plain HTTP to the course servers (AD-11, NFR-14) and is stored only as an argon2id hash; the Google ID token is still checked once and never stored. The Pix session token became a short access token (JWT) with a rotating refresh token (decided 2026-10-15, 2.8, Accounts). | Email and password (since 2026-10-15 a Pix ID and a password, without email); Kakao sign-in (not on every test phone) |
-| AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | A closed app cannot keep a WebSocket open, so a push is the only way to reach a friend who is not in Pix. Pushes are not guaranteed, so the photographer can share a link through any messenger instead; sending only through KakaoTalk would need it on every test phone. | WebSocket presence only; KakaoTalk-only invitations |
-| AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | Revised 2026-10-13. STUN alone often fails behind carrier NAT, so cellular sessions need a relay. The course servers cannot host one: a relay needs UDP or TCP 3478 and a UDP port range that the phones reach directly, and only HTTP on port 80 gets in. Cloudflare's relay needs no host of ours, its free monthly allowance is far above our use, and it also listens on TCP 80 and TLS 443 for networks that block UDP. The Pix server requests credentials per session with a key that stays on the server, so the relay cannot be used by others. Media stays SRTP-encrypted, so the relay cannot read it (NFR-14). | coturn on the server host (no open ports); coturn on AWS (cost and upkeep); a media server (SFU); no relay (Wi-Fi only) |
-| AD-15 | **The guide is an outline only and never shows the reference photo's pixels** | Framing the person matters more than the reference's background, and reference pixels over the live scene are confusing. The reference stays visible as a small thumbnail instead. Dropped with it: the guide that keeps the background. | Semi-transparent cutout (Iteration 1); a faint background guide |
-| AD-16 | **Saved guides live in the app's private storage** | Reuse without rebuilding, with nothing in the gallery and nothing on the server (FR-3.8, NFR-13). | Gallery album; server-side guides |
-| AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones; the zoom slider leaves the main layouts** | A pinch is the natural zoom gesture, and one toggle makes the rule simple: edit mode on, gestures edit the guide; off, a pinch zooms the camera. The same toggle on Subject view, because the subject both moves the guide (FR-7.2) and zooms. Decided 2026-10-12. There is no *detail settings* panel, and the zoom slider does not return (decided 2026-10-15). | Keeping the slider in the main layout; deciding by where the finger lands |
-| AD-18 | **Session state lives in a Redis session store, not in the server process** | Decided 2026-10-13; revises Iteration 1's in-memory registry and its one-worker rule. With shared state the server can run several workers when one process is no longer enough, and a new copy of the app can take over from the old one during a deploy without losing a waiting room (2.8). The state is small and short-lived (rooms, codes, presence, rate-limit windows), which fits Redis's atomic scripts and expiry, and pub/sub carries signals between workers (2.7). Cost: one more service to run, and room transitions become Redis scripts instead of plain Python. NFR-18 (50 sessions) fits in one worker, so this is for growth beyond the course, not for the demo load. | One process with in-memory state (Iteration 1); routing each room to one process by its code; session state in the relational database |
-
-### 1.4 Later iterations
-
-Iteration 2 adds accounts, invitations, sessions across networks, more camera and guide controls, and pose descriptions on the structure of Figure 1; its design is in section 2, and 1.4.1 keeps only the list of Could items. Later iterations are summarized below; their detailed design is added at the start of the iteration that builds them.
-
-#### 1.4.1 Iteration 2 · 10/11 – 10/25 (midterm presentation 10/21)
-
-The Iteration 2 design is in section 2: interfaces and models (2.1, 2.3), states (2.4), messages and APIs (2.5), algorithms (2.6), the database (2.7), and owners and build order (2.9). The architectural changes are AD-10 to AD-18. The Must items are the smooth outlines (FR-2.9, Iter2-P7) and the zoom without stutter (NFR-19, Iter2-P5). *Revised 2026-10-23:* invitations with push and the link fallback (Iter2-P15, 2.6.6) and sessions across networks with the relay and reconnection (Iter2-P16, 2.6.7) were not built in Iteration 2 and move to Iteration 3 with their design as written; the room-code session stays the only entry point until then.
-
-**Could items**, built only if time allows, in this order of preference: the remote-control switch (FR-7.5, Iter2-P17), remote focus (FR-7.7, Iter2-P17), the guide color switch (FR-3.10, Iter2-P11), and the shutter freeze fix (NFR-19, Iter2-P5). Each has a design note in its section, so a Could item that slips to Iteration 3 needs no design change. *Revised 2026-10-23:* none of the four was built in Iteration 2; all four move to Iteration 3 or later (1.4.2).
-
-
-#### 1.4.2 Iterations 3–4 · heuristic evaluation 11/2, user acceptance test 11/6
-
-| Feature | How the design changes |
-|----|----|
-| **Offline connection with a QR code** (F9) | The photographer's phone opens a local-only hotspot and runs the signaling itself, so neither the server nor a shared Wi-Fi is needed. The QR code carries the hotspot's connection details. The phone accepts only one connection per QR code, and the session starts only after both people tap *Resume*. This is another session entry point (AD-8). |
-| **Selfie mode and settings** | The front camera as another `CameraController` selection, mirrored preview, no ultrawide routing. A settings screen with the guide color, a frame-delay indicator for remote sessions (from the `ping` round trip, 2.5.1), and the language (Korean strings behind the same resource keys). |
-| **Invitations and sessions across networks** (Iter2-P15, Iter2-P16; moved from Iteration 2 on 2026-10-23) | Built as designed in 2.6.6 and 2.6.7: push notifications with the link fallback, the TURN relay, `SessionEntry.Invitation`, `session.join`, and reconnection with ICE restart. The two *Still open* rows of Iteration 2 (the invite link format, the wrong-code message) are decided with the Iteration 3 plan. |
-| **Sharing photos, and the Could items of Iteration 2** (FR-6.14; FR-7.5, FR-7.7, FR-3.10, and the shutter freeze, moved on 2026-10-23) | The photographer can send a photo to the subject over the reliable data channel in chunks, like the guide image. Remote focus, the remote-control switch, the guide color, and the shutter freeze follow the notes in 2.6.5 and 2.6.2. |
-| **Evaluation and UAT** | Fixes from the heuristic evaluation. The UAT user stories are fixed by the end of Iteration 3 and tested in Iteration 4. |
-
-#### 1.4.3 Iteration 5 · polish and final release
-
-Polish, stability, and performance work against the NFR targets based on UAT feedback, and the design patterns in section 3.
+| AD-1 | **Generate poses with an external image-editing API, called through our server** | No on-device model fits Android; the server hides the key and is one place to switch vendors or rate-limit. Paid calls run only on request. | On-device model (DreamLite); calling the API from the app |
+| AD-2 | **Segment the reference on the device (ML Kit)** | Fast (≤ 2 s), free, and offline, and the photo stays on the phone (FR-2.6). | Segmentation on the server or in the image API |
+| AD-3 | **Peer-to-peer media with WebRTC; the server only does signaling** | Lowest latency, no media-server cost, end-to-end encryption, and adaptive quality (NFR-6). | Media server (SFU); JPEG frames over WebSocket |
+| AD-4 | **CameraX is the only camera owner and feeds frames to WebRTC** | Only one client can open the camera, and one viewport keeps preview, capture, and stream on the same framing. | WebRTC's camera capturer |
+| AD-5 | **Two data channels: *realtime* (unordered, no retransmission) and *reliable* (ordered)** | Continuous values need only the newest value; images, commands, and results must arrive exactly once. | One reliable channel; relaying through the server |
+| AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp, out of the video and the photo, and free of reference pixels. A reference copy of at most 512 px goes once per guide, only for the subject's thumbnail. It is never drawn as the guide, saved, or sent through the server (FR-3.9, [#132]). | Burning the overlay into the video; mirroring the screen |
+| AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | The subject only requests, and the photographer applies requests in arrival order and echoes them, so the later change wins (FR-7.6). The first request decides a shared pose step (2.6.5). | Shared editing on both phones |
+| AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Streaming and sync work without accounts, and each entry point only yields a `sessionId`. | Building accounts and invitations first |
+| AD-9 | **One app for both roles** | Friends swap roles between shots: one codebase, one install, the role chosen per session. | A separate viewer app |
+| AD-10 | **One frame in the chosen aspect ratio (3:4, 9:16, or 1:1), shown whole (fit) on both phones** | One CameraX `ViewPort` makes what you see what is captured, with the same guide coordinates on both phones; 9:16 fits Instagram stories. The crops: 2.6.2. | Fixed 3:4; full-screen 9:16 with cropping |
+| AD-11 | **The server runs on the course-provided servers with Docker and nginx, over HTTP and WS, and an AWS server serves other networks** | The course servers open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. They stay the main hosting, as Servers A and B. An AWS server with the same setup serves other networks, cellular data included (2.8, Hosting). | AWS as the only hosting (cost); a TLS front such as a Cloudflare Tunnel (domain and approval; revisit if `ws://` fails on cellular); GitHub hosting; a laptop with port forwarding |
+| AD-12 | **Sign-in with a Pix ID and a password or with Google; the server issues its own tokens** | No Google account is needed, and Google is one tap. The Pix ID is the login name, with no email; either account can add the other (FR-5.13). Tokens and password hashes: 2.8, Accounts. | Email and password; Kakao sign-in (not on every test phone) |
+| AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | Only a push reaches a friend whose Pix is closed, and a link through any messenger covers a lost push. | WebSocket presence only; KakaoTalk-only invitations |
+| AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | STUN often fails behind carrier NAT, and the course servers cannot host a relay (port 80 only). Cloudflare's needs no host, fits its free allowance, and also listens on TCP 80 and TLS 443. The key stays on the server, and media stays SRTP-encrypted (NFR-14). | coturn on the server host (no open ports) or on AWS (cost, upkeep); a media server (SFU); no relay |
+| AD-15 | **The guide is an outline only and never shows the reference photo's pixels** | Framing the person matters more than the background, and reference pixels over the live scene confuse; a thumbnail shows the reference (AD-6). | Semi-transparent cutout; a faint background guide |
+| AD-16 | **Saved guides live in the app's private storage** | Reuse with nothing in the gallery or on the server (FR-3.8, NFR-13). The library (FR-3.11) is this store: up to 100 guides, thumbnails read on demand. | Gallery album; server-side guides |
+| AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom, and one toggle decides: on, gestures edit the guide; off, a pinch zooms. The subject moves the guide (FR-7.2) and zooms too. | A zoom slider; deciding by where the finger lands |
+| AD-18 | **Session state lives in a Redis session store, not in the server process** | Workers share the state, and a new copy takes over during a deploy without losing a waiting room (2.8). The small, short-lived state fits Redis's atomic scripts, expiry, and pub/sub (2.7). Cost: one more service and Lua room transitions; NFR-18's 50 sessions fit in one worker. | One process with in-memory state; routing rooms by code; the relational database |
 
 ## 2. Design Details
 
@@ -292,153 +320,252 @@ Polish, stability, and performance work against the NFR targets based on UAT fee
 ```mermaid
 flowchart TB
   subgraph UI["UI layer: Fragments with XML layouts"]
-    C1["Camera"] --- C2["Add guide with saved guides · Reference confirm"] --- C3["Generate poses · Generating · Pick a pose"] --- C4["Sign in · Sign up · Pix ID setup · Account · Friends · Add a friend · Sent requests"] --- C5["Invite sent · Invitation · Room code"] --- C6["Subject view"]
+    C1["Camera"] --- C2["Add a pose guide with My library · Library · Reference confirm"] --- C3["Generate poses · Generating poses · Pick a pose"] --- C4["Sign in · Sign up · Pix ID setup · Account · Share my camera · Add a friend · Sent requests"] --- C5["Who takes the photo? · Room code · See their camera · Invite sent · Invite not accepted · Invitation"] --- C6["Subject view and its Generate poses · Generating poses · Pick a pose · Your reference · Connection lost"] --- C7["Settings · How to use Pix · About Pix · tutorial tips"]
   end
   subgraph VM["ViewModels: StateFlow of UI state"]
-    V1["CameraViewModel"] --- V2["ReferenceViewModel"] --- V3["GenerationViewModel"] --- V4["AccountViewModel · FriendsViewModel"] --- V5["SessionViewModel · InvitationViewModel"] --- V6["SubjectViewModel"]
+    V1["CameraViewModel"] --- V2["ReferenceViewModel"] --- V3["GenerationViewModel · PoseSaveViewModel"] --- V4["AccountViewModel · FriendsViewModel"] --- V5["SessionViewModel · InvitationViewModel · IncomingInvitationsViewModel"] --- V6["SubjectViewModel · SubjectDescribeViewModel · SubjectGeneratingViewModel · SubjectPickViewModel · SubjectConfirmViewModel"] --- V7["SettingsViewModel"]
   end
   subgraph DOM["Managers and repositories"]
-    D1["CameraController · CameraSettings"] --- D2["GuideRepository · SavedGuideStore"] --- D3["ReferenceGuideMaker"] --- D4["PoseGenerator · GenerationConsent"] --- D5["AuthRepository · FriendsRepository · PresenceConnection · InvitationManager"] --- D6["SessionManager"] --- D7["GuideSyncer · RemoteControlHandler"]
+    D1["CameraController · CameraSettings"] --- D2["GuideRepository · SavedGuideStore"] --- D3["ReferenceGuideMaker"] --- D4["PoseGenerator · PoseTips · GenerationConsent · PersonDetector · PromptHistory"] --- D5["AuthRepository · FriendsRepository · PresenceConnection · InvitationManager · PushTokenRegistrar"] --- D6["SessionManager"] --- D7["GuideSyncer · PoseSyncer · ConfirmSyncer · DescriptionSyncer · PhotoSyncer · RemoteControlHandler"] --- D8["AppSettings · AppLanguage"]
   end
   subgraph SRC["Platform and network"]
-    S1["CameraX"] --- S2["ML Kit"] --- S3["WebRTC"] --- S4["OkHttp · Retrofit"] --- S5["DataStore · MediaStore · private files"] --- S6["Credential Manager · FCM"]
+    S1["CameraX"] --- S2["ML Kit"] --- S3["WebRTC"] --- S4["OkHttp · Retrofit"] --- S5["DataStore · MediaStore · private files"] --- S6["Credential Manager · FCM · AppCompat per-app language"]
   end
   UI --> VM --> DOM --> SRC
 ```
 
-*Figure 5. Layers of the Android app. Each layer depends only on the layer below it, except that the UI hosts the camera preview (`PreviewView`) and the subject's video view (`SurfaceViewRenderer`) directly.*
+*Figure 5. Layers of the Android app. Each layer depends only on the layer below it. The exception: the UI hosts the camera preview (`PreviewView`) and the subject's video view (`SurfaceViewRenderer`) directly.*
 
-**Package layout.** Files marked \* exist in `android/` as shared contracts (listed in `android/README.md`); the owners create the rest. The tree names the main files; `android/README.md` lists every module class.
+**Package layout.** Files marked \* are the shared contracts (`android/README.md`); every other class belongs to the owner in its `Owner:` comment. The tree names the main files.
 
 ```text
 android/app/src/main/java/com/lastpenguin/pix/
-├─ MainActivity*, PixApplication (creates the AppContainer)
-├─ ui/          camera/, guide/, generation/, account/, session/: one Fragment per wireframe screen; the screens of one flow
-│               share one activity-scoped ViewModel; PixViewModels builds every ViewModel from the AppContainer
-├─ camera/      CameraController*, CameraXController, CameraSettings (aspect ratio in DataStore), PhotoSaver, CameraZoom,
-│               CameraZoomPlan, CameraFrameCache
-├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore* (It 2), InMemoryGuideRepository,
-│               MlKitReferenceGuideMaker, FileSavedGuideStore (It 2), GuideGeometry, SubjectSegmenter,
-│               MaskSmoothing (It 2, functions), OutlineExtractor, overlay view
-├─ generation/  GenerationModels*, PoseGenerator*, RemotePoseGenerator, PoseImageCodec, GenerationConsent (DataStore)
+├─ MainActivity, PixApplication (creates the AppContainer)
+├─ ui/          camera/, guide/, generation/, account/, session/, settings/: one Fragment per screen; the screens of one
+│               flow share one activity-scoped ViewModel; PixViewModels builds every ViewModel from the AppContainer;
+│               ScreenTransitions (PixNavHostFragment, ScreenNavigator, ScreenMotion) and Motion
+├─ camera/      CameraController*, CameraXController, CameraSettings (aspect ratio in DataStore), PhotoSaver (PhotoAlbum),
+│               CameraZoom, CameraZoomPlan, CameraFrameCache
+├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore*, GuideLook* (GuideColor,
+│               GuideThickness, GuideOutlines), InMemoryGuideRepository, MlKitReferenceGuideMaker, FileSavedGuideStore,
+│               GuideGeometry, SubjectSegmenter, MaskSmoothing (functions), OutlineExtractor, MaskPng,
+│               ScreenshotPhoto and SharedPostCard (the screenshot cut), GuideOverlayView
+├─ generation/  GenerationModels*, PoseGenerator*, PoseTipper*, RemotePoseGenerator, RemotePoseTipper, PoseTips,
+│               PoseImageCodec, GenerationConsent (DataStore), PromptHistory* (DataStore), PersonDetector*
+│               (RuleBasedPersonDetector, MlKitPersonSignals), ScreenLanguage
+├─ settings/    AppSettings* (DataStore), AppLanguage* (Android's per-app language)
 ├─ account/     AccountModels*, AuthRepository*, FriendsRepository*, AuthTokens, BearerTokens, AccountRules, ApiMapping,
 │               RemoteAuthRepository, RemoteFriendsRepository, PresenceConnection, GoogleIdTokens,
-│               InvitationManager and PushTokenRegistrar (It 2, Iter2-P15, not yet written)
+│               InvitationManager and RemoteInvitationManager, PushTokenRegistrar
+├─ push/        PixMessagingService (FCM), PushNotifications, FirebasePushTokens
 ├─ session/     SessionModels*, SessionManager*, RtcSessionManager, SignalingClient, OkHttpSignalingClient,
-│               PeerConnectionClient, WebRtcPeerConnectionClient, CameraFrameSource, GuideImageCodec, GuideSyncer,
-│               RemoteControlHandler
-│  ├─ protocol/  SessionMessage*, message codec, channel routing
-│  └─ signaling/ SignalMessage*
-└─ core/        network/PixApi* (PixApi, PixAuthApi, PixAccountApi), network/ApiModels*, dependency wiring, timing logs
+│               PeerConnectionClient, WebRtcPeerConnectionClient, WebRtcRuntime, CameraFrameSource, RemoteVideo,
+│               GuideImageCodec, GuideSyncer, GuideReference (GuideReferenceCodec, MirrorReference),
+│               PoseSyncer (PoseShare, MirrorPoseSet), PoseCandidates (PoseCandidateCodec),
+│               ConfirmSyncer (ConfirmShare, MirrorConfirm), DescriptionSyncer (DescriptionShare, MirrorDescription),
+│               PhotoSyncer (PhotoShare, PhotoReader), RemoteControlHandler, MobileDataNotice
+│  ├─ protocol/  SessionMessage*, MessageCodec, ChannelRouter
+│  └─ signaling/ SignalMessage*, SignalCodec
+└─ core/        AppContainer (creates every module), Timings (timing logs), network/PixApi* (PixApi, PixAuthApi,
+                PixAccountApi), network/ApiModels*
 ```
+
+**Transitions between screens (Iter3-A14, [#181]; R&S 6.9).** `ui/ScreenTransitions.kt` sets every move in one place. `activity_main.xml` hosts the graph in `PixNavHostFragment`, Navigation's `NavHostFragment` with `ScreenNavigator` as its fragment navigator. `nav_graph.xml` names no animation.
+
+- `ScreenNavigator` sets the four `NavOptions` animators from `ScreenMotion.between`: forward between the shown and the next screen, back between the next and the screen beneath it after the move.
+- After `popUpTo`, the screen beneath is not the shown one: Back from *Generating poses* goes to Camera, so it fades.
+- Back, the back gesture, and *Back to camera* pop the back stack and play the back pair, also on a screen a notification or link opened (`MainActivity.open`). Options with their own animations keep them; the first screen has none.
+- Each transition lasts 300 ms on Material's standard curve (`res/animator/screen_*`, `res/values/motion.xml`). The going screen fades out in the first 35 %, and the coming one fades in over the rest.
+- The `ObjectAnimator`s follow the system animation scale, so with animations off each screen shows its end at once. Nothing waits: the coming screen takes touches at once, the going one none.
+- *Back to camera* from two screens deep pops both: the shown screen plays its back transition, and Camera fades in.
+
+| Pair | Transition | Why |
+|----|----|----|
+| Camera or *Subject view* and any screen | `FADE`: Material's fade through, without its scale | A live camera image should not slide. `PreviewView` (`COMPATIBLE`, a `TextureView`) fades with its screen. `SurfaceViewRenderer` takes no view alpha, so `SubjectFragment.onCreateAnimator` hides the video. |
+| Any other two screens | `SHARED_AXIS` along x: the next screen comes 30 dp in from the right, the last goes 30 dp left; back reverses it | A deeper step: *Share my camera* → *Add a friend*, the library → *Reference confirm*, *Generate poses* → *Generating poses* → *Pick a pose* |
+| A sheet (*Add a pose guide*, *Who takes the photo?*, *Account*, *Room code*, *Invite sent*) and the screen under it | None: the sheet keeps its own slide | `ScreenNavigator` does not move dialog destinations. A screen a sheet opens moves from the screen under it: Camera → *Reference confirm* fades. |
+
+**Who takes the photo (Iter3-A17, [#188]; R&S 6.7).** The phone that shows a room code or sends an invitation is the photographer. *Shoot together* opens `ShootTogetherSheet`, a dialog over Camera. Each choice replaces it (`popUpTo` inclusive), so Back goes to Camera.
+
+- *I'll take the photo* opens *Share my camera* (`friendsFragment`, `FriendsFragment`): friends to invite, and *Show a code*, signed in or not.
+- *I'll be in the photo* opens *See their camera* (`joinCodeFragment`, `JoinCodeFragment`): received invitations above the code field. The button counts them, so a dismissed invitation can still be accepted within its minute (2.6.6, FR-6.17).
+- *Show a QR code* and *Scan a QR code* are planned under them ([#122]).
+- A photographer whose subject left still waits in its room (`Waiting`, 2.4), unseen on Camera, and `SessionManager.start` ignores a second session. So *I'll be in the photo* and *Accept* (on *Invitation* and *See their camera*) first end that room (`SessionViewModel.endWaitingRoom` awaits `leave(CANCELLED)`). A session with someone in it, or on its way, still refuses them (FR-6.9).
+- *Room code* has no join field; it says which phone enters the code, and where. The code screens name the other phone's buttons by their own labels (`room_code_path`, `join_hint`, `withColoredPart`), so a renamed button renames them.
+- *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`); *Sign up* closes with it, and *Pix ID setup* replaces it. So *Invitation* and Settings open *Sign in* themselves.
+- Screens say *friend* only for the Pix friend list; elsewhere they name the role or say *the other person* (R&S 6.9).
 
 #### Module interfaces
 
-These interfaces are the contracts between owners. Each owner starts with a fake implementation (for example, a `FakeSessionManager` that echoes messages), so that UI and sync work can begin before the real module is ready.
+These interfaces are the contracts between owners. Hand-written fakes, such as `FakeSessionManager`, and the `InMemory` implementations stand in for them, so UI and sync work can start before a module is ready (Testing Documentation 2.1.8).
 
 ```kotlin
-enum class CameraStatus { IDLE, STARTING, READY, UNAVAILABLE }   // READY: camera open, its first analysis frame received, and the
-                                                                  // kept zoom and exposure applied again
-enum class AspectRatio { R4_3, R16_9, R1_1 }                       // It 2 (FR-1.13); R4_3 is the default
-enum class FlashMode { OFF, AUTO, ON }                              // It 2 (FR-1.12)
+enum class CameraStatus { IDLE, STARTING, READY, UNAVAILABLE } // READY: camera open, first analysis frame in, kept zoom
+                                                                // and exposure applied again
+enum class AspectRatio { R4_3, R16_9, R1_1 }                     // FR-1.13; R4_3 is the default
+enum class FlashMode { OFF, AUTO, ON }                            // FR-1.12
+enum class CameraFacing { BACK, FRONT }                           // FR-1.14: FRONT is selfie mode
 interface CameraController {
-    val status: StateFlow<CameraStatus>                // IDLE until bound; a failed bind is UNAVAILABLE, and bind again retries
+    val status: StateFlow<CameraStatus>               // IDLE until bound; a failed bind is UNAVAILABLE; bind again retries
     val capabilities: StateFlow<CameraCapabilities?>
-    val state: StateFlow<CameraState>                  // It 2: applied zoom, exposure, flash, aspect, in one value
-    val zoom: StateFlow<Float>                        // applied ratio relative to the primary rear camera, the same value as state.zoom, for callers that need only it
+    val state: StateFlow<CameraState>                 // applied zoom, exposure, flash, aspect, and light
+    val zoom: StateFlow<Float>                        // = state.zoom, relative to the bound camera's main lens
+    val facing: StateFlow<CameraFacing>               // the front camera is mirrored everywhere (2.6.4)
+    val hasFrontCamera: StateFlow<Boolean>            // false hides the camera switch
     fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider)
-    fun setZoom(ratio: Float, final: Boolean = true)   // primary-relative, clamped to [minZoom, maxZoom]; pinch and remote both call this; the newest value
-                                                       // once per display frame, and final = false (a pinch's steps) holds the lens (It 2, 2.6.5)
-    fun setFocusPoint(x: Float, y: Float)              // It 2: frame coordinates 0..1 (FR-1.4); also the remote focus request (Could)
-    fun setExposure(index: Int)                        // It 2: exposure-compensation index within capabilities.exposureRange (FR-1.11)
-    fun setFlash(mode: FlashMode)                      // It 2: ignored when capabilities.hasFlash is false (FR-1.12)
-    fun setAspectRatio(ratio: AspectRatio)             // It 2: rebinds the use cases with a ViewPort of that ratio (FR-1.13, AD-10)
-    suspend fun takePhoto(): Result<Uri>               // full resolution in the chosen ratio, Pictures/Pix, no overlay
-    suspend fun grabFrame(): Result<Bitmap>            // latest frame, upright: the scene photo (FR-4.1)
-    fun setFrameSink(sink: FrameSink?)                 // null stops streaming frames
+    fun setFacing(facing: CameraFacing)               // rebinds after any photo being saved, at 1x and brightness 0;
+                                                      // a front camera that fails gives the rear one back
+    fun setZoom(ratio: Float, final: Boolean = true)  // clamped to [minZoom, maxZoom]; pinch and remote; newest value once
+                                                      // per display frame; final = false holds the lens (2.6.5)
+    fun setFocusPoint(x: Float, y: Float)             // frame coordinates 0..1 (FR-1.4); also remote focus (Could)
+    fun setExposure(index: Int)                       // within capabilities.exposureRange (FR-1.11)
+    fun setFlash(mode: FlashMode)                     // ignored without capabilities.hasFlash (FR-1.12)
+    fun setTorch(on: Boolean)                         // the scene photo's light (FR-4.1); kept across rebinds; none on a
+                                                      // lens without a flash; state.torch says when it is on
+    fun setAspectRatio(ratio: AspectRatio)            // rebinds with a ViewPort of that ratio (FR-1.13, AD-10)
+    suspend fun takePhoto(): Result<Uri>              // full resolution, chosen ratio, Pictures/Pix, no overlay
+    suspend fun grabFrame(): Result<Bitmap>           // latest frame, upright: the scene photo (FR-4.1)
+    fun setFrameSink(sink: FrameSink?)                // null stops streaming
 }
-fun interface FrameSink { fun onFrame(image: ImageProxy) }   // must copy the image and close it before returning
+fun interface FrameSink { fun onFrame(image: ImageProxy, mirrored: Boolean) }   // copy and close the image before
+                                                                                 // returning; mirrored: the front camera's
 
-interface ReferenceGuideMaker {                         // fails with NoPersonFoundException (FR-2.4)
-    suspend fun make(source: Uri): Result<ReferenceGuide>                        // gallery photo
-    suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> // pose candidate
-}                                                        // It 2: the result carries the cutout, whose alpha is the smoothed mask, the person's
-                                                         // box (anchor), and a reference copy of at most 512 px (2.6.1)
+interface ReferenceGuideMaker {                         // fails with NoPersonFoundException (FR-2.4); the result has the
+                                                        // smoothed mask, anchor, a reference ≤ 512 px, and crop (2.6.1)
+    suspend fun make(source: Uri, wholeImage: Boolean = false): Result<ReferenceGuide>  // gallery photo; a feed screenshot
+                                                        // is cut to its photo unless wholeImage (FR-2.10)
+    suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide>      // pose candidate, never cut
+}
 
 interface GuideRepository {
     val guide: StateFlow<ReferenceGuide?>
     val state: StateFlow<GuideState>
-    val changes: SharedFlow<GuideChange>               // every applied change, for GuideSyncer
-    fun setGuide(guide: ReferenceGuide?)                 // null removes the guide; a new guide starts at guide.anchor (FR-3.1)
-    fun update(final: Boolean, change: (GuideState) -> GuideState)   // final = gesture ended; also hide/show through visible
+    val changes: SharedFlow<GuideChange>                // every applied change, for GuideSyncer
+    fun setGuide(guide: ReferenceGuide?)                // null removes it; a new guide starts at guide.anchor (FR-3.1)
+    fun update(final: Boolean, change: (GuideState) -> GuideState)   // final = gesture ended; hide and show via visible
 }
 
-interface SavedGuideStore {                              // It 2 (FR-3.8, AD-16): app private storage only
-    val saved: StateFlow<List<SavedGuide>>               // newest first; empty until the storage has been read once
-    suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide>   // a guide already saved keeps its one copy
+interface SavedGuideStore {                             // FR-3.8, FR-3.11, AD-16: the library, app-private storage only
+    val saved: StateFlow<List<SavedGuide>>              // newest first; empty until the storage is read once
+    suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved>   // one copy per guide id
     suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>>
-    suspend fun delete(id: String)                       // an unknown id does nothing
-    class InMemory : SavedGuideStore                     // for tests and screens that keep no guides
-    companion object { const val MAX_SAVED = 20 }        // the oldest goes first
+    suspend fun thumbnail(id: String): Bitmap?         // read when a cell shows; null for an unknown id or unreadable files
+    suspend fun delete(id: String)                      // an unknown id does nothing
+    class InMemory : SavedGuideStore                    // for tests and screens that keep no guides
+    companion object {
+        const val MAX_SAVED = 100                       // the oldest goes first
+        const val THUMBNAIL_WIDTH = 384                 // a library cell's 3:4 on a 3x screen, never enlarged
+        const val THUMBNAIL_HEIGHT = 512
+    }
 }
 
-interface CameraSettings {                               // It 2 (Design 2.8): the last aspect ratio, in DataStore
-    suspend fun aspectRatio(): AspectRatio?              // null when none is kept or it cannot be read, so the camera stays 4:3
+interface CameraSettings {                              // the last aspect ratio, in DataStore (2.8)
+    suspend fun aspectRatio(): AspectRatio?             // null when none is kept or readable: the camera stays 4:3
     suspend fun saveAspectRatio(ratio: AspectRatio)
 }
 
-interface PoseGenerator {
-    // POST /pose-suggestions first: suggested poses, or variations of a description, whose own POST /poses goes out at
-    // once. Emits Planned with the four poses, then one CandidateEvent each.
-    fun generate(scene: Bitmap, request: PoseRequest, seed: Long): Flow<GenerationEvent>
+interface AppSettings {                                 // FR-10.1, 2.6.8: the settings screen's choices, in DataStore
+    val guideLook: StateFlow<GuideLook>                 // color and thickness of every guide on this phone (FR-3.10)
+    val showLatency: StateFlow<Boolean>                 // the latency indicator in a session (FR-10.3); off by default
+    val baseBrightness: StateFlow<Float>                // Camera's base brightness in EV (FR-1.11); 0 by default
+    val tutorialSeen: StateFlow<Set<TutorialScreen>?>   // screens whose tips were seen (FR-10.4); null until read
+    suspend fun setGuideColor(color: GuideColor)
+    suspend fun setGuideThickness(thickness: GuideThickness)
+    suspend fun setShowLatency(show: Boolean)
+    suspend fun setBaseBrightness(ev: Float)            // kept within BASE_BRIGHTNESS_EV, -2..2 (key base_brightness_ev)
+    suspend fun setTutorialSeen(screens: Set<TutorialScreen>)   // adds them to the tips seen
+    suspend fun resetTutorial()                         // *Show the tutorial again*: every screen's tips due again
+    class InMemory : AppSettings                        // for tests
 }
 
-interface AuthRepository {                               // It 2 (FR-5.1–5.3, FR-5.11–5.15, AD-12); failures are AccountException
-    val state: StateFlow<AuthState>                      // Loading, SignedOut, or SignedIn(account); everything but friends works signed out
-    val expired: SharedFlow<Unit>                        // the server refused the refresh token: ask to sign in again
-    suspend fun signUp(pixId: String, password: String, displayName: String): Result<Account>  // PIX_ID_TAKEN, PIX_ID_INVALID, PASSWORD_INVALID
-    suspend fun isPixIdAvailable(pixId: String): Result<Boolean>   // Check on Sign up and Pix ID setup, without a sign-in; PIX_ID_INVALID
+interface AppLanguage {                                 // FR-10.2, 2.6.8: Pix's per-app language, kept by Android
+    val current: Language                               // PHONE, ENGLISH, or KOREAN
+    fun choose(language: Language)                      // recreates the activity in it, with its back stack
+    class InMemory : AppLanguage                        // for tests: Robolectric's Android 16 keeps no per-app language
+}
+
+interface PoseGenerator {                               // POST /pose-suggestions first (suggestions, or a description's
+                                                        // variations), while the description's own POST /poses goes out;
+                                                        // emits Planned with four poses, then one CandidateEvent each
+    fun generate(scene: Bitmap, request: PoseRequest, seed: Long, selfie: Boolean = false): Flow<GenerationEvent>
+}                                                       // selfie: sent with each request (FR-1.14)
+
+fun interface PersonDetector {                          // FR-4.13, 2.6.3: on the phone, before anything is sent
+    suspend fun findsPerson(scene: Bitmap): Boolean     // throws when it cannot check; the photo then goes on
+}
+
+interface PoseTipper {                                  // FR-4.10: POST /pose-tips; a failure means no tip
+    suspend fun tip(scene: Bitmap, candidate: Bitmap, pose: String): Result<PoseTip>
+}
+
+interface PromptHistory {                               // FR-4.11, NFR-13: on this phone only, in DataStore
+    val entries: StateFlow<List<PromptEntry>>           // newest use first; empty until the storage is read once
+    suspend fun record(text: String, role: Role, partnerId: String?)   // a set the server accepted, with this phone's
+                                                        // role and the session's friend; a blank text keeps nothing
+    suspend fun delete(text: String)                    // ✕; an unknown text does nothing
+    class InMemory : PromptHistory                      // for tests and screens that keep none
+    companion object { const val MAX_ENTRIES = 50 }    // the one used longest ago goes first
+}
+
+interface AuthRepository {                              // FR-5.1–5.3, FR-5.11–5.15, AD-12; failures are AccountException
+    val state: StateFlow<AuthState>                     // Loading, SignedOut, or SignedIn(account)
+    val expired: SharedFlow<Unit>                       // the server ended this sign-in: ask to sign in again
+    suspend fun signUp(pixId: String, password: String, displayName: String): Result<Account>   // PIX_ID_TAKEN,
+                                                        // PIX_ID_INVALID, PASSWORD_INVALID
+    suspend fun isPixIdAvailable(pixId: String): Result<Boolean>   // *Check*, without a sign-in; PIX_ID_INVALID
     suspend fun logIn(pixId: String, password: String): Result<Account>   // INVALID_CREDENTIALS
-    suspend fun signInWithGoogle(idToken: String): Result<GoogleSignIn>   // NotRegistered: ask about an existing Pix account
+    suspend fun signInWithGoogle(idToken: String): Result<GoogleSignIn>   // NotRegistered: ask about an existing account
     suspend fun signUpWithGoogle(idToken: String): Result<Account>   // a new account; the Pix ID comes next
     suspend fun addGoogle(idToken: String): Result<Account>   // GOOGLE_IN_USE or GOOGLE_ALREADY_ADDED
     suspend fun addPassword(password: String): Result<Account>   // a Google account with a Pix ID; PASSWORD_INVALID
-    suspend fun setPixId(pixId: String, password: String? = null): Result<Account>   // TAKEN or INVALID; a password account changing it sends its password
+    suspend fun setPixId(pixId: String, password: String? = null): Result<Account>   // TAKEN or INVALID; a password
+                                                        // account sends its password
     suspend fun setDisplayName(displayName: String): Result<Account>   // 1–30 characters after trimming
-    suspend fun freshAccessToken(): String?              // for the signaling socket, which sends it only when it opens
-    suspend fun signOut()                                // on the server if it answers, on the phone always
+    suspend fun refreshAccount(): Result<Unit>          // GET /me again: another phone may have changed the account
+    suspend fun freshAccessToken(): String?             // for a signaling socket, which sends it only when it opens
+    suspend fun signOut()                               // on the server if it answers, on the phone always
 }
 
-interface FriendsRepository {                            // It 2 (FR-5.4–5.10, FR-5.16); failures are AccountException
+interface FriendsRepository {                           // FR-5.4–5.10, FR-5.16; failures are AccountException
     val friends: StateFlow<List<Friend>>
-    val requests: StateFlow<List<FriendRequest>>         // received, pending
-    val sentRequests: StateFlow<List<SentRequest>>       // sent, not answered yet (FR-5.16)
-    suspend fun refresh(): Result<Unit>                  // the three lists; Friends and Sent requests call it every 10 s while shown
-    suspend fun search(pixId: String): Result<UserLookup> // exact match only
+    val requests: StateFlow<List<FriendRequest>>        // received, pending
+    val sentRequests: StateFlow<List<SentRequest>>      // sent, not answered yet
+    suspend fun refresh(): Result<Unit>                 // the three lists; every 10 s on Share my camera and Sent requests
+    suspend fun search(pixId: String): Result<UserLookup>   // exact match only
     suspend fun request(userId: String): Result<RequestOutcome>   // Sent, or BecameFriends when they had asked
     suspend fun accept(requestId: String): Result<Friend>
-    suspend fun cancel(requestId: String): Result<Unit>  // withdraws a request the user sent; it leaves sentRequests, on NOT_FOUND too
+    suspend fun cancel(requestId: String): Result<Unit> // withdraws a sent request; it leaves sentRequests even on NOT_FOUND
     suspend fun decline(requestId: String): Result<Unit>
     suspend fun remove(userId: String): Result<Unit>
 }
 
-interface InvitationManager {                            // It 2 (FR-6.1–6.4, AD-13); not yet written (Iter2-P15)
-    val outgoing: StateFlow<Invitation?>                 // photographer: the invitation being waited on
-    val incoming: Flow<Invitation>                       // subject: from a push or an opened link
-    suspend fun invite(friendId: String): Result<Invitation>      // fails with BUSY when the friend is in a session
-    suspend fun cancel(invitationId: String)
-    suspend fun accept(invitationId: String): Result<SessionEntry.Invitation>
-    suspend fun decline(invitationId: String)
-    fun shareLink(invitation: Invitation): String        // the invite link for the share sheet or the clipboard
+interface InvitationManager {                           // FR-6.1–6.4, FR-6.9, FR-6.17, AD-13; failures are AccountException
+    suspend fun invite(friendId: String): Result<SentInvitation>      // link and photographer's place; BUSY, NOT_FRIENDS
+    suspend fun open(invitationId: String): Result<OpenedInvitation>  // no sign-in needed; NOT_FOUND
+    suspend fun incoming(): Result<List<OpenedInvitation>>            // the pending ones received, newest first
+    suspend fun accept(invitationId: String): Result<SessionPlace>    // the friend's place; INVITATION_GONE, NOT_FOUND
+    suspend fun decline(invitationId: String): Result<Unit>
+    suspend fun cancel(invitationId: String): Result<Unit>            // the photographer
+}
+
+fun interface PushTokens { suspend fun current(): String? }          // Firebase's FCM token, null without one
+class PushTokenRegistrar(api, auth, tokens, scope) {                 // POST /devices once per sign-in, and again
+    fun start(): Job                                                  // when Firebase rotates the token while signed in
+    fun onNewToken(token: String)
 }
 
 interface SessionManager {
     val state: StateFlow<SessionState>
     val incoming: Flow<SessionMessage>                  // not replayed: a late subscriber misses earlier messages
-    val peerCapabilities: StateFlow<CameraCapabilities?> // subject: the last camera.capabilities, for a screen that opens late
-    val peerCamera: StateFlow<CameraState?>             // subject: the last camera.state (zoom, exposure, flash, aspect), null until one arrives
-    suspend fun start(entry: SessionEntry, role: Role)   // entry: NewRoom, RoomCode, or Invitation (It 2)
+    val peerCapabilities: StateFlow<CameraCapabilities?> // subject: the last camera.capabilities, for a late screen
+    val peerCamera: StateFlow<CameraState?>             // subject: the last camera.state; null until one arrives
+    val path: StateFlow<IcePath?>                       // the selected candidate pair while connected, every 2 s (2.6.7)
+    val latencyMs: StateFlow<Int?>                      // half the ping round trip, last three averaged (FR-10.3); null
+                                                        // until measured, while reconnecting, and after the end
+    suspend fun start(entry: SessionEntry, role: Role)   // NewRoom, RoomCode, Rejoin, Invite, or Invitation
     fun send(message: SessionMessage)                   // ChannelRouter picks realtime or reliable
+    suspend fun sendBulk(message: SessionMessage): Boolean   // a chunk behind every other reliable message, through a
+                                                        // reconnect (2.8); false once the session ended
     fun videoSink(): FrameSink                          // photographer: pass to CameraController
     suspend fun leave(reason: EndReason = EndReason.LEFT)
 }
@@ -454,37 +581,60 @@ classDiagram
   class CameraViewModel {
     +uiState StateFlow~CameraUiState~
     +guideSaveNotices Flow
-    +onShutter()
+    +toggleLabels Flow
+    +onShutter() Boolean
     +onZoomChanged(ratio, final)
+    +onZoomTap()
+    +onSwitchCamera()
     +onGuideGesture(dx, dy, scale, final)
     +setGuideEditing(on)
-    +onAspectTap()
+    +setAspectsOpen(open)
+    +onAspectChosen(aspect)
     +onExposureChange(index)
+    +setBrightnessOpen(open)
     +onFlashTap()
     +onFocusTap(x, y)
     +onOpacityChange(opacity, final)
     +onHideToggle()
+    +onTipButton()
     +onSaveGuide()
     +onRemoveGuide()
   }
   class ReferenceViewModel {
     +uiState StateFlow~ReferenceUiState~
     +savedGuides StateFlow
+    +library StateFlow~LibraryPage~
     +savedGuideResults Flow
+    +sharing StateFlow~Boolean~
+    +usedBySubject Flow
+    +openFor(fromSubject)
+    +onLibraryFilter(filter)
+    +thumbnail(id) Bitmap
     +onPhotoPicked(uri)
+    +onUseWholeImage()
+    +onCandidatePicked(image, tipFrom, chosenBy, saved)
     +onUseGuide()
     +onUseSaved(id)
     +onDeleteSaved(id)
+  }
+  class PoseSaveViewModel {
+    +hearts StateFlow~Map~
+    +results Flow
+    +toggle(key, image)
+    +savedGuide(key) ReferenceGuide
   }
   class CameraController {
     <<interface>>
     +capabilities StateFlow
     +state StateFlow~CameraState~
+    +facing StateFlow~CameraFacing~
     +bind(owner, surfaceProvider)
+    +setFacing(facing)
     +setZoom(ratio, final)
     +setFocusPoint(x, y)
     +setExposure(index)
     +setFlash(mode)
+    +setTorch(on)
     +setAspectRatio(ratio)
     +takePhoto() Result~Uri~
     +grabFrame() Result~Bitmap~
@@ -492,21 +642,39 @@ classDiagram
   }
   class CameraXController {
     -preview Preview
-    -imageCapture ImageCapture
+    -capture ImageCapture
     -analysis ImageAnalysis
-    -viewPort ViewPort
+    -frames CameraFrameCache
   }
   class PhotoSaver {
-    +outputOptions() OutputFileOptions
+    +outputOptions(mirrored) OutputFileOptions
+    +save(file, photoId, takenAt) Result~Uri~
+  }
+  class CameraSettings {
+    <<interface>>
+    +aspectRatio() AspectRatio
+    +saveAspectRatio(ratio)
   }
   class GuideRepository {
+    <<interface>>
     +guide StateFlow~ReferenceGuide~
     +state StateFlow~GuideState~
+    +changes SharedFlow~GuideChange~
     +setGuide(guide)
     +update(final, change)
   }
   class ReferenceGuideMaker {
-    +make(uri) Result~ReferenceGuide~
+    <<interface>>
+    +make(uri, wholeImage) Result~ReferenceGuide~
+    +make(bitmap, source) Result~ReferenceGuide~
+  }
+  class MlKitReferenceGuideMaker
+  class ScreenshotPhoto {
+    <<functions>>
+    +findScreenshotPhoto(pixels, width, height) PixelRect
+  }
+  class SharedPostCard {
+    +find() PixelRect
   }
   class SubjectSegmenter {
     +segment(bitmap) Result~Segmentation~
@@ -516,42 +684,53 @@ classDiagram
     +smoothMask(confidence, width, height, radius) FloatArray
   }
   class OutlineExtractor {
-    +extract(mask, stroke) Bitmap
+    +extract(mask, strokePx) Bitmap
   }
   class SavedGuideStore {
     <<interface>>
     +saved StateFlow
-    +save(guide, state)
+    +save(guide, state) Result~GuideSaved~
     +load(id)
+    +thumbnail(id) Bitmap
     +delete(id)
   }
+  class FileSavedGuideStore
   class GuideGeometry {
-    +frameToView(p, frame, view) Offset
-    +viewToFrame(p, frame, view) Offset
+    +frameToView(p, frame, view) PointF
+    +viewToFrame(p, frame, view) PointF
     +start(guide, frameAspect) GuideState
     +clamp(state, aspect, frameAspect) GuideState
   }
   class GuideOverlayView {
     <<View>>
     +render(guide, state)
+    +restyle(guide, outline)
     +editable Boolean
+    +lineColor Int
   }
   CameraViewModel --> CameraController
   CameraViewModel --> GuideRepository
+  CameraViewModel --> CameraSettings
+  CameraViewModel --> SavedGuideStore
   CameraXController ..|> CameraController
   CameraXController --> PhotoSaver
-  ReferenceGuideMaker --> SubjectSegmenter
-  ReferenceGuideMaker --> MaskSmoothing
-  ReferenceGuideMaker --> OutlineExtractor
-  CameraViewModel --> SavedGuideStore
+  MlKitReferenceGuideMaker ..|> ReferenceGuideMaker
+  MlKitReferenceGuideMaker --> ScreenshotPhoto : cut a screenshot first
+  ScreenshotPhoto --> SharedPostCard : a post shared in a story
+  MlKitReferenceGuideMaker --> SubjectSegmenter
+  MlKitReferenceGuideMaker --> MaskSmoothing
+  MlKitReferenceGuideMaker --> OutlineExtractor
+  FileSavedGuideStore ..|> SavedGuideStore
   ReferenceViewModel --> ReferenceGuideMaker
   ReferenceViewModel --> GuideRepository
-  ReferenceViewModel --> SavedGuideStore
+  ReferenceViewModel --> SavedGuideStore : My library and the library
+  PoseSaveViewModel --> ReferenceGuideMaker
+  PoseSaveViewModel --> SavedGuideStore : the ♥ on Pick a pose
   CameraViewModel ..> GuideOverlayView : renders state
   GuideOverlayView ..> GuideGeometry : maps
 ```
 
-*Figure 6. Camera and guide classes. Iteration 2 adds the camera controls, the mask smoothing in `MaskSmoothing.kt`, and `SavedGuideStore`, which `ReferenceViewModel` lists and opens on *Add a pose guide*.*
+*Figure 6. Camera and guide classes. `MlKitReferenceGuideMaker` cuts a screenshot to its photo, then segments, smooths, and outlines (2.6.1). `ReferenceViewModel` lists and opens the library (`SavedGuideStore`), and `PoseSaveViewModel` adds to it from the ♥ on *Pick a pose*.*
 
 ```mermaid
 classDiagram
@@ -562,31 +741,49 @@ classDiagram
     +incoming Flow~SessionMessage~
     +peerCapabilities StateFlow~CameraCapabilities~
     +peerCamera StateFlow~CameraState~
+    +path StateFlow~IcePath~
+    +latencyMs StateFlow~Int~
     +start(entry, role)
     +send(message)
+    +sendBulk(message) Boolean
     +videoSink() FrameSink
     +leave(reason)
   }
   class RtcSessionManager {
     -scope serial CoroutineScope
   }
+  class SessionViewModel {
+    +state StateFlow~SessionState~
+    +transitions SharedFlow~SessionState~
+    +startRoom()
+    +invite(friend)
+    +cancelInvite()
+    +joinRoom(code)
+    +joinInvitation(invitationId, place, partner) Boolean
+    +endWaitingRoom() Boolean
+    +reconnect()
+    +leave()
+  }
   class SignalingClient {
-    +connect(url)
+    <<interface>>
+    +events SharedFlow~SignalEvent~
+    +connect(url, accessToken)
     +send(signal)
-    +events Flow~SignalEvent~
+    +close()
   }
   class PeerConnectionClient {
+    <<interface>>
     +events SharedFlow~PeerEvent~
-    +createOffer() Sdp
+    +createOffer(iceRestart) Sdp
     +createAnswer() Sdp
     +applyRemote(sdp)
     +addIceCandidate(candidate)
-    +send(channel, text)
-    +bufferedAmount(channel)
+    +send(channel, text) Boolean
+    +bufferedAmount(channel) Long
     +stats() LinkStats
   }
   class CameraFrameSource {
-    +onFrame(image)
+    +onFrame(image, mirrored)
   }
   class MessageCodec {
     +encode(message) String
@@ -594,11 +791,93 @@ classDiagram
   }
   class ChannelRouter {
     +channelFor(message) Channel
+    +latestOnly(message) Boolean
   }
   class GuideSyncer {
+    +adopted SharedFlow~String~
+    +offerFailed Flow~String~
     +startAsSender(scope)
     +startAsReceiver(scope)
     +attribute(role)
+    +offer(guide)
+  }
+  class MirrorReference {
+    +reference StateFlow~GuideReference~
+    +set(reference)
+  }
+  class PoseShare {
+    <<interface>>
+    +picks Flow~SubjectPick~
+    +open(setId)
+    +planned(setId, poseIds)
+    +candidate(setId, poseId, image)
+    +failed(setId, poseId)
+    +picking(setId, poseIds)
+    +chosen(setId, poseId, by)
+    +close(setId)
+  }
+  class PoseSyncer {
+    +mirror StateFlow~MirrorPoseSet~
+    +pending StateFlow~SubjectPick~
+    +ended Flow~PoseSetEnd~
+    +pickFailed Flow~String~
+    +startAsSender(scope)
+    +startAsReceiver(scope)
+    +pick(poseId) Boolean
+  }
+  class DescriptionShare {
+    <<interface>>
+    +requests Flow~DescriptionRequest~
+    +open(descriptionId, scene, text, rejected)
+    +update(descriptionId, text, writer)
+    +end(descriptionId, started, text, setId)
+  }
+  class DescriptionSyncer {
+    +mirror StateFlow~MirrorDescription~
+    +startedScene StateFlow~StartedScene~
+    +started Flow~StartedDescription~
+    +ended Flow~DescriptionEnd~
+    +goFailed Flow~String~
+    +startAsSender(scope)
+    +startAsReceiver(scope)
+    +edit(holding, text) Boolean
+    +go(text, suggest) Boolean
+  }
+  class PhotoShare {
+    <<interface>>
+    +shutter() String
+    +taken(sessionId, uri, takenAt)
+    +notTaken(sessionId)
+  }
+  class PhotoSyncer {
+    +sendFailed Flow~Unit~
+    +received Flow~Boolean~
+    +shutters Flow~Unit~
+    +startAsSender(scope)
+    +startAsReceiver(scope)
+    +drop() Int
+  }
+  class PhotoAlbum {
+    <<interface>>
+    +save(file, photoId, takenAt) Result~Uri~
+  }
+  class ConfirmShare {
+    <<interface>>
+    +uses Flow~SubjectUse~
+    +open(confirmId)
+    +finding(confirmId)
+    +ready(confirmId, guide)
+    +used(confirmId, guideId, by)
+    +close(confirmId)
+  }
+  class ConfirmSyncer {
+    +mirror StateFlow~MirrorConfirm~
+    +pending StateFlow~SubjectUse~
+    +ended Flow~ConfirmEnd~
+    +useFailed Flow~String~
+    +startAsSender(scope)
+    +startAsReceiver(scope)
+    +use(guideId) Boolean
   }
   class RemoteControlHandler {
     +actions SharedFlow~RemoteAction~
@@ -609,11 +888,32 @@ classDiagram
   class SubjectViewModel {
     +uiState StateFlow~SubjectUiState~
     +onZoomGesture(ratio, final)
+    +onZoomTap()
     +onGuideGesture(dx, dy, scale, final)
     +setGuideEditing(on)
     +onExposureGesture(index, final)
     +setBrightnessOpen(open)
     +onFlashTap()
+    +setReferenceExpanded(expanded)
+    +setReferenceCorner(corner)
+    +onSaveGuide()
+    +claimSetOpening(setId) Boolean
+  }
+  class SubjectDescribeViewModel {
+    +usedBefore StateFlow
+    +onTextChanged(text)
+    +go(text, suggest)
+    +forget(text)
+  }
+  class SubjectGeneratingViewModel {
+    +uiState StateFlow~SubjectGeneratingUiState~
+  }
+  class SubjectPickViewModel {
+    +select(poseId)
+    +usePose()
+  }
+  class SubjectConfirmViewModel {
+    +useGuide()
   }
   RtcSessionManager ..|> SessionManager
   RtcSessionManager --> SignalingClient
@@ -622,37 +922,70 @@ classDiagram
   RtcSessionManager --> ChannelRouter
   PeerConnectionClient --> CameraFrameSource : video source
   CameraFrameSource ..|> FrameSink
+  SessionViewModel --> SessionManager
+  SessionViewModel --> GuideSyncer : runs it for the session
+  SessionViewModel --> RemoteControlHandler : photographer
+  SessionViewModel --> PhotoSyncer : runs it for the session
   GuideSyncer --> SessionManager
   GuideSyncer --> GuideRepository
+  GuideSyncer --> MirrorReference : subject writes the reference photo
   RemoteControlHandler --> SessionManager
   RemoteControlHandler --> CameraController
   RemoteControlHandler --> GuideRepository
   SubjectViewModel --> SessionManager
   SubjectViewModel --> GuideRepository
+  SubjectViewModel --> MirrorReference
+  SubjectViewModel --> SavedGuideStore : Save guide
+  PoseSyncer ..|> PoseShare
+  PoseSyncer --> SessionManager
+  SubjectViewModel --> PoseSyncer : the photographer's candidates
+  SubjectGeneratingViewModel --> PoseSyncer
+  SubjectPickViewModel --> PoseSyncer
+  ConfirmSyncer ..|> ConfirmShare
+  ConfirmSyncer --> SessionManager
+  ConfirmSyncer --> GuideImageCodec : the outline's mask
+  SubjectViewModel --> ConfirmSyncer : the photographer's Reference confirm
+  SubjectConfirmViewModel --> ConfirmSyncer
+  DescriptionSyncer ..|> DescriptionShare
+  DescriptionSyncer --> SessionManager
+  SubjectViewModel --> DescriptionSyncer : the photographer's Generate poses
+  SubjectDescribeViewModel --> DescriptionSyncer
+  SubjectDescribeViewModel --> PromptHistory : this phone's descriptions
+  PhotoSyncer ..|> PhotoShare
+  PhotoSyncer --> SessionManager
+  PhotoSyncer --> PhotoAlbum : the subject's Pix album
+  CameraViewModel --> PhotoShare : each photo taken in a session
 ```
 
-*Figure 7. Session, synchronization, and remote-control classes. The subject's pinch on the live video calls the existing `onZoomGesture(ratio, final)` API; its guide gestures and brightness and flash go through `RemoteControlHandler` the same way (2.6.5).*
+*Figure 7. Session, synchronization, and remote-control classes. `OkHttpSignalingClient` and `WebRtcPeerConnectionClient` are the real clients. `SessionViewModel` runs every syncer for the session. The subject's pinch calls `onZoomGesture(ratio, final)`; its guide gestures, brightness, and flash reach `RemoteControlHandler` the same way (2.6.5).*
 
 ```mermaid
 classDiagram
   direction LR
   class GenerationViewModel {
     +uiState StateFlow~GenerationUiState~
+    +usedBefore StateFlow
+    +consentGiven StateFlow~Boolean~
+    +onConsentGiven()
     +beginScene()
     +takeScene()
     +retakeScene()
-    +useScene()
+    +toggleLight()
+    +useScene() Boolean
     +onDescriptionChanged(text)
+    +onDescriptionFocus(focused) Boolean
     +generate(description)
     +suggestPoses()
+    +forget(text)
     +describeAgain()
     +retry()
     +cancel()
     +select(poseId)
+    +usePose() PoseUse
   }
   class PoseGenerator {
     <<interface>>
-    +generate(scene, request, seed) Flow~GenerationEvent~
+    +generate(scene, request, seed, selfie) Flow~GenerationEvent~
   }
   class RemotePoseGenerator {
     -api PixApi
@@ -660,15 +993,54 @@ classDiagram
   }
   class PixApi {
     <<Retrofit>>
-    +suggestPoses(image, description)
-    +createPose(image, description, seed)
+    +suggestPoses(image, description, selfie)
+    +createPose(image, description, seed, selfie)
+    +poseTip(scene, candidate, pose, language)
   }
+  class PersonDetector {
+    <<interface>>
+    +findsPerson(scene) Boolean
+  }
+  class RuleBasedPersonDetector
+  class MlKitPersonSignals {
+    +poseLikelihoods(scene) List
+    +faceCount(scene) Int
+  }
+  class PromptHistory {
+    <<interface>>
+    +entries StateFlow
+    +record(text, role, partnerId)
+    +delete(text)
+  }
+  class GenerationConsent {
+    <<interface>>
+    +isGiven() Boolean
+    +give()
+    +withdraw()
+  }
+  class PoseTips
+  class PoseTipper {
+    <<interface>>
+    +tip(scene, candidate, pose) Result~PoseTip~
+  }
+  class RemotePoseTipper
   GenerationViewModel --> PoseGenerator
+  GenerationViewModel --> PersonDetector : the scene photo
+  GenerationViewModel --> PromptHistory : a set's accepted description
+  GenerationViewModel --> GenerationConsent
+  GenerationViewModel --> CameraController : grabFrame, setTorch
+  GenerationViewModel --> PoseShare : the set, to the subject
+  GenerationViewModel --> DescriptionShare : the description, on both phones
   RemotePoseGenerator ..|> PoseGenerator
   RemotePoseGenerator --> PixApi
+  RuleBasedPersonDetector ..|> PersonDetector
+  RuleBasedPersonDetector --> MlKitPersonSignals : pose landmarks, then faces
+  PoseTips --> PoseTipper : the chosen pose's tip
+  RemotePoseTipper ..|> PoseTipper
+  RemotePoseTipper --> PixApi
 ```
 
-*Figure 8. Pose generation classes*
+*Figure 8. Pose generation classes. `ReferenceViewModel` hands the chosen candidate to `PoseTips`, and Camera shows its tip (FR-4.10).*
 
 ```mermaid
 classDiagram
@@ -677,13 +1049,13 @@ classDiagram
     +uiState StateFlow~AccountUiState~
     +events SharedFlow~AccountEvent~
     +logIn(pixId, password)
-    +continueWithGoogle(activity)
+    +continueWithGoogle(context)
     +answerExistingAccount(hasAccount)
     +signUp(pixId, displayName, password)
     +checkPixId(pixId)
     +savePixId(pixId)
     +saveDisplayName(name)
-    +addGoogle(activity)
+    +addGoogle(context)
     +addPassword(password)
     +signOut()
   }
@@ -702,15 +1074,23 @@ classDiagram
   }
   class InvitationViewModel {
     +uiState StateFlow~InvitationUiState~
+    +events Flow~InvitationEvent~
     +open(invitationId)
+    +retry()
     +accept()
     +decline()
-    +cancel()
-    +shareLink()
+  }
+  class IncomingInvitationsViewModel {
+    +uiState StateFlow~IncomingInvitationsUiState~
+    +events Flow~IncomingInvitationEvent~
+    +keepRefreshing()
+    +accept(invitation)
+    +decline(invitation)
   }
   class AuthRepository {
     <<interface>>
     +state StateFlow~AuthState~
+    +expired SharedFlow~Unit~
     +signUp(pixId, password, displayName)
     +isPixIdAvailable(pixId)
     +logIn(pixId, password)
@@ -720,7 +1100,9 @@ classDiagram
     +addPassword(password)
     +setPixId(pixId)
     +setDisplayName(name)
+    +refreshAccount()
     +freshAccessToken()
+    +signOut()
   }
   class FriendsRepository {
     <<interface>>
@@ -734,21 +1116,24 @@ classDiagram
   class AuthTokens {
     +state StateFlow~AuthState~
     +freshAccessToken()
-    +refreshAfterRejection(token)
+    +refreshAfterRejection(rejected)
+    +reload(read)
   }
   class PresenceConnection {
-    +start()
+    +start() Job
   }
   class InvitationManager {
     <<interface>>
-    +outgoing StateFlow
-    +incoming Flow
     +invite(friendId)
+    +open(invitationId)
+    +incoming()
     +accept(invitationId)
-    +shareLink(invitation)
+    +decline(invitationId)
+    +cancel(invitationId)
   }
   class PushTokenRegistrar {
-    +register(token)
+    +start() Job
+    +onNewToken(token)
   }
   class PixAuthApi {
     <<Retrofit>>
@@ -758,9 +1143,11 @@ classDiagram
   }
   AccountViewModel --> AuthRepository
   FriendsViewModel --> FriendsRepository
-  FriendsViewModel --> InvitationManager
-  InvitationViewModel --> InvitationManager
-  InvitationViewModel --> SessionManager
+  SessionViewModel --> InvitationManager : Invite, Cancel invite
+  InvitationViewModel --> InvitationManager : open, Accept, Decline
+  InvitationViewModel --> AuthRepository : signed in to answer
+  IncomingInvitationsViewModel --> InvitationManager : incoming every 5 s, Accept, Decline
+  IncomingInvitationsViewModel --> AuthRepository : while signed in
   AuthRepository --> PixAuthApi : sign-in
   AuthRepository --> AuthTokens : the sign-in, one refresh at a time
   AuthRepository --> PixAccountApi
@@ -768,101 +1155,177 @@ classDiagram
   PixAccountApi --> AuthTokens : bearer token, refresh on 401
   PresenceConnection --> AuthRepository : socket while in front
   InvitationManager --> PixAccountApi
-  InvitationManager --> SessionManager : accepted invitation → SessionEntry.Invitation
   PushTokenRegistrar --> PixAccountApi
+  PushTokenRegistrar --> AuthRepository : once per sign-in
 ```
 
-*Figure 8b. Account, friends, and invitation classes (Iteration 2). An accepted invitation becomes a `SessionEntry.Invitation` for the existing session code.*
+*Figure 8b. Account, friends, and invitation classes. Invitations reuse the session code: `SessionViewModel` starts `SessionEntry.Invite` with the photographer's place, and `joinInvitation` starts `SessionEntry.Invitation` with the place *Accept* gave. `IncomingInvitationsViewModel` lists received invitations on *Who takes the photo?* and *See their camera* ([#188]).*
 
-**Server modules.** The server app has these modules (independent of the framework choice); every worker runs all of them:
+```mermaid
+classDiagram
+  direction LR
+  class SettingsViewModel {
+    +guideLook StateFlow~GuideLook~
+    +showLatency StateFlow~Boolean~
+    +baseBrightness StateFlow~Float~
+    +account StateFlow~AuthState~
+    +language Language
+    +setGuideColor(color)
+    +setGuideThickness(thickness)
+    +setShowLatency(show)
+    +setBaseBrightness(ev)
+    +chooseLanguage(language)
+    +tutorialDue(screen) Flow~Boolean~
+    +tutorialSeen(screens)
+    +resetTutorial()
+  }
+  class AppSettings {
+    <<interface>>
+    +guideLook StateFlow~GuideLook~
+    +showLatency StateFlow~Boolean~
+    +baseBrightness StateFlow~Float~
+    +tutorialSeen StateFlow~Set~
+  }
+  class DataStoreAppSettings
+  class AppLanguage {
+    <<interface>>
+    +current Language
+    +choose(language)
+  }
+  class AndroidAppLanguage
+  class GuideOutlines {
+    +outline(guide, thickness) Bitmap
+  }
+  class TutorialFragment {
+    <<DialogFragment>>
+    +show(host, screen)
+  }
+  class CoachMarkLayout {
+    <<View>>
+  }
+  SettingsViewModel --> AppSettings
+  SettingsViewModel --> AppLanguage
+  SettingsViewModel --> AuthRepository : the Pix account row
+  DataStoreAppSettings ..|> AppSettings
+  AndroidAppLanguage ..|> AppLanguage
+  CameraViewModel --> AppSettings : base brightness
+  GuideOverlayView ..> SettingsViewModel : followLook
+  GuideOverlayView ..> GuideOutlines : another thickness
+  TutorialFragment --> SettingsViewModel : tips seen
+  TutorialFragment --> CoachMarkLayout : rings and captions
+```
+
+*Figure 8c. Settings and tutorial classes (2.6.8). `GuideOutlines` traces a guide at another thickness. `TutorialFragment` is a dialog among its screen's child fragments, not a navigation destination.*
+
+**Server modules.** Every worker runs all of them:
 
 | Module | Responsibility |
 |----|----|
-| `signaling` | WebSocket hub; relays `signal` messages. The room state is in the session store (`store/`); the registry keeps only this worker's sockets and their outgoing queues, and a signal for a socket on another worker travels through the store (AD-18, 2.7) |
-| `store` (It 2) | The Redis connection, the scripts for room transitions, delivery of messages between workers, the sweeper for expiry and dead workers, and the rate-limit windows (2.7) |
-| `poses` | The REST endpoints (scene photo validation, rate limiting, cancelling when the phone disconnects); `PoseGenerator`, the one client of OpenRouter's Image API, and `PoseSuggester`, which asks a vision model for four poses through OpenRouter's chat completions, each with its model as a setting; the prompts and the default poses (`prompts.toml`, read by `prompts.py`) |
-| `accounts` (It 2) | Sign-up and sign-in with a Pix ID and a password (argon2id) or with Google (ID token verification), session tokens, Pix IDs, exact lookup, friend requests, friendships, device tokens; presence from the signaling hub's signed-in sockets, kept in the session store |
-| `invitations` (It 2) | Create, accept, decline, cancel, 30 s expiry; FCM sends; invite links; hands the `sessionId` to `signaling` on accept |
-| `turn` (It 2) | Requests short-lived credentials from Cloudflare's TURN API and returns its `iceServers` for a session (AD-14) |
-| `db` (It 2) | SQLAlchemy models and Alembic migrations for 2.7; every worker brings the schema up to date when it starts |
+| `signaling` | WebSocket hub; relays `signal` messages. Rooms live in the session store; the registry keeps this worker's sockets and queues, and a message to another worker's socket goes through the store (AD-18, 2.7). |
+| `store` | Redis connection, room-transition scripts, messages between workers, the sweeper for expiry and dead workers, rate-limit windows (2.7) |
+| `poses` | REST endpoints: scene check, rate limits per kind (poses, suggestions, tips), cancel on disconnect. OpenRouter clients, each model a setting: `PoseGenerator` (Image API), `PoseSuggester` and `PoseTipper` (chat completions), `DescriptionFilter` and `PersonCheck` (Decisions API; 2.6.3). Prompts and default poses: `prompts.toml`, read by `prompts.py`. |
+| `accounts` | Sign-up and sign-in with a Pix ID and password (argon2id) or Google (ID token check), session tokens, Pix IDs, exact lookup, friend requests, friendships, device tokens; presence from the hub's signed-in sockets, in the session store |
+| `invitations` | Create (opens the session with the photographer's place), list received, accept (the subject's place), decline, cancel; 60 s expiry; invite links; FCM pushes for invitations and friend requests (`push.py`) |
+| `turn` | Short-lived Cloudflare TURN credentials as one phone's `iceServers`; Cloudflare's STUN server alone without a key or when Cloudflare fails (`TurnRelay`, AD-14) |
+| `db` | SQLAlchemy models and Alembic migrations (2.7); each worker migrates the schema when it starts |
 
 ### 2.3 Data models
 
 ```kotlin
 // ---- Guide ----------------------------------------------------------------
+enum class GuideSource { GALLERY, GENERATED }
 data class ReferenceGuide(
-    val id: String,               // UUID; the subject uses it to tell whether it already has the mask
-    val mask: Bitmap,             // ALPHA_8, person = opaque, after smoothing (2.6.1); cropped to the person; this is what the subject receives
-    val outline: Bitmap,          // ARGB_8888, same size as mask, drawn from it: a white anti-aliased line about 3 dp on screen, no fill
+    val id: String,               // UUID; tells the subject whether it already has the mask
+    val mask: Bitmap,             // ALPHA_8, smoothed (2.6.1), cropped to the person, opaque = person; what the subject gets
+    val outline: Bitmap,          // same size, traced from the mask: a white anti-aliased line, about 2 dp on screen, no fill
     val aspect: Float,            // mask width / height
-    val source: GuideSource,      // GALLERY or GENERATED
-    val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (the person and its 2 % margin), where a new guide starts (FR-3.1); null on the subject
-    val reference: Bitmap? = null,        // the photo itself, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); never sent, never drawn as the guide; null on the subject
+    val source: GuideSource,
+    val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (person + 2 % margin), where a new guide
+                                          // starts (FR-3.1); the subject gets it for Save guide (FR-6.16, Iter3-P16)
+    val reference: Bitmap? = null,        // the photo, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); null on
+                                          // the subject, whose copy arrives in guide.reference.* and stays in MirrorReference
+    val crop: PhotoCrop? = null,          // the screenshot it was cut from (FR-2.10); null for a whole image or a generated
+                                          // pose; never sent or saved
 )
-// Until the mask-only transfer (2.9, Guide sync), the code keeps the `cutout` in place of `mask`:
-// ARGB_8888 with the reference's pixels and the smoothed mask as its alpha. It is only sent; nothing draws it.
-
-data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float)   // fractions of an image's width and height
-// GuideStyle is removed in Iteration 2: the guide is an outline only (AD-15).
-
-data class GuideState(            // everything needed to place the guide, in frame coordinates
+data class PhotoCrop(
+    val original: Bitmap,         // the whole picked image, long side ≤ 1024 px, for Reference confirm's cut
+    val photo: NormalizedRect,    // the part kept, which mask, anchor, and reference are made from
+)
+data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float)   // fractions of an image
+data class GuideState(            // places the guide, in frame coordinates (2.6.2)
     val guideId: String? = null,  // null = no guide
-    val cx: Float = 0.5f,         // guide center, 0..1 of the current frame (AD-10); the start comes from ReferenceGuide.anchor
+    val cx: Float = 0.5f,         // center relative to the frame (AD-10); may leave 0..1 while part of the guide shows
     val cy: Float = 0.5f,
-    val height: Float = 0.7f,     // guide height / frame height; 0.21..2.1 for every start (FR-3.3); a new guide's comes from ReferenceGuide.anchor
-    val opacity: Float = 0.5f,    // 0.1..0.9, applied to the outline
+    val height: Float = 0.7f,     // guide height / frame height, 0.21..2.1 (FR-3.3); a new guide's comes from its anchor
+    val opacity: Float = 0.5f,    // 0.1..0.9, applied to the outline (FR-3.4)
     val visible: Boolean = true,  // false = hidden for a moment (FR-3.6); only the photographer changes it
 )
-
-data class SavedGuide(val id: String, val savedAt: Long, val thumbnail: Bitmap)   // It 2; the files are in the app's private storage (2.8)
+data class SavedGuide(val id: String, val savedAt: Long, val source: GuideSource)   // a library entry, no bitmap
+                                                         // (SavedGuideStore.thumbnail); files in app-private storage (2.8)
+data class GuideSaved(val guide: SavedGuide, val removedOldest: Boolean)   // what save did, decided inside the save
+enum class LibraryFilter { ALL, PHOTOS, GENERATED }      // the library's filters (FR-3.11): all, or one GuideSource
 
 // ---- Camera ---------------------------------------------------------------
-data class CameraCapabilities(
-    val minZoom: Float, val maxZoom: Float, // relative to the primary rear camera's 1x
-    val zoomStops: List<Float>,   // kept for compatibility; not shown anywhere since Iteration 2
-    val exposureRange: IntRange,  // It 2: exposure-compensation index range; 0..0 when unsupported
-    val exposureStep: Float,      // It 2: EV per index step
-    val hasFlash: Boolean,        // It 2
-    val aspectRatios: List<AspectRatio>,  // It 2: the ratios this phone can bind; always contains R4_3
-    val supportsFocusPoint: Boolean,      // It 2
+data class CameraCapabilities(    // sent in camera.capabilities
+    val minZoom: Float, val maxZoom: Float, // in units of the bound camera's main lens (primary rear, or front)
+    val zoomStops: List<Float>,   // kept for compatibility; not shown
+    val exposureRange: IntRange,  // exposure-compensation indexes; 0..0 when unsupported
+    val exposureStep: Float,      // EV per index step
+    val hasFlash: Boolean,
+    val aspectRatios: List<AspectRatio>,  // the ratios this phone can bind; always contains R4_3
+    val supportsFocusPoint: Boolean,
 )
-data class CameraState(           // It 2: the applied values, echoed to the subject in camera.state
+data class CameraState(           // the applied values, echoed in camera.state
     val zoom: Float,
     val exposure: Int = 0,
     val flash: FlashMode = FlashMode.OFF,
     val aspect: AspectRatio = AspectRatio.R4_3,
+    val torch: Boolean = false,   // the light is on, once applied (setTorch); not echoed
 )
 
 // ---- Session --------------------------------------------------------------
-// The It 2 additions (Invitation, Inviting, Reconnecting, DECLINED, BUSY) come with Iter2-P15 and Iter2-P16; SessionModels.kt
-// does not have them yet.
 enum class Role { PHOTOGRAPHER, SUBJECT }
-sealed interface SessionEntry {
-    data object NewRoom : SessionEntry                               // photographer asks for a code
-    data class RoomCode(val code: String) : SessionEntry            // subject enters the code
-    data class Invitation(val invitationId: String, val sessionId: String) : SessionEntry   // It 2: both phones, after accept (AD-8)
+sealed interface SessionEntry {   // AD-8
+    data object NewRoom : SessionEntry                      // photographer asks for a code
+    data class RoomCode(val code: String) : SessionEntry   // subject enters the code
+    data class Rejoin(val code: String) : SessionEntry     // subject's Reconnect: its rejoin token, else the code (2.6.7)
+    data class Invite(val invitationId: String, val place: SessionPlace, val partner: SessionPartner) : SessionEntry
+                                                           // photographer: the place the invitation opened
+    data class Invitation(val invitationId: String, val place: SessionPlace, val partner: SessionPartner) : SessionEntry
+                                                           // subject: the place Accept gave
 }
-sealed interface SessionState {
+data class SessionPlace(val sessionId: String, val rejoinToken: String, val iceServers: List<IceServer>)   // for session.join
+data class SessionPartner(val userId: String, val displayName: String)   // an invitation's friend (FR-4.11)
+sealed interface SessionState {   // 2.4
     data object Idle : SessionState
-    data class Waiting(val code: String) : SessionState              // photographer: room code shown, waiting for the subject
-    data class Inviting(val invitation: Invitation) : SessionState   // It 2: photographer, Invite sent
+    data class Waiting(val code: String) : SessionState              // photographer: code shown, waiting for the subject
+    data class Inviting(val invitationId: String) : SessionState     // photographer: invitation sent, its place taken
     data class Connecting(val sessionId: String?) : SessionState
-    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role) : SessionState
-    data class Reconnecting(val sessionId: String, val since: Long) : SessionState   // It 2: up to 10 s before Ended(CONNECTION_LOST)
+    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null) : SessionState
+    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
     data class Ended(val reason: EndReason) : SessionState
 }
+val SessionState.partner: SessionPartner?   // the friend while Connected or Reconnecting; null over a room code
 data class PeerInfo(
     val displayName: String,
-    val haveGuideId: String? = null, // subject only: the guide mask it already has, from its hello
+    val haveGuideId: String? = null,     // subject only: the guide mask it already has, from its hello
+    val haveReferenceId: String? = null, // subject only: the guide whose reference photo it already has
 )
-enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, DECLINED, BUSY, ERROR }
+enum class EndReason { LEFT, PEER_LEFT, CONNECTION_LOST, NOT_FOUND, EXPIRED, CANCELLED, ERROR, RATE_LIMITED, DECLINED }
+// EXPIRED also ends an invitation nobody accepted in time. DECLINED (the friend declined) ends only the photographer's
+// invitation, RATE_LIMITED (too many wrong codes from this network, 2.5.2) only a join; neither is sent in session.leave.
+data class IcePath(
+    val local: String, val remote: String,   // each side's candidate type: host, srflx, prflx, or relay
+    val network: String?,                    // this phone's network as WebRTC names it: wifi, cellular, …
+    val relayProtocol: String?,              // on a relayed path, how this phone reaches the relay: udp, tcp, or tls
+)
 
-// ---- Account (It 2) --------------------------------------------------------
+// ---- Account --------------------------------------------------------------
 data class Account(
     val userId: String, val pixId: String?, val displayName: String,   // pixId null until chosen
-    val hasPassword: Boolean, val hasGoogle: Boolean,   // the ways the account signs in; offer "Add Google" without it
-)   // the tokens stay inside AuthTokens and DataStore, never in UI state
-sealed interface AuthState {
+    val hasPassword: Boolean, val hasGoogle: Boolean,   // its ways to sign in: offer the missing one
+)   // the tokens stay in AuthTokens and DataStore, never in UI state
+sealed interface AuthState {      // all but friends and invitations works signed out (FR-5.1)
     data object Loading : AuthState                    // the kept sign-in is being read at app start
     data object SignedOut : AuthState
     data class SignedIn(val account: Account) : AuthState
@@ -873,38 +1336,43 @@ sealed interface GoogleSignIn {
 }
 data class PixUser(val userId: String, val pixId: String, val displayName: String)   // a lookup result or a request's sender
 data class Friend(val userId: String, val pixId: String, val displayName: String, val online: Boolean, val inSession: Boolean)
+                                          // inSession: a waiting room included; an invitation is refused (FR-6.9)
 data class FriendRequest(val id: String, val from: PixUser, val createdAt: Long)
-data class SentRequest(val id: String, val to: PixUser, val createdAt: Long)   // a request the user sent, not answered yet (FR-5.16)
+data class SentRequest(val id: String, val to: PixUser, val createdAt: Long)   // sent, not answered yet (FR-5.16)
 sealed interface UserLookup {
-    data class Found(val user: PixUser, val relation: Relation, val requestId: String?) : UserLookup   // relation decides the button (FR-5.8); requestId for REQUESTED and INCOMING
+    data class Found(val user: PixUser, val relation: Relation, val requestId: String?) : UserLookup
+                                          // relation decides the button (FR-5.8); requestId for REQUESTED and INCOMING
     data object NotFound : UserLookup
 }
 enum class Relation { NONE, SELF, FRIEND, REQUESTED, INCOMING }
 sealed interface RequestOutcome {
     data class Sent(val requestId: String) : RequestOutcome
-    data class BecameFriends(val friend: Friend) : RequestOutcome   // they had already asked, so their request is accepted
+    data class BecameFriends(val friend: Friend) : RequestOutcome   // they had asked already, so their request is accepted
 }
 enum class AccountError {   // the server's code (2.5.3), or the phone's own reason
     PIX_ID_TAKEN, PIX_ID_INVALID, PASSWORD_INVALID, INVALID_CREDENTIALS, INVALID_GOOGLE_TOKEN, GOOGLE_IN_USE,
-    GOOGLE_ALREADY_ADDED, PIX_ID_REQUIRED, PASSWORD_ALREADY_SET, NOT_FOUND, INVALID_REQUEST, UNAVAILABLE,
-    SIGNED_OUT, OFFLINE, UNKNOWN,
+    GOOGLE_ALREADY_ADDED, PIX_ID_REQUIRED, PASSWORD_ALREADY_SET, NOT_FOUND, INVALID_REQUEST,
+    NOT_FRIENDS, BUSY, INVITATION_GONE,   // invitations
+    UNAVAILABLE, SIGNED_OUT, OFFLINE, UNKNOWN,
 }
-class AccountException(val error: AccountError, val serverMessage: String = "")   // serverMessage names the broken rule (FR-5.3, FR-5.11)
-data class Invitation(
-    val id: String, val from: Friend, val to: Friend,
-    val status: InvitationStatus, val expiresAt: Long,
-    val sessionId: String? = null,   // set when accepted
+class AccountException(val error: AccountError, val serverMessage: String = "")   // the broken rule (FR-5.3, FR-5.11)
+data class SentInvitation(
+    val id: String, val to: PixUser, val expiresAt: Long,
     val link: String,                // the invite link (2.6.6)
+    val place: SessionPlace,         // the photographer's place in the session it opened
 )
-enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, CANCELLED, EXPIRED }
+data class OpenedInvitation(val id: String, val from: PixUser, val status: InvitationStatus, val expiresAt: Long)
+enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, CANCELLED, EXPIRED }   // Figure 9b; an unknown one counts as gone
 
-// ---- Generation -----------------------------------------------------------
-// The prompt around the pose stays on the server (2.6.3). The idea chips are a string array in the app's resources.
-sealed interface PoseRequest {                               // It 2 (FR-4.4, FR-4.8)
-    data class Described(val text: String) : PoseRequest     // the user's description, 1..100 characters, Korean or English
-    data object Suggested : PoseRequest                      // Skip, or Generate with an empty field: the server suggests four
+// ---- Generation (the prompt around the pose stays on the server, 2.6.3) ---
+const val POSE_COUNT = 4                                     // candidates per set (FR-4.3)
+const val DESCRIPTION_MAX_LENGTH = 100                       // FR-4.8; the server refuses longer ones
+sealed interface PoseRequest {                               // FR-4.4, FR-4.8
+    data class Described(val text: String) : PoseRequest     // the user's description, Korean or English
+    data object Suggested : PoseRequest                      // an empty field: the server suggests four
+    companion object { fun of(description: String): PoseRequest }   // folds whitespace; blank is Suggested
 }
-data class PlannedPose(val id: String, val text: String)     // "pose-1" .. "pose-4", the app's own names for its four requests
+data class PlannedPose(val id: String, val text: String)     // "pose-1" .. "pose-4", the app's names for its requests
 sealed interface GenerationEvent {
     data class Planned(val poses: List<PlannedPose>) : GenerationEvent   // first, once the poses are known: the slots
 }
@@ -913,7 +1381,20 @@ sealed interface CandidateEvent : GenerationEvent {
     data class Ready(override val poseId: String, val image: Bitmap) : CandidateEvent
     data class Failed(override val poseId: String, val error: GenerationError) : CandidateEvent
 }
-enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, SERVER }   // every pose of a description REJECTED: another description or photo (US-5)
+enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, NO_PERSON, SERVER }
+// every pose REJECTED: another description or photo (US-5); every pose NO_PERSON: another photo
+data class PoseTip(val text: String)                         // how to hold the phone for the chosen pose (FR-4.10)
+data class PoseKey(val setId: String, val poseId: String)    // a ♥ on Pick a pose (FR-4.14); pose ids repeat per set
+data class PromptEntry(val text: String, val usedAt: Long, val role: Role, val partners: Set<String> = emptySet())
+// one per text (PoseRequest.of); role: this phone's part the last time; partners: friends' account ids
+
+// ---- Settings (2.6.8) -----------------------------------------------------
+enum class GuideColor { WHITE, BLACK, YELLOW, MINT, PINK }   // FR-3.10; WHITE is FR-2.2's line; BLACK gets a light backing
+enum class GuideThickness(val scale: Float) { THIN(0.75f), NORMAL(1f), THICK(1.5f) }   // × the default 2 dp line
+data class GuideLook(val color: GuideColor = WHITE, val thickness: GuideThickness = NORMAL)   // this phone's; never sent
+enum class Language(val tag: String?) { PHONE(null), ENGLISH("en"), KOREAN("ko") }   // FR-10.2
+enum class TutorialScreen { CAMERA, ADD_GUIDE, GUIDE_ON_CAMERA, GENERATE_POSES, SUBJECT_VIEW }   // FR-10.4
+val BASE_BRIGHTNESS_EV = -2f..2f                             // FR-1.11; a camera's own range clamps it
 ```
 
 ### 2.4 State machines
@@ -921,41 +1402,70 @@ enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, SERVER } 
 ```mermaid
 stateDiagram-v2
   [*] --> Idle
-  Idle --> Waiting: start (code shown)
-  Idle --> Inviting: invite (It 2)
-  Idle --> Connecting: join (code entered), or accept an invitation (It 2)
+  Idle --> Waiting: start, code shown
+  Idle --> Inviting: invite
+  Idle --> Connecting: join with a code, or accept an invitation
   Waiting --> Connecting: subject joined
   Waiting --> Ended: cancel, or code expired
-  Inviting --> Connecting: friend accepted (It 2)
-  Inviting --> Ended: cancelled, declined, or 30 s expired (It 2)
+  Inviting --> Connecting: friend accepted
+  Inviting --> Ended: cancelled, declined, or expired
   Connecting --> Connected: both channels open and the other phone's hello received
+  Connecting --> Waiting: room code photographer, link lost or 15 s timeout
   Connecting --> Ended: 15 s timeout, NOT_FOUND or FULL, EXPIRED, another error
-  Connected --> Reconnecting: ICE disconnected (It 2)
-  Reconnecting --> Connected: ICE restart succeeded (It 2)
-  Reconnecting --> Ended: 10 s passed, CONNECTION_LOST (It 2)
-  Connected --> Ended: leave, peer left, link lost (ICE failed, or disconnected for 10 s)
-  Ended --> Idle: next session (photographer)
+  Connected --> Reconnecting: ICE disconnected or failed
+  Connected --> Waiting: room code photographer, subject left or link lost
+  Reconnecting --> Connected: link connected again, reliable channel open
+  Reconnecting --> Waiting: room code photographer, 10 s passed
+  Reconnecting --> Ended: 10 s passed, reliable channel closed, place gone, leave, or peer left
+  Connected --> Ended: leave, peer left, or reliable channel closed
+  Ended --> Idle: next room (photographer)
+  Ended --> Inviting: next invitation
   Ended --> Connecting: next session (subject)
 ```
 
-*Figure 9. `SessionState` on each phone. `Inviting` and `Reconnecting` are added in Iteration 2.*
+*Figure 9. `SessionState` on each phone. `Inviting` is the photographer's while an invitation waits.*
 
-As built: `Connected` needs both data channels open and the other phone's `hello`, which carries its name; the 15 s connecting timer starts when the peer connection opens (`session.joined` on the subject, `peer.joined` on the photographer). While connecting, a 15 s timeout ends the subject's session with `CONNECTION_LOST`, `NOT_FOUND` or `FULL` with `NOT_FOUND`, `EXPIRED` with `EXPIRED`, and any other server error, an SDP failure, or a `hello` with another protocol with `ERROR`. Until `Reconnecting` is built, an ICE `DISCONNECTED` leaves the state `Connected` for up to 10 s, in which WebRTC may recover by itself; after that, or at once on `FAILED`, the link counts as lost. A photographer whose app stays in the background for 60 s leaves the session. `Ended` stays until the next session starts; the screens return to the camera on their own.
+**Connecting.** `Connected` needs both data channels open and the other phone's `hello`, which carries its name. The 15 s connecting timer starts when the peer connection opens: at `session.joined` on the subject, at `peer.joined` on the photographer.
 
-On the photographer's phone, the room stays open when the subject leaves, the connection drops, or connecting times out: the state goes back to `Waiting` with the same code instead of `Ended`, so the subject can join again with *Reconnect* (FR-6.10, FR-6.11). The subject's phone goes to `Ended`.
+| Cause | Subject | Photographer |
+|----|----|----|
+| 15 s without `Connected`, or the link lost while connecting | `Ended(CONNECTION_LOST)` | `Waiting` (room code) or `Ended(CONNECTION_LOST)` (invitation) |
+| `NOT_FOUND`, `FULL`, or `FORBIDDEN` | `Ended(NOT_FOUND)` | `Ended(EXPIRED)` while `Inviting` |
+| `EXPIRED` | `Ended(EXPIRED)` | `Ended(EXPIRED)` |
+| `DECLINED` | – | `Ended(DECLINED)` |
+| `RATE_LIMITED` | `Ended(RATE_LIMITED)` | – |
+| Another server error or an SDP failure while connecting | `Ended(ERROR)` | As the 15 s timeout |
+| A `hello` with another protocol | `Ended(ERROR)` | `Ended(ERROR)` |
 
-In Iteration 2 the photographer goes to `Reconnecting` too, instead of straight back to `Waiting`, so a short drop on either side is bridged by an ICE restart (2.6.7); after 10 s the photographer returns to `Waiting` for a room-code session and to `Idle` for an invitation session, and the subject goes to `Ended(CONNECTION_LOST)` with *Reconnect*, which rejoins by `sessionId` while the photographer still holds it.
+**Without a subject.** A room code's photographer keeps the room open when the subject leaves, the link is lost, or connecting times out. It returns to `Waiting` with the same code, so the subject can join again with *Reconnect* (FR-6.10, FR-6.11). An invitation's session has no code, so its photographer leaves and ends. `Inviting` gives up after 80 s without the friend (2.6.6).
+
+**Drops (2.6.7).** ICE `DISCONNECTED` or `FAILED` while connected puts both phones in `Reconnecting`, and an ICE restart on the same connection bridges a short drop.
+
+- `peer.left` with `CONNECTION_LOST` changes nothing while `Connected` or `Reconnecting`: it is often the other phone's old socket. The link decides.
+- The reliable channel closing ends the session at once, since it closes only when the other phone closed its connection. A realtime channel that closes alone hands its messages to the reliable one.
+- After 10 s the photographer says "&lt;name&gt; disconnected" and returns to `Waiting`, or ends an invitation's session. The subject goes to `Ended(CONNECTION_LOST)`.
+- The subject's *Reconnect* (`SessionEntry.Rejoin`) retakes its place with its rejoin token while the photographer holds the session; without a token it joins the code again.
+
+A photographer whose app stays in the background for 60 s leaves the session. `Ended` stays until the next session starts, and the screens return to the camera by themselves.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> PENDING: POST /invitations, push sent
-  PENDING --> ACCEPTED: accept (sessionId created)
+  [*] --> PENDING: POST /invitations, session opened, push sent
+  PENDING --> ACCEPTED: accept, the friend's place given
   PENDING --> DECLINED: decline
   PENDING --> CANCELLED: photographer cancels
-  PENDING --> EXPIRED: 30 s on the server
+  PENDING --> EXPIRED: 60 s on the server
 ```
 
-*Figure 9b. An invitation on the server (Iteration 2). Opening a link to an invitation that is not `PENDING` shows "This invitation is no longer available" (FR-6.4).*
+*Figure 9b. An invitation on the server. `EXPIRED` is computed from `expires_at` and never stored. A link to an invitation that is not `PENDING` shows "This invitation is no longer available" (FR-6.4).*
+
+**Shared steps (2.5.1, 2.6.5).** The photographer's phone owns three steps of a session and sends their states to the subject. Each ends once; the first choice to reach the photographer's phone decides (AD-7).
+
+| Step | States |
+|----|----|
+| *Generate poses* (`DescriptionStep`) | `OPEN` while written → `STARTED` by its button (*Suggest 4 poses* or *Generate 4 poses from this*), or `CLOSED` |
+| The pose set (`PoseSetStep`) | `GENERATING` → `PICKING` when *Pick a pose* opens with a candidate → `CHOSEN` by the first *Use this pose*; `CLOSED` without a choice |
+| *Reference confirm* of a chosen pose (`ConfirmStep`) | `FINDING` (again after *Choose another photo*) → `READY` with the outline → `USED` by the first *Use this guide*; `CLOSED` without a guide |
 
 ### 2.5 Protocols and APIs
 
@@ -963,44 +1473,72 @@ Each protocol has a summary table, followed by a JSON example for every message 
 
 #### 2.5.1 Data channel protocol (phone ↔ phone)
 
-The photographer opens two channels when it creates the offer: `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). Every message uses one JSON envelope: `v` is the protocol version (2 since the subject's requests of Iter2-P17 were added on 2026-10-16; `hello` ends the session with a phone that speaks another version, because a version-1 phone would advertise the capabilities for brightness and flash yet drop those requests without an answer), `t` the type, `seq` a counter per type, `ts` the send time in milliseconds, and `b` the body. In code, `SessionMessage` uses `t` as its class discriminator, so the codec keeps `t` at the top and moves the other fields into `b`. Receivers ignore unknown types and unknown fields, so older builds keep working, and drop a `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, or `guide.move`, on either channel, whose `seq` is not newer than the last one applied for that type; other types are never dropped. Protocol 2 also drops `style` from `guide.state`; the guide image becomes a mask with the mask-only transfer, which is not built yet (2.9). Both phones update together. Only the photographer takes photos; the subject sends requests.
+The photographer owns the camera, the guide, and the shared steps. The subject sends requests, which the photographer applies and echoes (AD-7). Only the photographer takes photos.
 
-| Type | Channel | Dir. | Purpose |
-|----|----|----|----|
-| `hello` | reliable | both | First message; checks the protocol version |
-| `camera.capabilities` | reliable | P→S | Zoom range, exposure range, flash, aspect ratios (It 2) |
-| `guide.image.begin` | reliable | P→S | Starts sending the guide mask |
-| `guide.image.chunk` | reliable | P→S | One piece of the mask |
-| `guide.image.end` | reliable | P→S | Ends the mask; the subject checks it |
-| `guide.state` | realtime / reliable | P→S | Where the guide is drawn, its opacity, and whether it is visible |
-| `guide.clear` | reliable | P→S | The guide was removed |
-| `guide.move` (It 2) | realtime; `final` reliable | S→P | A step of the subject's guide drag or pinch, or its final value (FR-7.2) |
-| `camera.zoom.set` | realtime; `final` reliable | S→P | A step of the subject's pinch on the live video, or its final value |
-| `camera.exposure.set` (It 2) | realtime; `final` reliable | S→P | A step of the subject's brightness slider, or its final value (FR-7.3) |
-| `camera.flash.set` (It 2) | reliable | S→P | The subject's flash choice (FR-7.3) |
-| `camera.focus.set` (It 2, Could) | reliable | S→P | The subject's focus point (FR-7.7) |
-| `camera.state` | realtime / reliable | P→S | The zoom, exposure, flash, and aspect ratio actually applied, and who changed it |
-| `control.permission` (It 2, Could) | reliable | P→S | Whether remote control is allowed (FR-7.5) |
-| `session.leave` | reliable | both | Leaving on purpose |
-| `ping / pong` | realtime | both | Round-trip time for measurement |
+- **Channels.** Before its offer, the photographer opens `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). `ChannelRouter` picks the channel of each message.
+- **Envelope.** `{"v", "t", "seq", "ts", "b"}`: the protocol version (3), the type, a counter per type, the send time in ms, and the body. `MessageCodec` keeps `t`, the class discriminator of `SessionMessage`, at the top and moves the other fields into `b`.
+- **Compatibility.** A `hello` with another `protocol` ends the session with an error. Receivers ignore unknown types and unknown fields, so new types and optional fields keep version 3. A message with an unknown enum value is ignored whole.
+- **Newest value only.** For `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, and `guide.move`, receivers drop a message whose `seq` is not newer than the last one applied for its type. This holds on either channel. Other types are never dropped.
+- **Steps.** A gesture sends steps on `realtime`, at most every 50 ms, the newest winning. Its last value goes once on `reliable` with `final: true`.
+- **Order.** `hello` goes first on `reliable`. Reliable messages wait in one ordered queue until `hello` is sent and while the channel's `bufferedAmount` is 256 KiB or more. Realtime messages go at once or not at all (2.8). If `realtime` closes alone, its messages go on `reliable` (2.6.7).
+- **Chunks.** An image or photo goes in three parts. `.begin` holds the id, `format`, `bytes`, `chunks`, and an image's `width` and `height`. Each `.chunk` holds the id, `index`, and `data`, and `.end` the id and the `crc32` of the whole file. `data` is the Base64 of at most 9 KiB of the file (at most 12 KiB of text), so a message stays under 16 KiB. A skipped index, a wrong size, or a wrong CRC drops the transfer. An image `begin` over 2 MiB, or with a `chunks` that does not fit `bytes`, is refused.
+- **Shared steps (Iter3-P16).** `pose.description`, `pose.step`, and `guide.confirm` show the photographer's *Generate poses*, set of candidates, and *Reference confirm* on the subject's phone (2.6.5). Each instance has a new UUID and ends once. The subject keeps its copy in memory through a reconnect, and drops it at its end, at another one, or when the session ends. After a reconnect, the photographer sends its last one again as it is now, or only its end; the subject skips images it already holds (2.6.7).
+
+| Type | Dir. | Channel | Body | Purpose |
+|----|----|----|----|----|
+| `hello` | both | reliable | `protocol`, `appVersion`, `role`, `name`, `haveGuideId`, `haveReferenceId` | First message; checks the version |
+| `session.leave` | both | reliable | `reason` | Leaving on purpose |
+| `ping` / `pong` | both | realtime | `ts` | Round-trip time, every 2 s |
+| `camera.capabilities` | P→S | reliable | `capabilities` | Zoom and exposure ranges, flash, aspect ratios |
+| `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `by`, `final` | The applied camera values, and who changed them |
+| `camera.zoom.set` | S→P | steps realtime, final reliable | `ratio`, `final` | The subject's pinch or readout tap (FR-7.1) |
+| `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness slider (FR-7.3) |
+| `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
+| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 4) |
+| `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5; Could, Iteration 4) |
+| `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
+| `guide.reference.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The guide's reference photo, for the subject's thumbnail (FR-3.9) |
+| `guide.state` | P→S | steps realtime, final reliable | `state`, `final`, `by` | The guide's place, opacity, and visibility |
+| `guide.clear` | P→S | reliable | none | The guide was removed |
+| `guide.move` | S→P | steps realtime, final reliable | `guideId`, `cx`, `cy`, `height`, `final` | The subject's drag or pinch on the guide (FR-7.2) |
+| `pose.description` | P→S | reliable | `descriptionId`, `step`, `text`, `writer`, `rejected`, `setId` | The photographer's *Generate poses* (FR-6.15) |
+| `pose.scene.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The scene photo, for the subject's *Generate poses* |
+| `pose.description.edit` | S→P | reliable | `descriptionId`, `holding`, `text` | The subject's field takes or returns the description |
+| `pose.description.go` | S→P | reliable | `descriptionId`, `text`, `suggest` | The subject's *Generate poses* button |
+| `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by` | The photographer's set of candidates (FR-6.15) |
+| `pose.planned` | P→S | reliable | `setId`, `poseIds` | The set's slots in order (Iter3-A13) |
+| `pose.candidate.begin` / `.chunk` / `.end` | P→S | reliable | chunks | One candidate, for *Generating poses* and *Pick a pose* |
+| `pose.candidate.failed` | P→S | reliable | `setId`, `poseId` | A candidate that could not be created (Iter3-A13) |
+| `pose.pick` | S→P | reliable | `setId`, `poseId` | The subject's *Use this pose* |
+| `guide.confirm` | P→S | reliable | `confirmId`, `step`, `guideId`, `by` | The photographer's *Reference confirm* of a chosen pose (FR-6.15) |
+| `guide.confirm.image.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The outline's mask, for the subject's *Your reference* |
+| `guide.confirm.use` | S→P | reliable | `confirmId`, `guideId` | The subject's *Use this guide* |
+| `photo.shutter` | P→S | realtime | none | The shutter was pressed (Iter3-A12) |
+| `photo.begin` / `.chunk` / `.end` | P→S | reliable, bulk | chunks, with `takenAt` | A photo taken in the session, as saved (FR-6.14) |
+| `photo.ack` | S→P | reliable | `photoId`, `next` | The chunk the subject expects next |
+| `photo.saved` | S→P | reliable | `photoId`, `ok`, `reason` | Whether the photo is in the subject's album |
+
+| Transfer | Ids | Format and size | The receiver refuses | The subject keeps it |
+|----|----|----|----|----|
+| `guide.image.*` | `guideId` | `mask-png`: the smoothed mask as an 8-bit gray PNG, ≤ 720 px tall, a few KB | A PNG over 1280 px wide or 720 px tall, read from its header before inflating | As the guide; S→P, the photographer adopts it |
+| `guide.reference.*` | `guideId` | `jpeg`, quality 85, long side ≤ 512 px | A photo over 512 px | In memory (`MirrorReference`) until another guide or `guide.clear`; *Save guide* stores it with the guide |
+| `pose.candidate.*` | `setId`, `poseId` | `jpeg`, quality 85, else 70 or 55 to fit 1 MiB; long side ≤ 1024 px | Over 1024 px or 1 MiB, at `begin` | In memory, with its set; the ♥ on *Pick a pose* can save it (FR-4.14) |
+| `pose.scene.*` | `descriptionId` | As a candidate | As a candidate | In memory, with its description; never saved |
+| `guide.confirm.image.*` | `confirmId`, `guideId` | `mask-png`, as `guide.image.*` | Over 1280 px wide or 720 px tall, at `begin`; an outline its copy is not `READY` with | In memory, on *Your reference* only; never saved |
+| `photo.*` | `photoId` | `jpeg`: the saved file itself, ≤ 40 MiB | No bytes or over 40 MiB (`TOO_LARGE`), another format or chunk count (`BROKEN`), at `begin` | In its "Pix" album |
+
+The subject never draws a reference photo, candidate, scene photo, or outline as the guide, and never sends one on. The photographer's guide reaches it only as `guide.image.*`.
 
 <details>
 <summary><code>hello</code> · reliable · both</summary>
 
 ```json
-{
-  "v": 2, "t": "hello", "seq": 1, "ts": 1759212345678,
-  "b": {
-    "protocol": 2,
-    "appVersion": "0.2.0",
-    "role": "PHOTOGRAPHER",
-    "name": "Dongje",
-    "haveGuideId": null
-  }
-}
+{ "v": 3, "t": "hello", "seq": 1, "ts": 1759212345678,
+  "b": { "protocol": 3, "appVersion": "0.1.0", "role": "PHOTOGRAPHER", "name": "Pixel 8",
+         "haveGuideId": null, "haveReferenceId": null } }
 ```
 
-Sent by both phones as soon as the channels open. A different `protocol` ends the session with an error. `name` is the phone's device name from the system settings (its model when there is none), at most 40 characters, not the Pix display name. The subject puts the ID of the guide image it already has in `haveGuideId`.
+Both phones send it once both channels are open. `name` is the device name from the system settings, or the model, at most 40 characters; it is not the Pix display name. Only the subject sets `haveGuideId` and `haveReferenceId`: the guide image and the reference photo it already holds, which the photographer then skips.
 
 </details>
 
@@ -1008,64 +1546,66 @@ Sent by both phones as soon as the channels open. A different `protocol` ends th
 <summary><code>camera.capabilities</code> · reliable · P→S</summary>
 
 ```json
-{
-  "v": 2, "t": "camera.capabilities", "seq": 2, "ts": 1759212345690,
-  "b": {
-    "capabilities": {
-      "minZoom": 0.6, "maxZoom": 10.0, "zoomStops": [0.6, 1.0, 2.0, 3.0],
-      "exposureRange": [-12, 12], "exposureStep": 0.1667, "hasFlash": true,
-      "aspectRatios": ["R4_3", "R16_9", "R1_1"], "supportsFocusPoint": true
-    }
-  }
-}
+{ "v": 3, "t": "camera.capabilities", "seq": 2, "ts": 1759212345690,
+  "b": { "capabilities": {
+    "minZoom": 0.6, "maxZoom": 10.0, "zoomStops": [0.6, 1.0, 2.0, 3.0],
+    "exposureRange": [-12, 12], "exposureStep": 0.1667, "hasFlash": true,
+    "aspectRatios": ["R4_3", "R16_9", "R1_1"], "supportsFocusPoint": true } } }
 ```
 
-Sent once the session is connected, and again whenever the photographer's capabilities change, for example `hasFlash: false` while a separately exposed ultrawide without a flash is bound. The subject clamps its pinch-zoom requests to `minZoom`–`maxZoom` and shows them in its readout (2.6.5). The Iteration 2 fields size the brightness slider (`exposureRange`, `exposureStep`), hide the flash button (`hasFlash`), tell the subject which frame to expect, and enable remote focus (Could); `exposureRange` travels as `[min, max]`. A phone that leaves them out has none of these controls and binds 4:3 only. `zoomStops` is kept for compatibility and no longer shown.
+Sent when the session connects and at each change. For example, `hasFlash` is false while a separate ultrawide without a flash is bound. The subject uses `minZoom`–`maxZoom` for its pinch and readout, `exposureRange` (`[min, max]`) and `exposureStep` for its brightness slider, and `hasFlash` for its flash button. It does not use `zoomStops`, `aspectRatios`, or `supportsFocusPoint`. A missing field means no such control, and 4:3 only.
 
 </details>
 
 <details>
-<summary><code>guide.image.begin</code> · reliable · P→S</summary>
+<summary><code>guide.image.begin</code> · reliable · both</summary>
 
 ```json
-{
-  "v": 2, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
-  "b": {
-    "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17",
-    "format": "mask-png", "width": 540, "height": 720, "bytes": 9120, "chunks": 1, "aspect": 0.75
-  }
-}
+{ "v": 3, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "format": "mask-png",
+         "width": 540, "height": 720, "bytes": 9120, "chunks": 1, "aspect": 0.75,
+         "anchor": { "left": 0.31, "top": 0.21, "right": 0.69, "bottom": 0.95 }, "source": "GALLERY" } }
 ```
 
-Skipped if the subject reported the same `haveGuideId`. From Iteration 2 the image is the **smoothed mask** only (`mask-png`: 8-bit single-channel PNG, height ≤ 720 px), never the reference's pixels (AD-6, AD-15). There is no `anchor` (decided 2026-10-16): the photographer sends `guide.state` after every image, also to a subject that joins late, and the subject places the guide from it (2.6.2). Iteration 1 sent a `webp` cutout with alpha, which the code still sends until the mask-only transfer (2.9): `{guideId, format: "webp", width, height, bytes, chunks}`, lossy WebP at quality 90 and at most 720 px tall, without `aspect`, which the subject takes from the image.
+Only the smoothed mask travels, never the reference's pixels (AD-6, AD-15). `MaskPng` writes and reads it losslessly on both phones. `aspect` is the mask's width / height. `anchor` is the mask's box in its reference photo, in fractions, right and bottom exclusive (`ReferenceGuide.anchor`); `source` is `GALLERY` or `GENERATED`. Each goes only when the guide has it.
+
+- **P→S.** Skipped when `hello` reported the same `haveGuideId`. The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor` and `source` for *Save guide*.
+- **S→P.** The photographer adopts the guide, under the same `guideId`, in place of its own, starting at `anchor` (FR-3.1). It answers with `guide.state` `by: SUBJECT` and no image (2.6.5, *Guide from the subject*). An anchor that is not finite, lies outside 0..1, or has no area starts the guide centered; a missing `source` means `GALLERY`. No reference photo goes S→P, so the photographer shows no thumbnail for that guide (FR-3.9). A refused image leaves the photographer's guide as it was. Without a `guide.state` that names the guide within 5 s, the subject shows the photographer's guide again.
 
 </details>
 
 <details>
-<summary><code>guide.image.chunk</code> · reliable · P→S</summary>
+<summary><code>guide.image.chunk</code> · reliable · both</summary>
 
 ```json
-{
-  "v": 2, "t": "guide.image.chunk", "seq": 4, "ts": 1759212345705,
-  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "index": 0, "data": "UklGRl68AABXRUJQVlA4WAoAAAAQAAAAHwIAzwIA..." }
-}
+{ "v": 3, "t": "guide.image.chunk", "seq": 3, "ts": 1759212345705,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "index": 0, "data": "iVBORw0KGgoAAAANSUhEUgAAAhwAAALQCAAAAAD+..." } }
 ```
-
-`data` is Base64 of at most 12 KiB, so each message stays under 16 KiB. Chunks are sent only while the channel's `bufferedAmount` is below 256 KiB (2.8).
 
 </details>
 
 <details>
-<summary><code>guide.image.end</code> · reliable · P→S</summary>
+<summary><code>guide.image.end</code> · reliable · both</summary>
 
 ```json
-{
-  "v": 2, "t": "guide.image.end", "seq": 9, "ts": 1759212345760,
-  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "crc32": 3735928559 }
-}
+{ "v": 3, "t": "guide.image.end", "seq": 3, "ts": 1759212345760,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "crc32": 3735928559 } }
 ```
 
-The subject checks the CRC, decodes the mask, and draws the outline from it with the same `OutlineExtractor` as the photographer, without smoothing again (2.6.1 step 6).
+The receiver traces the outline from the mask with the sender's `OutlineExtractor`, without smoothing again (2.6.1).
+
+</details>
+
+<details>
+<summary><code>guide.reference.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "guide.reference.begin", "seq": 11, "ts": 1759212345780,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "format": "jpeg",
+         "width": 384, "height": 512, "bytes": 41210, "chunks": 5 } }
+```
+
+Sent once per guide, after the guide's image and `guide.state`, so the subject draws the guide first. Skipped for a guide without a reference photo, and when `hello` reported the same `haveReferenceId`. The subject shows it only with its guide (FR-3.9, AD-6).
 
 </details>
 
@@ -1073,20 +1613,13 @@ The subject checks the CRC, decodes the mask, and draws the outline from it with
 <summary><code>guide.state</code> · realtime / reliable · P→S</summary>
 
 ```json
-{
-  "v": 2, "t": "guide.state", "seq": 412, "ts": 1759212349120,
-  "b": {
-    "state": {
-      "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17",
-      "cx": 0.32, "cy": 0.55, "height": 0.7,
-      "opacity": 0.5, "visible": true
-    },
-    "final": false
-  }
-}
+{ "v": 3, "t": "guide.state", "seq": 412, "ts": 1759212349120,
+  "b": { "state": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "cx": 0.32, "cy": 0.55,
+                    "height": 0.7, "opacity": 0.5, "visible": true },
+         "final": false, "by": "PHOTOGRAPHER" } }
 ```
 
-Sent on `realtime` at most every 50 ms during a gesture, then once with `"final": true` on `reliable` when the gesture ends, so the final state always arrives. The fields are those of `GuideState` (2.3); `style` is gone since protocol 2. `visible: false` hides the guide on both phones (FR-3.6). Every `guide.state` carries `by`, `PHOTOGRAPHER` unless it is the echo of an applied `guide.move`, which carries `"by": "SUBJECT"`; a message without `by` means the photographer. The subject's echo lets the subject's own gesture settle on the applied value like zoom does.
+`state` holds the fields of `GuideState` (2.3); `visible: false` hides the guide on both phones (FR-3.6). The photographer sends it when the session connects and after every image. `by` is `SUBJECT` on the echo of an applied `guide.move`, and a missing `by` means the photographer.
 
 </details>
 
@@ -1094,20 +1627,20 @@ Sent on `realtime` at most every 50 ms during a gesture, then once with `"final"
 <summary><code>guide.clear</code> · reliable · P→S</summary>
 
 ```json
-{ "v": 2, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
+{ "v": 3, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
 ```
 
 </details>
 
 <details>
-<summary><code>guide.move</code> · realtime / reliable · S→P · It 2</summary>
+<summary><code>guide.move</code> · realtime / reliable · S→P</summary>
 
 ```json
-{ "v": 2, "t": "guide.move", "seq": 21, "ts": 1759212352100,
+{ "v": 3, "t": "guide.move", "seq": 21, "ts": 1759212352100,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }
 ```
 
-The subject's drag or pinch on the guide `guideId`, in frame coordinates, at most every 50 ms on `realtime` and once with `"final": true` on `reliable`. The photographer clamps it with `GuideGeometry` (the same limits as its own gestures, FR-3.2, FR-3.3), applies it to `GuideRepository`, and echoes `guide.state` with `by: SUBJECT`. A move for a guide the photographer no longer shows, because it was replaced while the gesture was in flight, is dropped: a gesture never crosses guide identities (2.6.2). Opacity and `visible` are not in this message; only the photographer changes them.
+The center and height the subject asks for, in frame coordinates. The photographer clamps and applies them like its own gesture (FR-3.2, FR-3.3) and echoes `guide.state`. It drops a move while the guide is hidden, and a move for a guide it no longer shows (2.6.2, 2.6.5). Only the photographer changes opacity and visibility.
 
 </details>
 
@@ -1115,10 +1648,10 @@ The subject's drag or pinch on the guide `guideId`, in frame coordinates, at mos
 <summary><code>camera.zoom.set</code> · realtime / reliable · S→P</summary>
 
 ```json
-{ "v": 2, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
+{ "v": 3, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
-Sent on `realtime` at most every 50 ms during a pinch on the live video, then once with `"final": true` on `reliable` when the pinch ends, is cancelled, or the screen pauses. The readout's Zoom in / Zoom out accessibility actions send a single final request. Unchanged from Iteration 1 except for the gesture (AD-17).
+A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* accessibility actions send one final request. The photographer clamps, applies, and echoes it (2.6.5).
 
 </details>
 
@@ -1126,55 +1659,277 @@ Sent on `realtime` at most every 50 ms during a pinch on the live video, then on
 <summary><code>camera.state</code> · realtime / reliable · P→S</summary>
 
 ```json
-{ "v": 2, "t": "camera.state", "seq": 58, "ts": 1759212352342,
+{ "v": 3, "t": "camera.state", "seq": 58, "ts": 1759212352342,
   "b": { "zoom": 2.0, "exposure": 3, "flash": "AUTO", "aspect": "R16_9", "by": "SUBJECT", "final": true } }
 ```
 
-Sent on every zoom the camera reports applied, as a step at once (the camera applies at most one request per display frame, 2.6.5), and once more with `"final": true` 100 ms after the last one; a step of the subject's brightness slider is echoed as a step. Iteration 2 adds `exposure`, `flash`, and `aspect` to the same message, so the subject always has the whole applied camera state and re-fits its video area when `aspect` changes (AD-10). A change of the exposure, the flash, or the ratio on the photographer's phone goes at once as a final state with `by: PHOTOGRAPHER`, and the first state after `hello` already carries them; a message without them means 0, `OFF`, and `R4_3`. The subject keeps the last one as `SessionManager.peerCamera`. `by` is PHOTOGRAPHER or SUBJECT; the subject logs `zoom.echo`, with the exposure and flash in its detail, for every final `camera.state` with `by: SUBJECT`, the echo of its zoom, brightness, or flash request (NFR-7).
+Each zoom the camera reports applied goes at once as a step, and once more as final 100 ms after the last one. A change of exposure, flash, or ratio goes at once as final; a step of the subject's slider is echoed as a step. Every message holds the whole applied state, from the first one after `hello`; a missing `exposure`, `flash`, or `aspect` means 0, `OFF`, or `R4_3`. `by` is `SUBJECT` when the change answers the subject's request. The subject keeps the last message as `SessionManager.peerCamera` and fits its video area to `aspect` (AD-10). It logs `zoom.echo`, with the exposure and flash, for each final one with `by: SUBJECT` (NFR-7).
 
 </details>
 
 <details>
-<summary><code>camera.exposure.set</code> · realtime / reliable · S→P · It 2</summary>
+<summary><code>camera.exposure.set</code> · realtime / reliable · S→P</summary>
 
 ```json
-{ "v": 2, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000, "b": { "index": 3, "final": true } }
+{ "v": 3, "t": "camera.exposure.set", "seq": 7, "ts": 1759212353000, "b": { "index": 3, "final": true } }
 ```
 
-An exposure-compensation index within `exposureRange`, with the same step-then-final pattern as zoom. The photographer clamps it, calls `setExposure`, and echoes `camera.state`.
+An exposure-compensation index, which the photographer clamps to `exposureRange` (2.6.5).
 
 </details>
 
 <details>
-<summary><code>camera.flash.set</code> · reliable · S→P · It 2</summary>
+<summary><code>camera.flash.set</code> · reliable · S→P</summary>
 
 ```json
-{ "v": 2, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }
+{ "v": 3, "t": "camera.flash.set", "seq": 2, "ts": 1759212354000, "b": { "mode": "AUTO" } }
 ```
 
-Ignored, with an unchanged echo, when `hasFlash` is false.
+When `hasFlash` is false, the photographer answers with the unchanged state.
 
 </details>
 
 <details>
-<summary><code>camera.focus.set</code> · reliable · S→P · It 2, Could</summary>
+<summary><code>camera.focus.set</code> · reliable · S→P · Could</summary>
 
 ```json
-{ "v": 2, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
+{ "v": 3, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
-A tap on the live video, in frame coordinates (2.6.2). The photographer calls `setFocusPoint` and shows the focus ring; there is no echo, because focus has no lasting state.
+Planned (FR-7.7, Could): a tap on the live video, in frame coordinates; the photographer calls `setFocusPoint`, with no echo. The type is in `SessionMessage`, but no phone sends or handles it yet.
 
 </details>
 
 <details>
-<summary><code>control.permission</code> · reliable · P→S · It 2, Could</summary>
+<summary><code>control.permission</code> · reliable · P→S · Could</summary>
 
 ```json
-{ "v": 2, "t": "control.permission", "seq": 1, "ts": 1759212340000, "b": { "allowed": false } }
+{ "v": 3, "t": "control.permission", "seq": 1, "ts": 1759212340000, "b": { "allowed": false } }
 ```
 
-Sent after `hello` and whenever the photographer changes the switch (FR-7.5). While `allowed` is false the subject disables its controls and the photographer ignores `camera.*.set` and `guide.move`. Until the switch is built, the subject assumes `true`.
+Planned (FR-7.5, Could): sent after `hello` and at each change of the photographer's switch. While `allowed` is false, the subject's controls are disabled and the photographer drops every request. The type is in `SessionMessage`, but no phone sends it yet, so remote control is always allowed.
+
+</details>
+
+<details>
+<summary><code>pose.step</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "pose.step", "seq": 3, "ts": 1759212400100,
+  "b": { "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "step": "PICKING", "poseIds": ["pose-1", "pose-2", "pose-4"] } }
+```
+
+| `step` | When | Fields |
+|----|----|----|
+| `GENERATING` | *Generate poses*' button started a set | — |
+| `PICKING` | The photographer's *Pick a pose* opened | `poseIds`: the candidates whose copy went out, in its order |
+| `CHOSEN` | A *Use this pose* decided | `poseId`, `by` |
+| `CLOSED` | No choice: Back, *Try other poses*, *Cancel*, or no candidate | — |
+
+Each set, *Try again* included, has a new `setId`.
+
+</details>
+
+<details>
+<summary><code>pose.candidate.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "pose.candidate.begin", "seq": 2, "ts": 1759212391400,
+  "b": { "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "poseId": "pose-2", "format": "jpeg",
+         "width": 768, "height": 1024, "bytes": 151320, "chunks": 17 } }
+```
+
+Each copy goes as soon as its candidate arrives on the photographer's phone, one at a time, so most copies arrive before `PICKING`. A candidate whose copy does not fit 1 MiB at quality 55 is not sent.
+
+</details>
+
+<details>
+<summary><code>pose.planned</code> / <code>pose.candidate.failed</code> · reliable · P→S (Iter3-A13)</summary>
+
+```json
+{ "v": 3, "t": "pose.planned", "seq": 2, "ts": 1759212391200,
+  "b": { "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "poseIds": ["pose-1", "pose-2", "pose-3", "pose-4"] } }
+```
+
+`pose.planned` goes once the set's candidates are planned, which takes suggested poses a few seconds, and before any copy. `pose.candidate.failed` (`setId`, `poseId`) marks a slot that failed, or that the set's 60 s limit ended, so the subject's slot says "Couldn't create". It carries no reason. A subject that holds another set, or none, ignores both.
+
+</details>
+
+<details>
+<summary><code>pose.pick</code> · reliable · S→P</summary>
+
+```json
+{ "v": 3, "t": "pose.pick", "seq": 1, "ts": 1759212405200, "b": { "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "poseId": "pose-2" } }
+```
+
+The photographer takes it only while that set is `PICKING` and nobody has chosen. A `pose.step` answers it; the subject waits 5 s (2.6.5).
+
+</details>
+
+<details>
+<summary><code>pose.description</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "pose.description", "seq": 4, "ts": 1759212380200,
+  "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "step": "OPEN", "text": "Jumping with both arms up", "writer": "PHOTOGRAPHER" } }
+```
+
+| `step` | When | Fields |
+|----|----|----|
+| `OPEN` | *Generate poses* opened; again at each change | `text`; `writer`, the phone whose field holds the description, left out while nobody types; `rejected: true` after the service refused the last description, left out otherwise |
+| `STARTED` | A set started from the description, from either phone | `text`, as the set asked for it, empty for suggested poses; `setId`, as `pose.step` names the set |
+| `CLOSED` | *Cancel* | — |
+
+The subject's prompt history keeps the `STARTED` text and waits for the answer of set `setId`, whichever message comes first (FR-4.11, 2.6.3, [#182]). Without `text` or `setId`, as from an older photographer, it uses its copy's last text and the set that follows.
+
+</details>
+
+<details>
+<summary><code>pose.scene.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "pose.scene.begin", "seq": 1, "ts": 1759212380300,
+  "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "format": "jpeg", "width": 768, "height": 1024, "bytes": 151320, "chunks": 17 } }
+```
+
+Sent once per description, after its first `pose.description`.
+
+</details>
+
+<details>
+<summary><code>pose.description.edit</code> · reliable · S→P</summary>
+
+```json
+{ "v": 3, "t": "pose.description.edit", "seq": 3, "ts": 1759212382100,
+  "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "holding": true, "text": "Jumping with both" } }
+```
+
+`holding: true` carries the text so far, from a tap on the field and at each change. `holding: false` carries the last text, when the field gives the description back (2.6.5). The photographer takes it only while its own field does not hold the description, and answers with `pose.description`.
+
+</details>
+
+<details>
+<summary><code>pose.description.go</code> · reliable · S→P</summary>
+
+```json
+{ "v": 3, "t": "pose.description.go", "seq": 1, "ts": 1759212384000,
+  "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "text": "Jumping with both arms up", "suggest": false } }
+```
+
+`suggest: true`, sent for an empty field, asks for suggested poses (Iter3-A13). The photographer takes it only while that description is open and its own field does not hold it. `pose.description` `STARTED` answers it; the subject waits 5 s (2.6.5).
+
+</details>
+
+<details>
+<summary><code>photo.shutter</code> · realtime · P→S</summary>
+
+```json
+{ "v": 3, "t": "photo.shutter", "seq": 1, "ts": 1759212499870, "b": {} }
+```
+
+Sent at each shutter press while connected, not while reconnecting, so the subject's video blinks at that moment (2.6.4, Iter3-A12). `photo.begin` comes only seconds later, once the photo is saved. A lost `photo.shutter` shows no blink.
+
+</details>
+
+<details>
+<summary><code>photo.begin</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "photo.begin", "seq": 1, "ts": 1759212500000,
+  "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "format": "jpeg", "bytes": 4718592, "chunks": 512, "takenAt": 1759212499870 } }
+```
+
+One photo at a time, in the order taken (2.6.5, *Photos on both phones*). `bytes` is the size of the JPEG as saved, so the subject keeps every pixel and the EXIF rotation. `takenAt` is when the photo was taken.
+
+</details>
+
+<details>
+<summary><code>photo.chunk</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "photo.chunk", "seq": 1, "ts": 1759212500040,
+  "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "index": 0, "data": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcG..." } }
+```
+
+Photo messages go through `SessionManager.sendBulk`: only while no other reliable message waits, `bufferedAmount` is below 64 KiB, and the link is not reconnecting (2.8). A chunk also waits while 32 chunks are unacknowledged.
+
+</details>
+
+<details>
+<summary><code>photo.end</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "photo.end", "seq": 1, "ts": 1759212502100,
+  "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "crc32": 3735928559 } }
+```
+
+The subject saves the photo if every byte came, the CRC matches, and the file starts as a JPEG.
+
+</details>
+
+<details>
+<summary><code>photo.ack</code> · reliable · S→P</summary>
+
+```json
+{ "v": 3, "t": "photo.ack", "seq": 3, "ts": 1759212500600, "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "next": 48 } }
+```
+
+Sent every 16 chunks.
+
+</details>
+
+<details>
+<summary><code>photo.saved</code> · reliable · S→P</summary>
+
+```json
+{ "v": 3, "t": "photo.saved", "seq": 4, "ts": 1759212502300, "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "ok": false, "reason": "STORAGE" } }
+```
+
+With `ok: false`, `reason` is `TOO_LARGE`, `BROKEN` (a skipped index, a wrong size or CRC, or not a JPEG), or `STORAGE`. A refusal can come before the last chunk, and stops that photo. The photographer sends its next photo after this answer, or after 30 s without progress (2.6.5).
+
+</details>
+
+<details>
+<summary><code>guide.confirm</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "guide.confirm", "seq": 2, "ts": 1759212406900,
+  "b": { "confirmId": "5b0e9c1d-7a24-4f3e-8d6b-2c9a0f1e3d47", "step": "READY", "guideId": "8f14e45f-ceea-467a-9b6c-1d2e3f4a5b6c" } }
+```
+
+| `step` | When | Fields |
+|----|----|----|
+| `FINDING` | The photographer's phone separates the person; again after *Choose another photo* | — |
+| `READY` | The outline is on screen; its mask follows | `guideId` |
+| `USED` | A *Use this guide* decided | `guideId`, `by` |
+| `CLOSED` | No guide: Back, no person found, or a photo that cannot be used | — |
+
+Each chosen pose has a new `confirmId`. A *Reference confirm* opened from *Add a pose guide* sends nothing.
+
+</details>
+
+<details>
+<summary><code>guide.confirm.image.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "guide.confirm.image.begin", "seq": 1, "ts": 1759212407000,
+  "b": { "confirmId": "5b0e9c1d-7a24-4f3e-8d6b-2c9a0f1e3d47", "guideId": "8f14e45f-ceea-467a-9b6c-1d2e3f4a5b6c",
+         "format": "mask-png", "width": 540, "height": 720, "bytes": 9120, "chunks": 1 } }
+```
+
+The subject traces the outline from the mask as for a guide (2.6.1). The guide used comes later as `guide.image.*`.
+
+</details>
+
+<details>
+<summary><code>guide.confirm.use</code> · reliable · S→P</summary>
+
+```json
+{ "v": 3, "t": "guide.confirm.use", "seq": 1, "ts": 1759212409300,
+  "b": { "confirmId": "5b0e9c1d-7a24-4f3e-8d6b-2c9a0f1e3d47", "guideId": "8f14e45f-ceea-467a-9b6c-1d2e3f4a5b6c" } }
+```
+
+The photographer takes it only while that outline is on screen and nobody has used it. A `guide.confirm` answers it; the subject waits 5 s (2.6.5).
 
 </details>
 
@@ -1183,10 +1938,10 @@ Sent after `hello` and whenever the photographer changes the switch (FR-7.5). Wh
 <summary><code>session.leave</code> · reliable · both</summary>
 
 ```json
-{ "v": 2, "t": "session.leave", "seq": 60, "ts": 1759212399000, "b": { "reason": "LEFT" } }
+{ "v": 3, "t": "session.leave", "seq": 60, "ts": 1759212399000, "b": { "reason": "LEFT" } }
 ```
 
-Sent before closing, so the other phone shows "left" instead of "connection lost".
+Sent before closing, with 150 ms to go out, so the other phone shows "left" instead of "connection lost".
 
 </details>
 
@@ -1194,29 +1949,52 @@ Sent before closing, so the other phone shows "left" instead of "connection lost
 <summary><code>ping / pong</code> · realtime · both</summary>
 
 ```json
-{ "v": 2, "t": "ping", "seq": 30, "ts": 1759212360000, "b": { "ts": 1759212360000 } }
-{ "v": 2, "t": "pong", "seq": 30, "ts": 1759212360041, "b": { "ts": 1759212360000 } }
+{ "v": 3, "t": "ping", "seq": 30, "ts": 1759212360000, "b": { "ts": 1759212360000 } }
+{ "v": 3, "t": "pong", "seq": 30, "ts": 1759212360041, "b": { "ts": 1759212360000 } }
 ```
 
-Every 2 s, from both phones. `pong` echoes the `ts` of the `ping`. The phone that receives a `ping` logs `ping.received ts=<ts>`, and the phone that sent it logs `rtt <ms> ms ts=<ts>` when the `pong` arrives. `Timings` times start at each phone's boot, so for one `ts` the receiver's clock minus the sender's is `t(ping.received) − t(rtt) + rtt/2`, within ±rtt/2. This offset aligns the two phones' logs for cross-phone latencies such as `guide.sent` → `guide.applied` (NFR-7).
+Every 2 s from both phones, once connected; `pong` echoes the `ping`'s `ts`. The receiver of a `ping` logs `ping.received ts=<ts>`, and its sender logs `rtt <ms> ms ts=<ts>` at the `pong`. Each phone's `Timings` clock starts at its boot. So, for one `ts`, the receiver's clock minus the sender's is `t(ping.received) − t(rtt) + rtt/2`, within ±rtt/2. This offset aligns the two logs for cross-phone latencies such as `guide.sent` → `guide.applied` (NFR-7). Half the average of the last three round trips is `SessionManager.latencyMs` (2.6.8).
 
 </details>
 
 #### 2.5.2 Signaling protocol (phone ↔ server, WebSocket)
 
-JSON text frames over `ws://<host>/ws` (the course servers have no TLS, AD-11), each with a `type` field. A signed-in phone sends its access token in the `Authorization: Bearer` header of the WebSocket upgrade; it is required for invitation sessions and optional for room codes, and it marks the user online for the friend list (presence, FR-5.9). A missing, unknown, or expired token leaves the socket anonymous: room codes still work, and the user does not show as online. The token is checked once, when the socket opens, and without the database, so a socket stays signed in while the database does not answer. While someone is signed in and Pix is in front, the app holds one such socket that sends no messages, apart from any session's own (`PresenceConnection`; decided 2026-10-21); WebSocket pings every 15 s, as on a session's socket, keep the course's proxy from closing it as idle. It opens again 1 s after it closes, doubling up to 30 s while it keeps failing, and closes when the app goes to the background or the person signs out. This socket never joins a session, and the session's own socket opens without a token until invitations ([#55], [#56]), so no friend is `inSession` yet and *Friends* never shows *In a session*.
+- **Transport.** JSON text frames over `ws://<host>/ws`, each with a `type` field; an `https` server URL gives `wss://`. The course servers have no TLS (AD-11). A socket holds at most one place.
+- **Sign-in.** A signed-in phone sends its access token in the `Authorization: Bearer` header of the upgrade. The server checks it once, when the socket opens, without the database. A missing, unknown, or expired token leaves the socket anonymous: room codes still work, and the user does not show as online.
+- **Presence (FR-5.9).** While someone is signed in and Pix is in front, `PresenceConnection` holds one socket that sends no messages and joins no session. It opens again 1 s after a close, doubling up to 30 s while it fails, and closes in the background or at sign-out. A session's socket carries the token too. So a friend in a session, a waiting room or an invitation's included, shows *In a session* and is `BUSY` for an invitation (FR-6.9).
+- **Keep-alive.** The app pings every 15 s, so the course's proxy does not close the socket as idle. Uvicorn pings every 20 s and waits 20 s for the answer.
 
 | Client → server | Server → client | Purpose |
 |----|----|----|
 | `room.create` | `room.created` | The photographer starts a session and gets a code |
-| `room.join` | `session.joined` and `peer.joined`, or `error` | The subject joins with the code |
-| `session.join` (It 2) | `session.joined` and `peer.joined`, or `peer.rejoined` | Both phones join an invitation session by `sessionId`; with `rejoin` after a drop (2.6.7) |
-| — | `invitation.accepted` (It 2) | Tells the waiting photographer that the friend accepted, with the `sessionId` |
-| `signal` | `signal` | Offer, answer, and ICE candidates, relayed unchanged; an offer may carry `iceRestart: true` |
-| `leave` | `peer.left` | Leaves the session |
+| `room.join` | `session.joined` to the subject and `peer.joined` to the photographer, or `error` | The subject joins with the code |
+| `session.join` | `session.joined`, and `peer.rejoined` or `peer.joined` | A phone takes its place again after its socket dropped (2.6.7), or takes its place in an invitation's session (2.6.6) |
+| `signal` | `signal` | Offer, answer, and ICE candidates, relayed unchanged |
+| `leave` | `peer.left` with `PEER_LEFT`, to the other phone | Leaves the session |
+| — | `peer.left` with `CONNECTION_LOST` | The other phone's socket dropped; the app ends nothing on it while connected or reconnecting (2.6.7) |
+| — | `error` with `EXPIRED` or `DECLINED` | Ends a waiting room on the photographer's phone: nobody joined in time, or the friend declined |
 | (unknown type) | `error` | Any message the server does not know |
 
-An `error` leaves the socket usable. Besides the codes of each message below, the server answers `UNKNOWN_TYPE` for an unknown `type`; `INVALID_MESSAGE` for malformed JSON, a binary frame, unexpected or invalid fields, or a room code that is not six digits (not counted as a wrong code); `INVALID_STATE` for a `room.create` or `room.join` from a socket already in a room, a `signal` before creating or joining, or an SDP from the wrong role; and `PEER_UNAVAILABLE` for a `signal` while the other phone is not connected. `peer.left` carries `PEER_LEFT` after a `leave` and `CONNECTION_LOST` when the other phone's socket drops. The server closes a socket with 1009 for a text frame over 64 KiB, with 1013 when its outgoing queue (128 messages) fills, a send takes over 5 s, or the session store fails, and with 1001 when the server stops. `server/README.md` keeps the full list.
+An `error` carries `code` and `message`, and the socket stays usable.
+
+| Code | Answers |
+|----|----|
+| `NOT_FOUND` | `room.join`: no active room with the code, or its photographer is not connected. `session.join`: the session ended |
+| `FULL` | `room.join`: the room has a subject. `room.create`: no free code |
+| `EXPIRED` | `room.join`: the code expired in the last 10 minutes. Unasked: nobody joined the waiting room in time |
+| `RATE_LIMITED` | `room.join` from an address with too many wrong codes |
+| `FORBIDDEN` | `session.join` whose token has no place: the subject left on purpose, or another subject joined since |
+| `DECLINED` | Unasked: the friend declined the invitation |
+| `INVALID_STATE` | `room.create` or `room.join` from a socket in a room; `session.join` from a socket in another session or in the other place; `signal` before a place; an SDP from the wrong role |
+| `PEER_UNAVAILABLE` | `signal` while the other phone is not connected |
+| `INVALID_MESSAGE` | Malformed JSON, a binary frame, unexpected or invalid fields, or a code that is not six digits, which does not count as wrong |
+| `UNKNOWN_TYPE` | An unknown `type` |
+
+The server closes a socket with these codes, and `server/README.md` keeps the full list:
+
+- 1009: a text frame over 64 KiB.
+- 1013: the socket's outgoing queue of 128 messages is full, a send takes over 5 s, or the session store fails.
+- 1001: the server stops.
 
 <details>
 <summary><code>room.create</code></summary>
@@ -1226,16 +2004,20 @@ An `error` leaves the socket usable. Besides the codes of each message below, th
 { "type": "room.create" }
 
 // server → photographer
-{ "type": "room.created", "code": "482915", "sessionId": "s_7f3a92c1",
+{ "type": "room.created", "code": "482915", "sessionId": "s_7f3a92c1d4e84b6a9c0f2e5d8b1a3c47",
   "iceServers": [
     { "urls": ["stun:stun.cloudflare.com:3478"] },
     { "urls": ["turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:3478?transport=tcp",
                "turns:turn.cloudflare.com:5349?transport=tcp"],
       "username": "g03a7c...", "credential": "9c1f52..." }
-  ] }
+  ],
+  "rejoinToken": "1IxXJGOSw2SsHsrX-HbBhg" }
 ```
 
-Room codes are 6 random digits, unique among active rooms and those expired in the last 10 minutes. A code expires 10 minutes after it was created if nobody has joined, or when the photographer leaves (FR-8.4); once a subject has joined, the code stays joinable while the photographer is connected, also after that subject leaves. When no free code is found, `room.create` answers `FULL` ("No room code available; try again"). From Iteration 2 `iceServers` is the list Cloudflare's TURN API returns for this session, passed on unchanged: its STUN and TURN entries with a username and credential that expire with the session (AD-14); in Iteration 1 it was empty on the same Wi-Fi. The same `iceServers` go to the subject in `session.joined`.
+- **Code.** 6 random digits, unique among active rooms and those expired in the last 10 minutes. It expires 10 minutes after creation if nobody joined, and ends when the photographer leaves (FR-8.4). After a join it stays joinable while the photographer is connected, also after the subject leaves.
+- **`iceServers`.** This phone's Cloudflare STUN and TURN entries, each with only `urls`, `username`, and `credential`, as the app's `IceServer` reads them. The credentials last `PIX_TURN_TTL_SECONDS` (4 h, longer than any session; AD-14). Each phone gets its own when it takes its place: the photographer here, the subject only after a successful join, so a wrong code costs none. The server keeps none.
+- **Fallback.** Without a TURN key, or when Cloudflare fails, answers in another shape, or takes over 3 s, the list is Cloudflare's STUN server alone: `[{"urls": ["stun:stun.cloudflare.com:3478"]}]`. The room still opens, and phones on different networks connect only where a direct path exists.
+- **`rejoinToken`.** 128 random bits, base64url: this place's proof for `session.join` (2.6.7). The server keeps only its SHA-256.
 
 </details>
 
@@ -1247,7 +2029,8 @@ Room codes are 6 random digits, unique among active rooms and those expired in t
 { "type": "room.join", "code": "482915" }
 
 // server → subject
-{ "type": "session.joined", "sessionId": "s_7f3a92c1", "role": "SUBJECT", "iceServers": [] }
+{ "type": "session.joined", "sessionId": "s_7f3a92c1d4e84b6a9c0f2e5d8b1a3c47", "role": "SUBJECT",
+  "iceServers": [ /* as in room.created */ ], "rejoinToken": "UprU3IM7HrJlboCA4a3xPg" }
 
 // server → photographer
 { "type": "peer.joined" }
@@ -1256,29 +2039,38 @@ Room codes are 6 random digits, unique among active rooms and those expired in t
 { "type": "error", "code": "NOT_FOUND", "message": "No active room with this code" }
 ```
 
-Error codes: `NOT_FOUND`, `FULL`, `EXPIRED`, and `RATE_LIMITED` (It 2), sent when the phone's network address has sent 100 wrong codes, unknown or expired, within 10 minutes; until the oldest of them leaves that window every `room.join` from the address gets it, the right code included, so a code cannot be guessed. The limit is high because the count is shared by phones on one Wi-Fi or carrier address, and because a room can be taken only in the seconds before the friend joins it: after that it answers `FULL`, which does not count (decided 2026-10-15). The other phone's name arrives in `hello` on the data channel.
+- The photographer's `peer.joined` goes only after the subject's `session.joined`. If the photographer leaves or drops while the subject's credentials are fetched, the subject gets only `peer.left`. The photographer then hears nothing of that subject, even in a new room on the same socket.
+- A new subject's token voids the earlier subject's, and a subject's `leave` voids its own.
+- `RATE_LIMITED` follows 100 wrong codes, unknown or expired, from one network address within 10 minutes. Until the oldest leaves that window, every `room.join` from the address gets it, the right code included, so a code cannot be guessed. `FULL` does not count. The app ends the join (`EndReason.RATE_LIMITED`), and *See their camera* says "Too many wrong codes from this network. Try again in a few minutes."
+- The other phone's name comes in `hello` (2.5.1).
 
 </details>
 
 <details>
-<summary><code>session.join</code> · It 2</summary>
+<summary><code>session.join</code></summary>
 
 ```jsonc
-// either phone → server, after an accepted invitation (or to rejoin after a drop)
-{ "type": "session.join", "sessionId": "s_7f3a92c1", "rejoin": false }
+// a phone whose socket dropped → server, over a new socket
+{ "type": "session.join", "sessionId": "s_7f3a92c1d4e84b6a9c0f2e5d8b1a3c47", "rejoin": true, "rejoinToken": "UprU3IM7HrJlboCA4a3xPg" }
 
-// server → the joining phone
-{ "type": "session.joined", "sessionId": "s_7f3a92c1", "role": "SUBJECT", "iceServers": [ /* as in room.created */ ] }
+// server → that phone
+{ "type": "session.joined", "sessionId": "s_7f3a92c1d4e84b6a9c0f2e5d8b1a3c47", "role": "SUBJECT", "iceServers": [] }
 
 // server → the other phone
-{ "type": "peer.joined" }          // first join
-{ "type": "peer.rejoined" }        // rejoin: the photographer sends an offer with an ICE restart
+{ "type": "peer.rejoined" }   // rejoin: true
+{ "type": "peer.joined" }     // rejoin: false, a subject taking its place
 
-// server → the photographer, when the friend accepts through REST
-{ "type": "invitation.accepted", "invitationId": "inv_9c2e", "sessionId": "s_7f3a92c1", "iceServers": [ /* … */ ] }
+// an invitation's photographer takes its place, with the token from POST /invitations (2.5.3)
+{ "type": "session.join", "sessionId": "s_7f3a92c1d4e84b6a9c0f2e5d8b1a3c47", "rejoin": false, "rejoinToken": "Nb1LtZKuwML6jLa-sSyFJA" }
+// server → that photographer, after its session.joined, when the friend took its place first
+{ "type": "peer.joined" }
 ```
 
-The session is created when the invitation is accepted (`POST /invitations/{id}/accept`), with the photographer's role fixed by who invited. `rejoin` keeps the peer's slot for the `sessionId` within the 60 s the session outlives its last socket. Errors: `NOT_FOUND`, `FORBIDDEN` (not a member of the session), `FULL`.
+- **Place.** The token decides the place, and so the role. A socket that still holds the place counts as the phone's old one, which the server would notice only once Uvicorn's pings go unanswered. The place moves to the new socket at once, and the old socket's later close sends no `peer.left`.
+- **Answer.** `session.joined` has an empty `iceServers` and no token; the phone keeps what it got first (AD-14).
+- **`rejoin: true`.** The phone kept its peer connection. The other phone gets `peer.rejoined`, and the photographer restarts ICE (2.6.7).
+- **`rejoin: false`.** A new peer connection: a subject's *Reconnect* (2.6.7), or either phone of an invitation, whose places open when it is sent and accepted (2.6.6). A subject taking its place is announced with `peer.joined`. A photographer that takes its place after its subject gets `peer.joined` itself, because it starts the connection.
+- **Lifetime.** A place can be taken until the photographer leaves, or 60 s after the session's last socket closed.
 
 </details>
 
@@ -1294,7 +2086,7 @@ The session is created when the invitation is accepted (`POST /invitations/{id}/
 { "type": "signal", "candidate": { "sdpMid": "0", "sdpMLineIndex": 0, "candidate": "candidate:1 1 udp 2122260223 192.168.0.12 50000 typ host" } }
 ```
 
-The photographer always sends the offer, and the subject answers.
+The photographer always sends the offer, and the subject answers. A `signal` holds exactly one of `sdp` and `candidate`. `sdpMid` may be null, and an empty `candidate` marks the end of candidates. An ICE restart is an offer with new ICE credentials, so it needs no field of its own.
 
 </details>
 
@@ -1309,7 +2101,7 @@ The photographer always sends the offer, and the subject answers.
 { "type": "peer.left", "reason": "PEER_LEFT" }
 ```
 
-A session is removed when the photographer leaves, or 60 s after its last phone disconnects.
+The sender gets no answer. The photographer's `leave` ends the session. The subject's frees its place for good, and the room stays open for the code.
 
 </details>
 
@@ -1324,29 +2116,44 @@ A session is removed when the photographer leaves, or 60 s after its last phone 
 
 #### 2.5.3 REST API (phone ↔ server)
 
-Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11), JSON responses. Errors use one shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. The exceptions are a request over 1 MiB, which is refused with a plain `413` before it is read, and answers that the framework gives before any endpoint runs: `{"detail": "Not Found"}` with `404` for an unknown path, `{"detail": "Method Not Allowed"}` with `405`, and a plain `500` for an unexpected failure. Endpoints marked *auth* need `Authorization: Bearer <access token>` from a sign-in or a refresh (`POST /auth/signup`, `/auth/login`, `/auth/google`, or `/auth/google/signup`) and answer `401 UNAUTHENTICATED` without it or with an expired one; `/pose-suggestions`, `/poses`, and `/pose-templates` work without an account (FR-5.1). `/users/lookup`, `/friend-requests`, and `/friends` also answer `403 PIX_ID_REQUIRED` until the caller has chosen a Pix ID.
+Base URL `http://<host>/api/v1`, plain HTTP on the course servers (AD-11). Requests and answers are JSON, except the multipart pose requests.
 
-| Endpoint | Purpose | Errors |
-|----|----|----|
-| `GET /pose-templates` | The default poses by id, for apps from before Iteration 2; the current app does not call it | — |
-| `POST /pose-suggestions` (It 2) | Four poses for the scene, chosen by a vision model, or, with a `description`, the description and three variations of it; the app asks once per set | `400 INVALID_IMAGE`, `400 INVALID_REQUEST`, `413`, `429 RATE_LIMITED`, `503 UNAVAILABLE` |
-| `POST /poses` | One pose candidate for a description, the user's or a suggested pose (It 2), or for a template id from an app before Iteration 2; the app sends four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `400 INVALID_REQUEST`, `413`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `503 UNAVAILABLE` (the session store, which counts the rate limit, does not answer), `504 UPSTREAM_TIMEOUT` |
-| `POST /auth/signup` (It 2) | Create an account with a Pix ID, a display name, and a password; return its tokens (FR-5.2, FR-5.11) | `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` |
-| `POST /auth/check-pix-id` (It 2) | Whether a sign-up could take a Pix ID now, for *Check* on Sign up and Pix ID setup (FR-5.15) | `400 PIX_ID_INVALID` |
-| `POST /auth/login` (It 2) | Sign in with a Pix ID and a password; return an access and a refresh token | `401 INVALID_CREDENTIALS` |
-| `POST /auth/refresh` (It 2) | Exchange a refresh token for a new access token and a new refresh token | `401 INVALID_REFRESH_TOKEN` |
-| `POST /auth/google` (It 2) | Verify a Google ID token and sign in the account that uses it; return an access and a refresh token | `401 INVALID_TOKEN`, `404 NOT_REGISTERED`, `503 UNAVAILABLE` |
-| `POST /auth/google/signup` (It 2) | Create an account for a Google account that no account uses, without a Pix ID yet (FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `503 UNAVAILABLE` |
-| `DELETE /auth/session` (It 2, auth) | Sign this phone out: its refresh token stops working and its device token is deleted; the access token works until it expires, at most 15 minutes later, and the app deletes both | — |
-| `GET /me`, `PUT /me` (It 2, auth) | The user's own account, with the ways it signs in; `PUT` sets the Pix ID, the display name, or both | `409 PIX_ID_TAKEN`, `400 PIX_ID_INVALID`, `401 INVALID_CREDENTIALS` |
-| `PUT /me/google` (It 2, auth) | Add a Google account, so the account signs in with either (FR-5.12, FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`, `503 UNAVAILABLE` |
-| `PUT /me/password` (It 2, auth) | Add a password to an account made with Google, so it signs in with its Pix ID too (FR-5.14) | `400 PASSWORD_INVALID`, `403 PIX_ID_REQUIRED`, `409 PASSWORD_ALREADY_SET` |
-| `POST /devices` (It 2, auth) | Register or refresh the FCM device token | `400 INVALID_REQUEST`; `401 UNAUTHENTICATED` once the phone signed out, even with an access token that has not expired |
-| `POST /users/lookup` (It 2, auth) | Exact-match lookup with the relation to the caller (FR-5.5, FR-5.8) | `404 NOT_FOUND` |
-| `GET /friend-requests` (It 2, auth) | Pending requests, received and sent (FR-5.7) | — |
-| `POST /friend-requests`, `POST /friend-requests/{id}/accept`, `POST /friend-requests/{id}/decline`, `DELETE /friend-requests/{id}` (It 2, auth) | Send, accept, decline, withdraw (FR-5.6, FR-5.7) | `409 ALREADY_FRIENDS`, `409 ALREADY_REQUESTED`, `404 NOT_FOUND` |
-| `GET /friends`, `DELETE /friends/{userId}` (It 2, auth) | Friend list with online status; remove a friend (FR-5.9, FR-5.10) | — |
-| `POST /invitations`, `GET /invitations/{id}`, `POST /invitations/{id}/accept`, `/decline`, `/cancel` (It 2, auth except `GET`) | Invite a friend; open an invitation from a push or a link; answer it (FR-6.1–6.4, FR-6.9) | `403 NOT_FRIENDS`, `409 BUSY`, `410 INVITATION_GONE` |
+- **Errors.** One shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. A missing or malformed field is `400 INVALID_REQUEST`; `422` is only `REJECTED` or `NO_PERSON`. Framework answers: a plain `413` for a request over 1 MiB, before reading it; `404 {"detail": "Not Found"}`; `405 {"detail": "Method Not Allowed"}`; a plain `500` for an unexpected failure.
+- **Access.** *auth* needs `Authorization: Bearer <access token>` (*Session tokens* below), otherwise `401 UNAUTHENTICATED`. *Pix ID* also needs a chosen Pix ID, otherwise `403 PIX_ID_REQUIRED`. "—" works without an account (FR-5.1).
+- **Outages.** An endpoint that needs the database or the session store answers `503 UNAVAILABLE` when it fails (2.7). The table lists the other errors.
+
+| Endpoint | Access | Purpose | Errors |
+|----|----|----|----|
+| `GET /pose-templates` | — | Default poses by id, for apps before Iteration 2 only | — |
+| `POST /pose-suggestions` (It 2) | — | Four poses for the scene, or a description and three variations; once per set | `400 INVALID_IMAGE`, `422 REJECTED`, `429 RATE_LIMITED` |
+| `POST /poses` | — | One candidate; the app sends a set's four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `422 REJECTED`, `422 NO_PERSON` (It 3), `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
+| `POST /pose-tips` (It 3) | — | How to hold the phone for the chosen candidate (FR-4.10) | `400 INVALID_IMAGE`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
+| `POST /auth/signup` (It 2) | — | Account with a Pix ID, display name, and password (FR-5.2, FR-5.11) | `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` |
+| `POST /auth/check-pix-id` (It 2) | — | Whether a Pix ID is free now (FR-5.15) | `400 PIX_ID_INVALID` |
+| `POST /auth/login` (It 2) | — | Sign in with a Pix ID and a password | `401 INVALID_CREDENTIALS` |
+| `POST /auth/refresh` (It 2) | — | New tokens for a refresh token | `401 INVALID_REFRESH_TOKEN` |
+| `POST /auth/google` (It 2) | — | Sign in with a Google ID token | `401 INVALID_TOKEN`, `404 NOT_REGISTERED`, `503 UNAVAILABLE` |
+| `POST /auth/google/signup` (It 2) | — | Account for an unused Google account, no Pix ID yet (FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `503 UNAVAILABLE` |
+| `DELETE /auth/session` (It 2) | auth | Sign this phone out | — |
+| `GET /me`, `PUT /me` (It 2) | auth | The caller's account; set the Pix ID, the display name, or both | `400 PIX_ID_INVALID`, `401 INVALID_CREDENTIALS`, `409 PIX_ID_TAKEN` |
+| `PUT /me/google` (It 2) | auth | Add a Google account (FR-5.12, FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`, `503 UNAVAILABLE` |
+| `PUT /me/password` (It 2) | auth | Add a password to a Google account (FR-5.14) | `400 PASSWORD_INVALID`, `403 PIX_ID_REQUIRED`, `409 PASSWORD_ALREADY_SET` |
+| `POST /devices` (It 2) | auth | Register or refresh the FCM token | `401 UNAUTHENTICATED` after sign-out, even with an unexpired token |
+| `POST /users/lookup` (It 2) | auth, Pix ID | Exact-match lookup with the relation to the caller (FR-5.5, FR-5.8) | `404 NOT_FOUND` |
+| `GET /friend-requests` (It 2) | auth, Pix ID | Pending requests, received and sent (FR-5.7) | — |
+| `POST /friend-requests`, `POST /friend-requests/{id}/accept`, `POST /friend-requests/{id}/decline`, `DELETE /friend-requests/{id}` (It 2) | auth, Pix ID | Send, accept, decline, withdraw (FR-5.6, FR-5.7, FR-5.16) | `404 NOT_FOUND`, `409 ALREADY_FRIENDS`, `409 ALREADY_REQUESTED` |
+| `GET /friends`, `DELETE /friends/{userId}` (It 2) | auth, Pix ID | Friends with online status; remove one (FR-5.9, FR-5.10) | — |
+| `POST /invitations` (It 3) | auth, Pix ID | Invite a friend (FR-6.1, FR-6.9) | `403 NOT_FRIENDS`, `409 BUSY` |
+| `GET /invitations/incoming` (It 3) | auth | The caller's open invitations (FR-6.17) | — |
+| `GET /invitations/{id}` (It 3) | — | One invitation, from a push or a link (FR-6.4) | `404 NOT_FOUND` |
+| `POST /invitations/{id}/accept`, `/decline`, `/cancel` (It 3) | auth | The friend answers; the photographer cancels (FR-6.2, FR-6.3) | `404 NOT_FOUND`, `410 INVITATION_GONE` |
+
+Outside `/api/v1`:
+
+- `/ws`: the signaling WebSocket (2.5.2).
+- `GET /i/{invitationId}` (It 3): the invite link's page (2.6.6).
+- `GET /health`: `{"status": "ok"}`, or `503` when Redis does not answer within 2 s (2.8, Deployment).
+- `GET /internal/stats`: open sessions and sockets, for `deploy.sh`; nginx does not forward it.
 
 <details>
 <summary><code>GET /pose-templates</code></summary>
@@ -1367,29 +2174,26 @@ Base URL `http://<host>/api/v1` (the course servers have no TLS, AD-11), JSON re
 <summary><code>POST /pose-suggestions</code> (It 2)</summary>
 
 ```jsonc
-// request: multipart/form-data, at most 1 MiB in total
-//   image        scene.jpg (JPEG, long side ≤ 1024 px, no EXIF), the same photo the four POST /poses send
-//   description  "벽에 기대서 카메라 보며 살짝 웃기"   (optional; 1..100 characters after trimming, as in POST /poses)
+// request: multipart/form-data, at most 1 MiB
+//   image        scene.jpg (JPEG, long side ≤ 1024 px, no EXIF), the photo the set's POST /poses send
+//   description  "벽에 기대서 카메라 보며 살짝 웃기"   (optional; checked as in POST /poses)
+//   selfie       "true"   (It 3, optional; a selfie from the front camera; left out means false)
 
-// response 200 without a description: four different poses in English, each 1..100 characters, in the order of the
-// slots
-{ "poses": [
-  "Lean your back against the black door, cross one ankle, and look at the camera.",
-  "Walk slowly past the flower cart while looking off to the side with a smile.",
-  "Stand near the cart and gently touch the flower display while looking down.",
-  "Stand straight facing front with hands in your pockets and a relaxed smile."
-] }
+// response 200 without a description: four different poses in English, in slot order
+{ "poses": [ "Lean your back against the black door, cross one ankle, and look at the camera.", /* three more */ ] }
 
 // response 200 with a description: the description as the server folded it, then three variations in English
 { "poses": [
   "벽에 기대서 카메라 보며 살짝 웃기",
   "Lean against the door, face the camera, and smile slightly with hands in pockets.",
-  "Lean against the door, face the camera, smile slightly, and cross your ankles.",
-  "Lean against the door, face the camera, smile slightly, and tilt your head to one side."
+  /* two more variations */
 ] }
 ```
 
-The server sends the photo and the suggestion prompt to the suggestion model (2.6.3) and checks its answer: it keeps the first four different poses of 1–100 characters, each on one line, and fills the rest with the default poses in their order. A model that fails, answers after `PIX_SUGGESTION_TIMEOUT_SECONDS` (8 s), or answers nothing usable gives the four default poses, so this endpoint fails only for the photo, the rate limit, or the session store, never for the model. With a `description`, the server checks it like `POST /poses` (`400 INVALID_REQUEST` when it is blank or longer than 100 characters, before any call and without counting it), sends the variation prompt instead, and keeps the first three usable variations that are not the description itself; the description fills in for any it cannot use, so a failing model gives the description four times. An empty `description` is read as left out. The answer is not cached: every call, *Try other poses* included, asks the model again. The poses, the description, and the variations describe the person in the photo, so they are never written to a log.
+- **Suggestions.** The server keeps the suggestion model's first four poses that differ, ignoring case, each one line of 1–100 characters (2.6.3). Default poses fill the rest, in order. A model that fails, answers nothing usable, or takes over `PIX_SUGGESTION_TIMEOUT_SECONDS` (8 s) gives the four default poses, so the model never fails the request.
+- **Variations.** A `description` is checked as in `POST /poses` before any call, without counting it, and then judged by the description filter (2.6.3). The server keeps the first three usable variations that differ from it; the description fills any gap. An empty `description` counts as left out.
+- **Selfie.** `selfie` true selects the selfie prompts and default poses (2.6.3).
+- Every call, *Try other poses* included, asks the model again; nothing is cached. No log holds a pose, a description, or a variation.
 
 </details>
 
@@ -1397,27 +2201,47 @@ The server sends the photo and the suggestion prompt to the suggestion model (2.
 <summary><code>POST /poses</code></summary>
 
 ```jsonc
-// request: multipart/form-data, at most 1 MiB in total
+// request: multipart/form-data, at most 1 MiB
 //   image       scene.jpg (JPEG, long side ≤ 1024 px, no EXIF)
-//   description "벽에 기대서 한 손은 주머니에"   (It 2; 1..100 characters after trimming; the user's text or a suggested pose)
-//   templateId  "wave"                      (instead of description, from apps before Iteration 2; exactly one of the two)
+//   description "벽에 기대서 한 손은 주머니에"   (It 2; the user's text or a suggested pose)
+//   templateId  "wave"   (instead of description, from apps before Iteration 2; exactly one of the two)
 //   seed        "1829304756" (an integer)
+//   selfie      "true"   (It 3, optional, as in POST /pose-suggestions)
 
-// response 200 to a description
-{ "templateId": null, "image": "/9j/4AAQSkZJRgABAQAAAQABAAD...", "elapsedMs": 13210 }
-
-// response 200 to a template
+// response 200; "templateId" is null for a description, since the app numbers its requests pose-1 … pose-4 (2.3)
 { "templateId": "wave", "image": "/9j/4AAQSkZJRgABAQAAAQABAAD...", "elapsedMs": 11840 }
-
-// response 504
-{ "error": { "code": "UPSTREAM_TIMEOUT", "message": "The image service did not answer within 60 s" } }
 ```
 
-`image` in the response is a Base64 JPEG. The server keeps neither the scene photo nor the result (FR-4.9). With a `description`, the response's `templateId` is `null`: the app tells its four requests apart by itself and names them `pose-1` … `pose-4` (2.3; changed on 2026-10-20 from a `candidateId` that the server echoed, which the app never needed). A refusal answers `422 REJECTED` with the same message for a description as for a template: the image service does not say whether it refused the photo or the text, and the app's suggested poses and variations are sent as descriptions too (US-5). A `templateId` names a default pose (`GET /pose-templates`), which goes into the same prompt as a description.
+- **Result.** `image` is a Base64 JPEG in 3:4, 9:16, or 1:1, whichever is closest to the scene's shape (2.6.3). The server keeps neither photo (FR-4.9). A `templateId` names a default pose, sent in the same prompt as a description.
+- **Description.** The server trims it and folds each run of whitespace, line breaks included, into one space. It must then have 1–100 Unicode code points, never more than the app's field counts. The app sends a `text/plain; charset=utf-8` part. The text reaches the prompt as written, in Korean or English (2.6.3), and never a log (NFR-13). An empty one counts as left out.
+- **Before counting.** `INVALID_IMAGE`: not a readable JPEG, over 1024 px on its long side, or with EXIF; the server never repairs a photo. `INVALID_REQUEST`: a missing part, a non-integer `seed`, both or neither of `templateId` and `description`, a blank or over-long description, or `selfie` with a `templateId`. None of these reaches a model or the rate limit.
+- **Selfie.** The app sends `selfie` with every request of a front-camera set. It is refused with a template: old apps never send it, and some default poses need both hands or the whole body.
+- **After counting.** The description filter and the person check run at the same time (2.6.3). `REJECTED`: the filter or the image service refused. The service does not say whether it refused the photo or the text, so its message is the same for a description and a template (US-5). `NO_PERSON` (It 3): no person in the scene; `REJECTED` wins when both apply.
+- **Upstream.** `seed` is reduced to 0…2³¹−1, the range the image models accept. `502 UPSTREAM_ERROR`: the image service failed, was unreachable, answered unreadably, or has no API key. `504 UPSTREAM_TIMEOUT`: no answer within `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (60 s). A phone that drops the request cancels the call (2.6.3).
 
-**The description.** The server trims it and turns each run of whitespace, line breaks included, into one space; it then has to be 1–100 characters. Characters are Unicode code points, which are never more than what the app's field counts, so whatever the field accepts passes; the app sends it as a `text/plain; charset=utf-8` part. An empty `description` is the same as none, so one next to a `templateId` asks for the template. The description is passed in Korean or English as written, inside the pose prompt (2.6.3), and is never written to a log (NFR-13).
+</details>
 
-The server checks the photo and does not repair it: one that is not a readable JPEG, is over 1024 px on its long side, or has EXIF gets `INVALID_IMAGE`. `INVALID_REQUEST` means that a part is missing, that `seed` is not an integer, that both or neither of `templateId` and `description` were sent, or that the description is blank or longer than 100 characters. Nothing is sent to the image service or counted by the rate limit in any of these cases. The server reduces `seed` to 0…2³¹−1, the range the image models accept.
+<details>
+<summary><code>POST /pose-tips</code> · It 3</summary>
+
+```jsonc
+// request: multipart/form-data, at most 1 MiB
+//   scene      scene.jpg, as sent to POST /poses
+//   candidate  the chosen candidate, checked like the scene; the app sends a long side of 768 px
+//   pose       "Wave at the camera with one hand"   (the pose it was made with; checked like a description)
+//   language   "en"   (FR-10.2: "en" or "ko"; left out means "en")
+
+// response 200; the app shows only "text"
+{ "text": "Zoom in or take a step closer, hold the phone at your waist and tilt it up a little - the legs look longer.",
+  "framing": "closer", "hold": "waist", "height": "lower", "angle": "up" }
+// framing: closer | back | keep · hold: crouching | waist | chest | eye | above head
+// height, against the phone's place for the scene: raise | lower | keep · angle: up | level | down
+```
+
+- The app asks when the user takes a candidate, never for a selfie.
+- `422 REJECTED`: the description filter refused `pose`, or the tip model declined the photos.
+- `502 UPSTREAM_ERROR` includes an answer the server cannot show: a number or a unit, over 160 characters (80 in Korean), or another language (2.6.3). `504 UPSTREAM_TIMEOUT` comes after `PIX_TIP_TIMEOUT_SECONDS` (10 s).
+- Tips count in rate-limit windows of their own (2.7).
 
 </details>
 
@@ -1429,26 +2253,25 @@ The server checks the photo and does not repair it: one that is not a readable J
 { "pixId": "dongje.p", "password": "sunset2026", "displayName": "Dongje" }
 
 // response 201; POST /auth/login { "pixId": "dongje.p", "password": "sunset2026" } answers the same with 200
-{ "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwaXgiLCJzdWIiOiJ1XzAxSFoi...", "refreshToken": "kq3V9x0Rz8...", "expiresIn": 900,
+{ "accessToken": "eyJhbGciOiJIUzI1NiIs...", "refreshToken": "kq3V9x0Rz8...", "expiresIn": 900,
   "user": { "id": "u_01HZ", "pixId": "dongje.p", "displayName": "Dongje", "hasPassword": true, "hasGoogle": false } }
 
 // response 400
 { "error": { "code": "PASSWORD_INVALID", "message": "A password needs at least one letter and one digit" } }
-
-// POST /auth/login with a wrong password or an unknown Pix ID → 401
-{ "error": { "code": "INVALID_CREDENTIALS", "message": "The Pix ID or the password is wrong" } }
 ```
 
-The Pix ID is the login name; `POST /auth/login` ignores capitals and spaces around it. A password has 8–64 characters, at least one letter and one digit, and is not the Pix ID (FR-5.11); `PASSWORD_INVALID` names the broken rule, as `PIX_ID_INVALID` does. A display name has 1–30 characters after trimming, otherwise `400 INVALID_REQUEST`. The server keeps only an argon2id hash of the password (2.8, Accounts). An unknown Pix ID and a wrong password get the same answer, and the server checks a stand-in hash for an unknown Pix ID, so both take as long. Login attempts are not limited for now (decided 2026-10-15). Each sign-in issues a new token for that phone, valid for 30 days.
+- **Rules.** A Pix ID has 4–20 characters of `a–z`, `0–9`, `.`, `_` (FR-5.2). A password has 8–64 characters, a letter and a digit, and is not the Pix ID in any case (FR-5.11). A display name has 1–30 characters after trimming, otherwise `400 INVALID_REQUEST`. `PIX_ID_INVALID` and `PASSWORD_INVALID` name the broken rule (FR-5.3).
+- **Log-in.** It ignores capitals and spaces around the Pix ID. An unknown Pix ID and a wrong password get the same answer in the same time: the server checks a stand-in hash. Hashing and the absent log-in limit: 2.8, Accounts.
 
-**Checking a Pix ID (FR-5.15, added 2026-10-22).** `POST /auth/check-pix-id` `{ "pixId": "test5" }` answers `200 { "available": true }`, or `false` when an account has that Pix ID, and `400 PIX_ID_INVALID`, naming the rule, for one that breaks the rules as at sign-up (no capitals or spaces are taken off). It needs no token, so *Check* on Sign up and on the Pix ID setup of a Google account use it alike; whether a Pix ID exists is not secret (2.8, Accounts), and, like log-in and the lookup, it is not limited for now. The answer can change before the form is sent, so sign-up and `PUT /me` still answer `409 PIX_ID_TAKEN`. The Pix ID travels in the body, as in the lookup, so no log prints it.
+**Checking a Pix ID (FR-5.15).** `POST /auth/check-pix-id` `{ "pixId": "test5" }` answers `200 { "available": true }`, or `false` when the Pix ID is taken. A Pix ID that breaks a rule gets `400 PIX_ID_INVALID`, without trimming. *Check* on *Sign up* and *Pix ID setup* uses it without a token. Sign-up and `PUT /me` still answer `409 PIX_ID_TAKEN`, since the answer can change. The Pix ID travels in the body, so no log prints it.
 
 **Session tokens.** A sign-in starts a session for that phone and answers with two tokens.
 
-- `accessToken` is a JWT signed with HS256 and the server's `PIX_JWT_SECRET`. Its claims are `iss` (`"pix"`), `sub` (the user's ID), `sid` (the session), `iat`, and `exp`, 15 minutes later (`expiresIn`, in seconds). The app sends it as `Authorization: Bearer <accessToken>` on every *auth* endpoint and on the signaling upgrade. The server checks the signature, the issuer, the expiry, and that the user exists, without looking up the session, and stores no copy.
-- `refreshToken` is 32 random bytes, which the server keeps only as a SHA-256 hash in `sessions` (2.7). It lasts 30 days from its last use, so a phone in use stays signed in. `POST /auth/refresh` `{ "refreshToken": "kq3V9x0Rz8..." }` answers `{ "accessToken", "refreshToken", "expiresIn" }`, and the old refresh token stops working. A refresh token that was already exchanged and comes back, from a copy or after an answer the phone never got, ends the session, so every holder has to sign in again; an unknown or expired one answers `401 INVALID_REFRESH_TOKEN` too.
-- The app refreshes when an *auth* endpoint answers `401 UNAUTHENTICATED`, or within a minute of `expiresIn`, and retries once; if the refresh is refused (`401`) it signs out and asks the person to sign in, and a refresh without an answer keeps the tokens. As built (Iter2-P13): `AuthTokens` runs one refresh at a time for every caller, and a caller that waited for one takes its new token instead of refreshing again, because a spent refresh token would end the session; `BearerTokens` adds the token and answers the `401` on the account client. The sign-in endpoints (`PixAuthApi`) have a client of their own, so the refresh never queues behind the account calls that wait for it or behind pose requests. A signaling socket keeps the user online after its access token expires, because the token is checked only when the socket opens.
-- Sign-out (`DELETE /auth/session`) deletes the session: its refresh token stops working at once, its device token goes with it, and its access token works until it expires.
+- **`accessToken`.** A JWT, HS256 with `PIX_JWT_SECRET`, with the claims `iss` (`"pix"`), `sub` (user ID), `sid` (session), `iat`, and `exp`, 15 minutes later (`expiresIn`, in seconds). It goes as `Authorization: Bearer` on every *auth* endpoint and on the signaling upgrade. The server checks the signature, issuer, expiry, and that the user exists, without a session lookup, and stores no copy.
+- **`refreshToken`.** 32 random bytes, stored only as a SHA-256 hash in `sessions` (2.7), valid 30 days from its last use. `POST /auth/refresh` `{ "refreshToken": "kq3V9x0Rz8..." }` answers `{ "accessToken", "refreshToken", "expiresIn" }`, and the old token stops working. A spent token that comes back ends the session for every holder. An unknown or expired one also gets `401 INVALID_REFRESH_TOKEN`.
+- **Sign-out.** `DELETE /auth/session` deletes the session and its device row at once. The access token works until it expires, at most 15 minutes later; the app deletes both tokens. A signaling socket stays online after its token expires, since the token is checked only at the upgrade.
+- **Several phones.** Each phone has its own session, so a refresh or sign-out on one never affects another. A change reaches other phones only through the server: *Share my camera* and *Sent requests* read `GET /me` every 10 s while shown (`AuthRepository.refreshAccount`, 2.8 *Push*). `AuthTokens.reload` drops a read that a change on this phone overtook, and does not write an unchanged account.
+- **In the app (Iter2-P13).** `BearerTokens` adds the token and answers `401 UNAUTHENTICATED` with one refresh and one retry. `AuthTokens` also refreshes a minute before expiry. It runs one refresh at a time and gives waiting callers its new token, since a spent token ends the session. A refused refresh signs the phone out; an unanswered one keeps the tokens. `PixAuthApi` has its own client, so a refresh never waits behind account or pose calls.
 
 </details>
 
@@ -1456,29 +2279,23 @@ The Pix ID is the login name; `POST /auth/login` ignores capitals and spaces aro
 <summary><code>POST /auth/google</code>, <code>POST /auth/google/signup</code>, and <code>PUT /me/google</code> · It 2</summary>
 
 ```jsonc
-// POST /auth/google; also the body of POST /auth/google/signup and PUT /me/google
+// the body of all three
 { "idToken": "eyJhbGciOiJSUzI1NiIs..." }
 
-// response 200: the account that uses this Google account
-{ "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwaXgiLCJzdWIiOiJ1XzAxSFoi...", "refreshToken": "kq3V9x0Rz8...", "expiresIn": 900,
-  "user": { "id": "u_01HZ", "pixId": "dongje.p", "displayName": "Dongje", "hasPassword": true, "hasGoogle": true } }
-
-// response 404: no account uses this Google account yet
-{ "error": { "code": "NOT_REGISTERED", "message": "No Pix account uses this Google account" } }
-
+// POST /auth/google → 200 as for POST /auth/login, with "hasGoogle": true · 404 NOT_REGISTERED: no account uses it yet
 // POST /auth/google/signup → 201: a new account named after the Google account, without a Pix ID yet
-{ "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwaXgiLCJzdWIiOiJ1XzAyQUIi...", "refreshToken": "Pz71bQd0Lw...", "expiresIn": 900,
-  "user": { "id": "u_02AB", "pixId": null, "displayName": "Junhyeong Han", "hasPassword": false, "hasGoogle": true } }
-
-// PUT /me/google (auth) → 200: the caller's account, now with "hasGoogle": true
-// 409 GOOGLE_IN_USE: another account uses this Google account · 409 GOOGLE_ALREADY_ADDED: this account has another one
+{ "accessToken": "eyJhbGciOiJIUzI1NiIs...", "refreshToken": "Pz71bQd0Lw...", "expiresIn": 900,
+  "user": { "id": "u_02AB", "pixId": null, "displayName": "Joonhyung Han", "hasPassword": false, "hasGoogle": true } }
+// PUT /me/google → 200: the caller's account with "hasGoogle": true; the same Google account again changes nothing
+// 409 GOOGLE_IN_USE: another account uses it · 409 GOOGLE_ALREADY_ADDED: this account has another one
 ```
 
-The server checks the ID token's signature against Google's published keys, which it keeps for as long as Google's `Cache-Control` allows, and checks that the audience is our web client ID (`PIX_GOOGLE_CLIENT_ID`, the server client ID the app passes to Credential Manager) and the issuer is Google. It keeps only the Google `sub` (AD-12); the token itself is never stored. While the client ID is unset, or Google's keys cannot be fetched, these endpoints answer `503 UNAVAILABLE`. An account from `POST /auth/google/signup` has a `null` Pix ID until `PUT /me` sets it, and is named after the Google account (up to 30 characters, or "Pix user" if Google gives no name).
+- **Verification.** The server checks the signature against Google's published keys, kept as long as Google's `Cache-Control` allows. The audience must be our web client ID (`PIX_GOOGLE_CLIENT_ID`, the server client ID the app passes to Credential Manager), and the issuer Google. Only the Google `sub` is kept (AD-12). Without the client ID or Google's keys, all three answer `503 UNAVAILABLE`.
+- **New account.** It is named after the Google account, up to 30 characters, or "Pix user" without a name. Its Pix ID is `null` until `PUT /me` sets one.
 
-**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with their Pix ID and password (`POST /auth/login`), and the app sends the same ID token to `PUT /me/google`; from then on the account signs in either way. *No:* `POST /auth/google/signup` creates the account, and the Pix ID setup follows. A password account can also add Google later with `PUT /me/google` (FR-5.12).
+**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* `POST /auth/google/signup` creates the account, and the Pix ID setup follows. A password account can add Google later the same way (FR-5.12).
 
-**Adding a password (FR-5.14).** An account made with Google can add a password with `PUT /me/password` `{ "password": "sunset2026" }`, which answers `200` with the account and `"hasPassword": true`; from then on its Pix ID and the password sign it in too. The Pix ID is the login name, so an account without one gets `403 PIX_ID_REQUIRED`; the password rules are those of sign-up (`400 PASSWORD_INVALID`); and an account that has a password gets `409 PASSWORD_ALREADY_SET`, because changing a password is not offered. There is no email, so a forgotten password cannot be reset.
+**Adding a password (FR-5.14).** `PUT /me/password` `{ "password": "sunset2026" }` answers `200` with `"hasPassword": true`; the Pix ID and password then sign in too. The Pix ID is the login name, so an account without one gets `403 PIX_ID_REQUIRED`. The rules are those of sign-up. An account with a password gets `409 PASSWORD_ALREADY_SET`, since changing a password is not offered. There is no email, so a forgotten password cannot be reset.
 
 </details>
 
@@ -1491,12 +2308,11 @@ The server checks the ID token's signature against Google's published keys, whic
 
 // response 200; GET /me answers the same
 { "id": "u_01HZ", "pixId": "dongje.p", "displayName": "Dongje", "hasPassword": true, "hasGoogle": false }
-
-// response 409
-{ "error": { "code": "PIX_ID_TAKEN", "message": "This Pix ID is taken" } }
 ```
 
-The rule is 4–20 characters of `a–z`, `0–9`, `.`, `_` (FR-5.2); `PIX_ID_INVALID` names the broken rule (FR-5.3), and a rejected Pix ID leaves the old one. A password account signs in with its Pix ID, so changing it takes the current `password`: without it, or with a wrong one, the answer is `401 INVALID_CREDENTIALS`, and a new Pix ID that is the password, in any case, is `400 PIX_ID_INVALID` (FR-5.11; added in review of [#78]). Setting the first Pix ID of a Google account, sending the same Pix ID again, and changing only the display name need no password. `PUT /me`, `PUT /me/password`, and `PUT /me/google` lock the user row before they check (`SELECT … FOR UPDATE`), so two of them sent at the same moment from two phones run one after the other, and the second sees the first: a Pix ID and a password can never end up the same, and a second Google account is refused instead of replacing the first.
+- The rules are those of sign-up (FR-5.2, FR-5.3); a rejected Pix ID leaves the old one.
+- A password account signs in with its Pix ID, so changing it needs the current `password`, otherwise `401 INVALID_CREDENTIALS`. A new Pix ID equal to the password in any case is `400 PIX_ID_INVALID` (FR-5.11). A Google account's first Pix ID, the same Pix ID again, and a display name alone need no password.
+- `PUT /me`, `PUT /me/password`, and `PUT /me/google` lock the user row first (`SELECT … FOR UPDATE`). Two at once from two phones run in turn, and the second sees the first. So a Pix ID and a password never match, and a second Google account is refused instead of replacing the first.
 
 </details>
 
@@ -1504,13 +2320,11 @@ The rule is 4–20 characters of `a–z`, `0–9`, `.`, `_` (FR-5.2); `PIX_ID_IN
 <summary><code>POST /devices</code> · It 2 · auth</summary>
 
 ```jsonc
-// request
+// request → 204
 { "fcmToken": "dXk3...:APA91b...", "platform": "android" }
-
-// response 204
 ```
 
-Sent after sign-in and whenever Firebase rotates the token. One row per device (2.7): a session keeps one device, so a rotated token replaces the old one, and the token of a phone that signs in to another account moves to that account. Sign-out deletes it, and an access token that outlives its sign-out cannot register a device again (`401 UNAUTHENTICATED`). `platform` must be `"android"` and `fcmToken` 1–4096 characters, or the answer is `400 INVALID_REQUEST`.
+The app sends it at each sign-in, at app start while signed in, and when Firebase rotates the token. A session has one device row (2.7): a rotated token replaces the old one, and the token of a phone signed in to another account moves there. Sign-out deletes the row. `platform` must be `"android"` and `fcmToken` 1–4096 characters, otherwise `400 INVALID_REQUEST`.
 
 </details>
 
@@ -1519,18 +2333,15 @@ Sent after sign-in and whenever Firebase rotates the token. One row per device (
 
 ```jsonc
 // request
-{ "pixId": "junhyeong.h" }
+{ "pixId": "joonhyung.h" }
 
 // response 200
-{ "user": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" }, "relation": "INCOMING", "requestId": "fr_77" }
+{ "user": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung" }, "relation": "INCOMING", "requestId": "fr_77" }
 // relation: NONE | SELF | FRIEND | REQUESTED | INCOMING  (decides Add / "This is you" / "Friends" / "Requested" / Accept)
 // requestId: the pending request between the two when relation is REQUESTED or INCOMING, otherwise null
-
-// response 404
-{ "error": { "code": "NOT_FOUND", "message": "No user with this Pix ID" } }
 ```
 
-Exact match only; no partial search or listing (FR-5.5, NFR-15). Capitals and spaces around the Pix ID are ignored, because a Pix ID has none. A user without a Pix ID cannot be found. The Pix ID travels in the body and never in the URL, because nginx's error log prints a failed request's whole request line and cannot leave the query out (2.8, Privacy; changed from `GET /users?pixId=` in review of [#78]).
+Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals and spaces around the Pix ID are ignored, since a Pix ID has none. A user without a Pix ID cannot be found. The Pix ID travels in the body, because nginx's error log prints a failed request's whole request line (2.8, Privacy).
 
 </details>
 
@@ -1542,21 +2353,25 @@ Exact match only; no partial search or listing (FR-5.5, NFR-15). Capitals and sp
 { "userId": "u_02AB" }
 
 // response 201
-{ "id": "fr_77", "to": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" }, "createdAt": 1760281200000 }
+{ "id": "fr_77", "to": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung" }, "createdAt": 1760281200000 }
 
 // response 200 instead, when u_02AB had already sent the caller a request: that request is accepted
-{ "friend": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong", "online": true, "inSession": false } }
+{ "friend": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung", "online": true, "inSession": false } }
 
 // GET /friend-requests → 200, newest first
 { "incoming": [ { "id": "fr_80", "from": { "id": "u_03CD", "pixId": "seongmin.c", "displayName": "Seongmin" }, "createdAt": 1760281300000 } ],
-  "outgoing": [ { "id": "fr_77", "to": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" }, "createdAt": 1760281200000 } ] }
+  "outgoing": [ /* as in the 201 above */ ] }
 
-// POST /friend-requests/fr_77/accept  → 200 { "friend": { "id": "u_01HZ", "pixId": "dongje.p", "displayName": "Dongje", "online": true, "inSession": false } }
-// POST /friend-requests/fr_77/decline → 204   (the receiver)
-// DELETE /friend-requests/fr_77       → 204   (the sender withdraws it)
+// POST /friend-requests/fr_77/accept → 200 { "friend": … } · POST …/decline → 204 (the receiver)
+// DELETE /friend-requests/fr_77 → 204 (the sender withdraws it)
 ```
 
-The receiver gets an FCM push `friend.request` and sees it under received requests (FR-5.7), and the sender sees it on *Sent requests* until it is answered or withdrawn (FR-5.16, added 2026-10-22); **TODO** Iter2-P15: the push is sent once the server has its FCM sender. A declined or withdrawn request is deleted and can be sent again later (US-8). Only the receiver can accept or decline, and only the sender can withdraw; anyone else, and a request already answered, get `404 NOT_FOUND`. Each of these, and a request that accepts the other user's, takes the request with one `DELETE … RETURNING`, so of two at the same moment only one succeeds: an accept and a withdrawal at once never leave the two as friends after the request was withdrawn. Sending and accepting between the same two users also lock both user rows (`SELECT … FOR UPDATE`) and run one after the other, so a request sent while the reverse one is accepted finds the friendship instead of being saved next to it. An accept reads the new friend's presence before it commits, so if the session store fails it answers `503 UNAVAILABLE` and saves nothing, and the same call can be repeated. Sending a request to oneself is `400 INVALID_REQUEST`. `createdAt` is in milliseconds since the epoch.
+- **Push.** The receiver gets the FCM push `friend.request` with `requestId` and `fromName`; FCM drops it if it cannot deliver it within a day. A request that accepts the reverse one sends none.
+- **Lists.** The receiver sees the request among received requests (FR-5.7), the sender on *Sent requests* (FR-5.16). A declined or withdrawn request is deleted and can be sent again (US-8).
+- **`404 NOT_FOUND`.** Only the receiver accepts or declines, and only the sender withdraws; anyone else, and a request already answered, gets `404`. So does a request to an unknown user or one without a Pix ID. A request to oneself is `400 INVALID_REQUEST`.
+- **Races.** Each answer, and a request that accepts the reverse one, takes the request with one `DELETE … RETURNING`. Of two at once only one succeeds, so an accept and a withdrawal never both do. Sending and accepting between two users lock both user rows (`SELECT … FOR UPDATE`), so a request sent during the reverse accept finds the friendship.
+- **Presence.** An accept reads the new friend's presence before it commits, so a failing session store leaves nothing saved, and the call can be repeated.
+- `createdAt` is in milliseconds since the epoch.
 
 </details>
 
@@ -1564,61 +2379,80 @@ The receiver gets an FCM push `friend.request` and sees it under received reques
 <summary><code>GET /friends</code> · It 2 · auth</summary>
 
 ```jsonc
-// response 200
-{ "friends": [ { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong", "online": true, "inSession": false } ] }
+// response 200, ordered by display name
+{ "friends": [ { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung", "online": true, "inSession": false } ] }
 ```
 
-`online` is true while the friend's phone holds an authenticated signaling socket; `inSession` is true while that socket is in a session, a waiting room included (FR-6.9); until a session's socket carries the token ([#55], [#56]) it is always false (2.5.2). Friends are ordered by display name. `DELETE /friends/u_02AB` answers `204`, removes both directions and any pending request between the two (FR-5.10), and answers `204` for someone who is not a friend as well.
+`online`: the friend's phone holds a signed-in signaling socket. `inSession`: that socket is in a session, a waiting room and an invitation included (FR-6.9). `DELETE /friends/u_02AB` ends the friendship for both and removes any pending request between them (FR-5.10). It answers `204`, also for someone who is not a friend.
 
 </details>
 
 <details>
-<summary><code>POST /invitations</code> and answers · It 2</summary>
+<summary><code>POST /invitations</code> and answers · It 3</summary>
 
 ```jsonc
-// request (auth)
+// request (auth, and a Pix ID)
 { "friendId": "u_02AB" }
 
-// response 201
-{ "id": "inv_9c2e", "to": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" },
-  "status": "PENDING", "expiresAt": 1760281230000, "link": "http://pix.example.org/i/inv_9c2e" }
+// response 201: the invitation, and the photographer's place in its session
+{ "id": "inv_01JB2C3D4E5F6G7H8J9KAMNPQR", "to": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung" },
+  "status": "PENDING", "expiresAt": 1760281230000, "link": "http://pix.example.org/i/inv_01JB2C3D4E5F6G7H8J9KAMNPQR",
+  "sessionId": "s_7f3a92c1", "rejoinToken": "cGhvdG9ncmFwaGVyX3Rv", "iceServers": [ /* as in room.created */ ] }
 
-// response 409
-{ "error": { "code": "BUSY", "message": "Junhyeong is in another session" } }
+// GET /invitations/inv_01JB2C3D4E5F6G7H8J9KAMNPQR (no auth needed to open a link)
+{ "id": "inv_01JB2C3D4E5F6G7H8J9KAMNPQR", "from": { "id": "u_01HZ", "pixId": "dongje.p", "displayName": "Dongje" },
+  "status": "PENDING", "expiresAt": 1760281230000 }
+// status: PENDING | ACCEPTED | DECLINED | CANCELLED | EXPIRED
 
-// GET /invitations/inv_9c2e (no auth needed to open a link)
-{ "id": "inv_9c2e", "from": { "id": "u_01HZ", "pixId": "dongje.p", "displayName": "Dongje" }, "status": "PENDING", "expiresAt": 1760281230000 }
-
-// POST /invitations/inv_9c2e/accept (auth) → 200
-{ "sessionId": "s_7f3a92c1", "iceServers": [ /* as in room.created */ ] }
-
-// POST /invitations/inv_9c2e/decline → 204 · POST /invitations/inv_9c2e/cancel → 204
-// any answer to a non-PENDING invitation → 410 INVITATION_GONE
+// GET /invitations/incoming (auth) → { "invitations": [ /* as above */ ] }: pending and unexpired, newest first, at most 20
+// POST …/accept (auth, the friend) → 200 { "sessionId", "rejoinToken", "iceServers" }: the friend's place
+// POST …/decline (the friend) → 204 · POST …/cancel (the photographer) → 204
+// anyone else → 404 NOT_FOUND · an answer to an invitation already answered or expired → 410 INVITATION_GONE
 ```
 
-The server sends the FCM push `invitation` with the `id` and the inviter's name on creation, expires the invitation 30 s later (FR-6.3), and on accept creates the session and notifies the photographer over its signaling socket (`invitation.accepted`, 2.5.2). Only friends can invite each other (`403 NOT_FRIENDS`, NFR-15).
+- **Who.** Only friends can invite each other; anyone else gets `403 NOT_FRIENDS`, whether the user exists or not (NFR-15). A friend in a session, a waiting room included, is `409 BUSY` (FR-6.9).
+- **Sending.** It opens the invitation's session with only the photographer's place, which its phone takes with `session.join` (2.5.2). After answering, the server pushes `invitation` to the friend's phones (2.6.6).
+- **Expiry.** An invitation expires 60 s after it was sent (`PIX_INVITATION_TTL_SECONDS`, FR-6.3), without a write. Then `GET` says `EXPIRED`, and every answer is `410`.
+- **Accepting.** It opens the subject's place for `PIX_INVITATION_JOIN_SECONDS` (15 s), or until the invitation expires if that is later. If the photographer has left, the accept is `410` and the invitation stays pending.
+- **Races.** Each answer is one `UPDATE … WHERE status = 'PENDING' AND expires_at > now`, so of two at once only one counts. The session changes before the commit, so a failing session store leaves nothing saved.
+- **Ending.** A decline ends the session and tells the photographer (`DECLINED`, 2.5.2). A cancel ends it too, and the friend's *Invitation* screen says that the invitation is no longer available (FR-6.4).
+- **Received invitations.** `GET /invitations/incoming` lets the friend answer an invitation whose notification was dismissed (FR-6.17, [#188]). The app reads it every 5 s while *Who takes the photo?* or *See their camera* is shown. It is declared before `/invitations/{id}`, which would take `incoming` for an id. An older server answers `404 NOT_FOUND`, and the app keeps the list it has.
 
 </details>
-
 
 ### 2.6 Algorithms and AI components
 
 #### 2.6.1 Reference guide: segmentation and outline
 
-1.  **Load.** Decode the picked image, applying its EXIF rotation, and downscale so the long side is at most 1280 px (a smaller photo is not scaled up).
-2.  **Segment.** Run the ML Kit subject segmenter with only the foreground confidence mask enabled. The segmenter's model is delivered by Google Play services, so the first use checks that the module is installed and waits for its download, for at most 60 s; a model that is not ready by then, like a photo that cannot be read, shows "Couldn't use this photo. Try another one." and returns to the camera.
-3.  **Check for a person.** If fewer than 2% of the pixels have confidence ≥ 0.5, the step fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
-4.  **Smooth the mask (It 2, FR-2.9).** Blur the confidence mask with three box blurs whose radius is 0.8 % of the person's height (close to a Gaussian; 9 px for a person 1100 px tall), so its 0.5 level becomes a smooth curve. The person is the largest region of the mask, so a stray blob far above or below does not stretch the height. Then drop separate regions smaller than 1 % of the foreground, such as a stray blob beside a hand, and fill holes smaller than 0.2 %; the gap between an arm and the body stays, and background that reaches the photo's edge is never a hole. People of similar size, such as a couple, are all kept (FR-2.5); a figure that small, far in the background, is dropped with the specks. Crop the mask to its bounding box plus a 2 % margin, store the aspect ratio, and keep the box's position in the photo as `anchor` (FR-3.1).
-5.  **Outline.** Trace the smoothed mask's 0.5 level with marching squares, placing each crossing between two pixels by interpolation, so the line follows the blurred curve instead of pixel steps; a person cut off by the photo's edge stays open there. Round the line with two passes of corner cutting (Chaikin) and draw it as a white anti-aliased line with round joins, about 3 dp on screen and scaled to the mask size, with no fill. The width assumes the default start of 70 % of the frame height; a guide that starts larger or smaller from its `anchor` gets a proportionally thicker or thinner line, the same on both phones, because the subject has no `anchor` (2.6.2). No pixel of the reference is used (AD-15).
-6.  **Hand over.** Put the `ReferenceGuide` into `GuideRepository`, which places it at `anchor` (2.6.2). The subject receives only the **smoothed mask** (single-channel PNG, height ≤ 720 px) and runs step 5 on it, never step 4, so both phones draw the same shape (decided 2026-10-12). Until the Iteration 2 contracts carry the mask (`mask-png`, 2.5.1), the cutout travels as in Iteration 1 with the smoothed mask as its alpha, so the subject already draws the same line. The reference photo itself stays on the photographer's phone, downscaled to 512 px for the corner thumbnail (FR-3.9).
+1.  **Load.** Decode the picked image with its EXIF rotation and downscale it to a long side of at most 1280 px, never up. **Cut a screenshot (It 3, FR-2.10, [#174], [#177]).** For an image taller than 1.9:1, `findScreenshotPhoto` looks for the photo in it by the rules below, in plain Kotlin on the phone (FR-2.6). Without one, the image is used whole, as are a generated pose and *Use the whole image*. Steps 2–5 see the cut alone, so the mask, `anchor`, and `reference` are the photo's. `crop` keeps the screenshot at 1024 px with the photo's place in it, on this phone only.
+2.  **Segment.** ML Kit's subject segmenter runs with only the foreground confidence mask. Its model comes from Google Play services; the first use waits for it at most 60 s. A model not ready by then, or an unreadable photo, shows "Couldn't use this photo. Try another one." and returns to the camera.
+3.  **Check for a person.** Fewer than 2 % of pixels with confidence ≥ 0.5 fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
+4.  **Smooth the mask (It 2, FR-2.9).** Three box blurs, close to a Gaussian, make the 0.5 level a smooth curve. Their radius is 0.8 % of the largest region's height (9 px for a person 1100 px tall). Separate regions under 1 % of the foreground are dropped, such as a small figure far behind. Holes under 0.2 % are filled; background that touches the photo's edge is never a hole. People of similar size are all kept (FR-2.5). The mask is cropped to its box plus 2 % of the box's longer side, and the box's place in the photo becomes `anchor` (FR-3.1).
+5.  **Outline.** Marching squares trace the 0.5 level with interpolated crossings, and two passes of Chaikin corner cutting round the line. A person cut off by the photo's edge stays open there. The line is white and anti-aliased, with round joins and no fill. It is about 2 dp on screen when the guide starts at 70 % of the frame height (`STROKE_ON_SCREEN_PX`, 16/3 px; [#182]), and proportionally thicker or thinner otherwise. It depends only on the mask's height, so both phones draw the same line; each phone's settings can change its color and thickness (2.6.8). No pixel of the reference is used (AD-15).
+6.  **Hand over.** `GuideRepository` places the guide at `anchor` (2.6.2). `ReferenceGuide.mask` is the smoothed mask as `ALPHA_8`, without the photo's pixels. The subject receives only this mask, a single-channel PNG at most 720 px tall (`mask-png`, `MaskGuideImageCodec`, 2.5.1), with `anchor` and `source` for its *Save guide* (FR-6.16). It runs step 5 on the mask, never step 4. A guide made on the subject's phone goes the other way, and the photographer adopts it at its `anchor` (2.6.5). The reference photo stays on the photographer's phone at 512 px for the thumbnail (FR-3.9). A JPEG copy goes once to the subject for its own thumbnail (`guide.reference.*`), never as the guide.
 
-All steps run on `Dispatchers.Default`. Target: ≤ 2 s from selection to *Reference confirm* including the smoothing (NFR-3); `Timings` marks `smooth.start` and `smooth.end` inside `seg.start`–`seg.end` show how much of it the smoothing takes. On the emulator the whole step took 0.25–0.35 s per photo once the model was loaded.
+| Cut rule | What counts |
+|----|----|
+| Background | The color most rows are filled with alone, in at least 5 % of the rows. |
+| Blank row | 99 % within 12 of the background on each channel; the outer 2 % on each side (a scrollbar) is ignored. |
+| Candidate | A run of non-blank rows touching neither the image's top nor its bottom. |
+| Margins | An image viewer's one-color margins, such as Google Images' grey panel, are trimmed from both sides while both outer columns match through 90 % of the rows. A flat area on one side only stays. |
+| Shape | At least 60 % of the screen's width; 1.91:1 to 9:16. |
+| No gap | No background- or margin-colored column in the middle three fifths (a grid, photos side by side). |
+| Story frame | Full width, at least 1.7 times as tall: a shared post's card if `SharedPostCard` finds one, else the frame. |
+| Choice | The tallest photo, unless a second one is at least 80 % of its height. |
 
-**Out of scope: arms and legs in front of the body.** Folded arms or crossed legs disappear inside the silhouette, and the outline does not draw them (decided 2026-10-14). Iter2-P7 tried drawing them from ML Kit Pose Detection landmarks: a capsule or a band along each limb, the photo's edges near the limb, the skin's color, and the landmarks' depth to tell which arm is in front. None read clearly as arms: edges break up on patterned clothes, skin color misses sleeves, the depth cannot tell the two arms apart, and the joints are tens of pixels off.
+`SharedPostCard` puts the card's sides where detail starts, a step over 10 to a neighbor, equally far from the frame's sides. Its top and bottom, also equally far from the frame's, are the strongest horizontal edges. Each edge snaps within 2 px and must run along a fifth of its side. The rules were set on 48 screenshots sent through KakaoTalk as 648 × 1404 JPEGs: 20 Instagram posts in light and dark mode, 5 Google Images, 19 Naver, and 4 story shares. Each cut fell within two rows of the photo's edges, in 2–40 ms on a laptop. A tolerance of 3 took in up to 7 noisy rows, and 20 lost a night sky to a dark background. A sky within 12 of a white app's background goes with the app.
+
+All steps run on `Dispatchers.Default`, within 2 s from selection to *Reference confirm* (NFR-3). `Timings` marks `seg.start`/`seg.end` around the whole, `smooth.start`/`smooth.end` around the smoothing, and `cut.start`/`cut.end` around the cut. On the emulator the whole took 0.25–0.35 s per photo once the model was loaded.
+
+**Reference confirm's cut (It 3, FR-2.10).** For a guide with a `crop`, `ScreenshotCutView` plays the cut once in 2 s, when the person is found while the screen watches. The rest of the screenshot dims around an accent-colored frame, the photo fills the card, and then it goes to the bottom-right corner at 72 dp as the outline fades in. A `ValueAnimator` drives it (`ScreenshotCut`), so *Remove animations* shows the end. Without a cut, the outline fades in over 200 ms, also on the subject's phone (Iter3-A13). *Use the whole image* (`onUseWholeImage`) makes the guide again from the whole image. Screen texts: R&S 6.2.
+
+**Out of scope: arms and legs in front of the body.** Folded arms or crossed legs disappear inside the silhouette, and the outline does not draw them.
 
 #### 2.6.2 Guide geometry (shared coordinates)
 
-Both phones use the same frame: the photographer's chosen aspect ratio, 4:3 by default, 16:9 or 1:1 as selected (AD-10, FR-1.13). CameraX binds Preview, ImageCapture, and ImageAnalysis in one `UseCaseGroup` with a `ViewPort` of that ratio, so the preview, the saved photo, and the streamed frame cover the same field of view; changing the ratio rebinds the group once no photo is being saved, and the Camera screen holds the preview's last frame until the new binding streams (2.6.5). The viewport (`FILL_CENTER`) cuts each ratio from the middle of the sensor's 4:3: 9:16 keeps the full height and 1:1 the full width. `ImageCapture` saves the JPEG already cropped to that rectangle, so `PhotoSaver` does not crop. `PreviewView` fits the crop but still draws the camera image around it, so the Camera screen clips it to the frame. The subject learns the ratio from `camera.state.aspect` and fits its video area to it. Each phone shows the whole frame, fitted and centered:
+Both phones use the photographer's aspect ratio: 4:3 by default, 16:9, or 1:1 (AD-10, FR-1.13). Preview, ImageCapture, and ImageAnalysis share one `UseCaseGroup` with a `ViewPort` of that ratio (`FILL_CENTER`), so the preview, the photo, and the stream show the same field of view. Each ratio is cut from the middle of the sensor's 4:3: 9:16 keeps the full height, 1:1 the full width. `ImageCapture` saves the photo already cropped, and the Camera screen clips `PreviewView` to the frame. The subject reads the ratio from `camera.state.aspect`. Each phone shows the whole frame, fitted and centered:
 
 ```text
 frame  W × H   (e.g. 720 × 960)          view  w × h   (the preview or the remote video area on screen)
@@ -1629,86 +2463,273 @@ view  → frame:  cx = (x − ox) / (W · s)      cy = (y − oy) / (H · s)
 guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 ```
 
-**Photographer composition aids (FR-1.9–1.10).** `CameraCompositionView` uses this same fit-centered image rectangle to draw lines at one-third and two-thirds in each direction. A short horizon bar is centered in the middle cell, with fixed horizontal end markers and a middle segment that counter-rotates with device roll. `CameraLevelMonitor` reads the gravity sensor, falling back to the accelerometer, while the view is resumed. It smooths gravity vectors before computing the screen-relative angle; level enters within ±2° and exits beyond ±3°. When level, the bar aligns horizontally and turns dark yellow (`#D4AC24`). Invalid sensor readings or an almost face-up/down phone hide the bar. These are non-interactive local View overlays and do not enter photos, analysis frames, or the WebRTC stream.
+**Photographer composition aids (FR-1.9, FR-1.10).** `CameraCompositionView` draws in the same rectangle. The rule-of-thirds grid is 0.5 dp with a 1 dp dark outline. The horizon bar is 1.5 dp with a 2.5 dp outline, and its middle counter-rotates with the roll. `CameraLevelMonitor` smooths the gravity sensor, or the accelerometer. Beyond 45° of roll the phone counts as on its side (`CameraLevel.baseDegrees`, 0 or 90), and the bar runs along the frame's long side (`cameraLevelFromGravity`; Iter3-A15, [#182]). Level enters within ±2°, exits beyond ±3°, and turns the bar dark yellow (`#D4AC24`). The bar hides past 20° (`MAX_LEVEL_TILT_DEGREES`), on invalid readings, and with the phone face up or down. The aids never enter photos, analysis frames, or the stream.
 
-**Camera zoom and the guide-edit mode (AD-17, decided 2026-10-12).** The zoom slider of Iteration 1 is removed. On Camera, a pinch on the preview zooms the camera while **guide-edit mode** is off; the readout shows the observed, applied ratio and keeps its Zoom in / Zoom out accessibility actions, which step the zoom without a gesture. The guide-edit mode toggle sits beside the zoom readout under the preview, on both screens, so it stays as the guide's own panel changes; while it is on, every drag and pinch edits the guide and the camera zoom does not change. The mode turns on when a guide is added, so that it can be placed at once, and off when the shutter is pressed or the guide is removed or hidden (decided 2026-10-13); on Subject view it starts off, because the subject mostly zooms. On Subject view the same toggle (its state and overlay wiring from Iter2-P6, shown with guide moves in Iter2-P17) decides whether a pinch on the live video sends `camera.zoom.set` or a drag and pinch sends `guide.move` (2.6.5); its readout follows the requested ratio optimistically during a pinch and settles on the applied echo. There is no *detail settings* panel (decided 2026-10-15): the brightness slider opens from its own button beside the zoom readout, and its value shows in EV; the flash and aspect-ratio buttons are in the top bar. `TrackedSliderController` serves the guide opacity and brightness sliders. Lens switching keeps the pinch's latest target through `STARTING`, as the slider did.
+**Camera zoom and the guide-edit mode (AD-17).** With guide-edit mode off, a pinch on the preview zooms; with it on, every drag and pinch edits the guide. The mode turns on when a guide is added and off at the shutter or when the guide is removed or hidden. On Subject view it starts off and chooses between `camera.zoom.set` and `guide.move` (2.6.5). The zoom row holds the readout, the pose tip's button (Camera only), and the mode's toggle. A tap on the readout steps through `quickZoomSteps` (FR-1.3): the camera's minimum when below 1×, then 1× and 2× where available. `nextZoomStep` takes the first step above the zoom (2 % tolerance), else the first; a tap before the last step is applied goes on from that step. On Subject view a late echo of an earlier step is ignored. The readout's tap area is at least 48 dp wide around a 28 dp pill, with Zoom in / Zoom out accessibility actions. The top bar's ratio button opens 3:4, 9:16, and 1:1 in a row (Iter3-A12, FR-1.13). Brightness is a bar beside the focus box (`ExposureBarView`; 2.8, *Camera labels and brightness*; [#182]). A lens switch keeps the pinch's target through `STARTING`.
 
-**Gestures.** In guide-edit mode, the photographer's pan and zoom deltas are converted with *view → frame* and applied to `GuideState`. `height` is limited to 0.21–2.1, and `cx`, `cy` are limited so that at least 20 % of the guide's width and height stay inside the frame (FR-3.2, FR-3.3). Because only frame coordinates are stored and sent, the guide lands on the same part of the scene on both phones (NFR-8). The subject's gestures go through the same conversion and the same limits on the photographer's phone (`guide.move`, FR-7.2).
+**Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). The screens: R&S 6.2.
 
-With guide-edit mode on, the overlay owns every touch sequence on the preview, so the guide is easy to grab even by its transparent parts, and the camera never zooms by mistake. With the mode off, the overlay passes touches through: a pinch zooms the camera and a tap focuses (FR-1.4). `PinchZoomController` owns the preview's touches, so it reports a single tap; the Camera screen converts it to frame coordinates for `setFocusPoint` and shows a ring there. `splitMotionEvents` stays disabled on the preview container, so one sequence stays one gesture as fingers join or leave. Read-only overlays always pass touches through.
+**Changes on screen (It 3, Iter3-A12, [#179]).** Camera changes animate in 300 ms or less (`ui/Motion.kt`: move 250 ms, turn 300 ms, fade 200 ms, dim 150 ms). With Android's animations off, each shows its end at once.
 
-The guide's normalized width is `height × aspect × (H / W)` of the current frame (4/3 for 4:3 portrait, 16/9 for 16:9, 1 for 1:1). For either normalized dimension `d`, the center is limited to `[v − d/2, 1 − v + d/2]`, where `v = min(0.2 × d, 1)`. Centers may therefore lie outside 0–1. If an unusually wide guide exceeds five frame widths, showing 20% is impossible at that scale; keep the whole frame width covered instead, preserving the 30–300% scale range. Geometry also clamps opacity to 0.1–0.9. Non-finite state values reset to their defaults. Coordinate conversion requires finite points and positive, finite frame and view sizes, so callers wait for layout before converting touches.
+- *New ratio.* The held frame dims to half (`previewScrim`) and blurs 16 dp in 150 ms (`RenderEffect`, Android 12 and later). In 250 ms the image's place, the zoom row, the live dot, and the held frame move to the new ratio's (`FramePlace`, `sceneMove`). The frame scales with the camera image's width around it, `max(width, height × 3/4)`, so the scene lands where the new preview shows it: 4:3 to 16:9 is a third larger, and 16:9 to 1:1 three quarters as large. On the Galaxy S22 the first also moves it 80 dp lower. The grid and guide stay hidden until the new binding streams; then the frame fades out in 200 ms and they fade in (FR-3.7).
+- *Other camera (FR-1.14).* The same hold, with the grid and guide kept. The frame turns over top over bottom in 300 ms (`rotationX`), then fades into the new preview.
+- *Lens change of the zoom.* The held frame goes at once (2.6.5).
+- *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms.
+- *Subject view.* The video area moves the same way when `camera.state.aspect` changes. The grid and guide wait for a frame of the new shape (`FrameWatchdog.shape`, within 2 %) or 2 s (2.6.4).
 
-**Starting position (FR-3.1, decided 2026-10-09; mapping decided 2026-10-16).** A new guide does not start centered. `setGuide` places it with `GuideGeometry.start`: `height` = the height of `anchor`, the box of the guide image's crop (the person and its 2 % margin), as a fraction of the photo's height, and `cx`, `cy` = the box's center as fractions of the photo; then the 20 % rule above clamps it. The same fractions are used whatever the photo's ratio, so the person keeps their height and center, and a photo wider than the frame reaches past the frame's sides (in 16:9, for instance); a person smaller than the minimum starts at 0.21 around the same center. A replacement starts at its own reference's place, not where the previous guide was moved. The limits 0.21–2.1 stay fractions of the frame height for every start, so the subject's mirror, which has no `anchor`, clamps alike, and the subject takes the start from the `guide.state` that follows every image, also when it joins late. When the aspect ratio changes during a session, the stored `cx`, `cy`, `height` are kept and re-clamped for the new frame; the person's size relative to the frame height therefore stays the same.
+**The guide's own changes (It 3, Iter3-A13, [#180]).** `GuideOverlayView` animates the guide through its paint's alpha and a scale about its middle. A guide with a new id fades in while growing from 95 % in 250 ms (`Motion.GUIDE_MS`), as the old one fades out. *Hide*, *Remove*, and the return after *Show* fade in 150 ms (`Motion.HIDE_MS`). Moves, resizes, and opacity apply at once, and a drag during an animation moves the guide. The guide already there when a view opens shows without animation. Subject view uses the same view.
 
-**Hide, show, and replace (FR-3.6, Iter2-P11).** *Hide*, at the start of the guide's panel, sets `visible = false` with a final update, which `guide.state` carries to the subject; *Show* brings the guide back at the same place. While the guide is hidden, guide-edit mode is off and its toggle disabled, the opacity slider is disabled and dimmed, and the hint reads "Guide hidden". There is no *Replace* button (decided 2026-10-16): with a guide on the camera, *Guide* opens *Add a pose guide* titled "Replace the pose guide?", whose *Cancel* reads *Keep the current guide*, and a confirmed reference replaces the guide through `setGuide`.
+**Gestures.** In guide-edit mode, pan and zoom deltas convert with *view → frame* and update `GuideState`. `height` stays within 0.21–2.1, and `cx`, `cy` keep at least 20 % of the guide's width and height in the frame (FR-3.2, FR-3.3). Only frame coordinates are stored and sent, so the guide covers the same scene on both phones (NFR-8). The subject's `guide.move` takes the same path on the photographer's phone (FR-7.2). With the mode on, the overlay owns every touch, transparent parts included. With it off, `PinchZoomController` takes them: a pinch zooms, a tap focuses at that frame point (FR-1.4), and one finger's vertical drag moves brightness (`VerticalDrag`, [#182]). `splitMotionEvents` is off on the preview, so a sequence stays one gesture.
 
-**Save guide (FR-3.8, Iter2-P18).** The guide's panel holds, in order, *Hide*, the opacity slider with its percentage, *Save guide*, and *Remove*, all icon buttons. *Save guide* keeps the guide on the camera with `SavedGuideStore.save`; its bookmark fills once the guide on the camera is a saved one, which the app knows because a guide keeps its ID when it is saved and loaded. A tap shows one notice for 3 s: "Guide saved. Use it again from Guide.", "Guide saved. The oldest saved guide was removed to keep 20.", "This guide is already saved. Find it under Guide.", or "Couldn't save the guide. Check the phone's storage." *Add a pose guide* lists the saved guides newest first as a row of thumbnails, hidden while there are none; a tap on one puts it on the camera at its reference's place (*Starting position*), and its ✕ deletes it after asking. A guide on the camera stays when its saved copy is deleted.
+The clamp (`GuideGeometry.clamp`): the guide's normalized width is `height × aspect × (H / W)`. For each normalized size `d`, the center stays in `[v − d/2, 1 − v + d/2]`, with `v = min(0.2 × d, 1)`, so a guide over five frames wide covers the whole frame, within the 30–300 % scale range. Opacity stays within 0.1–0.9, non-finite values reset to their defaults, and conversion waits for layout.
 
-**Overlay rendering.** `GuideOverlayView` caches the guide and state, then recalculates its drawing bounds when either changes or the View is resized. The outline bitmap is drawn into the destination rectangle with `opacity` applied through `Paint.alpha`; with `visible == false` nothing is drawn. Canvas clipping keeps the guide inside the image rectangle. The reference thumbnail (FR-3.9) is a separate `ShapeableImageView` over the preview on the photographer's phone only; it is not part of the overlay, not streamed, and not in photos. It starts in the top-left corner with its long side 72 dp. A tap enlarges it to half the preview's width, or narrower if it would be taller than its area, and hides the hint chip, which stays above it with the other chips; another tap makes it small again. A drag moves it with the finger and, on release, drops it into the nearest of the four corners (`ReferenceDragController`, `placeReference`); the bottom corners sit above the first panel at the preview's bottom, so it moves up when brightness or a notice opens. TalkBack reads the tap as *Enlarge* or *Make smaller* and offers the other corners as actions. The corner stays for the next guide, and a new guide starts small; the scene photo step hides the thumbnail.
+**Starting position (FR-3.1).** `GuideGeometry.start` places a new guide at its `anchor`: `height` is the box's height over the photo's, and `cx`, `cy` its center as fractions of the photo, whatever the photo's ratio. The clamp then applies, so a small person starts at 0.21. A replacement starts at its own reference's place; a guide without `anchor` starts centered at 0.7. The subject's mirror places the guide from the `guide.state` that follows every image, also after a late join. A ratio change keeps `cx`, `cy`, and `height` and clamps them again.
+
+**Hide, show, and replace (FR-3.6, Iter2-P11).** *Hide* sets `visible = false` with a final update, which `guide.state` carries to the subject; *Show* restores the guide in place. While it is hidden, the edit toggle and the opacity slider are disabled. *Hide* and *Show* also label the image for 3 s (2.8). With a guide on the camera, *Add a pose guide* asks to replace it, and a confirmed reference replaces it through `setGuide`.
+
+**Save guide (FR-3.8, Iter2-P18).** The guide's panel holds *Hide*, the opacity slider, *Save guide*, and *Remove*. *Save guide* is a toggle ([#182]): `toggleSaved`, shared with Subject view, saves a guide the library lacks and deletes one it has, by ID. A guide keeps its ID through save and load, so the bookmark stays filled. Each tap shows one notice for 3 s (`GuideSaveNotice`): saved, saved with the oldest of 100 removed (from the save's own `GuideSaved.removedOldest`), removed, or failed. The guide on the camera stays. The store: 2.8, *Guide store*.
+
+**The library (FR-3.8, FR-3.11, It 3, [#170]).** *Add a pose guide* opens with *My library*: *Add photo*, the ten newest saved guides marked photo or AI pose, and *All N*. *Generate poses here* follows, except from Subject view. A tap puts a guide on the camera at its *Starting position*. *All N* opens `LibraryFragment` in the sheet's place, so Back returns to the camera: a grid filtered by kind, newest first, where a long press deletes after asking. Thumbnails load as cells show, through a 24 MB `LruCache`. From Subject view, the library offers the guide to the photographer and leaves when the session ends. The screens: R&S 6.2.
+
+**Overlay rendering.** `GuideOverlayView` draws the outline with `opacity` as `Paint.alpha`, in this phone's line color and thickness (2.6.8), clipped to the image, and nothing while `visible == false`. The reference thumbnail (FR-3.9) is a separate view, never in the stream or photos. It starts top left with a 72 dp long side; a tap enlarges it to half the preview's width, or less to fit. A drag drops it into the nearest corner (`ReferenceDragController`), which TalkBack offers as actions. The corner persists, and a new guide starts small. Subject view shows the same thumbnail from `MirrorReference`, with its own corner, which is never sent (It 3, [#132]); it stays while the guide is hidden.
 
 #### 2.6.3 Pose generation
 
-1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, the Camera screen takes the scene photo. It is a state of that screen (`GenerationUiState.phase`), so the camera keeps running with zoom and the composition aids, and the shutter copies the latest analysis frame instead of saving a photo. Nothing is sent before *Use this photo*. The app resizes the photo to a long side of at most 1024 px and encodes it as JPEG (quality 85), which leaves out location and other metadata; the server checks this and rejects any other photo, but never resizes it (2.5.3). Preparing the photo on the phone keeps the four uploads small and the location data on the phone.
-2.  **What to pose (It 2, FR-4.8).** *Generate poses* shows the scene thumbnail, a field for a description of up to 100 characters in Korean or English with a counter, six idea chips, *Generate 4 poses*, and *Skip, suggest poses for me*. The chips are short English poses in the app's string resources, so they need no request; a chip fills the field, which can then be edited. A blank field counts as *Skip*.
-3.  **Requests.** Without a description, the app sends the photo to `POST /pose-suggestions`, which answers with four poses chosen for the scene (*Suggested poses* below), and then one `POST /poses` per pose. With a description, it sends the description's own `POST /poses` at once and asks `POST /pose-suggestions` for three variations of it (*Pose variations* below), then sends one `POST /poses` per variation. The description's request goes first so that the first candidate does not wait, and variations that do not come within 10 s, or at all, are replaced by the description. The four requests (`pose-1` … `pose-4`) each get a `seed` drawn from one seed for the set; a model without seed support ignores it. *Try again* sends the same request again; *Try other poses* goes back to *Generate poses* with the photo and the description kept, so the next set can ask for something else.
-4.  **Progressive results.** The screen shows its four slots once the poses are known ("Choosing poses…" for suggested poses, "Creating…" for a description, until then), fills them as candidates arrive, and moves to *Pick a pose* when all four are done, or at 60 s if at least one is ready (*Time limit* below). Requests still open at the limit are cancelled. Zero candidates means *Couldn't create poses* (FR-4.7). When the service refused every pose of a description, that screen says it would not create poses for that description with this photo, and offers *Edit description* in place of *Try again*; *Back to camera* leads to another photo. The service does not say which of the two it refused (US-5). After *Use this pose*, the app discards the scene photo and the other candidates.
-5.  **Cancellation.** *Cancel* cancels the coroutine scope, which cancels the HTTP calls. The server notices the closed connection and cancels its own call to the image API, which then does not bill that image. On the course servers the course's proxy does not pass the phone's cancel on (measured 2026-10-13; 2.8, Hosting), so there a cancelled request runs to the end and is billed; the rate limit bounds that cost.
+The server reaches every model through OpenRouter with one key (`OPENROUTER_API_KEY`). Each model is a setting:
 
-**Pose prompt.** Every candidate uses one prompt, `pose_prompt` in `server/src/pix_server/poses/prompts.toml`, with the pose in place of `{pose}`: the user's description as written (Korean included, which the image model follows), a suggested pose, a variation, or a default pose. The prompt changes the pose and the expression and lets the model act as a photographer in three ways only: move the person within the scene, frame them closer (knee-up or waist-up), and raise, lower, or tilt the camera a little. It never shows more than the scene photo does, and its rules come after the pose so that they win over it: the same person, clothing, place, and light, and nothing added to lean or sit on. *Why:* the template prompt it replaced (decided 2026-10-21) kept the framing fixed, so a person photographed from afar stayed small in every candidate, and it still widened the view when a pose needed the whole body. With the pose prompt, 13 of 16 descriptions were followed in all eight test photos with the same person and place. A candidate can be tighter than the live view; the photographer then zooms in or steps closer to match the guide. *Known limits:* a description can still add a prop, clothing, or a second person it asks for (a cup, a suit, a friend); walking toward the camera is mostly cut at the knees; and the image service, not Pix, decides what to refuse (a violent description was not refused in testing).
+| Use | Setting, default | Timeout | Why this model | Alternative |
+|----|----|----|----|----|
+| Candidates | `PIX_POSE_MODEL`, `openai/gpt-image-2.5-flare@low` | 60 s | 8 photos × 4 poses (2026-10-03, 10-04): faces and backgrounds kept like the alternatives, the most natural poses, the cheapest ($0.012 an image, about $0.05 a set, against $0.018 and $0.068). Frames closer best with the pose prompt (2026-10-21). Gemini 3.1 Flash Lite, the fastest, changed faces. | Seedream 5.0 Flash, Gemini 3.1 Flash |
+| Suggestions, variations | `PIX_SUGGESTION_MODEL`, `google/gemini-3.1-flash-lite`, minimal reasoning | 8 s | 10 vision models (2026-10-21): usable poses in 24 of 24 calls, 1.7 s median, 2.8 s at most, about $0.0005 a call; poses fit each place best. | `z-ai/glm-5.3-flash` |
+| Pose tips | `PIX_TIP_MODEL`, the same model, `low` reasoning | 10 s | *Pose tips*. | — |
+| Description filter | `PIX_FILTER_MODEL`, `typesafe/jev-1.14`, cutoff 0.7 | 2 s | *Description filter*. | `perplexity/pplx-decider-v1.2` |
+| Person check | `PIX_PERSON_MODEL`, `typesafe/jev-1.14`, cutoff 0.5 | 3 s | *Person check*. | — |
 
-**Suggested poses.** Without a description, the server sends the photo with `suggestion_prompt` to a vision model through OpenRouter's chat completions, with the same key as the image model: `PIX_SUGGESTION_MODEL`, by default `google/gemini-3.1-flash-lite`, with the least reasoning it allows and a JSON schema. The prompt's rules match the pose prompt's (only what is in the photo; no props, other people, or other clothes), so a suggestion does not ask for what the image model must leave out. The server keeps the first four different poses of 1–100 characters and fills the rest with the four default poses (hands on hips, wave, walking, arms crossed): all four when the model fails or takes longer than 8 s, so the endpoint never fails because of the model. Apps from before Iteration 2 still ask for the default poses by id. *Why suggestions:* they use the place, such as leaning on a door or sitting on a step, which the four fixed standing poses cannot. *Why this model:* of ten vision models tried on 2026-10-21, it gave usable poses in all 24 calls, 1.7 s median and 2.8 s at most, at about $0.0005 a call, and its poses fit each place best; `z-ai/glm-5.3-flash` did nearly as well and is the alternative. *Known limit:* the first suggested pose is often the same relaxed standing one; asking the model to avoid the previous set's poses is left for later.
+1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, Camera enters a scene-photo state (`GenerationUiState.phase`), and the shutter copies the latest analysis frame. A flash would not reach that frame, so the flash button switches the phone's light instead, on only while framing (`setTorch`; It 3, Iter3-A5). A shot waits until the light has held for 0.5 s, at most 1.5 s; a lens without a flash does not wait. *Use this photo* waits for the phone's *Person check*, and nothing is sent before it. The app sends JPEG at quality 85, long side at most 1024 px, without metadata; the server rejects any other photo and never resizes one (2.5.3).
+2.  **What to pose (It 2, FR-4.8).** *Generate poses* has a description field of up to 100 characters, in Korean or English, the descriptions used before, and one button (It 3, Iter3-A13, [#180]). The button reads *Suggest 4 poses* while the field is blank, spaces included (`PoseRequest.of`), and *Generate 4 poses from this* otherwise. The field's ✕ empties it; it hides while the other phone types. The screen: R&S 6.3.
+3.  **Requests.** Without a description, the app asks `POST /pose-suggestions` for four poses, then sends one `POST /poses` per pose. With a description, it sends that description's `POST /poses` at once and asks `POST /pose-suggestions` for three variations, then one `POST /poses` each. A variation missing after 10 s is replaced by the description. Each request (`pose-1` … `pose-4`) gets a `seed` drawn from one seed per set. *Try again* repeats the request with a new seed. *Try other poses* and Back on *Pick a pose* ([#182]) return to *Generate poses* with the photo and text kept. The photographer's ✕ discards the set and returns to the camera; the subject's arrow returns to Subject view.
+4.  **Progressive results.** *Generating poses* shows four slots, two by two in the scene's shape, narrower and centered for a 9:16 scene (`CandidateGridFit`). A candidate, or its failure, fades in over 200 ms where its spinner was (Iter3-A13). The run ends when all four are done or at 60 s, when open requests are cancelled. With at least one candidate, *Pick a pose* shows each on its own page of a `ViewPager2` (`PosePageAdapter`), in its own shape. The page on screen is the one *Use this pose* takes ([#108]). With none, *Couldn't create poses* opens (FR-4.7). After *Use this pose*, the other candidates go, and the scene photo once its tip is asked for.
+5.  **Cancellation.** *Cancel* or Back cancels the coroutine scope and its HTTP calls. The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
 
-**Pose variations.** With a description, the same model gets `variation_prompt` with the description in place of `{description}` and writes three variations that keep everything the description says and change what it leaves open: the arms and hands, the stance, the turn of the body, the head, or the spot. The server leaves out the description if the model repeats it, and puts the description in place of any variation it cannot use. *Why:* four requests with one description give four nearly identical images, because the image model reads one text the same way every time and ignores the seed. In 24 sets on three photos (2026-10-21), the description with three variations held 3.4 different poses of 4 against 2.0 for the description four times, while 90 of 96 images against 94 still followed the description; the first candidate keeps the user's own words in front of the image model. *Known limit:* a variation can add something in the place that competes with the request, such as touching a door while walking toward the camera; a prompt that forbade this did no better overall and is not used.
+**Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
 
-**Prompts as data.** The three prompts and the default poses are data in `prompts.toml`. The server checks the file when it starts: a prompt without its placeholder or with it twice, an empty prompt, or anything but four default poses of at most 100 characters stops it, so a mistake fails the tests and the image build instead of pose requests. `server/scripts/compare_image_edit_apis.py` (pose prompt) and `compare_suggestion_models.py` (suggestion and variation prompts, with `--description`) read the same file, so a change can be tried before it ships.
+**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. `PoseSaveViewModel`, scoped to the activity, cuts the person out with `ReferenceGuideMaker.make(image, GENERATED)` and saves the guide as an AI pose. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide. A tap on a filled heart deletes the guide. A newly saved ♥ pops to 125 % and back in 200 ms. Whether a save removed the oldest guide is decided under the store's lock (`GuideSaved`): of two hearts tapped at once with 99 saved, only the second removes one. *Use this pose* on a filled heart reuses its saved guide. Nothing of a ♥ is sent (2.6.5).
 
-**Image model.** Poses are generated through OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), which gives one request format, one key, and one bill for every vendor's models. The model is the server setting `PIX_POSE_MODEL`, by default `openai/gpt-image-2.5-flare@low`, GPT Image 2.5 Flare at low quality. *Why:* on eight photos with four poses each (2026-10-03 and 2026-10-04), it, Seedream 5.0 Flash, and Gemini 3.1 Flash kept faces and backgrounds with similar latency; GPT gave the most natural poses and is the cheapest ($0.012 per image, about $0.05 a set, against $0.018 and $0.068), and with the pose prompt it frames closer most naturally (2026-10-21). Gemini 3.1 Flash Lite, the fastest, changed faces and scenes. Seedream 5.0 Flash and Gemini 3.1 Flash are the alternatives. Every request asks for a 3:4 image at the `1K` resolution (`aspect_ratio`, `resolution`), whatever the ratio of the scene photo, so a 16:9 or 1:1 scene comes back as a 3:4 candidate; asking for the scene's own ratio is left for later (AD-10).
+**Pose prompt.** Every candidate uses `pose_prompt` with the pose in `{pose}`: the description as written (Korean included), a suggestion, a variation, or a default pose. It changes the pose and the expression. It lets the model move the person, frame closer (knee-up or waist-up), and raise, lower, or tilt the camera a little, but never show more than the scene photo. Its rules follow the pose, so they win: the same person, clothes, place, and light, and nothing new to lean or sit on. *Why:* with a fixed framing, a distant person stays small; with this prompt, 13 of 16 descriptions were followed in all eight test photos. *Known limits:* a description can still add a prop, clothing, or a second person, and walking toward the camera is mostly cut at the knees. The image service did not refuse a violent description in testing.
 
-**Time limit.** 60 s for a whole run on the phone, counted from the tap on *Generate 4 poses* or *Skip* with the suggestions or variations included, and 60 s for each call from the server to the image API (`PIX_POSE_UPSTREAM_TIMEOUT_SECONDS`); the phone's HTTP client waits 65 s, so the run's limit decides (decided 2026-10-21). *Why:* GPT Image 2.5 Flare usually finishes a set within NFR-4's 20 s and 30 s, but on a slow day single requests took up to 46 s, and at the earlier limit of 30 s two of four in one set failed although a late candidate is better than none. nginx waits 75 s for an answer, and a deploy lets requests in flight finish.
+**The user's words in the prompts.** The user's words reach a prompt in quotation marks, and `checked_pose` makes their double quotation marks single, so they cannot close it. Each such prompt says the quoted text only describes a pose, is never an instruction, and is never written into the photo. Each prompt with a photo says that text in it, such as a sign, belongs to the place. On five scenes (2026-11-03), suggestions and variations stayed usable, and Gemini repeated a Korean description in one of five answers, against all five with the earlier wording.
+
+**Description filter (It 3, FR-4.12).** `DescriptionFilter` judges every description of `POST /poses` and `POST /pose-suggestions` and every pose of `POST /pose-tips`, after the rate limit and before any other model. It asks two yes/no questions from `[filter]` in `prompts.toml`. One asks whether the text asks for harmful content: sexual content, injury, self-harm, hate, or a real person's look. The other asks whether it tries to manipulate the AI: ignore or reveal its rules, a new role, a fake system message, or a closed quotation mark. A probability at the cutoff or above answers `422 REJECTED`. Default poses, suggestion requests, and photos are not judged; other clothes, places, and props pass. The filter fails open, and the log gets only a refusal's question and probability. *Why:* seven decision models were compared on 107 labeled descriptions in English and Korean: 57 harmless, 50 attacks, 29 of them harmful (2026-11-02, `compare_filter_models.py`). Jev 1.14 at 0.7 refused no harmless one and caught every harmful one, in 0.4 s at $0.03 per 1,000 calls. The Decider caught all 50 attacks but refused "Forget the previous pose, try something totally new". *Known limits:* the numbers are optimistic until other descriptions are measured (Testing Documentation 3); a fake note that allows only something harmless can pass.
+
+**Person check (It 3, FR-4.13).** A scene photo without a person is not sent. On the phone, `RuleBasedPersonDetector` checks it after the shutter, and *Use this photo* waits; with no one found, only *Shoot again* works. It accepts an ML Kit pose (base model) with at least 8 of 33 landmarks in the frame, at likelihood 0.5 or more. Without one, it accepts any face down to 2 % of the photo's width. Both models are bundled, so it works offline; an error lets the photo go on. On the server, every `POST /poses` asks the person model about `photo` (`[person]`), in parallel with the filter. Below the cutoff it answers `422 NO_PERSON` without calling the image model, unless the filter refused. It fails open, also for a photo under 256 px. *Why:* on 53 scenes (2026-11-03; 39 with people, 14 without, such as statues, graffiti, a dog, and a mannequin), pose and face detection together found everyone; pose alone missed three. Selfie Segmentation marked graffiti as people, and Subject Segmentation marks walls. Jev scored people 0.96–0.98 and the rest 0.02–0.36, in 0.7 s for $0.0001 (`try_person_check.py`). *Known limits:* the phone accepts a cartoon face, a dog, or a mannequin; only distant passers-by can pass the server (0.49 and 0.81 for two edits).
+
+**Suggested poses.** Without a description, the suggestion model gets the photo with `suggestion_prompt` and a JSON schema; its rules match the pose prompt's. The server keeps the first four different poses of 1–100 characters. It fills the rest with the default poses (hands on hips, wave, walking, arms crossed), all four if the model fails or exceeds 8 s, so the endpoint never fails for the model. Apps from before Iteration 2 ask for the default poses by id (`templateId`). Suggestions use the place, such as a door or a step. *Known limit:* the first pose is often the same relaxed standing one.
+
+**Pose variations.** With a description, the same model gets `variation_prompt`. It writes three variations that keep everything the description says and vary what it leaves open: arms and hands, stance, turn, head, or spot. The server drops a repeat of the description and fills the gaps with the description. *Why:* the image model gives near-identical images for one text and ignores the seed. In 24 sets on three photos (2026-10-21), variations gave 3.4 different poses of 4, against 2.0, and 90 of 96 images followed the description, against 94. *Known limit:* a variation can add something that competes with the request, such as touching a door while walking.
+
+**Selfie prompts (It 3, FR-1.14).** A front-camera scene is a selfie (`GenerationUiState.selfie`). Every request of the set sends `selfie`, and the server uses the `[selfie]` prompts and default poses. They add one rule: one hand holds the phone at arm's length. Only the other hand, the face, the head, and the shoulders pose; the phone never shows; the shot stays a selfie from slightly above the eyes. *Why:* on three Wikimedia Commons selfies (2026-10-29), the general prompts turned all twelve candidates into photos someone else took; the selfie prompts kept all twelve selfies. The scene photo is mirrored like the preview (2.6.4).
+
+**Prompts as data.** The prompts, default poses, and questions are in `server/src/pix_server/poses/prompts.toml`, with the `[selfie]`, `[filter]`, and `[person]` tables. The server refuses to start on a missing or doubled placeholder, an empty prompt, or other than four default poses of up to 100 characters. A missing `[selfie]` table, duplicate selfie poses, an incomplete `[filter]` or `[person]` table, or an unknown key also stops it. A mistake therefore fails the tests and the image build, not pose requests. The scripts in `server/scripts/` read the same file, so a change can be tried first; `eval_poses.py` runs the AI module tests (Testing Documentation 3.1).
+
+**Image model.** Candidates come from OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), with one format, key, and bill for every vendor. Each request asks for `1K` and the closest `aspect_ratio` of 3:4, 9:16, and 1:1 (AD-10), which the listed models all accept (2026-10-30). A model may round the ratio, such as 896 × 1200 for 3:4, so each screen fits a candidate in its own shape. Nothing is cut, since the guide uses the whole candidate. The scene's thumbnails are 72 dp high. The server converts PNG or WebP to JPEG (quality 90) and turns OpenRouter's `403` into `422 REJECTED`.
+
+**Pose tips (It 3, FR-4.10).** When *Reference confirm* finds the person in a chosen candidate, `PoseTips` calls `POST /pose-tips` with the scene, the candidate (at most 768 px), and the pose. The one request takes 2–3.5 s, hidden behind that screen. The tip model fills `tip_prompt`'s JSON schema: the shot, the pose, the phone's height now and best, the angle, the framing, and then one sentence. Height and angle follow photographers' rules:
+
+| Shot | Phone | Angle |
+|----|----|----|
+| Full body, standing, walking, or leaning | at the waist | up a little |
+| Knees up or waist up | at the chest | level |
+| Chest up | at eye level | down a little |
+| Sitting or crouching | crouching | level |
+
+The server derives the height move. It refuses a sentence with a number, a unit, or a degree, over 160 characters, or with a letter outside the requested script (Latin for `en`, Hangul for `ko`). For the screens' language `ko`, it adds `tip_korean`: a 해요체 sentence of at most 80 characters, with "조금" instead of counts. Korean counts, units, and degrees are refused (한 걸음, 몇 미터까지, 구 도까지), while 한쪽, 구도, or 파라미터 pass (`KOREAN_MEASURES` in `tips.py`). After a language change, also on Android 10–12 (2.6.8), `PoseTips` asks again. A newer guide, another photo, or Back on *Reference confirm* cancels the request, also on the server; the one for the guide on Camera stays until another guide replaces it. A saved guide and a selfie's candidate get no tip. *Why Korean this way:* on 16 pairs, three rounds per language (2026-10-30), every Korean sentence was usable (31–58 characters). Its decisions matched English's in 13 of 16 pairs, within English's own spread: 7 of 16 pairs stable in English, 12 of 16 in Korean.
+
+**Time limit.** A run has 60 s on the phone, from the button, suggestions and variations included. Each server call to the image API has 60 s (`PIX_POSE_UPSTREAM_TIMEOUT_SECONDS`, then `504 UPSTREAM_TIMEOUT`). The phone's HTTP client waits 65 s and nginx 75 s, so the run's limit decides; a deploy lets requests finish. *Why:* sets usually finish within NFR-4's 20 s and 30 s, but single requests took up to 46 s on a slow day.
+
+**Limits and failures.** Each endpoint counts only requests about to reach a model, per client address and over all clients, and answers `429 RATE_LIMITED` past a limit (2.8, *Privacy*):
+
+| Endpoint | Per client, per hour | All clients, per 24 h |
+|----|----|----|
+| `POST /poses` | 20 | 500 |
+| `POST /pose-suggestions` | 10 | 500 |
+| `POST /pose-tips` | 20 | 1000 |
+
+| Failure | Result (texts: R&S 6.3) |
+|----|----|
+| One candidate | Its slot shows the failure; the others go on. |
+| Every candidate | *Couldn't create poses*, with *Try again*; the photo is kept (FR-4.7). |
+| Every pose of a description `REJECTED` | *Edit description* replaces *Try again*. The service does not say whether it refused the photo or the text (US-5). |
+| Every pose `NO_PERSON` | *Shoot again* replaces *Try again*. |
+| Suggestions, over 8 s | The default poses fill in. |
+| Variations, over 10 s | The description fills in. |
+| Filter or person check | The request goes on (fail open). |
+| Tip | Camera says so briefly; the guide works without it. |
 
 #### 2.6.4 Video pipeline
 
-- **Capture.** `ImageAnalysis` delivers a 4:3 YUV_420_888 buffer, 960×720 (1280×960 for 16:9, so the crop keeps 720 lines), or the nearest size the camera offers, with `STRATEGY_KEEP_ONLY_LATEST` on a dedicated single-thread executor. While streaming, `CameraFrameSource` packs each frame into NV21 (`NV21Buffer`, from a small pool of arrays), crops it to the viewport of the chosen ratio, so the stream is 960×720, 1280×720, or 720×720, passes it to the video source with its rotation, and closes the `ImageProxy` immediately. A ratio change rebinds the analysis use case; WebRTC accepts the new frame size without renegotiation. The video source keeps the frame's shape and scales down only beyond 1280×720 pixels, so the three sizes go as they are. The subject's renderer fits itself to the stream, and its grid and guide follow `camera.state.aspect`.
-- **Encoding.** Hardware H.264 is preferred, with VP8 as the fallback. The target is the frame's size at 30 fps and a maximum bitrate of 2.5 Mbps for every ratio (NFR-12). The degradation preference is *maintain framerate*, so poor networks lower resolution before frame rate (NFR-6). Over a TURN relay the same cap applies; the relay adds its own latency, budgeted in NFR-5 (0.8 s).
-- **Rendering.** The subject renders the remote track in a `SurfaceViewRenderer` with aspect-fit scaling, sized `wrap_content` and centered in the video area, so it measures itself to the video's shape: the frame in the photographer's ratio, with margins around it. At `match_parent` the renderer crops every frame to the view's shape whatever its scaling, which put the video out of line with the overlays ([#86]). The guide is drawn by `GuideOverlayView` and the grid by `CameraCompositionView`, Views on top that fit the same rectangle from `camera.state`'s ratio (2.6.2). The pinch is taken by the whole video area, so a pinch in the margins zooms too.
-- **Later optimization.** If CPU use or battery use misses NFR-12, switch to a GPU path: a CameraX Preview surface backed by WebRTC's `SurfaceTextureHelper` avoids the YUV copy.
+- **Capture.** `ImageAnalysis` delivers a 4:3 YUV_420_888 buffer, 960×720 (1280×960 for 16:9, so the crop keeps 720 lines), with `STRATEGY_KEEP_ONLY_LATEST` on its own thread. While streaming, `CameraFrameSource` packs each frame into NV21 from a small pool, crops it to the ratio (960×720, 1280×720, or 720×720), and passes it on with its rotation. The front camera's frames are flipped first (`YuvToNv21.mirror`), because CameraX mirrors only its preview; the subject then sees the photographer's view, and the guide lines up. Likewise the front camera's photo is flipped through EXIF (`PhotoSaver`), its scene photo when turned upright (`CameraFrameCache`), and a focus tap maps to the sensor's other side. A ratio change rebinds analysis, and WebRTC takes the new size without renegotiation. The source scales down only beyond 1280×720 pixels.
+- **Encoding.** Hardware H.264 is preferred, with VP8 as the fallback, at up to 30 fps and 2.5 Mbps for every ratio (NFR-12). *Maintain framerate* lowers resolution first on poor networks (NFR-6). A TURN relay keeps the cap and adds latency within NFR-5 (0.8 s).
+- **Rendering.** The subject's `SurfaceViewRenderer` uses aspect-fit scaling, `wrap_content`, centered, so it takes the video's shape. At `match_parent` it would crop the frames, and the overlays would not line up ([#86]). `GuideOverlayView` and `CameraCompositionView` fit the same rectangle from `camera.state` (2.6.2). The whole video area takes the pinch. `videoScrim` darkens the video (It 3, Iter3-A12). It is full until `FrameWatchdog` sees the first frame, then clears in 200 ms. It is 60 % under text and during a ratio change, and blinks to 50 % and back in 120 ms at the photographer's shutter (`photo.shutter`, 2.5.1).
+- **Later optimization.** If CPU or battery use misses NFR-12, switch to a GPU path: a CameraX Preview surface backed by WebRTC's `SurfaceTextureHelper` avoids the YUV copy.
 
 #### 2.6.5 Remote control
 
-- **Zoom.** The subject pinches the live video (AD-17) while guide-edit mode is off. `SubjectViewModel.onZoomGesture(ratio, final)` receives the pinch, as it received the slider: each step updates the subject's readout immediately (optimistic) and is sent as a non-final `camera.zoom.set` on the realtime channel at most every 50 ms, the newest value winning; the pinch's end, cancellation, or the screen pausing sends one final request on the reliable channel. The photographer clamps every request to `[minZoom, maxZoom]`, applies it through `CameraController.setZoom` with the request's `final`, so the subject's pinch holds the lens like the photographer's own, and echoes the applied value in `camera.state`; the subject's readout settles on that echo (AD-7). A final zoom, brightness, or flash request that the camera has not reported applied within 500 ms (waiting longer while the camera is `STARTING`) is confirmed if the camera already holds the value, and otherwise answered with the current state, `by: PHOTOGRAPHER`, so the subject's control snaps back; a request applied later, within 5 s, still counts as the subject's and still gets its one notice.
-- **Brightness and flash (It 2, FR-7.3; built 2026-10-16, Iter2-P17).** Subject view's brightness button opens the Camera screen's slider on the photographer's exposure range (`camera.capabilities`), and its flash button sits in the top bar; both are hidden when the photographer's camera has no range or no flash. The slider sends `camera.exposure.set` with the same step-then-final pattern as zoom (`StepSender`), and the flash button sends `camera.flash.set` and shows the tapped mode until the echo confirms or reverts it. The photographer clamps the index to the range and applies it through `setExposure`, and applies the flash through `setFlash` when it has one; a request the camera cannot take (no range, no flash) is answered with the unchanged `camera.state`. A change of exposure, flash, or ratio on the camera, from either phone, goes out as `camera.state` as soon as the camera reports it, `by: SUBJECT` when it matches the subject's pending request, and a step of the subject's slider is echoed as a step. The photographer's own brightness slider and flash button (FR-1.11, FR-1.12) call the same controller methods, so a change from either side ends in the same echoed state.
-- **Guide moves (It 2, FR-7.2; built 2026-10-16, Iter2-P17).** Subject view shows the guide-edit mode toggle while a guide is on the video (off by default, 2.6.2). With the mode on, the subject's drag and pinch on the guide are applied on the subject's phone first, clamped with `GuideGeometry` for the photographer's frame (`camera.state.aspect`) so the finger never leaves the photographer's limits, and sent as `guide.move` with the resulting center and height in frame coordinates, steps at most every 50 ms and the final value at once. `RemoteControlHandler` drops a move while the photographer has no guide or has hidden it, or for a guide it has since replaced (the move names its guide), and otherwise applies it to the photographer's `GuideRepository`, which clamps again like the photographer's own gestures and emits a `GuideChange`; `GuideSyncer` sends the resulting `guide.state` with `by: SUBJECT` (`attribute`), and the final move makes one notice. While the subject's gesture runs, its screen keeps its own guide and takes only the photographer's `visible` and `opacity` from the mirror; the first `guide.state` after the final value settles the guide. If both people move the guide at once, the photographer applies the requests in arrival order, so the later change wins and both phones agree (FR-7.6).
-- **Remote focus (It 2, Could, FR-7.7).** A tap on the live video sends `camera.focus.set`; the photographer calls `setFocusPoint`. No echo. **TODO** Iter2-P17 (Could, moved to Iteration 3 on 2026-10-23): the message is in the protocol since 2026-10-16; the subject's tap and the handler are not built.
-- **Permission (It 2, Could, FR-7.5).** `control.permission` from the photographer disables the subject's controls and makes the photographer drop every request while `allowed` is false. Until it is built, remote control is always allowed. **TODO** Iter2-P17 (Could, moved to Iteration 3 on 2026-10-23): the message is in the protocol since 2026-10-16; the switch and the subject's disabled state are not built.
-- **Ultrawide routing.** Prefer the primary logical camera's native sub-1× zoom when available. Otherwise, a separately exposed rear ultrawide can extend the range only if its primary-relative range overlaps the primary camera's range. The controller converts primary-relative requests to the selected camera's native `CameraControl.setZoomRatio` and converts observed `ZoomState` back before publishing, so every ratio on both phones is in primary-relative units.
-- **Zoom without stutter (It 2, Must, NFR-19; built 2026-10-22, Iter2-P5).** On the Galaxy S21 the preview stuttered on every zoom change and paused to load below 1×. The rules planned for any cause are built. One request per display frame: `CameraXController.setZoom` keeps only the newest request and applies it from a `Choreographer` frame callback, and skips a native ratio it already asked for. This is a precaution, because touch events can come faster than the display and each `setZoomRatio` replaces the camera's repeating request; on the S23 Ultra no stutter was measured with or without it, and its 30 fps preview (the most it offers apps) changed zoom on almost every frame. The lens is held during a pinch: `setZoom(ratio, final)` is non-final for the steps of a pinch on Camera and of the subject's pinch (`camera.zoom.set` carries `final`). While a pinch runs, the bound lens stays until the ratio is 5 % past the primary's minimum (`CameraZoomPlan.lensFor(ratio, current, final)`, `HOLD_BAND`): the primary shows its minimum down to 0.95×, and the ultrawide crops up to 1.05× where it can. A pinch that wavers around 1× rebinds at most once, and its last value settles on the lens of its ratio; a last value that differs from the shown zoom by more than 0.001 is not confirmed until the camera shows it, because a held lens shows its edge, not the pinch's value. When the subject's last value never comes (the link drops mid-pinch), `RemoteControlHandler.stop` ends the pinch where the camera is, so no lens stays held. The applied zoom that is kept across rebinds is what the lens shows, and a new binding publishes its zoom only once the kept one is restored, so the readout and the subject's echo never show the new lens's own 1× (0.5× on a 0.5 ultrawide). The last frame stays through a switch: a lens switch rebinds the camera, and the Camera screen keeps the preview's last frame on screen, without the spinner, from the moment the camera leaves `READY` for `STARTING` until it is `READY` again with the preview streaming (`PreviewHold`, the view of the aspect-ratio rebind of 2.6.2, at most 2 s); the camera reports `STARTING` before it unbinds, so the frame is the old lens's. Streaming alone is not enough, because the new lens streams at its own 1× until its zoom is restored, which `READY` reports. The grid and the guide stay over a held frame of the same ratio. The pending request completes when the new lens is `READY`. The subject's video keeps its last frame on its own. Measurement: `Timings` marks `camera.status`, `preview.stream`, and `preview.still` in every build, and, in debug builds only, `zoom.request`, `zoom.apply`, and `zoom.lens`, and for 1.5 s after each zoom request, lens switch, or shutter press every camera frame as `zoom.frame` with its sensor time and applied zoom (a `Camera2Interop` capture callback). `android/scripts/zoom_timings.py` turns the log into frame intervals, dropped frames, frozen frames (the same zoom again although a new ratio was asked for), new-ratio-to-frame latency, and the time of each lens switch (Testing Documentation IT-10). Measured on the S23 Ultra on 2026-10-22 ([#93]): no stutter before or after, 30 fps, no lens switch (it zooms to 0.6× natively), so the rules above are a precaution there. **TODO** Iter2-P5: the before and after numbers on the S21, where a lens switch happens (NFR-19, IT-10); whether `PreviewView` in `PERFORMANCE` mode is needed (Still open). The shutter freeze (Could, `CAPTURE_MODE_MINIMIZE_LATENCY`, no preview freeze effect) is not built and moved to Iteration 3 on 2026-10-23.
-- **Photos.** Only the photographer takes photos, with the camera screen's own shutter. The subject adjusts the shot, and the photographer decides when to take the photo.
-- **Notices.** For each final remote action it applies, `RemoteControlHandler` reports it, and the photographer's Camera screen shows a notice for 3 s: "Junhyeong set zoom to 2×", "Junhyeong moved the guide", "Junhyeong set brightness to +1.0", "Junhyeong turned the flash on", "Junhyeong turned the flash off", "Junhyeong set the flash to auto" (FR-7.4). The name is the one the other phone sent in `hello` (2.5.1).
+Subject view's controls are requests. The photographer's phone applies them in arrival order and echoes the result (AD-7).
 
-#### 2.6.6 Invitations and push (planned in Iteration 2, moved to Iteration 3 on 2026-10-23)
+- **Zoom.** With guide-edit mode off, the subject's pinch zooms the photographer's camera (AD-17). The readout shows each step at once (`SubjectViewModel.onZoomGesture`). `StepSender` sends steps as non-final `camera.zoom.set` on the realtime channel, at most every 50 ms, the newest winning. The pinch's end, a cancel, or the screen pausing sends one final request on the reliable channel. The photographer clamps it to `[minZoom, maxZoom]` and calls `CameraController.setZoom(ratio, final)`, which holds the lens during the pinch. It echoes the applied zoom in `camera.state`.
+- **Unanswered requests.** `RemoteControlHandler` gives a final zoom, brightness, or flash request 500 ms, and longer while the camera is `STARTING`. It then confirms a request the camera holds, or answers with the current state, `by: PHOTOGRAPHER`, so the control snaps back. A request applied within 5 s still counts as the subject's.
+- **Brightness and flash (It 2, FR-7.3).** Subject view's brightness button opens a slider over the exposure range from `camera.capabilities`. It stays a slider, since the subject sets no focus for Camera's bar (2.8, [#182]). The flash button is in the top bar. Each control hides when the camera lacks it.
+  - The slider sends `camera.exposure.set` like zoom. The flash button sends `camera.flash.set` and shows the tapped mode until the echo.
+  - The photographer clamps and calls `setExposure` or `setFlash`. It answers a request the camera cannot take with the unchanged `camera.state`.
+  - Each exposure, flash, or ratio change, from either phone, goes out as `camera.state`, `by: SUBJECT` when it matches the subject's request. A slider step is echoed as a step. Camera's own controls call the same methods (FR-1.11, FR-1.12).
+- **Guide moves (It 2, FR-7.2).** Subject view shows the guide-edit toggle and its label while a guide is on the video, off by default (2.6.2, 2.8).
+  - With it on, drags and pinches move the guide locally, clamped by `GuideGeometry` for the photographer's frame. `guide.move` sends the guide's id, center, and height: steps at most every 50 ms, the final value at once.
+  - `RemoteControlHandler` drops a move for a missing, hidden, or replaced guide. Otherwise the photographer's `GuideRepository` clamps and applies it, and `GuideSyncer` echoes `guide.state` with `by: SUBJECT`.
+  - During the gesture the subject takes only `visible` and `opacity` from the mirror. The first `guide.state` after the final value settles the guide. Of two moves, the later wins (FR-7.6).
+- **Guide from the subject (It 3, FR-6.15, FR-6.16, [#113]).** *Guide* on Subject view opens *Add a pose guide* with the subject's *My library* (2.6.2), without *Generate poses here*.
+  - `ReferenceViewModel` hands the guide to `GuideSyncer.offer`. The mirror shows it at once, at its `anchor` clamped for the narrowest frame, with its reference photo. `guide.image.*` sends it with `anchor` and `source` (2.5.1).
+  - The photographer adopts it with `attribute(SUBJECT)` and sends no image back. Camera says "Joonhyung set a pose guide". The guide is then the photographer's own, to move, hide, save, or remove.
+  - The subject sets other guide messages aside until a `guide.state` names its guide. Without a connection, or after 5 s without that state (`OFFER_TIMEOUT_MS`), it says "Couldn't send the guide" and shows the photographer's guide.
+  - Of two guides chosen at once, the later to arrive wins (AD-7). The subject shows a reference photo only for the guide on its video.
+  - *Reference confirm* and *No person found* return to Subject view when the session ends.
+- **Shared steps (It 3, FR-6.15, US-16, [#120]).** Only the photographer's phone generates poses. Its *Generate poses*, *Generating poses*, *Pick a pose*, and *Reference confirm* also show on the subject's phone (2.5.1).
+  - The photographer's syncer sends each step while connected, with images encoded off the main thread. After a reconnect it sends the current step, or only its end (2.6.7).
+  - The subject's syncer keeps a mirror in memory (`MirrorDescription`, `MirrorPoseSet`, `MirrorConfirm`) through a reconnect, until its end, the next one, or the session's end.
+  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button beside *Guide* opens it. One that arrives under *Add a pose guide* opens when the sheet closes.
+  - The subject's paused video says "Dongje is describing a pose…", "Dongje is creating poses…", "Dongje is picking a pose…", or "Dongje is checking the guide…".
+  - The first request to reach the photographer's phone decides (AD-7). One unanswered for 5 s says "Couldn't send your request", "Couldn't send your pick", or "Couldn't send your choice".
+  - Each subject screen follows the session itself. The shared screens say "… sees this too".
+- **Generate poses on both phones.** `DescriptionShare` reports the opening at *Use this photo*, *Try other poses*, or *Edit description* (scene photo, text, refusal), each change of text and `descriptionWriter`, and the end, `STARTED` or `CLOSED`. The scene copy (`PoseCandidateCodec`) follows the first message.
+  - One field at a time holds the description, from a tap until Done, the keyboard closing, a button, or leaving (`DescriptionForm`). The subject's `pose.description.edit` gets it only while the photographer's field is free.
+  - The other phone waits and shows "Joonhyung is typing…" or "Dongje is typing…". A subject's chip sends its text at once.
+  - `pose.description.go` starts the set with the subject's text, or the photographer's when nobody held the field. It is refused while the photographer's field holds it.
+  - A drop frees the subject's field (`DescriptionRequest.Gone`). The photographer's *Cancel* closes the subject's screen with "Dongje closed Generate poses". The subject's *Cancel* closes only its own.
+  - Subject view shows a description only while it holds no set or confirm.
+  - `STARTED` carries the text and `setId`. The subject records the text once that set has a candidate or is `PICKING` (2.6.3, Prompt history).
+- **Pick a pose on both phones.** `PoseShare` reports `GENERATING`, the planned slots and failed candidates (Iter3-A13), each candidate, `PICKING` in pager order, and `CHOSEN` or `CLOSED`.
+  - Copies go as JPEG ≤ 1024 px, one at a time. `PICKING` without a copy on the subject's phone opens no *Pick a pose* there. Through a drop the subject keeps *Pick a pose*, with *Use this pose* waiting.
+  - Swipes and the ♥ stay on each phone (2.6.3, *Saving a pose*).
+  - The subject's `pose.pick` counts only while the set is `PICKING` and unchosen. `PickPoseFragment` then uses that candidate and tip (FR-4.10) and says "Joonhyung chose this pose".
+  - The end closes the subject's screen with "Dongje chose a pose" or "Dongje closed the poses", unless the subject chose.
+- **Generating poses on both phones (Iter3-A13, [#180]).** `SubjectGeneratingFragment` shows the photographer's slots and failures in order (`pose.planned`, `pose.candidate.failed`). Before them it says "Choosing poses…" or "Creating…", from `DescriptionSyncer.startedScene`. It has *Back*, not *Cancel*; after *Back*, Subject view's button opens it again. With copies, `PICKING` leads on to *Pick a pose*. Otherwise the end returns to Subject view with "Dongje stopped creating poses" or "Dongje's poses couldn't be created".
+- **Reference confirm on both phones.** The chosen pose's *Reference confirm* also shows on the subject's *Your reference*. Only the photographer's phone segments the person (FR-4.6).
+  - `ConfirmShare` reports `FINDING`, `READY` with the outline's mask (`GuideImageCodec`), `FINDING` again for *Choose another photo*, and `USED` or `CLOSED`. A confirm from *Add a pose guide* is not shared. A set the subject still holds as `PICKING` shows first.
+  - The subject's `guide.confirm.use` counts only while that outline shows. `ReferenceViewModel` then sets the guide with its tip (FR-4.10) and says "Joonhyung used this guide". The guide reaches the subject like any guide.
+  - The end closes *Your reference* with "Dongje used this guide" or "Dongje closed the reference", unless the subject used it.
+- **Save guide on Subject view (FR-6.16, [#120]).** It saves the mirror guide like Camera's (FR-3.8, `SavedGuideStore`, 2.8): mask, reference copy, `anchor`, `source`, and state. The shared guide id keeps one copy per phone. It toggles like Camera's (`toggleSaved`, 2.6.2), with a label (2.8). The subject reuses it from *Add a pose guide*.
+- **Photos on both phones (FR-6.14, US-14, [#121]).** Each session photo reaches the subject's "Pix" album.
+  - A photo belongs to the session at its shutter (`PhotoShare.shutter`), then follows as `taken` or `notTaken`. In a connected session the shutter also sends `photo.shutter`, so the subject's video blinks (2.6.4).
+  - `PhotoSyncer` sends the saved JPEG itself, with its EXIF rotation, over the encrypted data channel, not through the Pix server (FR-1.5, NFR-13). It sends one photo at a time in shutter order, read from the gallery at its turn.
+  - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the phones' 64- and 256-message buffers.
+  - The subject writes chunks to a cache file. At `photo.end`, `PhotoAlbum` saves it to Pictures/Pix through a pending MediaStore row dated `takenAt`. `photo.saved` answers, `ok: true` again for a repeat.
+  - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
+  - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
+  - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
+- **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 4 (Iter2-P17); only the message exists.
+- **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Planned for Iteration 4 (Iter2-P17); only the message exists, so remote control is always allowed.
+- **Ultrawide routing.** `CameraZoomPlan` prefers the primary camera's native sub-1× zoom. A separate rear ultrawide extends the range only when its range reaches the primary's. The controller converts each request to the bound camera's native `setZoomRatio`, and `ZoomState` back, so every ratio is primary-relative.
+- **Zoom without stutter (It 2, Must, NFR-19).**
+  - `CameraXController.setZoom` applies only the newest request, once per `Choreographer` frame, and skips a native ratio already asked for. This is a precaution: the S23 Ultra showed no stutter either way.
+  - A pinch holds the bound lens until the ratio is 5 % past the primary's minimum, 0.95× to 1.05× (`CameraZoomPlan.lensFor`, `HOLD_BAND`). The final value picks the lens. `RemoteControlHandler.stop` ends a pinch whose final value never came.
+  - A new binding publishes its zoom only after restoring the kept one, so no phone shows the new lens's own 1×.
+  - `PreviewHold` keeps the last frame, without a spinner, from `READY` → `STARTING` until `READY` with the preview streaming, at most 2 s. The grid and the guide stay over it (2.6.2, *Changes on screen*).
+  - `Timings` marks `camera.status`, `preview.stream`, and `preview.still`. Debug builds add `zoom.request`, `zoom.apply`, `zoom.lens`, and `zoom.frame` for 1.5 s after each zoom, switch, or shutter. `android/scripts/zoom_timings.py` reports intervals, dropped and frozen frames, latency, and switches (IT-10).
+  - S23 Ultra, 2026-10-22: no stutter, 30 fps, and no lens switch, since it reaches 0.6× natively ([#93]). S21 and S22, Iteration 3: no stutter by eye, and the last frame at a switch (IT-10).
+  - The S21's frame intervals are not measured. `PreviewView`'s `PERFORMANCE` mode is tried with #183 in Iteration 4.
+  - The shutter freeze fix (Could) is planned for Iteration 4, with #183.
+- **Photos.** Only the photographer takes photos.
+- **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
 
-1.  **Device token.** After sign-in, `PushTokenRegistrar` sends the FCM token with `POST /devices`, and again whenever Firebase rotates it.
-2.  **Create.** *Invite* calls `POST /invitations`. The server refuses with `BUSY` if the friend is in a session, otherwise stores the invitation with a 30 s expiry, sends an FCM **data message** (`type: invitation`, `invitationId`, `from`) to the friend's devices, and returns the invitation with its link. The photographer's `SessionState` becomes `Inviting`.
-3.  **Deliver.** The app's `FirebaseMessagingService` turns the data message into a notification "Dongje invites you to shoot together" that opens the *Invitation* screen with the `invitationId`; with Pix in the foreground it opens the screen directly. A data message, not a notification message, so the app controls the text and the tap action in every app state.
-4.  **Link fallback (AD-13).** *Share invite link* hands `invitation.link` to the Android share sheet; *Copy link* copies it. The link opens a small page from nginx that hands over to Pix on the same screen through a custom scheme; on a phone without Pix the page says to install Pix. A verified App Link, which would open Pix without the page, needs HTTPS, and the course servers have none (AD-11) (**TODO** Iter2-P15: the final format, Still open).
-5.  **Answer.** *Accept* calls `POST /invitations/{id}/accept`; the server creates the session, answers with `sessionId` and `iceServers`, and sends `invitation.accepted` to the photographer's signaling socket. Both phones call `session.join` and continue as in Figure 2. *Decline* and *Cancel* delete the invitation; the other side sees *Invite not accepted* or "no longer available" (FR-6.3, FR-6.4). The server's expiry timer does the same at 30 s.
-6.  **Friend requests** use the same push path (`type: friend.request`) and open the *Friends* screen's requests list (FR-5.7).
+#### 2.6.6 Invitations and push (Iteration 3)
 
-#### 2.6.7 Reconnection and sessions across networks (planned in Iteration 2, moved to Iteration 3 on 2026-10-23)
+*Who takes the photo?* sets the roles. *I'll take the photo* opens *Share my camera*, whose *Invite* sends an invitation. *I'll be in the photo* opens *See their camera* (2.1; Iter3-A17, [#188]).
 
-- **ICE.** Every session's `iceServers` holds Cloudflare's STUN and TURN entries with credentials that expire with the session (AD-14, 2.5.2). WebRTC tries a direct path first and falls back to the relay; nothing in the app changes between the two.
-- **Drop detection.** `PeerConnection` state `DISCONNECTED` or `FAILED`, or a closed data channel, moves `SessionState` to `Reconnecting` on both phones and starts a 10 s budget (NFR-11). The subject's video view keeps the last frame with "Reconnecting…".
-- **Restart.** The signaling socket is reopened if it dropped, and the phone sends `session.join` with `rejoin: true`. The photographer, which always creates the offer, sends an offer with `iceRestart: true`; the answer and new candidates are relayed as before. When ICE connects and both channels are open again, both phones send `hello` again (the subject with its `haveGuideId`, so the mask is not resent), and the photographer resends `camera.capabilities`, `camera.state`, and the final `guide.state`.
-- **Give up.** After 10 s the subject shows *Connection lost* with *Reconnect*, which repeats the restart while the photographer still holds the session (60 s after its last socket), and the photographer returns to `Waiting` (room code) or `Idle` (invitation).
-- **Server deploys and restarts.** To a phone these look like a dropped signaling socket. A connected session continues, because the media goes phone to phone; the phone reopens the socket and rejoins when it next needs signaling, and the session is still there because it lives in the session store, not in the server process that was replaced (AD-18, 2.7; 2.8, Deployment).
-- **Cellular notice (FR-6.13).** The first time a session's selected candidate pair uses a cellular interface, the app shows "The live view uses mobile data" once; the flag lives in DataStore.
-- **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the candidate pair type (`host`, `srflx`, `relay`) give NFR-5 and NFR-10 per network pair.
+1.  **Device token.** `PushTokenRegistrar` sends the FCM token with `POST /devices` after each sign-in, the one kept at start included, and at each rotation while signed in. The manifest turns off Firebase's own registration, so a phone nobody signed in to has no token. On Android 13 and later, *Share my camera* asks for notification consent once per run while signed in.
+2.  **Create.** `POST /invitations` answers `BUSY` when the friend is in a session, a waiting room included.
+    - Otherwise the server stores the invitation for 60 s and opens its session with only the photographer's place and no code. It returns the link, `sessionId`, `rejoinToken`, and `iceServers`.
+    - It sends an FCM data message (`type: invitation`, `invitationId`, `fromName`, `expiresAt`) to each of the friend's signed-in phones, at high priority with 60 s to live (2.7, *Push targets*).
+    - The photographer joins with `session.join` and `rejoin: false`, and waits in `Inviting`.
+    - An answer that arrives after another session started here, as with *Show a code*, or after the sending screen closed, is cancelled. *Invite again* follows `SessionViewModel.sendingInvite`, a state, so it recovers from such a drop.
+3.  **Deliver.** `PixMessagingService` shows "Dongje invites you to shoot together" on a high-importance channel, also with Pix in front, until expiry.
+    - The tap opens `pix://invite/<invitationId>` over what Pix shows (`MainActivity` is single-top, `onNewIntent`). A link that starts Pix opens over Camera.
+    - *Invitation* reads `GET /invitations/{id}` again, so a stale notification says it is no longer available. Signed out, it offers *Sign in*, which returns to it.
+4.  **Link fallback (AD-13).** *Share invite link* and *Copy link* pass on `http://<host>/i/<invitationId>`. nginx sends it to the app, whose page button, `intent://invite/<id>#Intent;scheme=pix;package=com.lastpenguin.pix;end`, opens *Invitation* through `pix://invite/<id>`. Without Pix, the page says to get it. App Links need HTTPS, which the course servers lack (AD-11). The page reads nothing and names nobody.
+5.  **Answer.**
+    - *Accept* (`POST /invitations/{id}/accept`) returns the subject's place. The friend joins with `session.join`, the photographer hears `peer.joined`, and Figure 2 follows.
+    - The photographer waits at most 80 s in `Inviting`: 60 s, the friend's 15 s, and a margin.
+    - *Decline* ends the session with `DECLINED`, and the photographer sees *Invite not accepted* (FR-6.3).
+    - *Cancel invite* leaves the session at once and cancels on the server meanwhile; the friend's *Invitation* says "no longer available" (FR-6.4). After an accept, it ends the session itself; closing the sheet keeps it.
+    - A phone with a session open refuses *Accept* before any call (`SessionViewModel.busy`, FR-6.9). A room waiting alone after its subject left is ended first (`endWaitingRoom`, [#188]).
+    - *Invitation* follows the session's state, with its flag in its ViewModel, so a session that connects in the background still opens Subject view.
+    - Unanswered, the session ends at expiry with `EXPIRED`, also shown as *Invite not accepted*. After an accept, the server waits at least 15 s for the friend.
+6.  **Received invitations (FR-6.17, [#188]).** While *Who takes the photo?* or *See their camera* shows, `IncomingInvitationsViewModel` reads `GET /invitations/incoming` at once and every 5 s while signed in. A failed read keeps the list.
+    - The time left counts down each second, and an expired row leaves. *I'll be in the photo* shows the count. *See their camera* lists the rows above the code, newest first, without raising the keyboard.
+    - *Accept* works as on *Invitation* (`joinInvitation`, `InvitationJoin`). *Decline* closes the row even if its call fails. A gone invitation (`INVITATION_GONE`, `NOT_FOUND`) says it is no longer available.
+    - Answering in Pix removes the notification (`PushNotifications.cancelInvitation`).
+7.  **Friend requests** use the same push (`type: friend.request`) and open *Share my camera*'s requests (FR-5.7).
 
+#### 2.6.7 Reconnection and sessions across networks (Iteration 3)
+
+- **ICE.** Each phone gets its own Cloudflare STUN and TURN credentials from the server's `turn` module, valid for 4 h (AD-14, 2.5.2). Without a key, or when Cloudflare fails or takes over 3 s, it gets STUN only. WebRTC tries a direct path, then the relay. A debug build with `pix.relayOnly=true` uses only the relay (`IceTransportsType.RELAY`).
+- **Drop detection.** `PeerConnection` `DISCONNECTED` or `FAILED` moves both phones to `Reconnecting`, with a 10 s budget (NFR-11).
+  - The subject's video keeps its last frame, dimmed, with "Reconnecting…" (2.6.4). Its controls and shared-step buttons wait (2.6.5).
+  - The photographer's live light goes out, *End session* stays, and frames keep flowing. `peer.left` with `CONNECTION_LOST` is ignored then.
+  - The reliable channel closes only when the other phone closed its connection. Its closing ends the session: the photographer returns to `Waiting`, the subject to *Connection lost*.
+  - If only the realtime channel closes, its messages use the reliable one (`realtimeLost`).
+- **Restart.**
+  - Each phone opens a new socket at once, since OkHttp's 15 s pings would outlast the budget. It sends `session.join` with `rejoin: true` and its token (2.5.2). The server moves the place, also from a socket it thinks open, and sends `peer.rejoined`.
+  - The photographer sends an ICE-restart offer (`restartIce`) when its place is back and at every `peer.rejoined`, even on a working link. A restart waits for the last offer's answer, or 2 s. An answer with no offer pending is dropped.
+  - Candidates wait for their description, and the photographer holds the subject's candidates until the new answer applies. Signals go only over a socket that holds the place.
+  - The connection, both channels, the video track, and the reliable queue stay. `Reconnecting` ends when ICE connects with both channels open.
+  - The photographer then resends `camera.capabilities`, `camera.state`, the guide image unless `hello` named it, the final `guide.state`, and the open shared steps (2.5.1).
+  - A dropped socket reopens after 1 s, doubling to 30 s. While reconnecting it reopens every second, outside the doubling.
+- **Give up.** After 10 s the photographer says "&lt;name&gt; disconnected". It returns to `Waiting`, or ends an invitation's session. The subject shows *Connection lost*.
+  - *Reconnect* (`SessionEntry.Rejoin`) sends `session.join` with `rejoin: false`, the token, and the first credentials. It works while the photographer holds the session, up to 60 s after its last socket. Without a token it joins the code again. In an invitation's session it says the session has ended.
+  - A failure before the server answers keeps the token; a refusal drops it.
+  - If the photographer is off the server then, the subject resends `session.join` on `peer.rejoined`, so the photographer still gets `peer.joined`.
+  - A refused rejoin (`NOT_FOUND`, `FORBIDDEN`) ends a reconnecting session with "The session has ended". A running session goes on phone to phone.
+- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. After 10 s the photographer says "Couldn't send" (2.6.5).
+- **Server deploys and restarts.** To a phone these look like a dropped socket. Sessions and room codes continue, since they live in the session store (AD-18, 2.7; 2.8, Deployment). The photographer restarts ICE once (`peer.rejoined`).
+- **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it as a notice, Subject view as a toast. It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
+- **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the pair type (`host`, `srflx`, `relay`) for NFR-5 and NFR-10. It marks `session.reconnecting`, `signaling.rejoined`, and `session.reconnected <ms>` for NFR-11. `ice.pair` logs each pair, such as `local=relay/tcp remote=srflx network=cellular` (`LinkStatsParser`).
+
+#### 2.6.8 Settings (Iteration 3)
+
+The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on Camera's top bar. The gear hides while a session is live and during the scene photo. `SettingsViewModel` is activity-scoped, so each screen applies a change when it shows again.
+
+| Section | Rows |
+|----|----|
+| Camera | *Base brightness* |
+| Guide | Color, thickness, preview |
+| Shoot together | *Show the delay* |
+| General | *Language*, *Notifications* |
+| Privacy | *AI pose generation* |
+| Account | *Pix account* |
+| Help | *How to use Pix*, *Show the tutorial again*, *About Pix* |
+
+- **Base brightness (FR-1.11, [#182]).** "Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap." The slider runs from −2 to +2 EV in thirds, 0 by default, and shows its value, such as "+1.0". It is saved as `AppSettings.baseBrightness` (DataStore `base_brightness_ev`). Camera returns to it at each tap to focus (2.8, *Camera labels and brightness*). A camera with a smaller range clamps it.
+- **Guide look (FR-3.10).** Five colors: white, the default (FR-2.2); black; yellow; mint; and pink. Three thicknesses: about 1.5, 2, and 3 dp (`GuideThickness` 0.75, 1, 1.5), 2 dp by default. DataStore keeps them (`app_settings`).
+  - A color is a `SRC_IN` filter on the white outline (`GuideOverlayView.lineColor`). The opacity still applies.
+  - `GuideOutlines` traces another thickness from the mask off the main thread and keeps the last four. The default line shows until it is ready.
+  - Each phone draws every guide in its own look, so the protocol is unchanged. On *Reference confirm*'s dark card, a black line lies on a light backing (`bg_outline_light`, FR-2.3).
+- **Latency indicator (FR-10.3).** `SessionManager.latencyMs` is half the average of the last three `ping` round trips while `Connected` (2.5.1). With *Show the delay* on, both phones show "Delay 120 ms" during a session. Its dot is green up to 150 ms, yellow up to 300 ms, and red above; a dash shows before the first number and while reconnecting. It is the link's delay, not NFR-5's glass-to-glass delay.
+- **Language (FR-10.2).** *Phone's language*, English, or 한국어, through `AppCompatDelegate.setApplicationLocales`. The activity is recreated with its back stack, and `ScreenLanguages` follows (2.8, *Language*). Android 13 and later keep the choice; on Android 10–12, AppCompat's `AppLocalesMetadataHolderService` does, and `MainActivity` passes its resources to `ScreenLanguages.follow`.
+- **The other rows.**
+  - *Notifications* shows whether Pix's notifications are on and opens Android's page for them.
+  - *AI pose generation* follows `GenerationViewModel.consentGiven` (FR-4.2). After a confirmation, `withdrawConsent` withdraws the agreement, and Pix asks again before the next scene photo.
+  - *Pix account* shows the Pix ID and opens the account sheet. Signed out, it opens *Sign in*, which returns to Settings.
+  - *How to use Pix* explains guides, poses, shooting together, and the subject's controls. *About Pix* shows the version and the open-source licenses.
+- **First-use tutorial (FR-10.4).** Each `TutorialScreen` shows tips over its live view the first time it opens: Camera, *Add a pose guide* from Camera, the guide on Camera, *Generate poses* on either phone, and Subject view, titled "When you're the subject".
+  - `TutorialFragment` is a see-through dialog among the screen's child fragments, so the camera and the video keep running, a sheet stays open, and the screen can still navigate.
+  - Tips fade in over 200 ms (`Motion.FADE_MS`, Iter3-A14). *Got it* and Back mark them seen, pass touches through at once, and fade them out.
+  - `CoachMarkLayout` dims the screen and cuts a dashed ring around each control in `TUTORIAL_TIPS`. Each caption is TalkBack text with a dashed arrow, placed to avoid the other captions and rings.
+  - `showTutorialWhenDue` waits until the screen is in front, checking every 250 ms (`RECHECK_MS`). Camera's tips come 0.8 s after the preview streams, outside a session (FR-1.1, NFR-1); the guide's once a visible guide is drawn, also in a session. Subject view's come 0.8 s after the video shows.
+  - `AppSettings.tutorialSeen` (DataStore `tutorial_seen_screens`) is null until read, so seen tips never flash. *Show the tutorial again* clears it (`resetTutorial`).
+- **Fewer words on the screens (FR-10.4).** The screens drop what the tutorial covers: the guide and scene-photo hints, the bodies of *Add a pose guide*, *Generate poses*, and *Pick a pose*, and Subject view's caption. Camera's hint chip shows only "Guide hidden", or "Pinch to zoom" once guide-edit mode is off. Consent, failures, waiting, and TalkBack descriptions stay (NFR-13). NFR-16's hallway test checks the screens without the tutorial.
 
 ### 2.7 Database
 
-The server keeps accounts, friends, and invitations in a relational database: PostgreSQL 18 in a container on the course servers, and a SQLite file on a laptop and in the tests (decided 2026-10-15). The schema below works with both through SQLAlchemy, with Alembic migrations. Sessions, room codes, and online presence need no table: they are short-lived and live in the Redis session store described at the end of this section (AD-18). The app keeps small preferences in DataStore and saved guides in its private files (2.8).
+Accounts, friends, and invitations are in a relational database: PostgreSQL 18 in a container on the course servers, a SQLite file on a laptop and in the tests. One schema serves both, through SQLAlchemy and Alembic (`pix_server.db`). Short-lived state, such as sessions, room codes, and presence, is in the Redis session store below (AD-18). The app keeps small preferences in DataStore and saved guides in its private files (2.8).
 
 ```mermaid
 erDiagram
@@ -1766,134 +2787,384 @@ erDiagram
     text id PK "inv_<ulid>"
     text from_user_id FK
     text to_user_id FK
-    text status "PENDING ACCEPTED DECLINED CANCELLED EXPIRED"
-    text session_id "set on accept; the session itself is in the session store"
+    text status "PENDING ACCEPTED DECLINED CANCELLED; a pending one past expires_at has expired"
+    text session_id "the session opened with it, in the session store"
     timestamptz expires_at
     timestamptz created_at
   }
 ```
 
-*Figure 10. Database schema (Iteration 2).*
+*Figure 10. Database schema. The `invitations` table comes with invitations (Iteration 3).*
 
-- `friendships` holds one row per pair with `user_a < user_b` (the server orders them) and the pair as its primary key; a friend request is deleted when it is accepted (the friendship is created), declined, or either user removes the other.
-- `friend_requests` holds at most one request between two users, in either direction: (`user_a`, `user_b`), the pair with the smaller id first, is unique. A request in the opposite direction is accepted instead of duplicated, also when both are sent at the same moment: sending locks both users first, so the second waits, finds the first's request, and accepts it; the unique pair is the database's own guard.
-- Expired and answered invitations are deleted by a job after 24 h; nothing in the schema stores photos, guides, or session content (NFR-13).
-- Each sign-in on a phone is a row in `sessions`, which keeps only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. Every refresh token the session has exchanged goes to `spent_refresh_tokens`, so any of them that comes back ends the session; one spent longer ago than a session lasts is ignored, because it would have expired anyway, and is dropped at the session's next refresh. A sign-in removes the user's expired sessions, and a refresh moves `expires_at` forward. A device row belongs to the session that registered it, and `session_id` is unique, so a session has one device: `POST /devices` is one upsert on `session_id`, so a rotated FCM token replaces the old one in place, even when two registrations arrive at once. A token that two sessions register at the same moment ends up in one of them: the second meets the first's row, rolls back, and moves the token on its retry. Ending the session deletes it (`ON DELETE CASCADE`). A session that expired without a sign-out keeps its device row until the user signs in again, so the push sender (Iter2-P15, [#55]) must send only to devices whose session has not expired.
-- **Storage.** On the course servers PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's own disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
-- **Failure.** An account request that cannot reach PostgreSQL, loses its connection, or finds no free connection in the pool answers `503 UNAVAILABLE`; signaling and pose generation do not use the database and keep working. An `OSError` counts as a database failure only when the database driver raised it; any other is a bug and answers 500. Requests end their transaction before slow work, a password check waiting for its turn or Google's token check, so neither holds a connection, or SQLite's write lock, meanwhile.
-- Every user can sign in somehow: a check constraint requires a Google subject, a password hash, or both. `pix_id` and `google_sub` are unique, and many users may have neither yet.
-- **Migrations.** Every worker runs Alembic's `upgrade head` when it starts, before it takes requests (`pix_server.db.migrate`). On PostgreSQL it holds an advisory lock while it does, so with two workers in each of two copies one migrates and the others find the schema current. The old copy keeps serving during a deploy, so a revision must not break the release before it: add a column before the code needs it, and drop one a release after the code stops using it. On a SQLite file every transaction takes the write lock when it starts (`BEGIN IMMEDIATE`), so migrations, and requests, run one at a time; it is for one process on a laptop and for the tests. New revisions are written with `uv run alembic revision --autogenerate` from `server/`, and a test checks that the migrations build exactly the models' schema.
-- No table stores a Google ID token, a scene photo, a guide, or anything from the live view. Logs never contain tokens or Pix IDs with request bodies (2.8, Privacy).
+- **Users.** A check constraint requires a Google subject, a password hash, or both, so every user can sign in. `pix_id` and `google_sub` are unique; many users may have neither yet.
+- **Friends.** `friendships` has one row per pair, `user_a < user_b` (the server orders them), with the pair as its primary key. `friend_requests` has at most one request per pair, in either direction: (`user_a`, `user_b`) is unique. A request is deleted when it is accepted (the friendship is created), declined, or withdrawn, or when either user removes the other.
+- **Opposite requests.** A request in the opposite direction is accepted instead of duplicated, also when both come at once: sending locks both users, so the second finds the first's request and accepts it. The unique pair is the database's own guard.
+- **Sign-in sessions.** Each sign-in on a phone is a `sessions` row with only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. A sign-in removes the user's expired sessions; a refresh moves `expires_at` forward. Exchanged refresh tokens go to `spent_refresh_tokens`, so one that comes back ends the session. One spent longer ago than a session lasts is ignored, as it would have expired, and dropped at the next refresh.
+- **Devices.** A device row belongs to the session that registered it, and `session_id` is unique. `POST /devices` is one upsert on `session_id`, so a rotated FCM token replaces the old one in place, even when two registrations arrive at once. When two sessions register one token at once, the second meets the first's row, rolls back, and moves the token on its retry. Ending the session deletes the row (`ON DELETE CASCADE`).
+- **Push targets.** A session that expired without a sign-out keeps its device row until the user signs in again. The push sender skips such a row: it sends only to devices whose session has not expired. It deletes a row whose token FCM no longer knows (Iter3-P15, [#119]).
+- **Invitations.** A pending invitation past `expires_at` has expired, without a write. Rows are deleted a day after they were created, when a later invitation is sent. `session_id` names a session in the session store, not a row.
+- **Indexes.** Besides the keys and unique columns: `sessions.user_id`, `spent_refresh_tokens.session_id`, `devices.user_id`, `friend_requests.to_user_id`, `friendships.user_b`, and `invitations` on `from_user_id`, `to_user_id`, and `created_at`.
+- **Privacy.** No table stores a Google ID token, a scene photo, a guide, or anything from the live view or a session (NFR-13). Logs never contain tokens, or Pix IDs with request bodies (2.8, Privacy).
+- **Storage.** On the course servers PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
+- **Failure.** An account request that cannot reach PostgreSQL, loses its connection, or finds no free pool connection answers `503 UNAVAILABLE`; signaling and pose generation keep working. An `OSError` counts only when the database driver raised it; any other is a bug and answers `500`. Log-in ends its transaction before the password check, and `PUT /me/google` before Google's check, so neither holds a connection or SQLite's write lock while it waits.
+- **Migrations.** Every worker runs Alembic's `upgrade head` before it takes requests (`pix_server.db.migrate`), under an advisory lock on PostgreSQL: of the two workers in each of two copies, one migrates and the others find the schema current. The revisions are `0001` (accounts and friends) and `0002` (invitations). New ones come from `uv run alembic revision --autogenerate` in `server/`, and a test checks that the migrations build exactly the models' schema.
+- **Compatible revisions.** The old copy serves during a deploy, so a revision must not break the release before it: add a column before the code needs it, and drop one a release after the code stops using it.
+- **SQLite.** Every transaction takes the write lock when it starts (`BEGIN IMMEDIATE`), so migrations and requests run one at a time. It serves one process on a laptop and the tests.
 
-**Session store (Redis, AD-18).** Sessions, room codes, presence, the rate limits of poses and pose suggestions, and the wrong room codes per address are in Redis, so every worker, and both copies of the app during a deploy, see the same state. Nothing in it has to survive a Redis restart, so persistence is off; a deploy does not restart Redis. The code is the server's `store` module (2.2).
+**Session store (Redis, AD-18).** Redis holds sessions, room codes, presence, the rate-limit windows of pose requests, suggestions, and tips, and the wrong room codes per address, so every worker of both copies sees the same state. Nothing in it must survive a Redis restart, so persistence is off; a deploy does not restart Redis. The code is the server's `store` module (2.2).
 
 | Key | Holds | Removed |
 |----|----|----|
-| `session:<sessionId>` (hash) | The room code, the photographer's and the subject's connection IDs (empty while absent), the expiry time of an unjoined room, and the time its last socket left; Iter2-P15 adds the invitation ID | When the photographer leaves; otherwise by the sweeper, 10 min after creation if nobody joined (FR-8.4) or 60 s after its last socket (2.6.7) |
+| `session:<sessionId>` (hash) | `code`; the connection IDs `photographer` and `subject`, empty while absent; `photographer_token` and `subject_token`, SHA-256 hashes of the rejoin tokens, never the tokens (the subject's emptied when it leaves on purpose); `expires_at` of an unjoined room; `empty_since`, when its last socket left. An invitation's room has an empty `code` and an `invitation` ID | When the photographer leaves, or its invitation is declined or cancelled. Otherwise by the sweeper: 10 min after creation if nobody joined (FR-8.4), an invitation's at its expiry, or 60 s after its last socket (2.6.7) |
 | `code:<code>` | The `sessionId` of an active room code | With its session |
-| `expired` (sorted set) | Codes that expired in the last 10 min, scored by the time to forget them, so a late `room.join` answers `EXPIRED` and the code is not handed out again | By the sweeper when that time comes |
-| `deadlines` (sorted set) | Each session with an expiry ahead, scored by the earlier of its two deadlines, so the sweeper reads only the sessions that are due | With its session |
+| `expired` (sorted set) | Codes expired in the last 10 min, scored by when to forget them: a late `room.join` answers `EXPIRED`, and the code is not reused | By the sweeper at that time |
+| `deadlines` (sorted set) | Each session with an expiry ahead, scored by its earlier deadline, so the sweeper reads only those due | With its session |
 | `sessions` (set) | Every session ID, counted by `/internal/stats` | With its session |
 | `conn:<connectionId>` (hash) | The worker that holds the socket, the session it is in, and the signed-in user, if any | On disconnect |
-| `workers` (set), `worker:<workerId>`, and `conns:<workerId>` (set) | The registered workers: a worker adds itself when it starts, or after it lost its state, and every other script refuses to run for a worker that is not here; each worker's heartbeat, with a 15 s expiry kept by Redis itself; and the IDs of that worker's connections | The heartbeat by its expiry, the rest by the sweeper once the heartbeat is gone; all at once when the worker stops |
-| `presence:<userId>` (set, Iter2-P8) | The user's open connection IDs; the user is online while one of them exists, and in a session while one of them is (FR-5.9, FR-6.9) | With the connections, also those of a worker the sweeper finds dead |
-| `rate:pose:<address>` (sorted set) | The times of that address's pose requests inside the window (2.8, Privacy) | As the window moves, and the key an hour after its last request |
-| `rate:pose:all` (sorted set) | The times of every pose request inside the global window, 24 hours by default; a request is counted in both pose windows or in neither (2.8, Privacy) | As the window moves |
-| `rate:suggest:<address>`, `rate:suggest:all` (sorted sets) | The same two windows for `POST /pose-suggestions`, with the same lengths and their own limits (2.8, Privacy) | As the window moves, and each key one window after its last request |
-| `rate:join:<address>` (sorted set) | The times of that address's wrong room codes inside the window, 10 minutes by default (2.5.2) | As the window moves, and the key once the window has passed |
+| `workers` (set), `worker:<workerId>`, `conns:<workerId>` (set) | The registered workers; each one's heartbeat, which Redis expires after 15 s (`PIX_WORKER_TTL_SECONDS`); its connection IDs. A worker registers at start or after it lost its state; the other scripts refuse a worker not in `workers` | The heartbeat by its expiry, the rest by the sweeper once it is gone; all when the worker stops |
+| `presence:<userId>` (set, Iter2-P8) | The user's open connection IDs: online while one exists, in a session while one is in a session (FR-5.9, FR-6.9) | With the connections, also those of a worker the sweeper finds dead |
+| `rate:pose:<address>`, `rate:pose:all` (sorted sets) | The times of pose requests inside the window, per address (1 hour by default) and over all (24 hours by default). A request counts in both windows or in neither (2.8, Privacy) | As the window moves; each key one window after its last request |
+| `rate:suggest:<address>`, `rate:suggest:all`, `rate:tip:<address>`, `rate:tip:all` (sorted sets) | The same two windows for `POST /pose-suggestions` and for `POST /pose-tips`, each with its own limits (2.8, Privacy) | As above |
+| `rate:join:<address>` (sorted set) | The times of that address's wrong room codes inside the window, 10 min by default (2.5.2) | As above |
 | `sweeper` | The worker that sweeps during this interval | After one interval |
 | Channel `worker:<workerId>` | Messages for sockets that worker holds | Not stored |
 
-- **Atomic transitions.** Create, join, leave, disconnect, and expire each run as one Lua script inside Redis; rejoin (`session.join`) is added the same way with reconnection (Iter2-P16). A script checks and changes the session and returns the messages to deliver as plain rows (connection, its worker, message kind), which the worker turns into JSON. This keeps Iteration 1's guarantee that two joins cannot interleave, now across workers. The caller passes the current time in, so tests still move a fake clock; only the heartbeat uses Redis's own expiry, because it is about whether a process is alive.
-- **Delivery.** A worker puts a message for one of its own sockets straight into that socket's bounded queue, and publishes the others on the target worker's channel; every worker subscribes to its own channel before it takes sockets. Messages from one worker to another keep their order, so `peer.joined` still reaches the photographer before the subject's first `signal`. Pub/sub does not store messages: one lost while a worker reconnects to Redis shows up as a session that does not connect, which the 15 s connecting timeout and reconnection (2.6.7) already handle.
-- **Sweeper.** Every worker renews its heartbeat each second (`PIX_CLEANUP_INTERVAL_SECONDS`), and the one worker that gets the `sweeper` lock for that second also sweeps: it forgets old expired codes, expires unjoined rooms and tells the photographer `EXPIRED`, removes empty sessions, and treats every connection of a worker without a heartbeat as disconnected, so the other phone gets `peer.left` with `CONNECTION_LOST`. Every transition sweeps first as well, so a join enforces an expiry the sweeper has not reached yet.
-- **A worker that stops** gives up its connections at once. Their sessions stay for the usual 60 s, which is what a phone that reconnects comes back to once it can rejoin (2.6.7).
-- **Failure.** `/health` checks Redis, so a copy of the app that cannot reach it never receives traffic (2.8, Deployment). When a call to Redis fails, or a worker finds that it is no longer in `workers` (Redis restarted empty, or the sweeper took it for dead), messages for its sockets may have been lost, so it closes all of them with 1013 (try again later) and registers again. A live session goes on phone to phone, and a waiting room ends on the phone with an error instead of stalling with a code that no longer works. Until Redis answers, new sockets are closed with 1013, and pose requests and pose suggestions answer `503 UNAVAILABLE`, because they cannot be counted against the rate limit, as do `GET /friends` and accepting a friend request, which read presence; a disconnect the worker could not write is written later. If Redis itself restarts, open rooms are lost, as they were on a server restart in Iteration 1.
-- **Tests and laptops.** Without `PIX_REDIS_URL` the server keeps its state in fakeredis inside the process, which runs the same scripts; this is for one worker on a laptop, and the deployed image does not contain it. The tests use fakeredis too, which can also switch the store off, and CI runs them a second time on a real Redis. Likewise, without `PIX_DATABASE_URL` the accounts are in `pix.db` in the working directory; the tests use a new SQLite file each, and CI's second run uses PostgreSQL.
+- **Atomic transitions.** Each change of session state is one Lua script in Redis (`store/scripts.py`): `CONNECT`, `CREATE`, `JOIN`, `REJOIN` (`session.join`), `INVITE`, `ACCEPT_INVITATION`, `END_INVITATION`, `ROUTE` (where a `signal` goes), `LEAVE`, `DISCONNECT`, `BEAT` (heartbeat and sweep), and `RELEASE` (a worker stops); `REGISTER`, `STATS`, `PRESENCE`, and `RATE_LIMIT` complete the set. A script checks and changes the session and returns the messages to deliver as rows (connection, its worker, message kind), which the worker turns into JSON. So two joins cannot interleave, even on two workers.
+- **Time.** The caller passes the current time in, so tests can move a fake clock. Redis's own expiry serves only the heartbeat, which is about whether a process is alive, the `sweeper` lock, and dropping idle rate-limit keys.
+- **Delivery.** A worker puts a message for its own socket into that socket's bounded queue and publishes the others on the target worker's channel, to which that worker subscribed before taking sockets. Messages between two workers keep their order, so `peer.joined` reaches the photographer before the subject's first `signal`. Pub/sub stores nothing: a message lost while a worker reconnects shows up as a session that does not connect, which the 15 s connecting timeout and reconnection handle (2.6.7).
+- **Sweeper.** Every worker renews its heartbeat each second (`PIX_CLEANUP_INTERVAL_SECONDS`), and the worker that gets the `sweeper` lock for that second also sweeps. It forgets old expired codes, expires unjoined rooms and tells the photographer `EXPIRED`, and removes empty sessions. It treats every connection of a worker without a heartbeat as disconnected, so the other phone gets `peer.left` with `CONNECTION_LOST`. Every transition sweeps first too, so a join enforces an expiry the sweeper has not reached yet.
+- **A worker that stops** gives up its connections at once. Their sessions stay for the usual 60 s, in which a phone that reconnects takes its place again (2.6.7).
+- **Failure.** `/health` checks Redis, so a copy that cannot reach it gets no traffic (2.8, Deployment). When a Redis call fails, or a worker finds itself missing from `workers` (Redis restarted empty, or the sweeper took it for dead), messages for its sockets may be lost: it closes them all with 1013 (try again later) and registers again. A live session goes on phone to phone; a waiting room ends with an error instead of stalling with a dead code.
+- **Until Redis answers,** new sockets are closed with 1013, and pose, suggestion, and tip requests answer `503 UNAVAILABLE`, since the rate limit cannot count them. So do `GET /friends` and accepting a friend request, which read presence, and sending or answering an invitation, which changes its session. A disconnect the worker could not write is written later. If Redis itself restarts, open rooms are lost.
+- **Tests and laptops.** Without `PIX_REDIS_URL` the server keeps its state in fakeredis inside the process, with the same scripts, for one worker on a laptop; the deployed image lacks it. The tests use fakeredis too, which can also switch the store off. Without `PIX_DATABASE_URL` the accounts are in `pix.db` in the working directory, and each test uses a new SQLite file. CI runs the tests a second time on a real Redis and PostgreSQL.
 
 ### 2.8 Implementation decisions
 
-| Topic | Decision |
+**UI structure**
+
+- One activity with a Navigation graph; each wireframe screen is a destination. `PixNavHostFragment` gives every move between screens its transition (2.1).
+- A flow's screens share an activity-scoped ViewModel: account, friends, generation, incoming invitations, pose saving, reference, session, and settings. Camera, Subject view, the subject's shared-step screens, and *Invitation* have their own.
+- A ViewModel takes user events and exposes its UI state as a `StateFlow`. One-shot results and notices come from buffered `Channel`s, so they wait while the screen is stopped.
+- `AppContainer` creates every module, so a fake can stand in for one that is not ready.
+
+**Concurrency**
+
+- Segmentation, outline tracing, and image encoding run on `Dispatchers.Default`, file work on `Dispatchers.IO`. Network calls are Retrofit `suspend` functions on OkHttp's threads.
+- The saved-guide store encodes and writes on `Dispatchers.IO`, one call at a time. It traces outlines and cuts thumbnails on `Dispatchers.Default`, outside its lock.
+- CameraX analysis has its own single-thread executor.
+- WebRTC and WebSocket callbacks hop onto one serial session scope (`limitedParallelism(1)`), so session state never races. WebRTC's own threads are never blocked.
+
+**Message rate**
+
+- `guide.state`: at most every 50 ms (20 Hz) during a gesture; the final value at once on the reliable channel (2.5.1).
+- `camera.state`: one step per zoom the camera reports applied, at most one per display frame, and a final value 100 ms after the last (2.6.5).
+- The subject's requests: at most every 50 ms; the final value at once. Receivers drop a stale `seq`.
+
+**Backpressure**
+
+- Reliable messages wait in one ordered queue until `hello` has gone out and while the reliable channel's `bufferedAmount` is 256 KiB or more. Realtime messages never wait.
+- A guide image of tens of KB stays well under that limit, so control messages are not held up. A session photo of megabytes would hold the queue up, so its chunks go through `sendBulk`, outside it. They go one at a time, only while the queue is empty and `bufferedAmount` is below 64 KiB (2.6.5).
+
+**Caching**
+
+- The current guide and the last candidate set stay in memory for the app process only. No picked photo or generated pose is written to disk, except a saved guide (*Guide store*).
+- The subject keeps the last guide image and reference photo by ID and names them in `hello`, so a reconnect does not resend them (2.5.1).
+- A received session photo is written in chunks to `cacheDir/session-photos/`, then saved to the "Pix" album (2.6.5).
+
+**Guide store** (AD-16)
+
+- Each phone has two `InMemoryGuideRepository` instances: the photographer's guide, clamped to the chosen ratio's frame, and the subject's mirror, clamped to the narrowest frame (9:16). Writes are serialized.
+- `setGuide` resets the state to the guide's `anchor`, or clears it for null. `update` needs an image, keeps its ID, and clamps through `GuideGeometry`. Every applied change, hiding included, emits a `GuideChange`.
+- `FileSavedGuideStore` keeps each saved guide in `filesDir/guides/<id>/`, never in MediaStore:
+  - `mask.png`, as the subject receives it, at most 720 px tall (`mask-png`, 2.5.1);
+  - `reference.webp`, the 512 px reference copy;
+  - `meta.json`: `GuideState`, `anchor`, `aspect`, `source`, `savedAt`, and `order`.
+- It keeps at most 100 guides (`MAX_SAVED`); the save that deletes the oldest says so (`GuideSaved.removedOldest`). The increasing `order` sorts the list, so a clock set back cannot reorder it.
+- A guide is written to a hidden `.<id>` folder, then renamed. A read deletes half-written folders, folders without a usable `meta.json` or `mask.png`, and any beyond 100. An older folder's `cutout.webp`, whose alpha is the mask, becomes `mask.png` at the first read, and the cutout is deleted.
+- A start reads only the `meta.json` files, so a full library lists at once. Images are decoded on use or for a thumbnail; an undecodable mask fails the use with a message. A loaded guide's outline is traced again from its mask.
+- `thumbnail(id)` is the middle of the reference, or of the outline without one, cut to 3:4, at most 384 × 512 px, never enlarged.
+- A saved guide starts at its `anchor`, like a new guide, and its stored `GuideState` is not applied (FR-3.1).
+
+**Lifecycle**
+
+- The camera binds to the Camera screen's view lifecycle. The app is portrait only; ViewModels keep state across configuration changes, such as a new language.
+- In the background, the photographer's app releases the camera and the video pauses. After 60 s the photographer's phone leaves the session, even through a reconnection (2.6.7). No foreground service is used.
+- Subject view shows "Connecting…" until the first frame, then "The photographer's camera is paused." after 2 s without one.
+- A rebind restores the aspect ratio, brightness, and flash. DataStore keeps the last ratio.
+
+**Error handling**
+
+- Module interfaces return `Result` with typed errors (`NoPersonFoundException`, `GenerationError`, `EndReason`). ViewModels map each to exactly one failure screen.
+- One exception: an unreadable reference photo, or a segmentation model not ready within 60 s, shows the toast "Couldn't use this photo. Try another one." It returns to Camera, or to Subject view for the subject's guide.
+
+**Timeouts**
+
+| What | Limit |
 |----|----|
-| **UI structure** | One activity with a Navigation graph; each wireframe screen is one destination. The screens of one flow share one activity-scoped ViewModel (generation, account, friends, reference, session); Camera and Subject view have their own. A ViewModel exposes its UI state as `StateFlow`, plus one-shot results and notices as flows read from buffered `Channel`s, so a result waits while the screen is stopped, and it receives user events. Modules are created in one place, so a fake can stand in for a module that is not ready yet. |
-| **Concurrency** | Segmentation, outline, and image encoding run on `Dispatchers.Default`; network and file work on `Dispatchers.IO`. The saved-guide store encodes and scales its images on `Dispatchers.IO` with its file work, one call at a time, and traces a loaded guide's outline on `Dispatchers.Default`. CameraX analysis uses its own single-thread executor. All WebRTC and WebSocket callbacks hop onto one serial session scope (`limitedParallelism(1)`), so session state changes never race. WebRTC's own threads are never blocked. |
-| **Message rate** | `guide.state` is throttled to 20 Hz during gestures, and the final value goes on the reliable channel (2.5.1). `camera.state` follows the camera: one step for each zoom it reports applied, at most one per display frame, and a final value 100 ms after the last (2.6.5). The subject's requests go at most every 50 ms, with the final value at once. Receivers drop stale `seq`. |
-| **Backpressure** | Reliable messages, image chunks and control messages alike, wait in one ordered queue until `hello` has gone out and while the reliable channel's `bufferedAmount` is 256 KiB or more; realtime messages never wait. A guide image of tens of KB stays well under the limit, so control messages are not held up in practice. |
-| **Caching** | The current guide and the last candidate set are kept in memory for the app process only; no gallery or generated images are written to disk, except a guide the user saves (*Guide store*), whose cutout and 512 px reference copy go to the app's private files. The subject keeps the last received guide image by `guideId`, so a reconnect does not resend it. |
-| **Guide store** | Each phone uses `InMemoryGuideRepository`, with separate instances for the photographer's guide, clamped with the chosen ratio's frame, and the subject's mirror, clamped with the narrowest frame (9:16). `setGuide` resets the display state to the guide's `anchor` (or clears it for null); `update` is ignored without an image, keeps the stored image's ID, and clamps through `GuideGeometry`. Writes are serialized. Every applied operation emits a `GuideChange`, including the hidden flag. **Saved guides (It 2, AD-16)** are written by `FileSavedGuideStore`, the `SavedGuideStore` of the app, under `filesDir/guides/<id>/` as `mask.png`, `reference.webp` (the 512 px thumbnail source), and `meta.json` (`GuideState`, `anchor`, `aspect`, `savedAt`); at most 20, oldest deleted first; nothing is written to MediaStore. Until only the mask travels to the subject (2.6.1, step 6), a guide still holds the cutout, so the store keeps `cutout.webp` in place of `mask.png`, encoded as the subject receives it; its alpha is the mask (Iter2-P18, 2026-10-23). `meta.json` also keeps the guide's source and an increasing `order` that sorts the list, so a clock set back does not reorder it. A guide is written to a hidden `.<id>` folder and renamed into place; when the folder is read, a half-written folder, a folder that cannot be read back, and any beyond 20 are deleted. The thumbnail is the middle of the reference (or of the cutout without one), cut to 3:4 and at most 252 × 336 px; a loaded guide's outline is traced again from the stored cutout. `guides/` is left out of cloud backups and device transfers (`data_extraction_rules.xml`, NFR-13). A saved guide that is used starts at its `anchor`, like a new guide (FR-3.1): the `GuideState` in `meta.json` is kept but not applied. |
-| **Lifecycle** | The camera binds to the lifecycle of the camera screen; ViewModels keep UI state across rotation. If the photographer's app goes to the background, the camera is released and the video pauses. The session stays open for 60 s, and the subject sees that the camera is paused: Subject view shows "Connecting…" until the session's first frame arrives and "The photographer's camera is paused" when no frame has come for 2 s after that (revised 2026-10-23, Iter2-P22: the pause was counted from the screen's opening, so a session connected before its first frame read as paused). No foreground service is used. From Iteration 2 a drop moves both phones to `Reconnecting` for up to 10 s before the session ends (2.6.7). The aspect ratio, brightness, and flash are restored when the camera rebinds; the last ratio is kept in DataStore. |
-| **Error handling** | Module interfaces return `Result` with typed errors (`NoPersonFound`, `GenerationError`, `EndReason`). ViewModels map them to the failure screens in the wireframe, and each maps to exactly one screen, with one exception: a reference photo that cannot be read, or a segmentation model that is not ready within 60 s, shows the toast "Couldn't use this photo. Try another one." and returns to Camera. |
-| **Timeouts** | Pose generation: 60 s on the client for a whole run, and 60 s from server to API for each request (2.6.3, *Time limit*). Because the phone's limit starts first, it usually ends a request that reaches the limit before the server's `504` arrives. Session connecting: 15 s. A link that ICE reports disconnected: 10 s before it counts as lost (2.4). The photographer's app in the background: 60 s before it leaves the session. Remote requests: 500 ms before an unanswered final request is answered, and 5 s in which a late one is still the subject's (2.6.5). Room code: 10 min. Invitation: 30 s on the server (It 2). Reconnection: 10 s (It 2). TURN credentials: the session's lifetime plus 10 min (It 2). |
-| **Configuration and secrets** | The server URL is set per build type in `BuildConfig`: Server A for release, and for debug Server B or a laptop on the test Wi-Fi (`pix.serverUrl`). The Google web client ID is one constant in `app/build.gradle.kts` (`BuildConfig.GOOGLE_SERVER_CLIENT_ID`), the same as the servers' `PIX_GOOGLE_CLIENT_ID`; Google accepts sign-in only from an APK whose signing key is registered as an Android OAuth client in the same project (decided 2026-10-21). The course servers have no TLS (AD-11), so release builds allow plain HTTP and WebSocket traffic to the two course hostnames only, through the network security config; debug builds allow it to any host. The image-editing API key is the server environment variable `OPENROUTER_API_KEY` and is never committed; `PIX_POSE_MODEL` chooses the model. Iteration 2 adds `PIX_DATABASE_URL` (on the course servers the Compose file sets it, with a password that `deploy.sh` makes once and keeps in `/opt/pix/db-password`), `PIX_JWT_SECRET` (made by `deploy.sh` in `/opt/pix/jwt-secret` on the course servers), `PIX_ACCESS_TOKEN_MINUTES` (15), `PIX_SESSION_TTL_DAYS` (30), `PIX_REDIS_URL` (AD-18), and `PIX_GOOGLE_CLIENT_ID`; invitations and the relay will add `PIX_FCM_CREDENTIALS` (path to the Firebase service-account file), `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (Cloudflare's TURN key, AD-14), and `PIX_PUBLIC_URL` for invite links (Iter2-P15, Iter2-P16; not in `config.py` yet). `.env.example` lists every name, which a test keeps in step with the settings in code: a name with no value must be set on each server, and every other name is commented, showing the default the app already has. The Firebase file and the secrets live only in a `.env` file on each server. Each deploy and restart compares that file with the example and warns, in its log, in `pix status`, and at an operator's login, about a required name without a value and about a name the example does not list, which the app would ignore; it never writes the file, so a default changed in code is not pinned on a server (decided 2026-10-15). |
-| **Privacy** | The server does not log request bodies, images, or the image API's response bodies. It holds a scene photo in memory only and discards it after responding (NFR-13); a request over 1 MiB is refused before it is read, so no upload is written to disk. `POST /poses` is rate-limited per client IP address, 20 per hour by default, and over all clients together, 500 in 24 hours by default (`PIX_POSE_GLOBAL_LIMIT`, `PIX_POSE_GLOBAL_WINDOW_SECONDS`), counting only requests sent to the image API, to control cost; `POST /pose-suggestions` has windows of its own of the same lengths, 10 per address and 500 over all (`PIX_SUGGESTION_RATE_LIMIT`, `PIX_SUGGESTION_GLOBAL_LIMIT`). All answer `429 RATE_LIMITED`, with a message that says which. Neither a description, a suggested pose, nor a variation is written to a log, because all of them describe the person in the photo. The global limit bounds what the image API can cost in a day however many addresses send requests; the OpenRouter key's own spending limit, set in OpenRouter's dashboard, is the last bound. A `room.join` with a wrong code counts against the address too, 100 in 10 minutes (`PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS`; 2.5.2); on the course servers the address is the last `X-Forwarded-For` value, which the course's proxy adds. Requests to the course servers travel over plain HTTP (AD-11), so a scene photo, a password at sign-in, and the access and refresh tokens are not encrypted between the phone and the server; the live view is, because it goes phone to phone (NFR-14). No endpoint takes a Pix ID or other personal data in its URL, because nginx's error log prints a failed request's whole request line; the lookup is `POST /users/lookup`. The access logs of nginx and Uvicorn also leave out query strings, and the server never logs a password, a token, or a request body. Password hashes run two at a time per worker, so a burst of sign-ins, which needs no account, queues instead of using a 64 MiB argon2id buffer per thread of the pool. |
-| **Measurement hooks** | `Timings` logs named timestamps with a shared tag, so NFR latencies can be read from logcat without extra tools. Examples: `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping. Times are each phone's own clock; the `ping.received` and `rtt` lines align two phones' logs (2.5.1). With every ping, the session logs a `stats` line from WebRTC's statistics (codec, size, frame rate, bitrate, and round-trip time), the source for NFR-5, NFR-6, and NFR-12. The zoom marks and the frames after each zoom request feed `android/scripts/zoom_timings.py` (2.6.5). |
-| **Hosting (It 2, AD-11)** | Two course-provided servers, each behind the course's HTTP proxy and reachable only on port 80: Server A, `http://swpp26t10.147-46-242-169.sslip.io`, runs `main` as production, and Server B, `http://swpp26t10.147-46-242-174.sslip.io`, runs `dev` as staging. They cannot reach each other, so each has its own database and session store. `server/deploy/` holds a `docker-compose.yml` with `nginx` on port 80 (`/api/v1`, `/ws`, `/health`, and `/version`, and with invitations the `/i/<id>` page; anything else answers `404`, so FastAPI's `/docs` is not public), two copies of the app (`app-blue` and `app-green`; Uvicorn with two workers, a count set explicitly because the servers report 38 CPUs for the 8 cores we get), `redis`, and `postgres` with its files in `/opt/pix/postgres` on the server's disk (not a Docker volume, so no Docker cleanup can delete them), plus the nginx configuration. The course's proxy, measured on 2026-10-13: WebSockets pass and stay open (300 s with pings, 200 s idle), although the course cuts a plain HTTP response after 120 s; the proxy adds the phone's address as the last `X-Forwarded-For` value and passes on any value the client sent, so nginx trusts only the proxy and takes the last value; and it does not pass a client's cancel on to the server (2.6.3). |
-| **Deployment (It 2)** | GitHub cannot push to the servers: SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs repository admin rights the team does not have and is advised against on a public repository. So each server pulls. A systemd timer runs `server/deploy/deploy.sh` every minute, which compares its branch with the deployed commit. A merge that does not change `server/` only records the commit. Otherwise the script builds the image on the server, with the tests as a build stage, starts it as the idle copy (blue or green), and waits for its `/health`. It then waits until the old copy has no open room, for at most 10 min, then switches nginx, checks `/health` through it, and stops the old copy with a grace period long enough for a pose request in flight. Last it records the commit in `/version`. A failure at any step leaves the running copy serving, and that commit is not tried again; `deploy.sh rollback` switches back to the previous image. The two copies share their rooms through the session store (AD-18), but the wait stays until phones can rejoin a room after their socket drops (2.6.7, Iter2-P16): stopping a copy closes its sockets, and in a room that spans both copies the phone on the new copy would be told that its peer was lost, which ends a live session on the subject's phone. A workflow on GitHub's own runners builds the image on every pull request and, after a merge, waits until `/version` shows the commit, so a failed deploy is visible on the commit. |
-| **Accounts (It 2, AD-12)** | The app sends the access token as a bearer header on REST calls and the signaling upgrade. A person signs up with a Pix ID, a display name, and a password, or with Google; either kind of account can add the other way to sign in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the sockets of the same worker; only the hash is stored. They cross plain HTTP to the course servers (AD-11, NFR-14), and login attempts are not limited for now (decided 2026-10-15). Whether a Pix ID exists is not secret: the lookup tells any signed-in user and `POST /auth/check-pix-id` anyone, each for an exact Pix ID only (NFR-15), and neither is limited for now; a failed log-in still gives one answer for an unknown Pix ID and a wrong password (decided 2026-10-22). There is no email, so a forgotten password cannot be reset. The server verifies Google ID tokens with `google-auth` against Google's published keys and our web client ID, and stores only the Google subject. Each sign-in gives a 15-minute access token, a JWT signed with HS256 (`PyJWT`) and `PIX_JWT_SECRET` (`PIX_ACCESS_TOKEN_MINUTES`), and a refresh token that lasts 30 days from its last use (`PIX_SESSION_TTL_DAYS`); the app keeps both in DataStore (decided 2026-10-15; 2.5.3, *Session tokens*), in its private files without Keystore encryption, and `data_extraction_rules.xml` keeps them out of backups and transfers to a new phone (decided 2026-10-21). Checking an access token needs no database, so the signaling upgrade marks a user online from the token alone; REST endpoints still load the user. A refresh is one `UPDATE … WHERE refresh_hash = … RETURNING`, so two refreshes with one token cannot both succeed: the second finds the token spent and ends the session, as any later use of a spent token does. Sign-out ends the session at once for refreshes and within 15 minutes for the access token. Changing `PIX_JWT_SECRET` ends every access token, and the app refreshes. Without it a server process makes its own secret at start, which suits one worker on a laptop; on the course servers `deploy.sh` makes one once in `/opt/pix/jwt-secret` and Compose passes it to both copies. Everything but friends and invitations works without a token (FR-5.1). |
-| **Push (It 2, AD-13)** | Until push is built (Iter2-P15), *Friends* and *Sent requests* call `FriendsRepository.refresh()` (`GET /friends` and `GET /friend-requests`) every 10 s while they are shown. FCM data messages only, so the app renders every notification itself. A message for an invitation that is no longer `PENDING` when the app handles it opens the "no longer available" screen. The server deletes a device row when FCM reports the token unregistered. |
-| **Aspect ratio and camera controls (It 2)** | `setAspectRatio` rebinds the `UseCaseGroup` with a `ViewPort` of the new ratio once no photo is being saved; the default is 4:3, and the last choice is restored from DataStore (`camera_settings`). CameraX starts every binding without the exposure index and the flash mode, so `CameraXController` keeps them, as it keeps the zoom, and applies them again after a rebind, a lens switch, or the screen coming back; the camera stays `STARTING` until the exposure index is back, so no photo is taken at 0 EV. While a separately exposed ultrawide without a flash is bound, the capabilities report no flash and the state reports it off, so the flash button is hidden; the chosen mode returns with the primary camera. The capabilities come from the primary rear camera. A tap focuses, meters, and sets the white balance at that point and returns to continuous focus after 5 s (`FocusMeteringAction`); the point is mapped from the frame to the preview buffer through its crop and rotation. |
-| **Guide-edit mode (It 2, AD-17)** | A boolean in the screen's UI state, not in `GuideState`, so it is never synchronized; each phone has its own. It switches the overlay's `editable` flag and whether the preview's pinch detector is active. |
-| **SDK vs in-house** | **Use SDKs** for segmentation (ML Kit) and real-time media (WebRTC). These are hard problems with mature solutions. **Build in-house** the parts that make Pix different: guide geometry and sync, the message protocol, remote control, and the pose prompt pipeline. |
+| Pose generation | 60 s per run on the phone, 60 s per request from server to image API; the phone usually ends first, before the server's `504` (2.6.3) |
+| Other model calls | Each model's own limit on the server (2.6.3); the phone waits 10 s for variations, then repeats the description, and 15 s for a tip |
+| Session connecting | 15 s |
+| Reconnecting | 10 s before a dropped link counts as lost (2.4, 2.6.7) |
+| Signaling socket dropped in a session or while a room waits | Again after 1 s; every 1 s while reconnecting, otherwise doubling to 30 s |
+| Photographer's app in the background | 60 s, then it leaves the session |
+| Remote requests | 500 ms until an unanswered final request is answered; 5 s in which a late one is still the subject's (2.6.5) |
+| Session photo | Given up after 30 s without word from the subject (2.6.5) |
+| Room code | 10 min |
+| Invitation | 60 s (`PIX_INVITATION_TTL_SECONDS`); after an accept, at least 15 s for the friend's phone to take its place (`PIX_INVITATION_JOIN_SECONDS`); the photographer's phone gives up after 80 s without the server's word |
+| TURN credentials | 4 h (`PIX_TURN_TTL_SECONDS`, 14400) |
+| Cloudflare's TURN API | 3 s, then STUN only (`PIX_TURN_TIMEOUT_SECONDS`) |
+| A push to FCM | 5 s (`PIX_FCM_TIMEOUT_SECONDS`) |
+
+**Configuration and secrets**
+
+- `BuildConfig.SERVER_URL` is Server A in release builds. Debug builds use the AWS server, `http://3.105.185.251/`, or any server set in `pix.serverUrl`, such as a laptop on the test Wi-Fi. A debug build's `pix.relayOnly=true` forces the relay (2.6.7).
+- `BuildConfig.GOOGLE_SERVER_CLIENT_ID`, one constant in `app/build.gradle.kts`, equals the servers' `PIX_GOOGLE_CLIENT_ID`. Google accepts sign-in only from an APK whose signing key is registered as an Android OAuth client in that project.
+- The course servers have no TLS (AD-11). Release builds allow plain HTTP and WebSocket traffic only to the two course hostnames (`network_security_config.xml`); debug builds allow any host.
+- `server/.env.example` lists every setting, and a test keeps it in step with the code. Each server must set the names left empty: `OPENROUTER_API_KEY` (never committed), `PIX_GOOGLE_CLIENT_ID`, and Cloudflare's TURN key, `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (AD-14). The rest are commented with the app's default, such as `PIX_POSE_MODEL`.
+- On a server, Compose sets `PIX_REDIS_URL`, `PIX_DATABASE_URL`, `PIX_JWT_SECRET`, and `PIX_FCM_CREDENTIALS_FILE`. `deploy.sh` makes the database password and the JWT secret once, in `/opt/pix/db-password` and `/opt/pix/jwt-secret`.
+- The FCM key belongs to a service account of the app's Firebase project that may only send FCM messages. Compose mounts it from `/opt/pix/secrets/`, readable only by the app's user; without it, no push goes out. Other secrets live only in each server's `/opt/pix/.env`.
+- The server logs only Cloudflare's status, never the TURN token or a credential. The invite link takes its host from the request.
+- Each deploy and restart compares `.env` with the example. It warns in its log, in `pix status`, and at an operator's login. A warning names a required name left empty, or a name the example lacks, which the app ignores. It never writes `.env`, so no server pins an old default.
+
+**Privacy** (NFR-13)
+
+- The server never logs request bodies, images, the image API's response bodies, passwords, or tokens. Nor does it log descriptions, suggested poses, or variations, which describe the person in the photo.
+- A scene photo stays in memory until the response. nginx and the app refuse a request over 1 MiB before reading it, so no upload reaches the disk.
+- Each description and pose also goes, without the photo, to the description filter's decision model, TypeSafe's Jev on OpenRouter (2.6.3). A refusal logs only the question and its probability. Each `POST /poses` scene goes to the same model for the person check, which logs only its probability.
+- Rate limits count only requests that reach a model, to bound cost. Each answers `429 RATE_LIMITED` with a message that names the limit:
+
+| Request | Per address | All clients | Settings |
+|----|----|----|----|
+| `POST /poses` | 20 per hour | 500 per 24 h | `PIX_POSE_RATE_LIMIT`, `PIX_POSE_GLOBAL_LIMIT`, `PIX_POSE_GLOBAL_WINDOW_SECONDS` |
+| `POST /pose-suggestions` | 10 per hour | 500 per 24 h | `PIX_SUGGESTION_RATE_LIMIT`, `PIX_SUGGESTION_GLOBAL_LIMIT` |
+| `POST /pose-tips` | 20 per hour | 1000 per 24 h | `PIX_TIP_RATE_LIMIT`, `PIX_TIP_GLOBAL_LIMIT` |
+| `room.join` with a wrong code | 100 per 10 min | — | `PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS` (2.5.2) |
+
+- The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value (*Hosting*).
+- Over plain HTTP to the course servers, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
+- No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
+- Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
+- Cloud backups are off (`allowBackup="false"`); `data_extraction_rules.xml` keeps the sign-in, `guides/`, and the prompt history out of transfers to a new phone.
+
+**Measurement hooks**
+
+- `Timings` logs named timestamps under the tag `PixTimings`, so NFR latencies come from logcat without extra tools: for example `seg.start`/`seg.end`, `pose.first`, `guide.sent`/`guide.applied`, and `rtt` from ping.
+- Times are each phone's own clock (`elapsedRealtime`); the `ping.received` and `rtt` lines align two phones' logs (2.5.1).
+- Each ping also logs a `stats` line from WebRTC's statistics (codec, size, frame rate, bitrate, round-trip time), the source for NFR-5, NFR-6, and NFR-12. An `ice.pair` line names each new candidate pair (NFR-10, 2.6.7).
+- The zoom marks and the `zoom.frame` lines after each zoom request feed `android/scripts/zoom_timings.py` (2.6.5).
+
+**Hosting** (AD-11)
+
+| Server | Address | Branch | Use |
+|----|----|----|----|
+| A | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds |
+| B | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging |
+| AWS | `http://3.105.185.251` | `dev` | Debug builds; reachable from every network, cellular data included |
+
+- The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other, so each has its own database and session store.
+- The AWS server runs the same Compose setup. It stays on and answers from every network, so debug builds and sessions across networks use it.
+- `server/deploy/docker-compose.yml` runs:
+  - `nginx` on port 80, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version`, and answers `404` to the rest, so FastAPI's `/docs` is not public;
+  - `app-blue` and `app-green`, two copies of the app, each Uvicorn with two workers, set explicitly because the servers report 38 CPUs for our 8 cores;
+  - `redis`, which writes nothing to disk;
+  - `postgres`, with its files in `/opt/pix/postgres` on the server's disk, not a Docker volume, so no Docker cleanup can delete them.
+- The course's proxy, measured on 2026-10-13: WebSockets pass and stay open (300 s with pings, 200 s idle). A plain HTTP response is cut after 120 s, and a client's cancel is not passed on (2.6.3).
+- The proxy adds the phone's address as the last `X-Forwarded-For` value, after any value the client sent. So nginx trusts only the proxy and takes the last value.
+
+**Deployment**
+
+- GitHub cannot push to the course servers. SSH goes through a campus-only relay with personal keys, and a self-hosted runner needs admin rights and is advised against on a public repository. So each course server pulls.
+- A systemd timer runs `server/deploy/deploy.sh` every minute. For a new commit on its branch, the script:
+  1. only records it when it does not change `server/`;
+  2. otherwise builds the image on the server, with the tests as a build stage;
+  3. starts it as the idle copy (blue or green) and waits for its `/health`;
+  4. waits at most 10 min until the old copy has no open room, switches nginx, and checks `/health` through it;
+  5. stops the old copy with 70 s for a pose request in flight, and records the commit in `/version`.
+- A failed step leaves the running copy serving, and a commit with the same `server/` is not tried again. `deploy.sh rollback` switches back to the previous image.
+- Why wait for rooms: phones take their place again after a socket drop, on either copy (2.6.7, AD-18). An app from before reconnection cannot (Iter3-P14). In a room spanning both copies, the phone on the new copy would hear that its peer was lost, ending the subject's live session.
+- GitHub's runners build the image for every pull request. After a merge, a workflow waits until `/version` shows the commit, so a failed deploy shows on the commit.
+- GitHub reaches the AWS server, so it has no timer. After each push to `dev`, a workflow runs `deploy.sh deploy` there through AWS Systems Manager, as the `PixDeploy` command document, then checks `/version` at the public address.
+- The workflow's IAM user key may run only that document on that one instance. It is a secret of a GitHub environment that only `dev` may use, and no SSH port is open.
+
+**Accounts** (AD-12)
+
+- The app sends the access token as a bearer header on REST calls and on the signaling upgrade. Everything but friends and invitations works without one (FR-5.1).
+- Sign-up takes a Pix ID, a display name, and a password, or Google. Either account can add the other sign-in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Without email, a lost password cannot be reset.
+- Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the worker's sockets. Only the hash is stored.
+- Passwords cross plain HTTP to the course servers (AD-11, NFR-14). Log-in attempts are not limited.
+- Whether a Pix ID exists is not secret: the lookup tells any signed-in user, and `POST /auth/check-pix-id` anyone, for an exact Pix ID only (NFR-15). Neither is limited. A failed log-in answers alike for an unknown Pix ID and a wrong password.
+- `google-auth` verifies Google ID tokens against Google's published keys and our web client ID. The server stores only the Google subject.
+- A sign-in gives a 15-minute access token (`PIX_ACCESS_TOKEN_MINUTES`), a JWT that `PyJWT` signs with HS256 and `PIX_JWT_SECRET`. It also gives a refresh token valid 30 days from its last use (`PIX_SESSION_TTL_DAYS`; 2.5.3, *Session tokens*). The app keeps both in DataStore, in its private files, without Keystore encryption (*Privacy*).
+- An access token is checked without the database, so the signaling upgrade marks a user online from the token alone. REST endpoints still load the user.
+- A refresh is one `UPDATE … WHERE refresh_hash = … RETURNING`, so of two refreshes with one token, the second finds it spent and ends the session.
+- Sign-out ends refreshes at once and the access token within 15 minutes. A new `PIX_JWT_SECRET` ends every access token, and the app refreshes.
+- Without `PIX_JWT_SECRET`, each server process makes its own secret, which suits one worker on a laptop. On a server, both copies share the one `deploy.sh` keeps.
+
+**Push** (AD-13)
+
+- Pushes do not replace reading the lists. While shown, *Share my camera* and *Sent requests* call `AuthRepository.refreshAccount()` (`GET /me`) and `FriendsRepository.refresh()` (`GET /friends`, `GET /friend-requests`) every 10 s.
+- The account is read even without a Pix ID, so one chosen on another phone brings the lists at once. Received invitations are read every 5 s (2.6.6).
+- FCM carries data messages only; the app renders each notification (`push/PushNotifications`). An invitation's uses the high-importance *Invitations* channel for the invitation's lifetime. A friend request's uses *Friend requests* and opens *Share my camera* (`pix://friends`).
+- An invitation opened after it left `PENDING` shows "This invitation is no longer available".
+- The server pushes from a background task after its response, so FCM never slows or fails a request. It keeps FCM's access token, from the service account's key, until a minute before it expires.
+- The server deletes a device row whose token FCM reports unregistered (404). A log line holds FCM's status, never a token.
+
+**Aspect ratio and camera controls**
+
+- `setAspectRatio` rebinds the `UseCaseGroup` with a `ViewPort` of the new ratio once no photo is being saved. The default is 4:3; DataStore (`camera_settings`) restores the last ratio.
+- CameraX opens every binding without the exposure index and the flash mode. `CameraXController` keeps them, as it keeps the zoom, and applies them again after a rebind, a lens switch, or the screen's return.
+- The camera stays `STARTING` until the exposure index is back, so no photo is taken at 0 EV.
+- While a separately exposed ultrawide without a flash is bound, the capabilities and the state report no flash, so the button hides. The chosen mode returns with the primary camera.
+- The capabilities come from the chosen side's primary camera: rear, or front in selfie mode. A switch of side starts again at 1× and the base brightness.
+- A tap focuses, meters, and sets the white balance at that point, then returns to continuous focus after 5 s (`FocusMeteringAction`). The point maps from frame to preview buffer through its crop and rotation, mirrored on the front camera.
+
+**Guide-edit mode** (AD-17)
+
+- A boolean in the screen's UI state (`guideEditing`), not in `GuideState`, so it is never synchronized; each phone has its own.
+- It sets the overlay's `editable` flag and whether the preview's pinch zooms.
+
+**Camera labels and brightness** ([#182])
+
+- Toggles say in words what they did. One chip with an icon at the top of the image (`toggleLabel`) shows *Hide* / *Show* ("Guide hidden", "Guide shown"), a tap on the zoom readout (the step, such as "2×"), and *Save guide*'s notices.
+- The chip shows for 3 s (`CameraViewModel.NOTICE_MS`), and a new label replaces it at once. It is a live region for TalkBack. The hint chip steps aside for it, and opening the ratios takes it down (FR-1.13).
+- The guide-edit mode toggle shows `pinchModeLabel` above it for 3 s: *Guide* in the guide's color while drags and pinches move the guide, *Camera* in white while a pinch zooms. TalkBack reads "Pinch moves the guide" or "Pinch zooms the camera".
+- Subject view shows the same labels for its zoom step, its *Save guide* (no toast), and its toggle.
+- The pose tip's button closes an open tip, as any touch does (FR-4.10). The screen-wide touch skips the button, so one tap does not close and reopen the tip.
+- Brightness is `ExposureBarView`: a 48 × 128 dp touch area, a 1.5 dp accent line with a 2.5 dp outline, and a sun at the applied exposure index (FR-1.11).
+- A tap to focus brings the bar up beside the focus box: on its right, or its left near the image's right edge, always inside the image. Without point focus, it comes up at the tap.
+- Up without a tap point, as after the screen is made again, the bar stands at the middle of the image's right edge, clear of the horizon bar.
+- A drag on the bar, or one finger's drag up or down anywhere on the preview (`PinchZoomController.VerticalDrag`), moves the sun from where it was, up brighter. The bar spans the camera's whole range. Each step applies at once, and the last again on release.
+- A drag that starts with the bar down first focuses there, as a tap, and starts from the base. A sideways move or a second finger is no brightness drag; guide-edit mode keeps the preview's drags.
+- Every photo starts from the base brightness in Settings, like iPhone's exposure adjustment (2.6.8). `CameraViewModel` applies `AppSettings.baseBrightness` as the nearest exposure index in the camera's range (`ExposureScale.indexOf`).
+- It applies it when the range is first known, when the range or step changes (another camera), and when the setting changes. Each tap to focus drops a drag's change and sets the base again; the setting stays.
+- TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`CameraFragment.BRIGHTNESS_IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
+- The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view keeps its brightness button and horizontal slider (2.6.5).
+
+**Language** (FR-10.2)
+
+- English is in `res/values/` and Korean in `res/values-ko/`, behind the same keys. Android takes the first of the two in the phone's language list, else English. Settings can set Pix's own language instead (2.6.8).
+- The build declares both (`generateLocaleConfig`; English is the default in `res/resources.properties`), so Android 13+ offers them in its per-app language setting.
+- Strings without words (ratios, counters) are not translated. Android Lint fails any other string without its Korean.
+- Korean uses Pretendard, bundled (SIL OFL 1.1), because the UI's font, Manrope, has no Hangul. On Android 13 and later, lines break between words (`lineBreakWordStyle` phrase).
+- The server's text for the screens follows the same choice: `values-ko` sets `R.bool.screens_in_korean`, and the pose tip is asked for in Korean when it is true (2.6.3).
+
+**SDK vs in-house**
+
+- Use SDKs for segmentation (ML Kit) and real-time media (WebRTC): hard problems with mature solutions.
+- Build in-house what makes Pix different: guide geometry and sync, the message protocol, remote control, and the pose prompt pipeline.
 
 ### 2.9 Module ownership and build order
 
-| Module | Owner (role) | Built in Iteration 1 | Builds in Iteration 2 (issue) | Provides to |
-|----|----|----|----|----|
-| **App shell, design, and integration** | 한준형 (PM) | Activity, navigation graph, permission flow, `AppContainer` | Iteration 2 design and the shared contracts (Iter2-P3, [#45]); integration (Iter2-P22, [#60]); integration tests (Iter2-P21, [#59]); demo README (Iter2-P23, [#61]); schedule and issues | All screens |
-| **Camera** | 박동제 | Preview, capture to MediaStore, zoom, 3:4 viewport, `setFrameSink` | Tap to focus, brightness, flash, aspect ratios; `CameraController` and `CameraCapabilities` additions (Iter2-P10, [#51]) | Session, remote control |
-| **Reference guide** | 박동제 | Picker, segmentation, cutout, outline, *No person found* | Smooth outlines (Iter2-P7, [#49]); the `anchor` and the thumbnail copy of the reference (Iter2-P11, [#52]). Lines for arms and legs in front of the body are out of scope (2.6.1) | Guide overlay |
-| **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, [#52]); saved guides (Iter2-P18, [#58], built) | Guide sync, Subject view |
-| **Server deployment** | 박재완 | Running on the laptop on the test Wi-Fi | The course servers with Docker, nginx, and blue-green deploys (Iter2-P4, [#46]); the Redis session store (AD-18; Iter2-A2, [#73], built) | Everything |
-| **Accounts and friends** | 박재완 | — | Database, sign-in with a Pix ID and a password or with Google, Pix IDs, friend requests, friend list, presence (Iter2-P8, [#50]); Sign-in, Pix ID, and Friends screens (Iter2-P13, [#54]) | Invitations |
-| **Pose generation** | 박재완 | API choice, `POST /poses`, templates, `PoseGenerator` | Pose description and idea chips, *Generate poses* screen, one prompt, suggested poses (Iter2-P12, [#53]) | Reference guide |
-| **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | TURN through Cloudflare, `ws://` to the course server, `SessionEntry.Invitation`, `session.join`, reconnection with ICE restart (Iter2-P16, [#56]); invitations with push and link (Iter2-P15, [#55]). Neither was built in Iteration 2; both move to Iteration 3 (2026-10-23) | Guide sync, remote control |
-| **Remote control** | 조성민 | `RemoteControlHandler` (zoom), the zoom slider on Subject view | Brightness, flash, guide moves, and notices (Iter2-P17, [#57], built); remote focus and the permission switch if time allows (Iter2-P17, Could; moved to Iteration 3 on 2026-10-23); pinch zoom and the guide-edit mode toggle on Subject view, replacing its slider (Iter2-P6, [#48], built); zoom stutter (Iter2-P5, [#47], built and measured on the S23 Ultra 2026-10-22; the S21 numbers with IT-10) | UI |
-| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state` (in use since Iter2-P11); the mask-only transfer in `GuideImageCodec` and the syncer (decided 2026-10-16); no `anchor` is sent (2.5.1) | UI |
+Owners follow the README's *Team* section. The Iteration 3 table names who built each task, also in another owner's module.
 
-The friends feature needs both the accounts server (박재완) and the session entry point (조성민); Iter2-P8 lands before Iter2-P15 and Iter2-P16, and the two owners agree the order of the invitation work (Team Meetings 2026-10-09).
+| Module | Owner | Iteration 1 | Iteration 2 | Provides to |
+|----|----|----|----|----|
+| **App shell, design, and integration** | 한준형 (PM in Iteration 2); 박재완 (PM in Iteration 3) | Activity, navigation graph, permission flow, `AppContainer` | The design and the shared contracts (Iter2-P3, [#45]); integration (Iter2-P22, [#60]); integration tests (Iter2-P21, [#59]); demo README (Iter2-P23, [#61]); schedule and issues | All screens |
+| **Camera** | 박동제 | Preview, capture to MediaStore, zoom, the viewport, `setFrameSink` (한준형, #3) | Tap to focus, brightness, flash, aspect ratios; `CameraController` and `CameraCapabilities` additions (Iter2-P10, [#51]) | Session, remote control |
+| **Reference guide** | 박동제 | Picker, segmentation, cutout, outline, *No person found* | Smooth outlines (Iter2-P7, [#49]); the `anchor` and the thumbnail copy of the reference (Iter2-P11, [#52]). Lines for arms and legs in front of the body are out of scope (2.6.1). | Guide overlay |
+| **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity (한준형, #6) | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, [#52]); saved guides (Iter2-P18, [#58]) | Guide sync, Subject view |
+| **Server deployment** | 박재완 | The laptop on the test Wi-Fi | The course servers with Docker, nginx, and blue-green deploys (Iter2-P4, [#46]); the Redis session store (AD-18; Iter2-A2, [#73]) | Everything |
+| **Accounts and friends** | 박재완 | — | Database, sign-in with a Pix ID and a password or with Google, Pix IDs, friend requests, friend list, presence (Iter2-P8, [#50]); Sign-in, Pix ID, and Friends screens (Iter2-P13, [#54]) | Invitations |
+| **Pose generation** | 박재완 | API choice, `POST /poses`, the default poses, `PoseGenerator` | Pose descriptions, *Generate poses*, one prompt, suggested poses (Iter2-P12, [#53]) | Reference guide |
+| **Real-time session** | 조성민 | `SignalingClient`, `PeerConnectionClient`, `CameraFrameSource`, codec, router | `ws://` to the course server | Guide sync, remote control |
+| **Remote control** | 조성민 | `RemoteControlHandler` (zoom) | Brightness, flash, guide moves, and notices (Iter2-P17, [#57]); pinch zoom and the guide-edit mode toggle on Subject view (Iter2-P6, [#48]); zoom without stutter (Iter2-P5, [#47]) | UI |
+| **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state` (2.5.1) | UI |
+| **Shared steps** (`DescriptionSyncer`, `PoseSyncer`, `ConfirmSyncer`, `PhotoSyncer`) | 한준형 | — | — | UI |
+| **Settings and tutorial** (`SettingsViewModel`, `AppSettings`, `TutorialFragment`) | 조성민 (settings), 한준형 (tutorial) | — | — | All screens |
+
+The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 4.
+
+**Iteration 3 tasks** (from the kickoff of 2026-10-25; the tasks due 10/30 were for the user test of 10/31–11/1):
+
+| Task | Owner | Due | Status | Design |
+|----|----|----|----|----|
+| A temporary server on AWS for the user test (Iter3-P2) | 박재완 | 10/26 | Done | 2.8 |
+| The documents (PM; Iter3-P3–P5) | 박재완 | 10/26 | Done | — |
+| The Korean translation (Iter3-P7, [#111]) | 박재완 | 10/26 | Done | 2.8 |
+| Camera's buttons and preview size (Iter3-A2, [#136]) | 박동제 | — | Done | 2.6.2 |
+| Wireframes drawn from the app's screens (Iter3-A3, #141) | 박재완 | — | Done | — |
+| Candidates in the scene photo's ratio (Iter3-P8, [#112]) | 박재완 | 10/30 | Done | 2.6.3 |
+| The mask-only guide transfer both ways, in `GuideImageCodec` and the syncer, with `anchor` and `source`, which the subject keeps for *Save guide* (Iter3-P9, [#113]) | 한준형 | 10/30 | Done | 2.5.1, 2.6.1 |
+| *Pick a pose* one candidate at a time (Iter3-P10, [#114]; PR [#108]) | 박동제 | 10/30 | Done | 2.6.3 |
+| Pose tips (Iter3-P11, [#115]; PR [#110]) | 박동제 | 10/30 | Done | 2.6.3 |
+| Selfie mode, and whether the prompts suit it (Iter3-P12, [#116]) | 박동제 | 10/30 | Done | 2.6.3, 2.6.4 |
+| The reference thumbnail on Subject view, with `guide.reference.*` (Iter3-A1, [#132]) | 박동제 | 10/30 | Done | AD-6, 2.5.1, 2.6.2 |
+| Sessions on different networks, with TURN through Cloudflare (Iter3-P13, [#117]) | 조성민 | 10/30 | Done | 2.6.7 |
+| Reconnection after a short drop, with `session.join` and an ICE restart (Iter3-P14, [#118]) | 조성민 | 10/30 | Done | 2.6.7 |
+| Invitations and friend requests with push and the link, with `SessionEntry.Invitation` (Iter3-P15, [#119]) | 조성민 | 10/30 | Done | 2.6.6 |
+| Shared steps: guide selection from the subject's phone; the photographer's candidates on both phones' *Pick a pose*, the first choice deciding; *Save guide* on either phone (Iter3-P16, [#120]) | 한준형 | 10/30 | Done | 2.5.1, 2.6.5 |
+| Photos taken in a session saved on both phones (Iter3-P17, [#121]) | 한준형 | 10/30 | Done | 2.5.1, 2.6.5, 2.6.7 |
+| Pose tips in Korean (Iter3-A4, [#156]) | 박동제 | 10/31 | Done | 2.6.3, 2.8 |
+| A light for the scene photo (Iter3-A5, [#158]) | 박동제 | 10/31 | Done | 2.6.3 |
+| The app icon and branding assets (Iter3-A6, #162) | 박재완 | 10/31 | Done | — |
+| The offline QR connection (Iter3-P22, [#122]) | 조성민 | 11/5 | Moved to Iteration 4 | *Still open* |
+| The settings screen (Iter3-P23, [#123]) | 조성민 | 11/5 | Done | 2.6.8 |
+| The first-use tutorial (Iter3-P23, [#123]); its tips over each screen (#173) | 한준형; 박재완 (#173) | 11/5 | Done | 2.6.8 |
+| Prompt history on *Generate poses* (Iter3-P24, [#124]) | 박동제 | 11/5 | Done | 2.6.3 |
+| Four prompt templates and an improved default prompt (Iter3-P25, [#125]) | 박재완 | 11/5 | Moved to Iteration 4 | *Still open* |
+| The AI module test with an LLM judge (Iter3-P26, #126) | 박재완 | 11/5 | Done | Testing Documentation |
+| Integration tests for the Iteration 3 flows (Iter3-P27, #127) | 박재완 | 11/5 | Done | Testing Documentation |
+| Integrate the Iteration 3 features (Iter3-P28, [#128]) | 박재완 | 11/5 | Open | — |
+| The description filter and the person check (Iter3-A7, [#165]) | 박재완 | 11/5 | Done | 2.6.3, 2.8 |
+| The guide library: *My library* on *Add a pose guide* and the library screen (Iter3-A8, [#170]) | 조성민 | 11/5 | Done | 2.1, 2.6.2, 2.8, AD-16 |
+| A generated pose saved to the library with ♥ on *Pick a pose* (Iter3-A9, [#171]) | 조성민 | 11/5 | Done | 2.6.3 |
+| A screenshot of a feed post cut to its photo for its guide (Iter3-A10, [#174]) | 조성민 | 11/5 | Done | 2.1, 2.3, 2.6.1 |
+| Screenshots from other apps cut to their photo: image viewers and stories (Iter3-A11, [#177]) | 조성민 | 11/5 | Done | 2.6.1 |
+| The Iteration 3 documents, demo README, and `iteration-3-demo` (Iter3-P29, #129) | All | 11/6 | Open | — |
+| Camera changes animated on both phones (Iter3-A12, [#179]) | 조성민 | 11/6 | Done | 2.6.2 |
+| The guide and the pose flow polished (Iter3-A13, [#180]) | 조성민 | 11/6 | Done | 2.5.1, 2.6.3, 2.6.5 |
+| Transitions between screens (Iter3-A14, [#181]) | 조성민 | 11/6 | Done | 2.1 |
+| Camera's controls after the heuristic evaluation (Iter3-A15, [#182]) | 한준형 | 11/6 | Done | 2.6.2, 2.6.8, 2.8 |
+| Camera quality and latency closer to the stock camera (Iter3-A16, #183) | 한준형 | 11/6 | Moved to Iteration 4 | — |
+| Who takes the photo, chosen before connecting (Iter3-A17, [#188]) | 조성민 | 11/6 | Done | 2.1, 2.6.6 |
+
+**Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:
+
+1. **By 10/12.** This design (v1.0) and the shared contracts for the new interfaces, models, and messages, merged to `dev` with fakes (Iter2-P3).
+2. **By 10/14–10/16.** The course servers with Docker, nginx, and blue-green deploys (Iter2-P4); the zoom stutter (Iter2-P5, Must); pinch zoom with guide-edit mode (Iter2-P6); smooth outlines (Iter2-P7, Must), whose mask-only transfer moved to Iter3-P9; the accounts server (Iter2-P8).
+3. **By 10/17–10/18.** Camera controls (Iter2-P10); guide controls, thumbnail, and starting position (Iter2-P11); pose descriptions (Iter2-P12); Sign-in, Pix ID, and Friends screens (Iter2-P13).
+4. **By 10/20.** Remote brightness, flash, and guide moves (Iter2-P17); saved guides (Iter2-P18). Invitations with push and link (Iter2-P15) and sessions across networks with reconnection (Iter2-P16) moved to Iter3-P13–P15.
+5. **By 10/22–10/23.** Integration tests (Iter2-P21), integration on the test phones (Iter2-P22), and the demo README (Iter2-P23). Latency and connection rates on other network pairs waited for Iter3-P13. The midterm presentation (10/21) showed what was merged by then.
 
 **Shared contracts in code.** The contract files marked \* in 2.1 were written first in `android/` ([#13]), so each owner could build against them.
 
-- The contracts are the module interfaces (2.1), data models (2.3), data channel and signaling messages (2.5.1, 2.5.2), and the REST API (2.5.3). The Iteration 2 additions were planned to be written right after this design (Iter2-P3); instead each was added with its feature and reviewed there: the account and friends contracts with the Sign-in, Pix ID, and Friends screens ([#92]), and `SavedGuideStore` with saved guides ([#96]). `InvitationManager` comes with invitations (Iter2-P15).
-- Everything else is built by the owners in their tasks: screens, implementations, fakes, and the server.
+- The contracts are the module interfaces (2.1), data models (2.3), data channel and signaling messages (2.5.1, 2.5.2), and the REST API (2.5.3).
+- Later contracts come with their features and are reviewed there: account and friends with the Sign-in, Pix ID, and Friends screens ([#92]); `SavedGuideStore` with saved guides ([#96]); `InvitationManager` with invitations (Iter3-P15, [#119]); its `incoming`, with `GET /invitations/incoming`, with received invitations (Iter3-A17, [#188]).
+- The owners build everything else in their tasks: screens, implementations, fakes, and the server.
 - A contract changes only through a pull request that the affected owners review, together with this document.
-
-**Iteration 2 build order** (follows the schedule of 2026-10-11; dates are the issues' due dates):
-
-1.  **By 10/12.** This design (v1.0) and the shared contracts for the new interfaces, models, and messages, merged to `dev` with fakes (Iter2-P3).
-2.  **By 10/14–10/16.** In parallel: the course servers with Docker, nginx, and blue-green deploys (Iter2-P4); the zoom stutter (Iter2-P5, Must) and pinch zoom with guide-edit mode (Iter2-P6); smooth outlines and the mask-only transfer (Iter2-P7, Must); the accounts server (Iter2-P8).
-3.  **By 10/17–10/18.** Camera controls (Iter2-P10); guide controls, thumbnail, and starting position (Iter2-P11); pose descriptions (Iter2-P12); Sign-in, Pix ID, and Friends screens (Iter2-P13).
-4.  **By 10/20.** Invitations with push and link (Iter2-P15); sessions across networks and reconnection (Iter2-P16); remote brightness, flash, and guide moves (Iter2-P17); saved guides (Iter2-P18).
-5.  **By 10/22–10/23.** Integration tests (Iter2-P21), integration on the test phones (Iter2-P22), latency and connection-rate measurement per network pair, and the demo README (Iter2-P23). The midterm presentation is on 10/21 with what is merged by then.
 
 ### 2.10 Repository and branches
 
 ```text
 swpp-2026-project-team-10/
-├─ android/        Android app (Gradle project with the shared contracts; open this folder in Android Studio)
-├─ server/         FastAPI app with its Alembic migrations and Dockerfile; .env.example for secrets; scripts/ (model comparisons) and
-│                  tools/ (fake phones for testing); deploy/ with docker-compose, the nginx configuration, the deploy script, and the
-│                  systemd timer that deploys a new image (It 2)
-├─ wiki/           source of the GitHub wiki, with its images in wiki/images/; the wiki-sync workflow mirrors it on every push to dev
-└─ .github/        pull-request template; CI (Android lint and tests, server lint and tests, the server image), the deploy watcher, and
-                   the wiki-sync workflow
+├─ android/        Android app (Gradle project with the shared contracts; open this folder in Android Studio);
+│                  scripts/ (zoom_timings.py)
+├─ server/         FastAPI app with its Alembic migrations and Dockerfile; .env.example for secrets; scripts/ (model
+│                  comparisons, tries, and the AI module test), eval/ (its cases), and tools/ (fake phones for testing);
+│                  deploy/ with docker-compose, the nginx configuration, the deploy script, and the systemd timer
+├─ branding/       the logo, the app icon, and their usage guide
+├─ wiki/           source of the GitHub wiki, with its images in wiki/images/ and their drawings in wiki/design/ (the
+│                  architecture figure, the wireframes one file per flow, and render.py, which renders them); the
+│                  wiki-sync workflow mirrors it on every push to dev
+└─ .github/        pull-request template; CI (Android lint and tests, server lint and tests, the server image), the
+                   deploy watcher, the AWS server's deploy, and the wiki-sync workflow
 ```
 
-- **main**: stable; updated from **dev** with a merge commit at the end of each iteration. `iteration-N-demo` is created from main for the demo (`iteration-2-demo` for the midterm).
-- **dev**: integration branch. Each task gets its own branch from dev (for example `feat/12-guide-overlay`, with the issue number when the task has one) and returns through a pull request that is **squash-merged**, so dev has one commit per task.
+- **main**: stable; updated from **dev** with a merge commit at the end of each iteration. `iteration-N-demo` is created from main for each demo (`iteration-2-demo` for the midterm).
+- **dev**: integration branch. Each task gets its own branch from dev, with the issue number when the task has one (for example `feat/12-guide-overlay`). It returns through a pull request that is **squash-merged**, so dev has one commit per task.
 - **Commit messages and PR titles** follow [Conventional Commits](https://www.conventionalcommits.org) (for example `feat: add guide overlay`), and branch names start with the same type.
 
 ## 3. Design Patterns (Iteration 5)
 
-To be written in Iteration 5, with at least two patterns documented in detail. Each will list its location, the problem it solves, why it was chosen, its benefit, a short snippet, and the component roles. These are the candidates that the current design already uses:
+To be written in Iteration 5, with at least two patterns in detail. Each lists its location, the problem it solves, why it was chosen, its benefit, a short snippet, and the component roles. Candidates the code already uses:
 
 | Pattern | Where | Problem it addresses |
 |----|----|----|
 | **State** | `SessionState`, `RtcSessionManager` | Different allowed actions and UI in each connection phase (Figure 9) |
-| **Observer** | `StateFlow` in repositories and ViewModels | Many screens and the syncer react to one guide or session state |
+| **Observer** | `StateFlow` in repositories and ViewModels | Many screens and the syncers react to one guide or session state |
 | **Adapter** | `CameraFrameSource` | CameraX frames to the WebRTC video source |
-| **Strategy** | `SessionEntry` (room code, invitation; QR later); mask smoothing variants (with or without pose landmarks; today one set of functions in `MaskSmoothing.kt`) | Switch how a session starts, or how the mask is cleaned, without changing callers |
-| **Command** | `camera.*` and `guide.move` messages handled by `RemoteControlHandler` | Remote actions as objects that can be validated, queued, cancelled, and logged |
+| **Strategy** | `SessionEntry` (room code, invitation; QR later); mask smoothing (one set of functions in `MaskSmoothing.kt` today) | Change how a session starts, or how the mask is cleaned, without changing callers |
+| **Command** | `camera.*` and `guide.move` messages, handled by `RemoteControlHandler` | Remote actions as objects that can be validated, queued, cancelled, and logged |
 | **Repository / Facade** | `GuideRepository`, `SessionManager` | A simple interface over CameraX, ML Kit, WebRTC, and the network, which also makes fakes possible |
 
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13
@@ -1907,16 +3178,46 @@ To be written in Iteration 5, with at least two patterns documented in detail. E
 [#52]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/52
 [#53]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/53
 [#54]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/54
-[#55]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/55
-[#56]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/56
 [#57]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/57
 [#58]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/58
 [#59]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/59
 [#60]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/60
 [#61]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/61
 [#73]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/73
-[#78]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/78
 [#86]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/86
 [#92]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/92
+[#93]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/93
 [#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96
 [#99]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/99
+[#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
+[#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
+[#111]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/111
+[#112]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/112
+[#113]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/113
+[#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
+[#115]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/115
+[#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
+[#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
+[#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
+[#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
+[#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
+[#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
+[#120]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/120
+[#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
+[#122]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/122
+[#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
+[#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124
+[#125]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/125
+[#128]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/128
+[#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156
+[#158]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/158
+[#165]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/165
+[#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
+[#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171
+[#174]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/174
+[#177]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/177
+[#179]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/179
+[#180]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/180
+[#181]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/181
+[#182]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/182
+[#188]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/188

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -8,6 +8,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.FakeGuideRepository
 import com.lastpenguin.pix.session.FakeRemoteVideo
 import com.lastpenguin.pix.session.FakeSessionManager
+import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
@@ -49,7 +50,7 @@ class SubjectViewModelAspectTest {
 
     @Test
     fun aspect_beforeAnyCameraState_isTheDefault43() = runTest(dispatcher) {
-        val viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
         runCurrent()
 
         assertEquals(AspectRatio.R4_3, viewModel.uiState.value.aspect)
@@ -57,7 +58,7 @@ class SubjectViewModelAspectTest {
 
     @Test
     fun aspect_followsEveryCameraState() = runTest(dispatcher) {
-        val viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
         session.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT))
         runCurrent()
 
@@ -72,7 +73,7 @@ class SubjectViewModelAspectTest {
 
     @Test
     fun zoom_keptStateWithoutAnIncomingMessage_isShown() = runTest(dispatcher) {
-        val viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
         runCurrent()
 
         session.setPeerCamera(CameraState(zoom = 2.5f, aspect = AspectRatio.R1_1))
@@ -84,7 +85,7 @@ class SubjectViewModelAspectTest {
 
     @Test
     fun zoom_keptStateDuringAPinch_leavesThePinchValue() = runTest(dispatcher) {
-        val viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
         session.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT))
         session.deliver(
             SessionMessage.Capabilities(
@@ -104,7 +105,7 @@ class SubjectViewModelAspectTest {
     fun aspect_sentBeforeTheScreenOpened_isShownAtOnce() = runTest(dispatcher) {
         session.deliver(state(AspectRatio.R16_9))
 
-        val viewModel = SubjectViewModel(session, FakeGuideRepository(), FakeRemoteVideo())
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
         runCurrent()
 
         assertEquals(AspectRatio.R16_9, viewModel.uiState.value.aspect)

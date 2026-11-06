@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -29,7 +29,7 @@ class OkHttpSignalingClient(
     private val lock = Any()
     private var socket: WebSocket? = null
 
-    override fun connect(url: String) {
+    override fun connect(url: String, accessToken: String?) {
         close()
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -61,7 +61,9 @@ class OkHttpSignalingClient(
             }
         }
         synchronized(lock) {
-            socket = client.newWebSocket(Request.Builder().url(url).build(), listener)
+            val request = Request.Builder().url(url)
+            if (accessToken != null) request.header("Authorization", "Bearer $accessToken")
+            socket = client.newWebSocket(request.build(), listener)
         }
     }
 

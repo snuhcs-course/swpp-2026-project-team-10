@@ -19,18 +19,25 @@
     <color name="pix_text_faint">#8A8E94</color>
 
     <color name="pix_accent">#F2C14E</color>
+    <!-- The accent at 35%: a received invitation's outline, and the tile that counts them (FR-6.17). -->
+    <color name="pix_accent_stroke">#59F2C14E</color>
     <color name="pix_on_accent">#141413</color>
     <color name="pix_live">#36D399</color>
     <color name="pix_live_stroke">#7336D399</color>
     <color name="pix_guide">#5EEAD4</color>
     <color name="pix_guide_stroke">#805EEAD4</color>
     <color name="pix_danger">#FF6B57</color>
+    <!-- The blinking light while a session streams the camera (FR-6.8), the red of a recording light. -->
+    <color name="pix_recording">#FF3B30</color>
     <color name="pix_danger_stroke">#66FF6B57</color>
     <color name="pix_danger_text">#FFB4A8</color>
     <color name="pix_danger_surface">#1C1416</color>
+    <!-- A pose saved with ♥ (FR-4.14): the filled heart, red as hearts are elsewhere, apart from the danger color. -->
+    <color name="pix_heart">#FF4D5E</color>
 
     <!-- The horizon bar when level (FR-1.10, Design 2.6.2). -->
     <color name="camera_level_aligned">#D4AC24</color>
 
-    <color name="ic_launcher_background">#16171A</color>
+    <!-- The app icon's tile: paper, under the ink-and-sun shutter P (branding/pix-app-icon.svg). -->
+    <color name="ic_launcher_background">#F4F4F2</color>
 </resources>

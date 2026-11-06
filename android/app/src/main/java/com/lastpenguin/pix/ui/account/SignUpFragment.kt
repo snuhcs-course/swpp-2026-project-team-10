@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, FR-5.15, US-6). *Check* tells
- * whether the Pix ID is free before the form is sent. The account is signed in at once and Friends opens. Owner:
- * Accounts (#54).
+ * whether the Pix ID is free before the form is sent. The account is signed in at once, and Sign up and Sign in under it
+ * close, back to the screen that opened Sign in. Owner: Accounts (#54).
  */
 class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
 
@@ -46,13 +46,13 @@ class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(form::render) }
-                launch { viewModel.events.collect { if (it is AccountEvent.SignedIn) toFriends() } }
+                launch { viewModel.events.collect { if (it is AccountEvent.SignedIn) close() } }
             }
         }
     }
 
-    private fun toFriends() {
-        findNavController().popBackStack(R.id.friendsFragment, false)
+    private fun close() {
+        findNavController().popBackStack(R.id.signInFragment, true)
     }
 }
 

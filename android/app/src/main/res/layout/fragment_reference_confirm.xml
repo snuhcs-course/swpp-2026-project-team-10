@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Reference confirm (R&S 6.2). -->
+<!-- Reference confirm (R&S 6.2), and the subject's Your reference (R&S 6.6). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -21,13 +21,30 @@
             style="@style/Widget.Pix.Header.Back"
             android:contentDescription="@string/back" />
 
-        <TextView
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:accessibilityHeading="true"
-            android:text="@string/reference_title"
-            android:textAppearance="@style/TextAppearance.Pix.Header" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/reference_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+            <!-- "Joonhyung chose this pose" when the subject's pick brought the candidate here (FR-6.15). -->
+            <TextView
+                android:id="@+id/chosenByText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                android:visibility="gone"
+                tools:text="Joonhyung chose this pose"
+                tools:visibility="visible" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- The outline over a neutral background (FR-2.3). Dark, so the light stroke stands out as it does on the camera. -->
@@ -51,6 +68,14 @@
                 android:scaleType="fitCenter"
                 android:visibility="gone" />
 
+            <!-- A screenshot cut to its photo (FR-2.10): the cut, then the kept photo in the bottom right corner. -->
+            <com.lastpenguin.pix.ui.guide.ScreenshotCutView
+                android:id="@+id/screenshotCut"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/kept_photo_description"
+                android:visibility="gone" />
+
             <ProgressBar
                 android:id="@+id/referenceProgress"
                 android:layout_width="40dp"
@@ -59,21 +84,62 @@
                 android:indeterminateTint="@color/pix_accent"
                 android:visibility="gone" />
 
-            <!-- "Finding the person…" or "Person found". -->
-            <TextView
-                android:id="@+id/referenceStatus"
-                style="@style/Widget.Pix.Chip"
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_gravity="top|start"
                 android:layout_margin="14dp"
-                android:accessibilityLiveRegion="polite"
-                app:drawableTint="@color/pix_live"
-                android:text="@string/finding_person"
-                android:textColor="@color/pix_text"
-                android:visibility="invisible"
-                tools:drawableStartCompat="@drawable/ic_person_check_small"
-                tools:visibility="visible" />
+                android:orientation="vertical">
+
+                <!-- "Finding the person…" or "Person found". -->
+                <TextView
+                    android:id="@+id/referenceStatus"
+                    style="@style/Widget.Pix.Chip"
+                    android:accessibilityLiveRegion="polite"
+                    app:drawableTint="@color/pix_live"
+                    android:text="@string/finding_person"
+                    android:textColor="@color/pix_text"
+                    android:visibility="invisible"
+                    tools:drawableStartCompat="@drawable/ic_person_check_small"
+                    tools:visibility="visible" />
+
+                <!-- Only for a screenshot cut to its photo (FR-2.10). -->
+                <TextView
+                    android:id="@+id/cutChip"
+                    style="@style/Widget.Pix.Chip"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/cut_from_screenshot"
+                    android:textColor="@color/pix_text"
+                    android:visibility="gone"
+                    app:drawableStartCompat="@drawable/ic_crop_small"
+                    app:drawableTint="@color/pix_text"
+                    tools:visibility="visible" />
+            </LinearLayout>
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
+
+    <!-- In a session: the other phone shows this outline too, and the first Use this guide decides (FR-6.15). -->
+    <TextView
+        android:id="@+id/sharedHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+        android:visibility="gone"
+        tools:text="Joonhyung sees this guide too. The first to use it decides."
+        tools:visibility="visible" />
+
+    <!-- Makes the guide again from the whole screenshot (FR-2.10). -->
+    <Button
+        android:id="@+id/useWholeImageButton"
+        style="@style/Widget.Pix.Button.Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/use_whole_image"
+        android:visibility="gone"
+        tools:visibility="visible" />
 
     <Button
         android:id="@+id/useGuideButton"

@@ -1,7 +1,8 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 """The registry on the session store, without sockets. Each registry stands for one worker process."""
 
 import asyncio
+import hashlib
 import json
 
 import pytest
@@ -165,11 +166,14 @@ async def test_room_created_through_one_worker_is_joined_through_another(make_re
     # The subject signals right after joining; the photographer must still hear about the join first.
     await handle(second, subject, type="room.join", code=room["code"])
     await handle(second, subject, **answer)
-    assert await receive(subject) == {
+    # A registry without a relay gives every phone the STUN server only.
+    joined = await receive(subject)
+    assert joined == {
         "type": "session.joined",
         "sessionId": room["sessionId"],
         "role": "SUBJECT",
-        "iceServers": [],
+        "iceServers": [{"urls": ["stun:stun.cloudflare.com:3478"]}],
+        "rejoinToken": joined["rejoinToken"],
     }
     assert await receive(photographer) == {"type": "peer.joined"}
     assert await receive(photographer) == answer
@@ -184,6 +188,173 @@ async def test_room_created_through_one_worker_is_joined_through_another(make_re
         await handle(first, photographer, **offer)
     assert exc.value.code == "PEER_UNAVAILABLE"
     await handle(second, subject, type="room.join", code=room["code"])
+    assert await receive(photographer) == {"type": "peer.joined"}
+
+
+async def test_a_subject_rejoins_through_a_third_worker(make_registry):
+    first, second, third = await make_registry(), await make_registry(), await make_registry()
+    photographer, room = await create_room(first)
+    subject = await second.connect()
+    await handle(second, subject, type="room.join", code=room["code"])
+    token = (await receive(subject))["rejoinToken"]
+    assert await receive(photographer) == {"type": "peer.joined"}
+    await second.disconnect(subject)
+    assert await receive(photographer) == LEFT
+    again = await third.connect()
+    await handle(third, again, type="session.join", sessionId=room["sessionId"], rejoin=True, rejoinToken=token)
+    assert await receive(again) == {
+        "type": "session.joined",
+        "sessionId": room["sessionId"],
+        "role": "SUBJECT",
+        "iceServers": [],
+    }
+    assert await receive(photographer) == {"type": "peer.rejoined"}
+    offer = {"type": "signal", "sdp": {"type": "offer", "sdp": "v=0"}}
+    await handle(first, photographer, **offer)
+    assert await receive(again) == offer
+
+
+async def test_the_store_keeps_only_a_hash_of_each_rejoin_token(make_registry, open_store):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    await handle(registry, subject, type="room.join", code=room["code"])
+    token = (await receive(subject))["rejoinToken"]
+    connection = open_store()
+    try:
+        session = await connection.hgetall(f"session:{room['sessionId']}")
+    finally:
+        await connection.aclose()
+    assert session["photographer_token"] == hashlib.sha256(room["rejoinToken"].encode()).hexdigest()
+    assert session["subject_token"] == hashlib.sha256(token.encode()).hexdigest()
+    assert not any(secret in value for value in session.values() for secret in (room["rejoinToken"], token))
+
+
+async def take_place(registry, session_id, token):
+    phone = await registry.connect()
+    await handle(registry, phone, type="session.join", sessionId=session_id, rejoin=False, rejoinToken=token)
+    return phone, await receive(phone)
+
+
+async def test_an_invitations_room_is_accepted_and_joined_through_other_workers(make_registry, clock, open_store):
+    first, second, third = await make_registry(), await make_registry(), await make_registry()
+    session_id, token = await first.invite("inv_01JB2C3D4E5F6G7H8J9KAMNPQR", clock() + 30)
+    photographer, joined = await take_place(first, session_id, token)
+    assert joined["role"] == "PHOTOGRAPHER"
+    subject_token = await second.accept_invitation(session_id, clock() + 15)
+    subject, joined = await take_place(third, session_id, subject_token)
+    assert joined["role"] == "SUBJECT"
+    assert await receive(photographer) == {"type": "peer.joined"}
+    connection = open_store()
+    try:
+        session = await connection.hgetall(f"session:{session_id}")
+    finally:
+        await connection.aclose()
+    assert session["code"] == ""
+    assert session["invitation"] == "inv_01JB2C3D4E5F6G7H8J9KAMNPQR"
+    assert not any(secret in value for value in session.values() for secret in (token, subject_token))
+
+
+async def test_a_decline_through_another_worker_reaches_the_photographer_and_ends_the_room(make_registry, clock):
+    first, second = await make_registry(), await make_registry()
+    session_id, token = await first.invite("inv_01JB2C3D4E5F6G7H8J9KAMNPQR", clock() + 30)
+    photographer, _ = await take_place(first, session_id, token)
+    await second.end_invitation(session_id, "DECLINED")
+    assert (await receive(photographer))["code"] == "DECLINED"
+    assert await first.stats() == (0, 1)
+    assert await second.accept_invitation(session_id, clock() + 15) is None
+
+
+async def test_an_invitations_room_with_a_subject_cannot_be_accepted_or_ended_again(make_registry, clock):
+    registry = await make_registry()
+    session_id, token = await registry.invite("inv_01JB2C3D4E5F6G7H8J9KAMNPQR", clock() + 30)
+    photographer, _ = await take_place(registry, session_id, token)
+    subject, _ = await take_place(registry, session_id, await registry.accept_invitation(session_id, clock() + 15))
+    assert await receive(photographer) == {"type": "peer.joined"}
+    assert await registry.accept_invitation(session_id, clock() + 15) is None
+    await registry.end_invitation(session_id, "DECLINED")
+    assert await registry.stats() == (1, 2)
+    assert photographer.outbox.empty()
+
+
+async def test_an_unjoined_invitations_room_expires_with_no_code_to_remember(make_registry, clock, open_store):
+    registry = await make_registry()
+    session_id, token = await registry.invite("inv_01JB2C3D4E5F6G7H8J9KAMNPQR", clock() + 30)
+    photographer, _ = await take_place(registry, session_id, token)
+    clock.advance(29)
+    await registry.sweep()
+    assert photographer.outbox.empty()
+    clock.advance(1)
+    await registry.sweep()
+    assert (await receive(photographer))["code"] == "EXPIRED"
+    connection = open_store()
+    try:
+        assert await connection.zcard("expired") == 0
+    finally:
+        await connection.aclose()
+
+
+def held_relay(registry):
+    """Makes the registry's relay wait until the returned `release` is set; `asked` is set once a phone has asked."""
+    asked, release = asyncio.Event(), asyncio.Event()
+
+    async def ice_servers() -> list[dict]:
+        asked.set()
+        await release.wait()
+        return [{"urls": ["stun:stun.cloudflare.com:3478"]}]
+
+    registry.ice_servers = ice_servers
+    return asked, release
+
+
+async def test_a_photographer_who_leaves_while_the_subject_waits_for_credentials_hears_nothing_of_it(make_registry):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    asked, release = held_relay(registry)
+    joining = asyncio.create_task(handle(registry, subject, type="room.join", code=room["code"]))
+    await asyncio.wait_for(asked.wait(), timeout=2)
+
+    await handle(registry, photographer, type="leave")
+    assert await receive(subject) == {"type": "peer.left", "reason": "PEER_LEFT"}
+    release.set()
+    await handle(registry, photographer, type="room.create")
+    assert (await receive(photographer))["type"] == "room.created"
+    await asyncio.wait_for(joining, timeout=2)
+
+    # The subject never hears it joined a room that is gone, and the new room hears of no subject.
+    assert subject.outbox.empty()
+    assert photographer.outbox.empty()
+
+
+async def test_a_photographer_who_drops_while_the_subject_waits_for_credentials_is_not_told_of_it(make_registry):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    asked, release = held_relay(registry)
+    joining = asyncio.create_task(handle(registry, subject, type="room.join", code=room["code"]))
+    await asyncio.wait_for(asked.wait(), timeout=2)
+
+    await registry.disconnect(photographer)
+    assert await receive(subject) == LEFT
+    release.set()
+    await asyncio.wait_for(joining, timeout=2)
+
+    assert subject.outbox.empty()
+
+
+async def test_the_photographer_hears_of_the_subject_only_after_its_credentials_arrive(make_registry):
+    registry = await make_registry()
+    photographer, room = await create_room(registry)
+    subject = await registry.connect()
+    asked, release = held_relay(registry)
+    joining = asyncio.create_task(handle(registry, subject, type="room.join", code=room["code"]))
+    await asyncio.wait_for(asked.wait(), timeout=2)
+    assert photographer.outbox.empty()
+
+    release.set()
+    await asyncio.wait_for(joining, timeout=2)
+    assert (await receive(subject))["type"] == "session.joined"
     assert await receive(photographer) == {"type": "peer.joined"}
 
 

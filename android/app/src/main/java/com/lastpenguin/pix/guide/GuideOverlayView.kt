@@ -1,15 +1,21 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import androidx.core.animation.doOnEnd
+import com.lastpenguin.pix.ui.Motion
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -19,6 +25,10 @@ import kotlin.math.roundToInt
  * Owner: Camera/Overlay (#6). [editable] is the screen's guide-edit mode (AD-17, #48): while it is on, every touch
  * that starts inside the camera image edits the guide, so the camera never zooms by mistake; while it is off, every
  * touch passes through to the preview or live video below.
+ * Changes of the guide itself are animated in drawing (Iter3-A13), apart from the view's own alpha, which the screens
+ * fade with the grid: a new guide fades in as it grows from 95 %, a replaced one fades out meanwhile, and Hide, its
+ * return, and Remove fade. A move, a resize, and the opacity are drawn at once, also during these, and the first
+ * guide this view renders, such as the one already there when the screen opens, comes without any.
  */
 class GuideOverlayView @JvmOverloads constructor(
     context: Context,
@@ -30,9 +40,25 @@ class GuideOverlayView @JvmOverloads constructor(
     private var guide: ReferenceGuide? = null
     private var state = GuideState()
     private var bitmap: Bitmap? = null
+
+    /** The guide's outline at the settings' thickness, drawn instead of [ReferenceGuide.outline] while it is that guide's. */
+    private var restyled: Pair<ReferenceGuide, Bitmap>? = null
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private var ownsTouch = false
     private var gesture: TouchGesture? = null
+
+    /** Whether [render] has run: the first call shows what is there, without an animation. */
+    private var rendered = false
+
+    /** The guide drawn last, or hidden since: one that comes again is shown again, not a new guide. */
+    private var lastId: String? = null
+
+    /** The drawn guide's fade in and growth, 0 to 1; null while none runs. */
+    private var appear: ValueAnimator? = null
+    private var appearGrows = false
+
+    /** The guide that went, drawn as it was while it fades out; null while none does. */
+    private var leaving: Leaving? = null
 
     init {
         // Only a touch starting inside the camera image while editable is consumed; the video below owns the rest.
@@ -64,18 +90,127 @@ class GuideOverlayView @JvmOverloads constructor(
      */
     var onGesture: ((dx: Float, dy: Float, scale: Float, final: Boolean) -> Unit)? = null
 
+    /**
+     * The line's color from the settings (FR-3.10). The outline is drawn white, so another color tints it, and the
+     * opacity still applies.
+     */
+    var lineColor: Int = Color.WHITE
+        set(value) {
+            if (field == value) return
+            field = value
+            paint.colorFilter = if (value == Color.WHITE) null else PorterDuffColorFilter(value, PorterDuff.Mode.SRC_IN)
+            postInvalidateOnAnimation()
+        }
+
+    /**
+     * Draws [outline] for [guide] instead of its own outline: the same mask traced at the settings' thickness
+     * ([GuideOutlines]). Ignored for any other guide, so a late result never draws over a newer guide.
+     */
+    fun restyle(guide: ReferenceGuide?, outline: Bitmap?) {
+        val next = if (guide != null && outline != null) guide to outline else null
+        if (restyled?.first === next?.first && restyled?.second === next?.second) return
+        restyled = next
+        updateDrawing()
+        postInvalidateOnAnimation()
+    }
+
     /** Shows [guide] at [state]; null hides it. */
     fun render(guide: ReferenceGuide?, state: GuideState) {
-        if (this.guide === guide && this.state == state) return
+        if (rendered && this.guide === guide && this.state == state) return
         if (this.guide !== guide || state.guideId != this.state.guideId || !state.visible) {
             // A replacement is already committed in the repository. Never send an old gesture to the new image.
             finishGesture(sendFinal = this.guide === guide && this.state.guideId == state.guideId)
         }
+        val before = drawnId()
+        val going = if (before !=
+            null
+        ) {
+            Leaving(bitmap!!, RectF(guideBounds), RectF(frameBounds), drawnAlpha())
+        } else {
+            null
+        }
+        val replaced = this.guide !== guide
         this.guide = guide
         this.state = state
         updateDrawing()
+        val after = drawnId()
+        if (!rendered) {
+            rendered = true
+            lastId = after ?: guide?.id
+        } else if (after != before) {
+            // The state comes first and the animation follows it, so a tap meanwhile acts on what the state says.
+            if (going != null) leave(going, if (replaced && guide != null) Motion.GUIDE_MS else Motion.HIDE_MS)
+            if (after != null) {
+                val comesBack = after == lastId
+                show(grows = !comesBack, ms = if (comesBack) Motion.HIDE_MS else Motion.GUIDE_MS)
+            } else {
+                stopAppearing()
+            }
+        }
+        if (after != null) lastId = after
         if (!canEdit()) finishGesture()
         postInvalidateOnAnimation()
+    }
+
+    /** The id of the guide drawn now, or null while none is. */
+    private fun drawnId(): String? = guide?.id?.takeIf { bitmap != null }
+
+    /** The drawn guide's alpha, 0 to 255, as it shows now, within its fade in. */
+    private fun drawnAlpha(): Int = (paint.alpha * appearing).roundToInt()
+
+    /** How far the drawn guide has come in, 0 to 1; 1 while it is not coming in (a test reads it). */
+    internal val appearing: Float
+        get() = appear?.animatedValue as? Float ?: 1f
+
+    /** The drawn guide's coming in, while it runs: a test sets its fraction, since paused frames catch up at once. */
+    internal val appearance: ValueAnimator?
+        get() = appear
+
+    /** Whether a guide that went is still fading out (a test reads it). */
+    internal val fadingOut: Boolean
+        get() = leaving != null
+
+    private fun show(grows: Boolean, ms: Long) {
+        stopAppearing()
+        if (!Motion.on()) return
+        appearGrows = grows
+        appear = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = ms
+            interpolator = Motion.STANDARD
+            addUpdateListener { postInvalidateOnAnimation() }
+            doOnEnd { if (appear === it) appear = null }
+            start()
+        }
+    }
+
+    private fun stopAppearing() {
+        appear?.let {
+            appear = null
+            it.cancel()
+        }
+    }
+
+    private fun leave(going: Leaving, ms: Long) {
+        stopLeaving()
+        if (!Motion.on() || going.alpha == 0) return
+        leaving = going
+        going.fade = ValueAnimator.ofFloat(1f, 0f).apply {
+            duration = ms
+            interpolator = Motion.STANDARD
+            addUpdateListener { postInvalidateOnAnimation() }
+            doOnEnd {
+                if (leaving === going) leaving = null
+                postInvalidateOnAnimation()
+            }
+            start()
+        }
+    }
+
+    private fun stopLeaving() {
+        leaving?.let {
+            leaving = null
+            it.fade?.cancel()
+        }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -93,6 +228,8 @@ class GuideOverlayView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         finishGesture()
         releaseTouch()
+        stopAppearing()
+        stopLeaving()
         super.onDetachedFromWindow()
     }
 
@@ -207,6 +344,11 @@ class GuideOverlayView @JvmOverloads constructor(
 
     private data class TouchPosition(val x: Float, val y: Float, val span: Float)
 
+    /** A guide that went: its outline, where it was drawn, and its alpha then, which [fade] takes down to nothing. */
+    private class Leaving(val bitmap: Bitmap, val bounds: RectF, val frame: RectF, val alpha: Int) {
+        var fade: ValueAnimator? = null
+    }
+
     private data class TouchGesture(
         var primaryId: Int,
         var secondaryId: Int = -1,
@@ -240,20 +382,46 @@ class GuideOverlayView @JvmOverloads constructor(
         guideBounds.set(left, top, right, bottom)
         paint.alpha = (state.opacity.coerceIn(0f, 1f) * 255f).roundToInt()
         // The guide is an outline only; the reference's pixels are never drawn (FR-2.2, AD-15).
-        bitmap = guide.outline
+        bitmap = restyled?.takeIf { it.first === guide }?.second ?: guide.outline
+    }
+
+    /** Where the guide is drawn in this view, inside the camera image, or null while none is (the tutorial's ring). */
+    fun drawnGuideBounds(): RectF? {
+        if (bitmap == null) return null
+        val drawn = RectF(guideBounds)
+        return drawn.takeIf { it.intersect(frameBounds) }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        leaving?.let { going ->
+            val fade = going.fade?.animatedValue as? Float ?: 0f
+            draw(canvas, going.bitmap, going.bounds, going.frame, (going.alpha * fade).roundToInt(), scale = 1f)
+        }
         val image = bitmap ?: return
-        if (image.isRecycled) return
+        val coming = appearing
+        val scale = if (appearGrows) START_SCALE + (1f - START_SCALE) * coming else 1f
+        draw(canvas, image, guideBounds, frameBounds, (paint.alpha * coming).roundToInt(), scale)
+    }
+
+    private fun draw(canvas: Canvas, image: Bitmap, bounds: RectF, frame: RectF, alpha: Int, scale: Float) {
+        if (image.isRecycled || alpha <= 0) return
+        val opacity = paint.alpha
         val saved = canvas.save()
         try {
             // Keep the full destination rectangle: intersecting it with the frame would squeeze the whole image.
-            canvas.clipRect(frameBounds)
-            canvas.drawBitmap(image, null, guideBounds, paint)
+            canvas.clipRect(frame)
+            canvas.scale(scale, scale, bounds.centerX(), bounds.centerY())
+            paint.alpha = alpha
+            canvas.drawBitmap(image, null, bounds, paint)
         } finally {
+            paint.alpha = opacity
             canvas.restoreToCount(saved)
         }
+    }
+
+    private companion object {
+        /** How large a new guide starts, before it grows to its size. */
+        const val START_SCALE = 0.95f
     }
 }

@@ -5,6 +5,7 @@
 .env
 deploy/
 scripts/
+eval/
 tools/
 Dockerfile
 .dockerignore

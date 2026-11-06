@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The screen gone back from (Design 2.1, Material's shared axis along x): it goes 30 dp to the right, fading out
+     in the first 35 % of the transition. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <objectAnimator
+        android:duration="@integer/screen_transition_ms"
+        android:interpolator="@android:interpolator/fast_out_slow_in">
+        <propertyValuesHolder
+            android:propertyName="translationX"
+            android:valueFrom="0dp"
+            android:valueTo="@dimen/screen_slide"
+            android:valueType="floatType" />
+        <propertyValuesHolder
+            android:propertyName="alpha"
+            android:valueType="floatType">
+            <keyframe
+                android:fraction="0"
+                android:value="1" />
+            <keyframe
+                android:fraction="0.35"
+                android:value="0" />
+            <keyframe
+                android:fraction="1"
+                android:value="0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+</set>

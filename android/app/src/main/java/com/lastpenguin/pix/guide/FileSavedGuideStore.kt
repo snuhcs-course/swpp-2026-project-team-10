@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -9,7 +9,6 @@ import androidx.core.graphics.scale
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,14 +25,16 @@ import kotlinx.serialization.json.Json
 
 /**
  * [SavedGuideStore] in the app's private files (Design 2.8, *Guide store*): one folder per guide under [directory]
- * (`filesDir/guides/<id>/`) with `cutout.webp`, `reference.webp`, and `meta.json`. Until only the mask travels to the
- * subject (Design 2.6.1, step 6), a guide still holds its cutout, whose alpha is that smoothed mask, so the cutout is
- * kept, encoded as the subject receives it (WebP with alpha, at most 720 px tall), and a loaded guide draws the
- * outline the subject draws. The encoding is the store's own, so a later change to what travels does not change the
- * guides already saved. A guide is written to a hidden folder and renamed into place, so a half-written one is never
- * listed; a folder that cannot be read back is deleted. The list is ordered by an increasing number kept in
- * `meta.json`, not by the clock. Nothing goes to MediaStore.
- * Owner: Guide controls (#58).
+ * (`filesDir/guides/<id>/`) with `mask.png`, `reference.webp`, and `meta.json`. The mask is kept as the other phone
+ * receives it (an 8-bit grayscale PNG at most 720 px tall, [MaskPng]), so a loaded guide draws the outline the
+ * subject draws; the encoding is the store's own, so a later change to what travels does not change the guides
+ * already saved. A guide saved before the mask-only transfer has `cutout.webp` instead, a WebP whose alpha is the
+ * mask: the first read replaces it with `mask.png`, so none of the reference's pixels stay in the mask's place. A
+ * guide is written to a hidden folder and renamed into place, so a half-written one is never listed; a folder that
+ * cannot be read back is deleted. The list is ordered by an increasing number kept in `meta.json`, not by the clock.
+ * Listing a guide reads only its `meta.json`; its images are read when it is used or its thumbnail shown, so a full
+ * library starts as fast as an empty one (FR-3.11). Nothing goes to MediaStore.
+ * Owner: Guide controls (#58); the mask (#113); the library (#170).
  */
 class FileSavedGuideStore(
     private val directory: File,
@@ -58,14 +59,18 @@ class FileSavedGuideStore(
         scope.launch { locked { } }
     }
 
-    override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<SavedGuide> = locked { entries ->
-        entries.firstOrNull { it.saved.id == guide.id }?.let { return@locked Result.success(it.saved) }
+    override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> = locked { entries ->
+        entries.firstOrNull {
+            it.saved.id == guide.id
+        }?.let { return@locked Result.success(GuideSaved(it.saved, false)) }
         try {
             val entry = write(guide, state, order = (entries.maxOfOrNull { it.meta.order } ?: 0L) + 1)
             val kept = listOf(entry) + entries
-            kept.drop(SavedGuideStore.MAX_SAVED).forEach { remove(it.saved.id) }
+            val removed = kept.drop(SavedGuideStore.MAX_SAVED)
+            removed.forEach { remove(it.saved.id) }
             publish(kept.take(SavedGuideStore.MAX_SAVED))
-            Result.success(entry.saved)
+            // Decided under the lock, so two saves that overlap each say whether theirs deleted the oldest.
+            Result.success(GuideSaved(entry.saved, removedOldest = removed.isNotEmpty()))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -79,15 +84,15 @@ class FileSavedGuideStore(
         val read = locked { entries ->
             val meta = entries.firstOrNull { it.saved.id == id }?.meta ?: return@locked null
             val folder = File(directory, id)
-            Triple(meta, decode(File(folder, CUTOUT)), decode(File(folder, REFERENCE)))
+            Triple(meta, readMask(folder), decode(File(folder, REFERENCE)))
         } ?: return Result.failure(NoSuchElementException("No saved guide $id"))
-        val (meta, cutout, reference) = read
-        if (cutout == null) return Result.failure(IOException("The cutout of saved guide $id cannot be read"))
+        val (meta, mask, reference) = read
+        if (mask == null) return Result.failure(IOException("The mask of saved guide $id cannot be read"))
         // Tracing is work for the CPU, done outside the lock so that saves and deletes do not wait for it.
-        val outline = withContext(compute) { outlines.extract(cutout, outlineStrokePx(cutout.height)) }
+        val outline = withContext(compute) { outline(mask) }
         val guide = ReferenceGuide(
             id = id,
-            cutout = cutout,
+            mask = mask.toMaskBitmap(),
             outline = outline,
             aspect = meta.aspect,
             source = meta.source,
@@ -95,6 +100,17 @@ class FileSavedGuideStore(
             reference = reference,
         )
         return Result.success(guide to meta.state)
+    }
+
+    override suspend fun thumbnail(id: String): Bitmap? {
+        // The reference, or else the mask, whose outline stands in for a guide saved without one.
+        val (reference, mask) = locked { entries ->
+            if (entries.none { it.saved.id == id }) return@locked null
+            val folder = File(directory, id)
+            val reference = decode(File(folder, REFERENCE))
+            reference to (if (reference == null) readMask(folder) else null)
+        } ?: return null
+        return withContext(compute) { (reference ?: mask?.let { outline(it) })?.let { thumbnail(it) } }
     }
 
     override suspend fun delete(id: String) {
@@ -130,7 +146,7 @@ class FileSavedGuideStore(
             state = state,
         )
         try {
-            writeWebp(File(unfinished, CUTOUT), fitHeight(guide.cutout, MAX_CUTOUT_HEIGHT))
+            writeMask(File(unfinished, MASK), guide.mask.maskPixels())
             guide.reference?.let { writeWebp(File(unfinished, REFERENCE), it) }
             File(unfinished, META).writeText(json.encodeToString(Meta.serializer(), meta))
             folder.deleteRecursively()
@@ -139,7 +155,7 @@ class FileSavedGuideStore(
             unfinished.deleteRecursively()
             throw error
         }
-        return Entry(SavedGuide(guide.id, meta.savedAt, thumbnail(guide.reference ?: guide.cutout)), meta)
+        return Entry(SavedGuide(guide.id, meta.savedAt, guide.source), meta)
     }
 
     /**
@@ -162,8 +178,12 @@ class FileSavedGuideStore(
         return read.take(SavedGuideStore.MAX_SAVED)
     }
 
-    /** The folder's guide, or null when its `meta.json` or images cannot be used. */
+    /**
+     * The folder's guide, or null when its `meta.json` cannot be used or it has no mask; an old cutout is migrated
+     * first. The images are not decoded here: one that cannot be read fails the guide's use, with a message.
+     */
     private fun read(folder: File): Entry? {
+        migrate(folder)
         val meta = try {
             json.decodeFromString(Meta.serializer(), File(folder, META).readText())
         } catch (error: IOException) {
@@ -177,10 +197,54 @@ class FileSavedGuideStore(
             Log.w(TAG, "Saved guide ${folder.name} has values that cannot place a guide")
             return null
         }
-        val reference = File(folder, REFERENCE)
-        val source = decode(if (reference.isFile) reference else File(folder, CUTOUT)) ?: return null
-        return Entry(SavedGuide(folder.name, meta.savedAt, thumbnail(source)), meta)
+        if (!File(folder, MASK).isFile) return null
+        return Entry(SavedGuide(folder.name, meta.savedAt, meta.source), meta)
     }
+
+    /**
+     * A folder from before the mask-only transfer: `cutout.webp`'s alpha becomes `mask.png`, and the cutout, which
+     * holds the reference's pixels, is deleted. A cutout that cannot be read is left, and the folder fails [read].
+     * A cutout next to a mask is from a move that stopped before the delete, which is tried again at every read.
+     */
+    private fun migrate(folder: File) {
+        val cutout = File(folder, OLD_CUTOUT)
+        if (!cutout.isFile) return
+        if (!File(folder, MASK).isFile) {
+            val mask = decode(cutout)?.maskPixels() ?: return
+            val unfinished = File(folder, ".$MASK")
+            try {
+                writeMask(unfinished, mask)
+                if (!unfinished.renameTo(File(folder, MASK))) {
+                    throw IOException("Could not move $unfinished into place")
+                }
+            } catch (error: IOException) {
+                unfinished.delete()
+                Log.w(TAG, "Could not move saved guide ${folder.name} to a mask", error)
+                return
+            }
+        }
+        if (!cutout.delete()) Log.w(TAG, "Could not delete the old cutout of saved guide ${folder.name}")
+    }
+
+    /** At most [MAX_MASK_HEIGHT] tall, as the other phone receives it. */
+    private fun writeMask(file: File, mask: MaskPixels) {
+        file.writeBytes(MaskPng.encode(mask.fitHeight(MAX_MASK_HEIGHT)))
+    }
+
+    /** The folder's `mask.png`; null when it is missing or not a mask. */
+    private fun readMask(folder: File): MaskPixels? {
+        val file = File(folder, MASK)
+        if (!file.isFile) return null
+        return try {
+            MaskPng.decode(file.readBytes())
+        } catch (error: IOException) {
+            Log.w(TAG, "Could not read $file", error)
+            null
+        }
+    }
+
+    private fun outline(mask: MaskPixels): Bitmap =
+        outlines.extract(mask.alpha, mask.width, mask.height, outlineStrokePx(mask.height))
 
     private fun writeWebp(file: File, bitmap: Bitmap) {
         file.outputStream().use { out ->
@@ -223,33 +287,26 @@ class FileSavedGuideStore(
 
     private companion object {
         const val TAG = "PixSavedGuides"
-        const val CUTOUT = "cutout.webp"
+        const val MASK = "mask.png"
         const val REFERENCE = "reference.webp"
         const val META = "meta.json"
 
-        /** As the subject receives the cutout (`WebpGuideImageCodec`), so a loaded guide draws the subject's line. */
-        const val MAX_CUTOUT_HEIGHT = 720
-        const val QUALITY = 90
+        /** What a guide saved before the mask-only transfer has in place of [MASK]; only [migrate] reads it. */
+        const val OLD_CUTOUT = "cutout.webp"
 
-        /**
-         * The thumbnails on Add a pose guide: the item's 3:4 at its size on a 3x screen (84 × 112 dp), so a photo of
-         * any shape stays sharp; twenty of them take under 7 MB in memory.
-         */
-        const val THUMBNAIL_WIDTH = 252
-        const val THUMBNAIL_HEIGHT = 336
+        /** As the other phone receives the mask (`MaskGuideImageCodec`), so a loaded guide draws the subject's line. */
+        const val MAX_MASK_HEIGHT = 720
+        const val QUALITY = 90
 
         /** The UUIDs that `MlKitReferenceGuideMaker` gives, which also name the folders. */
         val ID = Regex("[A-Za-z0-9-]{1,64}")
 
         val json = Json { ignoreUnknownKeys = true }
 
-        fun fitHeight(bitmap: Bitmap, maxHeight: Int): Bitmap {
-            if (bitmap.height <= maxHeight) return bitmap
-            val width = maxOf(1, (bitmap.width.toFloat() * maxHeight / bitmap.height).roundToInt())
-            return bitmap.scale(width, maxHeight)
-        }
-
-        /** The middle of [source] cut to 3:4, at most [THUMBNAIL_WIDTH] × [THUMBNAIL_HEIGHT]. */
+        /**
+         * The middle of [source] cut to 3:4, at most [SavedGuideStore.THUMBNAIL_WIDTH] ×
+         * [SavedGuideStore.THUMBNAIL_HEIGHT].
+         */
         fun thumbnail(source: Bitmap): Bitmap {
             val (width, height) = if (source.width * 4 > source.height * 3) {
                 maxOf(1, source.height * 3 / 4) to source.height
@@ -263,7 +320,11 @@ class FileSavedGuideStore(
                 width,
                 height,
             )
-            return if (height <= THUMBNAIL_HEIGHT) cropped else cropped.scale(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
+            return if (height <= SavedGuideStore.THUMBNAIL_HEIGHT) {
+                cropped
+            } else {
+                cropped.scale(SavedGuideStore.THUMBNAIL_WIDTH, SavedGuideStore.THUMBNAIL_HEIGHT)
+            }
         }
 
         @Suppress("DEPRECATION")

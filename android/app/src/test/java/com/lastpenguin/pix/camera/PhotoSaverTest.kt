@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -6,6 +6,7 @@ import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -14,7 +15,8 @@ import org.junit.runner.RunWith
 
 /*
  * Where a photo goes (FR-1.5): a JPEG named `Pix_<date>_<time>_<uuid>.jpg` under Pictures/Pix in the shared
- * images collection, through the app's content resolver; two photos never share a name.
+ * images collection, through the app's content resolver; two photos never share a name; a front camera's photo is
+ * saved flipped left to right, as its preview shows it, and a rear camera's is not (FR-1.14).
  */
 @Suppress("RestrictedApi")
 @RunWith(AndroidJUnit4::class)
@@ -41,5 +43,11 @@ class PhotoSaverTest {
         val second = saver.outputOptions().contentValues!!.getAsString(MediaStore.Images.Media.DISPLAY_NAME)
 
         assertNotEquals(first, second)
+    }
+
+    @Test
+    fun aFrontCameraPhoto_isSavedMirrored_andARearCameraPhotoIsNot() {
+        assertTrue(saver.outputOptions(mirrored = true).metadata.isReversedHorizontal)
+        assertFalse(saver.outputOptions().metadata.isReversedHorizontal)
     }
 }

@@ -1,5 +1,7 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
 package com.lastpenguin.pix.account
+
+import com.lastpenguin.pix.session.SessionPlace
 
 // Accounts and friends (Design 2.3, R&S F5). Shared contract: change only with the Design Documentation.
 
@@ -81,6 +83,15 @@ enum class AccountError {
     NOT_FOUND,
     INVALID_REQUEST,
 
+    /** Only friends invite each other (Design 2.5.3). */
+    NOT_FRIENDS,
+
+    /** The friend is in another session (FR-6.9). */
+    BUSY,
+
+    /** The invitation was answered, cancelled, or expired (FR-6.4). */
+    INVITATION_GONE,
+
     /** The server could not reach Google or its database; try again later. */
     UNAVAILABLE,
 
@@ -91,6 +102,24 @@ enum class AccountError {
     OFFLINE,
     UNKNOWN,
 }
+
+/**
+ * An invitation this phone sent (Design 2.6.6): the friend, when it expires on the server's clock, the link for the share
+ * sheet (FR-6.1), and the photographer's place in the session it opened.
+ */
+data class SentInvitation(
+    val id: String,
+    val to: PixUser,
+    val expiresAt: Long,
+    val link: String,
+    val place: SessionPlace,
+)
+
+/** An invitation opened from a push or a link (FR-6.4): who invites, and whether it can still be answered. */
+data class OpenedInvitation(val id: String, val from: PixUser, val status: InvitationStatus, val expiresAt: Long)
+
+/** An invitation's state on the server (Design Figure 9b); EXPIRED once 60 s pass without an answer. */
+enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, CANCELLED, EXPIRED }
 
 /** A failed account call. [serverMessage] names the broken rule for PIX_ID_INVALID and PASSWORD_INVALID (FR-5.3, 5.11). */
 class AccountException(val error: AccountError, val serverMessage: String = "") : Exception("$error $serverMessage")

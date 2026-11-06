@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraController
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
@@ -21,6 +22,7 @@ import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.session.PhotoShare
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -66,6 +68,49 @@ class CameraViewModelTest {
         Dispatchers.resetMain()
     }
 
+    // Selfie mode (FR-1.14): the switch goes to the front camera and back; a phone without a front camera has no
+    // switch, and a photo being saved holds it.
+    @Test
+    fun switchCamera_goesToTheFrontCameraAndBack() = runTest {
+        runCurrent()
+        assertTrue(model.uiState.value.canSwitchCamera)
+
+        model.onSwitchCamera()
+        runCurrent()
+        assertEquals(CameraFacing.FRONT, model.uiState.value.facing)
+
+        model.onSwitchCamera()
+        runCurrent()
+        assertEquals(CameraFacing.BACK, model.uiState.value.facing)
+        assertEquals(listOf(CameraFacing.FRONT, CameraFacing.BACK), camera.facingRequests)
+    }
+
+    @Test
+    fun switchCamera_withoutAFrontCamera_doesNothing() = runTest {
+        camera.hasFrontCamera.value = false
+        runCurrent()
+        assertFalse(model.uiState.value.canSwitchCamera)
+
+        model.onSwitchCamera()
+        runCurrent()
+
+        assertTrue(camera.facingRequests.isEmpty())
+        assertEquals(CameraFacing.BACK, model.uiState.value.facing)
+    }
+
+    @Test
+    fun switchCamera_whileAPhotoIsSaved_doesNothing() = runTest {
+        runCurrent()
+        model.onShutter()
+        runCurrent()
+        assertTrue(model.uiState.value.isSaving)
+
+        model.onSwitchCamera()
+        runCurrent()
+
+        assertTrue(camera.facingRequests.isEmpty())
+    }
+
     @Test
     fun captureIsBlockedUntilCameraReady() = runTest {
         camera.status.value = CameraStatus.STARTING
@@ -98,6 +143,66 @@ class CameraViewModelTest {
         assertNull(model.uiState.value.captureNotice)
         camera.capture.complete(Result.failure(IOException("Storage still full")))
         runCurrent()
+    }
+
+    @Test
+    fun aSavedPhotoIsSharedWithTheMomentOfTheShutter() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share, clock = { 1_000 })
+        val photo = Uri.parse("content://media/external/images/media/1")
+
+        sharing.onShutter()
+        runCurrent()
+        // Asked at the shutter, not once it is saved: the session may have changed by then.
+        share.session = "another"
+        camera.capture.complete(Result.success(photo))
+        runCurrent()
+
+        assertEquals(listOf(Triple("s1", photo, 1_000L)), share.shared)
+    }
+
+    /** A session s1 until a test changes it. */
+    private class RecordingShare : PhotoShare {
+        var session: String? = "s1"
+        val shared = mutableListOf<Triple<String, Uri, Long>>()
+        val failed = mutableListOf<String>()
+
+        override fun shutter() = session
+
+        override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
+            shared += Triple(sessionId, uri, takenAt)
+        }
+
+        override fun notTaken(sessionId: String) {
+            failed += sessionId
+        }
+    }
+
+    @Test
+    fun aPhotoOutsideASessionIsNotShared() = runTest {
+        val share = RecordingShare().apply { session = null }
+        val sharing = CameraViewModel(camera, guides, photos = share)
+
+        sharing.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+
+        assertTrue(share.shared.isEmpty())
+    }
+
+    @Test
+    fun aPhotoThatFailedIsNotShared() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share)
+
+        sharing.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.failure(IOException("Storage full")))
+        runCurrent()
+
+        assertTrue(share.shared.isEmpty())
+        assertEquals(listOf("s1"), share.failed)
     }
 
     @Test
@@ -281,6 +386,7 @@ class CameraViewModelTest {
         override fun setFocusPoint(x: Float, y: Float) = Unit
         override fun setExposure(index: Int) = Unit
         override fun setFlash(mode: FlashMode) = Unit
+        override fun setTorch(on: Boolean) = Unit
         override fun setAspectRatio(ratio: AspectRatio) = Unit
         override suspend fun takePhoto(): Result<Uri> {
             captureCount++
@@ -289,6 +395,13 @@ class CameraViewModelTest {
         }
         override suspend fun grabFrame(): Result<Bitmap> = Result.failure(IllegalStateException("No frame"))
         override fun setFrameSink(sink: FrameSink?) = Unit
+        override val facing = MutableStateFlow(CameraFacing.BACK)
+        override val hasFrontCamera = MutableStateFlow(true)
+        val facingRequests = mutableListOf<CameraFacing>()
+        override fun setFacing(facing: CameraFacing) {
+            facingRequests += facing
+            this.facing.value = facing
+        }
     }
 
     @Test

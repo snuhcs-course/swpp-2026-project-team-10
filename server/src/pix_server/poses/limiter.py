@@ -1,15 +1,15 @@
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
-"""How many poses and suggestions the models are asked for (Design Documentation 2.8, Privacy): per client address,
-so one phone cannot use up the models, and over everyone, which bounds what a day can cost. Poses and suggestions
-are counted apart, in windows of the same lengths."""
+# AI-generated with Claude Code, 2026-10-26, reviewed by Jaewan Park and Dongje Park
+"""How many poses, suggestions, and tips the models are asked for (Design Documentation 2.8, Privacy): per client address,
+so one phone cannot use up the models, and over everyone, which bounds what a day can cost. Each kind is counted
+apart, in windows of the same lengths."""
 
 from typing import Literal
 
 from pix_server.config import Settings
 from pix_server.store import SessionStore, Window
 
-Kind = Literal["poses", "suggestions"]
-PREFIXES: dict[Kind, str] = {"poses": "rate:pose", "suggestions": "rate:suggest"}
+Kind = Literal["poses", "suggestions", "tips"]
+PREFIXES: dict[Kind, str] = {"poses": "rate:pose", "suggestions": "rate:suggest", "tips": "rate:tip"}
 
 
 class PoseLimiter:
@@ -23,10 +23,11 @@ class PoseLimiter:
     async def refuse(self, client: str, kind: Kind = "poses") -> Literal["client", "global"] | None:
         """Counts a request of `kind` for `client`; returns the window that refused it, or None."""
         settings = self._settings
-        if kind == "poses":
-            limit, global_limit = settings.pose_rate_limit, settings.pose_global_limit
-        else:
-            limit, global_limit = settings.suggestion_rate_limit, settings.suggestion_global_limit
+        limit, global_limit = {
+            "poses": (settings.pose_rate_limit, settings.pose_global_limit),
+            "suggestions": (settings.suggestion_rate_limit, settings.suggestion_global_limit),
+            "tips": (settings.tip_rate_limit, settings.tip_global_limit),
+        }[kind]
         prefix = PREFIXES[kind]
         per_client = Window(f"{prefix}:{client}", limit, settings.pose_rate_window_seconds)
         overall = Window(f"{prefix}:all", global_limit, settings.pose_global_window_seconds)

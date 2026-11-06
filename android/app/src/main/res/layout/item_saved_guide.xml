@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One saved guide on Add a pose guide (FR-3.8): its reference, and a ✕ that asks to delete it. -->
+<!-- One saved guide on Add a pose guide's My library (FR-3.11): its thumbnail and the icon of its kind. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="84dp"
@@ -10,7 +10,7 @@
         android:id="@+id/thumbnail"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/pix_ground"
+        android:background="@color/pix_surface_2"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"
@@ -20,15 +20,14 @@
         app:strokeColor="@color/pix_glass_stroke"
         app:strokeWidth="1dp" />
 
-    <ImageButton
-        android:id="@+id/deleteButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_gravity="top|end"
-        android:background="@drawable/bg_delete_badge"
-        android:contentDescription="@string/delete_saved_guide"
-        android:padding="10dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_close"
+    <ImageView
+        android:id="@+id/kindIcon"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="6dp"
+        android:background="@drawable/bg_kind_badge"
+        android:importantForAccessibility="no"
+        android:padding="5dp"
         app:tint="@color/pix_text" />
 </FrameLayout>

@@ -16,27 +16,81 @@
         <action
             android:id="@+id/action_camera_to_addGuide"
             app:destination="@id/addGuideSheet" />
-        <!-- Shoot together opens Friends, which also offers the room code (FR-8.1). -->
+        <!-- Shoot together asks who takes the photo first (FR-5.2, R&S 6.7). -->
         <action
-            android:id="@+id/action_camera_to_friends"
-            app:destination="@id/friendsFragment" />
+            android:id="@+id/action_camera_to_shootTogether"
+            app:destination="@id/shootTogetherSheet" />
         <!-- The scene photo is taken and confirmed on Camera (R&S 6.3); *Use this photo* starts Flow 2. -->
         <action
             android:id="@+id/action_camera_to_describePose"
             app:destination="@id/describePoseFragment" />
+        <action
+            android:id="@+id/action_camera_to_settings"
+            app:destination="@id/settingsFragment" />
     </fragment>
+
+    <!-- Settings, How to use Pix, and About Pix (FR-10.1, FR-10.4, R&S 6.10) -->
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.lastpenguin.pix.ui.settings.SettingsFragment"
+        android:label="Settings">
+        <action
+            android:id="@+id/action_settings_to_help"
+            app:destination="@id/helpFragment" />
+        <action
+            android:id="@+id/action_settings_to_about"
+            app:destination="@id/aboutFragment" />
+        <action
+            android:id="@+id/action_settings_to_account"
+            app:destination="@id/accountSheet" />
+        <!-- Signed out, Pix account opens Sign in, which comes back here (FR-10.5). -->
+        <action
+            android:id="@+id/action_settings_to_signIn"
+            app:destination="@id/signInFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/helpFragment"
+        android:name="com.lastpenguin.pix.ui.settings.HelpFragment"
+        android:label="How to use Pix" />
+
+    <fragment
+        android:id="@+id/aboutFragment"
+        android:name="com.lastpenguin.pix.ui.settings.AboutFragment"
+        android:label="About Pix" />
 
     <!-- Flow 1: Add a pose guide -->
     <dialog
         android:id="@+id/addGuideSheet"
         android:name="com.lastpenguin.pix.ui.guide.AddGuideSheet"
         android:label="Add a pose guide">
+        <!-- True from Subject view: the guide goes to the photographer, and the poses are not offered yet (FR-6.15). -->
+        <argument
+            android:name="fromSubject"
+            android:defaultValue="false"
+            app:argType="boolean" />
         <action
             android:id="@+id/action_addGuide_to_referenceConfirm"
             app:destination="@id/referenceConfirmFragment"
             app:popUpTo="@id/addGuideSheet"
             app:popUpToInclusive="true" />
+        <!-- All on My library (FR-3.11); back from the library returns to the camera or Subject view. -->
+        <action
+            android:id="@+id/action_addGuide_to_library"
+            app:destination="@id/libraryFragment"
+            app:popUpTo="@id/addGuideSheet"
+            app:popUpToInclusive="true" />
     </dialog>
+
+    <fragment
+        android:id="@+id/libraryFragment"
+        android:name="com.lastpenguin.pix.ui.guide.LibraryFragment"
+        android:label="Library">
+        <!-- Add photo; back from Reference confirm returns to the library. -->
+        <action
+            android:id="@+id/action_library_to_referenceConfirm"
+            app:destination="@id/referenceConfirmFragment" />
+    </fragment>
 
     <fragment
         android:id="@+id/referenceConfirmFragment"
@@ -122,11 +176,31 @@
             app:popUpToInclusive="true" />
     </fragment>
 
-    <!-- Flow 3: Friends, Add a friend, Sent requests; Sign in, Sign up, Pix ID setup, Account (R&S 6.4, 6.8) -->
+    <!-- Flow 6: Who takes the photo? (R&S 6.7). Each choice replaces the sheet, so Back from it is Camera. -->
+    <dialog
+        android:id="@+id/shootTogetherSheet"
+        android:name="com.lastpenguin.pix.ui.session.ShootTogetherSheet"
+        android:label="Who takes the photo?">
+        <action
+            android:id="@+id/action_shootTogether_to_friends"
+            app:destination="@id/friendsFragment"
+            app:popUpTo="@id/shootTogetherSheet"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_shootTogether_to_joinCode"
+            app:destination="@id/joinCodeFragment"
+            app:popUpTo="@id/shootTogetherSheet"
+            app:popUpToInclusive="true" />
+    </dialog>
+
+    <!-- Flow 3: Share my camera (friendsFragment), Add a friend, Sent requests; Sign in, Sign up, Pix ID setup,
+         Account (R&S 6.4, 6.8) -->
     <fragment
         android:id="@+id/friendsFragment"
         android:name="com.lastpenguin.pix.ui.account.FriendsFragment"
-        android:label="Friends">
+        android:label="Share my camera">
+        <!-- A friend request's notification (FR-5.7). -->
+        <deepLink app:uri="pix://friends" />
         <action
             android:id="@+id/action_friends_to_signIn"
             app:destination="@id/signInFragment" />
@@ -148,6 +222,11 @@
             android:id="@+id/action_friends_to_roomCode"
             app:destination="@id/roomCodeSheet"
             app:popUpTo="@id/cameraFragment" />
+        <!-- Invite sent floats over Camera too, so the camera is on when the friend accepts (R&S 6.5). -->
+        <action
+            android:id="@+id/action_friends_to_inviteSent"
+            app:destination="@id/inviteSentSheet"
+            app:popUpTo="@id/cameraFragment" />
     </fragment>
 
     <fragment
@@ -160,7 +239,8 @@
         android:name="com.lastpenguin.pix.ui.account.SentRequestsFragment"
         android:label="Sent requests" />
 
-    <!-- A signed-in screen returns to Friends by popping back to it. -->
+    <!-- Sign in, and Sign up or Pix ID setup after it, go back to the screen that opened Sign in: Share my camera,
+         Invitation, or Settings. -->
     <fragment
         android:id="@+id/signInFragment"
         android:name="com.lastpenguin.pix.ui.account.SignInFragment"
@@ -168,11 +248,12 @@
         <action
             android:id="@+id/action_signIn_to_signUp"
             app:destination="@id/signUpFragment" />
-        <!-- A new Google account chooses its Pix ID next; back from there is Friends (FR-5.13). -->
+        <!-- A new Google account chooses its Pix ID next, in Sign in's place (FR-5.13). -->
         <action
             android:id="@+id/action_signIn_to_pixIdSetup"
             app:destination="@id/pixIdSetupFragment"
-            app:popUpTo="@id/friendsFragment" />
+            app:popUpTo="@id/signInFragment"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment
@@ -194,19 +275,59 @@
     <dialog
         android:id="@+id/roomCodeSheet"
         android:name="com.lastpenguin.pix.ui.session.RoomCodeSheet"
-        android:label="Room code">
+        android:label="Room code" />
+
+    <!-- Flow 4: Invite sent and Invite not accepted (photographer) -->
+    <dialog
+        android:id="@+id/inviteSentSheet"
+        android:name="com.lastpenguin.pix.ui.session.InviteSentSheet"
+        android:label="Invite sent">
+        <!-- Cancel invite goes back to Share my camera (R&S 6.5). -->
         <action
-            android:id="@+id/action_roomCode_to_joinCode"
-            app:destination="@id/joinCodeFragment"
-            app:popUpTo="@id/roomCodeSheet"
-            app:popUpToInclusive="true" />
+            android:id="@+id/action_inviteSent_to_friends"
+            app:destination="@id/friendsFragment"
+            app:popUpTo="@id/cameraFragment" />
+        <action
+            android:id="@+id/action_inviteSent_to_inviteNotAccepted"
+            app:destination="@id/inviteNotAcceptedFragment"
+            app:popUpTo="@id/cameraFragment" />
     </dialog>
 
-    <!-- Flow 6: Join with code (subject) -->
+    <fragment
+        android:id="@+id/inviteNotAcceptedFragment"
+        android:name="com.lastpenguin.pix.ui.session.InviteNotAcceptedFragment"
+        android:label="Invite not accepted">
+        <action
+            android:id="@+id/action_inviteNotAccepted_to_inviteSent"
+            app:destination="@id/inviteSentSheet"
+            app:popUpTo="@id/cameraFragment" />
+    </fragment>
+
+    <!-- Flow 5: Invitation (subject), from the notification or the invite link (Design 2.6.6) -->
+    <fragment
+        android:id="@+id/invitationFragment"
+        android:name="com.lastpenguin.pix.ui.session.InvitationFragment"
+        android:label="Invitation">
+        <argument
+            android:name="invitationId"
+            app:argType="string" />
+        <deepLink app:uri="pix://invite/{invitationId}" />
+        <action
+            android:id="@+id/action_invitation_to_subject"
+            app:destination="@id/subjectFragment"
+            app:popUpTo="@id/invitationFragment"
+            app:popUpToInclusive="true" />
+        <!-- A signed-out phone signs in, then comes back here to answer. -->
+        <action
+            android:id="@+id/action_invitation_to_signIn"
+            app:destination="@id/signInFragment" />
+    </fragment>
+
+    <!-- Flow 6: See their camera (subject), where the code is entered -->
     <fragment
         android:id="@+id/joinCodeFragment"
         android:name="com.lastpenguin.pix.ui.session.JoinCodeFragment"
-        android:label="Join with code">
+        android:label="See their camera">
         <!-- True only from Session not found, which offers the kept code for editing (FR-8.3, #81). -->
         <argument
             android:name="keepCode"
@@ -246,11 +367,62 @@
         android:name="com.lastpenguin.pix.ui.session.SubjectFragment"
         android:label="Subject view">
         <action
+            android:id="@+id/action_subject_to_addGuide"
+            app:destination="@id/addGuideSheet">
+            <argument
+                android:name="fromSubject"
+                android:defaultValue="true"
+                app:argType="boolean" />
+        </action>
+        <action
+            android:id="@+id/action_subject_to_pickPose"
+            app:destination="@id/subjectPickPoseFragment" />
+        <action
+            android:id="@+id/action_subject_to_generating"
+            app:destination="@id/subjectGeneratingFragment" />
+        <action
+            android:id="@+id/action_subject_to_confirm"
+            app:destination="@id/subjectConfirmFragment" />
+        <action
+            android:id="@+id/action_subject_to_describe"
+            app:destination="@id/subjectDescribeFragment" />
+        <action
             android:id="@+id/action_subject_to_connectionLost"
             app:destination="@id/connectionLostFragment"
             app:popUpTo="@id/subjectFragment"
             app:popUpToInclusive="true" />
     </fragment>
+
+    <!-- The photographer's Generate poses on the subject's phone, where both write the description (FR-6.15). -->
+    <fragment
+        android:id="@+id/subjectDescribeFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectDescribeFragment"
+        android:label="Generate poses" />
+
+    <!-- The photographer's set as it is created, on the subject's phone (FR-6.15, Iter3-A13); its Pick a pose takes its
+         place, and back is Subject view. -->
+    <fragment
+        android:id="@+id/subjectGeneratingFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectGeneratingFragment"
+        android:label="Generating poses">
+        <action
+            android:id="@+id/action_subjectGenerating_to_pickPose"
+            app:destination="@id/subjectPickPoseFragment"
+            app:popUpTo="@id/subjectGeneratingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- The photographer's candidates on the subject's phone (FR-6.15); back is Subject view. -->
+    <fragment
+        android:id="@+id/subjectPickPoseFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectPickPoseFragment"
+        android:label="Pick a pose" />
+
+    <!-- The outline on the photographer's Reference confirm, on the subject's phone (FR-6.15); back is Subject view. -->
+    <fragment
+        android:id="@+id/subjectConfirmFragment"
+        android:name="com.lastpenguin.pix.ui.session.SubjectConfirmFragment"
+        android:label="Your reference" />
 
     <fragment
         android:id="@+id/connectionLostFragment"

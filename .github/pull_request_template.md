@@ -33,6 +33,7 @@ Branch: <type>/<issue#>-<name> from dev, and this PR targets dev.
 - [ ] The app builds (`./gradlew assembleDebug` in `android/`), or the server starts locally
 - [ ] The shared contracts in `android/` are unchanged, or the affected owners review this PR and the Design Documentation is updated
 - [ ] The "Done when" items of the issue are met
+- [ ] A changed screen is also changed in its wireframe (`wiki/design/wireframes/`), and its image in `wiki/images/` is rendered again (`wiki/design/render.py`)
 - [ ] Every source file AI wrote or changed starts with the `AI-generated with <tool>, <date>, reviewed by <name>` marker, dated and named for this PR
 
 <!-- Use "Part of #n" instead if the issue stays open after this PR. -->

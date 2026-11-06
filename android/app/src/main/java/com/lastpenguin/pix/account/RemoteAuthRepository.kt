@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.GoogleTokenBody
@@ -66,6 +66,8 @@ class RemoteAuthRepository(
     override suspend fun setDisplayName(displayName: String) = accountCall {
         tokens.update(accountApi.updateMe(UpdateMeBody(displayName = displayName.trim())))
     }
+
+    override suspend fun refreshAccount() = accountCall { tokens.reload { accountApi.me() } }
 
     override suspend fun freshAccessToken(): String? = tokens.freshAccessToken()
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-04, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -38,6 +38,10 @@ import org.junit.Test
  * kept), a guide whose values cannot place it (FAILED, no crash), a second tap while the first is opening (one load),
  * the sheet closing before it arrives (the camera's guide kept). A result that comes while no sheet collects waits.
  * onDeleteSaved: a saved guide (gone from the list) that is also on the camera (it stays there).
+ * library (FR-3.11): both kinds saved (every guide by default, each filter's count), a filter (only its kind, newest
+ * first, the counts unchanged), a guide saved meanwhile (listed), Add a pose guide opened again (back to every guide).
+ * thumbnail: one shown twice (read from the store once), one the store cannot read (null, read again next time), a
+ * deleted guide's (not kept).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SavedGuidesViewModelTest {
@@ -216,12 +220,115 @@ class SavedGuidesViewModelTest {
         assertNull(guides.guide.value)
     }
 
+    @Test
+    fun library_bothKindsSaved_listsEveryGuideAndCountsEachKind() = runTest(dispatcher) {
+        saved.save(fakeGuide("photo"), GuideState())
+        saved.save(generated("pose"), GuideState())
+
+        val page = model().library.value
+
+        assertEquals(LibraryFilter.ALL, page.filter)
+        assertEquals(listOf("pose", "photo"), page.guides.map { it.id })
+        assertEquals(2, page.count(LibraryFilter.ALL))
+        assertEquals(1, page.count(LibraryFilter.PHOTOS))
+        assertEquals(1, page.count(LibraryFilter.GENERATED))
+    }
+
+    @Test
+    fun onLibraryFilter_photos_listsOnlyPhotosNewestFirstAndKeepsTheCounts() = runTest(dispatcher) {
+        saved.save(fakeGuide("photo-1"), GuideState())
+        saved.save(generated("pose"), GuideState())
+        saved.save(fakeGuide("photo-2"), GuideState())
+        val model = model()
+
+        model.onLibraryFilter(LibraryFilter.PHOTOS)
+        runCurrent()
+
+        assertEquals(listOf("photo-2", "photo-1"), model.library.value.guides.map { it.id })
+        assertEquals(3, model.library.value.count(LibraryFilter.ALL))
+    }
+
+    @Test
+    fun library_guideSavedMeanwhile_isListed() = runTest(dispatcher) {
+        val model = model()
+        model.onLibraryFilter(LibraryFilter.GENERATED)
+        runCurrent()
+
+        saved.save(generated("pose"), GuideState())
+        runCurrent()
+
+        assertEquals(listOf("pose"), model.library.value.guides.map { it.id })
+    }
+
+    @Test
+    fun openFor_addAPoseGuideOpenedAgain_showsEveryGuide() = runTest(dispatcher) {
+        val model = model()
+        model.onLibraryFilter(LibraryFilter.GENERATED)
+        runCurrent()
+
+        model.openFor(fromSubject = false)
+        runCurrent()
+
+        assertEquals(LibraryFilter.ALL, model.library.value.filter)
+    }
+
+    @Test
+    fun thumbnail_shownTwice_isReadFromTheStoreOnce() = runTest(dispatcher) {
+        saved.save(fakeGuide("g1"), GuideState())
+        val counting = CountingThumbnails(saved)
+        val model = model(counting)
+
+        val first = model.thumbnail("g1")
+        val second = model.thumbnail("g1")
+
+        assertEquals(1, counting.reads)
+        assertEquals(first, second)
+    }
+
+    @Test
+    fun thumbnail_theStoreCannotRead_isNullAndReadAgainNextTime() = runTest(dispatcher) {
+        val counting = CountingThumbnails(saved)
+        val model = model(counting)
+
+        assertNull(model.thumbnail("missing"))
+        assertNull(model.thumbnail("missing"))
+
+        assertEquals(2, counting.reads)
+    }
+
+    @Test
+    fun thumbnail_ofADeletedGuide_isNotKept() = runTest(dispatcher) {
+        saved.save(fakeGuide("g1"), GuideState())
+        val model = model()
+        model.thumbnail("g1")
+
+        model.onDeleteSaved("g1")
+        runCurrent()
+
+        assertNull(model.thumbnail("g1"))
+    }
+
+    private fun generated(id: String) = ReferenceGuide(id, fakeBitmap(), fakeBitmap(), 0.5f, GuideSource.GENERATED)
+
     /** Saved guides never go through the maker. */
     private object UnusedMaker : ReferenceGuideMaker {
-        override suspend fun make(source: Uri): Result<ReferenceGuide> = Result.failure(IOException("unused"))
+        override suspend fun make(
+            source: Uri,
+            wholeImage: Boolean,
+        ): Result<ReferenceGuide> = Result.failure(IOException("unused"))
 
         override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> =
             Result.failure(IOException("unused"))
+    }
+
+    /** A store that counts how often a thumbnail is read from it. */
+    private class CountingThumbnails(private val inner: SavedGuideStore) : SavedGuideStore by inner {
+        var reads = 0
+
+        override suspend fun thumbnail(id: String): Bitmap? {
+            reads++
+            return inner.thumbnail(id)
+        }
     }
 
     /** A store whose loads wait for [release], so a second tap arrives while the first is opening. */

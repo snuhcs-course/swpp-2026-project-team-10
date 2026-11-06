@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -11,11 +11,15 @@ internal const val MAX_REFERENCE_LONG_SIDE = 1280
 /** The reference kept for the Camera screen's thumbnail, enlarged to at most half a phone's width (FR-3.9). */
 internal const val REFERENCE_THUMBNAIL_LONG_SIDE = 512
 
+/** A screenshot cut to its photo is kept this small with the guide, for Reference confirm's cut (FR-2.10). */
+internal const val CROP_ORIGINAL_LONG_SIDE = 1024
+
 /**
- * The outline's stroke where the guide first appears: about 8 px on screen, 3 dp on a typical phone (Design 2.6.1,
- * step 5). Much lower values round to a 1 px stroke on the 720 px cutout the subject receives.
+ * The outline's stroke where the guide first appears: about 5.3 px on screen, 2 dp on a typical phone (Design 2.6.1,
+ * step 5), thin enough not to compete with the photo. Much lower values round to a 1 px stroke on the 720 px mask the
+ * subject receives.
  */
-private const val STROKE_ON_SCREEN_PX = 8f
+private const val STROKE_ON_SCREEN_PX = 16f / 3f
 
 /** A new guide is [GuideState.DEFAULT_HEIGHT] of the frame; a 1080 px wide phone's 3:4 frame is 1440 px tall. */
 private const val GUIDE_ON_SCREEN_PX = GuideState.DEFAULT_HEIGHT * 1440f
@@ -67,7 +71,7 @@ internal fun cropWithMargin(bounds: PixelRect, width: Int, height: Int, fraction
     )
 }
 
-/** This rectangle as fractions of a [width]×[height] image: where the cutout lies in the reference (FR-3.1). */
+/** This rectangle as fractions of a [width]×[height] image: where the mask lies in the reference (FR-3.1). */
 internal fun PixelRect.relativeTo(width: Int, height: Int): NormalizedRect = NormalizedRect(
     left = left.toFloat() / width,
     top = top.toFloat() / height,
@@ -76,7 +80,23 @@ internal fun PixelRect.relativeTo(width: Int, height: Int): NormalizedRect = Nor
 )
 
 /**
- * The outline stroke in cutout pixels, scaled so it is about [STROKE_ON_SCREEN_PX] when the guide first appears
- * (Design 2.6.1, step 5): a small cutout is enlarged more on screen, so it gets a thinner stroke.
+ * The outline stroke in mask pixels, scaled so it is about [STROKE_ON_SCREEN_PX] when the guide first appears
+ * (Design 2.6.1, step 5): a small mask is enlarged more on screen, so it gets a thinner stroke.
  */
-internal fun outlineStrokePx(cutoutHeight: Int): Float = STROKE_ON_SCREEN_PX * cutoutHeight / GUIDE_ON_SCREEN_PX
+internal fun outlineStrokePx(maskHeight: Int): Float = STROKE_ON_SCREEN_PX * maskHeight / GUIDE_ON_SCREEN_PX
+
+/** The mask's values, from the alpha of any bitmap: an ALPHA_8 mask, or the WebP cutout of an older saved guide. */
+internal fun Bitmap.maskPixels(): MaskPixels {
+    val pixels = IntArray(width * height)
+    getPixels(pixels, 0, width, 0, 0, width, height)
+    for (k in pixels.indices) pixels[k] = pixels[k] ushr 24
+    return MaskPixels(width, height, pixels)
+}
+
+/** The mask as the ALPHA_8 bitmap that [ReferenceGuide.mask] holds. */
+internal fun MaskPixels.toMaskBitmap(): Bitmap {
+    val colors = IntArray(alpha.size) { alpha[it] shl 24 }
+    return Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8).apply {
+        setPixels(colors, 0, width, 0, 0, width, height)
+    }
+}

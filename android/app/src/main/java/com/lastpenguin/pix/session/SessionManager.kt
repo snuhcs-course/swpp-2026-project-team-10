@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-10-31, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -24,10 +24,29 @@ interface SessionManager {
     /** Subject: the applied camera values from the last `camera.state`, for the same reason; null until one arrives. */
     val peerCamera: StateFlow<CameraState?>
 
+    /**
+     * The candidate pair the video goes over, read from the link's statistics every 2 s while connected: direct or
+     * through the relay, and over which network (Design 2.6.7). null until the first reading and after the link ends.
+     */
+    val path: StateFlow<IcePath?>
+
+    /**
+     * The link's delay in milliseconds, half the round trip of the `ping` both phones send every 2 s, averaged over the
+     * last three, for the latency indicator (FR-10.3). null until the first answer, while reconnecting, and after the end.
+     */
+    val latencyMs: StateFlow<Int?>
+
     suspend fun start(entry: SessionEntry, role: Role)
 
     /** Sent on the realtime or reliable data channel as listed in Design 2.5.1. */
     fun send(message: SessionMessage)
+
+    /**
+     * Sends one chunk of something large on the reliable channel, behind every other reliable message: it waits until
+     * none is queued and the channel's buffer is low, and through a reconnect (Design 2.8, Backpressure). False once
+     * the session is over, when nothing was sent.
+     */
+    suspend fun sendBulk(message: SessionMessage): Boolean
 
     /** Photographer: pass to CameraController.setFrameSink while connected. */
     fun videoSink(): FrameSink

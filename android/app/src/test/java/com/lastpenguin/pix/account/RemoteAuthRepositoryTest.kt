@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.GoogleTokenBody
@@ -21,8 +21,9 @@ import org.junit.Test
  * PASSWORD_INVALID with the rule. Check: free, taken (sent as typed, without signing in), PIX_ID_INVALID with the
  * rule, no answer (OFFLINE). Log-in: accepted with capitals and spaces around the Pix ID, INVALID_CREDENTIALS.
  * Google: a registered account, NOT_REGISTERED (404, no sign-in), a new account without a Pix ID. Account changes:
- * addGoogle GOOGLE_IN_USE, setPixId (the account changes, the tokens stay), the display name trimmed. Any call without
- * an answer: OFFLINE. Sign-out: answered, and without an answer (the phone signs out either way).
+ * addGoogle GOOGLE_IN_USE, setPixId (the account changes, the tokens stay), the display name trimmed. The account read
+ * again: answered (a Pix ID chosen on another phone shows), no answer (OFFLINE, the account kept). Any call without an
+ * answer: OFFLINE. Sign-out: answered, and without an answer (the phone signs out either way).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteAuthRepositoryTest {
@@ -175,6 +176,29 @@ class RemoteAuthRepositoryTest {
         repository.setDisplayName("  Test User  ").getOrThrow()
 
         assertEquals(UpdateMeBody(displayName = "Test User"), accountApi.bodies.single())
+    }
+
+    @Test
+    fun refreshAccount_answered_showsThePixIdChosenOnAnotherPhone() = runTest {
+        val repository = repository()
+        repository.signUpWithGoogle("id-token")
+        accountApi.me = accountDto(pixId = "test2", hasPassword = false, hasGoogle = true)
+
+        repository.refreshAccount().getOrThrow()
+
+        assertEquals(listOf("me"), accountApi.calls)
+        assertEquals("test2", (repository.state.value as AuthState.SignedIn).account.pixId)
+    }
+
+    @Test
+    fun refreshAccount_withoutAnAnswer_isOfflineAndKeepsTheAccount() = runTest {
+        val repository = repository()
+        repository.signUpWithGoogle("id-token")
+        accountApi.me = accountDto(pixId = "test2", hasPassword = false, hasGoogle = true)
+        accountApi.failure = IOException("offline")
+
+        assertEquals(AccountError.OFFLINE, repository.refreshAccount().error())
+        assertNull((repository.state.value as AuthState.SignedIn).account.pixId)
     }
 
     @Test

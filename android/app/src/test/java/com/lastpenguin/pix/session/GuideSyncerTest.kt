@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideSource
@@ -57,7 +57,7 @@ class GuideSyncerTest {
 
     private fun connected(haveGuideId: String? = null, haveReferenceId: String? = null) {
         session.setState(
-            SessionState.Connected("s_1", PeerInfo("Junhyeong", haveGuideId, haveReferenceId), Role.PHOTOGRAPHER),
+            SessionState.Connected("s_1", PeerInfo("Joonhyung", haveGuideId, haveReferenceId), Role.PHOTOGRAPHER),
         )
     }
 

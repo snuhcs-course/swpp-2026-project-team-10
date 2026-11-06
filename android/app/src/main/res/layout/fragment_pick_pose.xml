@@ -62,7 +62,7 @@
         android:gravity="center"
         android:textAppearance="@style/TextAppearance.Pix.Body.Small"
         android:visibility="gone"
-        tools:text="Junhyeong sees these poses too. The first to choose decides."
+        tools:text="Joonhyung sees these poses too. The first to choose decides."
         tools:visibility="visible" />
 
     <Button

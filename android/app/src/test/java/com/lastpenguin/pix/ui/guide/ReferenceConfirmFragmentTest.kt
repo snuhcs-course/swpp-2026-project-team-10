@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -76,7 +76,7 @@ class ReferenceConfirmFragmentTest {
 
     /** This phone as the photographer of a connected session: the screen's SessionViewModel starts the senders. */
     private fun inASession(modules: TestAppContainer) {
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
     }
 
@@ -93,7 +93,7 @@ class ReferenceConfirmFragmentTest {
         val modules = launch()
         inASession(modules)
         pickCandidate()
-        assertEquals(string(R.string.shared_hint, "Junhyeong"), onScreen { it.sharedHint.text.toString() })
+        assertEquals(string(R.string.shared_hint, "Joonhyung"), onScreen { it.sharedHint.text.toString() })
         assertTrue(onScreen { it.sharedHint.isShown })
 
         val made = guide()
@@ -146,7 +146,7 @@ class ReferenceConfirmFragmentTest {
 
         assertSame(made, modules.guides.guide.value)
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_used_guide, "Junhyeong"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_used_guide, "Joonhyung"), ShadowToast.getTextOfLatestToast())
         assertEquals(
             SessionMessage.GuideConfirm(confirmId, ConfirmStep.USED, made.id, Role.SUBJECT),
             confirmSteps(modules).last(),
@@ -193,11 +193,11 @@ class ReferenceConfirmFragmentTest {
     fun theSubjectsPick_saysWhoseItIs_andAPhotoAfterItDoesNot() {
         launch()
         scenario!!.onFragment {
-            it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap(), chosenBy = "Junhyeong")
+            it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap(), chosenBy = "Joonhyung")
         }
         idle()
         assertTrue(onScreen { it.chosenByText.isShown })
-        assertEquals(string(R.string.peer_chose_this_pose, "Junhyeong"), onScreen { it.chosenByText.text.toString() })
+        assertEquals(string(R.string.peer_chose_this_pose, "Joonhyung"), onScreen { it.chosenByText.text.toString() })
 
         pickPhoto()
 

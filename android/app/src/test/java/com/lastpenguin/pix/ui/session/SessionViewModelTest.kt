@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -159,14 +159,14 @@ class SessionViewModelTest {
     fun aPhotoNotSentDuringTheSession_waitsForTheCameraScreen() = runTest(dispatcher) {
         val (photoModel, photos) = withPhotos(album = noAlbum)
         photoModel.startRoom()
-        session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         runCurrent()
 
         photos.shoot(photoUri, takenAt = 1)
         runCurrent()
 
         // Nothing has read it yet: it waits, as it does while the Camera screen is not in front.
-        assertEquals(PhotosNotSent("Junhyeong", 1), photoModel.photosNotSent.first())
+        assertEquals(PhotosNotSent("Joonhyung", 1), photoModel.photosNotSent.first())
     }
 
     /** What the Camera screen would read, from now on. */
@@ -183,7 +183,7 @@ class SessionViewModelTest {
         val (photoModel, photos) = withPhotos(reader, noAlbum)
         val notSent = notSent(photoModel)
         photoModel.startRoom()
-        session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         runCurrent()
         photos.shoot(photoUri, takenAt = 1)
         photos.shoot(photoUri, takenAt = 2)
@@ -197,7 +197,7 @@ class SessionViewModelTest {
 
         advanceTimeBy(1)
         runCurrent()
-        assertEquals(listOf(PhotosNotSent("Junhyeong", 2)), notSent)
+        assertEquals(listOf(PhotosNotSent("Joonhyung", 2)), notSent)
     }
 
     @Test
@@ -207,7 +207,7 @@ class SessionViewModelTest {
         val (photoModel, photos) = withPhotos(reader, noAlbum)
         val notSent = notSent(photoModel)
         photoModel.startRoom()
-        session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         runCurrent()
         photos.shoot(photoUri, takenAt = 1)
         runCurrent()
@@ -219,7 +219,7 @@ class SessionViewModelTest {
         advanceTimeBy(CameraViewModel.NOTICE_MS)
         runCurrent()
 
-        assertEquals(listOf(PhotosNotSent("Junhyeong", 1)), notSent)
+        assertEquals(listOf(PhotosNotSent("Joonhyung", 1)), notSent)
     }
 
     @Test
@@ -229,7 +229,7 @@ class SessionViewModelTest {
         val (photoModel, photos) = withPhotos(reader, noAlbum)
         val notSent = notSent(photoModel)
         photoModel.startRoom()
-        session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         runCurrent()
         photos.shoot(photoUri, takenAt = 1)
         runCurrent()
@@ -319,7 +319,7 @@ class SessionViewModelTest {
     fun guideFromTheSubject_isNoticedWithTheirName() = runTest(dispatcher) {
         val notices = mutableListOf<SessionNotice>()
         backgroundScope.launch { model.notices.collect { notices += it } }
-        session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         runCurrent()
 
         val image = codec.encode(fakeGuide("s1"))
@@ -328,7 +328,7 @@ class SessionViewModelTest {
         session.deliver(image.end())
         runCurrent()
 
-        assertEquals(listOf(SessionNotice.RemoteGuide("Junhyeong")), notices)
+        assertEquals(listOf(SessionNotice.RemoteGuide("Joonhyung")), notices)
     }
 
     @Test
@@ -434,7 +434,7 @@ class SessionViewModelTest {
     @Test
     fun reconnecting_keepsTheFrames_andSendsTheCapabilitiesAgainWhenConnected() = runTest(dispatcher) {
         model.startRoom()
-        val live = SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER)
+        val live = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
         session.setState(live)
         runCurrent()
         assertEquals(session.frameSink, camera.sink)
@@ -466,7 +466,7 @@ class SessionViewModelTest {
         // To the background while reconnecting; the link is back 30 s later, and the deadline stays.
         process.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         advanceTimeBy(30_000)
-        session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         advanceTimeBy(29_999)
         runCurrent()
         assertTrue(session.leaves.isEmpty())

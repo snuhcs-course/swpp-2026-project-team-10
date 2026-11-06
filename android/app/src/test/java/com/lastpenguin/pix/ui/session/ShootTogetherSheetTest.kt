@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.view.View
@@ -113,7 +113,7 @@ class ShootTogetherSheetTest {
 
         scenario!!.close()
         val connected = launch()
-        connected.session.setState(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        connected.session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
         tap(R.id.subjectButton)
         assertTrue(connected.session.leaves.isEmpty())

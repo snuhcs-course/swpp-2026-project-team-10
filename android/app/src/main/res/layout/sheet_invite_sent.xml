@@ -24,7 +24,7 @@
         android:textAppearance="@style/TextAppearance.Pix.Title"
         tools:text="J" />
 
-    <!-- "Waiting for Junhyeong", "Sending the invitation…", or "Junhyeong accepted · connecting…". -->
+    <!-- "Waiting for Joonhyung", "Sending the invitation…", or "Joonhyung accepted · connecting…". -->
     <TextView
         android:id="@+id/statusText"
         android:layout_width="wrap_content"
@@ -34,7 +34,7 @@
         android:accessibilityLiveRegion="polite"
         android:gravity="center"
         android:textAppearance="@style/TextAppearance.Pix.Title"
-        tools:text="Waiting for Junhyeong" />
+        tools:text="Waiting for Joonhyung" />
 
     <TextView
         android:id="@+id/bodyText"
@@ -44,7 +44,7 @@
         android:gravity="center"
         android:lineSpacingMultiplier="1.2"
         android:textAppearance="@style/TextAppearance.Pix.Body"
-        tools:text="Junhyeong gets a notification. The live view starts when they accept." />
+        tools:text="Joonhyung gets a notification. The live view starts when they accept." />
 
     <!-- The link, for a friend whose notification does not arrive (AD-13). -->
     <TextView

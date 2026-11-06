@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -104,9 +104,9 @@ class RtcSessionManagerTest {
         val peer = peers.created.last()
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         peer.open()
-        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
         runCurrent()
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER), manager.state.value)
         return manager to peer
     }
 
@@ -268,9 +268,9 @@ class RtcSessionManagerTest {
         assertEquals(Role.PHOTOGRAPHER, hello.role)
         assertEquals(SessionState.Connecting("s_1"), manager.state.value)
 
-        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
         runCurrent()
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER), manager.state.value)
 
         peer.stats = LinkStats("video/H264", 720, 960, 29.8, 2100.0, 12.0)
         advanceTimeBy(2_100)
@@ -373,12 +373,12 @@ class RtcSessionManagerTest {
         val photographerHello = photographerPeer.sentMessages().first() as SessionMessage.Hello
         assertEquals(null, photographerHello.haveGuideId)
         assertEquals(null, photographerHello.haveReferenceId)
-        photographerPeer.deliver(hello(Role.SUBJECT, "Junhyeong", haveGuideId = "g1", haveReferenceId = "g1"))
+        photographerPeer.deliver(hello(Role.SUBJECT, "Joonhyung", haveGuideId = "g1", haveReferenceId = "g1"))
         runCurrent()
         assertEquals(
             SessionState.Connected(
                 "s_2",
-                PeerInfo("Junhyeong", haveGuideId = "g1", haveReferenceId = "g1"),
+                PeerInfo("Joonhyung", haveGuideId = "g1", haveReferenceId = "g1"),
                 Role.PHOTOGRAPHER,
             ),
             photographer.state.value,
@@ -733,7 +733,7 @@ class RtcSessionManagerTest {
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         runCurrent()
         assertEquals("v=0 restart answer", peer.remote.last().sdp)
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER), manager.state.value)
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER), manager.state.value)
         // The same connection: its channels and video track stayed.
         assertEquals(1, peers.created.size)
         assertFalse(peer.closed)
@@ -846,7 +846,7 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
         assertTrue(peer.closed)
-        // "Junhyeong disconnected" comes only now.
+        // "Joonhyung disconnected" comes only now.
         assertEquals(SessionMessage.Leave(EndReason.CONNECTION_LOST), incoming.last())
     }
 
@@ -1145,7 +1145,7 @@ class RtcSessionManagerTest {
     private fun photographerPlace() = SessionPlace("s_1", "photographer-token", relay)
 
     /** The friend on the other phone of an invitation's session, as the account knows them (FR-4.11). */
-    private val friend = SessionPartner("u_2", "Junhyeong")
+    private val friend = SessionPartner("u_2", "Joonhyung")
 
     /** Photographer: an invitation was sent and this phone took the place it opened; the friend has not come yet. */
     private suspend fun TestScope.invitingPhotographer(): RtcSessionManager {
@@ -1184,11 +1184,11 @@ class RtcSessionManagerTest {
         assertEquals(listOf("offer"), sentSignals())
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         peer.open()
-        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
         runCurrent()
         // The invitation's friend is the session's, where a room code's session has none (FR-4.11).
         assertEquals(
-            SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER, friend),
+            SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER, friend),
             manager.state.value,
         )
         // The friend stays through a dropped link, for a set started meanwhile (FR-4.11).
@@ -1278,12 +1278,12 @@ class RtcSessionManagerTest {
         val peer = peers.created.single()
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         peer.open()
-        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
         runCurrent()
         advanceTimeBy(81_000)
         runCurrent()
         assertEquals(
-            SessionState.Connected("s_1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER, friend),
+            SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER, friend),
             manager.state.value,
         )
         assertFalse(SignalMessage.Leave in signaling.sent)
@@ -1298,7 +1298,7 @@ class RtcSessionManagerTest {
         val peer = peers.created.single()
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         peer.open()
-        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
         runCurrent()
         signaling.receive(SignalMessage.PeerLeft(EndReason.PEER_LEFT))
         runCurrent()
@@ -1315,7 +1315,7 @@ class RtcSessionManagerTest {
         val peer = peers.created.single()
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         peer.open()
-        peer.deliver(hello(Role.SUBJECT, "Junhyeong"))
+        peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
         runCurrent()
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()

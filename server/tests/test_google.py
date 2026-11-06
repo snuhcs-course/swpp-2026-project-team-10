@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 """The real Google ID token check, against keys served by a fake of Google's certificate endpoint. The tokens are
 signed here with a key made for the test, in the form Google uses.
 
@@ -96,7 +96,7 @@ def token(keys, key="published", **overrides) -> str:
         "iss": "https://accounts.google.com",
         "aud": CLIENT_ID,
         "sub": "110169484474386276334",
-        "name": "Junhyeong Han",
+        "name": "Joonhyung Han",
         "iat": now,
         "exp": now + 3600,
     }
@@ -107,7 +107,7 @@ def token(keys, key="published", **overrides) -> str:
 
 async def test_valid_token_gives_the_subject_and_the_name(make_verifier, keys):
     account = await make_verifier().verify(token(keys))
-    assert (account.subject, account.name) == ("110169484474386276334", "Junhyeong Han")
+    assert (account.subject, account.name) == ("110169484474386276334", "Joonhyung Han")
 
 
 async def test_issuer_without_the_scheme_is_also_google(make_verifier, keys):

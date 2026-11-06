@@ -153,7 +153,7 @@
                 tools:text="0/100" />
         </LinearLayout>
 
-        <!-- In a session: "Junhyeong is typing…" while the other phone's field holds the description (FR-6.15). -->
+        <!-- In a session: "Joonhyung is typing…" while the other phone's field holds the description (FR-6.15). -->
         <TextView
             android:id="@+id/descriptionTyping"
             android:layout_width="match_parent"
@@ -163,7 +163,7 @@
             android:textAppearance="@style/TextAppearance.Pix.Body.Small"
             android:textColor="@color/pix_accent"
             android:visibility="gone"
-            tools:text="Junhyeong is typing…"
+            tools:text="Joonhyung is typing…"
             tools:visibility="visible" />
 
         <!-- The descriptions used before (FR-4.11), hidden while there are none: the header with, in a session with a
@@ -217,7 +217,7 @@
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:maxWidth="160dp"
-                        tools:text="With Junhyeong" />
+                        tools:text="With Joonhyung" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -238,7 +238,7 @@
                 android:layout_marginTop="8dp"
                 android:textAppearance="@style/TextAppearance.Pix.Body.Small"
                 android:visibility="gone"
-                tools:text="Nothing used with Junhyeong yet"
+                tools:text="Nothing used with Joonhyung yet"
                 tools:visibility="visible" />
         </LinearLayout>
 
@@ -257,7 +257,7 @@
             android:gravity="center"
             android:textAppearance="@style/TextAppearance.Pix.Body.Small"
             android:visibility="gone"
-            tools:text="Junhyeong sees this too and can write it with you."
+            tools:text="Joonhyung sees this too and can write it with you."
             tools:visibility="visible" />
 
         <!-- The one button (Iter3-A13): with an empty field it asks for suggested poses, and says so; with a

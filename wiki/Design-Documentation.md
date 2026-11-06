@@ -76,10 +76,7 @@
 | 2.44 | 2026-11-05 | The guide and pose flow: one *Generate poses* button, *Generating poses* on the subject's phone too, and fades for guides, outlines, and candidates (2.2, 2.5.1, 2.6.1–2.6.3, 2.6.5; Iter3-A13, [#180]). |
 | 2.45 | 2026-11-05 | Who takes the photo, before connecting: *Shoot together* asks first, received invitations are listed, and sign-in returns to the screen that opened it (2.1, 2.5.3, 2.6.6, 2.6.8, 2.8, Figure 8b; Iter3-A17, [#188]). |
 | 2.46 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar, the horizon bar, thinner lines, and *Save guide* as a toggle (2.5.1, 2.6.1–2.6.3, 2.6.5, 2.6.8, 2.8; Iter3-A15, [#182]). |
-| 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code; QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*); Figure 1 redrawn; pushes only to signed-in phones (all sections). |
-| 2.48 | 2026-11-06 | Section 1.4 removed: the status of each task is in 2.9, and the later iterations' scope in R&S 4.1. The QR connection's plan moves to *Still open* (1.4, 2.9). |
-| 2.49 | 2026-11-06 | The AWS server stays on: the course servers stay the main hosting, and the AWS server serves other networks (1.1.1, AD-11, 2.8). |
-| 2.50 | 2026-11-06 | The Android README no longer lists every module class, so 2.1 no longer points to it for them (2.1). |
+| 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code. QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*). Figure 1 redrawn; pushes only to signed-in phones. Section 1.4 removed: the task status is in 2.9, the later scope in R&S 4.1, and the QR plan in *Still open*. The AWS server stays on beside the course servers, for other networks (all sections). |
 
 </details>
 
@@ -204,7 +201,7 @@ sequenceDiagram
   S->>P: camera.zoom.set (ratio 2.0, final)
   P->>C: setZoomRatio(2.0)
   P-->>S: camera.state (zoom 2.0, by SUBJECT, final)
-  Note over P: shows "Junhyeong set zoom to 2×"
+  Note over P: shows "Joonhyung set zoom to 2×"
   Note over S: snaps to the applied zoom
 ```
 
@@ -2288,7 +2285,7 @@ Outside `/api/v1`:
 // POST /auth/google → 200 as for POST /auth/login, with "hasGoogle": true · 404 NOT_REGISTERED: no account uses it yet
 // POST /auth/google/signup → 201: a new account named after the Google account, without a Pix ID yet
 { "accessToken": "eyJhbGciOiJIUzI1NiIs...", "refreshToken": "Pz71bQd0Lw...", "expiresIn": 900,
-  "user": { "id": "u_02AB", "pixId": null, "displayName": "Junhyeong Han", "hasPassword": false, "hasGoogle": true } }
+  "user": { "id": "u_02AB", "pixId": null, "displayName": "Joonhyung Han", "hasPassword": false, "hasGoogle": true } }
 // PUT /me/google → 200: the caller's account with "hasGoogle": true; the same Google account again changes nothing
 // 409 GOOGLE_IN_USE: another account uses it · 409 GOOGLE_ALREADY_ADDED: this account has another one
 ```
@@ -2336,10 +2333,10 @@ The app sends it at each sign-in, at app start while signed in, and when Firebas
 
 ```jsonc
 // request
-{ "pixId": "junhyeong.h" }
+{ "pixId": "joonhyung.h" }
 
 // response 200
-{ "user": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" }, "relation": "INCOMING", "requestId": "fr_77" }
+{ "user": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung" }, "relation": "INCOMING", "requestId": "fr_77" }
 // relation: NONE | SELF | FRIEND | REQUESTED | INCOMING  (decides Add / "This is you" / "Friends" / "Requested" / Accept)
 // requestId: the pending request between the two when relation is REQUESTED or INCOMING, otherwise null
 ```
@@ -2356,10 +2353,10 @@ Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals a
 { "userId": "u_02AB" }
 
 // response 201
-{ "id": "fr_77", "to": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" }, "createdAt": 1760281200000 }
+{ "id": "fr_77", "to": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung" }, "createdAt": 1760281200000 }
 
 // response 200 instead, when u_02AB had already sent the caller a request: that request is accepted
-{ "friend": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong", "online": true, "inSession": false } }
+{ "friend": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung", "online": true, "inSession": false } }
 
 // GET /friend-requests → 200, newest first
 { "incoming": [ { "id": "fr_80", "from": { "id": "u_03CD", "pixId": "seongmin.c", "displayName": "Seongmin" }, "createdAt": 1760281300000 } ],
@@ -2383,7 +2380,7 @@ Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals a
 
 ```jsonc
 // response 200, ordered by display name
-{ "friends": [ { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong", "online": true, "inSession": false } ] }
+{ "friends": [ { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung", "online": true, "inSession": false } ] }
 ```
 
 `online`: the friend's phone holds a signed-in signaling socket. `inSession`: that socket is in a session, a waiting room and an invitation included (FR-6.9). `DELETE /friends/u_02AB` ends the friendship for both and removes any pending request between them (FR-5.10). It answers `204`, also for someone who is not a friend.
@@ -2398,7 +2395,7 @@ Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals a
 { "friendId": "u_02AB" }
 
 // response 201: the invitation, and the photographer's place in its session
-{ "id": "inv_01JB2C3D4E5F6G7H8J9KAMNPQR", "to": { "id": "u_02AB", "pixId": "junhyeong.h", "displayName": "Junhyeong" },
+{ "id": "inv_01JB2C3D4E5F6G7H8J9KAMNPQR", "to": { "id": "u_02AB", "pixId": "joonhyung.h", "displayName": "Joonhyung" },
   "status": "PENDING", "expiresAt": 1760281230000, "link": "http://pix.example.org/i/inv_01JB2C3D4E5F6G7H8J9KAMNPQR",
   "sessionId": "s_7f3a92c1", "rejoinToken": "cGhvdG9ncmFwaGVyX3Rv", "iceServers": [ /* as in room.created */ ] }
 
@@ -2591,7 +2588,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - During the gesture the subject takes only `visible` and `opacity` from the mirror. The first `guide.state` after the final value settles the guide. Of two moves, the later wins (FR-7.6).
 - **Guide from the subject (It 3, FR-6.15, FR-6.16, [#113]).** *Guide* on Subject view opens *Add a pose guide* with the subject's *My library* (2.6.2), without *Generate poses here*.
   - `ReferenceViewModel` hands the guide to `GuideSyncer.offer`. The mirror shows it at once, at its `anchor` clamped for the narrowest frame, with its reference photo. `guide.image.*` sends it with `anchor` and `source` (2.5.1).
-  - The photographer adopts it with `attribute(SUBJECT)` and sends no image back. Camera says "Junhyeong set a pose guide". The guide is then the photographer's own, to move, hide, save, or remove.
+  - The photographer adopts it with `attribute(SUBJECT)` and sends no image back. Camera says "Joonhyung set a pose guide". The guide is then the photographer's own, to move, hide, save, or remove.
   - The subject sets other guide messages aside until a `guide.state` names its guide. Without a connection, or after 5 s without that state (`OFFER_TIMEOUT_MS`), it says "Couldn't send the guide" and shows the photographer's guide.
   - Of two guides chosen at once, the later to arrive wins (AD-7). The subject shows a reference photo only for the guide on its video.
   - *Reference confirm* and *No person found* return to Subject view when the session ends.
@@ -2604,7 +2601,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Each subject screen follows the session itself. The shared screens say "… sees this too".
 - **Generate poses on both phones.** `DescriptionShare` reports the opening at *Use this photo*, *Try other poses*, or *Edit description* (scene photo, text, refusal), each change of text and `descriptionWriter`, and the end, `STARTED` or `CLOSED`. The scene copy (`PoseCandidateCodec`) follows the first message.
   - One field at a time holds the description, from a tap until Done, the keyboard closing, a button, or leaving (`DescriptionForm`). The subject's `pose.description.edit` gets it only while the photographer's field is free.
-  - The other phone waits and shows "Junhyeong is typing…" or "Dongje is typing…". A subject's chip sends its text at once.
+  - The other phone waits and shows "Joonhyung is typing…" or "Dongje is typing…". A subject's chip sends its text at once.
   - `pose.description.go` starts the set with the subject's text, or the photographer's when nobody held the field. It is refused while the photographer's field holds it.
   - A drop frees the subject's field (`DescriptionRequest.Gone`). The photographer's *Cancel* closes the subject's screen with "Dongje closed Generate poses". The subject's *Cancel* closes only its own.
   - Subject view shows a description only while it holds no set or confirm.
@@ -2612,12 +2609,12 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Pick a pose on both phones.** `PoseShare` reports `GENERATING`, the planned slots and failed candidates (Iter3-A13), each candidate, `PICKING` in pager order, and `CHOSEN` or `CLOSED`.
   - Copies go as JPEG ≤ 1024 px, one at a time. `PICKING` without a copy on the subject's phone opens no *Pick a pose* there. Through a drop the subject keeps *Pick a pose*, with *Use this pose* waiting.
   - Swipes and the ♥ stay on each phone (2.6.3, *Saving a pose*).
-  - The subject's `pose.pick` counts only while the set is `PICKING` and unchosen. `PickPoseFragment` then uses that candidate and tip (FR-4.10) and says "Junhyeong chose this pose".
+  - The subject's `pose.pick` counts only while the set is `PICKING` and unchosen. `PickPoseFragment` then uses that candidate and tip (FR-4.10) and says "Joonhyung chose this pose".
   - The end closes the subject's screen with "Dongje chose a pose" or "Dongje closed the poses", unless the subject chose.
 - **Generating poses on both phones (Iter3-A13, [#180]).** `SubjectGeneratingFragment` shows the photographer's slots and failures in order (`pose.planned`, `pose.candidate.failed`). Before them it says "Choosing poses…" or "Creating…", from `DescriptionSyncer.startedScene`. It has *Back*, not *Cancel*; after *Back*, Subject view's button opens it again. With copies, `PICKING` leads on to *Pick a pose*. Otherwise the end returns to Subject view with "Dongje stopped creating poses" or "Dongje's poses couldn't be created".
 - **Reference confirm on both phones.** The chosen pose's *Reference confirm* also shows on the subject's *Your reference*. Only the photographer's phone segments the person (FR-4.6).
   - `ConfirmShare` reports `FINDING`, `READY` with the outline's mask (`GuideImageCodec`), `FINDING` again for *Choose another photo*, and `USED` or `CLOSED`. A confirm from *Add a pose guide* is not shared. A set the subject still holds as `PICKING` shows first.
-  - The subject's `guide.confirm.use` counts only while that outline shows. `ReferenceViewModel` then sets the guide with its tip (FR-4.10) and says "Junhyeong used this guide". The guide reaches the subject like any guide.
+  - The subject's `guide.confirm.use` counts only while that outline shows. `ReferenceViewModel` then sets the guide with its tip (FR-4.10) and says "Joonhyung used this guide". The guide reaches the subject like any guide.
   - The end closes *Your reference* with "Dongje used this guide" or "Dongje closed the reference", unless the subject used it.
 - **Save guide on Subject view (FR-6.16, [#120]).** It saves the mirror guide like Camera's (FR-3.8, `SavedGuideStore`, 2.8): mask, reference copy, `anchor`, `source`, and state. The shared guide id keeps one copy per phone. It toggles like Camera's (`toggleSaved`, 2.6.2), with a label (2.8). The subject reuses it from *Add a pose guide*.
 - **Photos on both phones (FR-6.14, US-14, [#121]).** Each session photo reaches the subject's "Pix" album.
@@ -2625,8 +2622,8 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `PhotoSyncer` sends the saved JPEG itself, with its EXIF rotation, over the encrypted data channel, not through the Pix server (FR-1.5, NFR-13). It sends one photo at a time in shutter order, read from the gallery at its turn.
   - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the phones' 64- and 256-message buffers.
   - The subject writes chunks to a cache file. At `photo.end`, `PhotoAlbum` saves it to Pictures/Pix through a pending MediaStore row dated `takenAt`. `photo.saved` answers, `ok: true` again for a repeat.
-  - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Junhyeong" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
-  - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Junhyeong". The subject deletes partial files, also at each session start.
+  - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
+  - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
   - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
 - **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 4 (Iter2-P17); only the message exists.
 - **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Planned for Iteration 4 (Iter2-P17); only the message exists, so remote control is always allowed.
@@ -2641,7 +2638,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The S21's frame intervals are not measured. `PreviewView`'s `PERFORMANCE` mode is tried with #183 in Iteration 4.
   - The shutter freeze fix (Could) is planned for Iteration 4, with #183.
 - **Photos.** Only the photographer takes photos.
-- **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Junhyeong set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
+- **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
 
 #### 2.6.6 Invitations and push (Iteration 3)
 

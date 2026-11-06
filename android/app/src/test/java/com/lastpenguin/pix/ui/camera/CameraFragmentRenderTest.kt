@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -574,7 +574,7 @@ class CameraFragmentRenderTest {
     fun cameraSwitch_staysInASession() {
         val modules = launch()
 
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.switchCameraButton.visibility) }
@@ -586,12 +586,12 @@ class CameraFragmentRenderTest {
     fun connectedSession_showsTheLiveLightAndEndSession_andAPeerLeavingShowsANotice() {
         val modules = launch()
 
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.liveDot.visibility)
-            assertEquals(string(R.string.live_badge, "Junhyeong"), controls.liveDot.contentDescription.toString())
+            assertEquals(string(R.string.live_badge, "Joonhyung"), controls.liveDot.contentDescription.toString())
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
             assertEquals(View.GONE, controls.shootTogetherButton.visibility)
         }
@@ -601,7 +601,7 @@ class CameraFragmentRenderTest {
 
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.noticeText.visibility)
-            assertEquals(string(R.string.peer_left, "Junhyeong"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.peer_left, "Joonhyung"), controls.noticeText.text.toString())
         }
 
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
@@ -612,7 +612,7 @@ class CameraFragmentRenderTest {
     @Test
     fun reconnectingSession_turnsTheLightOff_andKeepsEndSession() {
         val modules = launch()
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         modules.session.setState(SessionState.Reconnecting("s1", 0L))
@@ -629,7 +629,7 @@ class CameraFragmentRenderTest {
     fun theLiveLight_goesOutWhileTheCameraCannotStream_andComesBack() {
         val camera = FakeCameraController()
         val modules = launch(camera)
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         camera.setStatus(CameraStatus.UNAVAILABLE)

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -197,12 +197,12 @@ class DescriptionFormTest {
     @Test
     fun inASession_theSwitchShowsAllOrTheOnesUsedWithTheFriend_andSaysWhenThereAreNone() {
         val binding = form()
-        val friend = SessionPartner("u_2", "Junhyeong")
+        val friend = SessionPartner("u_2", "Joonhyung")
 
         shared.showHistory(listOf(entry("Wave", "u_2"), entry("Jump", "u_3")), friend)
 
         assertEquals(View.VISIBLE, binding.historyFilter.visibility)
-        assertEquals("With Junhyeong", binding.historyWithPartner.text.toString())
+        assertEquals("With Joonhyung", binding.historyWithPartner.text.toString())
         assertTrue(binding.historyAll.isSelected)
         assertFalse(binding.historyWithPartner.isSelected)
         assertEquals(listOf("Wave", "Jump"), binding.chipTexts())
@@ -214,12 +214,12 @@ class DescriptionFormTest {
         assertEquals(listOf("Wave"), binding.chipTexts())
         assertEquals(View.GONE, binding.historyEmpty.visibility)
 
-        // Wave forgotten: nothing was used with Junhyeong.
+        // Wave forgotten: nothing was used with Joonhyung.
         shared.showHistory(listOf(entry("Jump", "u_3")), friend)
 
         assertEquals(emptyList<String>(), binding.chipTexts())
         assertEquals(View.VISIBLE, binding.historyEmpty.visibility)
-        assertEquals("Nothing used with Junhyeong yet", binding.historyEmpty.text.toString())
+        assertEquals("Nothing used with Joonhyung yet", binding.historyEmpty.text.toString())
 
         // The session ended: the whole history again, without the switch.
         shared.showHistory(listOf(entry("Jump", "u_3")), partner = null)

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -268,14 +268,14 @@ class CameraFragmentInteractionTest {
     fun aPhotoThatIsNotSent_isANotice() {
         val modules = launch()
         onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         modules.photos.shoot(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(string(R.string.session_photo_not_sent, "Junhyeong"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.session_photo_not_sent, "Joonhyung"), controls.noticeText.text.toString())
         }
     }
 
@@ -283,7 +283,7 @@ class CameraFragmentInteractionTest {
     fun twoPhotosNotSent_eachGetTheirFullTime() {
         val modules = launch()
         onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
         val photo = Uri.parse("content://media/external/images/media/1")
 
@@ -300,7 +300,7 @@ class CameraFragmentInteractionTest {
     @Test
     fun liveViewOnMobileData_isANotice() {
         val modules = launch()
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         modules.session.setPath(IcePath("srflx", "relay", "cellular", null))
@@ -317,13 +317,13 @@ class CameraFragmentInteractionTest {
         val camera = FakeCameraController(exposureRange = -4..4, hasFlash = true)
         val modules = launch(camera)
         modules.guides.setGuide(guide())
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         modules.session.deliver(SessionMessage.ZoomSet(2f, final = true))
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.remote_zoom_notice, "Junhyeong", "2"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.remote_zoom_notice, "Joonhyung", "2"), controls.noticeText.text.toString())
         }
 
         modules.session.deliver(SessionMessage.ExposureSet(2, final = true))
@@ -331,7 +331,7 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ ->
             val ev = ExposureScale.formatEv(2, 0.5f)
             assertEquals(
-                string(R.string.remote_brightness_notice, "Junhyeong", ev),
+                string(R.string.remote_brightness_notice, "Joonhyung", ev),
                 controls.noticeText.text.toString(),
             )
         }
@@ -339,33 +339,33 @@ class CameraFragmentInteractionTest {
         modules.session.deliver(SessionMessage.FlashSet(FlashMode.ON))
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.remote_flash_on_notice, "Junhyeong"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.remote_flash_on_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
 
         modules.session.deliver(SessionMessage.FlashSet(FlashMode.AUTO))
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.remote_flash_auto_notice, "Junhyeong"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.remote_flash_auto_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
         modules.session.deliver(SessionMessage.FlashSet(FlashMode.OFF))
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.remote_flash_off_notice, "Junhyeong"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.remote_flash_off_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
 
         modules.session.deliver(SessionMessage.GuideMove("guide-1", 0.5f, 0.5f, 0.8f, final = true))
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.remote_guide_move_notice, "Junhyeong"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.remote_guide_move_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
 
         modules.session.deliver(SessionMessage.Leave(EndReason.CONNECTION_LOST))
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.peer_disconnected, "Junhyeong"), controls.noticeText.text.toString())
+            assertEquals(string(R.string.peer_disconnected, "Joonhyung"), controls.noticeText.text.toString())
         }
 
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Junhyeong"), Role.PHOTOGRAPHER))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
         onScreen { controls, _ -> controls.endSessionButton.performClick() }
         idle()

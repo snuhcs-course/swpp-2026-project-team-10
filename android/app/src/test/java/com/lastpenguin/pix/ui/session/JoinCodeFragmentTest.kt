@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.Manifest
@@ -279,7 +279,7 @@ class JoinCodeFragmentTest {
 
     @Test
     fun invitations_eachACompactRow_newestFirst_withTheTimeLeft_andTheKeyboardDown() {
-        launchInvited(invitation("inv_2", JUNHYEONG, 48_000), invitation("inv_1", DONGJE, 21_000))
+        launchInvited(invitation("inv_2", JOONHYUNG, 48_000), invitation("inv_1", DONGJE, 21_000))
 
         onScreen { binding, _ ->
             assertEquals(View.VISIBLE, binding.invitationsSection.visibility)
@@ -287,7 +287,7 @@ class JoinCodeFragmentTest {
             assertFalse(binding.codeInput.hasFocus())
         }
         val rows = rows()
-        assertEquals(listOf("Junhyeong", "Dongje"), rows.map { it.nameText.text.toString() })
+        assertEquals(listOf("Joonhyung", "Dongje"), rows.map { it.nameText.text.toString() })
         assertEquals(listOf("J", "D"), rows.map { it.avatarText.text.toString() })
         assertEquals(listOf("0:48", "0:21"), rows.map { it.timeLeftText.text.toString() })
         assertEquals(string(R.string.accept_invitation_from, "Dongje"), rows[1].acceptButton.contentDescription)
@@ -296,7 +296,7 @@ class JoinCodeFragmentTest {
 
     @Test
     fun oneInvitation_isACompactRowToo_andOneThatExpiredIsNotListed() {
-        launchInvited(invitation("inv_1", DONGJE, 48_000), invitation("inv_0", JUNHYEONG, -1_000), known = false)
+        launchInvited(invitation("inv_1", DONGJE, 48_000), invitation("inv_0", JOONHYUNG, -1_000), known = false)
 
         assertEquals(listOf("Dongje"), rows().map { it.nameText.text.toString() })
         onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.invitationsSection.visibility) }
@@ -337,7 +337,7 @@ class JoinCodeFragmentTest {
     @Test
     fun accept_whileAnotherSessionIsOpen_saysSo_andAcceptsNothing() {
         val modules = launchInvited(invitation("inv_1", DONGJE, 48_000))
-        modules.session.setState(SessionState.Connected("s_0", PeerInfo("Junhyeong"), Role.SUBJECT))
+        modules.session.setState(SessionState.Connected("s_0", PeerInfo("Joonhyung"), Role.SUBJECT))
         idle()
 
         rows().single().acceptButton.performClick()
@@ -402,13 +402,13 @@ class JoinCodeFragmentTest {
 
     @Test
     fun decline_removesTheRow() {
-        val modules = launchInvited(invitation("inv_2", JUNHYEONG, 48_000), invitation("inv_1", DONGJE, 21_000))
+        val modules = launchInvited(invitation("inv_2", JOONHYUNG, 48_000), invitation("inv_1", DONGJE, 21_000))
 
         rows()[1].declineButton.performClick()
         idle()
 
         assertEquals("decline:inv_1", modules.invitations.calls.last { it != "incoming" })
-        assertEquals(listOf("Junhyeong"), rows().map { it.nameText.text.toString() })
+        assertEquals(listOf("Joonhyung"), rows().map { it.nameText.text.toString() })
         assertTrue(modules.session.starts.isEmpty())
     }
 
@@ -425,7 +425,7 @@ class JoinCodeFragmentTest {
 
     private companion object {
         val DONGJE = PixUser("u_1", "dongje.p", "Dongje")
-        val JUNHYEONG = PixUser("u_3", "junhyeong.h", "Junhyeong")
+        val JOONHYUNG = PixUser("u_3", "joonhyung.h", "Joonhyung")
 
         /** From [from], with [left] ms to go by this phone's clock. */
         fun invitation(id: String, from: PixUser, left: Long) =

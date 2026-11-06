@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 """Sign-up, sign-in, the caller's account, and device tokens through the REST API (Design 2.5.3, R&S F5).
 
 Partitions:
@@ -72,7 +72,7 @@ def log_in(client, pix_id, password=PASSWORD):
     return client.post("/api/v1/auth/login", json={"pixId": pix_id, "password": password})
 
 
-def google_sign_up(client, token="google:sub-1:Junhyeong Han"):
+def google_sign_up(client, token="google:sub-1:Joonhyung Han"):
     response = client.post("/api/v1/auth/google/signup", json={"idToken": token})
     assert response.status_code == 201, response.text
     return bearer(response.json()["accessToken"]), response.json()["user"]
@@ -261,24 +261,24 @@ def test_wrong_password_and_unknown_pix_id_get_the_same_answer(client, sign_up, 
 
 def test_an_account_without_a_password_cannot_log_in_with_one(client):
     headers, _ = google_sign_up(client)
-    client.put("/api/v1/me", headers=headers, json={"pixId": "junhyeong.h"})
-    assert_error(log_in(client, "junhyeong.h"), 401, "INVALID_CREDENTIALS")
+    client.put("/api/v1/me", headers=headers, json={"pixId": "joonhyung.h"})
+    assert_error(log_in(client, "joonhyung.h"), 401, "INVALID_CREDENTIALS")
 
 
 # --- Google --------------------------------------------------------------------------------------------------------
 
 
 def test_google_sign_in_of_an_unknown_google_account_answers_not_registered(client):
-    response = client.post("/api/v1/auth/google", json={"idToken": "google:sub-1:Junhyeong"})
+    response = client.post("/api/v1/auth/google", json={"idToken": "google:sub-1:Joonhyung"})
     assert_error(response, 404, "NOT_REGISTERED")
 
 
 def test_google_sign_up_creates_an_account_without_a_pix_id_and_signs_in_later(client):
-    headers, user = google_sign_up(client, "google:sub-1:Junhyeong Han")
+    headers, user = google_sign_up(client, "google:sub-1:Joonhyung Han")
     assert user == {
         "id": user["id"],
         "pixId": None,
-        "displayName": "Junhyeong Han",
+        "displayName": "Joonhyung Han",
         "hasPassword": False,
         "hasGoogle": True,
     }
@@ -381,12 +381,12 @@ def test_adding_google_with_an_invalid_token_answers_invalid_token(client, sign_
 
 
 def test_google_account_adds_a_password_and_then_logs_in_with_either(client):
-    headers, user = google_sign_up(client, "google:sub-1:Junhyeong")
-    client.put("/api/v1/me", headers=headers, json={"pixId": "junhyeong.h"})
+    headers, user = google_sign_up(client, "google:sub-1:Joonhyung")
+    client.put("/api/v1/me", headers=headers, json={"pixId": "joonhyung.h"})
     response = client.put("/api/v1/me/password", headers=headers, json={"password": PASSWORD})
     assert response.status_code == 200
-    assert response.json() == {**user, "pixId": "junhyeong.h", "hasPassword": True}
-    by_password = log_in(client, "junhyeong.h")
+    assert response.json() == {**user, "pixId": "joonhyung.h", "hasPassword": True}
+    by_password = log_in(client, "joonhyung.h")
     assert by_password.status_code == 200
     assert by_password.json()["user"]["id"] == user["id"]
     by_google = client.post("/api/v1/auth/google", json={"idToken": "google:sub-1"})
@@ -401,14 +401,14 @@ def test_adding_a_password_before_choosing_a_pix_id_answers_pix_id_required(clie
     assert client.get("/api/v1/me", headers=headers).json()["hasPassword"] is False
 
 
-@pytest.mark.parametrize("password, rule", [("abcde12", "at least 8"), ("junhyeong.h1", "Pix ID")])
+@pytest.mark.parametrize("password, rule", [("abcde12", "at least 8"), ("joonhyung.h1", "Pix ID")])
 def test_adding_a_password_that_breaks_a_rule_names_it_and_saves_nothing(client, password, rule):
     headers, _ = google_sign_up(client)
-    client.put("/api/v1/me", headers=headers, json={"pixId": "junhyeong.h1"})
+    client.put("/api/v1/me", headers=headers, json={"pixId": "joonhyung.h1"})
     response = client.put("/api/v1/me/password", headers=headers, json={"password": password})
     assert rule in assert_error(response, 400, "PASSWORD_INVALID")
     assert client.get("/api/v1/me", headers=headers).json()["hasPassword"] is False
-    assert_error(log_in(client, "junhyeong.h1", password), 401, "INVALID_CREDENTIALS")
+    assert_error(log_in(client, "joonhyung.h1", password), 401, "INVALID_CREDENTIALS")
 
 
 def test_account_with_a_password_cannot_set_another(client, sign_up):
@@ -423,7 +423,7 @@ def test_pix_id_change_and_new_password_at_once_never_leave_the_two_equal(client
     """A Google account signed in on two phones: one changes the Pix ID to "sunset2026" while the other adds that as
     the password. Whichever runs second sees the first and refuses, so they never end up the same."""
     first, _ = google_sign_up(client)
-    client.put("/api/v1/me", headers=first, json={"pixId": "junhyeong.h"})
+    client.put("/api/v1/me", headers=first, json={"pixId": "joonhyung.h"})
     second = bearer(client.post("/api/v1/auth/google", json={"idToken": "google:sub-1"}).json()["accessToken"])
 
     async def both():
@@ -445,10 +445,10 @@ def test_pix_id_change_and_new_password_at_once_never_leave_the_two_equal(client
 
 def test_google_account_chooses_its_pix_id(client):
     headers, user = google_sign_up(client)
-    response = client.put("/api/v1/me", headers=headers, json={"pixId": "junhyeong.h"})
+    response = client.put("/api/v1/me", headers=headers, json={"pixId": "joonhyung.h"})
     assert response.status_code == 200
-    assert response.json() == {**user, "pixId": "junhyeong.h"}
-    assert client.get("/api/v1/me", headers=headers).json()["pixId"] == "junhyeong.h"
+    assert response.json() == {**user, "pixId": "joonhyung.h"}
+    assert client.get("/api/v1/me", headers=headers).json()["pixId"] == "joonhyung.h"
 
 
 @pytest.mark.parametrize("pix_id, status, code", [("ab", 400, "PIX_ID_INVALID"), ("taken.id", 409, "PIX_ID_TAKEN")])
@@ -675,7 +675,7 @@ def changed_after_signing(token, **claims):
 )
 def test_token_not_signed_by_this_server_for_a_user_is_refused(client, settings, sign_up, make):
     headers, _ = sign_up("dongje.p")
-    _, other = sign_up("junhyeong.h")
+    _, other = sign_up("joonhyung.h")
     token = headers["Authorization"].removeprefix("Bearer ")
     assert_error(client.get("/api/v1/me", headers=bearer(make(settings, token, other))), 401, "UNAUTHENTICATED")
 
@@ -712,7 +712,7 @@ def test_device_token_is_kept_for_the_signed_in_user(client, sign_up):
 
 def test_device_token_moves_to_the_account_that_signs_in_on_the_phone(client, sign_up):
     first, _ = sign_up("dongje.p")
-    second, user = sign_up("junhyeong.h")
+    second, user = sign_up("joonhyung.h")
     register(client, first, "fcm-1")
     register(client, second, "fcm-1")
     assert devices(client) == [(user["id"], "fcm-1")]
@@ -848,7 +848,7 @@ def test_a_sign_in_waiting_for_its_password_check_holds_up_no_other_request(clie
 
 def test_adding_google_holds_no_database_while_google_answers(client, sign_up, google):
     adding, _ = sign_up("dongje.p")
-    other, _ = sign_up("junhyeong.h")
+    other, _ = sign_up("joonhyung.h")
     google.delay = 0.4
     first, status = finishes_before(
         client,

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -152,7 +152,7 @@ class RtcSessionManagerTimingsTest {
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         peer.open()
         peer.deliver(
-            otherPhone.encode(SessionMessage.Hello(appVersion = "0.1.0", role = Role.SUBJECT, name = "Junhyeong")),
+            otherPhone.encode(SessionMessage.Hello(appVersion = "0.1.0", role = Role.SUBJECT, name = "Joonhyung")),
         )
         runCurrent()
         assertTrue(manager.state.value is SessionState.Connected)

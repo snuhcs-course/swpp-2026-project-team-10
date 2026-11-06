@@ -58,9 +58,7 @@
 | 2.34 | 2026-11-05 | The guide and pose flow: one *Generate poses* button with a ✕, *Generating poses* on the subject's phone too, and fades for guides and candidates (FR-4.4, FR-4.8, FR-6.15, 6.3, 6.6, 6.9, 6.10, Figures 2, 5; Iter3-A13, [#180]). |
 | 2.35 | 2026-11-05 | Who takes the photo, before connecting: *Shoot together* asks first, then *Share my camera* or *See their camera*; received invitations listed; sign-in returns to its screen (FR-5.2, FR-5.4, FR-5.7, FR-5.16, FR-6.17, FR-8.1–8.2, FR-9.1–9.2, FR-10.5, US-9, US-13, 6.4, 6.6, 6.7, 6.9, Figures 3, 3b, 4, 6, 7; Iter3-A17, [#188]). |
 | 2.36 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar with a base in Settings, the horizon bar, thinner lines, and *Save guide* as a toggle (FR-1.3, FR-1.4, FR-1.10, FR-1.11, FR-2.2, FR-3.6, FR-3.8, FR-3.10, FR-4.6, FR-4.10, FR-4.11, FR-6.16, FR-7.1, FR-7.3, FR-10.1, 6.2, 6.3, 6.6, 6.10, Figures 1, 2, 4–7; Iter3-A15, [#182]). |
-| 2.37 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code; F9, FR-4.8, FR-7.5, FR-7.7, FR-9.1–9.4, and NFR-19's shutter freeze moved to Iteration 4 (all sections). |
-| 2.38 | 2026-11-06 | The UAT stories fixed: US-2, US-4, US-9, US-10, and US-12 (4.4). |
-| 2.39 | 2026-11-06 | The AWS server stays on; it is no longer temporary (7). |
+| 2.37 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code. F9, FR-4.8, FR-7.5, FR-7.7, FR-9.1–9.4, and NFR-19's shutter freeze moved to Iteration 4. The UAT stories fixed: US-2, US-4, US-9, US-10, and US-12 (4.4). The AWS server stays on (all sections). |
 
 </details>
 
@@ -110,7 +108,7 @@ Every session has two people, each with Pix. *Who takes the photo?* sets the rol
 
 ### 2.4 Example scenario
 
-> Dongje and Junhyeong are at the Han River. Junhyeong wants a photo like one saved on Instagram. Dongje taps *Guide* › *Add photo*, picks that photo, and drags its outline to the left third of the frame. Dongje taps *Shoot together* › *I'll take the photo* and invites Junhyeong. Junhyeong accepts from the notification and sees Dongje's camera with the same outline. Junhyeong steps into it and pinches the video to 2×, and Dongje's camera zooms in at once. Dongje presses the shutter, and both phones save the photo without the outline.
+> Dongje and Joonhyung are at the Han River. Joonhyung wants a photo like one saved on Instagram. Dongje taps *Guide* › *Add photo*, picks that photo, and drags its outline to the left third of the frame. Dongje taps *Shoot together* › *I'll take the photo* and invites Joonhyung. Joonhyung accepts from the notification and sees Dongje's camera with the same outline. Joonhyung steps into it and pinches the video to 2×, and Dongje's camera zooms in at once. Dongje presses the shutter, and both phones save the photo without the outline.
 
 ---
 
@@ -302,7 +300,7 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 | FR-7.1 | A pinch on *Subject view*'s video changes the photographer's zoom within their range. The readout follows the pinch, then settles on the zoom the photographer's phone applied. *Subject view* has Camera's guide-edit mode toggle, zoom actions, quick steps, and labels (FR-1.3). | Must | It 1 / It 2 / It 3 |
 | FR-7.2 | In guide-edit mode, the subject moves and resizes the guide within the photographer's limits (FR-3.2, FR-3.3), and both phones show the change. Opacity, hiding, and removal stay with the photographer; the subject replaces the guide only through *Add a pose guide* (FR-6.15). | Must | It 2 |
 | FR-7.3 | *Subject view* has a brightness slider, opened from a button, and a flash button, with the photographer's range and states (FR-1.11, FR-1.12). The flash button is hidden without a flash. The subject sets no focus, so it has no bar beside a focus box ([#182]). | Should | It 2 |
-| FR-7.4 | The photographer sees a short notice for each remote action, such as "Junhyeong set zoom to 2×" or "Junhyeong moved the guide". | Should | It 1 |
+| FR-7.4 | The photographer sees a short notice for each remote action, such as "Joonhyung set zoom to 2×" or "Joonhyung moved the guide". | Should | It 1 |
 | FR-7.5 | The photographer allows or blocks remote control on *Invite sent* and during the session. While it is blocked, the subject's remote controls are disabled with "Dongje turned off remote control". Until it is built, remote control is always allowed. | Could | It 4 |
 | FR-7.6 | The photographer's own controls always work, and only the photographer takes photos. If both people change the zoom, the guide, or the brightness at once, the later change wins, and both phones show the same final value. | Must | It 1 |
 | FR-7.7 | The subject sets the focus point remotely, as with FR-1.4. | Could | It 4 |
@@ -450,7 +448,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Edge** | I have no account | I use the camera, guides, or pose generation | Pix never asks me to sign in. |
 | **Normal** | I have no account | I tap *Shoot together › I'll take the photo › Sign in to add friends › New to Pix? Sign up* and enter the Pix ID "dongje.p", my name, and a password | *Share my camera* shows "My Pix ID: dongje.p". On another phone, "dongje.p" and the password sign me in. |
 | **Normal** | I signed up as "dongje.p" with a password, and no Pix account uses my Google account | I tap *Continue with Google*, answer *Yes, sign in*, and sign in as "dongje.p" | My Google account is added. From then on, Google alone signs me in as "dongje.p". |
-| **Normal** | I signed up with Google and chose the Pix ID "junhyeong.h" | I tap *Add a password* in *Account* | On a phone without my Google account, "junhyeong.h" and the password sign me in. |
+| **Normal** | I signed up with Google and chose the Pix ID "joonhyung.h" | I tap *Add a password* in *Account* | On a phone without my Google account, "joonhyung.h" and the password sign me in. |
 | **Failure** | I am signing up | I enter "abcdefgh" as the password | The rule "8–64 characters with a letter and a digit" shows, and no account is created. |
 | **Normal** | I am signing up and typed the Pix ID "test5" | I tap *Check* | Before I fill in the rest, "This Pix ID is available" appears under the field, or "This Pix ID is taken" if someone has it. |
 
@@ -461,10 +459,10 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | I am on *Add a friend* | I search for "junhyeong.h" | The result shows Junhyeong (@junhyeong.h) with *Add*. |
-| **Normal** | The result is shown | I tap *Add* | The button becomes "Requested", with *Withdraw request* beside it. Once Junhyeong accepts, Junhyeong is in my friend list. |
-| **Failure** | No user has the ID "junhyeong.hh" | I search for it | *No user found* appears. *Search again* keeps my text so I can fix it. |
-| **Edge** | I type only part of an ID, such as "junhyeong" | I search | *No user found* appears: only exact IDs match. |
+| **Normal** | I am on *Add a friend* | I search for "joonhyung.h" | The result shows Joonhyung (@joonhyung.h) with *Add*. |
+| **Normal** | The result is shown | I tap *Add* | The button becomes "Requested", with *Withdraw request* beside it. Once Joonhyung accepts, Joonhyung is in my friend list. |
+| **Failure** | No user has the ID "joonhyung.hh" | I search for it | *No user found* appears. *Search again* keeps my text so I can fix it. |
+| **Edge** | I type only part of an ID, such as "joonhyung" | I search | *No user found* appears: only exact IDs match. |
 | **Edge** | I search for my own ID or an existing friend's | The result appears | It shows "This is you" or "Friends" instead of *Add*. |
 | **Normal** | I sent a request to "test3", who has not answered | I tap *Sent requests · 1* on *Share my camera*, then *Withdraw* | The request leaves the list, and test3 no longer sees it. |
 
@@ -486,14 +484,14 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | Junhyeong is in my friend list | I tap *Invite* | *Invite sent* shows "Waiting for Junhyeong", and Junhyeong gets a notification within 5 s. |
-| **Normal** | I am on Wi-Fi, and Junhyeong is on cellular data | Junhyeong accepts | Within 10 s, a red light blinks at the top right of my camera image (TalkBack: "Live · Junhyeong connected"). |
-| **Failure** | The invitation is waiting | Junhyeong declines, or 60 s pass | *Invite not accepted* appears with *Invite again* and *Back to camera*. |
-| **Edge** | The invitation is waiting | I tap *Cancel invite* | I return to *Share my camera*. If Junhyeong opens the invitation now, it says it is no longer available. |
-| **Edge** | Junhyeong is in another session | I tap *Invite* | "Junhyeong is in another session" appears, and no invitation is sent. |
-| **Edge** | Junhyeong shows as offline because Pix is closed | I tap *Invite* | Junhyeong still gets the invitation as a notification. |
-| **Edge** | The invitation is waiting, and Junhyeong got no notification | I tap *Share invite link* and send it in KakaoTalk | Junhyeong opens the link and sees the same *Invitation* screen; *Accept* connects us. |
-| **Edge** | The invitation is waiting, and Junhyeong dismissed its notification by mistake | Junhyeong taps *Shoot together*, sees "1 invite" on *I'll be in the photo*, and taps it | *See their camera* lists my invitation with its time left, and *Accept* connects us. |
+| **Normal** | Joonhyung is in my friend list | I tap *Invite* | *Invite sent* shows "Waiting for Joonhyung", and Joonhyung gets a notification within 5 s. |
+| **Normal** | I am on Wi-Fi, and Joonhyung is on cellular data | Joonhyung accepts | Within 10 s, a red light blinks at the top right of my camera image (TalkBack: "Live · Joonhyung connected"). |
+| **Failure** | The invitation is waiting | Joonhyung declines, or 60 s pass | *Invite not accepted* appears with *Invite again* and *Back to camera*. |
+| **Edge** | The invitation is waiting | I tap *Cancel invite* | I return to *Share my camera*. If Joonhyung opens the invitation now, it says it is no longer available. |
+| **Edge** | Joonhyung is in another session | I tap *Invite* | "Joonhyung is in another session" appears, and no invitation is sent. |
+| **Edge** | Joonhyung shows as offline because Pix is closed | I tap *Invite* | Joonhyung still gets the invitation as a notification. |
+| **Edge** | The invitation is waiting, and Joonhyung got no notification | I tap *Share invite link* and send it in KakaoTalk | Joonhyung opens the link and sees the same *Invitation* screen; *Accept* connects us. |
+| **Edge** | The invitation is waiting, and Joonhyung dismissed its notification by mistake | Joonhyung taps *Shoot together*, sees "1 invite" on *I'll be in the photo*, and taps it | *See their camera* lists my invitation with its time left, and *Accept* connects us. |
 
 #### US-10 · See the photographer's framing live
 <sub>F6 · FR-6.4, 6.6, 6.10–6.12 · It 1–3 · UAT</sub>
@@ -504,7 +502,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 |---|---|---|---|
 | **Normal** | I received Dongje's invitation | I tap the notification, then *Accept* | Within 10 s, *Subject view* shows Dongje's camera live, with a blinking red light (TalkBack: "Dongje's camera"). |
 | **Normal** | We are connected over Wi-Fi | Dongje moves the phone | My view follows within 0.5 s. |
-| **Normal** | We are connected | I tap *Leave* | I return to my own camera, and Dongje sees "Junhyeong left". |
+| **Normal** | We are connected | I tap *Leave* | I return to my own camera, and Dongje sees "Joonhyung left". |
 | **Failure** | We are connected | The connection drops and does not recover within 10 s | *Connection lost* appears. *Reconnect* rejoins without a new invitation if Dongje is still in the session; *Leave* returns to my camera. |
 | **Edge** | The invitation expired or was cancelled | I tap the old notification | "This invitation is no longer available" appears. |
 
@@ -530,11 +528,11 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 
 | Case | Given | When | Then |
 |---|---|---|---|
-| **Normal** | We are connected, remote control is allowed, and guide-edit mode is off | I pinch the live video to 2× and let go | My readout follows at once; Dongje's camera zooms to 2× within 0.5 s. Both readouts settle on the applied ratio, and Dongje sees "Junhyeong set zoom to 2×". |
+| **Normal** | We are connected, remote control is allowed, and guide-edit mode is off | I pinch the live video to 2× and let go | My readout follows at once; Dongje's camera zooms to 2× within 0.5 s. Both readouts settle on the applied ratio, and Dongje sees "Joonhyung set zoom to 2×". |
 | **Normal** | We are connected, with remote control allowed | I use the readout's Zoom in / Zoom out action | Dongje's phone gets the final requested ratio, and both phones show the applied result. |
 | **Edge** | I am pinching the live video | An applied zoom arrives from Dongje's phone | My readout keeps following my fingers; after the pinch, it shows the applied value. |
 | **Edge** | I am pinching the live video while connected | The pinch is cancelled, or I leave the screen | The last requested value is sent as final, and the pinch ends. |
-| **Normal** | We are connected, with remote control allowed | I drag the guide to the right and pinch it larger | The guide moves and grows on both phones, and Dongje sees "Junhyeong moved the guide". |
+| **Normal** | We are connected, with remote control allowed | I drag the guide to the right and pinch it larger | The guide moves and grows on both phones, and Dongje sees "Joonhyung moved the guide". |
 | **Normal** | We are connected, with remote control allowed | I tap the brightness button and raise the slider | Dongje's preview and my live view get brighter within 0.5 s. |
 | **Normal** | We are connected, with remote control allowed | I tap the flash button | Dongje's flash moves to its next state, and both phones show it. |
 | **Failure** (Could, It 4) | The remote-control switch is built, and Dongje turned it off | I look at my controls | They are disabled with "Dongje turned off remote control". The live view continues. |
@@ -566,8 +564,8 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 |---|---|---|---|
 | **Normal** | We are in a session | Dongje takes a photo | It is also saved to my "Pix" album at full resolution, without the guide, and I see "Photo saved to your Pix album". |
 | **Normal** | We are in a session | Dongje takes three photos in a row | All three are saved to my "Pix" album, in the order taken. |
-| **Failure** | A photo is being sent | The connection drops | Sending resumes after reconnecting. If the session has ended, Dongje sees "Couldn't send a photo to Junhyeong". |
-| **Failure** | My phone's storage is full | Dongje takes a photo | I see "Couldn't save Dongje's photo", and Dongje sees "Couldn't send a photo to Junhyeong". |
+| **Failure** | A photo is being sent | The connection drops | Sending resumes after reconnecting. If the session has ended, Dongje sees "Couldn't send a photo to Joonhyung". |
+| **Failure** | My phone's storage is full | Dongje takes a photo | I see "Couldn't save Dongje's photo", and Dongje sees "Couldn't send a photo to Joonhyung". |
 
 #### US-15 · Know how to take the generated pose
 <sub>F4 · FR-4.10 · It 3</sub>
@@ -592,9 +590,9 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Normal** | Both phones show *Generate poses* | Dongje types the description | My field waits with "Dongje is typing…" and shows Dongje's text. Once Dongje is done, I can change it. |
 | **Normal** | Both phones show *Generate poses* | I type a description and tap *Generate 4 poses from this* first | Dongje's phone creates the poses from my description, and both phones follow the set. |
 | **Normal** | We are connected, and Dongje creates poses | Dongje's candidates are ready | Both phones show *Pick a pose* with the same candidates. |
-| **Normal** | Both phones show *Pick a pose* | I tap *Use this pose* first | Both phones open *Reference confirm* with my choice's outline; Dongje's says "Junhyeong chose this pose". |
+| **Normal** | Both phones show *Pick a pose* | I tap *Use this pose* first | Both phones open *Reference confirm* with my choice's outline; Dongje's says "Joonhyung chose this pose". |
 | **Normal** | Both phones show *Pick a pose* | Dongje uses a candidate first | My *Pick a pose* closes with "Dongje chose a pose", and both phones open *Reference confirm* with Dongje's choice. |
-| **Normal** | Both phones show *Reference confirm* | I tap *Use this guide* first | I return to *Subject view*, and Dongje to the camera with "Junhyeong used this guide". The guide is on both phones. |
+| **Normal** | Both phones show *Reference confirm* | I tap *Use this guide* first | I return to *Subject view*, and Dongje to the camera with "Joonhyung used this guide". The guide is on both phones. |
 | **Normal** | Both phones show *Reference confirm* | Dongje taps *Use this guide* first, or goes back | My *Reference confirm* closes with "Dongje used this guide" and the guide on both, or with "Dongje closed the reference". |
 | **Normal** | A guide is saved on my phone | On *Subject view*, I tap *Guide*, then the guide under *My library* | The guide appears on both phones. |
 | **Normal** | A guide is on both phones | I tap *Save guide* on *Subject view* | The guide is saved on my phone. |
@@ -640,7 +638,7 @@ Each flow is a wireflow: one row per task, labeled arrows for inputs and system 
 - **White outline**: the pose guide
 - **Grey figure**: the real person
 
-**Input → result** lists what the user can do and where it leads; **Not allowed / failure** lists blocked inputs and failures. The tables call the photographer Dongje and the subject Junhyeong, as in [2.4](#24-example-scenario); the figures show test accounts. A label at the top of the image shows for 3 s, and a new one replaces it at once.
+**Input → result** lists what the user can do and where it leads; **Not allowed / failure** lists blocked inputs and failures. The tables call the photographer Dongje and the subject Joonhyung, as in [2.4](#24-example-scenario); the figures show test accounts. A label at the top of the image shows for 3 s, and a new one replaces it at once.
 
 ### 6.2 Flow 1 · Add a pose guide from a photo
 
@@ -681,7 +679,7 @@ Each flow is a wireflow: one row per task, labeled arrows for inputs and system 
 | **Consent notice** | A dialog over Add a pose guide, the first time only: "Send this photo to an AI service?"; *Not now*, *Agree and continue*. | *Agree and continue* → Scene photo · *Not now* → Add a pose guide. | Nothing is sent without consent (FR-4.2). |
 | **Scene photo** | Camera with "Take the scene photo" and *Cancel* in place of the gear and *Shoot together*; the flash button as a light. Hidden: *Guide*, the thumbnail, any guide and its controls, the ratio, and brightness. | Pinch → zoom · Flash → light on or off · Shutter → Review; nothing is saved · *Cancel* or system back → Camera. | The shutter waits for the camera. No tap to focus. A failed shot → "Couldn't take the photo. Try again." |
 | **Scene photo · Review** | "Use this photo?"; the photo; "Pix sends this photo to create the poses."; *Shoot again*, *Use this photo*. No person: "No one in this photo" (FR-4.13). | *Use this photo* → Generate poses · *Shoot again* or system back → Scene photo · *Cancel* → Camera. | No zoom. *Use this photo* waits for the person check, and stays disabled without a person. |
-| **Generate poses** | The scene photo; "Describe the pose" with "0/100" and a ✕; "Used before" chips, each with a ✕, and *All* / *With Junhyeong* in an invitation's session (FR-4.11); one button, *Suggest 4 poses* while empty, *Generate 4 poses from this* with text (FR-4.8). After a refusal: "The last set was refused. Try a different description, or another photo." In a session: "Junhyeong sees this too", and "Junhyeong is typing…" while Junhyeong types (FR-6.15). | A chip → its text in the field; its ✕ → removed from the history · *With Junhyeong* → those used with Junhyeong · The button → Generating poses · *Cancel* or system back → Camera, also closing Junhyeong's · Junhyeong's button first → Generating poses. | 100 characters; spaces only count as empty. Nothing is sent before the button. While Junhyeong types, this field and button wait. |
+| **Generate poses** | The scene photo; "Describe the pose" with "0/100" and a ✕; "Used before" chips, each with a ✕, and *All* / *With Joonhyung* in an invitation's session (FR-4.11); one button, *Suggest 4 poses* while empty, *Generate 4 poses from this* with text (FR-4.8). After a refusal: "The last set was refused. Try a different description, or another photo." In a session: "Joonhyung sees this too", and "Joonhyung is typing…" while Joonhyung types (FR-6.15). | A chip → its text in the field; its ✕ → removed from the history · *With Joonhyung* → those used with Joonhyung · The button → Generating poses · *Cancel* or system back → Camera, also closing Joonhyung's · Joonhyung's button first → Generating poses. | 100 characters; spaces only count as empty. Nothing is sent before the button. While Joonhyung types, this field and button wait. |
 | **Generating poses** | "n of 4 ready", or "Choosing poses…" / "Creating…" until the poses are known; four slots filling in, "Couldn't create" in a failed one; *Cancel*. | *Cancel* or system back → Camera · Done, or 60 s, with one ready → Pick a pose. | No candidate can be picked yet. None ready, or an error → Couldn't create poses. |
 | **Pick a pose** | ✕ (TalkBack: "Close, back to Camera"); one candidate at a time, neighbors at the sides; "2 / 4" (TalkBack: "Pose 2 of 4"), hidden for one; a ♥ on each, red once saved; *Use this pose*, *Try other poses*. | Swipe → the next one, now selected · ♥ → "Pose saved to My library."; again → "Pose removed from My library." (FR-4.14) · *Use this pose* → Reference confirm (Flow 1) · *Try other poses* or system back → Generate poses, photo and description kept ([#182]) · ✕ → Camera, all discarded. | A pose without a person → "Couldn't find a person in this pose." A ♥ ignores taps while it saves, and finishes after the screen is left. A failed candidate is not shown. |
 | **Couldn't create poses** | The scene photo; "The request failed or took longer than 60 seconds. Your photo is kept, so you can try again." A refused description, or no one found by the server, says so instead (FR-4.12, FR-4.13). | *Try again* → Generating poses · after a refusal, *Edit description* instead → Generate poses, text kept · with no one, *Shoot again* instead → Scene photo · *Back to camera* → Camera. | — |
@@ -710,7 +708,7 @@ Each flow is a wireflow: one row per task, labeled arrows for inputs and system 
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Share my camera** | Top bar: *Add a friend*, account button. Under *Invite a Pix friend*: received requests (FR-5.7), "Sent requests · 2" (FR-5.16), and friends with "Online", "Offline", or "In a session" and *Invite* (FR-5.9), or "No friends yet". Bottom: *Connect with someone nearby* with *Show a code*, and "My Pix ID: dongje.p". Lists refresh every 10 s. Signed in, it asks once per run to show notifications (Android 13 and later). | *Add a friend* → Add a friend · *Invite* → Invite sent (Flow 4), also to an offline friend · *Accept* / *Decline* a request (US-8) · *Sent requests · 2* → Sent requests · Long press a friend (TalkBack: *Remove friend*) → "Remove Junhyeong?" (FR-5.10) · *Show a code* → Room code (Flow 6) · Account button → Account · Own Pix ID → copied (FR-5.4) · Back → Camera. | Friend in another session → "Junhyeong is in another session" (FR-6.9). Withdrawn request → "This request is no longer there." Failed refresh → "Couldn't update your friends. Check your connection." Signed out by the server → "You were signed out. Sign in again to see your friends." |
+| **Share my camera** | Top bar: *Add a friend*, account button. Under *Invite a Pix friend*: received requests (FR-5.7), "Sent requests · 2" (FR-5.16), and friends with "Online", "Offline", or "In a session" and *Invite* (FR-5.9), or "No friends yet". Bottom: *Connect with someone nearby* with *Show a code*, and "My Pix ID: dongje.p". Lists refresh every 10 s. Signed in, it asks once per run to show notifications (Android 13 and later). | *Add a friend* → Add a friend · *Invite* → Invite sent (Flow 4), also to an offline friend · *Accept* / *Decline* a request (US-8) · *Sent requests · 2* → Sent requests · Long press a friend (TalkBack: *Remove friend*) → "Remove Joonhyung?" (FR-5.10) · *Show a code* → Room code (Flow 6) · Account button → Account · Own Pix ID → copied (FR-5.4) · Back → Camera. | Friend in another session → "Joonhyung is in another session" (FR-6.9). Withdrawn request → "This request is no longer there." Failed refresh → "Couldn't update your friends. Check your connection." Signed out by the server → "You were signed out. Sign in again to see your friends." |
 | **Share my camera** (signed out) | "Sign in to add friends by their Pix ID and invite them." with *Sign in to add friends*; *Show a code*. An account without a Pix ID: "Choose your Pix ID" with *Choose a Pix ID*. | *Sign in to add friends* → Sign in · *Choose a Pix ID* → Pix ID setup · *Show a code* → Room code · Back → Camera. | — |
 | **Add a friend** | "Their Pix ID"; *Search*; a result with name, @ID, and *Add*. | *Search* → the result, or No user found · *Add* → "Requested", with *Withdraw request* · Back → Share my camera. | Only a–z, 0–9, ".", "_"; *Search* waits for text. Own ID, a friend, or a pending request → "This is you", "Friends", "Requested", or *Accept* in place of *Add* (FR-5.8). A failed search → its reason. |
 | **No user found** | The field in red, "No user found"; *Search again*. | *Search again* → the field, text kept · Back → Share my camera. | — |
@@ -735,11 +733,11 @@ Each flow is a wireflow: one row per task, labeled arrows for inputs and system 
 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
-| **Invite sent** | A sheet over Camera: "Sending the invitation…", "Waiting for Junhyeong", then "Junhyeong accepted · connecting…"; *Share invite link*, *Copy link* (FR-6.1); *Cancel invite*. No remote-control toggle yet (FR-7.5, Could, Iteration 4). | Junhyeong accepts → Friend connected · *Cancel invite* → Share my camera; after an accept, it ends the session. | Declined, or 60 s → Invite not accepted (FR-6.3). Closing the sheet while waiting cancels the invitation. Other failures → "Couldn't connect…". |
-| **Friend connected** | Camera + guide with a blinking red light (FR-6.8), and *End session* in place of the gear and *Shoot together*. A notice per remote action, such as "Junhyeong set zoom to 2×" or "Junhyeong set a pose guide" (FR-7.4). "The live view uses mobile data." once (FR-6.13). While the link reconnects, the light is off (FR-6.12). | Flow 1's inputs · *End session* → Camera; the subject is told · The subject's changes → applied and echoed back. | "Junhyeong left", or "Junhyeong disconnected" after 10 s without the link (FR-6.11, FR-6.12); the camera keeps working. Unsent photos → "Couldn't send a photo to Junhyeong" or "Couldn't send 2 photos to Junhyeong" (FR-6.14). |
-| **Pick a pose · shared** | Pick a pose (Flow 2) with "Junhyeong sees this too". | Either phone's *Use this pose* first → Reference confirm on both. | Swipes and ♥s are not sent (FR-6.15). Leaving closes Junhyeong's screen too. |
-| **Reference confirm** (Junhyeong's choice) | Reference confirm with "Junhyeong chose this pose" and "Junhyeong sees this too". | Either phone's *Use this guide* first → Friend connected, the guide on both; Junhyeong's first adds "Junhyeong used this guide" · Another photo → its outline on both · Back → Camera; Junhyeong's closes. | A failure closes Junhyeong's too. A photo picked from Camera's *Guide* is not shared. |
-| **Invite not accepted** | "Junhyeong declined or didn't answer within a minute." | *Invite again* → Invite sent · *Back to camera* → Camera. | — |
+| **Invite sent** | A sheet over Camera: "Sending the invitation…", "Waiting for Joonhyung", then "Joonhyung accepted · connecting…"; *Share invite link*, *Copy link* (FR-6.1); *Cancel invite*. No remote-control toggle yet (FR-7.5, Could, Iteration 4). | Joonhyung accepts → Friend connected · *Cancel invite* → Share my camera; after an accept, it ends the session. | Declined, or 60 s → Invite not accepted (FR-6.3). Closing the sheet while waiting cancels the invitation. Other failures → "Couldn't connect…". |
+| **Friend connected** | Camera + guide with a blinking red light (FR-6.8), and *End session* in place of the gear and *Shoot together*. A notice per remote action, such as "Joonhyung set zoom to 2×" or "Joonhyung set a pose guide" (FR-7.4). "The live view uses mobile data." once (FR-6.13). While the link reconnects, the light is off (FR-6.12). | Flow 1's inputs · *End session* → Camera; the subject is told · The subject's changes → applied and echoed back. | "Joonhyung left", or "Joonhyung disconnected" after 10 s without the link (FR-6.11, FR-6.12); the camera keeps working. Unsent photos → "Couldn't send a photo to Joonhyung" or "Couldn't send 2 photos to Joonhyung" (FR-6.14). |
+| **Pick a pose · shared** | Pick a pose (Flow 2) with "Joonhyung sees this too". | Either phone's *Use this pose* first → Reference confirm on both. | Swipes and ♥s are not sent (FR-6.15). Leaving closes Joonhyung's screen too. |
+| **Reference confirm** (Joonhyung's choice) | Reference confirm with "Joonhyung chose this pose" and "Joonhyung sees this too". | Either phone's *Use this guide* first → Friend connected, the guide on both; Joonhyung's first adds "Joonhyung used this guide" · Another photo → its outline on both · Back → Camera; Joonhyung's closes. | A failure closes Joonhyung's too. A photo picked from Camera's *Guide* is not shared. |
+| **Invite not accepted** | "Joonhyung declined or didn't answer within a minute." | *Invite again* → Invite sent · *Back to camera* → Camera. | — |
 
 ### 6.6 Flow 5 · Shoot together, subject's phone
 
@@ -757,7 +755,7 @@ Each flow is a wireflow: one row per task, labeled arrows for inputs and system 
 |---|---|---|---|
 | **Invitation** | From the notification "Dongje invites you to shoot together" or the invite link's *Open in Pix*: "Dongje wants to show you their camera"; *Accept*, *Decline*. | *Accept* → Subject view · *Decline* → Camera; Dongje sees Invite not accepted. | Expired, cancelled, answered, or for another account → "This invitation is no longer available". Signed out → "Sign in to Pix with the account your friend invited, then accept." with *Sign in*, which returns here. Not loaded → "Couldn't open the invitation" with *Try again*. Another session here → "You're in another session. Leave it first, then accept." A room this phone waits in alone, as after its subject left (Design 2.4), is ended first ([#188]). |
 | **Subject view** | Dongje's live camera in Dongje's ratio, with the grid, the guide, and its reference thumbnail (FR-3.9); a blinking red light (FR-6.6). Top bar: flash, *Leave*. Over the video: brightness, zoom readout, and with a guide *Save guide* and the mode toggle. *Guide* at the bottom. No shutter. "Connecting…", "The photographer's camera is paused." after 2 s without video, or "Reconnecting…" (FR-6.12). "The live view uses mobile data." once (FR-6.13). | *Leave* → Camera · System back → "Leave the session?" · Dongje ends the session → "Dongje ended the session" → Camera. | Not reconnected in 10 s → Connection lost. |
-| **Subject view** · remote control | Brightness opens a horizontal EV slider above *Guide* (FR-7.3, [#182]). | Pinch the video or tap the readout → Dongje's zoom (FR-7.1) · Mode on: drag or pinch the guide → on both phones (FR-7.2) · Slider or flash → Dongje's camera · *Guide* → Add a pose guide with this phone's library, without *Generate poses here*; a guide used → on both phones, and "Junhyeong set a pose guide" on Dongje's (FR-6.15) · *Save guide* → this phone's library (FR-6.16) · *Save guide*, the readout, and the toggle show the Camera screen's labels · Tap the video → Dongje's focus (FR-7.7, Could, Iteration 4). | Opacity and hiding stay Dongje's. A guide that did not reach Dongje → "Couldn't send the guide". Remote control blocked, if built → disabled with a message (FR-7.5). |
+| **Subject view** · remote control | Brightness opens a horizontal EV slider above *Guide* (FR-7.3, [#182]). | Pinch the video or tap the readout → Dongje's zoom (FR-7.1) · Mode on: drag or pinch the guide → on both phones (FR-7.2) · Slider or flash → Dongje's camera · *Guide* → Add a pose guide with this phone's library, without *Generate poses here*; a guide used → on both phones, and "Joonhyung set a pose guide" on Dongje's (FR-6.15) · *Save guide* → this phone's library (FR-6.16) · *Save guide*, the readout, and the toggle show the Camera screen's labels · Tap the video → Dongje's focus (FR-7.7, Could, Iteration 4). | Opacity and hiding stay Dongje's. A guide that did not reach Dongje → "Couldn't send the guide". Remote control blocked, if built → disabled with a message (FR-7.5). |
 | **Subject view** · Dongje's steps | While Dongje describes, creates, picks, or checks a pose: "Dongje is describing a pose…", "…creating poses…", "…picking a pose…", or "…checking the guide…", and a button beside *Guide* for that step. | Dongje's step starts → its screen opens here once: Generate poses, Generating poses, Pick a pose, or Your reference · The button → it again · Dongje's photo saved here → "Photo saved to your Pix album" (FR-6.14). | Dongje decides or closes first → "Dongje chose a pose", "Dongje closed the poses", "Dongje used this guide", "Dongje closed the reference", or "Dongje closed Generate poses". A photo not saved → "Couldn't save Dongje's photo". |
 | **Generate poses** (Dongje's) | As on Dongje's phone, with this phone's history and *All* / *With Dongje* (FR-4.11), "Dongje sees this too", and "Dongje is typing…". | Typing → shown on Dongje's phone · The button → Dongje's phone starts the set · Back → Subject view. | While Dongje types, this field waits. No answer in 5 s → "Couldn't send your request". |
 | **Generating poses** (Dongje's set) | As on Dongje's phone; *Back* in place of *Cancel*. | Ready → Pick a pose · *Back* → Subject view. | Dongje cancels → "Dongje stopped creating poses"; all failed → "Dongje's poses couldn't be created". |
@@ -878,7 +876,7 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 | **Session** | A live connection between one photographer's phone and one subject's phone (*Shoot together*). |
 | **Live view** | The photographer's camera image as shown on the subject's phone. |
 | **Remote control** | The subject adjusting the shot from their phone: the zoom, the guide's position and size, the brightness, and the flash. Either person can move and resize the guide; only the photographer takes the photo. |
-| **Pix ID** | A unique user name, such as "junhyeong.h", that friends use to find each other. |
+| **Pix ID** | A unique user name, such as "joonhyung.h", that friends use to find each other. |
 | **Room code** | A 6-digit code (*Show a code*) that connects two phones without an account. |
 | **Invite link** | A link to an invitation that the photographer shares when the push notification does not arrive; it opens the same *Invitation* screen. |
 | **Relay** | Cloudflare's managed TURN service, which forwards the encrypted live view when the phones cannot connect directly, for example on cellular data. |

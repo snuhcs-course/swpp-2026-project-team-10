@@ -1,7 +1,7 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
 name: server-deploy-aws
 
-# Deploys dev to the temporary AWS server (Design 2.8, Hosting). Unlike the course servers, GitHub can reach it, so
+# Deploys dev to the AWS server (Design 2.8, Hosting). Unlike the course servers, GitHub can reach it, so
 # instead of a timer on the server pulling, this workflow has AWS Systems Manager run the PixDeploy document there,
 # which runs deploy.sh. Its access key may run only that document on that one instance, and it is a secret of the aws
 # environment, which only dev may use, so no SSH port needs to be open. The AWS side is set up once

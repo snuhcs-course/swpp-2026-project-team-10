@@ -16,7 +16,7 @@
 
 ---
 
-Pix is an Android camera app. It helps two people get the portrait that one of them has in mind. When friends take photos of each other, the person in the photo often knows the pose and the framing they want. But only the photographer sees the screen. Pix gives both people the same view. The photographer puts a pose guide on the camera. The subject's phone shows the live camera with the same guide, and the subject can adjust the shot. The photographer takes the photo. Pix saves it at full quality, without the guide.
+Pix is an Android camera app that helps two people get the portrait one of them has in mind. When friends photograph each other, the person in the photo usually knows the pose and framing they want, but only the photographer sees the screen. Pix gives both people the same view: the photographer puts a pose guide on the camera, and the friend's phone shows the live camera with the same guide and can adjust the shot. The photographer takes the photo, and it is saved at full quality without the guide.
 
 This branch is the **Iteration 3 build**. Two phones now connect over Wi-Fi or cellular data, with an invitation or a room code. Both phones follow the guide and pose steps together, and both phones keep the photo. AI poses fit the scene's ratio and come with a tip on how to take them. Pix also has selfie mode, a guide library, settings, a tutorial, and Korean.
 
@@ -89,7 +89,7 @@ Known limitations of the Iteration 3 build ([Testing Documentation 3.2](https://
 - The person check on the phone misses people who are far away or in low light. Pix then refuses the scene photo, so these users get no poses.
 - Suggested poses are often too alike for close-up scenes and selfies.
 - Some error messages do not say why a request failed. For example, a request over the daily AI limit shows the general error message.
-- The course servers answer only on the campus network. So debug builds use a temporary AWS server.
+- The course servers answer only on the campus network. So debug builds use the AWS server.
 
 ### Next: Iteration 4
 
@@ -103,7 +103,7 @@ Known limitations of the Iteration 3 build ([Testing Documentation 3.2](https://
 ![Architecture](wiki/images/design_target_architecture.png)
 
 - **Pix server** (FastAPI behind nginx on port 80): connects the two phones (signaling) and keeps accounts, friends, and invitations. It sends push notifications through Firebase Cloud Messaging (FCM). It checks each description and scene photo with a decision model. Then it sends the pose requests to the image and vision models through OpenRouter. The API key stays on the server. The server never sees the video.
-- **Servers**: Server A on the course servers runs `main` for release builds. Server B runs `dev` for staging. A temporary AWS server runs `dev` for debug builds and answers from any network. Each server deploys a new commit blue-green. The course servers pull it with a timer, and GitHub Actions deploys the AWS server.
+- **Servers**: Server A on the course servers runs `main` for release builds. Server B runs `dev` for staging. The AWS server runs `dev` for debug builds and answers from any network. Each server deploys a new commit blue-green. The course servers pull it with a timer, and GitHub Actions deploys the AWS server.
 - **Phone to phone** (WebRTC): the live video and the photos go directly between the two phones. So do the guide, the shared steps, the candidates, and the subject's controls. Without a direct path, Cloudflare's TURN relay forwards the encrypted packets. Each phone draws the guide itself, so the guide never appears in the video or in saved photos.
 - **On the phone**: CameraX runs the camera, and ML Kit makes the outline and the person check. The guide library, the settings, and the sign-in tokens stay on the phone.
 
@@ -115,7 +115,7 @@ The full design is in the [Design Documentation](https://github.com/snuhcs-cours
 |---|---|
 | Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel, and coroutines · CameraX 1.6 · ML Kit Subject Segmentation, Pose Detection, and Face Detection · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore · Credential Manager with Google ID · Firebase Cloud Messaging |
 | Server | Python 3.11 · FastAPI and Uvicorn (WebSocket signaling and REST API) · SQLAlchemy 2 with asyncpg and Alembic on PostgreSQL 18 · Redis (session store) · PyJWT and argon2 · google-auth (Google sign-in and FCM) · pydantic-settings · httpx2 · Pillow · Docker and nginx with blue-green deploys |
-| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging · OpenRouter · AWS EC2 (the temporary server) |
+| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging · OpenRouter · AWS EC2 (the AWS server) |
 | AI | Through OpenRouter: GPT Image 2.5 Flare at low quality for the candidates · Gemini 3.1 Flash Lite for the suggestions and the tips · Jev 1.14 (`typesafe/jev-1.14`) for the description filter and the person check. The AI module test uses Claude Opus 5.5 as its judge. |
 | Tests and CI | JUnit 4, Robolectric 4.17, and FragmentScenario with JaCoCo · pytest with pytest-cov, fakeredis, and SQLite · Spotless with ktlint · Ruff · GitHub Actions (lint, tests, the server image, the AWS deploy, the wiki) |
 
@@ -140,7 +140,7 @@ git checkout iteration-3-demo
 
 ### 2. Choose a server
 
-**The AWS server (no setup).** A debug build uses the temporary AWS server, `http://3.105.185.251/`, by default. It runs `dev` and answers from any network, cellular data included. To check it, open `http://3.105.185.251/health` in a phone's browser. It answers `{"status":"ok"}`.
+**The AWS server (no setup).** A debug build uses the AWS server, `http://3.105.185.251/`, by default. It runs `dev` and answers from any network, cellular data included. To check it, open `http://3.105.185.251/health` in a phone's browser. It answers `{"status":"ok"}`.
 
 **Server A (campus network only).** A release build uses Server A, `http://swpp26t10.147-46-242-169.sslip.io/`. It runs `main`. To use it in a debug build, create `android/local.properties` with this line:
 

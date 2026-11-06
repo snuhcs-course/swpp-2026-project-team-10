@@ -79,6 +79,7 @@
 | 2.54 | 2026-11-05 | The AI module test plan: evaluation set, rules, judge, test sets, commands, and thresholds, declared before the first run (3.1). |
 | 2.55 | 2026-11-06 | The UAT plan: five stories, the setup, the judging rules, and a script per story (4.3, 4.4). |
 | 2.56 | 2026-11-06 | The heuristic evaluation of 11/4: ratings, problems found, and what follows, and its Test Log row; the UAT moves to 4.3 and 4.4 (1, 4, 6). |
+| 2.57 | 2026-11-06 | The AWS server stays on; it is no longer temporary (2.1.6). |
 
 </details>
 
@@ -417,7 +418,7 @@ That comment is the full list of the class's partitions. The table gives each te
 | Fault injection | Simulate failures and check that the app survives them. | **Areas:** the server's answers to the app (the fake transport); the session's channels and sockets, rejoin included (Iter3-P14); images and masks in transit and on disk (Iter2-P18, Iter3-P9); the camera and storage; the server's dependencies: the session store, the account database, Google's certificates, the AI models, the description filter, the person check (Iter3-A7), and Cloudflare's TURN API (Iter3-P13); the app's account calls (Iter2-P13). **Examples:** the fake transport answers `502`, `504`, `429`, a truncated body, or a disconnect; the session store off or emptied by a restart, so sockets close with 1013 and pose requests answer `503 UNAVAILABLE`; the suggestion model failing, so the four default poses are used; storage full on save (FR-1.7). |
 | Fuzz | Feed many random or malformed inputs. | Random bytes and random JSON to `MessageCodec.decode` and to the signaling socket: the receiver ignores or rejects them and never crashes. |
 
-**Pairwise device and network matrix (2.1.5, NFR-10).** The three factors give 36 combinations; a pairwise table covers every pair of values in fewer runs. The runs are recorded in 2.2.2. From Iteration 3 the network pairs run against the temporary AWS server, which cellular data reaches (IT-12).
+**Pairwise device and network matrix (2.1.5, NFR-10).** The three factors give 36 combinations; a pairwise table covers every pair of values in fewer runs. The runs are recorded in 2.2.2. From Iteration 3 the network pairs run against the AWS server, which cellular data reaches (IT-12).
 
 | Factor | Values |
 |---|---|

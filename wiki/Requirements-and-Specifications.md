@@ -60,6 +60,7 @@
 | 2.36 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar with a base in Settings, the horizon bar, thinner lines, and *Save guide* as a toggle (FR-1.3, FR-1.4, FR-1.10, FR-1.11, FR-2.2, FR-3.6, FR-3.8, FR-3.10, FR-4.6, FR-4.10, FR-4.11, FR-6.16, FR-7.1, FR-7.3, FR-10.1, 6.2, 6.3, 6.6, 6.10, Figures 1, 2, 4–7; Iter3-A15, [#182]). |
 | 2.37 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code; F9, FR-4.8, FR-7.5, FR-7.7, FR-9.1–9.4, and NFR-19's shutter freeze moved to Iteration 4 (all sections). |
 | 2.38 | 2026-11-06 | The UAT stories fixed: US-2, US-4, US-9, US-10, and US-12 (4.4). |
+| 2.39 | 2026-11-06 | The AWS server stays on; it is no longer temporary (7). |
 
 </details>
 
@@ -839,7 +840,7 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 **Constraints**
 - OpenRouter's Image API bills each generated image and has rate limits. Pose generation needs no account, so the server limits requests per network address per hour (by default 20 poses, 10 suggestion requests, and 20 tips; phones behind one address share them) and for all phones per day (by default 500 poses).
 - The Pix server runs with Docker and nginx on the two course servers, one for the stable build and one for development. They are reachable only over HTTP on port 80, so there is no HTTPS or WSS (NFR-14). They cannot host a TURN relay, so sessions across networks use Cloudflare's managed relay.
-- Until the course servers are reachable from outside the campus network, a temporary AWS server with the same setup serves the user test and sessions across networks. GitHub hosting serves only static pages and cannot run the server.
+- The course servers answer only on the campus network. So an AWS server with the same setup serves debug builds and sessions across networks. GitHub hosting serves only static pages and cannot run the server.
 - Development follows the course schedule: about 10 hours of work per member per iteration.
 
 **Out of scope**

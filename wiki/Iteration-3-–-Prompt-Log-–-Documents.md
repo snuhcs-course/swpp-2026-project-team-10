@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-Iteration-3]]
 
-## Iteration 3 kickoff ([#130])
+## Cleaning up the documents ([#109])
 
 - [Jaewan, 10-25] "We are now going to start iteration 3. First I'm going to cleanup the design document and R&S's revision history. They are toooo long currently. Can you make each content shorter and concise? Without changing the numbers or order"
 - [Jaewan, 10-25] "can you also check for any unnecessary content that contains old app behavior? so we don't have to record all of our rationales on the decision changes we made, the design document and R&S only need to record the current, final behavior"
@@ -8,6 +8,8 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 10-25] "also do the same for the tesing documentation and fix the mismatch"
 - [Jaewan, 10-25] "Regarding the revision history 2.0, it should also be kept concise like what we did for the previous ones"
 - [Jaewan, 10-25] "commit and push this"
+## Iteration 3 kickoff ([#130])
+
 - [Jaewan, 10-25] "Okay and now this is a plan of what we are going to do this in iteration 3, from our weekly meeting today: […]"
   > ## 기능 개발
   >
@@ -113,13 +115,15 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 10-26] "commit and push this, and then create the issues. there are two remaining issues from iter2, so close them."
 - [Jaewan, 10-26] "update the wiki links and close the Iteration 2 milestone"
 - [Jaewan, 10-26] "commit and push this"
+## Wireframes in the repository ([#131])
+
 - [Jaewan, 10-26] "I have one more question. We are currently managing the wireframes in https://claude.ai/artifact/GRLQMzirhDrBui9WWTQ1vm , but can we also manage this in code? in this repo?"
 - [Jaewan, 10-26] "I think it would be better to manage this in code, and make the person who made a UI fix also edit the wireframe in the same PR. but can we or should we push this to the canvas after each change in our code?"
 - [Jaewan, 10-26] "yes, set it up on a new branch from dev"
 - [Jaewan, 10-26] "I think we should put `design/` into `wiki/` and put `design_architecture.html` into it"
 - [Jaewan, 10-26] "update CLAUDE.md and include instructions to update the wireframes too. and maybe we should have a render script for `design_architecture.html` too? or just one universal render script?"
 
-## Wireframes and Korean translation ([#138], [#140])
+## Korean translation and redrawn wireframes ([#138], [#140])
 
 - [Jaewan, 10-26] "Now we need to do Korean translation (issue #111). How are we going to do this?"
 - [Jaewan, 10-27] "yes, yes, yes. One more question. how is the default language chosen in Android? should the user change language settings in the app or in the phone settings?"
@@ -247,6 +251,8 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
   > - Making Android break Korean lines between words instead of in the middle of them (lineBreakWordStyle="phrase").
 - [Jaewan, 10-27] "in the wireframes, text outside the phone screens that mark the exact text in the phone screen should be written in korean. fix these"
 - [Jaewan, 10-27] "commit and push this. then, there are new changes to dev so apply this"
+## Room codes on any network, and Korean wording ([#144])
+
 - [Jaewan, 10-27] "this is merged into dev. can you run the emulator and give me some screenshots of the korean screens?"
 - [Jaewan, 10-27] "in 14_room_code.png, it says "두 휴대폰을 같은 WiFi에 연결하세요". is this shown always? I think we've merged #139 (connecting from different networks)"
 - [Jaewan, 10-27] "on different networks, do we always go to TURN?"
@@ -269,6 +275,9 @@ Back to [[AI Collaboration Report – Iteration 3|AI-Collaboration-Report-–-It
 - [Jaewan, 10-27] "yeah and check for that bug"
 - [Jaewan, 10-27] "yeah fix that pattern there too. and just fix the test name, we don't need to fix the testing document"
 
+[#109]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/109
 [#130]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/130
+[#131]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/131
 [#138]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/138
 [#140]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/140
+[#144]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/144

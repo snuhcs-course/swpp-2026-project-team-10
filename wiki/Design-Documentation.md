@@ -77,6 +77,7 @@
 | 2.45 | 2026-11-05 | Who takes the photo, before connecting: *Shoot together* asks first, received invitations are listed, and sign-in returns to the screen that opened it (2.1, 2.5.3, 2.6.6, 2.6.8, 2.8, Figure 8b; Iter3-A17, [#188]). |
 | 2.46 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar, the horizon bar, thinner lines, and *Save guide* as a toggle (2.5.1, 2.6.1–2.6.3, 2.6.5, 2.6.8, 2.8; Iter3-A15, [#182]). |
 | 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code; QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*); Figure 1 redrawn; pushes only to signed-in phones (all sections). |
+| 2.48 | 2026-11-06 | The UAT plan done (1.4.2). |
 
 </details>
 
@@ -338,7 +339,7 @@ The plan from the kickoff of 2026-10-25 (Team Meetings) and the items added duri
 | **Checks before pose generation** (FR-4.12, FR-4.13) | Delivered: the description filter and the person check (Iter3-A7, [#165]). | 2.6.3 |
 | **Camera and screen polish** | Delivered: Camera's buttons and preview size (Iter3-A2, [#136]); a light for the scene photo (Iter3-A5, [#158]); the app icon (Iter3-A6, #162); camera animations (Iter3-A12, [#179]); the guide and pose flow (Iter3-A13, [#180]); screen transitions (Iter3-A14, [#181]); Camera's controls after the heuristic evaluation (Iter3-A15, [#182]); choosing who takes the photo (Iter3-A17, [#188]). Moved to Iteration 4: photos and latency closer to the stock camera (Iter3-A16, #183). | 2.1, 2.6.2, 2.6.3, 2.6.8, 2.8 |
 | **The Could items** (FR-7.5, FR-7.7, NFR-19) | Moved to Iteration 4: the remote-control switch and remote focus (Iter2-P17), and the shutter freeze fix (Iter2-P5, with #183). Their messages, `control.permission` and `camera.focus.set`, are defined but unused. | 2.6.5 |
-| **Testing and evaluation** | Done: the user test on the AWS server, six participants, 11/1–11/4; the AI module test (Iter3-P26, #126); the integration tests (Iter3-P27, #127). Open: the UAT stories; integration (Iter3-P28, [#128]); the documents (Iter3-P29, #129). | Testing Documentation 3, 4 |
+| **Testing and evaluation** | Done: the user test on the AWS server, six participants, 11/1–11/4; the AI module test (Iter3-P26, #126); the integration tests (Iter3-P27, #127); the UAT plan (Testing Documentation 4.2). Open: integration (Iter3-P28, [#128]); the documents (Iter3-P29, #129). | Testing Documentation 3, 4 |
 
 #### 1.4.3 Iterations 4 and 5 · fixes, polish, and final release
 

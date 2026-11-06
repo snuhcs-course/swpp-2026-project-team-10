@@ -59,6 +59,7 @@
 | 2.35 | 2026-11-05 | Who takes the photo, before connecting: *Shoot together* asks first, then *Share my camera* or *See their camera*; received invitations listed; sign-in returns to its screen (FR-5.2, FR-5.4, FR-5.7, FR-5.16, FR-6.17, FR-8.1–8.2, FR-9.1–9.2, FR-10.5, US-9, US-13, 6.4, 6.6, 6.7, 6.9, Figures 3, 3b, 4, 6, 7; Iter3-A17, [#188]). |
 | 2.36 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar with a base in Settings, the horizon bar, thinner lines, and *Save guide* as a toggle (FR-1.3, FR-1.4, FR-1.10, FR-1.11, FR-2.2, FR-3.6, FR-3.8, FR-3.10, FR-4.6, FR-4.10, FR-4.11, FR-6.16, FR-7.1, FR-7.3, FR-10.1, 6.2, 6.3, 6.6, 6.10, Figures 1, 2, 4–7; Iter3-A15, [#182]). |
 | 2.37 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code; F9, FR-4.8, FR-7.5, FR-7.7, FR-9.1–9.4, and NFR-19's shutter freeze moved to Iteration 4 (all sections). |
+| 2.38 | 2026-11-06 | The UAT stories fixed: US-2, US-4, US-9, US-10, and US-12 (4.4). |
 
 </details>
 
@@ -339,7 +340,7 @@ Planned for Iteration 4 (#122).
 
 ### 4.4 User stories and acceptance criteria
 
-Each story lists its scenarios in Given-When-Then form: **Normal** is the expected path, **Failure** an error or a rejected input, and **Edge** an unusual but valid situation. Stories marked "UAT candidate" are proposals; the final UAT set is fixed by the end of Iteration 3.
+Each story lists its scenarios in Given-When-Then form: **Normal** is the expected path, **Failure** an error or a rejected input, and **Edge** an unusual but valid situation. Stories marked "UAT" are the user acceptance test's, with its criteria and scripts in the Testing Documentation (4.2).
 
 #### US-1 · Take a photo right after opening Pix
 <sub>F1 · FR-1.1–1.14 · It 1–3</sub>
@@ -364,7 +365,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Failure** | The phone's storage is full | I tap the shutter | "Couldn't write the photo. Check available storage and try again." appears; the camera stays ready. |
 
 #### US-2 · Turn a gallery photo into a pose guide
-<sub>F2 · FR-2.1–2.7, FR-2.9, FR-2.10 · It 1–3 · UAT candidate</sub>
+<sub>F2 · FR-2.1–2.7, FR-2.9, FR-2.10 · It 1–3 · UAT</sub>
 
 > As a photographer, I want to pick a reference photo from my gallery and see the person in it on my camera screen, so that I can frame the shot the way my friend wants.
 
@@ -404,7 +405,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Normal** | A guide is on the preview over a dark scene | I switch *Settings › Guide › Color* between *Black* and *White* | The outline changes between black and white. |
 
 #### US-4 · Get pose ideas that fit this place
-<sub>F4 · FR-4.1–4.7, FR-4.9, FR-4.13 · It 1–3 · UAT candidate</sub>
+<sub>F4 · FR-4.1–4.7, FR-4.9, FR-4.13 · It 1–3 · UAT</sub>
 
 > As a user without a reference photo, I want Pix to suggest poses from a photo of where we are, so that I get ideas that fit this place and this person.
 
@@ -478,7 +479,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Edge** | The request is shown | I tap *Decline* | The request disappears. Seongmin is not told and can send a request again later. |
 
 #### US-9 · Invite a friend to shoot together
-<sub>F6, F7 · FR-6.1–6.5, FR-6.9, FR-6.17, FR-7.5 · It 3 · UAT candidate</sub>
+<sub>F6, F7 · FR-6.1–6.5, FR-6.9, FR-6.17, FR-7.5 · It 3 · UAT</sub>
 
 > As a photographer, I want to invite a friend from my list, so that they can see my camera from where they are standing without typing a code.
 
@@ -494,7 +495,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Edge** | The invitation is waiting, and Junhyeong dismissed its notification by mistake | Junhyeong taps *Shoot together*, sees "1 invite" on *I'll be in the photo*, and taps it | *See their camera* lists my invitation with its time left, and *Accept* connects us. |
 
 #### US-10 · See the photographer's framing live
-<sub>F6 · FR-6.4, 6.6, 6.10–6.12 · It 1–3 · UAT candidate</sub>
+<sub>F6 · FR-6.4, 6.6, 6.10–6.12 · It 1–3 · UAT</sub>
 
 > As a subject, I want to see the photographer's camera view on my own phone, so that I can fix my position and pose myself.
 
@@ -507,7 +508,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Edge** | The invitation expired or was cancelled | I tap the old notification | "This invitation is no longer available" appears. |
 
 #### US-11 · See the same guide on both phones
-<sub>F3, F6 · FR-3.7, FR-3.9, FR-6.7 · It 1–3 · UAT candidate</sub>
+<sub>F3, F6 · FR-3.7, FR-3.9, FR-6.7 · It 1–3</sub>
 
 > As a subject, I want the guide on my phone to match the photographer's, so that we both aim at the same target.
 
@@ -522,7 +523,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Failure** | I am on *Subject view* | I look for the guide's opacity or hide controls | There are none; only Dongje changes those. I can move and resize the guide (FR-7.2) and choose another with *Guide* (FR-6.15). |
 
 #### US-12 · Adjust the shot from my phone
-<sub>F7 · FR-7.1–7.7 · It 1–3 · UAT candidate</sub>
+<sub>F7 · FR-7.1–7.7 · It 1–3 · UAT</sub>
 
 > As a subject, I want to adjust the photographer's zoom, the guide, and the brightness from my phone, so that I get the framing I want without shouting instructions.
 

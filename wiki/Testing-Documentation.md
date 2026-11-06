@@ -77,6 +77,8 @@
 | 2.52 | 2026-11-05 | The AI module test plan without the metamorphic checks (3.1). |
 | 2.53 | 2026-11-05 | Same-iteration change notes removed from the shared steps' row, IT-9, IT-13, and IT-23 (1.1, 2.1.5). |
 | 2.54 | 2026-11-05 | The AI module test plan: evaluation set, rules, judge, test sets, commands, and thresholds, declared before the first run (3.1). |
+| 2.55 | 2026-11-06 | The UAT plan: five stories, the setup, the judging rules, and a script per story (4.3, 4.4). |
+| 2.56 | 2026-11-06 | The heuristic evaluation of 11/4: ratings, problems found, and what follows, and its Test Log row; the UAT moves to 4.3 and 4.4 (1, 4, 6). |
 
 </details>
 
@@ -86,7 +88,7 @@ Sections 1–3 **verify** Pix against the R&S and the Design (tests, the AI eval
 
 - Functional: 2 (unit, integration), 4 (UAT).
 - Performance: 2.2.3 (NFR-1 to NFR-12, NFR-19).
-- Usability: the NFR-16 hallway test, the user test (4.1), the heuristic evaluation, 4, 5.
+- Usability: the NFR-16 hallway test, the user test (4.1), the heuristic evaluation (4.2), 4, 5.
 - Acceptance: 4.
 - Security and access control: the NFR-14 and NFR-15 server tests in 2 (non-friend and blocked cases).
 - Compatibility: the NFR-17 device pass (2.2.2), the pairwise device and network table (2.1.6).
@@ -186,8 +188,8 @@ Passing CI is necessary, not sufficient. The reviewer also checks the tests (1.3
 Sections first required in each iteration (sections 2, 3, and 4 stay current in every later iteration):
 
 - **Iteration 2:** 1 Test Responsibility & Schedule; 2 Unit & Integration Testing (plan, first results).
-- **Iteration 3:** 3 AI Module Testing (evaluation set, thresholds, first results); 4.1 Preliminary user test; 4.2 UAT plan. Testing focuses on taking photos with the camera, pose suggestions and the guide, and live sharing. Where latency is tested, and with which limits, is **TBD**.
-- **Iteration 4:** 4.3 UAT results (the UAT on 11/16 and 11/18).
+- **Iteration 3:** 3 AI Module Testing (evaluation set, thresholds, first results); 4.1 Preliminary user test; 4.2 Heuristic evaluation; 4.3 UAT plan. Testing focuses on taking photos with the camera, pose suggestions and the guide, and live sharing. Where latency is tested, and with which limits, is **TBD**.
+- **Iteration 4:** 4.4 UAT results (the UAT on 11/16 and 11/18).
 - **Iteration 5:** 5 Alpha & Beta Testing: in-class testing on 11/30, real user test on 12/2 (plan, execution, results).
 
 ### 1.3 Test quality rules
@@ -731,7 +733,7 @@ Each iteration's run adds a column to the tables below; the run's details are in
 
 ## 4. Acceptance Testing
 
-Acceptance testing checks that Pix does what its users need (validation). The preliminary user test (4.1) was run by the team on its own, before and apart from the course's heuristic evaluation and UAT. The UAT (4.2, 4.3) runs in class in Iteration 4.
+Acceptance testing checks that Pix does what its users need (validation). The preliminary user test (4.1) was run by the team on its own, before and apart from the course's heuristic evaluation (4.2) and UAT. The UAT (4.3, 4.4) runs in class in Iteration 4.
 
 ### 4.1 Preliminary user test (Iteration 3)
 
@@ -780,25 +782,144 @@ A test with users outside the team, run to find problems early. It is separate f
 | Guidance on the background and the camera's tilt for the pose | 1 (P4) | No fix decided |
 | A timer; the shutter on the subject's phone; the guide's color and thickness | 1 each | The guide's color and thickness built ([#163], merged 11/2); no fix decided for the other two |
 
-### 4.2 UAT plan (Iteration 3)
+### 4.2 Heuristic evaluation (In-Class, Iteration 3)
 
-To be completed in Iteration 3. The UAT runs in class on 11/16 and 11/18 (Iteration 4).
+The course's heuristic evaluation, held in class on 11/4. Students of other teams used Pix and rated it against Nielsen's ten heuristics.
 
-- **Black-box stories.** The UAT is validation, so its stories are written from the R&S, run by a tester who follows the procedure without knowing the code, and judged on what the user sees.
-- **Stories.** At least five user stories from R&S 4.4, chosen once and not changed afterwards. The candidates are US-2, US-4, US-9, US-10, US-11, and US-12 (marked "UAT candidate" in the R&S).
-- **Per story.** The acceptance criteria (the observable pass conditions, from the story's Given–When–Then table) and the tester's procedure, step by step, with the devices and the network.
+**Run.** Two rounds on 11/4. Three evaluators: E1 (Team 13) and E2 (Team 5) in the first round, E3 (Team 19) in the second. Each rated every heuristic from 0 (no problem) to 4 (usability catastrophe), with a reason and a suggestion. The app was built from `7b03e9e`.
 
-| Story | Acceptance criteria | Procedure | Devices |
+**Ratings.** "—" is a heuristic left unrated.
+
+| Heuristic | E1 | E2 | E3 |
 |---|---|---|---|
-| US-? | | | |
+| Visibility of system status | 0 | 0 | 0 |
+| Match between system and the real world | 1 | 0 | 0 |
+| User control and freedom | 0 | 0 | 0 |
+| Consistency and standards | 1 | 0 | 0 |
+| Error prevention | 0 | — | 0 |
+| Recognition rather than recall | 0 | 1 | 0 |
+| Flexibility and efficiency of use | 2 | — | 0 |
+| Aesthetic and minimalist design | 0 | 0 | 0 |
+| Help users recognize, diagnose, and recover from errors | 0 | 1 | 2 |
+| Help and documentation | 0 | 0 | 1 |
 
-### 4.3 UAT results (Iteration 4)
+**Summary.**
 
-To be completed in Iteration 4: for each story, pass or fail, the test date, the tester, and any deviation from the criteria.
+- No major problem (3) or catastrophe (4). Of 28 ratings, 21 are 0, five are 1 (cosmetic), and two are 2 (minor).
+- The two minor problems: *Generate poses* had two buttons that did the same thing with an empty field (E1), and a request stopped by the daily AI limit failed without saying why, which held up the evaluation (E3).
+- Error messages drew the most comments: two of the three evaluators found that they do not say why something failed or what to do. Iteration 4 gives each case of failure its own message.
+- Praised: the guide, the live session, the horizon bar, and the loading of AI poses always show the state (E1, E3). The screens follow the stock camera's conventions and icons (E2, E3). ✕ and undo lead back from any state, AI generation included, and guides can be saved and reused (E3).
+
+**Problems found and what follows.** Most severe first; suggestions rated 0 last.
+
+| Problem | Heuristic · severity · evaluator | What follows |
+|---|---|---|
+| A request stopped by the daily AI limit showed only *Couldn't create poses*, without the reason, which held up the evaluation | Error recovery · 2 · E3 | Iteration 4: a separate error message for each case of failure. The app already tells the limit apart (HTTP 429) but shows the general message |
+| *Generate 4 poses* and *Skip, suggest poses for me* did the same thing with an empty field | Flexibility and efficiency · 2 · E1 | Built: one button, *Suggest 4 poses* or *Generate 4 poses from this* (Iter3-A13, [#180]) |
+| A refused description only says to try another, not why it was refused or how to write one | Error recovery · 1 · E2 | Iteration 4: a separate error message for each case of failure, as above |
+| The toggle that sets whether a pinch moves the guide or zooms the camera needs a clearer icon | Recognition rather than recall · 1 · E2 | Built: a tap shows *Guide* or *Camera* above the toggle for 3 s (Iter3-A15, [#182]). The icon is unchanged |
+| The horizon bar is thick | Consistency and standards · 1 · E1 | Built: 1.5 dp instead of 3 dp; the grid, the guide, and the focus mark are thinner too (Iter3-A15, [#182]) |
+| Pinch zoom lags behind the camera; a zoom slider would be easier | Match with the real world · 1 · E1 | Iteration 4: latency closer to the stock camera ([#183]). No fix decided for a slider |
+| One fixed tutorial is not enough for this many features; first users could follow a walkthrough | Help and documentation · 1 · E3 | No fix decided |
+| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole |
+| A saved guide could bring back the zoom and flash it was shot with | Flexibility and efficiency · 0 · E3 | No fix decided |
+| The guide's color and thickness could be set automatically for visibility | Additional · 0 · E1 | No fix decided. Both are set in Settings (FR-3.10) |
+| A switch to turn off the horizon bar; a landscape layout | Additional · 0 · E3 | The bar now hides past a 20° tilt (Iter3-A15, [#182]). No fix decided for a switch or a landscape layout |
+
+### 4.3 UAT plan (Fixed in Iteration 3)
+
+The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team follow the scripts below without knowing the code, and judge only what they see.
+
+**Stories.** The UAT includes five stories of R&S 4.4, fixed on 2026-11-06 and not changed afterwards. Together they cover Pix's two uses: a pose guide on one phone, and shooting together on two phones.
+
+| Story | What it checks | Phones |
+|---|---|---|
+| [US-2](#us-2--turn-a-gallery-photo-into-a-pose-guide) · Turn a gallery photo into a pose guide | The guide from a reference photo (F2) | A |
+| [US-4](#us-4--get-pose-ideas-that-fit-this-place) · Get pose ideas that fit this place | AI poses for the scene, without a reference (F4) | A, with tester B in the scene |
+| [US-9](#us-9--invite-a-friend-to-shoot-together) · Invite a friend to shoot together | A session started from an invitation (F6) | A and B |
+| [US-10](#us-10--see-the-photographers-framing-live) · See the photographer's framing live | The subject's live view (F6) | A and B |
+| [US-12](#us-12--adjust-the-shot-from-my-phone) · Adjust the shot from my phone | Remote control from the subject's phone (F7) | A and B |
+
+**Setup.**
+
+- **Build.** The phones run a debug build of the UAT commit, recorded in 4.4.
+- **Phones.** The phones are the testers' own, with Android 10 or later, and are not chosen yet. Phone A is the photographer's and phone B the subject's. Each is on Wi-Fi or cellular data, as its tester likes. On both, Pix is in Korean with notifications allowed. The scripts below quote Pix's English text.
+- **Accounts.** A is signed in as `test1` (Test Account 1), B as `test2` (Test Account 2). The two are friends. A has not yet agreed to send photos to the AI service.
+- **Photos on A.** R1: one person, full body, with an arm stretched out and the legs apart. R2: a landscape without people. R3: a screenshot of an Instagram post that shows one person.
+- **People.** Tester A holds phone A. Tester B holds phone B and is the person in A's scene: 2–4 m away, whole body in the frame, in good light.
+- **Order.** The scripts run in the table's order, in about 20 minutes. US-2 and US-4 start on Camera without a guide. US-10 continues US-9's session.
+
+**Judging.**
+
+- Each "Pass when" cell is an acceptance criterion. A story passes when all its criteria pass.
+- A step may be repeated once when the tester's input was wrong. A crash, a freeze, or a second miss fails the criterion.
+- A failure outside Pix, such as the network or the server going down, is a deviation. The story runs again once the cause is fixed.
+- Times under 1 s are not judged by eye.
+
+#### US-2 · Turn a gallery photo into a pose guide
+
+| Step | Tester does | Pass when |
+|---|---|---|
+| 1 | On A's Camera, tap *Guide* › *Add photo*, and choose R2. | *No person found* appears. |
+| 2 | Tap *Choose another photo*, and choose R1. | The photo picker opens again. Within 2 s of choosing R1, *Reference confirm* shows the person as an outline. The guide contains none of the photo's pixels or background. |
+| 3 | Look at the outline. | It is smooth. The stretched arm and the legs keep their real shape and length. |
+| 4 | Tap *Use this guide*. | Camera shows the guide over the live preview. |
+| 5 | Tap *Guide*, which asks "Replace the pose guide?". Tap *Add photo*, and choose R3. | *Reference confirm* shows the screenshot cut to the post's photo, with "Cut from a screenshot". Only the post's person is outlined. |
+
+#### US-4 · Get pose ideas that fit this place
+
+| Step | Tester does | Pass when |
+|---|---|---|
+| 1 | On A's Camera, tap *Guide* › *Generate poses here*. On "Send this photo to an AI service?", tap *Agree and continue*. | — |
+| 2 | Point A at a place with no one in it, such as a wall, and press the shutter. | "No one in this photo" appears, and *Use this photo* is disabled. |
+| 3 | Tap *Shoot again*. Frame tester B, press the shutter, and tap *Use this photo*. | *Generate poses* shows the scene photo, with *Suggest 4 poses* for the empty field. |
+| 4 | Turn off A's network, both Wi-Fi and cellular data, and tap *Suggest 4 poses*. | *Couldn't create poses* appears, with the scene photo kept. |
+| 5 | Turn A's network back on, wait for the connection, and tap *Try again*. | *Generating poses* shows the scene photo and fills in each candidate as it arrives, with "n of 4 ready". All four candidates are ready within 60 s. |
+| 6 | Swipe to a candidate, and tap *Use this pose*. | *Reference confirm* opens with that pose's person as an outline. |
+
+#### US-9 · Invite a friend to shoot together
+
+| Step | Tester does | Pass when |
+|---|---|---|
+| 1 | On B, close Pix: swipe it away from the recent apps. On A, tap *Shoot together* › *I'll take the photo*, then *Invite* beside Test Account 2. | A shows "Waiting for Test Account 2". Within 5 s, B gets the notification "Test Account 1 invites you to shoot together". |
+| 2 | On A, tap *Cancel invite*. On B, tap the notification. | A is back on *Share my camera*. B says "This invitation is no longer available". |
+| 3 | On A, tap *Invite* again. On B, tap the new notification, then *Decline*. | A shows *Invite not accepted*, with *Invite again* and *Back to camera*. |
+| 4 | On A, tap *Invite again*. On B, swipe the new notification away, and tap *Shoot together* in Pix. | *I'll be in the photo* shows "1 invite". |
+| 5 | On B, tap *I'll be in the photo*. | *See their camera* lists Test Account 1's invitation with its time left. |
+| 6 | On B, tap *Accept*. | Within 10 s, a red light blinks at the top right of A's camera image, and B shows A's camera live. |
+
+#### US-10 · See the photographer's framing live
+
+| Step | Tester does | Pass when |
+|---|---|---|
+| 1 | Continue US-9's session. On A, move the phone slowly left and right. | B's *Subject view* is titled "Test Account 1's camera" and has a blinking red light. Its live view follows A's movement. |
+| 2 | On B, tap *Leave*, then *Leave* again to confirm. | B is back on its own camera. A shows "Test Account 2 left". |
+| 3 | On A, tap *Shoot together* › *I'll take the photo* › *Invite*. On B, tap the notification, then *Accept*. | Within 10 s, B's *Subject view* shows A's camera live, with a blinking red light. |
+| 4 | Turn off B's network, both Wi-Fi and cellular data, for 15 s. | B shows *Connection lost*. |
+| 5 | Turn B's network back on, and tap *Leave*. | B is back on its own camera. |
+
+#### US-12 · Adjust the shot from my phone
+
+| Step | Tester does | Pass when |
+|---|---|---|
+| 1 | On A, tap *Guide* › *Add photo*, choose R1, and tap *Use this guide*. Invite B as in US-10 step 3; B accepts from the notification. | B's *Subject view* shows A's camera live, with the guide. |
+| 2 | On B, with guide-edit mode off (the toggle beside the zoom readout says *Camera*), pinch the live video to 2×, and let go. | B's readout follows the pinch. A's camera zooms, both readouts settle on the same ratio, and A shows "Test Account 2 set zoom to 2×". |
+| 3 | On B, tap the toggle so that it says *Guide*. Drag the guide to the right, and pinch it larger. | The guide moves and grows on both phones. A shows "Test Account 2 moved the guide". |
+| 4 | On B, tap the brightness button, and raise the slider. | A's preview and B's live view get brighter. |
+| 5 | On B, tap the flash button. | A's flash moves to its next state, and both phones show that state. |
+| 6 | Set both phones' toggles to *Camera*. On A and B, pinch the zoom at the same moment, and let go. | Both readouts settle on the same zoom. |
+
+### 4.4 UAT results (In-Class, Iteration 4)
+
+To be completed in Iteration 4: the build's commit, the two phones, and for each story, pass or fail, the test date, the tester, and any deviation from the criteria, with the steps that failed.
 
 | Story | Result | Date | Tester | Deviations |
 |---|---|---|---|---|
-| US-? | | | | |
+| US-2 | | | | |
+| US-4 | | | | |
+| US-9 | | | | |
+| US-10 | | | | |
+| US-12 | | | | |
 
 ---
 
@@ -830,6 +951,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 | 2026-11-06 | 3 | Integration scripts on the phones (IT-1–4, 6, 8, 10–34), from 11/04 | `7b03e9e`, `c842fa1` | 31 of 31 pass; IT-5, 7, and 9 covered by later scripts; IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
 | 2026-11-05 | 3 | AI module tests: three runs of the 50 cases, the judge's validation, the description filter, and the person check on a Galaxy Note20 | `430447f` | Suggestions (78.0 %) and the person check (34.6 % of people refused) fail; the other nine thresholds pass, tips at the threshold (80.0 %) | [3.2](#32-results), [record](#run-2026-11-05-ai-module-tests) |
+| 2026-11-04 | 3 | Heuristic evaluation in class: three evaluators of other teams, Nielsen's ten heuristics | `7b03e9e` | No major problem; two minor: *Generate poses*' two buttons for an empty field, built in Iteration 3, and the daily AI limit's failure without its reason | 4.2 |
 | 2026-11-04 | 3 | User test, 11/1–11/4: six participants outside the team, a Google Form over five scenarios | — | SUS 77.9; no crashes; 5 of 6 say Pix would help; follow-ups for Iteration 4 in 4.1 | 4.1 |
 | 2026-11-04 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `7b03e9e` | 1,471 + 784 tests, 0 failed; app 85.9 % (94.2 / 97.4 / 94.5 / 49.6); server 98.3 % | 2.2.1 (before the run of 11/06) |
 | 2026-10-23 | 2 | Integration scripts on the phones (IT-1, 5–9, 11), from the 10/23 demo and the 10/15 midterm recordings; IT-10 from [#93] | `23c620a` | IT-1, 8 pass; IT-5, 7, 9 pass with a step not run; IT-6, 11 partial; IT-2, 3, 4 not run (Iter2-P15/P16). Timing NFRs not measured; cellular pairs not run | 2.2.2, 2.2.3; [record](#run-2026-10-23-integration-scripts) |
@@ -1881,4 +2003,5 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#180]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/180
 [#181]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/181
 [#182]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/182
+[#183]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/183
 [#188]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/188

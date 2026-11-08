@@ -87,11 +87,11 @@ Audience: the development team. This page describes Pix's design as built throug
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
-| Four prompt templates (FR-4.8) | With a description, four templates around one `{pose}` replace the three variations. The default template reads `{pose}` as the user's request, keeps the face and the clothes, and makes one pose per photo (2.6.3). Open: the templates, and requests such as "two photos saluting and two with hands up" (Iter3-P25, [#125]; now [#207]). Open also, from the kickoff of 11/7: whether four templates are needed at all, the belongings kept, and the framing. | 박재완 | Iteration 4 |
-| Offline QR connection (F9) | The photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]; now [#212]). | 조성민 | Iteration 4 |
-| The light mode's colors (FR-10.1) | Light mode follows the phone's setting, with dark kept, on color tokens sorted into *page* and *on the image* ([#208]). Open: the palette, the current black and yellow or a lighter one; the comparison boards are on the team's design canvas ([#209]). | 박동제 | Iteration 4 |
+| Four prompt templates (FR-4.8) | With a description, four templates around one `{pose}` replace the three variations. The default template reads `{pose}` as the user's request, keeps the face and the clothes, and makes one pose per photo (2.6.3). Open: the templates, and requests such as "two photos saluting and two with hands up" (Iter3-P25, [#125]; now [#211]). Open also, from the kickoff of 11/7: whether four templates are needed at all, the belongings kept, and the framing. | 박재완 | Iteration 4 |
+| Offline QR connection (F9) | The photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]; now [#214]). | 조성민 | Iteration 4 |
+| The light mode's colors (FR-10.1) | Light mode follows the phone's setting, with dark kept, on color tokens sorted into *page* and *on the image* ([#202]). Open: the palette, the current black and yellow or a lighter one; the comparison boards are on the team's design canvas ([#212]). | 박동제 | Iteration 4 |
 | Back on the pose screens (FR-4.6) | Back never leaves *Generate poses* or *Pick a pose* for Camera; only ✕ does. Proposal: on *Pick a pose*, Back is *Try other poses*; on *Generate poses* after it, Back returns to the candidates, and *Generate again* makes a new set from the same description; opened from the scene photo, Back returns to its review ([#199]). Open: the map. | 한준형 | Iteration 4 |
-| Situation prompts (FR-4.8) | A prompt per situation (background, person, landmark, ID photo, default, selfie) behind a `situation` field, compared with the current prompt on the evaluation scenes before the choice is built ([#206], [#217]). Open: which situations keep their own prompt. | 박재완 | Iteration 4 |
+| Situation prompts (FR-4.8) | A prompt per situation (background, person, landmark, ID photo, default, selfie) behind a `situation` field, compared with the current prompt on the evaluation scenes before the choice is built ([#209], [#210]). Open: which situations keep their own prompt. | 박재완 | Iteration 4 |
 
 **Contents**
 
@@ -2639,8 +2639,8 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `PreviewHold` keeps the last frame, without a spinner, from `READY` → `STARTING` until `READY` with the preview streaming, at most 2 s. The grid and the guide stay over it (2.6.2, *Changes on screen*).
   - `Timings` marks `camera.status`, `preview.stream`, and `preview.still`. Debug builds add `zoom.request`, `zoom.apply`, `zoom.lens`, and `zoom.frame` for 1.5 s after each zoom, switch, or shutter. `android/scripts/zoom_timings.py` reports intervals, dropped and frozen frames, latency, and switches (IT-10).
   - S23 Ultra, 2026-10-22: no stutter, 30 fps, and no lens switch, since it reaches 0.6× natively ([#93]). S21 and S22, Iteration 3: no stutter by eye, and the last frame at a switch (IT-10).
-  - The S21's frame intervals are not measured. `PreviewView`'s `PERFORMANCE` mode is tried with [#205] in Iteration 4 (Iter4-P8, low priority).
-  - The shutter freeze fix (Could) is planned for Iteration 4, with [#205].
+  - The S21's frame intervals are not measured. `PreviewView`'s `PERFORMANCE` mode is tried with [#208] in Iteration 4 (Iter4-P11, low priority).
+  - The shutter freeze fix (Could) is planned for Iteration 4, with [#208].
 - **Photos.** Only the photographer takes photos.
 - **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
 
@@ -3101,11 +3101,11 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Pose tips in Korean (Iter3-A4, [#156]) | 박동제 | 10/31 | Done | 2.6.3, 2.8 |
 | A light for the scene photo (Iter3-A5, [#158]) | 박동제 | 10/31 | Done | 2.6.3 |
 | The app icon and branding assets (Iter3-A6, #162) | 박재완 | 10/31 | Done | — |
-| The offline QR connection (Iter3-P22, [#122]) | 조성민 | 11/5 | Moved to Iteration 4 ([#212]) | *Still open* |
+| The offline QR connection (Iter3-P22, [#122]) | 조성민 | 11/5 | Moved to Iteration 4 ([#214]) | *Still open* |
 | The settings screen (Iter3-P23, [#123]) | 조성민 | 11/5 | Done | 2.6.8 |
 | The first-use tutorial (Iter3-P23, [#123]); its tips over each screen (#173) | 한준형; 박재완 (#173) | 11/5 | Done | 2.6.8 |
 | Prompt history on *Generate poses* (Iter3-P24, [#124]) | 박동제 | 11/5 | Done | 2.6.3 |
-| Four prompt templates and an improved default prompt (Iter3-P25, [#125]) | 박재완 | 11/5 | Moved to Iteration 4 ([#207]) | *Still open* |
+| Four prompt templates and an improved default prompt (Iter3-P25, [#125]) | 박재완 | 11/5 | Moved to Iteration 4 ([#211]) | *Still open* |
 | The AI module test with an LLM judge (Iter3-P26, #126) | 박재완 | 11/5 | Done | Testing Documentation |
 | Integration tests for the Iteration 3 flows (Iter3-P27, #127) | 박재완 | 11/5 | Done | Testing Documentation |
 | Integrate the Iteration 3 features (Iter3-P28, [#128]) | 박재완 | 11/5 | Done | — |
@@ -3119,7 +3119,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The guide and the pose flow polished (Iter3-A13, [#180]) | 조성민 | 11/6 | Done | 2.5.1, 2.6.3, 2.6.5 |
 | Transitions between screens (Iter3-A14, [#181]) | 조성민 | 11/6 | Done | 2.1 |
 | Camera's controls after the heuristic evaluation (Iter3-A15, [#182]) | 한준형 | 11/6 | Done | 2.6.2, 2.6.8, 2.8 |
-| Camera quality and latency closer to the stock camera (Iter3-A16, #183) | 한준형 | 11/6 | Moved to Iteration 4 ([#205]) | — |
+| Camera quality and latency closer to the stock camera (Iter3-A16, #183) | 한준형 | 11/6 | Moved to Iteration 4 ([#208]) | — |
 | Who takes the photo, chosen before connecting (Iter3-A17, [#188]) | 조성민 | 11/6 | Done | 2.1, 2.6.6 |
 
 **Iteration 4 tasks** (from the kickoff of 2026-11-07; Iteration 4 runs 11/8–11/20, with the UAT in class on 11/16 and 11/18):
@@ -3129,25 +3129,25 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The documents and the issues (Iter4-P1, [#198]) | 조성민 | 11/9 | Open | — |
 | Back on the pose screens, with *Generate again* (Iter4-P2, [#199]) | 한준형 | 11/12 | Open | 2.4, 2.6.5, *Still open* |
 | A refused description kept in the history (Iter4-P3, [#200]) | 한준형 | 11/12 | Open | 2.6.3, 2.6.5 |
-| A message for each way pose generation fails (Iter4-P4, [#201]) | 한준형 | 11/13 | Open | 2.5.3, 2.6.3 |
-| The subject's live view mirrored (Iter4-P5, [#202]) | 한준형 | 11/12 | Open | 2.6.4 |
-| Landscape photos saved as taken, and landscape poses (Iter4-P6, [#203]) | 한준형 | 11/19 | Open | 2.6.1–2.6.4, 2.8 |
-| The controls turn with the phone, like the stock camera's (Iter4-P7, [#204]) | 한준형 | 11/19 | Open | 2.1, 2.6.2 |
-| Camera quality and latency, low priority (Iter4-P8, [#205]; from #183) | 한준형 | 11/19 | Open | 2.8 |
-| Situation prompts, compared with the current prompt (Iter4-P9, [#206]) | 박재완 | 11/19 | Open | 2.5.3, 2.6.3, *Still open* |
-| The situation choice on *Generate poses* (Iter4-P10, [#217]) | 박재완 | 11/19 | Open | 2.1, 2.5.1, 2.6.5 |
-| Prompt templates and the default prompt (Iter4-P11, [#207]; from #125) | 박재완 | 11/19 | Open | 2.6.3, *Still open* |
-| Color tokens and a DayNight theme (Iter4-P12, [#208]) | 박동제 | 11/12 | Open | 2.8 |
-| Light mode (Iter4-P13, [#209]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
-| UI fixes: no notice after saving, the primary buttons at the top right, and the user test's and the heuristic evaluation's leftovers (Iter4-P14, [#210]) | 박동제 | 11/13 | Open | 2.6.2 |
-| Better pose tips, with the background (Iter4-P15, [#211]) | 박동제 | 11/19 | Open | 2.6.3 |
-| The offline QR connection (Iter4-P16, [#212]; from #122) | 조성민 | 11/19 | Open | *Still open*, AD-8 |
-| The UAT (Iter4-P17, [#213]) | 조성민 | 11/18 | Open | Testing Documentation 4.3, 4.4 |
-| Integration tests for the Iteration 4 flows (Iter4-P18, [#214]) | 조성민 | 11/19 | Open | Testing Documentation |
-| Integrate the Iteration 4 features (Iter4-P19, [#215]) | 조성민 | 11/19 | Open | — |
-| The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#216]) | All | 11/20 | Open | — |
+| The subject's live view mirrored (Iter4-P4, [#201]) | 한준형 | 11/12 | Open | 2.6.4 |
+| Color tokens and a DayNight theme (Iter4-P5, [#202]) | 박동제 | 11/12 | Open | 2.8 |
+| A message for each way pose generation fails (Iter4-P6, [#203]) | 한준형 | 11/13 | Open | 2.5.3, 2.6.3 |
+| UI fixes: no notice after saving, the primary buttons at the top right, and the leftovers of the user test and the heuristic evaluation (Iter4-P7, [#204]) | 박동제 | 11/13 | Open | 2.6.2 |
+| The UAT (Iter4-P8, [#205]) | 조성민 | 11/18 | Open | Testing Documentation 4.3, 4.4 |
+| Landscape photos saved as taken, and landscape poses (Iter4-P9, [#206]) | 한준형 | 11/19 | Open | 2.6.1–2.6.4, 2.8 |
+| The controls turn with the phone (Iter4-P10, [#207]) | 한준형 | 11/19 | Open | 2.1, 2.6.2 |
+| Camera quality and latency, low priority (from #183) (Iter4-P11, [#208]) | 한준형 | 11/19 | Open | 2.8 |
+| Situation prompts, compared with the current prompt (Iter4-P12, [#209]) | 박재완 | 11/19 | Open | 2.5.3, 2.6.3, *Still open* |
+| The situation choice on *Generate poses* (Iter4-P13, [#210]) | 박재완 | 11/19 | Open | 2.1, 2.5.1, 2.6.5 |
+| Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Open | 2.6.3, *Still open* |
+| Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
+| Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/19 | Open | 2.6.3 |
+| The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Open | *Still open*, AD-8 |
+| Integration tests for the Iteration 4 flows (Iter4-P18, [#215]) | 조성민 | 11/19 | Open | Testing Documentation |
+| Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Open | — |
+| The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#217]) | All | 11/20 | Open | — |
 
-Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#211]).
+Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
 
 **Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:
 
@@ -3231,8 +3231,6 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
 [#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
-[#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
-[#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
 [#120]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/120
 [#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
 [#122]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/122
@@ -3240,6 +3238,8 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124
 [#125]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/125
 [#128]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/128
+[#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
+[#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
 [#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156
 [#158]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/158
 [#165]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/165
@@ -3255,20 +3255,20 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#198]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/198
 [#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
 [#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200
-[#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
-[#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
-[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
-[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
-[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
-[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
-[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
-[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
-[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
-[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
-[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
-[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
-[#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
-[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214
-[#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
-[#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216
-[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
+[#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
+[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
+[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
+[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
+[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
+[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
+[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
+[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
+[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
+[#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
+[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
+[#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214
+[#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
+[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216

@@ -422,25 +422,25 @@ The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues ne
 | Owner | Item | Due |
 |---|---|---|
 | 조성민 | PM work: the documents and the issues ([#198]) | 11/9 (Mon) |
-| 한준형 | Back on the pose generation screens ([#199]) | 11/12 (Thu) |
+| 한준형 | Back on the pose screens ([#199]) | 11/12 (Thu) |
 | 한준형 | A refused description kept in the history ([#200]) | 11/12 (Thu) |
-| 한준형 | One message for each way pose generation fails ([#201]) | 11/13 (Fri) |
-| 한준형 | The mirrored live view ([#202]) | 11/12 (Thu) |
-| 한준형 | Landscape photos and landscape poses ([#203]) | 11/19 (Thu) |
-| 한준형 | The controls turn with the phone ([#204]) | 11/19 (Thu) |
-| 한준형 | Camera quality and latency, low priority ([#205]) | 11/19 (Thu) |
-| 박재완 | Situation prompts, compared with the current prompt ([#206]) | 11/19 (Thu) |
-| 박재완 | The situation choice on *Generate poses* ([#217]) | 11/19 (Thu) |
-| 박재완 | Prompt templates and the default prompt ([#207]) | 11/19 (Thu) |
-| 박동제 | Color tokens and a DayNight theme ([#208]) | 11/12 (Thu) |
-| 박동제 | Light mode ([#209]) | 11/19 (Thu) |
-| 박동제 | UI fixes ([#210]) | 11/13 (Fri) |
-| 박동제 | Better pose tips ([#211]) | 11/19 (Thu) |
-| 조성민 | The QR connection ([#212]) | 11/19 (Thu) |
-| 조성민 | The UAT ([#213]) | 11/18 (Wed) |
-| 조성민 | Integration tests ([#214]) | 11/19 (Thu) |
-| 조성민 | Integration ([#215]) | 11/19 (Thu) |
-| All | The documents and the demo README ([#216]) | 11/20 (Fri) |
+| 한준형 | The mirrored live view ([#201]) | 11/12 (Thu) |
+| 박동제 | Color tokens and a DayNight theme ([#202]) | 11/12 (Thu) |
+| 한준형 | One message for each way pose generation fails ([#203]) | 11/13 (Fri) |
+| 박동제 | UI fixes ([#204]) | 11/13 (Fri) |
+| 조성민 | The UAT ([#205]) | 11/18 (Wed) |
+| 한준형 | Landscape photos and landscape poses ([#206]) | 11/19 (Thu) |
+| 한준형 | The controls turn with the phone ([#207]) | 11/19 (Thu) |
+| 한준형 | Camera quality and latency, low priority ([#208]) | 11/19 (Thu) |
+| 박재완 | Situation prompts, compared with the current prompt ([#209]) | 11/19 (Thu) |
+| 박재완 | The situation choice on *Generate poses* ([#210]) | 11/19 (Thu) |
+| 박재완 | Prompt templates and the default prompt ([#211]) | 11/19 (Thu) |
+| 박동제 | Light mode ([#212]) | 11/19 (Thu) |
+| 박동제 | Better pose tips ([#213]) | 11/19 (Thu) |
+| 조성민 | The QR connection ([#214]) | 11/19 (Thu) |
+| 조성민 | Integration tests ([#215]) | 11/19 (Thu) |
+| 조성민 | Integration ([#216]) | 11/19 (Thu) |
+| All | The documents and the demo README ([#217]) | 11/20 (Fri) |
 
 [↑ Back to the list](#iteration-4)
 
@@ -456,20 +456,20 @@ The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues ne
 [#198]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/198
 [#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
 [#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200
-[#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
-[#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
-[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
-[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
-[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
-[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
-[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
-[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
-[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
-[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
-[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
-[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
-[#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
-[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214
-[#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
-[#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216
-[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
+[#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
+[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
+[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
+[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
+[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
+[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
+[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
+[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
+[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
+[#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
+[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
+[#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214
+[#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
+[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216

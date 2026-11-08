@@ -157,7 +157,7 @@ Every session has two people, each with Pix. *Who takes the photo?* sets the rol
 | **Iteration 1**<br>9/27 – 10/9 · prototype | Take photos; add a guide from a gallery photo or from four generated poses (predefined pose templates); adjust the guide; connect a second phone **with a room code on the same Wi-Fi**, which shows the live view and guide and changes the zoom. |
 | **Iteration 2**<br>10/11 – 10/25 · midterm 10/21 | Accounts and friends (F5). Focus, brightness, flash, 4:3, 16:9, and 1:1, and smooth pinch zoom with a guide-edit mode on both phones. Smooth outlines, the starting position, a thumbnail, hide, replace, and saved guides. Guide, brightness, and flash from the subject's phone. Poses from suggestions, idea chips, or a description. Room codes without sign-in. |
 | **Iteration 3**<br>10/26 – 11/6 · user test 10/31–11/1, heuristic evaluation 11/4 | Invitations **over Wi-Fi or cellular data**, friend-request pushes, reconnection, and *Who takes the photo?* (F6). Poses in the scene's ratio, one at a time, with a tip, filter, person check, and history (F4). Shared guide and pose steps; photos on both phones. Selfie mode, the library, ♥ for AI poses, and the screenshot cut. Camera's controls after the heuristic evaluation; animations. Settings and a tutorial (F10). Key user acceptance test (UAT) stories fixed. |
-| **Iteration 4**<br>11/8 – 11/20 · UAT 11/16 and 11/18 | Fixes and improvements from the user test and the heuristic evaluation: Back on the pose screens, refused descriptions out of the history, a message for each failure, the live view unmirrored, landscape photos and poses, the controls that turn with the phone, and the camera's quality and latency (F1, F4, F6). Poses by situation and the prompt templates (FR-4.4, FR-4.8); tips with the background (FR-4.10). Color tokens, light mode, and UI fixes (F10, 6.9). The QR connection (F9, [#212]). The UAT and its fixes. |
+| **Iteration 4**<br>11/8 – 11/20 · UAT 11/16 and 11/18 | Fixes and improvements from the user test and the heuristic evaluation: Back on the pose screens, refused descriptions out of the history, a message for each failure, the live view unmirrored, landscape photos and poses, the controls that turn with the phone, and the camera's quality and latency (F1, F4, F6). Poses by situation and the prompt templates (FR-4.4, FR-4.8); tips with the background (FR-4.10). Color tokens, light mode, and UI fixes (F10, 6.9). The QR connection (F9, [#214]). The UAT and its fixes. |
 | **Iteration 5**<br>tentative · in-class testing 11/30, real user test 12/2 | Polish, stability, and performance against the non-functional requirements, from UAT feedback; in-class testing and a test with real users. The remote-control switch (FR-7.5), remote focus (FR-7.7), and search, situations, and memos in the library (FR-3.11), left out of Iteration 4 at its kickoff. |
 
 ### 4.2 Feature list
@@ -174,7 +174,7 @@ Priority: **Must** = required for the product to make sense · **Should** = impo
 | F6 | **Shoot-together session** | Invitations; the live view and guide on the subject's phone over any network; shared steps and photos. | Must | It 1 – 3 |
 | F7 | **Remote control** | The subject's zoom, guide, brightness, and flash; the photographer takes the photo. The switch and remote focus (Could) come in Iteration 5. | Must / Should / Could | It 1 – 3 / It 5 |
 | F8 | **Room-code session** | A 6-digit code, without sign-in. | Must | It 1 |
-| F9 | **Offline connection (QR)** | A hotspot and a QR code, without internet ([#212]). | Should | It 4 |
+| F9 | **Offline connection (QR)** | A hotspot and a QR code, without internet ([#214]). | Should | It 4 |
 | F10 | **Settings and help** | Base brightness, language, guide look, latency, privacy, account, and help; a tutorial; the theme (It 4). | Must / Should | It 3 – 4 |
 
 ### 4.3 Detailed requirements
@@ -189,8 +189,8 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 | FR-1.2 | On first launch, Pix asks for camera permission. If it is denied, Pix explains why and links to the system settings. If the camera cannot open, Pix says so. | Must | It 1 |
 | FR-1.3 | The camera screen has a shutter and a readout of the applied zoom. A pinch zooms within the phone's range, relative to the primary rear camera; below 1× only where the hardware allows. With the **guide-edit mode** toggle on, drags and pinches move the guide; a new guide turns it on, and a photo or hiding the guide turns it off. A tap on the zoom readout steps through the widest zoom below 1× (0.6× on most phones), 1×, and 2×; TalkBack's zoom actions also work. For 3 s, a label read by TalkBack names each step and, over the toggle, what a pinch moves: *Guide* or *Camera*. A new label replaces the last ([#182]). | Must | It 1 / It 2 / It 3 |
 | FR-1.4 | A tap on the preview sets focus and exposure there and resets the brightness to the base (FR-1.11), also on a camera without focus points ([#182]). | Should | It 2 |
-| FR-1.5 | Photos are saved at full resolution to the gallery's "Pix" album, without the guide or any control. A photo taken with the phone held sideways is saved as a landscape photo, as the phone was held ([#203]). | Must | It 1 / It 4 |
-| FR-1.6 | After saving, the thumbnail updates, with no notice ([#210]; until Iteration 4 a notice said the photo has no guide). A tap on the thumbnail opens the photo in the gallery. | Must | It 1 / It 4 |
+| FR-1.5 | Photos are saved at full resolution to the gallery's "Pix" album, without the guide or any control. A photo taken with the phone held sideways is saved as a landscape photo, as the phone was held ([#206]). | Must | It 1 / It 4 |
+| FR-1.6 | After saving, the thumbnail updates, with no notice ([#204]; until Iteration 4 a notice said the photo has no guide). A tap on the thumbnail opens the photo in the gallery. | Must | It 1 / It 4 |
 | FR-1.7 | If saving fails, for example on full storage, Pix says why and keeps the camera and guide as they were. | Must | It 1 |
 | FR-1.8 | The camera screen has *Guide* and *Shoot together*. | Must | It 1 |
 | FR-1.9 | A 3×3 grid divides the image in the chosen ratio into equal thirds, without letterbox bars (FR-1.13). | Must | It 1 |
@@ -199,7 +199,7 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 | FR-1.12 | A flash button sets off, auto, or on. It is hidden on a camera without a flash. | Should | It 2 |
 | FR-1.13 | The ratio button offers 4:3, 16:9, and 1:1, labeled as the phone is held: 3:4, 9:16, 1:1 (Iter3-A12). The preview, grid, guide frame, photo, and live view share the ratio, cut from the middle of the 4:3 image: 16:9 keeps the full height, 1:1 the full width. The preview fills the width below the top bar: 1:1 sits in the 4:3 area with the rest dimmed, and 16:9 reaches under the controls, which keep their place for every ratio. The ratio survives a restart. | Should | It 2 / It 3 |
 | FR-1.14 | The camera switch selects the front camera (selfie mode), also in a session. Its photo, scene photo, and the subject's video are mirrored like its preview. A selfie scene photo gets selfie poses (Design Documentation 2.6.3). | Must | It 3 |
-| FR-1.15 | When the phone is turned on its side, the icons of the controls turn with it, smoothly, to the nearest quarter turn, as the stock camera's do; the layout stays portrait ([#204]). | Should | It 4 |
+| FR-1.15 | When the phone is turned on its side, the icons of the controls turn with it, smoothly, to the nearest quarter turn, as the stock camera's do; the layout stays portrait ([#207]). | Should | It 4 |
 
 #### F2 · Guide from a reference photo
 
@@ -238,14 +238,14 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 |---|---|---|---|
 | FR-4.1 | *Generate poses here* returns to Camera, where the user frames, zooms, and shoots the scene photo, then taps *Use this photo* or *Shoot again*. With a flash, the flash button keeps the light on while framing, until the shot or leaving; a shot waits for the light (It 3). Nothing is sent before *Use this photo*, and the scene photo is not saved to the gallery. | Must | It 1 |
 | FR-4.2 | Before the first scene photo, Pix asks consent to send it to an external AI service. Without consent, nothing is sent. After a withdrawal in the settings, Pix asks again (FR-10.5). | Should | It 1 |
-| FR-4.3 | The Pix server makes four candidates that keep the same person and background, in the scene photo's ratio (FR-1.13); a landscape scene photo gives landscape candidates ([#203]). It uses an image-editing model on OpenRouter that a server setting chooses (Design Documentation 2.6.3). | Must | It 1 / It 3 / It 4 |
+| FR-4.3 | The Pix server makes four candidates that keep the same person and background, in the scene photo's ratio (FR-1.13); a landscape scene photo gives landscape candidates ([#206]). It uses an image-editing model on OpenRouter that a server setting chooses (Design Documentation 2.6.3). | Must | It 1 / It 3 / It 4 |
 | FR-4.4 | With an empty field, *Suggest 4 poses* asks the server for four poses that suit the scene and the chosen situation (FR-4.8), then requests one candidate for each. If the server cannot suggest poses, it uses hands on hips, wave, walking, and arms crossed, or four selfie poses. | Must | It 1 / It 2 / It 4 |
 | FR-4.5 | *Generating poses* shows the scene photo, each candidate as it arrives, how many are ready ("n of 4 ready"), the caption "Same person and place · up to 60 s", and *Cancel* (6.3). | Must | It 1 |
 | FR-4.6 | *Pick a pose* shows the candidates one at a time, without pose names. A swipe moves to the next, and the one on screen is selected ([#108]). *Use this pose* opens it on *Reference confirm* (F2). *Try other poses* and Back return to *Generate poses* with the photo and description kept, where *Generate again* makes a new set from the same description, and Back from there returns to the candidates ([#199]). Back never leaves the pose screens for Camera; only the ✕ discards the set and returns to Camera ([#182]). | Must | It 1 / It 3 / It 4 |
-| FR-4.7 | If no candidate arrives within 60 s, or every request fails, *Couldn't create poses* offers *Try again* and *Back to camera* and keeps the photo. If the service refused every pose of a description, *Edit description* replaces *Try again* (US-5). If only some fail, Pix shows the others. The message says what happened and what to do for each case: offline, the 60 s timeout, this phone's hourly limit or Pix's daily limit, a description the filter refused, a request the image service declined, no person (FR-4.13), or a server error ([#201]). | Must | It 1 / It 4 |
-| FR-4.8 | *Generate poses* shows the scene photo, a Korean or English description field of up to 100 characters, and the descriptions used before (FR-4.11). A row of situations above the field, *Default* selected, chooses the prompts: background, person, landmark, ID photo, default, or selfie; the choice goes to the other phone with the description ([#206], [#217]). With a description, its one button, *Generate 4 poses from this*, sends it and three variations the server writes; the description fills any variation missing after 10 s. With an empty field, the button is *Suggest 4 poses* (FR-4.4). The prompt keeps the person, face, clothing, place, and belongings, gives each candidate one pose, and keeps the scene's framing unless the pose needs a closer one, never wider (Design Documentation 2.6.3). Planned: four prompt templates in place of the variations, if they prove better ([#207]). | Should | It 2 / It 4 |
+| FR-4.7 | If no candidate arrives within 60 s, or every request fails, *Couldn't create poses* offers *Try again* and *Back to camera* and keeps the photo. If the service refused every pose of a description, *Edit description* replaces *Try again* (US-5). If only some fail, Pix shows the others. The message says what happened and what to do for each case: offline, the 60 s timeout, this phone's hourly limit or Pix's daily limit, a description the filter refused, a request the image service declined, no person (FR-4.13), or a server error ([#203]). | Must | It 1 / It 4 |
+| FR-4.8 | *Generate poses* shows the scene photo, a Korean or English description field of up to 100 characters, and the descriptions used before (FR-4.11). A row of situations above the field, *Default* selected, chooses the prompts: background, person, landmark, ID photo, default, or selfie; the choice goes to the other phone with the description ([#209], [#210]). With a description, its one button, *Generate 4 poses from this*, sends it and three variations the server writes; the description fills any variation missing after 10 s. With an empty field, the button is *Suggest 4 poses* (FR-4.4). The prompt keeps the person, face, clothing, place, and belongings, gives each candidate one pose, and keeps the scene's framing unless the pose needs a closer one, never wider (Design Documentation 2.6.3). Planned: four prompt templates in place of the variations, if they prove better ([#211]). | Should | It 2 / It 4 |
 | FR-4.9 | The Pix server keeps neither the scene photo nor the generated images after it returns them. | Must | It 1 |
-| FR-4.10 | After *Use this pose*, a translucent banner on Camera says how to take the pose: how close, how high, at what angle, how the pose fits the background, and why ([#211]). It uses plain words in the screens' language, without numbers (FR-10.2). It opens once, after "Preparing a tip…". A touch closes it, and a button beside the zoom readout opens or closes it ([#182]). A guide from a photo or from the library has no tip. | Must | It 3 / It 4 |
+| FR-4.10 | After *Use this pose*, a translucent banner on Camera says how to take the pose: how close, how high, at what angle, how the pose fits the background, and why ([#213]). It uses plain words in the screens' language, without numbers (FR-10.2). It opens once, after "Preparing a tip…". A touch closes it, and a button beside the zoom readout opens or closes it ([#182]). A guide from a photo or from the library has no tip. | Must | It 3 / It 4 |
 | FR-4.11 | The descriptions used before show as chips under the field, newest first, each with a ✕ that deletes it; the list hides while empty. A description is recorded on both phones once the server accepts it, at its first candidate, so a refused one is not kept (FR-4.12, [#182]). Each entry keeps the phone's role and, in an invitation's session, the friend's account. In such a session, *All* / *With &lt;name&gt;* switches to the descriptions used with that friend. The history stays on the phone (NFR-13): one entry per text, at most 50. | Should | It 3 |
 | FR-4.12 | Before any AI model reads it, the server refuses a description, or a tip's pose, that tries to manipulate the models or asks for harmful content. Harmful means sexual content, injury, self-harm, a weapon aimed at a person, hate or humiliation, or a real person's likeness. Pix shows it as refused (FR-4.7). Clothes, places, and props pass, in Korean as in English. If the check cannot run, the request goes on. | Should | It 3 |
 | FR-4.13 | Before *Use this photo*, the phone looks for a person in the scene photo: near or far, from behind, or in a selfie. Without one, Pix says so, offers *Shoot again*, and sends nothing. The server checks again before editing, and without a person *Couldn't create poses* offers *Shoot again*. If a check cannot run, the photo goes on. | Should | It 3 |
@@ -319,7 +319,7 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 
 #### F9 · Offline connection with a QR code
 
-Planned for Iteration 4 ([#212]; was #122).
+Planned for Iteration 4 ([#214]; was #122).
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
@@ -333,7 +333,7 @@ Planned for Iteration 4 ([#212]; was #122).
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-10.1 | The settings screen holds the base brightness (FR-1.11, [#182]), the guide's look (FR-3.10), the theme (the phone's setting, light, or dark; [#209]), the latency indicator, the language, how-to-use help, and the items of FR-10.5. A gear on Camera's top bar opens it; the gear is hidden during a session and the scene photo (Iter3-P23). | Must | It 3 / It 4 |
+| FR-10.1 | The settings screen holds the base brightness (FR-1.11, [#182]), the guide's look (FR-3.10), the theme (the phone's setting, light, or dark; [#212]), the latency indicator, the language, how-to-use help, and the items of FR-10.5. A gear on Camera's top bar opens it; the gear is hidden during a session and the scene photo (Iter3-P23). | Must | It 3 / It 4 |
 | FR-10.2 | The screens are in English and Korean. They follow the phone's language unless the settings choose one. | Must | It 3 |
 | FR-10.3 | A setting, off by default, shows the delay on both phones during a session, with a dot: green up to 150 ms, yellow up to 300 ms, red above. The delay is half the round trip of pings sent every 2 s, averaged over the last three (Iter3-P23). NFR-5 measures the video's own delay. | Should | It 3 |
 | FR-10.4 | A tutorial explains five screens the first time each opens: Camera, *Add a pose guide*, the guide on Camera, *Generate poses*, and *Subject view*. Its tips lie over the live screen and run no camera, server, or session (6.10). They wait a moment for the preview, a guide, or the photographer's video, and Camera's never show in a session. Closing them marks them seen, and the settings can show them again on each screen. | Should | It 3 |
@@ -794,13 +794,13 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 |---|---|---|
 | Camera permission denied | Why the camera is needed; *Open settings*. Built (6.2), not drawn. | FR-1.2 |
 | Subject view, control blocked | Disabled remote controls with the reason. Could, Iteration 5. | FR-7.5 |
-| Show QR, Scan QR, Connected | The QR code and hotspot status from *Show a QR code* on Share my camera; the scanner from *Scan a QR code* on See their camera; both phones confirm with *Resume*. Iteration 4 ([#212]). | FR-9.1–9.4 |
+| Show QR, Scan QR, Connected | The QR code and hotspot status from *Show a QR code* on Share my camera; the scanner from *Scan a QR code* on See their camera; both phones confirm with *Resume*. Iteration 4 ([#214]). | FR-9.1–9.4 |
 
 ### 6.9 Rules for every screen
 
 - **Portrait only.** Every screen is designed for one-handed portrait use. Held sideways, the icons of the controls turn with the phone; the layout does not (FR-1.15, It 4).
 - **Theme.** Light and dark, following the phone's setting unless Settings chooses one (FR-10.1, It 4). Nothing over the camera image changes between the modes.
-- **Primary buttons** sit at the top right of the top bar; the bottom keeps the secondary actions (It 4, [#210]).
+- **Primary buttons** sit at the top right of the top bar; the bottom keeps the secondary actions (It 4, [#204]).
 - **System back** does what the screen's secondary action (*Back* or *Cancel*) does. On Subject view, it first asks "Leave the session?".
 - **Waiting states** say what the app waits for and how long it may take, and offer *Cancel*.
 - **Failure screens** say what happened in plain words and offer a retry and a way back. No screen is a dead end.
@@ -890,25 +890,26 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 [#52]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/52
 [#53]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/53
 [#54]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/54
+[#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96
 [#108]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/108
 [#110]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/110
 [#111]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/111
+[#113]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/113
 [#114]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/114
 [#115]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/115
+[#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
 [#117]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/117
 [#118]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/118
 [#119]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/119
+[#120]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/120
+[#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
+[#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
 [#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124
 [#132]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/132
 [#136]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/136
 [#139]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/139
-[#113]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/113
-[#116]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/116
-[#120]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/120
-[#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
 [#156]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/156
 [#158]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/158
-[#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
 [#165]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/165
 [#170]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/170
 [#171]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/171
@@ -920,14 +921,13 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 [#182]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/182
 [#188]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/188
 [#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
-[#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
-[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
-[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
-[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
-[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
-[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
-[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
-[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
-[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
-[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
-[#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96
+[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
+[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
+[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
+[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
+[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
+[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
+[#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
+[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212

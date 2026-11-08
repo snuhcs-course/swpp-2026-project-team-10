@@ -152,15 +152,15 @@ One member writes and maintains each component's tests, following the module own
 | The guide and the pose flow (Iter3-A13) | Views, ViewModels, Managers | `guide/`, `ui/`, `session/` | 조성민 |
 | Transitions between screens (Iter3-A14) | Views | `ui/` | 조성민 |
 | Who takes the photo (Iter3-A17) | Views; the invitations client and endpoint | `ui/`, `account/`, `test_invitations.py` | 조성민 |
-| Back on the pose screens, the refused description in the history, the failure messages, the mirrored view (Iter4-P2–P5) | ViewModels, Views, Managers; server module | `ui/`, `generation/`, `session/`, `test_poses.py` | 한준형 |
-| Landscape photos and the controls that turn (Iter4-P6, P7) | Platform, Managers, Views | `camera/`, `ui/camera/`, `generation/` | 한준형 |
-| Camera quality and latency (Iter4-P8) | Platform | `camera/` | 한준형 |
-| Situation prompts and the choice; the prompt templates (Iter4-P9, P10, P11) | Server module, ViewModels, Views | `test_prompts.py`, `test_poses.py`, `generation/`, `ui/`, `session/` | 박재완 |
-| Color tokens, light mode, the UI fixes, and the tips (Iter4-P12–P15) | Views, resources; server module | `ui/`, `settings/`, `test_prompts.py` | 박동제 |
-| The QR connection (Iter4-P16) | Managers, Views | `session/`, `ui/session/` | 조성민 |
+| Back on the pose screens, the refused description in the history, the failure messages, the mirrored view (Iter4-P2–P4, P6) | ViewModels, Views, Managers; server module | `ui/`, `generation/`, `session/`, `test_poses.py` | 한준형 |
+| Landscape photos and the controls that turn (Iter4-P9, P10) | Platform, Managers, Views | `camera/`, `ui/camera/`, `generation/` | 한준형 |
+| Camera quality and latency (Iter4-P11) | Platform | `camera/` | 한준형 |
+| Situation prompts and the choice; the prompt templates (Iter4-P12–P14) | Server module, ViewModels, Views | `test_prompts.py`, `test_poses.py`, `generation/`, `ui/`, `session/` | 박재완 |
+| Color tokens, light mode, the UI fixes, and the tips (Iter4-P5, P7, P15, P16) | Views, resources; server module | `ui/`, `settings/`, `test_prompts.py` | 박동제 |
+| The QR connection (Iter4-P17) | Managers, Views | `session/`, `ui/session/` | 조성민 |
 | Integration tests, Iteration 2 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 (Iter2-P21) | 한준형 |
 | Integration tests, Iteration 3 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 | 박재완 |
-| Integration tests, Iteration 4 flows; the UAT (Iter4-P18, P17) | Across components (two phones, public server); testers outside the team | 2.1.5, 4.3, 4.4 | 조성민 |
+| Integration tests, Iteration 4 flows; the UAT (Iter4-P18, P8) | Across components (two phones, public server); testers outside the team | 2.1.5, 4.3, 4.4 | 조성민 |
 | This page, CI, and coverage reports | — | `wiki/Testing-Documentation.md`, `.github/workflows/` | 한준형 (Iteration 2), 박재완 (Iteration 3), 조성민 (Iteration 4) |
 
 **Policy for new code**
@@ -730,9 +730,9 @@ Each iteration's run adds a column to the tables below; the run's details are in
 **Failure analysis, Iteration 3.**
 
 - **Judge.** The first rubric (`d90b9af85425`) failed the agreement check on the run1 sample: 87.9 % over all, but 70.0 % for *same person* and 83.3 % for *same background*. It failed small changes that we pass, such as a held bag set aside or a wider frame. The rubric was revised on that sample and checked on the run2 sample. No candidate was failed by all three labelers, and 2 were failed by a majority (both *same background*), which the judge passed, so its remaining errors lean lenient on the background.
-- **Suggestions (fail).** The four suggestions are too alike for close-up scenes and selfies: of the 33 failing sets, 24 are chest-up shots and 17 are selfies (17 of the 24 selfie sets). The poses then differ only in the head, the gaze, or the expression. Not planned for Iteration 4: its kickoff of 11/7 left it out. The situation prompts ([#206]) may change the suggestions, and the metric runs again with them ([#214]); Iteration 5 **TBD**.
+- **Suggestions (fail).** The four suggestions are too alike for close-up scenes and selfies: of the 33 failing sets, 24 are chest-up shots and 17 are selfies (17 of the 24 selfie sets). The poses then differ only in the head, the gaze, or the expression. Not planned for Iteration 4: its kickoff of 11/7 left it out. The situation prompts ([#209]) may change the suggestions, and the metric runs again with them ([#215]); Iteration 5 **TBD**.
 - **Person check (fail).** The phone's ML Kit check missed every far-away person (0 of 4 found) and both low-light photos, and one near, one sitting, and one partly hidden person. The check blocks the photo (FR-4.13), so these users cannot get poses. The server's check alone found all 26 people. How the two checks combine is not planned for Iteration 4 (its kickoff of 11/7 left it out); Iteration 5 **TBD**.
-- **Tips (at the threshold).** In most failed tips, the height or tilt does not suit the candidate's shot (for example, chest height for a full-body shot taken from below). 19 of the 60 failures also give the wrong distance, such as "step back" for a candidate that is framed tighter. Addressed in Iteration 4 ([#211]).
+- **Tips (at the threshold).** In most failed tips, the height or tilt does not suit the candidate's shot (for example, chest height for a full-body shot taken from below). 19 of the 60 failures also give the wrong distance, such as "step back" for a candidate that is framed tighter. Addressed in Iteration 4 ([#213]).
 - **Rule breaks.** Both are a changed face (run1 s21, run3 s27).
 - **Requests without an image.** The image provider's safety system refused 7 requests as sexual content; 4 of them are one scene (s15, a woman sitting on a concrete block), and the same request is refused again when replayed. The server cannot tell these refusals from other upstream errors, so the app cannot explain them to the user. One request did not answer within the app's 60 s.
 - **Variations that repeat the description.** In 15 of 150 described sets, a variation was the description with a full stop added, which the server's duplicate check misses. For Korean descriptions, the first variation is often the English translation. Both are to be addressed with the prompt revision ([#125]).
@@ -783,12 +783,12 @@ A test with users outside the team, run to find problems early. It is separate f
 |---|---|---|
 | The prompts used before, on *Generate poses* | 5 (P2–P6) | Built: prompt history ([#164], merged 11/3) |
 | Photos saved on both phones | 3 (P1, P4, P5) | Built: session photos on both phones ([#159], merged 11/2) |
-| ‘참고 사진 올리기’ unclear; poses for an occasion (졸업식, 증명사진); similar poses whatever the background; choosing the gender | 3; 1; 1; 1 | Iteration 4: poses by situation ([#206], [#217]); the wording checked again ([#210]) |
-| An outline alone hides the pose under long hair or a thick coat; the face and arms not marked; the silhouette not fitting the person | 3 (P1, P3, P4) | On hold (the kickoff of 11/7): ML Kit's detection may err too much, and a background overlay did not work well. The tips say how the pose fits the background instead ([#211]) |
+| ‘참고 사진 올리기’ unclear; poses for an occasion (졸업식, 증명사진); similar poses whatever the background; choosing the gender | 3; 1; 1; 1 | Iteration 4: poses by situation ([#209], [#210]); the wording checked again ([#204]) |
+| An outline alone hides the pose under long hair or a thick coat; the face and arms not marked; the silhouette not fitting the person | 3 (P1, P3, P4) | On hold (the kickoff of 11/7): ML Kit's detection may err too much, and a background overlay did not work well. The tips say how the pose fits the background instead ([#213]) |
 | The photo going to an outside AI service; the photo changed by AI | 4; 1 | No fix decided |
 | The wait for poses | 2, and 1 asking for faster generation | No fix decided |
-| The default suggested poses; no step that sets the scene photo apart from the camera after *AI로 포즈 생성* | 1; 1 | No fix decided for the default poses; Iteration 4: the scene photo step marked on Camera ([#210]) |
-| Guidance on the background and the camera's tilt for the pose | 1 (P4) | Iteration 4: the tips ([#211]) |
+| The default suggested poses; no step that sets the scene photo apart from the camera after *AI로 포즈 생성* | 1; 1 | No fix decided for the default poses; Iteration 4: the scene photo step marked on Camera ([#204]) |
+| Guidance on the background and the camera's tilt for the pose | 1 (P4) | Iteration 4: the tips ([#213]) |
 | A timer; the shutter on the subject's phone; the guide's color and thickness | 1 each | The guide's color and thickness built ([#163], merged 11/2); no fix decided for the other two |
 
 ### 4.2 Heuristic evaluation (In-Class, Iteration 3)
@@ -816,21 +816,21 @@ The course's heuristic evaluation, held in class on 11/4. Students of other team
 
 - No major problem (3) or catastrophe (4). Of 28 ratings, 21 are 0, five are 1 (cosmetic), and two are 2 (minor).
 - The two minor problems: *Generate poses* had two buttons that did the same thing with an empty field (E1), and a request stopped by the daily AI limit failed without saying why, which held up the evaluation (E3).
-- Error messages drew the most comments: two of the three evaluators found that they do not say why something failed or what to do. Iteration 4 gives each case of failure its own message ([#201]).
+- Error messages drew the most comments: two of the three evaluators found that they do not say why something failed or what to do. Iteration 4 gives each case of failure its own message ([#203]).
 - Praised: the guide, the live session, the horizon bar, and the loading of AI poses always show the state (E1, E3). The screens follow the stock camera's conventions and icons (E2, E3). ✕ and undo lead back from any state, AI generation included, and guides can be saved and reused (E3).
 
 **Problems found and what follows.** Most severe first; suggestions rated 0 last.
 
 | Problem | Heuristic · severity · evaluator | What follows |
 |---|---|---|
-| A request stopped by the daily AI limit showed only *Couldn't create poses*, without the reason, which held up the evaluation | Error recovery · 2 · E3 | Iteration 4: a separate error message for each case of failure ([#201]). The app already tells the limit apart (HTTP 429) but shows the general message |
+| A request stopped by the daily AI limit showed only *Couldn't create poses*, without the reason, which held up the evaluation | Error recovery · 2 · E3 | Iteration 4: a separate error message for each case of failure ([#203]). The app already tells the limit apart (HTTP 429) but shows the general message |
 | *Generate 4 poses* and *Skip, suggest poses for me* did the same thing with an empty field | Flexibility and efficiency · 2 · E1 | Built: one button, *Suggest 4 poses* or *Generate 4 poses from this* (Iter3-A13, [#180]) |
-| A refused description only says to try another, not why it was refused or how to write one | Error recovery · 1 · E2 | Iteration 4: a separate error message for each case of failure, as above ([#201]) |
-| The toggle that sets whether a pinch moves the guide or zooms the camera needs a clearer icon | Recognition rather than recall · 1 · E2 | Built: a tap shows *Guide* or *Camera* above the toggle for 3 s (Iter3-A15, [#182]). The icon is unchanged; Iteration 4: a clearer icon ([#210]) |
+| A refused description only says to try another, not why it was refused or how to write one | Error recovery · 1 · E2 | Iteration 4: a separate error message for each case of failure, as above ([#203]) |
+| The toggle that sets whether a pinch moves the guide or zooms the camera needs a clearer icon | Recognition rather than recall · 1 · E2 | Built: a tap shows *Guide* or *Camera* above the toggle for 3 s (Iter3-A15, [#182]). The icon is unchanged; Iteration 4: a clearer icon ([#204]) |
 | The horizon bar is thick | Consistency and standards · 1 · E1 | Built: 1.5 dp instead of 3 dp; the grid, the guide, and the focus mark are thinner too (Iter3-A15, [#182]) |
-| Pinch zoom lags behind the camera; a zoom slider would be easier | Match with the real world · 1 · E1 | Iteration 4: latency closer to the stock camera ([#205], low priority). No fix decided for a slider |
+| Pinch zoom lags behind the camera; a zoom slider would be easier | Match with the real world · 1 · E1 | Iteration 4: latency closer to the stock camera ([#208], low priority). No fix decided for a slider |
 | One fixed tutorial is not enough for this many features; first users could follow a walkthrough | Help and documentation · 1 · E3 | No fix decided |
-| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole ([#208], [#209]), and a clearer ✕ ([#210]) |
+| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole ([#202], [#212]), and a clearer ✕ ([#204]) |
 | A saved guide could bring back the zoom and flash it was shot with | Flexibility and efficiency · 0 · E3 | No fix decided |
 | The guide's color and thickness could be set automatically for visibility | Additional · 0 · E1 | No fix decided. Both are set in Settings (FR-3.10) |
 | A switch to turn off the horizon bar; a landscape layout | Additional · 0 · E3 | The bar now hides past a 20° tilt (Iter3-A15, [#182]). No fix decided for a switch or a landscape layout |
@@ -2014,12 +2014,12 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#182]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/182
 [#183]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/183
 [#188]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/188
-[#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
-[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
-[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
-[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
-[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
-[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
-[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
-[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214
-[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
+[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
+[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
+[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
+[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
+[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
+[#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
+[#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214

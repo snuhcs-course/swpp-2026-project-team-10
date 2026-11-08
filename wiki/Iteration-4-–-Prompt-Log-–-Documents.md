@@ -1,13 +1,19 @@
 Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-Iteration-4]]
 
-## Iteration 4 kickoff: the issues and the documents ([#198])
+## Iteration 4 kickoff: the issues and the documents ([#198], [#218])
 
-- [Sungmin, 11-07] "자 이제 내가 iter 4에서 pm 역할을 해야되는데, 먼저 할 일들을 이슈에 쫙 올리고 분배하고 위키 정리랑 디자인 document 나 이런 문서들 갱신하고 그런 작업을 먼저 해야되거든? iter3에서 jaewan park 가 그 역할을 맡았는데, 우리 깃헙에 올라간 이슈들이랑 pr들을 보고 분석해서 나도 이터 4 시작때 어떤 작업들을 해야되는지 쫙 정리해줘. 참고로 이번 이터 4때 할 작업들은 […] 대충 이런식으로 일 분배를 할건데, 이걸 각각 여러개의 이슈로 나눠서 분배를 할 예정이야."
-- [Sungmin, 11-07] "일단 qr 오프라인 연결도 이슈로 넣어주고 나한테 배정해줘. 그리고 일단 나머지는 빼줘. 그리고 iteration4 는 11/8 - 11/20까지로 하자. kickoff 미팅은 11/7일에 했다고 해줘. 그리고 p10이랑 p11은 따로 하고, p6-p8은 합쳐줘. 그리고 p12랑 p13은 내가 얘기한적이 없었는데, 이건 왜 넣어놓은거야? 이건 빼는게 좋을거 같아. 그리고 라이트 모드의 색 방향은 아직 미정이라서 미정이라고 그냥 넣어놔. 이정도면 될거 같아? 이슈 작성할 수 있겠어?"
-- [Sungmin, 11-07] "그리고 이터4로 미뤄진 이슈들은 https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/56 이런식으로 닫아줘"
-- [Sungmin, 11-07] "아 근데 생각해보니까 가로 컨트롤 회전은 하나의 이슈로 하고 가로 사진 저장, 가로 포즈 생성은 다른 이슈로 하는게 맞겠다. 그리고 컨트롤 회전할 때 아이콘들이 부드럽게 상용 카메라 앱처럼 회전하는 그런 애니메이션도 들어가야될거 같아. 이거 반영해서 이슈 부분 수정해줘."
-- [Sungmin, 11-07] "올려"
-- [Sungmin, 11-07] "11/7일에 4명 전원 참석했고, 일단 기존 기능 강화 및 버그 fix 관련해서 얘기를 나눴는데, […] 이런 얘기들이 나왔어. 그리고 현재 이미지 생성 프롬프트 관련해서 […] 상황별 가이드 / 프롬프트 지원 관련해서 […] 이런 요소들이 필요하고 비교도 필요하다고 그런 말들을 했어. 그리고 얼굴 팔다리 배경 윤곽선에 대해서도 얘기를 나눴는데, mlkit 에서 pose detection이나 segmentation을 활용할 수는 있겠지만 오차가 너무 클 수도 있고, 배경 overlay가 잘 안되는걸 확인해서 일단 보류를 하기로 결정했어. 그 대신에 포즈 팁을 강화해서 배경과의 조화나 어떻게 찍어야될지를 잘 알려주기로 결정했어. 그리고 UI 개선사항으로는 라이트모드를 넣어주기로 했고, 보통 입력 버튼들이 하단에 가있는데, 우측 상단으로 바꾸는게 좋겠다는 생각을 했어. 그리고 카메라 찍고 이미지 저장할 때 토스트 안띄우고, 포즈 선택 화면 때 현재는 뒤로가기 누르면 바로 카메라로 나가지는 문제가 있는데, 카메라로 못가게 하고, 프롬프트를 재 입력하거나 아니면 같은 프롬프트로 이미지를 재생성할 수 있도록 하는게 좋겠다고 얘기를 했어. 그렇게 해서 역할 분담을 했는데, 이렇게 팀미팅.md를 정리해줘. 그리고 jaewan park 할 일 중에 지금 상황별로 다른 프롬프트를 하는 […] 이게 있는데, 그 상황별로 사진 찍게 하려면 관련된 UI 구현도 필요하고 각 상황별 프롬프트에 대한 정리도 필요하거든? 그래서 저 이슈를 UI 구현하는 이슈랑 상황별 프롬프트 관련 이슈랑 따로 나누는게 좋을 것 같은데 어떻게 생각해?"
-- [Sungmin, 11-07] "고쳐"
+- [Sungmin, 11-07] "Now I'm the PM for Iteration 4. First I have to put the tasks up as issues and assign them, and tidy and update the wiki, the design document, and the rest. Jaewan Park had that role in Iteration 3, so look at the issues and PRs on our GitHub, analyze them, and lay out what I have to do at the start of Iteration 4. For reference, the Iteration 4 work is […]. We'll split it roughly like this, each item into several issues to assign."
+- [Sungmin, 11-07] "Put the QR offline connection in as an issue too and assign it to me. Leave the rest out for now. Iteration 4 is 11/8 to 11/20, and say the kickoff meeting was on 11/7. Keep P10 and P11 separate, and merge P6–P8. I never mentioned P12 and P13; why did you add them? Better to drop them. The light mode's color direction is undecided, so just write it as undecided. Is that enough? Can you write the issues?"
+- [Sungmin, 11-07] "And close the issues carried over to Iteration 4 the way #56 was closed."
+- [Sungmin, 11-07] "Actually, thinking about it, the landscape control rotation should be one issue, and saving landscape photos and generating landscape poses another. And when the controls rotate, the icons should turn smoothly like a commercial camera app's, with that animation. Reflect this in the issues."
+- [Sungmin, 11-07] "Post them."
+- [Sungmin, 11-07] "On 11/7 all four of us attended. First we talked about strengthening what is built and about bug fixes: […]. Then about the current image generation prompt: […]. For situation-specific guides and prompts: […]; we said these are needed and need a comparison. We also discussed outlines of the face, the limbs, and the background: ML Kit's pose detection or segmentation could be used, but the error may be too large, and we saw that the background overlay does not work well, so we decided to put it on hold. Instead we decided to strengthen the pose tips, so they say how the pose fits the background and how to shoot. For the UI we decided to add light mode, and we thought the input buttons, usually at the bottom, had better move to the top right. No toast when a photo is saved. And on the pose selection screen, Back currently exits straight to the camera, so block that and let the user re-enter the prompt or regenerate with the same prompt. Then we split the roles; write this up in Team-Meetings.md. Also, one of Jaewan Park's tasks is the situation-specific prompts (#206): shooting by situation needs a UI too, and the prompt for each situation needs working out, so I think we should split it into a UI issue and a prompts issue. What do you think?"
+- [Sungmin, 11-07] "Fix it."
+- [Sungmin, 11-07] "Hey, don't leave it at P20, slot it in the middle."
+- [Sungmin, 11-07] "Can't this be changed in the GitHub UI?"
+- [Sungmin, 11-08] "Commit and open the PR for now."
+- [Sungmin, 11-08] "So in Iteration 4 the Design document is numbered 3.0, 3.1, 3.2, like that? And did the prompt log go up in the Korean original, or was it the English translation?"
+- [Sungmin, 11-08] "Post the English translation, and from now on post the prompts translated into English."
 
 [#198]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/198
+[#218]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/218

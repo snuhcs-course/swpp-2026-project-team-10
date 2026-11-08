@@ -2,7 +2,7 @@ Notes from our longer team meetings: the iteration kickoff, mid-iteration syncs,
 
 Each note lists the attendees, the agenda, the decisions for each agenda item, and the action items with an owner and a due date.
 
-**Members:** 박동제 (PM in Iteration 1), 박재완, 조성민, 한준형 (PM in Iteration 2)
+**Members:** 박동제 (PM in Iteration 1), 박재완 (PM in Iteration 3), 조성민 (PM in Iterations 4 and 5), 한준형 (PM in Iteration 2)
 
 ## Iteration 1
 
@@ -363,6 +363,87 @@ The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues ne
 
 [↑ Back to the list](#iteration-3)
 
+## Iteration 4
+
+| Date | Meeting | Topics |
+|---|---|---|
+| [2026-11-07 (Sat)](#2026-11-07-sat-iteration-4-kickoff) | Iteration 4 kickoff | Schedule, fixes and improvements, prompts, poses by situation, the guide's outline, UI, tasks |
+
+### 2026-11-07 (Sat): Iteration 4 kickoff
+
+**Attendees:** 박동제, 박재완, 조성민, 한준형
+
+**Agenda**
+1. Schedule
+2. Fixes and improvements to what is built
+3. Pose generation prompts
+4. Poses by situation
+5. The guide's outline: face, limbs, and background
+6. UI
+7. Tasks
+
+**1. Schedule**
+- Iteration 4 runs 11/8–11/20. 조성민 is PM.
+- The UAT is held in class on 11/16 and 11/18, with the five stories fixed in Iteration 3 ([[Testing Documentation|Testing-Documentation]] 4.3).
+
+**2. Fixes and improvements to what is built**
+- On the pose generation screens, Back leaves for Camera, while *Try other poses* already leads back from the candidates; the two overlap. See 6.
+- A description the filter refused stays in the prompt history.
+- Every failure of pose generation shows the same message.
+- The subject's live view is mirrored left to right.
+- Landscape photos:
+  - a photo taken with the phone held sideways is saved as a portrait;
+  - a landscape scene photo should give landscape poses;
+  - the controls (buttons, panels) should turn when the phone is turned.
+- Camera optimization, low priority: saving a photo is slow (hide it with a trick?), and the photo quality should come closer to the stock camera's.
+
+**3. Pose generation prompts**
+- Belongings change between the scene photo and the candidates: the system prompt is to say they stay the same.
+- The candidates look zoomed in compared with the scene photo.
+- Whether four paraphrased prompts (Iter3-P25) are needed at all is open; to be compared before building.
+
+**4. Poses by situation**
+- Situations: background emphasized, person emphasized, landmark, ID photo (증명사진), default, selfie.
+- Both a UI to choose the situation and a prompt per situation are needed.
+- The current prompt and the situation prompts are to be compared before choosing.
+
+**5. The guide's outline: face, limbs, and background**
+- ML Kit's pose detection or segmentation could mark the face and the limbs, but the error may be too large, and a background overlay was tried and did not work well. On hold.
+- Instead, the pose tips are strengthened: how the pose fits the background, and how to take the shot.
+
+**6. UI**
+- Light mode, with dark kept. The color direction is not decided yet.
+- The primary buttons, usually at the bottom of a screen, move to the top right.
+- No toast after a photo is saved.
+- From *Pick a pose*, Back must not leave for Camera: it offers to edit the description or to generate again with the same one.
+
+**7. Tasks**
+
+| Owner | Item | Due |
+|---|---|---|
+| 조성민 | PM work: the documents and the issues ([#198]) | 11/9 (Mon) |
+| 한준형 | Back on the pose generation screens ([#199]) | 11/12 (Thu) |
+| 한준형 | A refused description kept in the history ([#200]) | 11/12 (Thu) |
+| 한준형 | One message for each way pose generation fails ([#201]) | 11/13 (Fri) |
+| 한준형 | The mirrored live view ([#202]) | 11/12 (Thu) |
+| 한준형 | Landscape photos and landscape poses ([#203]) | 11/19 (Thu) |
+| 한준형 | The controls turn with the phone ([#204]) | 11/19 (Thu) |
+| 한준형 | Camera quality and latency, low priority ([#205]) | 11/19 (Thu) |
+| 박재완 | Situation prompts, compared with the current prompt ([#206]) | 11/19 (Thu) |
+| 박재완 | The situation choice on *Generate poses* ([#217]) | 11/19 (Thu) |
+| 박재완 | Prompt templates and the default prompt ([#207]) | 11/19 (Thu) |
+| 박동제 | Color tokens and a DayNight theme ([#208]) | 11/12 (Thu) |
+| 박동제 | Light mode ([#209]) | 11/19 (Thu) |
+| 박동제 | UI fixes ([#210]) | 11/13 (Fri) |
+| 박동제 | Better pose tips ([#211]) | 11/19 (Thu) |
+| 조성민 | The QR connection ([#212]) | 11/19 (Thu) |
+| 조성민 | The UAT ([#213]) | 11/18 (Wed) |
+| 조성민 | Integration tests ([#214]) | 11/19 (Thu) |
+| 조성민 | Integration ([#215]) | 11/19 (Thu) |
+| All | The documents and the demo README ([#216]) | 11/20 (Fri) |
+
+[↑ Back to the list](#iteration-4)
+
 [#1]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/1
 [#12]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/12
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13
@@ -372,3 +453,23 @@ The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues ne
 [#121]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/121
 [#123]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/123
 [#124]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/124
+[#198]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/198
+[#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
+[#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200
+[#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
+[#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
+[#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
+[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
+[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
+[#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
+[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
+[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
+[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
+[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
+[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
+[#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
+[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214
+[#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
+[#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216
+[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A choice in a sheet, such as Upload a reference. -->
-<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#14FFFFFF">
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/pix_ripple">
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="20dp" />

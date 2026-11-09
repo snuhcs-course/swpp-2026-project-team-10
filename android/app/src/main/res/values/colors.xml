@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Design tokens: a dark camera UI where the preview is the page and controls float on glass.
-     One accent, one live color, one guide color. -->
+<!-- Design tokens (README, Look; Design 2.8). Every color in a layout, drawable, color list, style, or theme names one
+     of these (ColorTokensTest), in two sets. -->
 <resources>
+    <!-- Pages: the tokens a mode may change. Light mode (#212) gives them a second set of values; until then Pix is
+         dark only (PixApplication). -->
     <color name="pix_ground">#0B0B0D</color>
     <color name="pix_surface">#16171A</color>
     <color name="pix_surface_2">#1F2024</color>
@@ -12,6 +14,17 @@
     <color name="pix_glass_stroke">#29FFFFFF</color>
     <color name="pix_outline">#24FFFFFF</color>
     <color name="pix_hairline">#14FFFFFF</color>
+    <!-- The chosen half of a two-way switch, such as Thin / Normal / Thick. -->
+    <color name="pix_selected">#24FFFFFF</color>
+    <!-- A touch's ripple over the ground, and over a control's own shape. -->
+    <color name="pix_ripple">#14FFFFFF</color>
+    <color name="pix_ripple_strong">#1FFFFFFF</color>
+    <!-- A slider's track beyond its value. -->
+    <color name="pix_track">#33FFFFFF</color>
+    <!-- A sheet's drag handle. -->
+    <color name="pix_handle">#47FFFFFF</color>
+    <!-- The dark disc behind a failure screen's icon. -->
+    <color name="pix_icon_backdrop">#CC0C0C0E</color>
 
     <color name="pix_text">#F4F4F2</color>
     <color name="pix_text_soft">#E6E7E9</color>
@@ -21,11 +34,21 @@
     <color name="pix_accent">#F2C14E</color>
     <!-- The accent at 35%: a received invitation's outline, and the tile that counts them (FR-6.17). -->
     <color name="pix_accent_stroke">#59F2C14E</color>
+    <!-- The accent at 22%: the halo of the room code's waiting dot. -->
+    <color name="pix_accent_glow">#38F2C14E</color>
+    <!-- The accent at 20%: a slider's halo, and the brightness button while its slider is open. -->
+    <color name="pix_accent_soft">#33F2C14E</color>
     <color name="pix_on_accent">#141413</color>
+    <!-- A touch's ripple on the accent. -->
+    <color name="pix_ripple_on_accent">#1F141413</color>
     <color name="pix_live">#36D399</color>
     <color name="pix_live_stroke">#7336D399</color>
+    <!-- The check inside the live color's circle. -->
+    <color name="pix_on_live">#0B2A1E</color>
     <color name="pix_guide">#5EEAD4</color>
     <color name="pix_guide_stroke">#805EEAD4</color>
+    <!-- The guide color at 20%: the guide slider's halo, and the guide-edit toggle while the mode is on. -->
+    <color name="pix_guide_soft">#335EEAD4</color>
     <color name="pix_danger">#FF6B57</color>
     <!-- The blinking light while a session streams the camera (FR-6.8), the red of a recording light. -->
     <color name="pix_recording">#FF3B30</color>
@@ -35,8 +58,37 @@
     <!-- A pose saved with ♥ (FR-4.14): the filled heart, red as hearts are elsewhere, apart from the danger color. -->
     <color name="pix_heart">#FF4D5E</color>
 
-    <!-- The horizon bar when level (FR-1.10, Design 2.6.2). -->
+    <!-- On the image: what is drawn over the camera's image or a photo, the same in every mode (R&S 6.9), and the
+         camera screens' bars and shutter, apart so that light mode can give them other values. -->
+    <!-- The ground of Camera and Subject view: the bars above and below the image. -->
+    <color name="camera_bar">#0B0B0D</color>
+    <!-- The shutter's ring and disc, its disc while pressed, and both while it is disabled. -->
+    <color name="camera_shutter">#F4F4F2</color>
+    <color name="camera_shutter_pressed">#D6D6D3</color>
+    <color name="camera_shutter_disabled">#59F4F4F2</color>
+    <!-- The panels over the image (the ratios, the guide's controls) and their edge, 12,12,14 at 62%. -->
+    <color name="camera_panel">#9E0C0C0E</color>
+    <color name="camera_panel_stroke">#1FFFFFFF</color>
+    <!-- The inside of the chosen ratio's shape. -->
+    <color name="camera_option_selected">#29FFFFFF</color>
+    <!-- The gradient behind the controls below the image while they lie over it: from 70% to clear. -->
+    <color name="camera_scrim">#B30C0C0E</color>
+    <color name="camera_scrim_clear">#000C0C0E</color>
+    <!-- The edge of the last photo's thumbnail. -->
+    <color name="camera_thumbnail_stroke">#80FFFFFF</color>
+    <!-- The grid's lines and their dark outline (FR-1.9), and the dimming outside a 1:1 frame (R&S 6.2). -->
+    <color name="camera_grid">#87FFFFFF</color>
+    <color name="camera_grid_outline">#32000000</color>
+    <color name="camera_dim">#99000000</color>
+    <!-- The horizon bar (FR-1.10, Design 2.6.2), its dark outline, and the bar when level. -->
+    <color name="camera_level">#FFFFFFFF</color>
+    <color name="camera_level_outline">#8C000000</color>
     <color name="camera_level_aligned">#D4AC24</color>
+    <!-- The dark outline of the brightness bar beside the focus box (Design 2.8). -->
+    <color name="camera_exposure_outline">#5A000000</color>
+    <!-- The photo behind Settings' guide preview: a sky over the ground. -->
+    <color name="guide_preview_sky">#AFC3D6</color>
+    <color name="guide_preview_ground">#33373E</color>
 
     <!-- The app icon's tile: paper, under the ink-and-sun shutter P (branding/pix-app-icon.svg). -->
     <color name="ic_launcher_background">#F4F4F2</color>

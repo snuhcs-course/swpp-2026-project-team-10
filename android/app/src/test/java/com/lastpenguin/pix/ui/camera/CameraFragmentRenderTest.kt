@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-09, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -655,7 +655,8 @@ class CameraFragmentRenderTest {
         fun white() = bitmap(30, 40).apply { eraseColor(Color.WHITE) }
 
         // 30 x 40, the 4:3 area: the square is rows 5 to 35.
-        val square = heldFrame(white(), AspectRatio.R1_1)
+        val dim = ApplicationProvider.getApplicationContext<Application>().getColor(R.color.camera_dim)
+        val square = heldFrame(white(), AspectRatio.R1_1, dim)
         assertEquals(Color.WHITE, square.getPixel(15, 20))
         assertEquals(Color.WHITE, square.getPixel(15, 6))
         val dimmed = square.getPixel(15, 2)
@@ -665,7 +666,7 @@ class CameraFragmentRenderTest {
 
         for (aspect in listOf(AspectRatio.R4_3, AspectRatio.R16_9)) {
             val frame = white()
-            assertTrue(heldFrame(frame, aspect) === frame)
+            assertTrue(heldFrame(frame, aspect, dim) === frame)
             assertEquals(Color.WHITE, frame.getPixel(15, 2))
         }
     }

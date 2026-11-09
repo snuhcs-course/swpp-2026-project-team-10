@@ -8,7 +8,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/camera_bar">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/topBar"
@@ -794,7 +795,7 @@
                             android:scaleType="centerCrop"
                             android:src="@drawable/gallery_placeholder"
                             app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
-                            app:strokeColor="#80FFFFFF"
+                            app:strokeColor="@color/camera_thumbnail_stroke"
                             app:strokeWidth="1.5dp" />
                     </FrameLayout>
                 </LinearLayout>

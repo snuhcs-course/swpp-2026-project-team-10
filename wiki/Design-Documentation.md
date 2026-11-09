@@ -78,6 +78,7 @@
 | 2.46 | 2026-11-05 | Camera's controls after the heuristic evaluation: control labels, a drag brightness bar, the horizon bar, thinner lines, and *Save guide* as a toggle (2.5.1, 2.6.1–2.6.3, 2.6.5, 2.6.8, 2.8; Iter3-A15, [#182]). |
 | 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code. QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*). Figure 1 redrawn; pushes only to signed-in phones. Section 1.4 removed: the task status is in 2.9, the later scope in R&S 4.1, and the QR plan in *Still open*. The AWS server stays on beside the course servers, for other networks (all sections). |
 | 3.0 | 2026-11-07 | Iteration 4 plan from the kickoff of 11/7: the task table with owners and due dates (2.9); the open decisions (*Still open*: the light mode's colors, Back on the pose screens, the situation prompts, whether four templates are needed); the Iteration 3 table closed. The remote-control switch and remote focus move to Iteration 5 (2.5.1, 2.6.5, 2.9). |
+| 3.1 | 2026-11-09 | Color tokens and a DayNight theme (Iter4-P5, [#202]): the tokens in two sets, page and on the image, and `Theme.Pix` on DayNight but dark until light mode (2.8). |
 
 </details>
 
@@ -2850,6 +2851,8 @@ erDiagram
 - A flow's screens share an activity-scoped ViewModel: account, friends, generation, incoming invitations, pose saving, reference, session, and settings. Camera, Subject view, the subject's shared-step screens, and *Invitation* have their own.
 - A ViewModel takes user events and exposes its UI state as a `StateFlow`. One-shot results and notices come from buffered `Channel`s, so they wait while the screen is stopped.
 - `AppContainer` creates every module, so a fake can stand in for one that is not ready.
+- Colors are tokens in `colors.xml`, in two sets (Iter4-P5, [#202]). The page tokens (`pix_*`) are the ones light mode gives a second value ([#212]). The tokens on the image (`camera_*`, `guide_preview_*`) are what is drawn over the camera's image or a photo, which stays the same in every mode (R&S 6.9), and the camera screens' bars and shutter, apart so that light mode can give them other values. No layout, drawable, color list, style, or theme writes a color as a value; an icon is white and takes its color from the tint where it is used. *Why:* light mode then changes values, not screens.
+- `Theme.Pix` is a DayNight theme that takes the mode Pix sets, not the phone's: `PixApplication` sets dark until light mode adds the choice ([#212]), which also decides which parts of Camera and Subject view change with the mode.
 
 **Concurrency**
 

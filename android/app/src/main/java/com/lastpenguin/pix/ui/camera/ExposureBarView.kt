@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-09, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.os.Bundle
 import android.util.AttributeSet
@@ -37,7 +36,7 @@ class ExposureBarView @JvmOverloads constructor(
         strokeCap = Paint.Cap.ROUND
     }
     private val lineOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(OUTLINE_ALPHA, 0, 0, 0)
+        color = context.getColor(R.color.camera_exposure_outline)
         strokeWidth = LINE_OUTLINE_DP * density
         strokeCap = Paint.Cap.ROUND
     }
@@ -234,7 +233,6 @@ class ExposureBarView @JvmOverloads constructor(
         const val LINE_DP = 1.5f
         const val LINE_OUTLINE_DP = 2.5f
         const val LINE_ALPHA = 204
-        const val OUTLINE_ALPHA = 90
         const val SUN_DP = 7f
         const val GAP_DP = 3f
         const val CORE = 0.4f

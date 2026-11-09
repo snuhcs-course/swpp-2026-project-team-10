@@ -1,0 +1,12 @@
+Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-Iteration-4]]
+
+## Color tokens and a DayNight theme ([#202])
+
+- [Dongje, 11-09] "Light mode needs the colors turned into tokens first. Check the code, and tell me the order of the work and what I need to review." (The agent counted 199 colors written as values in 60 resource files and 15 in Kotlin, most of them the icons' white and transparent, and listed five decisions: the camera's bars, the camera's shared styles, dark until light mode, the icons, and the names and the test's scope.)
+- [Dongje, 11-09] "1. Give the camera's top and bottom bars and the shutter tokens of their own. 2. I don't get 'camera tokens and three style variants': isn't there only one style now? 3. Keep it dark until #212. 4. Do the icons even have to change color? 5. Go with your recommendations." (The icons stay white and take their tint where they are used. Tracing every view then showed about sixty on the camera screens reaching page tokens through shared styles and text appearances, not five, so Camera and Subject view are inflated in the dark configuration instead of getting copies of the styles; the 62 screens of `KoreanScreensTest`, rendered before and after, were identical.)
+- [Dongje, 11-09] "Delete the old app and install it. But did you make the app follow the phone's setting? Don't follow it: for now always dark by default, with light or dark chosen in Settings." (Pix already ignored the phone's setting, since it starts dark; the wording of the documents was made plain, and the choice in Settings goes to light mode, [#212]. On the S22 in light mode Camera, Settings, and the *Shoot together* sheet stayed dark.)
+- [Dongje, 11-09] "I plan to make Camera and Subject view light too. Does what you built now conflict with light mode later?" (Yes: drawing those two screens dark would have to go, and the 51 views over the image get fixed colors instead; in 9:16 and 1:1 the bottom controls lie over the image, which light mode has to decide.)
+- [Dongje, 11-09] "Take only that part out now." (The dark drawing of the two screens, its test, and the sentences about it were removed; `DayNightThemeTest` checks that Pix starts dark and that the theme follows the configuration.)
+
+[#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
+[#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212

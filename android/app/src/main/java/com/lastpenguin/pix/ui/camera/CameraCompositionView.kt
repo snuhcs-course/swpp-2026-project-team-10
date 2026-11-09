@@ -1,13 +1,13 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-09, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
+import androidx.annotation.ColorInt
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.frameAspect
@@ -22,11 +22,11 @@ class CameraCompositionView @JvmOverloads constructor(
 ) : View(context, attrs) {
     private val density = resources.displayMetrics.density
     private val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(135, 255, 255, 255)
+        color = context.getColor(R.color.camera_grid)
         strokeWidth = density * GRID_DP
     }
     private val gridOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(50, 0, 0, 0)
+        color = context.getColor(R.color.camera_grid_outline)
         strokeWidth = density * GRID_OUTLINE_DP
     }
     private val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -34,11 +34,13 @@ class CameraCompositionView @JvmOverloads constructor(
         strokeCap = Paint.Cap.ROUND
     }
     private val barOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(140, 0, 0, 0)
+        color = context.getColor(R.color.camera_level_outline)
         strokeWidth = density * BAR_OUTLINE_DP
         strokeCap = Paint.Cap.ROUND
     }
     private val levelColor = context.getColor(R.color.camera_level_aligned)
+    private val notLevelColor = context.getColor(R.color.camera_level)
+    private val outsideDim = Paint().apply { color = context.getColor(R.color.camera_dim) }
     private var frame = ViewfinderFrame(0f, 0f, 0f, 0f)
     private var level: CameraLevel? = null
 
@@ -92,7 +94,7 @@ class CameraCompositionView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (frame.width == 0f || frame.height == 0f) return
-        if (dimOutside) dimOutsideFrame(canvas, width.toFloat(), height.toFloat(), frame)
+        if (dimOutside) dimOutsideFrame(canvas, width.toFloat(), height.toFloat(), frame, outsideDim)
         val clipped = canvas.save()
         canvas.clipRect(frame.left, frame.top, frame.right, frame.bottom)
         // Two lines in each direction create nine identically sized cells inside the image only.
@@ -113,7 +115,7 @@ class CameraCompositionView @JvmOverloads constructor(
         val cy = frame.centerY
         // Held on its side, the horizon runs along the frame's long side, and the bar with it (FR-1.10).
         val span = (if (value.baseDegrees == 0f) frame.width else frame.height) / 3f
-        bar.color = if (value.isLevel) levelColor else Color.WHITE
+        bar.color = if (value.isLevel) levelColor else notLevelColor
         val held = canvas.save()
         canvas.rotate(value.baseDegrees, cx, cy)
         // Fixed short wings mark the target horizon; the middle segment follows gravity.
@@ -136,11 +138,9 @@ private const val GRID_DP = 0.5f
 private const val GRID_OUTLINE_DP = 1f
 private const val BAR_DP = 1.5f
 private const val BAR_OUTLINE_DP = 2.5f
-private const val DIM_ALPHA = 153
-private val outsideDim = Paint().apply { color = Color.argb(DIM_ALPHA, 0, 0, 0) }
 
-/** Darkens [canvas], [width] by [height], outside [frame], as 1:1 shows inside the 4:3 area (R&S 6.2). */
-internal fun dimOutsideFrame(canvas: Canvas, width: Float, height: Float, frame: ViewfinderFrame) {
+/** Darkens [canvas], [width] by [height], outside [frame] with [outsideDim], as 1:1 shows in the 4:3 area (R&S 6.2). */
+internal fun dimOutsideFrame(canvas: Canvas, width: Float, height: Float, frame: ViewfinderFrame, outsideDim: Paint) {
     canvas.drawRect(0f, 0f, width, frame.top, outsideDim)
     canvas.drawRect(0f, frame.bottom, width, height, outsideDim)
     canvas.drawRect(0f, frame.top, frame.left, frame.bottom, outsideDim)
@@ -149,17 +149,19 @@ internal fun dimOutsideFrame(canvas: Canvas, width: Float, height: Float, frame:
 
 /**
  * The preview's last [bitmap] as the Camera screen holds it while the camera rebinds: of a 1:1 [aspect], the 4:3 area
- * with the outside dimmed as the live view showed it, because the overlay that dims it goes with the old ratio; of
- * the others, as it is (the still is clipped to their frame). It is drawn pixel for pixel where the preview was, so it
- * has no density, which would scale it when the display's size setting differs from the one the bitmap was made for.
+ * with the outside dimmed in [dimColor] as the live view showed it, because the overlay that dims it goes with the old
+ * ratio; of the others, as it is (the still is clipped to their frame). It is drawn pixel for pixel where the preview
+ * was, so it has no density, which would scale it when the display's size setting differs from the one the bitmap was
+ * made for.
  */
-internal fun heldFrame(bitmap: Bitmap, aspect: AspectRatio): Bitmap {
+internal fun heldFrame(bitmap: Bitmap, aspect: AspectRatio, @ColorInt dimColor: Int): Bitmap {
     val dim = aspect.previewAspect != aspect.frameAspect
     val held = if (!dim || bitmap.isMutable) bitmap else bitmap.copy(Bitmap.Config.ARGB_8888, true)
     if (dim) {
         val width = held.width.toFloat()
         val height = held.height.toFloat()
-        dimOutsideFrame(Canvas(held), width, height, fitViewfinderFrame(width, height, aspect.frameAspect))
+        val frame = fitViewfinderFrame(width, height, aspect.frameAspect)
+        dimOutsideFrame(Canvas(held), width, height, frame, Paint().apply { color = dimColor })
     }
     held.density = Bitmap.DENSITY_NONE
     return held

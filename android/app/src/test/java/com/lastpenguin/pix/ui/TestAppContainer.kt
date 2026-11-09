@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-09, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -57,6 +57,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import org.robolectric.RuntimeEnvironment
 
 /**
  * An [AppContainer] of fakes for screen tests under Robolectric (Testing Documentation 2.1.3): the camera, the
@@ -159,8 +160,13 @@ class TestAppContainer(
         screenLanguages = screenLanguages,
     )
 
-    /** Installs the container in the test's [PixApplication]; call before the screen is launched. */
+    /**
+     * Installs the container in the test's [PixApplication]; call before the screen is launched. The screen is drawn
+     * dark, as on the phone: Pix keeps dark through `AppCompatDelegate`, which only an `AppCompatActivity` follows, and
+     * `launchFragmentInContainer` hosts a plain `FragmentActivity`, so the test runs in the night configuration.
+     */
     fun install(): TestAppContainer {
+        RuntimeEnvironment.setQualifiers("+night")
         ApplicationProvider.getApplicationContext<PixApplication>().installContainer(container)
         return this
     }

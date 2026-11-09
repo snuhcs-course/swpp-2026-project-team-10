@@ -133,7 +133,7 @@
         <item name="backgroundTint">@color/button_primary_background</item>
         <item name="android:textColor">@color/button_primary_text</item>
         <item name="iconTint">@color/button_primary_text</item>
-        <item name="rippleColor">#1F141413</item>
+        <item name="rippleColor">@color/pix_ripple_on_accent</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
@@ -160,7 +160,7 @@
         <item name="iconTint">@color/button_secondary_text</item>
         <item name="iconPadding">8dp</item>
         <item name="iconGravity">textStart</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
@@ -180,7 +180,7 @@
         <item name="android:insetBottom">0dp</item>
         <item name="cornerRadius">14dp</item>
         <item name="android:textColor">@color/button_text_text</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
     </style>
 
@@ -216,7 +216,7 @@
         <item name="iconTint">@color/button_secondary_text</item>
         <item name="iconSize">16dp</item>
         <item name="iconPadding">6dp</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
         <item name="android:textSize">12sp</item>
     </style>
@@ -241,7 +241,7 @@
         <item name="iconPadding">0dp</item>
         <item name="iconSize">18dp</item>
         <item name="iconTint">@color/button_secondary_text</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
     </style>
 
     <!-- An icon button over a photo, such as the ♥ on Pick a pose: the round shape in glass, so it shows on any photo. -->
@@ -273,7 +273,7 @@
         <item name="android:paddingTop">6dp</item>
         <item name="android:paddingBottom">10dp</item>
         <item name="android:textColor">@color/button_secondary_text</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textSize">12sp</item>
     </style>
 
@@ -315,7 +315,7 @@
         <item name="cornerRadius">12dp</item>
         <item name="backgroundTint">@color/segment_background</item>
         <item name="android:textColor">@color/segment_text</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label.Bold</item>
     </style>
 
@@ -335,8 +335,8 @@
         <item name="trackInsideCornerSize">2dp</item>
         <item name="thumbColor">@color/slider_thumb</item>
         <item name="trackColorActive">@color/slider_track_active</item>
-        <item name="trackColorInactive">#33FFFFFF</item>
-        <item name="haloColor">#33F2C14E</item>
+        <item name="trackColorInactive">@color/pix_track</item>
+        <item name="haloColor">@color/pix_accent_soft</item>
         <item name="haloRadius">18dp</item>
         <item name="tickVisible">false</item>
         <item name="labelStyle">@style/Widget.Pix.Slider.Label</item>
@@ -345,7 +345,7 @@
     <!-- The guide's own controls use the guide color. -->
     <style name="Widget.Pix.Slider.Guide">
         <item name="trackColorActive">@color/slider_guide_track_active</item>
-        <item name="haloColor">#335EEAD4</item>
+        <item name="haloColor">@color/pix_guide_soft</item>
     </style>
 
     <style name="Widget.Pix.Slider.Label" parent="Widget.Material3.Slider.Label">
@@ -422,7 +422,7 @@
         <item name="chipMinHeight">36dp</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
         <item name="android:textColor">@color/pix_text_soft</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
         <item name="closeIconVisible">true</item>
         <item name="closeIcon">@drawable/ic_close</item>
         <item name="closeIconTint">@color/pix_text_muted</item>
@@ -434,7 +434,7 @@
         <item name="cardCornerRadius">18dp</item>
         <item name="cardElevation">0dp</item>
         <item name="strokeColor">@color/pose_card_stroke</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
     </style>
 
     <style name="Widget.Pix.Card" parent="Widget.Material3.CardView.Filled">
@@ -479,7 +479,7 @@
     </style>
 
     <style name="Widget.Pix.BottomSheet.DragHandle" parent="Widget.Material3.BottomSheet.DragHandle">
-        <item name="tint">#47FFFFFF</item>
+        <item name="tint">@color/pix_handle</item>
     </style>
 
     <style name="MaterialAlertDialog.Pix.Title.Text" parent="MaterialAlertDialog.Material3.Title.Text">

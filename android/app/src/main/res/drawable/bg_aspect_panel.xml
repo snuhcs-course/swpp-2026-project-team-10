@@ -2,5 +2,5 @@
 <!-- The ratios under the top bar (FR-1.13): the glass of the panels over the preview, nearly square at its corners. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <corners android:radius="2dp" />
-    <solid android:color="#9E0C0C0E" />
+    <solid android:color="@color/camera_panel" />
 </shape>

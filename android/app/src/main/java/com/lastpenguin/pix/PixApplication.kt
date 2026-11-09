@@ -1,8 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-09, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix
 
 import android.app.Application
 import androidx.annotation.VisibleForTesting
+import androidx.appcompat.app.AppCompatDelegate
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.core.Timings
 
@@ -10,6 +11,9 @@ class PixApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Timings.mark("app.start")
+        // Dark whatever the phone's setting: Theme.Pix takes the mode set here (DayNight), and light mode adds its
+        // colors and a choice in Settings (Iter4-P15, #212).
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
     }
 
     private var installed: AppContainer? = null

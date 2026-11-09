@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-09, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -1330,7 +1330,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // One still fading out is replaced.
         clearStill(controls)
         val aspect = shownAspect ?: viewModel.uiState.value.aspect
-        controls.aspectStill.setImageBitmap(heldFrame(frame, aspect))
+        controls.aspectStill.setImageBitmap(
+            heldFrame(frame, aspect, controls.aspectStill.context.getColor(R.color.camera_dim)),
+        )
         // The bitmap is the whole camera image; show the old frame only, as the preview did.
         controls.aspectStill.clipBounds = controls.previewView.clipBounds
         controls.aspectStill.isVisible = true

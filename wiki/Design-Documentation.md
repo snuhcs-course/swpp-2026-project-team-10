@@ -79,6 +79,7 @@
 | 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code. QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*). Figure 1 redrawn; pushes only to signed-in phones. Section 1.4 removed: the task status is in 2.9, the later scope in R&S 4.1, and the QR plan in *Still open*. The AWS server stays on beside the course servers, for other networks (all sections). |
 | 3.0 | 2026-11-07 | Iteration 4 plan from the kickoff of 11/7: the task table with owners and due dates (2.9); the open decisions (*Still open*: the light mode's colors, Back on the pose screens, the situation prompts, whether four templates are needed); the Iteration 3 table closed. The remote-control switch and remote focus move to Iteration 5 (2.5.1, 2.6.5, 2.9). |
 | 3.1 | 2026-11-09 | Color tokens and a DayNight theme (Iter4-P5, [#202]): the tokens in two sets, page and on the image, and `Theme.Pix` on DayNight but dark until light mode (2.8). |
+| 3.2 | 2026-11-10 | A refused description is kept on neither phone: the description's own request decides, a refusal deletes the entry, and `pose.candidate.failed` says `descriptionRejected`; the owner of this task and of Iter4-P6 (2.2, 2.5.1, 2.6.3, 2.9; Iter4-P3, [#200]). |
 
 </details>
 
@@ -816,7 +817,7 @@ classDiagram
     +open(setId)
     +planned(setId, poseIds)
     +candidate(setId, poseId, image)
-    +failed(setId, poseId)
+    +failed(setId, poseId, descriptionRejected)
     +picking(setId, poseIds)
     +chosen(setId, poseId, by)
     +close(setId)
@@ -1513,7 +1514,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by` | The photographer's set of candidates (FR-6.15) |
 | `pose.planned` | P→S | reliable | `setId`, `poseIds` | The set's slots in order (Iter3-A13) |
 | `pose.candidate.begin` / `.chunk` / `.end` | P→S | reliable | chunks | One candidate, for *Generating poses* and *Pick a pose* |
-| `pose.candidate.failed` | P→S | reliable | `setId`, `poseId` | A candidate that could not be created (Iter3-A13) |
+| `pose.candidate.failed` | P→S | reliable | `setId`, `poseId`, `descriptionRejected` (only when true) | A candidate that could not be created (Iter3-A13), and whether the service refused the set's description itself (Iter4-P3) |
 | `pose.pick` | S→P | reliable | `setId`, `poseId` | The subject's *Use this pose* |
 | `guide.confirm` | P→S | reliable | `confirmId`, `step`, `guideId`, `by` | The photographer's *Reference confirm* of a chosen pose (FR-6.15) |
 | `guide.confirm.image.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The outline's mask, for the subject's *Your reference* |
@@ -1756,7 +1757,7 @@ Each copy goes as soon as its candidate arrives on the photographer's phone, one
   "b": { "setId": "c41f7a20-5d3b-4e8a-9f61-0b2d3c4e5f60", "poseIds": ["pose-1", "pose-2", "pose-3", "pose-4"] } }
 ```
 
-`pose.planned` goes once the set's candidates are planned, which takes suggested poses a few seconds, and before any copy. `pose.candidate.failed` (`setId`, `poseId`) marks a slot that failed, or that the set's 60 s limit ended, so the subject's slot says "Couldn't create". It carries no reason. A subject that holds another set, or none, ignores both.
+`pose.planned` goes once the set's candidates are planned, which takes suggested poses a few seconds, and before any copy. `pose.candidate.failed` (`setId`, `poseId`) marks a slot that failed, or that the set's 60 s limit ended, so the subject's slot says "Couldn't create". It carries no reason. It says `descriptionRejected: true` when the failure is the service refusing the set's description itself, so the subject's history does not keep that description (2.6.3, *Prompt history*; Iter4-P3, [#200]). An older photographer sends none, and an older subject ignores it. A subject that holds another set, or none, ignores both.
 
 </details>
 
@@ -2516,7 +2517,7 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 4.  **Progressive results.** *Generating poses* shows four slots, two by two in the scene's shape, narrower and centered for a 9:16 scene (`CandidateGridFit`). A candidate, or its failure, fades in over 200 ms where its spinner was (Iter3-A13). The run ends when all four are done or at 60 s, when open requests are cancelled. With at least one candidate, *Pick a pose* shows each on its own page of a `ViewPager2` (`PosePageAdapter`), in its own shape. The page on screen is the one *Use this pose* takes ([#108]). With none, *Couldn't create poses* opens (FR-4.7). After *Use this pose*, the other candidates go, and the scene photo once its tip is asked for.
 5.  **Cancellation.** *Cancel* or Back cancels the coroutine scope and its HTTP calls. The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
 
-**Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
+**Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A refused description can still get candidates (Iter4-P3, [#200]). The filter judges each of a set's five requests by itself and lets a request through when it cannot answer in 2 s. One of the description's own requests can pass that way. So can the request for variations, whose variations then pass as other words. The description's own request therefore decides. When a refused pose (`REJECTED`) is the description as written, the set records nothing, and `delete` removes the entry, also one that an earlier set or a build before [#182] kept. A refused variation changes nothing. The photographer's phone says so in `pose.candidate.failed` (`descriptionRejected`, 2.5.1), and the subject's phone then does the same, also when the refusal follows a candidate. The filter's refusal and the image service's both count (decided 2026-11-10). They share `REJECTED` today, and a code that tells them apart ([#203]) must count for both. A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
 
 **Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. `PoseSaveViewModel`, scoped to the activity, cuts the person out with `ReferenceGuideMaker.make(image, GENERATED)` and saves the guide as an AI pose. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide. A tap on a filled heart deletes the guide. A newly saved ♥ pops to 125 % and back in 200 ms. Whether a save removed the oldest guide is decided under the store's lock (`GuideSaved`): of two hearts tapped at once with 99 saved, only the second removes one. *Use this pose* on a filled heart reuses its saved guide. Nothing of a ♥ is sent (2.6.5).
 
@@ -3131,10 +3132,10 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 |----|----|----|----|----|
 | The documents and the issues (Iter4-P1, [#198]) | 조성민 | 11/9 | Open | — |
 | Back on the pose screens, with *Generate again* (Iter4-P2, [#199]) | 한준형 | 11/12 | Open | 2.4, 2.6.5, *Still open* |
-| A refused description kept in the history (Iter4-P3, [#200]) | 한준형 | 11/12 | Open | 2.6.3, 2.6.5 |
+| A refused description kept in the history (Iter4-P3, [#200]) | 박동제 | 11/12 | Open | 2.5.1, 2.6.3 |
 | The subject's live view mirrored (Iter4-P4, [#201]) | 한준형 | 11/12 | Open | 2.6.4 |
 | Color tokens and a DayNight theme (Iter4-P5, [#202]) | 박동제 | 11/12 | Open | 2.8 |
-| A message for each way pose generation fails (Iter4-P6, [#203]) | 한준형 | 11/13 | Open | 2.5.3, 2.6.3 |
+| A message for each way pose generation fails (Iter4-P6, [#203]) | 박동제 | 11/13 | Open | 2.5.3, 2.6.3 |
 | UI fixes: no notice after saving, the primary buttons at the top right, and the leftovers of the user test and the heuristic evaluation (Iter4-P7, [#204]) | 박동제 | 11/13 | Open | 2.6.2 |
 | The UAT (Iter4-P8, [#205]) | 조성민 | 11/18 | Open | Testing Documentation 4.3, 4.4 |
 | Landscape photos saved as taken, and landscape poses (Iter4-P9, [#206]) | 한준형 | 11/19 | Open | 2.6.1–2.6.4, 2.8 |

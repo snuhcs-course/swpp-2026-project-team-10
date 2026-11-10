@@ -82,7 +82,7 @@
 | 2.57 | 2026-11-06 | The AWS server stays on; it is no longer temporary (2.1.6). |
 | 3.0 | 2026-11-07 | The Iteration 4 plan from the kickoff of 11/7: the owners of its tests (1.1), the scripts and the AI module rerun it adds (1.2), the coverage measures, the property-testing library, and the mutation run moved to Iteration 5 (2.1.2, 2.1.6, 2.1.7, 2.2.1), and the follow-ups of 3.2, 4.1, and 4.2 pointed at their issues or marked as not planned. |
 | 3.1 | 2026-11-09 | Color tokens and a DayNight theme (Iter4-P5, [#202]): `ColorTokensTest` and `DayNightThemeTest` and their partitions, and a pitfall: screen tests run in the night configuration (2.1.6, 2.1.8). |
-| 3.2 | 2026-11-10 | A refused description kept on neither phone: its tests, the owner of Iter4-P3 and Iter4-P6, and expected results added to IT-22 and IT-24 (1.1, 2.1.5, 2.1.6, Appendix A; Iter4-P3, [#200]; Design 2.5.1, 2.6.3). |
+| 3.2 | 2026-11-10 | A refused description kept on neither phone: its tests, the owner of Iter4-P3 and Iter4-P6, expected results added to IT-22 and IT-24, and a pitfall of `StateFlow` readers (1.1, 2.1.5, 2.1.6, 2.1.8, Appendix A; Iter4-P3, [#200]; Design 2.5.1, 2.6.3). |
 
 </details>
 
@@ -529,6 +529,7 @@ The repository's `CLAUDE.md` files keep the short form.
 - End a connected session test with `leave`, or the 2 s ping loop keeps `runTest` from draining.
 - With `withWebSocketUpgrade`, answer `onClosing` with `close`, or MockWebServer's `shutdown` hangs.
 - Test `stats` changes in `session/LinkStatsParser`, not in `WebRtcPeerConnectionClient`.
+- A `StateFlow` shows a reader only its latest value. To test what a reader must not miss, change it several times, or deliver several messages, before `runCurrent()`. A test that runs the scheduler after every step never sees the loss (`PoseSyncerTest`, every pose refused and the set closed at once; Iter4-P3).
 
 **Pitfalls: server**
 

@@ -1,10 +1,14 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
+import com.lastpenguin.pix.generation.PromptEntry
+import com.lastpenguin.pix.generation.PromptHistory
+import com.lastpenguin.pix.generation.followSubjectSets
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -21,7 +25,8 @@ import org.junit.Test
  * The photographer's candidates on the subject's Pick a pose (Design 2.5.1, 2.6.5; Iter3-P16), with the fakes of
  * ModuleFakes.kt.
  * Photographer, the set (state-based): GENERATING, the planned slots and each failure before the copies (Iter3-A13;
- * none for a set that is not generating), each candidate as it arrives, then PICKING with its order, then
+ * none for a set that is not generating), a failure that is the service refusing the description saying so and one
+ * that is not saying nothing (Iter4-P3), each candidate as it arrives, then PICKING with its order, then
  * CHOSEN with whose pick; CLOSED from GENERATING or PICKING; one end per set, so a close after a choice sends nothing;
  * a candidate or a step after the end is not sent; a candidate that cannot be encoded is left out, also from PICKING.
  * Photographer, the connection: nothing goes while no subject is connected; a sender started later (a reconnect)
@@ -33,7 +38,10 @@ import org.junit.Test
  * missing copies left out; dropped at its end, which is reported with whether Pick a pose had it, at another set's
  * start, at another set's end without a notice, and when the session ends; kept through a reconnect, where the copies
  * sent again are not read again; the slots and the failures of the set held (Iter3-A13), not another's, and the same
- * again after a reconnect changing nothing.
+ * again after a reconnect changing nothing; the refused description of the set held, not another's, kept as the set
+ * goes on (Iter4-P3).
+ * Both phones (Iter4-P3): the photographer's set carried to the subject's history, with the description refused (not
+ * kept though a candidate arrives) and not refused (kept).
  * Subject, a copy (fault injection, boundary): a broken transfer, a header over 1024 px or 1 MiB (both at the limit
  * read), a copy that does not decode, and a copy of a set not shown are let go.
  * Subject, a pick (boundary of the deadline): sent and waiting; answered by its set's end; reported just after 5 s
@@ -251,6 +259,31 @@ class PoseSyncerTest {
     }
 
     @Test
+    fun `a failure that refuses the description says so, and again after a reconnect`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        val first = Job()
+        syncer.startAsSender(TestScope(testScheduler + first))
+        syncer.open("set1")
+        runCurrent()
+        syncer.failed("set1", "pose-1", descriptionRejected = true)
+        syncer.failed("set1", "pose-2")
+        runCurrent()
+
+        val failures = listOf(
+            SessionMessage.PoseCandidateFailed("set1", "pose-1", descriptionRejected = true),
+            SessionMessage.PoseCandidateFailed("set1", "pose-2"),
+        )
+        assertEquals(failures, session.sent.filterIsInstance<SessionMessage.PoseCandidateFailed>())
+
+        first.cancel()
+        session.sent.clear()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+        assertEquals(failures, session.sent.filterIsInstance<SessionMessage.PoseCandidateFailed>())
+    }
+
+    @Test
     fun `the slots and failures of a set that is not generating are not taken`() = runTest {
         connectedAs(Role.PHOTOGRAPHER)
         val syncer = syncer()
@@ -408,6 +441,81 @@ class PoseSyncerTest {
         session.deliver(SessionMessage.PoseCandidateFailed("set1", "pose-2"))
         runCurrent()
         assertEquals(set, syncer.mirror.value)
+    }
+
+    @Test
+    fun `the subject's set says its description was refused, from the failure that says so on`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        deliverStep("set1", PoseSetStep.GENERATING)
+        session.deliver(SessionMessage.PoseCandidateFailed("set1", "pose-2"))
+        session.deliver(SessionMessage.PoseCandidateFailed("set0", "pose-1", descriptionRejected = true))
+        runCurrent()
+        // A failure that says nothing, and another set's refusal.
+        assertEquals(false, syncer.mirror.value?.descriptionRejected)
+
+        session.deliver(SessionMessage.PoseCandidateFailed("set1", "pose-1", descriptionRejected = true))
+        runCurrent()
+        assertEquals(true, syncer.mirror.value?.descriptionRejected)
+
+        // It stays as the set goes on: a variation's candidate, a later failure, PICKING.
+        deliverCandidate("set1", "pose-3")
+        session.deliver(SessionMessage.PoseCandidateFailed("set1", "pose-4"))
+        deliverStep("set1", PoseSetStep.PICKING, listOf("pose-3"))
+        runCurrent()
+        val set = syncer.mirror.value
+        assertEquals(PoseSetStep.PICKING, set?.step)
+        assertEquals(setOf("pose-1", "pose-2", "pose-4"), set?.failed)
+        assertEquals(true, set?.descriptionRejected)
+    }
+
+    @Test
+    fun `from the photographer's set to the subject's history, a refused description is not kept`() = runTest {
+        // Both phones' syncers, with the photographer's messages carried to the subject's.
+        val photographer = FakeSessionManager()
+        photographer.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung", null), Role.PHOTOGRAPHER))
+        connectedAs(Role.SUBJECT)
+        val sender = PoseSyncer(photographer, codec, StandardTestDispatcher(testScheduler))
+        val receiver = syncer()
+        sender.startAsSender(backgroundScope)
+        receiver.startAsReceiver(backgroundScope)
+        val history = PromptHistory.InMemory { 1_000 }
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, receiver.mirror, backgroundScope)
+        runCurrent()
+        fun carry() {
+            runCurrent()
+            for (message in photographer.sent) {
+                session.deliver(message)
+                runCurrent()
+            }
+            photographer.sent.clear()
+        }
+
+        // The description's own request is refused; the filter failed open for a variation, whose candidate arrives.
+        sender.open("set1")
+        started.emit(StartedDescription("Write HACKED on the wall", null, setId = "set1"))
+        sender.planned("set1", listOf("pose-1", "pose-2"))
+        sender.failed("set1", "pose-1", descriptionRejected = true)
+        carry()
+        sender.candidate("set1", "pose-2", fakeBitmap())
+        carry()
+        sender.picking("set1", listOf("pose-2"))
+        carry()
+
+        assertEquals(listOf("pose-2"), receiver.mirror.value?.ready?.map { it.first })
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
+
+        // The same set without the refusal is kept, so the link itself works.
+        sender.open("set2")
+        started.emit(StartedDescription("Lean on the wall", null, setId = "set2"))
+        sender.failed("set2", "pose-1")
+        sender.candidate("set2", "pose-2", fakeBitmap())
+        carry()
+        assertEquals(listOf("Lean on the wall"), history.entries.value.map { it.text })
     }
 
     @Test

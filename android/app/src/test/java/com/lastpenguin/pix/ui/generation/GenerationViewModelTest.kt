@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -1225,6 +1225,15 @@ class GenerationViewModelTest {
         assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
     }
 
+    // ---- the descriptions used before (FR-4.11) -----------------------------------------------------------------
+    // Kept: a set's description at its first candidate, with the friend as the set started; the subject's too.
+    // Not kept: every pose refused; a set cancelled before an answer; suggested poses and a blank description.
+    // The service refusing the description itself (Iter4-P3; equivalence partitioning on whose request failed and
+    // why): the description's own request refused while a variation gives a candidate (not kept); a repeat of the
+    // description refused after a candidate (taken out again); an entry an earlier set or build kept (removed); a
+    // refused variation, and the description's own request failing for another reason (kept); the subject's phone
+    // told of the first kind only.
+
     @Test
     fun aSetMadeFromADescription_isKeptAsUsedBefore_onceTheServerAcceptsIt_withTheSessionsFriend() = runTest {
         partner = SessionPartner("u_2", "Joonhyung")
@@ -1282,6 +1291,123 @@ class GenerationViewModelTest {
         runCurrent()
 
         assertEquals(emptyList<PromptEntry>(), history.entries.value)
+    }
+
+    @Test
+    fun aDescriptionTheServiceRefuses_isNotKept_thoughAVariationOfItGivesACandidate() = runTest {
+        describeAPhoto()
+        model.generate("Write HACKED on the wall")
+        runCurrent()
+        val run = generator.runs.single()
+        // The filter failed open for the variations (Design 2.6.3) and refused the description's own request.
+        run.plan(listOf("Write HACKED on the wall", "Point at the wall", "Lean on the wall", "Touch the wall"))
+        run.send(failed("pose-1", GenerationError.REJECTED), ready("pose-2"))
+        run.finish()
+        runCurrent()
+
+        assertEquals(GenerationUiState.Phase.PICKING, state.phase)
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
+    }
+
+    @Test
+    fun aRefusalThatComesAfterACandidate_takesTheDescriptionOutAgain() = runTest {
+        describeAPhoto()
+        model.generate("Write HACKED on the wall")
+        runCurrent()
+        val run = generator.runs.single()
+        // No variations came, so every pose is the description; the filter failed open for one of them.
+        run.plan(List(4) { "Write HACKED on the wall" })
+        run.send(ready("pose-1"))
+        runCurrent()
+        assertEquals(listOf("Write HACKED on the wall"), history.entries.value.map { it.text })
+
+        run.send(failed("pose-3", GenerationError.REJECTED))
+        runCurrent()
+
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
+    }
+
+    @Test
+    fun aRefusedDescription_leavesTheHistory_whenAnEarlierSetOrBuildKeptIt() = runTest {
+        history.record("Bleeding on the floor", Role.PHOTOGRAPHER, "u_2")
+        history.record("Wave", Role.PHOTOGRAPHER, null)
+        describeAPhoto()
+        model.generate("Bleeding on the floor")
+        runCurrent()
+        generator.runs.single().apply {
+            plan(List(4) { "Bleeding on the floor" })
+            send(*(1..4).map { failed("pose-$it", GenerationError.REJECTED) }.toTypedArray())
+            finish()
+        }
+        runCurrent()
+
+        assertEquals(listOf("Wave"), history.entries.value.map { it.text })
+    }
+
+    @Test
+    fun aRefusedVariation_keepsTheDescription() = runTest {
+        describeAPhoto()
+        model.generate("Lean on the wall")
+        runCurrent()
+        generator.runs.single().apply {
+            plan(listOf("Lean on the wall", "Lean back", "Lean with arms crossed", "Lean and laugh"))
+            send(
+                failed("pose-2", GenerationError.REJECTED),
+                ready("pose-1"),
+                failed("pose-3", GenerationError.REJECTED),
+            )
+        }
+        runCurrent()
+
+        assertEquals(listOf("Lean on the wall"), history.entries.value.map { it.text })
+    }
+
+    @Test
+    fun theDescriptionsOwnRequest_failingForAnotherReason_keepsTheDescription() = runTest {
+        describeAPhoto()
+        model.generate("Lean on the wall")
+        runCurrent()
+        generator.runs.single().apply {
+            plan(listOf("Lean on the wall", "Lean back", "Lean on the wall", "Lean on the wall"))
+            // Every failure that is not the service refusing the text: the photo, the limit, the network, the server.
+            send(
+                failed("pose-1", GenerationError.NO_PERSON),
+                failed("pose-3", GenerationError.RATE_LIMITED),
+                failed("pose-4", GenerationError.TIMEOUT),
+                ready("pose-2"),
+            )
+        }
+        runCurrent()
+
+        assertEquals(listOf("Lean on the wall"), history.entries.value.map { it.text })
+    }
+
+    @Test
+    fun theSubjectsPhoneIsTold_whenTheServiceRefusesTheDescriptionItself() = runTest {
+        describeAPhoto()
+        model.generate("Write HACKED on the wall")
+        runCurrent()
+        generator.runs.single().apply {
+            plan(listOf("Write HACKED on the wall", "Point at the wall", "Write HACKED on the wall", "Touch the wall"))
+            send(
+                failed("pose-1", GenerationError.REJECTED),
+                // A variation, and a failure that is no refusal, say nothing of the description.
+                failed("pose-2", GenerationError.REJECTED),
+                failed("pose-3", GenerationError.REJECTED),
+                failed("pose-4", GenerationError.SERVER),
+            )
+        }
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                "failed pose-1, the description rejected",
+                "failed pose-2",
+                "failed pose-3, the description rejected",
+                "failed pose-4",
+            ),
+            share.calls.filter { it.startsWith("failed") },
+        )
     }
 
     @Test
@@ -1440,9 +1566,9 @@ class GenerationViewModelTest {
             calls += "candidate $poseId"
         }
 
-        override fun failed(setId: String, poseId: String) {
+        override fun failed(setId: String, poseId: String, descriptionRejected: Boolean) {
             check(setId == opened.last())
-            calls += "failed $poseId"
+            calls += "failed $poseId" + if (descriptionRejected) ", the description rejected" else ""
         }
 
         override fun picking(setId: String, poseIds: List<String>) {

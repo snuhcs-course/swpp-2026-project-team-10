@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -185,10 +185,16 @@ sealed interface SessionMessage {
     /**
      * The candidate [poseId] of the set [setId] could not be created (Iter3-A13), so the subject's slot says so as the
      * photographer's does, which shows every failure alike; no reason travels, so a new one breaks no older phone.
+     * [descriptionRejected] says that the service refused the set's description itself, so the subject's history does
+     * not keep it either (FR-4.11); a photographer of an older version sends none, and an older subject ignores it.
      */
     @Serializable
     @SerialName("pose.candidate.failed")
-    data class PoseCandidateFailed(val setId: String, val poseId: String) : SessionMessage
+    data class PoseCandidateFailed(
+        val setId: String,
+        val poseId: String,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val descriptionRejected: Boolean = false,
+    ) : SessionMessage
 
     /**
      * The subject's *Use this pose* on the candidate [poseId] (FR-6.15), a request like its others (AD-7): the

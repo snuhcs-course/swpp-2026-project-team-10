@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -61,6 +61,7 @@ class MessageCodecTest {
             SessionMessage.PoseCandidateEnd("set1", "pose-4", 3735928559L),
             SessionMessage.PosePlanned("set1", listOf("pose-1", "pose-2", "pose-3", "pose-4")),
             SessionMessage.PoseCandidateFailed("set1", "pose-2"),
+            SessionMessage.PoseCandidateFailed("set1", "pose-1", descriptionRejected = true),
             SessionMessage.PosePick("set1", "pose-4"),
             SessionMessage.GuideConfirm("c1", ConfirmStep.FINDING),
             SessionMessage.GuideConfirm("c1", ConfirmStep.READY, guideId = "g1"),
@@ -142,6 +143,27 @@ class MessageCodecTest {
         assertEquals(
             SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-2", by = Role.SUBJECT),
             example!!.message,
+        )
+    }
+
+    @Test
+    fun `a failed candidate says that the description was refused only when it was`() {
+        val plain = Json.parseToJsonElement(codec.encode(SessionMessage.PoseCandidateFailed("set1", "pose-2")))
+        assertEquals("pose.candidate.failed", plain.jsonObject.getValue("t").jsonPrimitive.content)
+        assertEquals(setOf("setId", "poseId"), plain.jsonObject.getValue("b").jsonObject.keys)
+
+        val refused = SessionMessage.PoseCandidateFailed("set1", "pose-1", descriptionRejected = true)
+        val body = Json.parseToJsonElement(codec.encode(refused)).jsonObject.getValue("b").jsonObject
+        assertEquals(setOf("setId", "poseId", "descriptionRejected"), body.keys)
+
+        // As a photographer of an older version sends it: nothing said.
+        val older = """{"v":3,"t":"pose.candidate.failed","seq":1,"ts":0,"b":{"setId":"set1","poseId":"pose-2"}}"""
+        assertEquals(SessionMessage.PoseCandidateFailed("set1", "pose-2"), codec.decode(older)!!.message)
+        val example =
+            """{"v":3,"t":"pose.candidate.failed","seq":1,"ts":0,"b":{"setId":"s","poseId":"p","descriptionRejected":true}}"""
+        assertEquals(
+            SessionMessage.PoseCandidateFailed("s", "p", descriptionRejected = true),
+            codec.decode(example)!!.message,
         )
     }
 

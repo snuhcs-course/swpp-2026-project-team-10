@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.generation
 
 import androidx.datastore.core.DataStore
@@ -30,7 +30,9 @@ import org.junit.Test
  * subject's sets followed with the friend the start found, kept once the set that follows the start has a candidate
  * or is PICKING, and a blank one not; the subject's set that ends without a candidate (a description the server turns
  * down), whose text is not kept, also when a later set without a start is accepted; an earlier set, accepted before
- * the start came, which does not count for it; a DataStore read that fails, which
+ * the start came, which does not count for it; the subject's set whose description the service refused itself (Iter4-P3):
+ * not kept though a variation gives a candidate, taken out again when the refusal follows a candidate, and an entry an
+ * earlier set or build kept removed, with the text as the start carries it; a DataStore read that fails, which
  * keeps the entries read last and reads again, so a change written meanwhile shows.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -215,6 +217,60 @@ class PromptHistoryTest {
         sets.value = withACandidate("s2")
         runCurrent()
         assertEquals(listOf("Jump", "Wave"), entries.map { it.text })
+    }
+
+    @Test
+    fun theSubjectsSet_whoseDescriptionTheServiceRefused_isNotKept_thoughAVariationGivesACandidate() = runTest {
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, sets, backgroundScope)
+        runCurrent()
+
+        started.emit(StartedDescription("Write HACKED on the wall", null, setId = "s1"))
+        sets.value = generatingSet("s1").copy(failed = setOf("pose-1"), descriptionRejected = true)
+        runCurrent()
+        sets.value = withACandidate("s1").copy(failed = setOf("pose-1"), descriptionRejected = true)
+        runCurrent()
+        sets.value = sets.value?.copy(step = PoseSetStep.PICKING, poseIds = listOf("pose-1"))
+        runCurrent()
+
+        assertEquals(emptyList<PromptEntry>(), entries)
+    }
+
+    @Test
+    fun aRefusalOnTheSubjectsSet_afterACandidate_takesTheDescriptionOutAgain() = runTest {
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, sets, backgroundScope)
+        runCurrent()
+
+        started.emit(StartedDescription("Write HACKED on the wall", null, setId = "s1"))
+        sets.value = withACandidate("s1")
+        runCurrent()
+        assertEquals(listOf("Write HACKED on the wall"), entries.map { it.text })
+
+        sets.value = withACandidate("s1").copy(failed = setOf("pose-3"), descriptionRejected = true)
+        runCurrent()
+
+        assertEquals(emptyList<PromptEntry>(), entries)
+    }
+
+    @Test
+    fun theSubjectsRefusedDescription_leavesTheHistory_whenAnEarlierSetOrBuildKeptIt() = runTest {
+        history.record("Bleeding on the floor", Role.SUBJECT, "u_1")
+        history.record("Wave", Role.PHOTOGRAPHER, null)
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, sets, backgroundScope)
+        runCurrent()
+
+        // As the start carries it, whitespace and all.
+        started.emit(StartedDescription("Bleeding  on the floor ", null, setId = "s1"))
+        sets.value = generatingSet("s1")
+        runCurrent()
+        sets.value = generatingSet("s1").copy(failed = setOf("pose-1"), descriptionRejected = true)
+        runCurrent()
+        sets.value = null
+        runCurrent()
+
+        assertEquals(listOf("Wave"), entries.map { it.text })
     }
 
     @Test

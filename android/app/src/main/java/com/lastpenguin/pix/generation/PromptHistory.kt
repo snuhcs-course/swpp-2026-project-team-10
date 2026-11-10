@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.generation
 
 import android.content.Context
@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -52,7 +53,8 @@ data class PromptEntry(
  * The descriptions used before (FR-4.11; Design 2.6.3, Prompt history): on this phone only, since the server keeps
  * no description (NFR-13), and still there after the app restarts. Each set a description starts, on either phone of a
  * session, is recorded once the server accepts the description (its first candidate), with this phone's role and the
- * session's friend as the set started; a description the server turns down is not kept. The same text used again
+ * session's friend as the set started. A description the service refuses is not kept, also when variations of it give
+ * candidates, and a refusal removes the entry an earlier set or an older build kept. The same text used again
  * moves to the front and adds the friend. At most [MAX_ENTRIES] are kept, and the one used longest ago goes first.
  * Owner: Pose generation; the history Iter3-P24.
  */
@@ -66,7 +68,7 @@ interface PromptHistory {
      */
     suspend fun record(text: String, role: Role, partnerId: String?)
 
-    /** ✕ on the entry of [text]; an unknown text does nothing. */
+    /** ✕ on the entry of [text], or the service refusing that description; an unknown text does nothing. */
     suspend fun delete(text: String)
 
     /** Keeps the history for the life of the process only; for tests and screens that keep none. */
@@ -108,8 +110,10 @@ internal fun List<PromptEntry>.without(text: String): List<PromptEntry> = filter
  * is PICKING. The start names its set ([StartedDescription.setId]), since `pose.step` and the start come on their own
  * and either can arrive first; from an older photographer, whose start names none, the set that follows is taken. A set
  * that ends without one, as a description the server turns down does, keeps nothing, and the next start replaces a
- * start still waiting. Followed on [scope] for the life of the app, because the set can start while
- * Subject view, not *Generate poses*, is in front.
+ * start still waiting. A named set whose failure says that the service refused the description itself
+ * ([MirrorPoseSet.descriptionRejected]) keeps nothing either, whatever candidates it has, and the description leaves
+ * this phone's history, also when the refusal comes after a candidate. Followed on [scope] for the life of the app,
+ * because the set can start while Subject view, not *Generate poses*, is in front.
  */
 fun PromptHistory.followSubjectSets(
     started: Flow<StartedDescription>,
@@ -119,19 +123,25 @@ fun PromptHistory.followSubjectSets(
     started.collectLatest { start ->
         val named = start.setId
         if (named != null) {
-            // That set, whether its answer came before the start or comes after; another set means it ended unanswered.
+            // That set, whether its answer came before the start or comes after, for as long as this phone holds it,
+            // since a refusal can follow a candidate; another set, or none after it, means it ended.
             var seen = false
-            val decided = sets.first { set ->
+            var kept = false
+            sets.transformWhile { set ->
+                if (set?.setId != named) return@transformWhile !seen
+                seen = true
+                emit(set)
+                !set.descriptionRejected
+            }.collect { set ->
                 when {
-                    set?.setId == named -> {
-                        seen = true
-                        set.accepted
-                    }
+                    set.descriptionRejected -> described(start.text)?.let { delete(it) }
 
-                    else -> seen
+                    set.accepted && !kept -> {
+                        kept = true
+                        record(start.text, Role.SUBJECT, start.partner?.userId)
+                    }
                 }
             }
-            if (decided?.setId == named) record(start.text, Role.SUBJECT, start.partner?.userId)
             return@collectLatest
         }
         // A set already accepted when the start comes is an earlier one, whose end has not arrived yet.
@@ -158,6 +168,9 @@ fun PromptHistory.followSubjectSets(
 /** The server accepted the set's description: a candidate arrived, or the photographer is picking from it. */
 private val MirrorPoseSet.accepted: Boolean
     get() = step == PoseSetStep.PICKING || candidates.isNotEmpty()
+
+/** [text] as its entry has it (`PoseRequest.of`); null for a blank one, which has none. */
+private fun described(text: String): String? = (PoseRequest.of(text) as? PoseRequest.Described)?.text
 
 private val Context.promptHistoryStore by preferencesDataStore(
     name = "prompt_history",

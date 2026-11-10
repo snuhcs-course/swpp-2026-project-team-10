@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -43,8 +43,11 @@ interface PoseShare {
     /** The candidate [poseId] of [setId] arrived. */
     fun candidate(setId: String, poseId: String, image: Bitmap)
 
-    /** The candidate [poseId] of [setId] could not be created. */
-    fun failed(setId: String, poseId: String)
+    /**
+     * The candidate [poseId] of [setId] could not be created; with [descriptionRejected], because the service refused
+     * the set's description itself, which the subject's phone then does not keep either (FR-4.11).
+     */
+    fun failed(setId: String, poseId: String, descriptionRejected: Boolean = false)
 
     /** *Pick a pose* opened with the created candidates [poseIds], in its order. */
     fun picking(setId: String, poseIds: List<String>)
@@ -65,7 +68,7 @@ interface PoseShare {
 
         override fun candidate(setId: String, poseId: String, image: Bitmap) = Unit
 
-        override fun failed(setId: String, poseId: String) = Unit
+        override fun failed(setId: String, poseId: String, descriptionRejected: Boolean) = Unit
 
         override fun picking(setId: String, poseIds: List<String>) = Unit
 
@@ -90,6 +93,8 @@ data class MirrorPoseSet(
      *  before Iter3-A13, which does not say. */
     val slots: List<String> = emptyList(),
     val failed: Set<String> = emptySet(),
+    /** The service refused the set's description itself, as a failure said (FR-4.11); never from an older photographer. */
+    val descriptionRejected: Boolean = false,
 ) {
     /** What the subject's *Pick a pose* shows: the candidates of [poseIds] whose copy is here, in their order. */
     val ready: List<Pair<String, Bitmap>>
@@ -137,6 +142,8 @@ class PoseSyncer(
         val slots: List<String> = emptyList(),
         /** In the order they failed. */
         val failed: List<String> = emptyList(),
+        /** Of [failed], those whose failure was the service refusing the set's description itself (FR-4.11). */
+        val refusals: Set<String> = emptySet(),
     ) {
         val open: Boolean get() = step == PoseSetStep.GENERATING || step == PoseSetStep.PICKING
     }
@@ -166,10 +173,13 @@ class PoseSyncer(
         }
     }
 
-    override fun failed(setId: String, poseId: String) {
+    override fun failed(setId: String, poseId: String, descriptionRejected: Boolean) {
         shared.update { set ->
             if (set?.setId == setId && set.step == PoseSetStep.GENERATING && poseId !in set.failed) {
-                set.copy(failed = set.failed + poseId)
+                set.copy(
+                    failed = set.failed + poseId,
+                    refusals = if (descriptionRejected) set.refusals + poseId else set.refusals,
+                )
             } else {
                 set
             }
@@ -238,11 +248,8 @@ class PoseSyncer(
                 }
                 if (set.open) {
                     for (poseId in set.failed) {
-                        if (failuresSent.add(
-                                poseId,
-                            )
-                        ) {
-                            session.send(SessionMessage.PoseCandidateFailed(set.setId, poseId))
+                        if (failuresSent.add(poseId)) {
+                            session.send(SessionMessage.PoseCandidateFailed(set.setId, poseId, poseId in set.refusals))
                         }
                     }
                 }
@@ -346,7 +353,14 @@ class PoseSyncer(
                         }
 
                         is SessionMessage.PoseCandidateFailed -> _mirror.update { set ->
-                            if (set?.setId == message.setId) set.copy(failed = set.failed + message.poseId) else set
+                            if (set?.setId == message.setId) {
+                                set.copy(
+                                    failed = set.failed + message.poseId,
+                                    descriptionRejected = set.descriptionRejected || message.descriptionRejected,
+                                )
+                            } else {
+                                set
+                            }
                         }
 
                         is SessionMessage.PoseCandidateBegin -> {

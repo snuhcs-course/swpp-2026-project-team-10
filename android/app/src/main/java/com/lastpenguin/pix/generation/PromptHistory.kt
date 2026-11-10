@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.generation
 
 import android.content.Context
@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.lastpenguin.pix.session.DescriptionVerdicts
 import com.lastpenguin.pix.session.MirrorPoseSet
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.StartedDescription
@@ -17,6 +18,7 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +31,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -52,7 +56,8 @@ data class PromptEntry(
  * The descriptions used before (FR-4.11; Design 2.6.3, Prompt history): on this phone only, since the server keeps
  * no description (NFR-13), and still there after the app restarts. Each set a description starts, on either phone of a
  * session, is recorded once the server accepts the description (its first candidate), with this phone's role and the
- * session's friend as the set started; a description the server turns down is not kept. The same text used again
+ * session's friend as the set started. A description the service refuses is not kept, also when variations of it give
+ * candidates, and a refusal removes the entry an earlier set or an older build kept. The same text used again
  * moves to the front and adds the friend. At most [MAX_ENTRIES] are kept, and the one used longest ago goes first.
  * Owner: Pose generation; the history Iter3-P24.
  */
@@ -66,7 +71,7 @@ interface PromptHistory {
      */
     suspend fun record(text: String, role: Role, partnerId: String?)
 
-    /** ✕ on the entry of [text]; an unknown text does nothing. */
+    /** ✕ on the entry of [text], or the service refusing that description; an unknown text does nothing. */
     suspend fun delete(text: String)
 
     /** Keeps the history for the life of the process only; for tests and screens that keep none. */
@@ -108,30 +113,39 @@ internal fun List<PromptEntry>.without(text: String): List<PromptEntry> = filter
  * is PICKING. The start names its set ([StartedDescription.setId]), since `pose.step` and the start come on their own
  * and either can arrive first; from an older photographer, whose start names none, the set that follows is taken. A set
  * that ends without one, as a description the server turns down does, keeps nothing, and the next start replaces a
- * start still waiting. Followed on [scope] for the life of the app, because the set can start while
- * Subject view, not *Generate poses*, is in front.
+ * start still waiting. A named set is read from [verdicts] (`PoseSyncer.verdicts`), which keep what a set said after
+ * it ended, where [sets] would have dropped it: one whose failure said that the service refused the description itself
+ * keeps nothing, whatever candidates it has, and the description leaves this phone's history, also when the refusal
+ * comes after a candidate or together with the set's end. A change of the history that is still being written when
+ * the next start comes is finished first. Followed on [scope] for the life of the app, because the set can start
+ * while Subject view, not *Generate poses*, is in front.
  */
 fun PromptHistory.followSubjectSets(
     started: Flow<StartedDescription>,
     sets: StateFlow<MirrorPoseSet?>,
+    verdicts: StateFlow<DescriptionVerdicts>,
     scope: CoroutineScope,
 ): Job = scope.launch {
     started.collectLatest { start ->
         val named = start.setId
         if (named != null) {
-            // That set, whether its answer came before the start or comes after; another set means it ended unanswered.
-            var seen = false
-            val decided = sets.first { set ->
+            // What that set said of its description, whether told before the start or after. Unlike the mirror, the
+            // verdicts drop no set, so a refusal that came with the set's end is still here. Accepted keeps the
+            // description, once; refused, before or after a candidate, takes it out and ends the wait.
+            var kept = false
+            verdicts.transformWhile { told ->
+                emit(told)
+                named !in told.refused
+            }.collect { told ->
                 when {
-                    set?.setId == named -> {
-                        seen = true
-                        set.accepted
-                    }
+                    named in told.refused -> described(start.text)?.let { finished { delete(it) } }
 
-                    else -> seen
+                    named in told.accepted && !kept -> {
+                        kept = true
+                        finished { record(start.text, Role.SUBJECT, start.partner?.userId) }
+                    }
                 }
             }
-            if (decided?.setId == named) record(start.text, Role.SUBJECT, start.partner?.userId)
             return@collectLatest
         }
         // A set already accepted when the start comes is an earlier one, whose end has not arrived yet.
@@ -150,7 +164,7 @@ fun PromptHistory.followSubjectSets(
             }
         }
         if (decided != null && decided.setId == setId && decided.accepted) {
-            record(start.text, Role.SUBJECT, start.partner?.userId)
+            finished { record(start.text, Role.SUBJECT, start.partner?.userId) }
         }
     }
 }
@@ -158,6 +172,15 @@ fun PromptHistory.followSubjectSets(
 /** The server accepted the set's description: a candidate arrived, or the photographer is picking from it. */
 private val MirrorPoseSet.accepted: Boolean
     get() = step == PoseSetStep.PICKING || candidates.isNotEmpty()
+
+/**
+ * A [change] of the history that the next start must not cut short: it replaces the wait of the start before it, and
+ * the storage may still be writing then.
+ */
+private suspend fun finished(change: suspend () -> Unit) = withContext(NonCancellable) { change() }
+
+/** [text] as its entry has it (`PoseRequest.of`); null for a blank one, which has none. */
+private fun described(text: String): String? = (PoseRequest.of(text) as? PoseRequest.Described)?.text
 
 private val Context.promptHistoryStore by preferencesDataStore(
     name = "prompt_history",

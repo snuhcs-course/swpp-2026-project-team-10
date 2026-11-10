@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -125,8 +125,9 @@ data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
  * subject's *Pick a pose* through [share], and the subject's first pick of it counts as a *Select* (Design 2.6.5).
  * Each set made from a description, by either phone, goes into this phone's [history] as the photographer's, with the
  * session's friend from [partner] as the set started, once the server has accepted the description: a set whose first
- * candidate arrives (FR-4.11). A description the server turns down never makes one. Back on each screen goes one step
- * back; Back from Pick a pose discards the set (#199).
+ * candidate arrives (FR-4.11). A description the service refuses is not kept, also when its
+ * variations give candidates, and leaves the history if it was there; the subject's phone is told with the failure
+ * ([share]). Back on each screen goes one step back; Back from Pick a pose discards the set (#199).
  * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16; the history Iter3-P24.
  */
 class GenerationViewModel(
@@ -165,10 +166,16 @@ class GenerationViewModel(
     /** The set being generated or picked from, as [share] knows it; null between sets. */
     private var setId: String? = null
 
-    /** The set made from a description that the history waits to keep until the server accepts it (FR-4.11). */
-    private class UnrecordedSet(val setId: String, val text: String, val partnerId: String?)
+    /**
+     * The set made from a description, for the history (FR-4.11): [kept] once the server accepted the description, at
+     * the set's first candidate, and [refused] once the service refused the description itself.
+     */
+    private class DescribedSet(val setId: String, val text: String, val partnerId: String?) {
+        var kept = false
+        var refused = false
+    }
 
-    private var unrecorded: UnrecordedSet? = null
+    private var describedSet: DescribedSet? = null
 
     /** Generate poses as [descriptions] knows it, while the phase is DESCRIBING; null otherwise. */
     private var descriptionId: String? = null
@@ -549,7 +556,7 @@ class GenerationViewModel(
         setId = id
         // Kept once the server accepts it, whichever phone wrote it, with the friend as the set starts; suggested
         // poses have no description to keep.
-        unrecorded = described.takeIf { it.isNotEmpty() }?.let { UnrecordedSet(id, it, partner()?.userId) }
+        describedSet = described.takeIf { it.isNotEmpty() }?.let { DescribedSet(id, it, partner()?.userId) }
         share.open(id)
         _uiState.value = GenerationUiState(
             scene = scene,
@@ -682,7 +689,11 @@ class GenerationViewModel(
                         share.candidate(id, event.poseId, event.image)
                     }
 
-                    is CandidateEvent.Failed -> share.failed(id, event.poseId)
+                    is CandidateEvent.Failed -> {
+                        val refused = refusesDescription(id, event)
+                        if (refused) dropRefused(id)
+                        share.failed(id, event.poseId, refused)
+                    }
                 }
             }
         }
@@ -690,12 +701,36 @@ class GenerationViewModel(
 
     /**
      * The set [id]'s first candidate arrived, so the server accepted its description (FR-4.11): it goes into the
-     * history, once. A description the description filter turns down fails every candidate and is never kept.
+     * history, once, unless the service refused the description itself ([dropRefused]).
      */
     private fun record(id: String) {
-        val set = unrecorded?.takeIf { it.setId == id } ?: return
-        unrecorded = null
+        val set = describedSet?.takeIf { it.setId == id && !it.kept && !it.refused } ?: return
+        set.kept = true
         viewModelScope.launch { history.record(set.text, Role.PHOTOGRAPHER, set.partnerId) }
+    }
+
+    /**
+     * Whether [failure] is the service refusing the description of the set [id] itself (FR-4.12): a refused pose that
+     * is the description as written, which every pose is while the variations are missing. The filter's refusal and
+     * the image service's both count, so an error that tells them apart must count for both here. A refused variation
+     * says nothing of the description, and neither does a failure that is no refusal.
+     */
+    private fun refusesDescription(id: String, failure: CandidateEvent.Failed): Boolean {
+        if (failure.error != GenerationError.REJECTED) return false
+        val set = describedSet?.takeIf { it.setId == id } ?: return false
+        return _uiState.value.poses.firstOrNull { it.id == failure.poseId }?.text == set.text
+    }
+
+    /**
+     * The service refused the description of the set [id] itself: the set keeps nothing, whatever candidates its
+     * variations give or a request the filter could not judge (it fails open, Design 2.6.3) gave before, and the
+     * description leaves the history, where this set, an earlier one, or a build that kept every description may have
+     * put it (FR-4.11).
+     */
+    private fun dropRefused(id: String) {
+        val set = describedSet?.takeIf { it.setId == id && !it.refused } ?: return
+        set.refused = true
+        viewModelScope.launch { history.delete(set.text) }
     }
 
     /**

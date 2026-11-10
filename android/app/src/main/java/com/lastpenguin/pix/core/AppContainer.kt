@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-10, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -258,7 +258,7 @@ class AppContainer(
             // As the subject, each set the photographer starts is this phone's history too (FR-4.11), whichever
             // screen is in front, once the server accepted its description.
             val promptHistory = DataStorePromptHistory(appContext, appScope)
-            promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, appScope)
+            promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),

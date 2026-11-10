@@ -4,6 +4,7 @@ package com.lastpenguin.pix.generation
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import com.lastpenguin.pix.session.DescriptionVerdicts
 import com.lastpenguin.pix.session.MirrorPoseSet
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -30,9 +32,11 @@ import org.junit.Test
  * subject's sets followed with the friend the start found, kept once the set that follows the start has a candidate
  * or is PICKING, and a blank one not; the subject's set that ends without a candidate (a description the server turns
  * down), whose text is not kept, also when a later set without a start is accepted; an earlier set, accepted before
- * the start came, which does not count for it; the subject's set whose description the service refused itself (Iter4-P3):
- * not kept though a variation gives a candidate, taken out again when the refusal follows a candidate, and an entry an
- * earlier set or build kept removed, with the text as the start carries it; a DataStore read that fails, which
+ * the start came, which does not count for it; a set its start names, read from the verdicts: accepted before or
+ * after the start, another set's verdict, and a set accepted and gone before the history looks; the subject's set whose
+ * description the service refused itself (Iter4-P3): not kept though a variation gives a candidate, taken out again
+ * when the refusal follows a candidate, both told in one look, and an entry an earlier set or build kept removed, with
+ * the text as the start carries it and the mirror never showing the refusal; a DataStore read that fails, which
  * keeps the entries read last and reads again, so a change written meanwhile shows.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -113,6 +117,13 @@ class PromptHistoryTest {
     /** The photographer's set on the subject's phone, as `PoseSyncer.mirror` holds it. */
     private val sets = MutableStateFlow<MirrorPoseSet?>(null)
 
+    /** What the photographer's sets said of their descriptions, as `PoseSyncer.verdicts` holds it past a set's end. */
+    private val verdicts = MutableStateFlow(DescriptionVerdicts())
+
+    private fun accept(id: String) = verdicts.update { it.copy(accepted = it.accepted + id) }
+
+    private fun refuse(id: String) = verdicts.update { it.copy(refused = it.refused + id) }
+
     private fun generatingSet(id: String) = MirrorPoseSet(id, PoseSetStep.GENERATING)
 
     private fun withACandidate(id: String) =
@@ -121,7 +132,7 @@ class PromptHistoryTest {
     @Test
     fun theSubjectsSets_areKeptOnceTheServerAcceptsThem_withTheFriendTheStartFound() = runTest {
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         runCurrent()
 
         started.emit(StartedDescription("Wave", SessionPartner("u_1", "Dongje")))
@@ -155,7 +166,7 @@ class PromptHistoryTest {
     @Test
     fun theSubjectsTurnedDownDescription_isNotKept() = runTest {
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         runCurrent()
 
         started.emit(StartedDescription("Bleeding", null))
@@ -176,7 +187,7 @@ class PromptHistoryTest {
     @Test
     fun anEarlierSetAcceptedBeforeTheStart_doesNotCountForIt() = runTest {
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         sets.value = withACandidate("s0")
         runCurrent()
 
@@ -198,23 +209,22 @@ class PromptHistoryTest {
     @Test
     fun aStartThatNamesItsSet_countsThatSet_evenAcceptedBeforeTheStartArrived() = runTest {
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         runCurrent()
 
         // pose.step won the race: the started set already has a candidate when its start comes.
-        sets.value = withACandidate("s1")
+        accept("s1")
         runCurrent()
         started.emit(StartedDescription("Wave", null, setId = "s1"))
         runCurrent()
         assertEquals(listOf(PromptEntry("Wave", 1_000, Role.SUBJECT)), entries)
 
-        // The start first, an earlier set still showing, then the named set's answer.
+        // The start first, then the named set's answer.
         now = 2_000
         started.emit(StartedDescription("Jump", null, setId = "s2"))
         runCurrent()
         assertEquals(1, entries.size)
-        sets.value = generatingSet("s2")
-        sets.value = withACandidate("s2")
+        accept("s2")
         runCurrent()
         assertEquals(listOf("Jump", "Wave"), entries.map { it.text })
     }
@@ -222,15 +232,13 @@ class PromptHistoryTest {
     @Test
     fun theSubjectsSet_whoseDescriptionTheServiceRefused_isNotKept_thoughAVariationGivesACandidate() = runTest {
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         runCurrent()
 
         started.emit(StartedDescription("Write HACKED on the wall", null, setId = "s1"))
-        sets.value = generatingSet("s1").copy(failed = setOf("pose-1"), descriptionRejected = true)
+        refuse("s1")
         runCurrent()
-        sets.value = withACandidate("s1").copy(failed = setOf("pose-1"), descriptionRejected = true)
-        runCurrent()
-        sets.value = sets.value?.copy(step = PoseSetStep.PICKING, poseIds = listOf("pose-1"))
+        accept("s1")
         runCurrent()
 
         assertEquals(emptyList<PromptEntry>(), entries)
@@ -239,15 +247,30 @@ class PromptHistoryTest {
     @Test
     fun aRefusalOnTheSubjectsSet_afterACandidate_takesTheDescriptionOutAgain() = runTest {
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         runCurrent()
 
         started.emit(StartedDescription("Write HACKED on the wall", null, setId = "s1"))
-        sets.value = withACandidate("s1")
+        accept("s1")
         runCurrent()
         assertEquals(listOf("Write HACKED on the wall"), entries.map { it.text })
 
-        sets.value = withACandidate("s1").copy(failed = setOf("pose-3"), descriptionRejected = true)
+        refuse("s1")
+        runCurrent()
+
+        assertEquals(emptyList<PromptEntry>(), entries)
+    }
+
+    @Test
+    fun aCandidateAndTheRefusal_toldBeforeTheHistoryLooks_keepNothing() = runTest {
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
+        runCurrent()
+
+        // Both before the start arrives, and both in one look.
+        accept("s1")
+        refuse("s1")
+        started.emit(StartedDescription("Write HACKED on the wall", null, setId = "s1"))
         runCurrent()
 
         assertEquals(emptyList<PromptEntry>(), entries)
@@ -258,25 +281,28 @@ class PromptHistoryTest {
         history.record("Bleeding on the floor", Role.SUBJECT, "u_1")
         history.record("Wave", Role.PHOTOGRAPHER, null)
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         runCurrent()
 
-        // As the start carries it, whitespace and all.
+        // As the start carries it, whitespace and all. The refusal and the set's end come together, so the mirror
+        // never shows the set refused, and may not show it at all.
         started.emit(StartedDescription("Bleeding  on the floor ", null, setId = "s1"))
-        sets.value = generatingSet("s1")
-        runCurrent()
-        sets.value = generatingSet("s1").copy(failed = setOf("pose-1"), descriptionRejected = true)
-        runCurrent()
-        sets.value = null
+        refuse("s1")
         runCurrent()
 
+        assertEquals(listOf("Wave"), entries.map { it.text })
+
+        // Another set's refusal is not this start's.
+        started.emit(StartedDescription("Wave", null, setId = "s2"))
+        refuse("s9")
+        runCurrent()
         assertEquals(listOf("Wave"), entries.map { it.text })
     }
 
     @Test
     fun theNamedSetEndingUnanswered_keepsNothing_evenIfAnotherSetIsAcceptedAfter() = runTest {
         val started = MutableSharedFlow<StartedDescription>()
-        history.followSubjectSets(started, sets, backgroundScope)
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
         runCurrent()
 
         started.emit(StartedDescription("Bleeding", null, setId = "s1"))
@@ -284,9 +310,24 @@ class PromptHistoryTest {
         runCurrent()
         sets.value = null
         sets.value = withACandidate("s2")
+        accept("s2")
         runCurrent()
 
         assertEquals(emptyList<PromptEntry>(), entries)
+    }
+
+    @Test
+    fun aNamedSetAcceptedAndGoneBeforeTheHistoryLooks_isStillKept() = runTest {
+        val started = MutableSharedFlow<StartedDescription>()
+        history.followSubjectSets(started, sets, verdicts, backgroundScope)
+        runCurrent()
+
+        // Its first candidate and its end come together, as when the photographer cancels: the mirror shows no set.
+        started.emit(StartedDescription("Wave", null, setId = "s1"))
+        accept("s1")
+        runCurrent()
+
+        assertEquals(listOf("Wave"), entries.map { it.text })
     }
 
     @Test

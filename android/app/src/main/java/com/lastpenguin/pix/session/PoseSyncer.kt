@@ -93,13 +93,19 @@ data class MirrorPoseSet(
      *  before Iter3-A13, which does not say. */
     val slots: List<String> = emptyList(),
     val failed: Set<String> = emptySet(),
-    /** The service refused the set's description itself, as a failure said (FR-4.11); never from an older photographer. */
-    val descriptionRejected: Boolean = false,
 ) {
     /** What the subject's *Pick a pose* shows: the candidates of [poseIds] whose copy is here, in their order. */
     val ready: List<Pair<String, Bitmap>>
         get() = poseIds.mapNotNull { id -> candidates[id]?.let { id to it } }
 }
+
+/**
+ * What the photographer's sets said of their descriptions, for the subject's history (FR-4.11): the sets the server
+ * [accepted], with a candidate or PICKING, and the sets whose description the service [refused] itself. Both only grow
+ * while the session lasts, so a reader that looks late, or after a set ended, misses nothing. [PoseSyncer.mirror]
+ * drops an ended set, and a reader of it can miss what came with the set's end.
+ */
+data class DescriptionVerdicts(val accepted: Set<String> = emptySet(), val refused: Set<String> = emptySet())
 
 /**
  * How a set the subject knew ended: [step] is CHOSEN, with [by] whose *Use this pose* it was, or CLOSED. [wasPicking]
@@ -115,10 +121,12 @@ data class PoseSetEnd(val setId: String, val step: PoseSetStep, val by: Role?, v
  * session is connected, sends what the subject does not have yet, in order: the step, the planned slots and each
  * failed candidate (Iter3-A13), each candidate's copy, one at a time, then PICKING or the set's end. A sender started again after the link reconnects (Design 2.6.7) sends the
  * open set again, or only the end of a set that ended during the drop, which closes it on a subject that still holds
- * it. The subject's picks of the PICKING set go to [picks]; deciding is GenerationViewModel's, which calls [chosen].
+ * it. A failure that refuses the set's description (FR-4.11) goes out even when the set has ended, before its end. The
+ * subject's picks of the PICKING set go to [picks]; deciding is GenerationViewModel's, which calls [chosen].
  *
  * Subject ([startAsReceiver]): keeps the set in [mirror], in memory only, through a reconnect, and drops it at its end,
- * at another set, and when the session ends, saying in [ended] how it ended. [pick] sends `pose.pick` and waits
+ * at another set, and when the session ends, saying in [ended] how it ended. What each set said of its description
+ * stays in [verdicts] past the set's end, for this phone's history. [pick] sends `pose.pick` and waits
  * [PICK_TIMEOUT_MS] for a step that answers it; otherwise [pickFailed].
  * Owner: Shared steps (Iter3-P16).
  */
@@ -225,6 +233,18 @@ class PoseSyncer(
             // The copies that went out; PICKING names only these, so the subject is never told of one it cannot have.
             // One that names none still says the photographer is picking; the subject then opens no Pick a pose.
             val delivered = mutableSetOf<String>()
+
+            // The failures not sent yet. Of a set that ended, only those that refuse its description: its slots are
+            // gone, but the subject's history still needs the refusal, which the answers and the end of a set whose
+            // every pose is refused reach this sender as one change (FR-4.11).
+            fun sendFailures(set: SharedSet) {
+                for (poseId in set.failed) {
+                    val refusal = poseId in set.refusals
+                    if ((set.open || refusal) && failuresSent.add(poseId)) {
+                        session.send(SessionMessage.PoseCandidateFailed(set.setId, poseId, refusal))
+                    }
+                }
+            }
             shared.collect { set ->
                 if (set == null) return@collect
                 if (set.setId != announced) {
@@ -233,9 +253,11 @@ class PoseSyncer(
                     delivered.clear()
                     slotsSent = false
                     failuresSent.clear()
-                    // A set that ended before this sender heard of it goes as its end alone: a subject that held it
-                    // through a reconnect closes it, and any other drops the set it holds or has nothing to drop.
+                    // A set that ended before this sender heard of it goes as its end alone, after any refusal of
+                    // its description: a subject that held it through a reconnect closes it, and any other drops the
+                    // set it holds or has nothing to drop.
                     val step = if (set.open) PoseSetStep.GENERATING else set.step
+                    if (!set.open) sendFailures(set)
                     send(SessionMessage.PoseStep(set.setId, step, poseId = set.chosen, by = set.by))
                     sentStep = step
                 }
@@ -246,13 +268,7 @@ class PoseSyncer(
                     session.send(SessionMessage.PosePlanned(set.setId, set.slots))
                     Timings.mark("pose.sent", "planned ${set.setId} ${set.slots.size}")
                 }
-                if (set.open) {
-                    for (poseId in set.failed) {
-                        if (failuresSent.add(poseId)) {
-                            session.send(SessionMessage.PoseCandidateFailed(set.setId, poseId, poseId in set.refusals))
-                        }
-                    }
-                }
+                sendFailures(set)
                 for ((poseId, image) in set.candidates) {
                     // A set that ended or was replaced while an earlier copy was encoded sends no more of them.
                     if (shared.value?.let { it.setId == set.setId && it.open } != true) break
@@ -319,6 +335,11 @@ class PoseSyncer(
     /** Subject: the photographer's open set; null when there is none. */
     val mirror: StateFlow<MirrorPoseSet?> = _mirror.asStateFlow()
 
+    private val _verdicts = MutableStateFlow(DescriptionVerdicts())
+
+    /** Subject: what this session's sets said of their descriptions; empty again when the session ends. */
+    val verdicts: StateFlow<DescriptionVerdicts> = _verdicts.asStateFlow()
+
     private val _pending = MutableStateFlow<SubjectPick?>(null)
 
     /** Subject: the pick no step has answered yet, while *Pick a pose* waits for the photographer. */
@@ -352,14 +373,14 @@ class PoseSyncer(
                             if (set?.setId == message.setId) set.copy(slots = message.poseIds) else set
                         }
 
-                        is SessionMessage.PoseCandidateFailed -> _mirror.update { set ->
-                            if (set?.setId == message.setId) {
-                                set.copy(
-                                    failed = set.failed + message.poseId,
-                                    descriptionRejected = set.descriptionRejected || message.descriptionRejected,
-                                )
-                            } else {
-                                set
+                        is SessionMessage.PoseCandidateFailed -> {
+                            // Whatever set this phone holds: the refusal of a set that ended while the link was
+                            // down comes with its end alone.
+                            if (message.descriptionRejected) {
+                                _verdicts.update { it.copy(refused = it.refused + message.setId) }
+                            }
+                            _mirror.update { set ->
+                                if (set?.setId == message.setId) set.copy(failed = set.failed + message.poseId) else set
                             }
                         }
 
@@ -398,6 +419,7 @@ class PoseSyncer(
                     deadline?.cancel()
                     _pending.value = null
                     _mirror.value = null
+                    _verdicts.value = DescriptionVerdicts()
                 }
             }
         }
@@ -415,8 +437,11 @@ class PoseSyncer(
             Log.w(TAG, "Dropped candidate ${begin.poseId}: not a ${begin.format} image")
             return
         }
-        _mirror.update { set ->
-            if (set?.setId == begin.setId) set.copy(candidates = set.candidates + (begin.poseId to image)) else set
+        if (_mirror.value?.setId == begin.setId) {
+            _mirror.update { set ->
+                if (set?.setId == begin.setId) set.copy(candidates = set.candidates + (begin.poseId to image)) else set
+            }
+            accept(begin.setId)
         }
         Timings.mark("pose.applied", "candidate ${begin.poseId} ${bytes.size} B")
     }
@@ -431,6 +456,7 @@ class PoseSyncer(
 
             PoseSetStep.PICKING -> if (current?.setId == message.setId) {
                 _mirror.value = current.copy(step = PoseSetStep.PICKING, poseIds = message.poseIds)
+                accept(message.setId)
             }
 
             PoseSetStep.CHOSEN, PoseSetStep.CLOSED -> when {
@@ -453,6 +479,11 @@ class PoseSyncer(
             }
         }
         Timings.mark("pose.applied", "${message.step.name.lowercase()} ${message.setId}")
+    }
+
+    /** The server accepted the description of [setId]: a candidate of it arrived, or the photographer picks from it. */
+    private fun accept(setId: String) {
+        _verdicts.update { it.copy(accepted = it.accepted + setId) }
     }
 
     /** A step of [setId] answers the pick waiting for it; another set's start drops any (null). */

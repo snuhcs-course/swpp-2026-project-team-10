@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.lastpenguin.pix.session.DescriptionVerdicts
 import com.lastpenguin.pix.session.MirrorPoseSet
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.StartedDescription
@@ -110,33 +111,33 @@ internal fun List<PromptEntry>.without(text: String): List<PromptEntry> = filter
  * is PICKING. The start names its set ([StartedDescription.setId]), since `pose.step` and the start come on their own
  * and either can arrive first; from an older photographer, whose start names none, the set that follows is taken. A set
  * that ends without one, as a description the server turns down does, keeps nothing, and the next start replaces a
- * start still waiting. A named set whose failure says that the service refused the description itself
- * ([MirrorPoseSet.descriptionRejected]) keeps nothing either, whatever candidates it has, and the description leaves
- * this phone's history, also when the refusal comes after a candidate. Followed on [scope] for the life of the app,
- * because the set can start while Subject view, not *Generate poses*, is in front.
+ * start still waiting. A named set is read from [verdicts] (`PoseSyncer.verdicts`), which keep what a set said after
+ * it ended, where [sets] would have dropped it: one whose failure said that the service refused the description itself
+ * keeps nothing, whatever candidates it has, and the description leaves this phone's history, also when the refusal
+ * comes after a candidate or together with the set's end. Followed on [scope] for the life of the app, because the
+ * set can start while Subject view, not *Generate poses*, is in front.
  */
 fun PromptHistory.followSubjectSets(
     started: Flow<StartedDescription>,
     sets: StateFlow<MirrorPoseSet?>,
+    verdicts: StateFlow<DescriptionVerdicts>,
     scope: CoroutineScope,
 ): Job = scope.launch {
     started.collectLatest { start ->
         val named = start.setId
         if (named != null) {
-            // That set, whether its answer came before the start or comes after, for as long as this phone holds it,
-            // since a refusal can follow a candidate; another set, or none after it, means it ended.
-            var seen = false
+            // What that set said of its description, whether told before the start or after. Unlike the mirror, the
+            // verdicts drop no set, so a refusal that came with the set's end is still here. Accepted keeps the
+            // description, once; refused, before or after a candidate, takes it out and ends the wait.
             var kept = false
-            sets.transformWhile { set ->
-                if (set?.setId != named) return@transformWhile !seen
-                seen = true
-                emit(set)
-                !set.descriptionRejected
-            }.collect { set ->
+            verdicts.transformWhile { told ->
+                emit(told)
+                named !in told.refused
+            }.collect { told ->
                 when {
-                    set.descriptionRejected -> described(start.text)?.let { delete(it) }
+                    named in told.refused -> described(start.text)?.let { delete(it) }
 
-                    set.accepted && !kept -> {
+                    named in told.accepted && !kept -> {
                         kept = true
                         record(start.text, Role.SUBJECT, start.partner?.userId)
                     }

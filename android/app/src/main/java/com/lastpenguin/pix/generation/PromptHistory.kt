@@ -18,6 +18,7 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -114,8 +116,9 @@ internal fun List<PromptEntry>.without(text: String): List<PromptEntry> = filter
  * start still waiting. A named set is read from [verdicts] (`PoseSyncer.verdicts`), which keep what a set said after
  * it ended, where [sets] would have dropped it: one whose failure said that the service refused the description itself
  * keeps nothing, whatever candidates it has, and the description leaves this phone's history, also when the refusal
- * comes after a candidate or together with the set's end. Followed on [scope] for the life of the app, because the
- * set can start while Subject view, not *Generate poses*, is in front.
+ * comes after a candidate or together with the set's end. A change of the history that is still being written when
+ * the next start comes is finished first. Followed on [scope] for the life of the app, because the set can start
+ * while Subject view, not *Generate poses*, is in front.
  */
 fun PromptHistory.followSubjectSets(
     started: Flow<StartedDescription>,
@@ -135,11 +138,11 @@ fun PromptHistory.followSubjectSets(
                 named !in told.refused
             }.collect { told ->
                 when {
-                    named in told.refused -> described(start.text)?.let { delete(it) }
+                    named in told.refused -> described(start.text)?.let { finished { delete(it) } }
 
                     named in told.accepted && !kept -> {
                         kept = true
-                        record(start.text, Role.SUBJECT, start.partner?.userId)
+                        finished { record(start.text, Role.SUBJECT, start.partner?.userId) }
                     }
                 }
             }
@@ -161,7 +164,7 @@ fun PromptHistory.followSubjectSets(
             }
         }
         if (decided != null && decided.setId == setId && decided.accepted) {
-            record(start.text, Role.SUBJECT, start.partner?.userId)
+            finished { record(start.text, Role.SUBJECT, start.partner?.userId) }
         }
     }
 }
@@ -169,6 +172,12 @@ fun PromptHistory.followSubjectSets(
 /** The server accepted the set's description: a candidate arrived, or the photographer is picking from it. */
 private val MirrorPoseSet.accepted: Boolean
     get() = step == PoseSetStep.PICKING || candidates.isNotEmpty()
+
+/**
+ * A [change] of the history that the next start must not cut short: it replaces the wait of the start before it, and
+ * the storage may still be writing then.
+ */
+private suspend fun finished(change: suspend () -> Unit) = withContext(NonCancellable) { change() }
 
 /** [text] as its entry has it (`PoseRequest.of`); null for a blank one, which has none. */
 private fun described(text: String): String? = (PoseRequest.of(text) as? PoseRequest.Described)?.text

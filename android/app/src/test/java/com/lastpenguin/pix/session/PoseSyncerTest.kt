@@ -41,7 +41,7 @@ import org.junit.Test
  * sent again are not read again; the slots and the failures of the set held (Iter3-A13), not another's, and the same
  * again after a reconnect changing nothing; the verdicts (Iter4-P3): a refusal kept past its set's end, also of a set
  * not held, a set accepted by a candidate or by PICKING, one both accepted and refused, a set that only fails, and
- * all of them gone with the session.
+ * all of them kept when the session ends.
  * Both phones (Iter4-P3): the photographer's set carried to the subject's history, with the description refused (not
  * kept though a candidate arrives), not refused (kept), and every pose refused with the set closed in the same change
  * and the messages arriving back to back (an entry kept before removed).
@@ -534,9 +534,12 @@ class PoseSyncerTest {
             syncer.verdicts.value,
         )
 
+        // The session's end takes the set, not the verdicts: a refusal that came just before it is still read after.
+        val told = syncer.verdicts.value
         receiving.cancel()
         runCurrent()
-        assertEquals(DescriptionVerdicts(), syncer.verdicts.value)
+        assertNull(syncer.mirror.value)
+        assertEquals(told, syncer.verdicts.value)
     }
 
     @Test

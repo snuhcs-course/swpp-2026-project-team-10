@@ -101,9 +101,10 @@ data class MirrorPoseSet(
 
 /**
  * What the photographer's sets said of their descriptions, for the subject's history (FR-4.11): the sets the server
- * [accepted], with a candidate or PICKING, and the sets whose description the service [refused] itself. Both only grow
- * while the session lasts, so a reader that looks late, or after a set ended, misses nothing. [PoseSyncer.mirror]
- * drops an ended set, and a reader of it can miss what came with the set's end.
+ * [accepted], with a candidate or PICKING, and the sets whose description the service [refused] itself. Both only grow,
+ * and stay when a set or its session ends, so a reader that looks late misses nothing: a set's id is never used again,
+ * and each set adds its id at most twice. [PoseSyncer.mirror] drops an ended set, and a reader of it can miss what
+ * came with the set's end.
  */
 data class DescriptionVerdicts(val accepted: Set<String> = emptySet(), val refused: Set<String> = emptySet())
 
@@ -126,7 +127,7 @@ data class PoseSetEnd(val setId: String, val step: PoseSetStep, val by: Role?, v
  *
  * Subject ([startAsReceiver]): keeps the set in [mirror], in memory only, through a reconnect, and drops it at its end,
  * at another set, and when the session ends, saying in [ended] how it ended. What each set said of its description
- * stays in [verdicts] past the set's end, for this phone's history. [pick] sends `pose.pick` and waits
+ * stays in [verdicts] past the set's end and the session's, for this phone's history. [pick] sends `pose.pick` and waits
  * [PICK_TIMEOUT_MS] for a step that answers it; otherwise [pickFailed].
  * Owner: Shared steps (Iter3-P16).
  */
@@ -337,7 +338,7 @@ class PoseSyncer(
 
     private val _verdicts = MutableStateFlow(DescriptionVerdicts())
 
-    /** Subject: what this session's sets said of their descriptions; empty again when the session ends. */
+    /** Subject: what the sets said of their descriptions; kept when the session ends, unlike [mirror]. */
     val verdicts: StateFlow<DescriptionVerdicts> = _verdicts.asStateFlow()
 
     private val _pending = MutableStateFlow<SubjectPick?>(null)
@@ -419,7 +420,6 @@ class PoseSyncer(
                     deadline?.cancel()
                     _pending.value = null
                     _mirror.value = null
-                    _verdicts.value = DescriptionVerdicts()
                 }
             }
         }

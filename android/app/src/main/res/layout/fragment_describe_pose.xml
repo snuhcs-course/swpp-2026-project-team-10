@@ -38,9 +38,8 @@
                 android:text="@string/describe_title"
                 android:textAppearance="@style/TextAppearance.Pix.Header" />
 
-            <!-- The one button (Iter3-A13): Suggest with an empty field, Generate with a description, Regenerate with
-                 the text of the set kept behind this screen (FR-4.4, FR-4.8, US-5, #199). DescriptionForm sets its
-                 label as the field changes. -->
+            <!-- The one button (Iter3-A13): Suggest with an empty field, Generate with a description (FR-4.4, FR-4.8,
+                 US-5, #199). DescriptionForm sets its label as the field changes. -->
             <Button
                 android:id="@+id/generateButton"
                 style="@style/Widget.Pix.Button.Header"
@@ -270,19 +269,6 @@
             android:textAppearance="@style/TextAppearance.Pix.Body.Small"
             android:visibility="gone"
             tools:text="Joonhyung sees this too"
-            tools:visibility="visible" />
-
-        <!-- Pick a pose again with the set that Back from it kept behind this screen; nothing is sent (#199). -->
-        <Button
-            android:id="@+id/seeLastPosesButton"
-            style="@style/Widget.Pix.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/see_last_poses"
-            android:visibility="gone"
-            app:icon="@drawable/ic_grid"
-            app:iconSize="18dp"
             tools:visibility="visible" />
     </LinearLayout>
 </ScrollView>

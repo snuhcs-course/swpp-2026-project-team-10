@@ -99,12 +99,6 @@ data class GenerationUiState(
 
     val readyCount: Int get() = candidates.values.count { it is CandidateEvent.Ready }
 
-    /**
-     * A set stays behind Generate poses after Back from Pick a pose (#199): *See the last poses* opens it again, and
-     * the screen's button says *Regenerate* while the field asks for the same.
-     */
-    val hasKeptSet: Boolean get() = phase == Phase.DESCRIBING && readyCount > 0
-
     /** The image *Select* sends to Reference confirm. */
     val selectedImage: Bitmap?
         get() = (candidates[selectedPoseId] as? CandidateEvent.Ready)?.image
@@ -132,7 +126,7 @@ data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
  * Each set made from a description, by either phone, goes into this phone's [history] as the photographer's, with the
  * session's friend from [partner] as the set started, once the server has accepted the description: a set whose first
  * candidate arrives (FR-4.11). A description the server turns down never makes one. Back on each screen goes one step
- * back, and a set left by Back on Pick a pose can stay behind Generate poses (#199).
+ * back; Back from Pick a pose discards the set (#199).
  * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16; the history Iter3-P24.
  */
 class GenerationViewModel(
@@ -428,8 +422,8 @@ class GenerationViewModel(
     }
 
     /**
-     * *Generate*, or *Regenerate* for the kept set's text: candidates of the description, or of four suggested poses
-     * when it is blank (US-5), in place of any kept set. Only from Generate poses.
+     * *Generate*: candidates of the description, or of four suggested poses when it is blank (US-5). Only from Generate
+     * poses.
      */
     fun generate(description: String) {
         val state = _uiState.value
@@ -449,42 +443,25 @@ class GenerationViewModel(
         get() = phase == GenerationUiState.Phase.DESCRIBING && descriptionWriter != Role.SUBJECT
 
     /**
-     * Back on Pick a pose and on Couldn't create poses: Generate poses with the photo and the text kept; nothing is sent
-     * until the user asks again (FR-4.6, US-5). With [keepSet], the candidates stay behind it for *See the last poses*
-     * (#199); without, the set is discarded. Either way the set ends for the subject's phone.
+     * Back on Pick a pose, once confirmed, and on Couldn't create poses: Generate poses with the photo and the text
+     * kept and the set discarded, on the subject's phone too; nothing is sent until the user asks again (FR-4.6, US-5,
+     * #199).
      */
-    fun describeAgain(keepSet: Boolean = false) {
+    fun describeAgain() {
         val state = _uiState.value
         val ended = state.phase == GenerationUiState.Phase.PICKING || state.phase == GenerationUiState.Phase.FAILED
         if (!ended || state.scene == null) return
-        val keep = keepSet && state.phase == GenerationUiState.Phase.PICKING
         _uiState.update {
-            if (keep) {
-                it.copy(phase = GenerationUiState.Phase.DESCRIBING, chosenBy = null)
-            } else {
-                it.copy(
-                    phase = GenerationUiState.Phase.DESCRIBING,
-                    poses = emptyList(),
-                    candidates = emptyMap(),
-                    selectedPoseId = null,
-                    chosenBy = null,
-                )
-            }
+            it.copy(
+                phase = GenerationUiState.Phase.DESCRIBING,
+                poses = emptyList(),
+                candidates = emptyMap(),
+                selectedPoseId = null,
+                chosenBy = null,
+            )
         }
         closeSet()
         openDescription()
-    }
-
-    /**
-     * *See the last poses* on Generate poses: Pick a pose again with the set Back kept, the pose on screen as it was;
-     * nothing is sent (#199). Returns whether there was a set to show.
-     */
-    fun showLastPoses(): Boolean {
-        val state = _uiState.value
-        if (!state.hasKeptSet || state.descriptionWriter == Role.SUBJECT) return false
-        endDescription(started = false)
-        _uiState.update { it.copy(phase = GenerationUiState.Phase.PICKING, descriptionWriter = null) }
-        return true
     }
 
     /**
@@ -524,8 +501,8 @@ class GenerationViewModel(
     }
 
     /**
-     * Back on Generate poses: the photo's review on Camera again, which already found a person in it; the text and any
-     * kept set wait for its *Use* (#199). The subject's Generate poses closes.
+     * Back on Generate poses: the photo's review on Camera again, which already found a person in it; the text waits
+     * for its *Use* (#199). The subject's Generate poses closes.
      */
     fun backToReview() {
         if (_uiState.value.phase != GenerationUiState.Phase.DESCRIBING) return

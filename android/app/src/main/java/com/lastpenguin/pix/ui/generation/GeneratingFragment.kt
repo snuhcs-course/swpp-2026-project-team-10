@@ -17,8 +17,8 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Generating poses (R&S 6.3). Back at the top left asks first, since the AI service is already making the set, then
- * stops it and returns to Generate poses with the photo and the description (#199). Owner: Server/AI/Sync (#7); Back
+ * Generating poses (R&S 6.3). Back at the top left asks first, since the images being created are lost, then stops the
+ * set and returns to Generate poses with the photo and the description (#199). Owner: Server/AI/Sync (#7); Back
  * Iter4-P2.
  */
 class GeneratingFragment : Fragment(R.layout.fragment_generating) {
@@ -45,7 +45,7 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
         }
     }
 
-    /** Back: asks first, as the set is already being made. */
+    /** Back: asks first, as the images being created would be lost. */
     private fun askToStop() {
         confirmGoingBack(generating = true, onConfirm = ::stop)
     }

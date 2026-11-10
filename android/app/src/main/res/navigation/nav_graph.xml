@@ -124,12 +124,6 @@
             app:destination="@id/generatingFragment"
             app:popUpTo="@id/describePoseFragment"
             app:popUpToInclusive="true" />
-        <!-- See the last poses: Pick a pose again with the set kept behind this screen (#199). -->
-        <action
-            android:id="@+id/action_describePose_to_pickPose"
-            app:destination="@id/pickPoseFragment"
-            app:popUpTo="@id/describePoseFragment"
-            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment

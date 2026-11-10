@@ -9,10 +9,10 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 
 /**
- * Back on Generating poses and Pick a pose asks first (R&S 6.3, #199): the AI service was already asked for the set,
- * so going back is confirmed. [generating] says whether the set is still being made or is made. *Go back* runs
- * [onConfirm]; *Cancel*, a tap outside, or system back keeps the screen. The dialog closes with the screen's view, so a
- * set that ends meanwhile, or a recreated screen, leaves no question behind.
+ * Back on Generating poses and Pick a pose asks first, since it loses the set (R&S 6.3, #199). It says that the images
+ * go and cannot be recovered, those still being created ([generating]) or those made. *Go back* runs [onConfirm];
+ * *Cancel*, a tap outside, or system back keeps the screen. The dialog closes with the screen's view, so a set that
+ * ends meanwhile, or a recreated screen, leaves no question behind.
  */
 internal fun Fragment.confirmGoingBack(generating: Boolean, onConfirm: () -> Unit): AlertDialog {
     val dialog = MaterialAlertDialogBuilder(requireContext())

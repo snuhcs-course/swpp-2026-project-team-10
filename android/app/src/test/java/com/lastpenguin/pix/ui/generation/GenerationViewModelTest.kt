@@ -650,52 +650,6 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun backOnPickAPose_keepingTheSet_opensGeneratePosesWithTheSet_andSeeTheLastPosesReturnsToIt() = runTest {
-        pickFromWave()
-        val picking = state
-
-        model.describeAgain(keepSet = true)
-        runCurrent()
-
-        // Generate poses, with the set kept behind it; nothing is sent (#199).
-        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
-        assertEquals("Wave", state.description)
-        assertTrue(state.hasKeptSet)
-        assertEquals(picking.candidates, state.candidates)
-        assertEquals("close ${share.opened.single()}", share.calls.last())
-
-        assertTrue(model.showLastPoses())
-        runCurrent()
-
-        assertEquals(picking.copy(chosenBy = null), state)
-        assertEquals(1, generator.runs.size)
-    }
-
-    @Test
-    fun backOnPickAPose_withoutKeepingTheSet_dropsIt_andSeeTheLastPosesDoesNothing() = runTest {
-        pickFromWave()
-
-        model.describeAgain()
-
-        assertFalse(state.hasKeptSet)
-        assertFalse(model.showLastPoses())
-        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
-    }
-
-    @Test
-    fun theNextSetFromGeneratePoses_replacesTheKeptSet() = runTest {
-        pickFromWave()
-        model.describeAgain(keepSet = true)
-
-        model.generate("Wave")
-
-        assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
-        assertFalse(state.hasKeptSet)
-        assertTrue(state.candidates.isEmpty())
-        assertFalse(model.showLastPoses())
-    }
-
-    @Test
     fun regenerateOnPickAPose_asksForTheSameRequestAgain_withANewSeed() = runTest {
         pickFromWave()
         val scene = state.scene
@@ -746,7 +700,6 @@ class GenerationViewModelTest {
         assertSame(scene, state.scene)
         assertEquals("Wave", state.description)
         assertTrue(state.candidates.isEmpty() && state.poses.isEmpty())
-        assertFalse(state.hasKeptSet)
         assertEquals("close ${share.opened.single()}", share.calls.last())
         // The subject's phone shows Generate poses again (Design 2.6.5).
         assertEquals(2, descriptions.calls.count { it.startsWith("open") })

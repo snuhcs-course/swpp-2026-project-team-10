@@ -33,10 +33,10 @@ import kotlinx.coroutines.launch
  * next. The pose on screen is the selected one, which *Select* at the top right takes. In a session the subject sees
  * the same candidates, and a pick of theirs that comes first goes on here like this phone's own (Design 2.6.5). The ♥
  * on a candidate keeps it in this phone's library (FR-4.14), and *Select* goes on with the guide it saved.
- * Back goes one step back (#199), after asking, since the set was made by the AI service: to Generate poses with the
- * photo and the description kept, and outside a session the set too, for *See the last poses*; Back on Reference confirm comes back here with the set. *Regenerate* makes a new
- * set of the same request. In a session the set goes to the subject's phone, so Back discards it, the choice is final,
- * and there is no *Regenerate*.
+ * Back goes one step back (#199): it asks first, since the set is lost, then goes to Generate poses with the photo
+ * and the description kept. Back on Reference confirm comes back here with the set. *Regenerate* makes a new set of
+ * the same request. In a session the set goes to the subject's phone, so the choice is final, and there is no
+ * *Regenerate*.
  * Owner: Server/AI/Sync (#7). The chosen pose goes to Reference confirm (#5); the set on both phones Iter3-P16; the ♥
  * the library (#171); Back and *Regenerate* Iter4-P2.
  */
@@ -150,17 +150,17 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         viewModel.cancel()
     }
 
-    /** Back: asks first, as the set is already made. */
+    /** Back: asks first, as the set is lost, on the subject's phone too in a session. */
     private fun askToGoBack() {
         confirmGoingBack(generating = false, onConfirm = ::describeAgain)
     }
 
     /**
      * Back confirmed: Generate poses again, with the photo and the description kept, so the user can change what to
-     * ask for; outside a session the set stays behind it.
+     * ask for; the set is gone.
      */
     private fun describeAgain() {
-        viewModel.describeAgain(keepSet = subjectName() == null)
+        viewModel.describeAgain()
         val navController = findNavController()
         if (navController.currentDestination?.id == R.id.pickPoseFragment) {
             navController.navigate(R.id.action_pickPose_to_describePose)

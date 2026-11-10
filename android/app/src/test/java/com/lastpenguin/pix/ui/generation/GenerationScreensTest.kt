@@ -70,17 +70,16 @@ import org.robolectric.shadows.ShadowToast
  * descriptions used before, newest first (FR-4.11; none hides them; a chip fills the field, and its ✕ drops it; in an
  * invitation's session, the switch to the ones used with the friend, kept while the link reconnects, for a set started
  * meanwhile), the one button starts a run, of the text or of suggested poses for an empty field (Iter3-A13), and opens
- * Generating poses; Back (the photo's review on Camera, the text kept); a set kept behind it (#199): See the last poses
- * (Pick a pose with it, nothing sent) and the button's Regenerate, and neither without one; in a session, the hint, this
+ * Generating poses; Back (the photo's review on Camera, the text kept); in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
  * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
- * Back and system back, asked first (the run stopped, Generate poses with the photo and the text; Cancel keeps it
- * going). Pick a pose: only the ready
+ * Back and system back, asked first that the images being created are lost (the run stopped, Generate poses with the
+ * photo and the text; Cancel keeps it going). Pick a pose: only the ready
  * candidates, one per page with a counter; the page on screen is the selected pose, so Select works at once and takes
  * the pose swiped to (to Reference confirm, this screen and the set left under it); a pose selected before the screen
- * opens is the one shown; Back and system back, asked first (Generate poses, the photo, the description, and the set
- * kept; Cancel stays); Back on
+ * opens is the one shown; Back and system back, asked first that the poses are lost (Generate poses with the photo and
+ * the description, the set gone; Cancel stays); Back on
  * Reference confirm (the set again, another pose selectable); the set let go once this screen leaves the back stack
  * after Select; Regenerate (the same request again, on Generating poses); in a session, the hint that the subject sees
  * the poses too, no Regenerate, Back dropping the set, and the subject's pick that comes first, which opens Reference
@@ -365,54 +364,6 @@ class GenerationScreensTest {
             s.close()
         }
         scenario = null
-    }
-
-    /** Generate poses after Back on Pick a pose, with the set of "hands on hips" kept behind it. */
-    private fun describingWithAKeptSet(modules: TestAppContainer, activity: FragmentActivity) {
-        picking(modules, activity)
-        activity.viewModel<GenerationViewModel>().apply {
-            select("pose-2")
-            describeAgain(keepSet = true)
-        }
-    }
-
-    @Test
-    fun describe_withAKeptSet_regeneratesItsText_andSeeTheLastPosesReturnsToIt() {
-        val modules = modules()
-        val (s, nav) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) {
-            describingWithAKeptSet(modules, it)
-        }
-        scenario = s
-
-        s.onFragment {
-            val binding = FragmentDescribePoseBinding.bind(it.requireView())
-            assertEquals(string(R.string.regenerate_poses), binding.generateButton.text.toString())
-            binding.descriptionInput.setText("Wave")
-            assertEquals(string(R.string.generate_from_description), binding.generateButton.text.toString())
-            binding.descriptionInput.setText("hands on hips")
-            assertTrue(binding.seeLastPosesButton.isShown)
-            binding.seeLastPosesButton.performClick()
-        }
-        idle()
-
-        assertEquals(R.id.pickPoseFragment, nav.currentDestination?.id)
-        s.onFragment {
-            val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
-            assertEquals(GenerationUiState.Phase.PICKING, state.phase)
-            assertEquals("pose-2", state.selectedPoseId)
-        }
-        assertEquals(1, modules.generator.runs.size)
-    }
-
-    @Test
-    fun describe_withoutAKeptSet_hasNoSeeTheLastPoses() {
-        modules()
-        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
-        scenario = s
-
-        s.onFragment {
-            assertEquals(View.GONE, FragmentDescribePoseBinding.bind(it.requireView()).seeLastPosesButton.visibility)
-        }
     }
 
     /** Generate poses in a session with Joonhyung; the screen's SessionViewModel sends it to the subject. */
@@ -1098,7 +1049,7 @@ class GenerationScreensTest {
         s.onFragment {
             val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
             assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
-            assertFalse(state.hasKeptSet)
+            assertTrue(state.poses.isEmpty() && state.candidates.isEmpty())
         }
     }
 
@@ -1147,7 +1098,7 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_backAndSystemBack_returnToGeneratePoses_withThePhotoTheDescriptionAndTheSetKept() {
+    fun pick_backAndSystemBack_askFirst_thenReturnToGeneratePoses_withThePhotoAndTheDescription_withoutTheSet() {
         val back: List<(PickPoseFragment) -> Unit> = listOf(
             { FragmentPickPoseBinding.bind(it.requireView()).backButton.performClick() },
             { it.requireActivity().onBackPressedDispatcher.onBackPressed() },
@@ -1174,7 +1125,8 @@ class GenerationScreensTest {
                 assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
                 assertNotNull(state.scene)
                 assertEquals("hands on hips", state.description)
-                assertTrue(state.hasKeptSet)
+                // The question said the poses are lost, and they are.
+                assertTrue(state.poses.isEmpty() && state.candidates.isEmpty())
             }
             assertEquals(1, modules.generator.runs.size)
             s.close()
@@ -1183,7 +1135,7 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_back_asksFirst_sayingThePosesAreMade_andCancelStays() {
+    fun pick_back_asksFirst_thatThePosesAreLost_andCancelStays() {
         val modules = modules()
         val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
         scenario = s

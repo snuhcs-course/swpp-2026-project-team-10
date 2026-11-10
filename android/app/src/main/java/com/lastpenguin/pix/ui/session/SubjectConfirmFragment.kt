@@ -48,6 +48,8 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
         hadOutline = null
+        // The outline of the photographer's chosen pose: the guide itself (#199).
+        binding.referenceTitle.setText(R.string.pose_guide_title)
         binding.useGuideButton.setOnClickListener { viewModel.useGuide() }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         // Back leaves the photographer's confirm as it is; Subject view's *Your reference* opens it again.

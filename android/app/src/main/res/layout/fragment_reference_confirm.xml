@@ -22,7 +22,9 @@
             style="@style/Widget.Pix.Header.Back"
             android:contentDescription="@string/back" />
 
+        <!-- Your reference, or Guide for a generated pose's outline (#199). -->
         <TextView
+            android:id="@+id/referenceTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"

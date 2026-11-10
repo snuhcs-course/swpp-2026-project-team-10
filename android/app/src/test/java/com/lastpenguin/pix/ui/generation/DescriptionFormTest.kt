@@ -29,9 +29,7 @@ import org.robolectric.annotation.GraphicsMode
  * ✕; in a session, the switch between all and the friend's, nothing used with the friend yet, and the friend gone; the
  * same history again (the chips kept as they are); a friend's name of 30 characters (cut short, both halves of the
  * switch on the screen). The last description rejected or not. The one button (Iter3-A13): its label for an empty
- * field, spaces only, a typed text, a kept text, a chip, and the other phone's text; with a set kept behind the screen
- * (#199), Regenerate for the set's text (padded the same way, or empty for suggested poses) and not for another, and
- * no Regenerate once the set is gone; it sends the field as typed. The
+ * field, spaces only, a typed text, a kept text, a chip, and the other phone's text; it sends the field as typed. The
  * ✕: shown with text, hidden with none and while the field waits; it empties the field as typing would.
  * In a session (FR-6.15): the other phone's text shown, but not over this field's typing; the field, the chips, and
  * the buttons waiting while the other person types or the link is paused, and the buttons while an answer is awaited;
@@ -281,28 +279,6 @@ class DescriptionFormTest {
         shared.showHistory(listOf(entry("Wave")), partner = null)
         binding.chips().single().performClick()
         assertEquals(binding.describe(), binding.label())
-    }
-
-    @Test
-    fun withAKeptSet_theLabelIsRegenerate_onlyForTheSetsOwnText() {
-        val binding = form(text = "Wave")
-        val regenerate = binding.root.context.getString(R.string.regenerate_poses)
-
-        shared.keptRequest = PoseRequest.Described("Wave")
-        assertEquals(regenerate, binding.label())
-        // The server reads the text with its spaces folded, so this asks for the same set.
-        binding.descriptionInput.setText("  Wave ")
-        assertEquals(regenerate, binding.label())
-        binding.descriptionInput.setText("Jump")
-        assertEquals(binding.describe(), binding.label())
-        binding.descriptionInput.setText("")
-        assertEquals(binding.suggest(), binding.label())
-
-        // A kept set of suggested poses: the empty field asks for them again.
-        shared.keptRequest = PoseRequest.Suggested
-        assertEquals(regenerate, binding.label())
-        shared.keptRequest = null
-        assertEquals(binding.suggest(), binding.label())
     }
 
     @Test

@@ -73,6 +73,14 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
                     binding.referenceImage.showOutline(settingsViewModel.guideLook, guides)
                 }
                 launch {
+                    // A generated pose's outline is the guide itself, not a reference photo (#199).
+                    viewModel.fromPose.collect { pose ->
+                        binding.referenceTitle.setText(
+                            if (pose) R.string.pose_guide_title else R.string.reference_title,
+                        )
+                    }
+                }
+                launch {
                     viewModel.chosenBy.collect { name ->
                         binding.chosenByText.isVisible = name != null
                         if (name != null) binding.chosenByText.text = getString(R.string.peer_chose_this_pose, name)

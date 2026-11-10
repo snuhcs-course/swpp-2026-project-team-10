@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.navOptions
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.MarginPageTransformer
 import androidx.viewpager2.widget.ViewPager2
@@ -29,13 +30,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Pick a pose (R&S 6.3): the created candidates one at a time, as large as the screen allows, and a swipe for the
- * next. The pose on screen is the selected one, which *Use this pose* takes. In a session the subject sees the same
- * candidates, and a pick of theirs that comes first goes on here like this phone's own (Design 2.6.5). The ♥ on a
- * candidate keeps it in this phone's library (FR-4.14), and *Use this pose* goes on with the guide it saved. Back, like
- * *Try other poses*, goes to Generate poses with the photo and the description kept; the ✕ at the top leaves for the
- * camera and discards them.
+ * next. The pose on screen is the selected one, which *Select* at the top right takes. In a session the subject sees
+ * the same candidates, and a pick of theirs that comes first goes on here like this phone's own (Design 2.6.5). The ♥
+ * on a candidate keeps it in this phone's library (FR-4.14), and *Select* goes on with the guide it saved.
+ * Back goes one step back (#199), after asking, since the set was made by the AI service: to Generate poses with the
+ * photo and the description kept, and outside a session the set too, for *See the last poses*; Back on Reference confirm comes back here with the set. *Regenerate* makes a new
+ * set of the same request. In a session the set goes to the subject's phone, so Back discards it, the choice is final,
+ * and there is no *Regenerate*.
  * Owner: Server/AI/Sync (#7). The chosen pose goes to Reference confirm (#5); the set on both phones Iter3-P16; the ♥
- * the library (#171).
+ * the library (#171); Back and *Regenerate* Iter4-P2.
  */
 class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 
@@ -44,23 +47,34 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val saves: PoseSaveViewModel by activityViewModels { PixViewModels.Factory }
 
+    /**
+     * The set went on to Reference confirm with this screen left under it (outside a session): once this screen leaves
+     * the back stack, the guide is on the camera, and the set is let go ([onDestroy]).
+     */
+    private var handedOn = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handedOn = savedInstanceState?.getBoolean(HANDED_ON) ?: false
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentPickPoseBinding.bind(view)
+        // Back on Reference confirm came back to this set: this phone's choice is undone.
+        handedOn = false
+        if (subjectName() == null) viewModel.pickAgain()
         val pages = PosePageAdapter(::onHeart)
         binding.setupPosePager(pages, viewModel::select)
 
-        binding.usePoseButton.setOnClickListener {
+        binding.selectButton.setOnClickListener {
             // Read before usePose, which ends the choosing.
             val saved = savedGuide(viewModel.uiState.value)
             viewModel.usePose()?.let { goOn(it, chosenBy = null, saved) }
         }
-        // The top bar's control is a ✕ here, which leaves for the camera; the subject's Pick a pose keeps the arrow.
-        binding.backButton.setImageResource(R.drawable.ic_close)
-        binding.backButton.contentDescription = getString(R.string.close_to_camera)
-        binding.backButton.setOnClickListener { backToCamera() }
-        binding.tryOtherButton.setOnClickListener { describeAgain() }
-        // System back is Try other poses: the set is left, the photo and the description are kept.
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { describeAgain() }
+        binding.backButton.setOnClickListener { askToGoBack() }
+        // System back does what Back does (R&S 6.9).
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { askToGoBack() }
+        binding.regenerateButton.setOnClickListener { regenerate() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -77,10 +91,22 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
                         val subject = subjectName(session)
                         binding.sharedHint.isVisible = subject != null
                         if (subject != null) binding.sharedHint.text = getString(R.string.shared_hint, subject)
+                        binding.regenerateButton.isVisible = subject == null
                     }
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(HANDED_ON, handedOn)
+    }
+
+    override fun onDestroy() {
+        // Left the back stack after the set went on: the guide is on the camera, and the other images are let go.
+        if (handedOn && activity?.isChangingConfigurations != true) viewModel.cancel()
+        super.onDestroy()
     }
 
     /** The connected subject's name while this phone is the photographer; null outside a session. */
@@ -104,29 +130,51 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
     /**
      * The chosen pose goes to Reference confirm, the same step as an uploaded photo: the person is separated on the
      * phone (FR-4.6), unless its ♥ [saved] it already, whose guide goes on. [chosenBy] names the subject when it was
-     * their pick.
+     * their pick. Outside a session this screen stays under it with the set, for its Back (#199); in a session the
+     * choice is final on both phones, so the set is let go.
      */
     private fun goOn(use: PoseUse, chosenBy: String?, saved: ReferenceGuide?) {
         referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, saved)
-        findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
+        if (subjectName() == null) {
+            handedOn = true
+            findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
+            return
+        }
+        findNavController().navigate(
+            R.id.action_pickPose_to_referenceConfirm,
+            null,
+            navOptions { popUpTo(R.id.pickPoseFragment) { inclusive = true } },
+        )
         // Reference confirm has the image now. The scene and the other candidates cannot be reached again, so they
         // are let go; after navigating, so that this screen does not take the empty state for a restart.
         viewModel.cancel()
     }
 
-    /** Generate poses again, with the photo and the description kept, so the user can change what to ask for. */
+    /** Back: asks first, as the set is already made. */
+    private fun askToGoBack() {
+        confirmGoingBack(generating = false, onConfirm = ::describeAgain)
+    }
+
+    /**
+     * Back confirmed: Generate poses again, with the photo and the description kept, so the user can change what to
+     * ask for; outside a session the set stays behind it.
+     */
     private fun describeAgain() {
-        viewModel.describeAgain()
+        viewModel.describeAgain(keepSet = subjectName() == null)
         val navController = findNavController()
         if (navController.currentDestination?.id == R.id.pickPoseFragment) {
             navController.navigate(R.id.action_pickPose_to_describePose)
         }
     }
 
-    /** The ✕: back to the camera, discarding the photo, the description, and the candidates. */
-    private fun backToCamera() {
-        viewModel.cancel()
-        findNavController().popBackStack(R.id.cameraFragment, false)
+    /** *Regenerate*: a new set of the same request, on Generating poses. */
+    private fun regenerate() {
+        viewModel.regenerate()
+        val navController = findNavController()
+        val started = viewModel.uiState.value.phase == GenerationUiState.Phase.GENERATING
+        if (started && navController.currentDestination?.id == R.id.pickPoseFragment) {
+            navController.navigate(R.id.action_pickPose_to_generating)
+        }
     }
 
     private fun showPages(binding: FragmentPickPoseBinding, pages: PosePageAdapter, state: GenerationUiState) {
@@ -138,7 +186,9 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 
     private fun render(binding: FragmentPickPoseBinding, pages: PosePageAdapter, state: GenerationUiState) {
         showPages(binding, pages, state)
-        binding.usePoseButton.isEnabled = state.selectedImage != null && state.chosenBy == null
+        val choosing = state.phase == GenerationUiState.Phase.PICKING && state.chosenBy == null
+        binding.selectButton.isEnabled = state.selectedImage != null && choosing
+        binding.regenerateButton.isEnabled = choosing
 
         val navController = findNavController()
         // The subject's pick came first (Design 2.6.5): it goes on as this phone's own would have.
@@ -195,8 +245,8 @@ internal fun FragmentPickPoseBinding.showPosePages(
     shown: () -> Boolean,
 ) {
     pages.submitList(slots.map { PosePage(it, hearts[it.pose.id]) }) {
-        // The list is compared off the main thread, so this can come after the screen was left (Use this pose,
-        // Try other poses): then there is nothing to select or show.
+        // The list is compared off the main thread, so this can come after the screen was left (Select, Back,
+        // Regenerate): then there is nothing to select or show.
         if (!shown()) return@submitList
         val pager = candidatePager
         val selected = slots.indexOfFirst { it.pose.id == selectedId }
@@ -234,3 +284,5 @@ internal fun Fragment.showPoseSaveNotice(notice: PoseSaveNotice) {
     }
     Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
 }
+
+private const val HANDED_ON = "handedOn"

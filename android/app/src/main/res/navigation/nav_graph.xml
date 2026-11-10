@@ -124,6 +124,12 @@
             app:destination="@id/generatingFragment"
             app:popUpTo="@id/describePoseFragment"
             app:popUpToInclusive="true" />
+        <!-- See the last poses: Pick a pose again with the set kept behind this screen (#199). -->
+        <action
+            android:id="@+id/action_describePose_to_pickPose"
+            app:destination="@id/pickPoseFragment"
+            app:popUpTo="@id/describePoseFragment"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment
@@ -140,21 +146,33 @@
             app:destination="@id/generationFailedFragment"
             app:popUpTo="@id/generatingFragment"
             app:popUpToInclusive="true" />
+        <!-- Back: the set stops, and Generate poses shows again with the photo and the description (#199). -->
+        <action
+            android:id="@+id/action_generating_to_describePose"
+            app:destination="@id/describePoseFragment"
+            app:popUpTo="@id/generatingFragment"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment
         android:id="@+id/pickPoseFragment"
         android:name="com.lastpenguin.pix.ui.generation.PickPoseFragment"
         android:label="Pick a pose">
+        <!-- Select: Pick a pose stays under Reference confirm, whose Back returns to the set (#199); in a session it
+             goes, with popUpTo set in code. -->
         <action
             android:id="@+id/action_pickPose_to_referenceConfirm"
-            app:destination="@id/referenceConfirmFragment"
-            app:popUpTo="@id/pickPoseFragment"
-            app:popUpToInclusive="true" />
-        <!-- Try other poses: Generate poses again, with the photo and the description kept. -->
+            app:destination="@id/referenceConfirmFragment" />
+        <!-- Back: Generate poses again, with the photo and the description kept. -->
         <action
             android:id="@+id/action_pickPose_to_describePose"
             app:destination="@id/describePoseFragment"
+            app:popUpTo="@id/pickPoseFragment"
+            app:popUpToInclusive="true" />
+        <!-- Regenerate: a new set of the same request (#199). -->
+        <action
+            android:id="@+id/action_pickPose_to_generating"
+            app:destination="@id/generatingFragment"
             app:popUpTo="@id/pickPoseFragment"
             app:popUpToInclusive="true" />
     </fragment>
@@ -168,7 +186,7 @@
             app:destination="@id/generatingFragment"
             app:popUpTo="@id/generationFailedFragment"
             app:popUpToInclusive="true" />
-        <!-- The service rejected the description: Generate poses again, with the text kept (US-5). -->
+        <!-- Back: Generate poses again, with the text kept (US-5, #199). -->
         <action
             android:id="@+id/action_generationFailed_to_describePose"
             app:destination="@id/describePoseFragment"

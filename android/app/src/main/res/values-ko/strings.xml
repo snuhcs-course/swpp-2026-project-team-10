@@ -125,7 +125,7 @@
     <string name="finding_person">인물을 인식하는 중…</string>
     <string name="person_found">인물을 인식했어요</string>
     <string name="couldnt_use_photo">이 사진은 사용할 수 없어요. 다른 사진을 고르세요.</string>
-    <string name="use_this_guide">이 가이드 사용</string>
+    <string name="use">사용</string>
     <string name="choose_another_photo">다른 사진 고르기</string>
     <string name="cut_from_screenshot">스크린샷에서 사진만 남겼어요</string>
     <string name="kept_photo_description">스크린샷에서 남긴 사진</string>
@@ -142,7 +142,6 @@
     <string name="scene_title">배경 사진 촬영</string>
     <string name="scene_review_title">이 사진을 사용할까요?</string>
     <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
-    <string name="use_this_photo">이 사진 사용</string>
     <string name="shoot_again">다시 촬영</string>
     <string name="scene_shot_failed">사진을 촬영하지 못했어요. 다시 시도하세요.</string>
     <string name="scene_no_person_title">사진에 사람이 없어요</string>
@@ -154,7 +153,6 @@
     <string name="description_refused">지난 요청이 거절됐어요. 설명이나 사진을 바꿔 다시 시도하세요.</string>
     <string name="description_rejected_message">AI 서비스가 이 사진으로 “%1$s” 포즈를 생성하지 않았어요. 설명을 바꾸거나, 카메라로 돌아가 다른 사진을 찍으세요.</string>
     <string name="generation_no_person_message">AI 서비스가 이 사진에서 사람을 찾지 못했어요. 인물이 나오게 사진을 다시 찍으세요.</string>
-    <string name="edit_description">설명 수정</string>
     <!-- The descriptions used before on Generate poses (FR-4.11): the section, its All / With <name> switch, the line
          shown when nothing was used with that friend, and the ✕ of an entry, for TalkBack. -->
     <string name="history_label">이전에 쓴 설명</string>
@@ -162,8 +160,10 @@
     <string name="history_with">%1$s님과</string>
     <string name="history_empty_with">%1$s님과 쓴 설명이 아직 없어요</string>
     <string name="history_delete">“%1$s” 설명을 기록에서 지우기</string>
-    <string name="suggest_four_poses">AI 추천 포즈 4개 생성</string>
-    <string name="generate_four_from_description">입력한 포즈로 4개 생성</string>
+    <string name="suggest_poses">추천받기</string>
+    <string name="generate_from_description">생성</string>
+    <string name="regenerate_poses">다시 생성</string>
+    <string name="see_last_poses">방금 만든 포즈 보기</string>
     <string name="clear_description">설명 지우기</string>
     <string name="choosing_poses">포즈 선택 중…</string>
     <string name="scene_photo_description">포즈를 생성할 배경 사진</string>
@@ -172,10 +172,12 @@
     <string name="ready_count">%2$d개 중 %1$d개 완료</string>
     <string name="generating_scene_caption">인물과 배경은 그대로 · 최대 60초</string>
     <string name="pick_pose_title">포즈 선택</string>
-    <string name="close_to_camera">닫고 카메라로 돌아가기</string>
     <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
-    <string name="use_this_pose">이 포즈 사용</string>
-    <string name="try_other_poses">다른 포즈 생성</string>
+    <string name="select_pose">선택</string>
+    <string name="go_back_title">정말 되돌아가시겠습니까?</string>
+    <string name="go_back_generating">이미지가 생성 중입니다.</string>
+    <string name="go_back_generated">이미지가 생성되었습니다.</string>
+    <string name="go_back">되돌아가기</string>
     <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
     <string name="save_pose">이 포즈를 내 보관함에 저장</string>
     <string name="remove_saved_pose">이 포즈를 내 보관함에서 빼기</string>

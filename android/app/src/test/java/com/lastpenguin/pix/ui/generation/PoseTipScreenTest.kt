@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -75,7 +75,7 @@ class PoseTipScreenTest {
         }
         idle()
 
-        s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).usePoseButton.performClick() }
+        s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).selectButton.performClick() }
         idle()
         // Nothing is asked before Reference confirm has found the person.
         assertEquals(0, modules.tipper.requests.size)

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -16,7 +16,11 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
-/** Generating poses (R&S 6.3). Owner: Server/AI/Sync (#7). */
+/**
+ * Generating poses (R&S 6.3). Back at the top left asks first, since the AI service is already making the set, then
+ * stops it and returns to Generate poses with the photo and the description (#199). Owner: Server/AI/Sync (#7); Back
+ * Iter4-P2.
+ */
 class GeneratingFragment : Fragment(R.layout.fragment_generating) {
 
     private val viewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
@@ -30,9 +34,9 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
             CandidateGridFit(resources.getDimensionPixelSize(R.dimen.pose_card_margin)),
         )
 
-        binding.cancelButton.setOnClickListener { cancel() }
-        // System back does the same as Cancel (R&S 6.9).
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { cancel() }
+        binding.backButton.setOnClickListener { askToStop() }
+        // System back does what Back does (R&S 6.9).
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { askToStop() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -41,9 +45,19 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
         }
     }
 
-    private fun cancel() {
-        viewModel.cancel()
-        findNavController().popBackStack(R.id.cameraFragment, false)
+    /** Back: asks first, as the set is already being made. */
+    private fun askToStop() {
+        confirmGoingBack(generating = true, onConfirm = ::stop)
+    }
+
+    /** Back confirmed: the requests stop, and Generate poses shows the photo and the description again. */
+    private fun stop() {
+        val navController = findNavController()
+        val generating = viewModel.uiState.value.phase == GenerationUiState.Phase.GENERATING
+        if (!generating || navController.currentDestination?.id != R.id.generatingFragment) return
+        // Navigates first, so that this screen does not take Generate poses' phase for a restart.
+        navController.navigate(R.id.action_generating_to_describePose)
+        viewModel.stopGenerating()
     }
 
     private fun render(binding: FragmentGeneratingBinding, candidates: PoseCandidateAdapter, state: GenerationUiState) {

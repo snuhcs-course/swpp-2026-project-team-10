@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -22,6 +22,7 @@ import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
+import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
@@ -38,11 +39,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks a description used before (FR-4.11), or leaves the
- * field empty for the server to suggest four poses for the scene. Nothing is sent before the one button, *Suggest 4
- * poses* or *Generate 4 poses from this* (Iter3-A13). In a session the subject sees this step too: one field at a time
- * holds the description, and the subject's button goes on here like this phone's own (Design 2.6.5). The first time it
- * opens, its tutorial tips come over it (FR-10.4).
- * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16.
+ * field empty for the server to suggest four poses for the scene. Nothing is sent before the one button at the top
+ * right, *Suggest*, *Generate*, or *Regenerate* (Iter3-A13, #199). Back at the top left returns to the scene photo's
+ * review. After Back on Pick a pose, the set waits behind this screen: *See the last poses* opens it again. In a session
+ * the subject sees this step too: one field at a time holds the description, and the subject's button goes on here like
+ * this phone's own (Design 2.6.5). The first time it opens, its tutorial tips come over it (FR-10.4).
+ * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16; Back and the kept set Iter4-P2.
  */
 class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 
@@ -56,7 +58,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
         val state = viewModel.uiState.value
         if (state.phase != GenerationUiState.Phase.DESCRIBING || state.scene == null) {
             // Nothing to describe, for example after the app process was restarted on this screen.
-            view.post { if (isAdded) backToCamera() }
+            view.post { if (isAdded) leaveForCamera() }
             return
         }
         binding.sceneImage.showScene(state.scene)
@@ -75,9 +77,10 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
             onForget = viewModel::forget,
         )
         this.form = form
-        binding.cancelButton.setOnClickListener { backToCamera() }
-        // System back is Cancel (R&S 6.9).
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToCamera() }
+        binding.backButton.setOnClickListener { backToReview() }
+        // System back does what Back does (R&S 6.9).
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToReview() }
+        binding.seeLastPosesButton.setOnClickListener { showLastPoses() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -90,6 +93,9 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
                         val subject = connected?.peer?.displayName
                         val typing = subject.takeIf { generation.descriptionWriter == Role.SUBJECT }
                         form.showShared(generation.description, typing, subject)
+                        // The set kept behind this screen: the button's Regenerate, and See the last poses (#199).
+                        form.keptRequest = generation.request.takeIf { generation.hasKeptSet }
+                        binding.seeLastPosesButton.isVisible = generation.hasKeptSet
                         // The descriptions used before, with the friend of an invitation's session, also while it reconnects (FR-4.11).
                         form.showHistory(used, session.partner)
                         // The subject's button came first: it goes on as this phone's own.
@@ -119,7 +125,26 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
         }
     }
 
-    private fun backToCamera() {
+    /** Back: the scene photo's review on Camera, with the text kept for its *Use*. */
+    private fun backToReview() {
+        hideKeyboard()
+        form?.stopTyping()
+        // Pops first, so that this screen does not take the review's phase for anything to follow.
+        findNavController().popBackStack(R.id.cameraFragment, false)
+        viewModel.backToReview()
+    }
+
+    /** *See the last poses*: Pick a pose with the set kept behind this screen; nothing is sent. */
+    private fun showLastPoses() {
+        val navController = findNavController()
+        if (navController.currentDestination?.id != R.id.describePoseFragment) return
+        hideKeyboard()
+        form?.stopTyping()
+        if (viewModel.showLastPoses()) navController.navigate(R.id.action_describePose_to_pickPose)
+    }
+
+    /** Nothing to describe: the camera, with the step discarded. */
+    private fun leaveForCamera() {
         hideKeyboard()
         viewModel.cancel()
         findNavController().popBackStack(R.id.cameraFragment, false)
@@ -134,7 +159,8 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 /**
  * The description field, its counter and ✕, the descriptions used before (FR-4.11), and the one button of Generate
  * poses (FR-4.4, FR-4.8, US-5), on either phone. The button's label says what it starts: suggested poses while the
- * field is blank, which a blank description asks for, else poses of the description (Iter3-A13). Apart from the
+ * field is blank, which a blank description asks for, else poses of the description (Iter3-A13), and *Regenerate* while
+ * the field asks for what the set kept behind the screen was made of ([keptRequest], #199). Apart from the
  * fragments, so the form can be tested on the real layout without a ViewModel or navigation. [showHistory] lists the
  * descriptions used before as chips, all of them or, through the switch, those used with the session's friend; a chip
  * fills the field, and its ✕ asks [onForget] to drop it.
@@ -172,6 +198,14 @@ class DescriptionForm(
 
     /** The other person types, or the link is paused: the chips wait with the field. */
     private var locked = false
+
+    /** What the set kept behind Generate poses was made of, or null without one (#199). */
+    var keptRequest: PoseRequest? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            renderText()
+        }
 
     init {
         // One line of input, so Done closes the keyboard, shown wrapped over up to four lines.
@@ -302,7 +336,12 @@ class DescriptionForm(
         val context = binding.root.context
         binding.descriptionCounter.text =
             context.getString(R.string.description_counter, input.length(), DESCRIPTION_MAX_LENGTH)
-        val label = if (input.text.isBlank()) R.string.suggest_four_poses else R.string.generate_four_from_description
+        val text = input.text.toString()
+        val label = when {
+            keptRequest != null && PoseRequest.of(text) == keptRequest -> R.string.regenerate_poses
+            text.isBlank() -> R.string.suggest_poses
+            else -> R.string.generate_from_description
+        }
         binding.generateButton.setText(label)
         renderClear()
     }

@@ -79,6 +79,7 @@
 | 2.47 | 2026-11-06 | Rewritten in concise, simple technical English and checked against the code. QR, the prompt templates, FR-7.5, FR-7.7, and camera quality with the shutter freeze (#183) moved to Iteration 4; the zoom stutter settled and Korean poses dropped (*Still open*). Figure 1 redrawn; pushes only to signed-in phones. Section 1.4 removed: the task status is in 2.9, the later scope in R&S 4.1, and the QR plan in *Still open*. The AWS server stays on beside the course servers, for other networks (all sections). |
 | 3.0 | 2026-11-07 | Iteration 4 plan from the kickoff of 11/7: the task table with owners and due dates (2.9); the open decisions (*Still open*: the light mode's colors, Back on the pose screens, the situation prompts, whether four templates are needed); the Iteration 3 table closed. The remote-control switch and remote focus move to Iteration 5 (2.5.1, 2.6.5, 2.9). |
 | 3.1 | 2026-11-09 | Color tokens and a DayNight theme (Iter4-P5, [#202]): the tokens in two sets, page and on the image, and `Theme.Pix` on DayNight but dark until light mode (2.8). |
+| 3.2 | 2026-11-10 | Back on the pose screens (Iter4-P2, [#199]): each screen's Back goes one step back, the set waits behind *Generate poses* outside a session, *Regenerate* on *Pick a pose*, the step's action at the top right, Back on *Generating poses* and *Pick a pose* asking "Go back?" first, and *Reference confirm* without *Choose another photo*; the decision leaves *Still open* (2.4, 2.5.1, 2.5.3, 2.6.3, 2.6.5). |
 
 </details>
 
@@ -91,7 +92,6 @@ Audience: the development team. This page describes Pix's design as built throug
 | Four prompt templates (FR-4.8) | With a description, four templates around one `{pose}` replace the three variations. The default template reads `{pose}` as the user's request, keeps the face and the clothes, and makes one pose per photo (2.6.3). Open: the templates, and requests such as "two photos saluting and two with hands up" (Iter3-P25, [#125]; now [#211]). Open also, from the kickoff of 11/7: whether four templates are needed at all, the belongings kept, and the framing. | 박재완 | Iteration 4 |
 | Offline QR connection (F9) | The photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]; now [#214]). | 조성민 | Iteration 4 |
 | The light mode's colors (FR-10.1) | Light mode follows the phone's setting, with dark kept, on color tokens sorted into *page* and *on the image* ([#202]). Open: the palette, the current black and yellow or a lighter one; the comparison boards are on the team's design canvas ([#212]). | 박동제 | Iteration 4 |
-| Back on the pose screens (FR-4.6) | Back never leaves *Generate poses* or *Pick a pose* for Camera; only ✕ does. Proposal: on *Pick a pose*, Back is *Try other poses*; on *Generate poses* after it, Back returns to the candidates, and *Generate again* makes a new set from the same description; opened from the scene photo, Back returns to its review ([#199]). Open: the map. | 한준형 | Iteration 4 |
 | Situation prompts (FR-4.8) | A prompt per situation (background, person, landmark, ID photo, default, selfie) behind a `situation` field, compared with the current prompt on the evaluation scenes before the choice is built ([#209], [#210]). Open: which situations keep their own prompt. | 박재완 | Iteration 4 |
 
 **Contents**
@@ -150,7 +150,7 @@ Pix is one Android app in two roles, **photographer** and **subject**, plus a sm
 | Flow | Path | Transport | Latency budget |
 |----|----|----|----|
 | **Reference photo → guide** | Photo → downscale → screenshot cut (FR-2.10) → ML Kit segmentation → mask smoothing → person box and outline → guide store | On device | ≤ 2 s (NFR-3) |
-| **Pose generation** | Scene photo → person check on the phone → *Use this photo* → resized JPEG, no EXIF → `POST /pose-suggestions` (filter) → four parallel `POST /poses` (filter, person check) → image model → candidates → reference flow → `POST /pose-tips`. A description's own `POST /poses` starts at once. | HTTP to the server, HTTPS to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
+| **Pose generation** | Scene photo → person check on the phone → *Use* → resized JPEG, no EXIF → `POST /pose-suggestions` (filter) → four parallel `POST /poses` (filter, person check) → image model → candidates → reference flow → `POST /pose-tips`. A description's own `POST /poses` starts at once. | HTTP to the server, HTTPS to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
 | **Session setup** | Room code or invitation → signaling → SDP and ICE → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
 | **Live view** | CameraX frames → NV21 (`NV21Buffer`), cropped to the frame → H.264 or VP8 → subject's renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi, ≤ 0.8 s on cellular or relay (NFR-5) |
 | **Guide sync** | Guide store → `guide.image.*` (the mask, once per guide), `guide.reference.*` (thumbnail photo), `guide.state` → the other phone's mirror → overlay. The photographer adopts a guide made on the subject's phone. | Data channel | ≤ 0.3 s (NFR-7) |
@@ -1468,9 +1468,35 @@ stateDiagram-v2
 
 | Step | States |
 |----|----|
-| *Generate poses* (`DescriptionStep`) | `OPEN` while written → `STARTED` by its button (*Suggest 4 poses* or *Generate 4 poses from this*), or `CLOSED` |
-| The pose set (`PoseSetStep`) | `GENERATING` → `PICKING` when *Pick a pose* opens with a candidate → `CHOSEN` by the first *Use this pose*; `CLOSED` without a choice |
-| *Reference confirm* of a chosen pose (`ConfirmStep`) | `FINDING` (again after *Choose another photo*) → `READY` with the outline → `USED` by the first *Use this guide*; `CLOSED` without a guide |
+| *Generate poses* (`DescriptionStep`) | `OPEN` while written → `STARTED` by its button (*Suggest*, *Generate*, or *Regenerate*), or `CLOSED` |
+| The pose set (`PoseSetStep`) | `GENERATING` → `PICKING` when *Pick a pose* opens with a candidate → `CHOSEN` by the first *Select*; `CLOSED` without a choice |
+| *Reference confirm* of a chosen pose (`ConfirmStep`) | `FINDING` → `READY` with the outline → `USED` by the first *Use*; `CLOSED` without a guide |
+
+**Pose screens (2.6.3, [#199]).** `GenerationUiState.phase` on the photographer's phone. Back on each screen goes one step back, and that step shows what it had. The guide on the camera, or a choice in a session, ends the step (`IDLE`).
+
+```mermaid
+stateDiagram-v2
+  [*] --> IDLE
+  IDLE --> FRAMING: Generate poses here
+  FRAMING --> IDLE: Back
+  FRAMING --> REVIEWING: shutter
+  REVIEWING --> FRAMING: Back
+  REVIEWING --> DESCRIBING: Use, a person found
+  DESCRIBING --> REVIEWING: Back
+  DESCRIBING --> GENERATING: Suggest, Generate, or Regenerate
+  DESCRIBING --> PICKING: See the last poses
+  GENERATING --> DESCRIBING: Back, confirmed
+  GENERATING --> PICKING: a candidate ready
+  GENERATING --> FAILED: none ready
+  PICKING --> DESCRIBING: Back, confirmed; the set kept outside a session
+  PICKING --> GENERATING: Regenerate
+  PICKING --> IDLE: the guide on the camera, or a choice in a session
+  FAILED --> DESCRIBING: Back
+  FAILED --> GENERATING: Try again
+  FAILED --> FRAMING: Shoot again
+```
+
+*Figure 9c. The pose screens. `REVIEWING` and `FRAMING` are steps of the Camera screen. Outside a session, *Select* keeps `PICKING` under *Reference confirm*, whose Back returns to the set.*
 
 ### 2.5 Protocols and APIs
 
@@ -1514,10 +1540,10 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `pose.planned` | P→S | reliable | `setId`, `poseIds` | The set's slots in order (Iter3-A13) |
 | `pose.candidate.begin` / `.chunk` / `.end` | P→S | reliable | chunks | One candidate, for *Generating poses* and *Pick a pose* |
 | `pose.candidate.failed` | P→S | reliable | `setId`, `poseId` | A candidate that could not be created (Iter3-A13) |
-| `pose.pick` | S→P | reliable | `setId`, `poseId` | The subject's *Use this pose* |
+| `pose.pick` | S→P | reliable | `setId`, `poseId` | The subject's *Select* |
 | `guide.confirm` | P→S | reliable | `confirmId`, `step`, `guideId`, `by` | The photographer's *Reference confirm* of a chosen pose (FR-6.15) |
 | `guide.confirm.image.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The outline's mask, for the subject's *Your reference* |
-| `guide.confirm.use` | S→P | reliable | `confirmId`, `guideId` | The subject's *Use this guide* |
+| `guide.confirm.use` | S→P | reliable | `confirmId`, `guideId` | The subject's *Use* |
 | `photo.shutter` | P→S | realtime | none | The shutter was pressed (Iter3-A12) |
 | `photo.begin` / `.chunk` / `.end` | P→S | reliable, bulk | chunks, with `takenAt` | A photo taken in the session, as saved (FR-6.14) |
 | `photo.ack` | S→P | reliable | `photoId`, `next` | The chunk the subject expects next |
@@ -1728,10 +1754,10 @@ Planned (FR-7.5, Could): sent after `hello` and at each change of the photograph
 |----|----|----|
 | `GENERATING` | *Generate poses*' button started a set | — |
 | `PICKING` | The photographer's *Pick a pose* opened | `poseIds`: the candidates whose copy went out, in its order |
-| `CHOSEN` | A *Use this pose* decided | `poseId`, `by` |
-| `CLOSED` | No choice: Back, *Try other poses*, *Cancel*, or no candidate | — |
+| `CHOSEN` | A *Select* decided | `poseId`, `by` |
+| `CLOSED` | No choice: Back, *Regenerate*, or no candidate | — |
 
-Each set, *Try again* included, has a new `setId`.
+Each set, *Try again* and *Regenerate* included, has a new `setId`.
 
 </details>
 
@@ -1783,7 +1809,7 @@ The photographer takes it only while that set is `PICKING` and nobody has chosen
 |----|----|----|
 | `OPEN` | *Generate poses* opened; again at each change | `text`; `writer`, the phone whose field holds the description, left out while nobody types; `rejected: true` after the service refused the last description, left out otherwise |
 | `STARTED` | A set started from the description, from either phone | `text`, as the set asked for it, empty for suggested poses; `setId`, as `pose.step` names the set |
-| `CLOSED` | *Cancel* | — |
+| `CLOSED` | Back | — |
 
 The subject's prompt history keeps the `STARTED` text and waits for the answer of set `setId`, whichever message comes first (FR-4.11, 2.6.3, [#182]). Without `text` or `setId`, as from an older photographer, it uses its copy's last text and the set that follows.
 
@@ -1904,9 +1930,9 @@ With `ok: false`, `reason` is `TOO_LARGE`, `BROKEN` (a skipped index, a wrong si
 
 | `step` | When | Fields |
 |----|----|----|
-| `FINDING` | The photographer's phone separates the person; again after *Choose another photo* | — |
+| `FINDING` | The photographer's phone separates the person | — |
 | `READY` | The outline is on screen; its mask follows | `guideId` |
-| `USED` | A *Use this guide* decided | `guideId`, `by` |
+| `USED` | A *Use* decided | `guideId`, `by` |
 | `CLOSED` | No guide: Back, no person found, or a photo that cannot be used | — |
 
 Each chosen pose has a new `confirmId`. A *Reference confirm* opened from *Add a pose guide* sends nothing.
@@ -2198,7 +2224,7 @@ Outside `/api/v1`:
 - **Suggestions.** The server keeps the suggestion model's first four poses that differ, ignoring case, each one line of 1–100 characters (2.6.3). Default poses fill the rest, in order. A model that fails, answers nothing usable, or takes over `PIX_SUGGESTION_TIMEOUT_SECONDS` (8 s) gives the four default poses, so the model never fails the request.
 - **Variations.** A `description` is checked as in `POST /poses` before any call, without counting it, and then judged by the description filter (2.6.3). The server keeps the first three usable variations that differ from it; the description fills any gap. An empty `description` counts as left out.
 - **Selfie.** `selfie` true selects the selfie prompts and default poses (2.6.3).
-- Every call, *Try other poses* included, asks the model again; nothing is cached. No log holds a pose, a description, or a variation.
+- Every call, *Regenerate* included, asks the model again; nothing is cached. No log holds a pose, a description, or a variation.
 
 </details>
 
@@ -2510,15 +2536,15 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 | Description filter | `PIX_FILTER_MODEL`, `typesafe/jev-1.14`, cutoff 0.7 | 2 s | *Description filter*. | `perplexity/pplx-decider-v1.2` |
 | Person check | `PIX_PERSON_MODEL`, `typesafe/jev-1.14`, cutoff 0.5 | 3 s | *Person check*. | — |
 
-1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, Camera enters a scene-photo state (`GenerationUiState.phase`), and the shutter copies the latest analysis frame. A flash would not reach that frame, so the flash button switches the phone's light instead, on only while framing (`setTorch`; It 3, Iter3-A5). A shot waits until the light has held for 0.5 s, at most 1.5 s; a lens without a flash does not wait. *Use this photo* waits for the phone's *Person check*, and nothing is sent before it. The app sends JPEG at quality 85, long side at most 1024 px, without metadata; the server rejects any other photo and never resizes one (2.5.3).
-2.  **What to pose (It 2, FR-4.8).** *Generate poses* has a description field of up to 100 characters, in Korean or English, the descriptions used before, and one button (It 3, Iter3-A13, [#180]). The button reads *Suggest 4 poses* while the field is blank, spaces included (`PoseRequest.of`), and *Generate 4 poses from this* otherwise. The field's ✕ empties it; it hides while the other phone types. The screen: R&S 6.3.
-3.  **Requests.** Without a description, the app asks `POST /pose-suggestions` for four poses, then sends one `POST /poses` per pose. With a description, it sends that description's `POST /poses` at once and asks `POST /pose-suggestions` for three variations, then one `POST /poses` each. A variation missing after 10 s is replaced by the description. Each request (`pose-1` … `pose-4`) gets a `seed` drawn from one seed per set. *Try again* repeats the request with a new seed. *Try other poses* and Back on *Pick a pose* ([#182]) return to *Generate poses* with the photo and text kept. The photographer's ✕ discards the set and returns to the camera; the subject's arrow returns to Subject view.
-4.  **Progressive results.** *Generating poses* shows four slots, two by two in the scene's shape, narrower and centered for a 9:16 scene (`CandidateGridFit`). A candidate, or its failure, fades in over 200 ms where its spinner was (Iter3-A13). The run ends when all four are done or at 60 s, when open requests are cancelled. With at least one candidate, *Pick a pose* shows each on its own page of a `ViewPager2` (`PosePageAdapter`), in its own shape. The page on screen is the one *Use this pose* takes ([#108]). With none, *Couldn't create poses* opens (FR-4.7). After *Use this pose*, the other candidates go, and the scene photo once its tip is asked for.
-5.  **Cancellation.** *Cancel* or Back cancels the coroutine scope and its HTTP calls. The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
+1.  **Scene photo, taken by the user and prepared on the phone.** After *Generate poses here*, Camera enters a scene-photo state (`GenerationUiState.phase`), and the shutter copies the latest analysis frame. A flash would not reach that frame, so the flash button switches the phone's light instead, on only while framing (`setTorch`; It 3, Iter3-A5). A shot waits until the light has held for 0.5 s, at most 1.5 s; a lens without a flash does not wait. Its review shows the photo in the middle of the space under the top bar, with *Use* at the top right and Back, which shoots again ([#199]). *Use* waits for the phone's *Person check*, and nothing is sent before it. The app sends JPEG at quality 85, long side at most 1024 px, without metadata; the server rejects any other photo and never resizes one (2.5.3).
+2.  **What to pose (It 2, FR-4.8).** *Generate poses* has a description field of up to 100 characters, in Korean or English, the descriptions used before, and one button (It 3, Iter3-A13, [#180]). The button, at the top right ([#199]), reads *Suggest* while the field is blank, spaces included (`PoseRequest.of`), *Regenerate* while the field asks for the set kept behind the screen, and *Generate* otherwise. The field's ✕ empties it; it hides while the other phone types. The screen: R&S 6.3.
+3.  **Requests.** Without a description, the app asks `POST /pose-suggestions` for four poses, then sends one `POST /poses` per pose. With a description, it sends that description's `POST /poses` at once and asks `POST /pose-suggestions` for three variations, then one `POST /poses` each. A variation missing after 10 s is replaced by the description. Each request (`pose-1` … `pose-4`) gets a `seed` drawn from one seed per set. *Try again* and *Regenerate* on *Pick a pose* repeat the request with a new seed. Back on each screen goes one step back (2.4, Figure 9c; [#199]); on *Generating poses* and *Pick a pose*, where the AI service was already asked, it first asks "Go back?" (`confirmGoingBack`), a dialog that closes with the screen's view, so a set that ends meanwhile leaves no question: *Pick a pose* to *Generate poses* with the photo, the text, and the set kept, which *See the last poses* opens again (`describeAgain(keepSet)`, `showLastPoses`); *Generate poses* to the photo's review (`backToReview`); *Generating poses* and *Couldn't create poses* to *Generate poses* (`stopGenerating`, `describeAgain`). In a session the set is on both phones, so Back discards it and *Pick a pose* has no *Regenerate*. The subject's Back returns to Subject view.
+4.  **Progressive results.** *Generating poses* shows four slots, two by two in the scene's shape, narrower and centered for a 9:16 scene (`CandidateGridFit`). A candidate, or its failure, fades in over 200 ms where its spinner was (Iter3-A13). The run ends when all four are done or at 60 s, when open requests are cancelled. With at least one candidate, *Pick a pose* shows each on its own page of a `ViewPager2` (`PosePageAdapter`), in its own shape. The page on screen is the one *Select* takes ([#108]). With none, *Couldn't create poses* opens (FR-4.7). After *Select*, *Pick a pose* stays under *Reference confirm*, whose Back returns to the set (`pickAgain`); the set goes once the screen leaves the back stack. In a session a choice is final, and the set goes at once. The scene photo goes once its tip is asked for.
+5.  **Cancellation.** Back on *Generating poses* cancels the coroutine scope and its HTTP calls. The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
 
 **Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
 
-**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. `PoseSaveViewModel`, scoped to the activity, cuts the person out with `ReferenceGuideMaker.make(image, GENERATED)` and saves the guide as an AI pose. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide. A tap on a filled heart deletes the guide. A newly saved ♥ pops to 125 % and back in 200 ms. Whether a save removed the oldest guide is decided under the store's lock (`GuideSaved`): of two hearts tapped at once with 99 saved, only the second removes one. *Use this pose* on a filled heart reuses its saved guide. Nothing of a ♥ is sent (2.6.5).
+**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. `PoseSaveViewModel`, scoped to the activity, cuts the person out with `ReferenceGuideMaker.make(image, GENERATED)` and saves the guide as an AI pose. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide. A tap on a filled heart deletes the guide. A newly saved ♥ pops to 125 % and back in 200 ms. Whether a save removed the oldest guide is decided under the store's lock (`GuideSaved`): of two hearts tapped at once with 99 saved, only the second removes one. *Select* on a filled heart reuses its saved guide. Nothing of a ♥ is sent (2.6.5).
 
 **Pose prompt.** Every candidate uses `pose_prompt` with the pose in `{pose}`: the description as written (Korean included), a suggestion, a variation, or a default pose. It changes the pose and the expression. It lets the model move the person, frame closer (knee-up or waist-up), and raise, lower, or tilt the camera a little, but never show more than the scene photo. Its rules follow the pose, so they win: the same person, clothes, place, and light, and nothing new to lean or sit on. *Why:* with a fixed framing, a distant person stays small; with this prompt, 13 of 16 descriptions were followed in all eight test photos. *Known limits:* a description can still add a prop, clothing, or a second person, and walking toward the camera is mostly cut at the knees. The image service did not refuse a violent description in testing.
 
@@ -2526,7 +2552,7 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 **Description filter (It 3, FR-4.12).** `DescriptionFilter` judges every description of `POST /poses` and `POST /pose-suggestions` and every pose of `POST /pose-tips`, after the rate limit and before any other model. It asks two yes/no questions from `[filter]` in `prompts.toml`. One asks whether the text asks for harmful content: sexual content, injury, self-harm, hate, or a real person's look. The other asks whether it tries to manipulate the AI: ignore or reveal its rules, a new role, a fake system message, or a closed quotation mark. A probability at the cutoff or above answers `422 REJECTED`. Default poses, suggestion requests, and photos are not judged; other clothes, places, and props pass. The filter fails open, and the log gets only a refusal's question and probability. *Why:* seven decision models were compared on 107 labeled descriptions in English and Korean: 57 harmless, 50 attacks, 29 of them harmful (2026-11-02, `compare_filter_models.py`). Jev 1.14 at 0.7 refused no harmless one and caught every harmful one, in 0.4 s at $0.03 per 1,000 calls. The Decider caught all 50 attacks but refused "Forget the previous pose, try something totally new". *Known limits:* the numbers are optimistic until other descriptions are measured (Testing Documentation 3); a fake note that allows only something harmless can pass.
 
-**Person check (It 3, FR-4.13).** A scene photo without a person is not sent. On the phone, `RuleBasedPersonDetector` checks it after the shutter, and *Use this photo* waits; with no one found, only *Shoot again* works. It accepts an ML Kit pose (base model) with at least 8 of 33 landmarks in the frame, at likelihood 0.5 or more. Without one, it accepts any face down to 2 % of the photo's width. Both models are bundled, so it works offline; an error lets the photo go on. On the server, every `POST /poses` asks the person model about `photo` (`[person]`), in parallel with the filter. Below the cutoff it answers `422 NO_PERSON` without calling the image model, unless the filter refused. It fails open, also for a photo under 256 px. *Why:* on 53 scenes (2026-11-03; 39 with people, 14 without, such as statues, graffiti, a dog, and a mannequin), pose and face detection together found everyone; pose alone missed three. Selfie Segmentation marked graffiti as people, and Subject Segmentation marks walls. Jev scored people 0.96–0.98 and the rest 0.02–0.36, in 0.7 s for $0.0001 (`try_person_check.py`). *Known limits:* the phone accepts a cartoon face, a dog, or a mannequin; only distant passers-by can pass the server (0.49 and 0.81 for two edits).
+**Person check (It 3, FR-4.13).** A scene photo without a person is not sent. On the phone, `RuleBasedPersonDetector` checks it after the shutter, and *Use* waits; with no one found, only Back, which shoots again, works. It accepts an ML Kit pose (base model) with at least 8 of 33 landmarks in the frame, at likelihood 0.5 or more. Without one, it accepts any face down to 2 % of the photo's width. Both models are bundled, so it works offline; an error lets the photo go on. On the server, every `POST /poses` asks the person model about `photo` (`[person]`), in parallel with the filter. Below the cutoff it answers `422 NO_PERSON` without calling the image model, unless the filter refused. It fails open, also for a photo under 256 px. *Why:* on 53 scenes (2026-11-03; 39 with people, 14 without, such as statues, graffiti, a dog, and a mannequin), pose and face detection together found everyone; pose alone missed three. Selfie Segmentation marked graffiti as people, and Subject Segmentation marks walls. Jev scored people 0.96–0.98 and the rest 0.02–0.36, in 0.7 s for $0.0001 (`try_person_check.py`). *Known limits:* the phone accepts a cartoon face, a dog, or a mannequin; only distant passers-by can pass the server (0.49 and 0.81 for two edits).
 
 **Suggested poses.** Without a description, the suggestion model gets the photo with `suggestion_prompt` and a JSON schema; its rules match the pose prompt's. The server keeps the first four different poses of 1–100 characters. It fills the rest with the default poses (hands on hips, wave, walking, arms crossed), all four if the model fails or exceeds 8 s, so the endpoint never fails for the model. Apps from before Iteration 2 ask for the default poses by id (`templateId`). Suggestions use the place, such as a door or a step. *Known limit:* the first pose is often the same relaxed standing one.
 
@@ -2562,8 +2588,8 @@ The server derives the height move. It refuses a sentence with a number, a unit,
 | Failure | Result (texts: R&S 6.3) |
 |----|----|
 | One candidate | Its slot shows the failure; the others go on. |
-| Every candidate | *Couldn't create poses*, with *Try again*; the photo is kept (FR-4.7). |
-| Every pose of a description `REJECTED` | *Edit description* replaces *Try again*. The service does not say whether it refused the photo or the text (US-5). |
+| Every candidate | *Couldn't create poses*, with *Try again* at the top right and Back to *Generate poses*; the photo is kept (FR-4.7). |
+| Every pose of a description `REJECTED` | No *Try again*; Back changes the description. The service does not say whether it refused the photo or the text (US-5). |
 | Every pose `NO_PERSON` | *Shoot again* replaces *Try again*. |
 | Suggestions, over 8 s | The default poses fill in. |
 | Variations, over 10 s | The description fills in. |
@@ -2604,21 +2630,21 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The subject's paused video says "Dongje is describing a pose…", "Dongje is creating poses…", "Dongje is picking a pose…", or "Dongje is checking the guide…".
   - The first request to reach the photographer's phone decides (AD-7). One unanswered for 5 s says "Couldn't send your request", "Couldn't send your pick", or "Couldn't send your choice".
   - Each subject screen follows the session itself. The shared screens say "… sees this too".
-- **Generate poses on both phones.** `DescriptionShare` reports the opening at *Use this photo*, *Try other poses*, or *Edit description* (scene photo, text, refusal), each change of text and `descriptionWriter`, and the end, `STARTED` or `CLOSED`. The scene copy (`PoseCandidateCodec`) follows the first message.
+- **Generate poses on both phones.** `DescriptionShare` reports the opening at *Use* on the scene photo, or at Back from *Pick a pose*, *Generating poses*, or *Couldn't create poses* (scene photo, text, refusal), each change of text and `descriptionWriter`, and the end, `STARTED` or `CLOSED`. The scene copy (`PoseCandidateCodec`) follows the first message.
   - One field at a time holds the description, from a tap until Done, the keyboard closing, a button, or leaving (`DescriptionForm`). The subject's `pose.description.edit` gets it only while the photographer's field is free.
   - The other phone waits and shows "Joonhyung is typing…" or "Dongje is typing…". A subject's chip sends its text at once.
   - `pose.description.go` starts the set with the subject's text, or the photographer's when nobody held the field. It is refused while the photographer's field holds it.
-  - A drop frees the subject's field (`DescriptionRequest.Gone`). The photographer's *Cancel* closes the subject's screen with "Dongje closed Generate poses". The subject's *Cancel* closes only its own.
+  - A drop frees the subject's field (`DescriptionRequest.Gone`). The photographer's Back closes the subject's screen with "Dongje closed Generate poses". The subject's Back closes only its own.
   - Subject view shows a description only while it holds no set or confirm.
   - `STARTED` carries the text and `setId`. The subject records the text once that set has a candidate or is `PICKING` (2.6.3, Prompt history).
 - **Pick a pose on both phones.** `PoseShare` reports `GENERATING`, the planned slots and failed candidates (Iter3-A13), each candidate, `PICKING` in pager order, and `CHOSEN` or `CLOSED`.
-  - Copies go as JPEG ≤ 1024 px, one at a time. `PICKING` without a copy on the subject's phone opens no *Pick a pose* there. Through a drop the subject keeps *Pick a pose*, with *Use this pose* waiting.
+  - Copies go as JPEG ≤ 1024 px, one at a time. `PICKING` without a copy on the subject's phone opens no *Pick a pose* there. Through a drop the subject keeps *Pick a pose*, with *Select* waiting.
   - Swipes and the ♥ stay on each phone (2.6.3, *Saving a pose*).
   - The subject's `pose.pick` counts only while the set is `PICKING` and unchosen. `PickPoseFragment` then uses that candidate and tip (FR-4.10) and says "Joonhyung chose this pose".
   - The end closes the subject's screen with "Dongje chose a pose" or "Dongje closed the poses", unless the subject chose.
-- **Generating poses on both phones (Iter3-A13, [#180]).** `SubjectGeneratingFragment` shows the photographer's slots and failures in order (`pose.planned`, `pose.candidate.failed`). Before them it says "Choosing poses…" or "Creating…", from `DescriptionSyncer.startedScene`. It has *Back*, not *Cancel*; after *Back*, Subject view's button opens it again. With copies, `PICKING` leads on to *Pick a pose*. Otherwise the end returns to Subject view with "Dongje stopped creating poses" or "Dongje's poses couldn't be created".
+- **Generating poses on both phones (Iter3-A13, [#180]).** `SubjectGeneratingFragment` shows the photographer's slots and failures in order (`pose.planned`, `pose.candidate.failed`). Before them it says "Choosing poses…" or "Creating…", from `DescriptionSyncer.startedScene`. Its Back returns to Subject view, whose button opens it again; the set goes on. With copies, `PICKING` leads on to *Pick a pose*. Otherwise the end returns to Subject view with "Dongje stopped creating poses" or "Dongje's poses couldn't be created".
 - **Reference confirm on both phones.** The chosen pose's *Reference confirm* also shows on the subject's *Your reference*. Only the photographer's phone segments the person (FR-4.6).
-  - `ConfirmShare` reports `FINDING`, `READY` with the outline's mask (`GuideImageCodec`), `FINDING` again for *Choose another photo*, and `USED` or `CLOSED`. A confirm from *Add a pose guide* is not shared. A set the subject still holds as `PICKING` shows first.
+  - `ConfirmShare` reports `FINDING`, `READY` with the outline's mask (`GuideImageCodec`), and `USED` or `CLOSED`. A confirm from *Add a pose guide* is not shared. A set the subject still holds as `PICKING` shows first.
   - The subject's `guide.confirm.use` counts only while that outline shows. `ReferenceViewModel` then sets the guide with its tip (FR-4.10) and says "Joonhyung used this guide". The guide reaches the subject like any guide.
   - The end closes *Your reference* with "Dongje used this guide" or "Dongje closed the reference", unless the subject used it.
 - **Save guide on Subject view (FR-6.16, [#120]).** It saves the mirror guide like Camera's (FR-3.8, `SavedGuideStore`, 2.8): mask, reference copy, `anchor`, `source`, and state. The shared guide id keeps one copy per phone. It toggles like Camera's (`toggleSaved`, 2.6.2), with a label (2.8). The subject reuses it from *Add a pose guide*.

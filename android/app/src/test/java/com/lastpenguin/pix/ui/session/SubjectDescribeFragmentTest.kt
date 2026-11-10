@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -239,7 +239,7 @@ class SubjectDescribeFragmentTest {
         launch()
 
         onScreen { binding ->
-            assertEquals(string(R.string.generate_four_from_description), binding.generateButton.text.toString())
+            assertEquals(string(R.string.generate_from_description), binding.generateButton.text.toString())
             binding.generateButton.performClick()
         }
         idle()
@@ -260,7 +260,7 @@ class SubjectDescribeFragmentTest {
 
         onScreen { binding ->
             binding.clearDescriptionButton.performClick()
-            assertEquals(string(R.string.suggest_four_poses), binding.generateButton.text.toString())
+            assertEquals(string(R.string.suggest_poses), binding.generateButton.text.toString())
             binding.generateButton.performClick()
         }
         idle()

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -7,11 +7,13 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
@@ -20,6 +22,7 @@ import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -37,13 +40,18 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectFragment
 import java.time.Duration
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -64,6 +72,8 @@ import org.robolectric.annotation.GraphicsMode
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
  * The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
+ * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
+ * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -138,6 +148,70 @@ class CameraLayoutTest {
         val density = resources.displayMetrics.density
         fun dp(px: Number) = (px.toFloat() / density).roundToInt()
         return Rect(dp(at[0]), dp(at[1]), dp(at[0] + width), dp(at[1] + height))
+    }
+
+    // ---- The scene photo's review ----------------------------------------------------------------
+
+    /** The scene photo step's review of a [width] x [height] px photo. */
+    private fun Camera.reviewing(width: Int, height: Int) {
+        (modules.camera as FakeCameraController).frame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val generation = activity.viewModel<GenerationViewModel>()
+        generation.beginScene()
+        idle()
+        generation.takeScene()
+        idle()
+    }
+
+    /** Where [this] draws its picture on the screen, in dp. */
+    private fun ImageView.pictureBox(): Rect {
+        val at = IntArray(2)
+        getLocationInWindow(at)
+        val drawn = RectF(drawable.bounds).also(imageMatrix::mapRect)
+        val density = resources.displayMetrics.density
+        fun dp(px: Float) = (px / density).roundToInt()
+        return Rect(
+            dp(at[0] + paddingLeft + drawn.left),
+            dp(at[1] + paddingTop + drawn.top),
+            dp(at[0] + paddingLeft + drawn.right),
+            dp(at[1] + paddingTop + drawn.bottom),
+        )
+    }
+
+    @Test
+    fun scenePhotoReview_thePhotoInTheMiddleUnderTheBar_itsMessageUnderIt_andUseAtTheTopRight() {
+        val screen = camera()
+        screen.reviewing(300, 400)
+
+        val photo = screen.controls.sceneStill.pictureBox()
+        assertEquals(360, photo.width())
+        assertEquals(480, photo.height())
+        // As much room above, under the 48 dp bar, as below, to the screen's bottom at 705 dp.
+        assertTrue("$photo", abs((photo.top - 48) - (705 - photo.bottom)) <= 1)
+        val message = screen.controls.sceneMessage
+        assertTrue("${message.box()} under $photo", abs(message.box().top - (photo.bottom + 12)) <= 1)
+        assertNull(message.background)
+
+        // Use draws 40 dp in the middle of the 48 dp bar, its right edge 20 dp from the screen's.
+        val use = screen.controls.usePhotoButton as MaterialButton
+        val box = use.box()
+        val density = use.resources.displayMetrics.density
+        val drawnTop = box.top + (use.insetTop / density).roundToInt()
+        val drawnBottom = box.bottom - (use.insetBottom / density).roundToInt()
+        assertEquals(340, box.right)
+        assertEquals(40, drawnBottom - drawnTop)
+        assertEquals(24, (drawnTop + drawnBottom) / 2)
+    }
+
+    @Test
+    fun scenePhotoReview_aPhotoThatLeavesNoRoom_hasItsMessageOverItsBottom_onGlass() {
+        val screen = camera()
+        screen.reviewing(288, 512)
+
+        val photo = screen.controls.sceneStill.pictureBox()
+        val message = screen.controls.sceneMessage
+        assertTrue("${message.box()} over $photo", message.box().top < photo.bottom)
+        assertTrue("${message.box()} 20 dp above the bottom", message.box().bottom <= 705 - 20)
+        assertNotNull(message.background)
     }
 
     // ---- Ratios -----------------------------------------------------------------------------

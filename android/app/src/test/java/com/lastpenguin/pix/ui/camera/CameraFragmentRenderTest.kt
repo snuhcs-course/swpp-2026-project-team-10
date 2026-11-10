@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-09, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -38,6 +38,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,7 +50,9 @@ import org.robolectric.annotation.GraphicsMode
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
  * camera status STARTING, READY; a guide added, hidden, removed by the shutter's end of edit mode; a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
- * scene photo step framing and reviewing, its review while the phone looks for a person and without one (FR-4.13), and
+ * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
+ * to framing) and Use at the top right of the review (#199), its review while the phone looks for a person and without
+ * one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
  * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, while the
  * scene photo is framed, and in a session (FR-1.14).
@@ -379,6 +382,8 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.sceneTitle.visibility)
             assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
+            assertEquals(View.VISIBLE, controls.sceneBackButton.visibility)
+            assertEquals(View.GONE, controls.usePhotoButton.visibility)
             // The flash button stays, as the light for the scene photo; the ratio and brightness go.
             assertEquals(View.VISIBLE, controls.flashButton.visibility)
             assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
@@ -398,27 +403,36 @@ class CameraFragmentRenderTest {
 
         onScreen { controls, _ ->
             assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
-            assertEquals(string(R.string.scene_review_body), controls.hintText.text.toString())
-            assertEquals(View.VISIBLE, controls.hintText.visibility)
-            assertEquals(View.VISIBLE, controls.sceneStill.visibility)
-            assertEquals(View.VISIBLE, controls.sceneReviewControls.visibility)
-            assertEquals(View.GONE, controls.captureControls.visibility)
+            // What is sent is said under the photo, not over the camera's image.
+            assertEquals(string(R.string.scene_review_body), controls.sceneMessage.text.toString())
+            assertEquals(View.VISIBLE, controls.sceneMessage.visibility)
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            assertEquals(View.VISIBLE, controls.sceneReview.visibility)
+            assertNotNull(controls.sceneStill.drawable)
+            assertEquals(View.VISIBLE, controls.usePhotoButton.visibility)
+            assertTrue(controls.usePhotoButton.isEnabled)
+            assertEquals(View.VISIBLE, controls.sceneBackButton.visibility)
+            assertEquals(View.INVISIBLE, controls.captureControls.visibility)
             assertEquals(View.INVISIBLE, controls.zoomReadout.visibility)
             assertEquals(View.GONE, controls.captureStatus.visibility)
             assertEquals(View.GONE, controls.cameraSettings.visibility)
-            controls.shootAgainButton.performClick()
+            // Back on the review shoots again.
+            controls.sceneBackButton.performClick()
         }
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(View.GONE, controls.sceneStill.visibility)
+            assertEquals(View.GONE, controls.sceneReview.visibility)
+            assertEquals(View.GONE, controls.usePhotoButton.visibility)
             assertEquals(View.VISIBLE, controls.captureControls.visibility)
-            controls.sceneCancelButton.performClick()
+            // Back while framing leaves the step.
+            controls.sceneBackButton.performClick()
         }
         idle()
 
         onScreen { controls, _ ->
             assertEquals(View.GONE, controls.sceneTitle.visibility)
+            assertEquals(View.GONE, controls.sceneBackButton.visibility)
             assertEquals(View.VISIBLE, controls.guideOverlay.visibility)
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
             assertEquals(View.VISIBLE, controls.cameraSettings.visibility)
@@ -436,14 +450,14 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
 
-        // The phone found no one (FR-4.13): only Shoot again helps.
+        // The phone found no one (FR-4.13): only Back, which shoots again, helps.
         onScreen { controls, _ ->
             assertEquals(string(R.string.scene_no_person_title), controls.sceneTitle.text.toString())
-            assertEquals(string(R.string.scene_no_person_body), controls.hintText.text.toString())
-            assertEquals(View.VISIBLE, controls.sceneStill.visibility)
+            assertEquals(string(R.string.scene_no_person_body), controls.sceneMessage.text.toString())
+            assertEquals(View.VISIBLE, controls.sceneReview.visibility)
             assertFalse(controls.usePhotoButton.isEnabled)
-            assertTrue(controls.shootAgainButton.isEnabled)
-            controls.shootAgainButton.performClick()
+            assertTrue(controls.sceneBackButton.isEnabled)
+            controls.sceneBackButton.performClick()
         }
         idle()
 
@@ -452,7 +466,7 @@ class CameraFragmentRenderTest {
         idle()
         onScreen { controls, _ ->
             assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
-            assertEquals(string(R.string.scene_review_body), controls.hintText.text.toString())
+            assertEquals(string(R.string.scene_review_body), controls.sceneMessage.text.toString())
             assertTrue(controls.usePhotoButton.isEnabled)
         }
         assertEquals(2, modules.persons.checked.size)

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Reference confirm (R&S 6.2), and the subject's Your reference (R&S 6.6). -->
+<!-- Reference confirm (R&S 6.2), and the subject's Your reference (R&S 6.6): Back at the top left, Use at the top
+     right (#199). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -21,30 +22,24 @@
             style="@style/Widget.Pix.Header.Back"
             android:contentDescription="@string/back" />
 
-        <LinearLayout
-            android:layout_width="wrap_content"
+        <TextView
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:orientation="vertical">
+            android:layout_marginEnd="12dp"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/reference_title"
+            android:textAppearance="@style/TextAppearance.Pix.Header" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:accessibilityHeading="true"
-                android:text="@string/reference_title"
-                android:textAppearance="@style/TextAppearance.Pix.Header" />
-
-            <!-- "Joonhyung chose this pose" when the subject's pick brought the candidate here (FR-6.15). -->
-            <TextView
-                android:id="@+id/chosenByText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
-                android:visibility="gone"
-                tools:text="Joonhyung chose this pose"
-                tools:visibility="visible" />
-        </LinearLayout>
+        <!-- Puts the guide on the camera, once the person is found. -->
+        <Button
+            android:id="@+id/useGuideButton"
+            style="@style/Widget.Pix.Button.Header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:enabled="false"
+            android:text="@string/use" />
     </LinearLayout>
 
     <!-- The outline over a neutral background (FR-2.3). Dark, so the light stroke stands out as it does on the camera. -->
@@ -88,7 +83,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|start"
-                android:layout_margin="14dp"
+                android:layout_margin="12dp"
                 android:orientation="vertical">
 
                 <!-- "Finding the person…" or "Person found". -->
@@ -103,11 +98,21 @@
                     tools:drawableStartCompat="@drawable/ic_person_check_small"
                     tools:visibility="visible" />
 
+                <!-- "Joonhyung chose this pose" when the subject's pick brought the candidate here (FR-6.15). -->
+                <TextView
+                    android:id="@+id/chosenByText"
+                    style="@style/Widget.Pix.Chip"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/pix_text"
+                    android:visibility="gone"
+                    tools:text="Joonhyung chose this pose"
+                    tools:visibility="visible" />
+
                 <!-- Only for a screenshot cut to its photo (FR-2.10). -->
                 <TextView
                     android:id="@+id/cutChip"
                     style="@style/Widget.Pix.Chip"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="8dp"
                     android:text="@string/cut_from_screenshot"
                     android:textColor="@color/pix_text"
                     android:visibility="gone"
@@ -118,7 +123,7 @@
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- In a session: the other phone shows this outline too, and the first Use this guide decides (FR-6.15). -->
+    <!-- In a session: the other phone shows this outline too, and the first Use decides (FR-6.15). -->
     <TextView
         android:id="@+id/sharedHint"
         android:layout_width="match_parent"
@@ -140,20 +145,4 @@
         android:text="@string/use_whole_image"
         android:visibility="gone"
         tools:visibility="visible" />
-
-    <Button
-        android:id="@+id/useGuideButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:enabled="false"
-        android:text="@string/use_this_guide" />
-
-    <Button
-        android:id="@+id/chooseAnotherButton"
-        style="@style/Widget.Pix.Button.Secondary"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="@string/choose_another_photo" />
 </LinearLayout>

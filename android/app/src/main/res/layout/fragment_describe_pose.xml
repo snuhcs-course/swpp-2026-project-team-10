@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generate poses (R&S 6.3, FR-4.8): what to pose, asked before anything is sent. -->
+<!-- Generate poses (R&S 6.3, FR-4.8), and the subject's (R&S 6.6): what to pose, asked before anything is sent. Back
+     at the top left, the one button at the top right (#199). -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -21,29 +22,41 @@
             android:gravity="center_vertical"
             android:minHeight="56dp">
 
-            <!-- Cancel (R&S 6.3): back to the camera, discarding the scene photo. -->
+            <!-- Back to the scene photo's review (#199). -->
             <ImageButton
-                android:id="@+id/cancelButton"
+                android:id="@+id/backButton"
                 style="@style/Widget.Pix.Header.Back"
-                android:contentDescription="@string/cancel" />
+                android:contentDescription="@string/back" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
+                android:layout_marginEnd="12dp"
+                android:layout_weight="1"
                 android:accessibilityHeading="true"
                 android:text="@string/describe_title"
                 android:textAppearance="@style/TextAppearance.Pix.Header" />
+
+            <!-- The one button (Iter3-A13): Suggest with an empty field, Generate with a description, Regenerate with
+                 the text of the set kept behind this screen (FR-4.4, FR-4.8, US-5, #199). DescriptionForm sets its
+                 label as the field changes. -->
+            <Button
+                android:id="@+id/generateButton"
+                style="@style/Widget.Pix.Button.Header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/suggest_poses" />
         </LinearLayout>
 
         <!-- The scene photo the poses are made from. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:background="@drawable/bg_info_card"
             android:gravity="center_vertical"
-            android:padding="10dp">
+            android:padding="12dp">
 
             <!-- 72 dp high and as wide as the photo's shape (showScene): 54 dp for 3:4, 9:16 narrower, 1:1 square. -->
             <com.google.android.material.imageview.ShapeableImageView
@@ -81,7 +94,7 @@
             android:id="@+id/descriptionLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="24dp"
             android:text="@string/describe_label"
             android:textAppearance="@style/TextAppearance.Pix.Action.Small"
             android:textColor="@color/pix_text" />
@@ -106,7 +119,7 @@
                 android:maxLength="100"
                 android:paddingEnd="48dp" />
 
-            <!-- ✕ empties the field while it holds text and is not waiting (Iter3-A13), so the one button below asks for
+            <!-- ✕ empties the field while it holds text and is not waiting (Iter3-A13), so the one button asks for
                  suggested poses again; on the first line, in a 48 dp touch area. -->
             <ImageButton
                 android:id="@+id/clearDescriptionButton"
@@ -128,7 +141,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:gravity="end">
 
             <!-- Shown after the service refused every pose of the description, for the photo or the text; the text is kept (US-5). -->
@@ -253,21 +266,23 @@
             android:id="@+id/sharedHint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
             android:gravity="center"
             android:textAppearance="@style/TextAppearance.Pix.Body.Small"
             android:visibility="gone"
-            tools:text="Joonhyung sees this too and can write it with you."
+            tools:text="Joonhyung sees this too"
             tools:visibility="visible" />
 
-        <!-- The one button (Iter3-A13): with an empty field it asks for suggested poses, and says so; with a
-             description, four poses of it (FR-4.4, FR-4.8, US-5). DescriptionForm sets its label as the field changes. -->
+        <!-- Pick a pose again with the set that Back from it kept behind this screen; nothing is sent (#199). -->
         <Button
-            android:id="@+id/generateButton"
+            android:id="@+id/seeLastPosesButton"
+            style="@style/Widget.Pix.Button.Secondary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/suggest_four_poses"
-            app:icon="@drawable/ic_sparkle"
-            app:iconSize="18dp" />
+            android:layout_marginTop="12dp"
+            android:text="@string/see_last_poses"
+            android:visibility="gone"
+            app:icon="@drawable/ic_grid"
+            app:iconSize="18dp"
+            tools:visibility="visible" />
     </LinearLayout>
 </ScrollView>

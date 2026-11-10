@@ -24,15 +24,33 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <!-- Back during the scene photo for poses (R&S 6.3, #199): from the live camera to the camera as it was, from the
+             photo's review to the live camera again. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sceneBackButton"
+            style="@style/Widget.Pix.Button.Icon.TopBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/back"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:visibility="gone"
+            app:icon="@drawable/ic_arrow_back"
+            app:iconSize="24dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:visibility="visible" />
+
         <!-- Flash (FR-1.12), whose tap moves to the next choice, and the aspect ratio (FR-1.13), whose tap opens the
-             ratios under the bar. -->
+             ratios under the bar. During the scene photo, the flash keeps the light on, beside Back. -->
         <LinearLayout
             android:id="@+id/cameraSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@id/sceneBackButton"
             app:layout_constraintTop_toTopOf="parent">
 
             <com.google.android.material.button.MaterialButton
@@ -124,13 +142,17 @@
                 android:visibility="gone"
                 tools:visibility="visible" />
 
+            <!-- The scene photo's review (R&S 6.3, #199): Generate poses opens, once a person is found (FR-4.13). Its
+                 right edge 20 dp from the screen's, like every screen's action at the top right. -->
             <Button
-                android:id="@+id/sceneCancelButton"
-                style="@style/Widget.Pix.Button.Glass"
+                android:id="@+id/usePhotoButton"
+                style="@style/Widget.Pix.Button.Header.Camera"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/cancel"
-                android:visibility="gone" />
+                android:layout_marginEnd="10dp"
+                android:text="@string/use"
+                android:visibility="gone"
+                tools:visibility="visible" />
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -283,16 +305,6 @@
             android:layout_gravity="center"
             android:contentDescription="@string/starting_camera"
             android:indeterminateTint="@color/pix_accent" />
-
-        <!-- The scene photo that was taken, over the camera, until it is used or shot again (R&S 6.3). -->
-        <ImageView
-            android:id="@+id/sceneStill"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/pix_ground"
-            android:contentDescription="@string/scene_photo_description"
-            android:scaleType="fitCenter"
-            android:visibility="gone" />
 
         <!-- The guide's reference photo in a corner (FR-3.9). A tap enlarges it to half the preview's width, under the
              chips, and hides the hint; another tap makes it small again. A drag drops it into the nearest corner,
@@ -667,13 +679,15 @@
         app:layout_constraintStart_toStartOf="parent">
 
         <!-- Guide, shutter, and the last photo, in thirds and on one center line; the Guide label hangs below. The
-             shutter keeps its size and place whatever the ratio (R&S 6.2). -->
+             shutter keeps its size and place whatever the ratio (R&S 6.2). The panel around it gives the preview's
+             place its height (previewArea), so it stays even with this row alone in it. -->
         <LinearLayout
             android:id="@+id/captureControls"
             android:layout_width="match_parent"
             android:layout_height="88dp"
             android:baselineAligned="false"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            tools:ignore="UselessParent">
 
             <FrameLayout
                 android:layout_width="0dp"
@@ -802,30 +816,44 @@
             </FrameLayout>
         </LinearLayout>
 
-        <!-- Replaces the row above while the scene photo is confirmed (R&S 6.3). -->
-        <LinearLayout
-            android:id="@+id/sceneReviewControls"
-            android:layout_width="match_parent"
-            android:layout_height="88dp"
-            android:gravity="center_vertical"
-            android:visibility="gone"
-            tools:ignore="ButtonStyle">
-
-            <Button
-                android:id="@+id/shootAgainButton"
-                style="@style/Widget.Pix.Button.Secondary"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/shoot_again" />
-
-            <Button
-                android:id="@+id/usePhotoButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:text="@string/use_this_photo" />
-        </LinearLayout>
     </LinearLayout>
+
+    <!-- The scene photo that was taken, over the camera, until it is used or Back shoots again (R&S 6.3, #199): in the
+         middle of the room under the top bar, which the bar's last 4 dp of touch height reach over, and what it is for
+         12 dp under it, or over its bottom when the photo leaves no room (placeSceneMessage). -->
+    <FrameLayout
+        android:id="@+id/sceneReview"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="-4dp"
+        android:background="@color/camera_bar"
+        android:outlineProvider="none"
+        android:translationZ="2dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar">
+
+        <ImageView
+            android:id="@+id/sceneStill"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/scene_photo_description"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:id="@+id/sceneMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginHorizontal="20dp"
+            android:accessibilityLiveRegion="polite"
+            android:drawablePadding="6dp"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            tools:text="@string/scene_review_body" />
+    </FrameLayout>
 </com.lastpenguin.pix.ui.camera.TouchWatchingLayout>

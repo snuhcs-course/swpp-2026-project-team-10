@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shared by the failure screens: what happened, a retry, and a way back (R&S 6.9). -->
+<!-- Shared by the failure screens: what happened, a retry, and a way back (R&S 6.9). The pose and guide failures put
+     them in the top bar, Back at the top left and the retry at the top right (#199); the session's keep the two
+     buttons at the bottom. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -7,13 +9,44 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:paddingHorizontal="20dp"
-    android:paddingTop="20dp"
+    android:paddingTop="8dp"
     android:paddingBottom="20dp">
 
+    <!-- Shown by showFailureTopBar; its action hides when the failure has no retry. -->
+    <LinearLayout
+        android:id="@+id/failureTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="56dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            style="@style/Widget.Pix.Header.Back"
+            android:contentDescription="@string/back" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/topActionButton"
+            style="@style/Widget.Pix.Button.Header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:text="Try again" />
+    </LinearLayout>
+
+    <!-- 12 dp under the screen's top padding, and 8 dp under the top bar (showFailureTopBar). -->
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/failureCard"
         style="@style/Widget.Pix.Card"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginTop="12dp"
         android:layout_weight="1">
 
         <FrameLayout
@@ -38,7 +71,7 @@
                 <TextView
                     style="@style/Widget.Pix.Chip"
                     android:layout_gravity="top|start"
-                    android:layout_margin="14dp"
+                    android:layout_margin="12dp"
                     android:text="@string/your_photo" />
             </FrameLayout>
 
@@ -48,7 +81,7 @@
                 android:layout_gravity="center"
                 android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:padding="28dp">
+                android:padding="24dp">
 
                 <ImageView
                     android:id="@+id/failureIcon"
@@ -64,7 +97,7 @@
                     android:id="@+id/failureTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
+                    android:layout_marginTop="24dp"
                     android:accessibilityHeading="true"
                     android:gravity="center"
                     android:textAppearance="@style/TextAppearance.Pix.Title"
@@ -89,13 +122,13 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        tools:text="Choose another photo" />
+        tools:text="Invite again" />
 
     <Button
         android:id="@+id/secondaryButton"
         style="@style/Widget.Pix.Button.Secondary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="12dp"
         tools:text="Back to camera" />
 </LinearLayout>

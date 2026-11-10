@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -61,8 +61,8 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
             onForget = viewModel::forget,
         )
         this.form = form
-        // Back and Cancel leave the photographer's description as it is; Subject view opens it again.
-        binding.cancelButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
+        // Back leaves the photographer's description as it is; Subject view opens it again.
+        binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToSubject() }
 
         viewLifecycleOwner.lifecycleScope.launch {

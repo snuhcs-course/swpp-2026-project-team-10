@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -44,17 +44,17 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** The scene photo on Camera, Generate poses, Generating poses, Pick a pose, and Couldn't create poses (R&S 6.3). */
 data class GenerationUiState(
-    /** The photo the user took and confirmed; kept for *Try again* and *Try other poses*. */
+    /** The photo the user took and confirmed; kept for *Try again*, *Regenerate*, and Back to Generate poses. */
     val scene: Bitmap? = null,
     /** The scene photo is a selfie from the front camera: the server makes selfie poses of it (FR-1.14). */
     val selfie: Boolean = false,
-    /** What the set was asked for; *Try again* asks for it again. */
+    /** What the set was asked for; *Try again* and *Regenerate* ask for it again. */
     val request: PoseRequest? = null,
-    /** The description field's text on Generate poses, kept for *Try other poses* and when the service rejects it. */
+    /** The description field's text on Generate poses, kept for Back to it and when the service rejects it. */
     val description: String = "",
     /** The service rejected every pose of the description: Couldn't create poses and Generate poses say so (US-5). */
     val descriptionRejected: Boolean = false,
-    /** The phone is looking for a person in the scene photo (FR-4.13); *Use this photo* waits for it. */
+    /** The phone is looking for a person in the scene photo (FR-4.13); *Use* waits for it. */
     val checkingPerson: Boolean = false,
     /**
      * No one was found in the scene photo, so no pose can be made of it: by the phone, on the photo's review (FR-4.13),
@@ -67,8 +67,7 @@ data class GenerationUiState(
      */
     val descriptionWriter: Role? = null,
     /**
-     * The set, from *Generate 4 poses* or *Suggest 4 poses* on: its poses' ids repeat in every set, so a ♥ names
-     * both (FR-4.14).
+     * The set, from *Generate* or *Suggest* on: its poses' ids repeat in every set, so a ♥ names both (FR-4.14).
      */
     val setId: String? = null,
     /** The poses of the set, once known; one slot each. */
@@ -81,25 +80,32 @@ data class GenerationUiState(
     val shotFailed: Boolean = false,
     /**
      * The phone's light is turned on for the scene photo, a frame of the preview that a photo's flash would not reach
-     * (FR-4.1). It is on only while the scene is framed, and stays chosen for *Shoot again*.
+     * (FR-4.1). It is on only while the scene is framed, and stays chosen when Back on the review shoots again.
      */
     val light: Boolean = false,
     /**
-     * Whose *Use this pose* took a candidate of this set (Design 2.6.5): this phone's, or in a session the subject's,
-     * which Pick a pose then goes on with as with its own. The first one decides; nothing is selected after it.
+     * Whose *Select* took a candidate of this set (Design 2.6.5): this phone's, or in a session the subject's, which
+     * Pick a pose then goes on with as with its own. The first one decides; nothing is selected after it, unless this
+     * phone's Back from Reference confirm opens the set again ([pickAgain]).
      */
     val chosenBy: Role? = null,
 ) {
     /**
      * FRAMING and REVIEWING are the scene photo step on the Camera screen: the live camera, whose shutter takes the
-     * photo, then the photo with *Use this photo* and *Shoot again*. DESCRIBING is Generate poses. Nothing is sent
-     * before GENERATING.
+     * photo, then the photo with *Use*, whose Back shoots again. DESCRIBING is Generate poses. Nothing is sent before
+     * GENERATING.
      */
     enum class Phase { IDLE, FRAMING, REVIEWING, DESCRIBING, GENERATING, PICKING, FAILED }
 
     val readyCount: Int get() = candidates.values.count { it is CandidateEvent.Ready }
 
-    /** The image *Use this pose* sends to Reference confirm. */
+    /**
+     * A set stays behind Generate poses after Back from Pick a pose (#199): *See the last poses* opens it again, and
+     * the screen's button says *Regenerate* while the field asks for the same.
+     */
+    val hasKeptSet: Boolean get() = phase == Phase.DESCRIBING && readyCount > 0
+
+    /** The image *Select* sends to Reference confirm. */
     val selectedImage: Bitmap?
         get() = (candidates[selectedPoseId] as? CandidateEvent.Ready)?.image
 
@@ -115,17 +121,18 @@ data class GenerationUiState(
         }
 }
 
-/** What *Use this pose* hands on to Reference confirm: the candidate, and what its tip is asked from (FR-4.10). */
+/** What *Select* hands on to Reference confirm: the candidate, and what its tip is asked from (FR-4.10). */
 data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
 
 /**
  * Pose generation (Design 2.2, Figure 8). Shared by the Camera screen, for the scene photo, and the four
  * generation screens (activity scope). In a session, Generate poses goes to the subject's phone through
  * [descriptions], where either phone writes the description, one at a time, and starts the set; each set goes to the
- * subject's *Pick a pose* through [share], and the subject's first pick of it counts as a *Use this pose* (Design
- * 2.6.5). Each set made from a description, by either phone, goes into this phone's [history] as the photographer's,
- * with the session's friend from [partner] as the set started, once the server has accepted the description: a set
- * whose first candidate arrives (FR-4.11). A description the server turns down never makes one.
+ * subject's *Pick a pose* through [share], and the subject's first pick of it counts as a *Select* (Design 2.6.5).
+ * Each set made from a description, by either phone, goes into this phone's [history] as the photographer's, with the
+ * session's friend from [partner] as the set started, once the server has accepted the description: a set whose first
+ * candidate arrives (FR-4.11). A description the server turns down never makes one. Back on each screen goes one step
+ * back, and a set left by Back on Pick a pose can stay behind Generate poses (#199).
  * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16; the history Iter3-P24.
  */
 class GenerationViewModel(
@@ -286,14 +293,14 @@ class GenerationViewModel(
             }
             Timings.mark("pose.person", if (found) "found" else "none")
             _uiState.update {
-                // Shoot again or Cancel while the check ran: the photo it looked at is gone.
+                // Back while the check ran: the photo it looked at is gone.
                 if (it.phase != GenerationUiState.Phase.REVIEWING || it.scene !== scene) return@update it
                 it.copy(checkingPerson = false, noPerson = !found)
             }
         }
     }
 
-    /** *Shoot again*: the photo is dropped and the live camera is shown again, with the light as it was. */
+    /** Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was. */
     fun retakeScene() {
         checking?.cancel()
         _uiState.update {
@@ -308,8 +315,8 @@ class GenerationViewModel(
     }
 
     /**
-     * *Use this photo*: Generate poses asks what to pose (FR-4.8). Still nothing is sent. Not before the phone has
-     * found a person in the photo (FR-4.13). Returns whether Generate poses opens.
+     * *Use* on the photo's review: Generate poses asks what to pose (FR-4.8). Still nothing is sent. Not before the
+     * phone has found a person in the photo (FR-4.13). Returns whether Generate poses opens.
      */
     fun useScene(): Boolean {
         val state = _uiState.value
@@ -364,8 +371,8 @@ class GenerationViewModel(
 
     /**
      * The subject's field and buttons on Generate poses (FR-6.15), requests like its others (AD-7): an edit is taken
-     * while this phone's field does not hold the description, and *Generate 4 poses* or *Suggest 4 poses* the same
-     * way, with the subject's text while its field held it.
+     * while this phone's field does not hold the description, and *Generate* or *Suggest* the same way, with the
+     * subject's text while its field held it.
      */
     private fun onSubjectRequest(request: DescriptionRequest) {
         val state = _uiState.value
@@ -421,8 +428,8 @@ class GenerationViewModel(
     }
 
     /**
-     * *Generate 4 poses*: four candidates of the description, or of four suggested poses when it is blank (US-5).
-     * Only from Generate poses.
+     * *Generate*, or *Regenerate* for the kept set's text: candidates of the description, or of four suggested poses
+     * when it is blank (US-5), in place of any kept set. Only from Generate poses.
      */
     fun generate(description: String) {
         val state = _uiState.value
@@ -430,7 +437,7 @@ class GenerationViewModel(
         start(state.scene, state.selfie, PoseRequest.of(description), description)
     }
 
-    /** *Suggest 4 poses*, with the field blank: the server chooses four poses for the scene (FR-4.4). */
+    /** *Suggest*, with the field blank: the server chooses four poses for the scene (FR-4.4). */
     fun suggestPoses() {
         val state = _uiState.value
         if (!state.canStart || state.scene == null) return
@@ -442,13 +449,66 @@ class GenerationViewModel(
         get() = phase == GenerationUiState.Phase.DESCRIBING && descriptionWriter != Role.SUBJECT
 
     /**
-     * *Try other poses* on Pick a pose and *Edit description* on Couldn't create poses: back to Generate poses with
-     * the photo and the text kept and the set discarded; nothing is sent until the user asks again (FR-4.6, US-5).
+     * Back on Pick a pose and on Couldn't create poses: Generate poses with the photo and the text kept; nothing is sent
+     * until the user asks again (FR-4.6, US-5). With [keepSet], the candidates stay behind it for *See the last poses*
+     * (#199); without, the set is discarded. Either way the set ends for the subject's phone.
      */
-    fun describeAgain() {
+    fun describeAgain(keepSet: Boolean = false) {
         val state = _uiState.value
         val ended = state.phase == GenerationUiState.Phase.PICKING || state.phase == GenerationUiState.Phase.FAILED
         if (!ended || state.scene == null) return
+        val keep = keepSet && state.phase == GenerationUiState.Phase.PICKING
+        _uiState.update {
+            if (keep) {
+                it.copy(phase = GenerationUiState.Phase.DESCRIBING, chosenBy = null)
+            } else {
+                it.copy(
+                    phase = GenerationUiState.Phase.DESCRIBING,
+                    poses = emptyList(),
+                    candidates = emptyMap(),
+                    selectedPoseId = null,
+                    chosenBy = null,
+                )
+            }
+        }
+        closeSet()
+        openDescription()
+    }
+
+    /**
+     * *See the last poses* on Generate poses: Pick a pose again with the set Back kept, the pose on screen as it was;
+     * nothing is sent (#199). Returns whether there was a set to show.
+     */
+    fun showLastPoses(): Boolean {
+        val state = _uiState.value
+        if (!state.hasKeptSet || state.descriptionWriter == Role.SUBJECT) return false
+        endDescription(started = false)
+        _uiState.update { it.copy(phase = GenerationUiState.Phase.PICKING, descriptionWriter = null) }
+        return true
+    }
+
+    /**
+     * *Regenerate* on Pick a pose: a new set of the same request with a new seed, in place of this one (#199). Not after
+     * a choice.
+     */
+    fun regenerate() {
+        val state = _uiState.value
+        if (state.phase != GenerationUiState.Phase.PICKING || state.chosenBy != null) return
+        val scene = state.scene ?: return
+        val request = state.request ?: return
+        start(scene, state.selfie, request, state.description)
+    }
+
+    /**
+     * Back on Generating poses: the requests stop and Generate poses shows again with the photo and the text, on the
+     * subject's phone too (#199).
+     */
+    fun stopGenerating() {
+        val state = _uiState.value
+        if (state.phase != GenerationUiState.Phase.GENERATING) return
+        generating?.cancel()
+        generating = null
+        closeSet()
         _uiState.update {
             it.copy(
                 phase = GenerationUiState.Phase.DESCRIBING,
@@ -456,10 +516,39 @@ class GenerationViewModel(
                 candidates = emptyMap(),
                 selectedPoseId = null,
                 chosenBy = null,
+                descriptionRejected = false,
+                noPerson = false,
             )
         }
-        closeSet()
         openDescription()
+    }
+
+    /**
+     * Back on Generate poses: the photo's review on Camera again, which already found a person in it; the text and any
+     * kept set wait for its *Use* (#199). The subject's Generate poses closes.
+     */
+    fun backToReview() {
+        if (_uiState.value.phase != GenerationUiState.Phase.DESCRIBING) return
+        endDescription(started = false)
+        _uiState.update {
+            it.copy(
+                phase = GenerationUiState.Phase.REVIEWING,
+                descriptionWriter = null,
+                checkingPerson = false,
+                noPerson = false,
+            )
+        }
+    }
+
+    /**
+     * Pick a pose shows again after Back on Reference confirm: this phone's choice is undone, so another pose can be
+     * selected (#199). The subject's choice stays, since the subject's phone went on with it.
+     */
+    fun pickAgain() {
+        _uiState.update {
+            val mine = it.phase == GenerationUiState.Phase.PICKING && it.chosenBy == Role.PHOTOGRAPHER
+            if (mine) it.copy(chosenBy = null) else it
+        }
     }
 
     /**
@@ -503,8 +592,9 @@ class GenerationViewModel(
     }
 
     /**
-     * *Cancel* and *Back to camera*: stops the requests and discards the scene and the candidates. Also called once
-     * *Use this pose* has handed the chosen image on, so the other images do not stay in memory.
+     * Back on the scene photo and the end of the pose screens: stops the requests and discards the scene and the
+     * candidates. Also called once the chosen image is on the camera, or handed on in a session, so the other images do
+     * not stay in memory.
      */
     fun cancel() {
         shooting?.cancel()
@@ -528,8 +618,8 @@ class GenerationViewModel(
     }
 
     /**
-     * *Use this pose*: the selected candidate, unless the subject's pick came first (Design 2.6.5), in which case
-     * null, and Pick a pose goes on with the subject's. The set counts as chosen here before Reference confirm opens.
+     * *Select*: the selected candidate, unless the subject's pick came first (Design 2.6.5), in which case null, and
+     * Pick a pose goes on with the subject's. The set counts as chosen here before Reference confirm opens.
      */
     fun usePose(): PoseUse? {
         val state = _uiState.value
@@ -545,7 +635,7 @@ class GenerationViewModel(
         return PoseUse(image, state.tipSource)
     }
 
-    /** The subject's *Use this pose* (FR-6.15): taken only for this set while nobody has chosen (AD-7). */
+    /** The subject's *Select* (FR-6.15): taken only for this set while nobody has chosen (AD-7). */
     private fun onSubjectPick(pick: SubjectPick) {
         val state = _uiState.value
         val open = pick.setId == setId && state.phase == GenerationUiState.Phase.PICKING && state.chosenBy == null

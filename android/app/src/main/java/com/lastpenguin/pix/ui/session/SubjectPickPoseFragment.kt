@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -34,8 +34,8 @@ import com.lastpenguin.pix.ui.generation.showPoseSaveNotice
 import kotlinx.coroutines.launch
 
 /**
- * *Pick a pose* on the subject's phone (R&S 6.6, FR-6.15): the photographer's candidates, as on their phone, without
- * *Try other poses*. The swipe stays on this phone; *Use this pose* asks the photographer's phone, whose first choice
+ * *Pick a pose* on the subject's phone (R&S 6.6, FR-6.15): the photographer's candidates, as on their phone in a
+ * session, without *Regenerate*. The swipe stays on this phone; *Select* asks the photographer's phone, whose first choice
  * decides, and the screen closes when the set ends, saying so when the photographer decided. It covers Subject view,
  * so it follows the session itself, like the guide screens (Design 2.6.5). The ♥ keeps a candidate in this phone's own
  * library (FR-4.14) and sends nothing to the photographer's phone.
@@ -49,10 +49,9 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentPickPoseBinding.bind(view)
-        binding.tryOtherButton.isVisible = false
         val pages = PosePageAdapter(::onHeart)
         binding.setupPosePager(pages, viewModel::select)
-        binding.usePoseButton.setOnClickListener { viewModel.usePose() }
+        binding.selectButton.setOnClickListener { viewModel.usePose() }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         // Back leaves the photographer's set as it is; Subject view's *Pick a pose* opens it again.
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToSubject() }
@@ -106,7 +105,7 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         binding.sharedHint.isVisible = name != null
         if (name != null) binding.sharedHint.text = getString(R.string.shared_hint, name)
         showPages(binding, pages, ui)
-        binding.usePoseButton.isEnabled = ui.selectedPoseId != null && !ui.waiting && !ui.reconnecting
+        binding.selectButton.isEnabled = ui.selectedPoseId != null && !ui.waiting && !ui.reconnecting
     }
 
     private fun showPages(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {

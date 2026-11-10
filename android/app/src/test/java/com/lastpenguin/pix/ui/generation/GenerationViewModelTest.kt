@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -54,6 +54,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -631,6 +632,188 @@ class GenerationViewModelTest {
         val generating = state
         model.describeAgain()
         assertEquals(generating, state)
+    }
+
+    /** Pick a pose of the description "Wave", with pose-1 and pose-2 ready and pose-2 on screen. */
+    private fun TestScope.pickFromWave() {
+        describeAPhoto()
+        model.onDescriptionChanged("Wave")
+        model.generate("Wave")
+        runCurrent()
+        generator.runs.last().run {
+            plan(List(4) { "Wave" })
+            send(ready("pose-1"), ready("pose-2"))
+            finish()
+        }
+        runCurrent()
+        model.select("pose-2")
+    }
+
+    @Test
+    fun backOnPickAPose_keepingTheSet_opensGeneratePosesWithTheSet_andSeeTheLastPosesReturnsToIt() = runTest {
+        pickFromWave()
+        val picking = state
+
+        model.describeAgain(keepSet = true)
+        runCurrent()
+
+        // Generate poses, with the set kept behind it; nothing is sent (#199).
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+        assertEquals("Wave", state.description)
+        assertTrue(state.hasKeptSet)
+        assertEquals(picking.candidates, state.candidates)
+        assertEquals("close ${share.opened.single()}", share.calls.last())
+
+        assertTrue(model.showLastPoses())
+        runCurrent()
+
+        assertEquals(picking.copy(chosenBy = null), state)
+        assertEquals(1, generator.runs.size)
+    }
+
+    @Test
+    fun backOnPickAPose_withoutKeepingTheSet_dropsIt_andSeeTheLastPosesDoesNothing() = runTest {
+        pickFromWave()
+
+        model.describeAgain()
+
+        assertFalse(state.hasKeptSet)
+        assertFalse(model.showLastPoses())
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+    }
+
+    @Test
+    fun theNextSetFromGeneratePoses_replacesTheKeptSet() = runTest {
+        pickFromWave()
+        model.describeAgain(keepSet = true)
+
+        model.generate("Wave")
+
+        assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
+        assertFalse(state.hasKeptSet)
+        assertTrue(state.candidates.isEmpty())
+        assertFalse(model.showLastPoses())
+    }
+
+    @Test
+    fun regenerateOnPickAPose_asksForTheSameRequestAgain_withANewSeed() = runTest {
+        pickFromWave()
+        val scene = state.scene
+
+        model.regenerate()
+        runCurrent()
+
+        assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
+        assertTrue(state.candidates.isEmpty())
+        assertEquals(2, generator.runs.size)
+        assertSame(scene, generator.runs[1].scene)
+        assertEquals(PoseRequest.Described("Wave"), generator.runs[1].request)
+        assertNotEquals(generator.runs[0].seed, generator.runs[1].seed)
+    }
+
+    @Test
+    fun regenerate_worksOnlyOnPickAPose_beforeAChoice() = runTest {
+        describeAPhoto()
+        model.regenerate()
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+
+        pickFromWave()
+        model.usePose()
+        model.regenerate()
+        runCurrent()
+
+        assertEquals(GenerationUiState.Phase.PICKING, state.phase)
+        assertEquals(1, generator.runs.size)
+    }
+
+    @Test
+    fun backOnGeneratingPoses_stopsTheRequests_andReturnsToGeneratePosesWithThePhotoAndTheText() = runTest {
+        describeAPhoto()
+        model.onDescriptionChanged("Wave")
+        model.generate("Wave")
+        runCurrent()
+        val run = generator.runs.single()
+        run.plan(List(4) { "Wave" })
+        run.send(ready("pose-1"))
+        runCurrent()
+        val scene = state.scene
+
+        model.stopGenerating()
+        runCurrent()
+
+        assertTrue(run.cancelled)
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+        assertSame(scene, state.scene)
+        assertEquals("Wave", state.description)
+        assertTrue(state.candidates.isEmpty() && state.poses.isEmpty())
+        assertFalse(state.hasKeptSet)
+        assertEquals("close ${share.opened.single()}", share.calls.last())
+        // The subject's phone shows Generate poses again (Design 2.6.5).
+        assertEquals(2, descriptions.calls.count { it.startsWith("open") })
+    }
+
+    @Test
+    fun stopGenerating_worksOnlyWhileGenerating() = runTest {
+        describeAPhoto()
+        val describing = state
+
+        model.stopGenerating()
+
+        assertEquals(describing, state)
+    }
+
+    @Test
+    fun backOnGeneratePoses_returnsToThePhotosReview_withTheTextKeptForTheNextTime() = runTest {
+        describeAPhoto()
+        model.onDescriptionChanged("Wave")
+        val scene = state.scene
+
+        model.backToReview()
+        runCurrent()
+
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertSame(scene, state.scene)
+        assertFalse(state.checkingPerson || state.noPerson)
+        assertEquals("the subject's Generate poses closes", "closed", descriptions.calls.last())
+        assertTrue(generator.runs.isEmpty())
+
+        assertTrue(model.useScene())
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+        assertEquals("Wave", state.description)
+    }
+
+    @Test
+    fun backToReview_worksOnlyOnGeneratePoses() = runTest {
+        pickFromWave()
+        val picking = state
+
+        model.backToReview()
+
+        assertEquals(picking, state)
+    }
+
+    @Test
+    fun aPoseUsedAndThenLeftOnReferenceConfirm_canBeChosenAgain() = runTest {
+        pickFromWave()
+        model.usePose()
+
+        model.pickAgain()
+
+        assertNull(state.chosenBy)
+        model.select("pose-1")
+        assertEquals("pose-1", state.selectedPoseId)
+        assertNotNull(model.usePose())
+    }
+
+    @Test
+    fun pickAgain_keepsTheSubjectsChoice() = runTest {
+        pickFromWave()
+        share.pick(SubjectPick(share.opened.single(), "pose-1"))
+        runCurrent()
+
+        model.pickAgain()
+
+        assertEquals(Role.SUBJECT, state.chosenBy)
     }
 
     @Test

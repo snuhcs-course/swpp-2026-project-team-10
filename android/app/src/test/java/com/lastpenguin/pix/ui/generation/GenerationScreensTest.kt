@@ -82,7 +82,7 @@ import org.robolectric.shadows.ShadowToast
  * the description, the set gone; Cancel stays); Back on
  * Reference confirm (the set again, another pose selectable); the set let go once this screen leaves the back stack
  * after Select; Regenerate (the same request again, on Generating poses); in a session, the hint that the subject sees
- * the poses too, no Regenerate, Back dropping the set, and the subject's pick that comes first, which opens Reference
+ * the poses too, no Regenerate, Back dropping the set, Select final while the link reconnects, and the subject's pick that comes first, which opens Reference
  * confirm with its candidate, the set let go (Design 2.6.5). The ♥ on Pick a pose (FR-4.14): on the page on screen only, saving the pose as a generated
  * guide (disabled meanwhile, filled in red, "Pose saved"), a filled one removing it, a pose without a person (nothing saved),
  * Use this pose after it (the saved guide goes on, cut out once), and a ♥ still saving when the pose is used (saved
@@ -1032,6 +1032,28 @@ class GenerationScreensTest {
             // A new set would go to the subject's phone too: Regenerate is for this phone alone.
             assertEquals(View.GONE, binding.regenerateButton.visibility)
         }
+    }
+
+    @Test
+    fun pick_whileTheLinkReconnects_staysASession_noRegenerate_andSelectIsFinal() {
+        val modules = modules()
+        modules.session.setState(SessionState.Reconnecting("s_1", 0L))
+        val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        scenario = s
+        lateinit var activity: FragmentActivity
+        s.onFragment {
+            activity = it.requireActivity()
+            val binding = FragmentPickPoseBinding.bind(it.requireView())
+            // The set is shared with the subject still: a new one would replace theirs.
+            assertEquals(View.GONE, binding.regenerateButton.visibility)
+            binding.selectButton.performClick()
+        }
+        idle()
+
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
+        // The choice is final on both phones: the set is let go, and Pick a pose is not under Reference confirm.
+        assertEquals(GenerationUiState(), activity.viewModel<GenerationViewModel>().uiState.value)
+        assertFalse(nav.currentBackStack.value.any { it.destination.id == R.id.pickPoseFragment })
     }
 
     @Test

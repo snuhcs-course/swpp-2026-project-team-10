@@ -62,7 +62,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         val binding = FragmentPickPoseBinding.bind(view)
         // Back on Reference confirm came back to this set: this phone's choice is undone.
         handedOn = false
-        if (subjectName() == null) viewModel.pickAgain()
+        if (!inSession()) viewModel.pickAgain()
         val pages = PosePageAdapter(::onHeart)
         binding.setupPosePager(pages, viewModel::select)
 
@@ -91,7 +91,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
                         val subject = subjectName(session)
                         binding.sharedHint.isVisible = subject != null
                         if (subject != null) binding.sharedHint.text = getString(R.string.shared_hint, subject)
-                        binding.regenerateButton.isVisible = subject == null
+                        binding.regenerateButton.isVisible = !inSession(session)
                     }
                 }
             }
@@ -109,9 +109,16 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         super.onDestroy()
     }
 
-    /** The connected subject's name while this phone is the photographer; null outside a session. */
+    /** The connected subject's name while this phone is the photographer; null outside a session, or reconnecting. */
     private fun subjectName(session: SessionState = sessionViewModel.state.value): String? =
         (session as? SessionState.Connected)?.takeIf { it.role == Role.PHOTOGRAPHER }?.peer?.displayName
+
+    /**
+     * Whether the set is shared with a subject: connected, or reconnecting, when the subject's name is unknown but the
+     * set is still theirs too. Only the photographer opens this screen, so a link that reconnects is the photographer's.
+     */
+    private fun inSession(session: SessionState = sessionViewModel.state.value): Boolean =
+        subjectName(session) != null || session is SessionState.Reconnecting
 
     /** The ♥ on a candidate (FR-4.14): saves it to this phone's library, or removes it once saved. */
     private fun onHeart(slot: PoseSlot) {
@@ -135,7 +142,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
      */
     private fun goOn(use: PoseUse, chosenBy: String?, saved: ReferenceGuide?) {
         referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, saved)
-        if (subjectName() == null) {
+        if (!inSession()) {
             handedOn = true
             findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
             return

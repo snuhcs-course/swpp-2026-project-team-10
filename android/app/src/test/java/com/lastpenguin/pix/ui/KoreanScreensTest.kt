@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -494,6 +494,36 @@ class KoreanScreensTest {
     @Test
     fun couldntCreatePoses_noPerson_isInKorean() {
         allFailed(GenerationError.NO_PERSON)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun couldntCreatePoses_offline_isInKorean() {
+        allFailed(GenerationError.OFFLINE)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun couldntCreatePoses_timedOut_isInKorean() {
+        allFailed(GenerationError.TIMEOUT)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun couldntCreatePoses_overTheHourlyLimit_isInKorean() {
+        allFailed(GenerationError.RATE_LIMITED)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun couldntCreatePoses_overTheDailyLimit_isInKorean() {
+        allFailed(GenerationError.DAILY_LIMITED)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun couldntCreatePoses_declined_isInKorean() {
+        allFailed(GenerationError.DECLINED)
         assertKorean(screen())
     }
 

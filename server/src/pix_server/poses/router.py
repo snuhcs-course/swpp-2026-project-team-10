@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -50,14 +50,15 @@ class PoseTipResponse(BaseModel):
 
 
 async def count(request: Request, kind: Kind) -> None:
-    """Counts a request that is about to reach a model, or refuses it with 429. Only such requests count, because the
+    """Counts a request that is about to reach a model, or refuses it with 429: `RATE_LIMITED` for this client's window
+    and `DAILY_LIMITED` for everyone's day, which the app tells apart (FR-4.7). Only such requests count, because the
     limits exist to control what the models cost."""
     limiter: PoseLimiter = request.app.state.pose_limiter
     refused = await limiter.refuse(request.client.host if request.client else "", kind)
     if refused == "client":
         raise ApiError(429, "RATE_LIMITED", "Too many pose requests from this device; try again later")
     if refused == "global":
-        raise ApiError(429, "RATE_LIMITED", "Pix has made as many poses as it can for today; try again later")
+        raise ApiError(429, "DAILY_LIMITED", "Pix has made as many poses as it can for today; try again tomorrow")
 
 
 async def judge(request: Request, text: str, field: str = "description") -> None:

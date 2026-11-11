@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -82,7 +82,8 @@ class RemotePoseGenerator(
 
     /**
      * The server's poses for the scene; it answers with its default poses when its model fails, so a failure here is
-     * the connection or the server itself. Throws an [IOException] or an [HttpException].
+     * the connection, a limit, or the server itself. Throws a [GenerationFailedException] that says which, since the
+     * run then ends before any pose (FR-4.7).
      */
     private suspend fun suggest(parts: Parts): List<String> {
         val answer = try {
@@ -91,11 +92,12 @@ class RemotePoseGenerator(
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            Log.w(TAG, "suggestions: ${describe(error)}")
-            throw error
+            val body = errorBody(error)
+            Log.w(TAG, "suggestions: ${describe(error, body)}")
+            throw GenerationFailedException(errorOf(error, body), error)
         }
         val poses = answer.poses.filter { it.isNotBlank() }.take(POSE_COUNT)
-        if (poses.isEmpty()) throw IOException("The server suggested no poses")
+        if (poses.isEmpty()) throw GenerationFailedException(GenerationError.SERVER, IOException("No poses suggested"))
         return poses
     }
 
@@ -154,14 +156,28 @@ class RemotePoseGenerator(
     }
 
     /**
-     * The statuses of Design 2.5.3, and for 422 its code: no person in the scene photo (FR-4.13), or a refused
-     * description. Anything else from the server, such as a rejected photo, is a server error.
+     * The statuses of Design 2.5.3, and their codes: for 429, everyone's day used up or this phone's hour; for 422, no
+     * person in the scene photo (FR-4.13), the image service declining, or a refused description, also without a
+     * readable code. Anything else from the server, such as a rejected photo, is a server error.
      */
     private fun errorOf(error: Exception, body: ApiErrorBody?): GenerationError = when (error) {
         is HttpException -> when (error.code()) {
-            429 -> GenerationError.RATE_LIMITED
-            422 -> if (body?.error?.code == NO_PERSON) GenerationError.NO_PERSON else GenerationError.REJECTED
+            429 -> if (body?.error?.code ==
+                DAILY_LIMITED
+            ) {
+                GenerationError.DAILY_LIMITED
+            } else {
+                GenerationError.RATE_LIMITED
+            }
+
+            422 -> when (body?.error?.code) {
+                NO_PERSON -> GenerationError.NO_PERSON
+                DECLINED -> GenerationError.DECLINED
+                else -> GenerationError.REJECTED
+            }
+
             504 -> GenerationError.TIMEOUT
+
             else -> GenerationError.SERVER
         }
 
@@ -200,6 +216,12 @@ class RemotePoseGenerator(
 
         /** The 422 code of a scene photo in which the server found no one (Design 2.5.3). */
         private const val NO_PERSON = "NO_PERSON"
+
+        /** The 422 code of the image service declining the request, apart from the description filter's REJECTED. */
+        private const val DECLINED = "DECLINED"
+
+        /** The 429 code of everyone's limit for the day, apart from this phone's hourly RATE_LIMITED. */
+        private const val DAILY_LIMITED = "DAILY_LIMITED"
         private val JPEG = "image/jpeg".toMediaType()
         private val TEXT = "text/plain".toMediaType()
         private val errorJson = Json { ignoreUnknownKeys = true }

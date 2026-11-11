@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -550,6 +550,25 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.peer_picking_pose, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.GONE, binding.pickPoseButton.visibility)
         }
+    }
+
+    @Test
+    fun aSetThatFailsWhileSubjectViewIsInFront_saysWhy() {
+        val modules = launch()
+        scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        poseStep(modules, PoseSetStep.GENERATING)
+
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "OFFLINE"))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        // The same reason as on the photographer's phone, though the subject left its Generating poses (#203).
+        assertEquals(
+            string(R.string.peer_poses_failed, "Dongje") + "\n" + string(R.string.generation_offline_message),
+            ShadowToast.getTextOfLatestToast(),
+        )
     }
 
     @Test

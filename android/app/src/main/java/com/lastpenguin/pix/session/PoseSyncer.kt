@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
 import android.util.Log
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.CoroutineDispatcher
@@ -55,8 +56,11 @@ interface PoseShare {
     /** The first *Use this pose*, [by] whom. */
     fun chosen(setId: String, poseId: String, by: Role)
 
-    /** The set ended without a choice: Back, *Try other poses*, *Cancel*, or no candidate. */
-    fun close(setId: String)
+    /**
+     * The set ended without a choice: Back, *Regenerate*, *Cancel*, or no candidate, which says why in [failure], so
+     * the subject's phone says it too (FR-4.7).
+     */
+    fun close(setId: String, failure: GenerationError? = null)
 
     /** For a phone with nothing to share, such as the ViewModel's tests. */
     object None : PoseShare {
@@ -74,7 +78,7 @@ interface PoseShare {
 
         override fun chosen(setId: String, poseId: String, by: Role) = Unit
 
-        override fun close(setId: String) = Unit
+        override fun close(setId: String, failure: GenerationError?) = Unit
     }
 }
 
@@ -112,7 +116,14 @@ data class DescriptionVerdicts(val accepted: Set<String> = emptySet(), val refus
  * How a set the subject knew ended: [step] is CHOSEN, with [by] whose *Use this pose* it was, or CLOSED. [wasPicking]
  * says whether the subject's *Pick a pose* had the set, so whether a notice is worth showing.
  */
-data class PoseSetEnd(val setId: String, val step: PoseSetStep, val by: Role?, val wasPicking: Boolean)
+data class PoseSetEnd(
+    val setId: String,
+    val step: PoseSetStep,
+    val by: Role?,
+    val wasPicking: Boolean,
+    /** Why a CLOSED set failed (FR-4.7); null when the photographer closed it, or did not say. */
+    val failure: GenerationError? = null,
+)
 
 /**
  * Shows the photographer's candidates on the subject's *Pick a pose* (Design 2.5.1: pose.step, pose.candidate.*,
@@ -153,6 +164,8 @@ class PoseSyncer(
         val failed: List<String> = emptyList(),
         /** Of [failed], those whose failure was the service refusing the set's description itself (FR-4.11). */
         val refusals: Set<String> = emptySet(),
+        /** Why a CLOSED set failed, which its end says (FR-4.7). */
+        val failure: GenerationError? = null,
     ) {
         val open: Boolean get() = step == PoseSetStep.GENERATING || step == PoseSetStep.PICKING
     }
@@ -215,9 +228,13 @@ class PoseSyncer(
         }
     }
 
-    override fun close(setId: String) {
+    override fun close(setId: String, failure: GenerationError?) {
         shared.update { set ->
-            if (set?.setId == setId && set.open) set.copy(step = PoseSetStep.CLOSED, candidates = emptyList()) else set
+            if (set?.setId == setId && set.open) {
+                set.copy(step = PoseSetStep.CLOSED, candidates = emptyList(), failure = failure)
+            } else {
+                set
+            }
         }
     }
 
@@ -259,7 +276,15 @@ class PoseSyncer(
                     // set it holds or has nothing to drop.
                     val step = if (set.open) PoseSetStep.GENERATING else set.step
                     if (!set.open) sendFailures(set)
-                    send(SessionMessage.PoseStep(set.setId, step, poseId = set.chosen, by = set.by))
+                    send(
+                        SessionMessage.PoseStep(
+                            set.setId,
+                            step,
+                            poseId = set.chosen,
+                            by = set.by,
+                            failure = set.failure?.name,
+                        ),
+                    )
                     sentStep = step
                 }
                 // The slots and the failures before the copies, which take a while to encode, so the subject's
@@ -291,7 +316,15 @@ class PoseSyncer(
                     }
 
                     PoseSetStep.CHOSEN, PoseSetStep.CLOSED -> if (!ended) {
-                        send(SessionMessage.PoseStep(set.setId, set.step, poseId = set.chosen, by = set.by))
+                        send(
+                            SessionMessage.PoseStep(
+                                set.setId,
+                                set.step,
+                                poseId = set.chosen,
+                                by = set.by,
+                                failure = set.failure?.name,
+                            ),
+                        )
                         sentStep = set.step
                     }
                 }
@@ -466,7 +499,13 @@ class PoseSyncer(
                     answer(message.setId)
                     _mirror.value = null
                     endings.trySend(
-                        PoseSetEnd(message.setId, message.step, message.by, current.step == PoseSetStep.PICKING),
+                        PoseSetEnd(
+                            message.setId,
+                            message.step,
+                            message.by,
+                            current.step == PoseSetStep.PICKING,
+                            failureNamed(message.failure),
+                        ),
                     )
                 }
 
@@ -480,6 +519,10 @@ class PoseSyncer(
         }
         Timings.mark("pose.applied", "${message.step.name.lowercase()} ${message.setId}")
     }
+
+    /** A failure as `pose.step` names it: null for none, and a server error for a name this phone does not know. */
+    private fun failureNamed(name: String?): GenerationError? =
+        name?.let { GenerationError.entries.firstOrNull { error -> error.name == it } ?: GenerationError.SERVER }
 
     /** The server accepted the description of [setId]: a candidate of it arrived, or the photographer picks from it. */
     private fun accept(setId: String) {

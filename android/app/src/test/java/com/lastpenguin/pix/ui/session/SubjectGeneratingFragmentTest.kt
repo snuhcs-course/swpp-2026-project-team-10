@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.BitmapDrawable
@@ -48,7 +48,8 @@ import org.robolectric.shadows.ShadowToast
  * "Choosing poses…" for suggested poses and "Creating…" for a description; a photographer of before Iter3-A13, whose
  * copies fill in as they arrive; the set's Pick a pose with copies here (on to the subject's Pick a pose, in this
  * screen's place) and without any (back to Subject view); the set's end (back, with a notice that the photographer
- * stopped, or that every pose failed); Back (Subject view, nothing sent); the session ending (back).
+ * stopped, that every pose failed, or, from a photographer that says why, the reason as on its phone, #203); Back
+ * (Subject view, nothing sent); the session ending (back).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -219,6 +220,22 @@ class SubjectGeneratingFragmentTest {
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
         assertEquals(string(R.string.peer_poses_failed, "Dongje"), ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun aSetThatFailed_goesBack_sayingWhy_asThePhotographersPhoneDoes() {
+        val modules = generating()
+        val nav = launch()
+
+        // As suggestions that reached the day's limit end a set before any slot (#203).
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "DAILY_LIMITED"))
+        idle()
+
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        assertEquals(
+            string(R.string.peer_poses_failed, "Dongje") + "\n" + string(R.string.generation_daily_limit_message),
+            ShadowToast.getTextOfLatestToast(),
+        )
     }
 
     @Test

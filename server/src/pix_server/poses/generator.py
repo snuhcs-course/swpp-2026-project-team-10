@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 """One pose candidate per call through OpenRouter's Image API."""
 
 import asyncio
@@ -107,9 +107,10 @@ class PoseGenerator:
             raise ApiError(502, "UPSTREAM_ERROR", "The image service could not be reached") from exc
 
         if response.status_code == 403:
-            # OpenRouter's status for a content filter or a model refusal.
+            # OpenRouter's status for a content filter or a model refusal: `DECLINED`, apart from the description
+            # filter's `REJECTED`, so the app can say which refused (FR-4.7).
             logger.warning("OpenRouter declined a pose request")
-            raise ApiError(422, "REJECTED", "The image service declined this request")
+            raise ApiError(422, "DECLINED", "The image service declined this request")
         try:
             body = response.json()
             if response.status_code != 200 or "error" in body:

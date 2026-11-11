@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -12,6 +12,7 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.GenerationEvent
+import com.lastpenguin.pix.generation.GenerationFailedException
 import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
@@ -54,6 +55,8 @@ data class GenerationUiState(
     val description: String = "",
     /** The service rejected every pose of the description: Couldn't create poses and Generate poses say so (US-5). */
     val descriptionRejected: Boolean = false,
+    /** Why the set failed, which Couldn't create poses says (FR-4.7); null unless the phase is FAILED. */
+    val failure: GenerationError? = null,
     /** The phone is looking for a person in the scene photo (FR-4.13); *Use* waits for it. */
     val checkingPerson: Boolean = false,
     /**
@@ -465,6 +468,7 @@ class GenerationViewModel(
                 candidates = emptyMap(),
                 selectedPoseId = null,
                 chosenBy = null,
+                failure = null,
             )
         }
         closeSet()
@@ -501,6 +505,7 @@ class GenerationViewModel(
                 selectedPoseId = null,
                 chosenBy = null,
                 descriptionRejected = false,
+                failure = null,
                 noPerson = false,
             )
         }
@@ -569,9 +574,12 @@ class GenerationViewModel(
         generating = viewModelScope.launch { generate(id, scene, selfie, request) }
     }
 
-    /** The open set ends without a choice, for the subject's *Pick a pose* too; one that was chosen stays chosen. */
-    private fun closeSet() {
-        setId?.let(share::close)
+    /**
+     * The open set ends without a choice, for the subject's *Pick a pose* too, saying why when it [failure]d; one that
+     * was chosen stays chosen.
+     */
+    private fun closeSet(failure: GenerationError? = null) {
+        setId?.let { share.close(it, failure) }
         setId = null
     }
 
@@ -629,8 +637,8 @@ class GenerationViewModel(
     }
 
     /**
-     * Ends in PICKING when at least one candidate arrived and in FAILED otherwise (FR-4.7), saying so when the service
-     * rejected every pose of a description (US-5). One limit covers the whole run, the suggestions included, so
+     * Ends in PICKING when at least one candidate arrived and in FAILED otherwise, with why ([failureOf], FR-4.7), which
+     * the subject's phone hears with the set's end. One limit covers the whole run, the suggestions included, so
      * Generating poses never lasts longer than the 60 s it says (NFR-4).
      */
     private suspend fun generate(id: String, scene: Bitmap, selfie: Boolean, request: PoseRequest) {
@@ -638,6 +646,8 @@ class GenerationViewModel(
             "pose.start",
             (if (request is PoseRequest.Suggested) "suggested" else "described") + if (selfie) " selfie" else "",
         )
+        // Why the run itself ended early, as the suggestions failing does; null when it ran to its end.
+        var stopped: GenerationError? = null
         val inTime = withTimeoutOrNull(limitMs) {
             try {
                 generator.generate(scene, request, Random.nextLong(), selfie).collect { event -> receive(id, event) }
@@ -646,20 +656,31 @@ class GenerationViewModel(
             } catch (error: Exception) {
                 // The poses could not be had; whatever arrived before a later failure is still shown.
                 Log.w(TAG, "Generation stopped: $error")
+                stopped = (error as? GenerationFailedException)?.error ?: GenerationError.SERVER
             }
         }
-        if (inTime == null) stopUnanswered(id)
+        if (inTime == null) {
+            stopUnanswered(id)
+            // The limit came before any pose was known, as with suggestions that take too long.
+            if (_uiState.value.poses.isEmpty()) stopped = GenerationError.TIMEOUT
+        }
         val state = _uiState.value
         Timings.mark("pose.done", "${state.readyCount} of ${state.poses.size} ready")
-        fun failedAll(error: GenerationError) = state.poses.isNotEmpty() &&
-            state.poses.all { (state.candidates[it.id] as? CandidateEvent.Failed)?.error == error }
-        val rejected = request is PoseRequest.Described && failedAll(GenerationError.REJECTED)
-        val noPerson = failedAll(GenerationError.NO_PERSON)
+        val errors =
+            state.candidates.values.mapNotNull { (it as? CandidateEvent.Failed)?.error } + listOfNotNull(stopped)
+        val failure = failureOf(errors, request)
         _uiState.update {
             if (it.readyCount > 0) {
                 it.copy(phase = GenerationUiState.Phase.PICKING)
             } else {
-                it.copy(phase = GenerationUiState.Phase.FAILED, descriptionRejected = rejected, noPerson = noPerson)
+                it.copy(
+                    phase = GenerationUiState.Phase.FAILED,
+                    failure = failure,
+                    // Generate poses says so once back there (US-5): the filter or the image service refused.
+                    descriptionRejected = request is PoseRequest.Described &&
+                        (failure == GenerationError.REJECTED || failure == GenerationError.DECLINED),
+                    noPerson = failure == GenerationError.NO_PERSON,
+                )
             }
         }
         val ended = _uiState.value
@@ -667,7 +688,7 @@ class GenerationViewModel(
             // In the pager's order, which the subject's Pick a pose follows.
             share.picking(id, ended.poses.map { it.id }.filter { ended.candidates[it] is CandidateEvent.Ready })
         } else {
-            closeSet()
+            closeSet(failure)
         }
     }
 
@@ -716,7 +737,8 @@ class GenerationViewModel(
      * says nothing of the description, and neither does a failure that is no refusal.
      */
     private fun refusesDescription(id: String, failure: CandidateEvent.Failed): Boolean {
-        if (failure.error != GenerationError.REJECTED) return false
+        // The filter's refusal and the image service's both count (#200, decided 2026-11-10).
+        if (failure.error != GenerationError.REJECTED && failure.error != GenerationError.DECLINED) return false
         val set = describedSet?.takeIf { it.setId == id } ?: return false
         return _uiState.value.poses.firstOrNull { it.id == failure.poseId }?.text == set.text
     }
@@ -756,3 +778,31 @@ class GenerationViewModel(
         const val LIGHT_SETTLE_MS = 500L
     }
 }
+
+/**
+ * Which of a failed set's [errors], one per failed pose and the run's own, Couldn't create poses names (FR-4.7): the
+ * first in [FAILURE_ORDER], since a cause that another try would meet again (a limit, the photo, a refusal) tells the
+ * user more than one that may pass. A suggested set's refusal is the image service's, since nobody wrote a description;
+ * no error at all is a server error.
+ */
+internal fun failureOf(errors: Collection<GenerationError>, request: PoseRequest?): GenerationError {
+    val first = FAILURE_ORDER.firstOrNull { it in errors } ?: GenerationError.SERVER
+    return if (first == GenerationError.REJECTED &&
+        request !is PoseRequest.Described
+    ) {
+        GenerationError.DECLINED
+    } else {
+        first
+    }
+}
+
+private val FAILURE_ORDER = listOf(
+    GenerationError.DAILY_LIMITED,
+    GenerationError.RATE_LIMITED,
+    GenerationError.NO_PERSON,
+    GenerationError.REJECTED,
+    GenerationError.DECLINED,
+    GenerationError.OFFLINE,
+    GenerationError.TIMEOUT,
+    GenerationError.SERVER,
+)

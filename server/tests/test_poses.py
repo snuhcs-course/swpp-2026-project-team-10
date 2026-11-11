@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
@@ -6,8 +6,9 @@
 # 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short; its shape, which the candidate is asked
 # in: each of the app's ratios (3:4, 9:16, 1:1), as the phone sends it and a pixel off, either side of the shape halfway
 # between two ratios, and landscape. Image API: a candidate in JPEG, PNG,
-# or WEBP; a refusal (403) of a template and of a description, with one message for both; another failing status; an unreadable answer; no
-# answer in time; no key. Limits: each window full, and a request refused before the image API, which is not counted.
+# or WEBP; a refusal (403) of a template and of a description, `DECLINED` with one message for both; another failing
+# status; an unreadable answer; no answer in time; no key. Limits: each window full, the client's `RATE_LIMITED` and
+# everyone's day `DAILY_LIMITED`, and a request refused before the image API, which is not counted.
 # Selfie (FR-1.14): `selfie` true, false, left out, and not a boolean; with a template, refused.
 import asyncio
 import base64
@@ -263,9 +264,10 @@ def test_malformed_request_uses_the_api_error_shape(client, image_api, make_imag
     assert image_api.requests == []
 
 
-def test_declined_request_is_rejected(client, image_api, make_image):
+def test_declined_request_is_declined_apart_from_the_filter(client, image_api, make_image):
+    # The image service's own refusal has a code of its own, so the app tells it from the filter's (FR-4.7, #203).
     image_api.fails(403, "Input flagged by moderation")
-    message = assert_error(create_pose(client, make_image()), 422, "REJECTED")
+    message = assert_error(create_pose(client, make_image()), 422, "DECLINED")
     assert "moderation" not in message
     assert "description" not in message
 
@@ -273,8 +275,8 @@ def test_declined_request_is_rejected(client, image_api, make_image):
 def test_declined_description_gets_the_same_message_as_a_template(client, image_api, make_image):
     # The image service does not say whether it refused the photo or the text, so the description is not blamed.
     image_api.fails(403, "Input flagged by moderation")
-    template = assert_error(create_pose(client, make_image()), 422, "REJECTED")
-    described = assert_error(describe_pose(client, make_image(), "Looking back over the shoulder"), 422, "REJECTED")
+    template = assert_error(create_pose(client, make_image()), 422, "DECLINED")
+    described = assert_error(describe_pose(client, make_image(), "Looking back over the shoulder"), 422, "DECLINED")
     assert described == template
 
 
@@ -336,7 +338,8 @@ def test_global_limit_refuses_every_client_once_the_day_is_used_up(client, image
     settings.pose_global_limit = 3
     for _ in range(3):
         assert create_pose(client, make_image()).status_code == 200
-    message = assert_error(create_pose(client, make_image()), 429, "RATE_LIMITED")
+    # The day's limit for everyone has a code of its own, apart from this phone's hour (FR-4.7, #203).
+    message = assert_error(create_pose(client, make_image()), 429, "DAILY_LIMITED")
     assert "today" in message
     assert len(image_api.requests) == 3
     clock.advance(settings.pose_global_window_seconds)

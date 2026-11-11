@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
@@ -51,8 +52,8 @@ sealed interface RemoteAction {
  * earlier one. A final request the camera has not reported applied after [ECHO_TIMEOUT_MS] is confirmed if the
  * camera holds its value by then, and otherwise answered with the current state, so the subject's control snaps
  * back. Every `camera.state` carries the whole applied camera state (Design 2.5.1):
- * a change of exposure, flash, or aspect ratio, from either phone, is sent as soon as the camera reports it,
- * attributed to the subject when it matches the subject's pending request.
+ * a change of exposure, flash, aspect ratio, or the camera in use (#201), from either phone, is sent as soon as the
+ * camera reports it, attributed to the subject when it matches the subject's pending request.
  *
  * **Guide moves (It 2, FR-7.2).** `guide.move` carries the center and height the subject asks for, in frame
  * coordinates; [guides] clamps it with the limits of the photographer's frame and publishes the change, which
@@ -95,11 +96,10 @@ class RemoteControlHandler(
         zoomJob = scope.launch { camera.zoom.collect { zoom -> onApplied(zoom) } }
         // The first zoom echo above already carries the current values.
         settingsJob = scope.launch {
-            camera.state.map {
-                Triple(it.exposure, it.flash, it.aspect)
-            }.distinctUntilChanged().drop(1).collect { (exposure, flash, _) ->
-                onSettingsApplied(exposure, flash)
-            }
+            combine(camera.state.map { Triple(it.exposure, it.flash, it.aspect) }, camera.facing, ::Pair)
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { (settings, _) -> onSettingsApplied(settings.first, settings.second) }
         }
     }
 
@@ -316,7 +316,7 @@ class RemoteControlHandler(
     }
 
     /**
-     * Exposure, flash, or ratio changed on the camera. A change that matches the subject's pending request is the
+     * Exposure, flash, ratio, or the camera in use changed. A change that matches the subject's pending request is the
      * subject's and gets its notice (brightness only for the slider's final value); a step of the subject's slider
      * is echoed as a step, everything else as a final state.
      */
@@ -353,6 +353,7 @@ class RemoteControlHandler(
                 exposure = applied.exposure,
                 flash = applied.flash,
                 aspect = applied.aspect,
+                facing = camera.facing.value,
             ),
         )
     }

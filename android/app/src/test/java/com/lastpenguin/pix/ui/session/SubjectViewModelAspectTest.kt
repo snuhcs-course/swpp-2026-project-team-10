@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-10-27, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.FakeGuideRepository
@@ -22,13 +23,16 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /*
  * Partitions: the photographer's frame on Subject view (AD-10). Before any camera.state (4:3); a ratio in a
  * camera.state; a later change; a ratio sent before the screen opened. The zoom from a camera.state the session kept
- * without an `incoming` emission: outside a pinch (shown) and during one (the pinch's value stays).
+ * without an `incoming` emission: outside a pinch (shown) and during one (the pinch's value stays). The mirror (#201):
+ * before any camera.state (the rear camera, mirrored), the front camera (shown as sent), and a switch back.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelAspectTest {
@@ -69,6 +73,21 @@ class SubjectViewModelAspectTest {
         session.deliver(state(AspectRatio.R1_1))
         runCurrent()
         assertEquals(AspectRatio.R1_1, viewModel.uiState.value.aspect)
+    }
+
+    @Test
+    fun mirrored_forTheRearCamera_notForTheFrontOne_whoseVideoIsAMirrorAlready() = runTest(dispatcher) {
+        val viewModel = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
+        runCurrent()
+        assertTrue(viewModel.uiState.value.mirrored)
+
+        session.deliver(state(AspectRatio.R4_3).copy(facing = CameraFacing.FRONT))
+        runCurrent()
+        assertFalse(viewModel.uiState.value.mirrored)
+
+        session.deliver(state(AspectRatio.R4_3).copy(facing = CameraFacing.BACK))
+        runCurrent()
+        assertTrue(viewModel.uiState.value.mirrored)
     }
 
     @Test

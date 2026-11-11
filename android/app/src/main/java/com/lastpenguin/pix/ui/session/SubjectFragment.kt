@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-11, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -222,6 +222,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
                         reshape(binding, ui.aspect)
+                        renderMirror(binding, ui.mirrored)
                         renderReference(binding, ui)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
@@ -421,6 +422,21 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
         renderOverlays(binding, viewModel.uiState.value)
         renderVideo(binding)
+    }
+
+    /**
+     * The rear camera's video as a mirror (#201), so the subject moves to the guide the way they see themselves. The
+     * renderer flips the video, since a SurfaceView ignores its own scale; the grid, the guide, and the reference photo
+     * flip as views. A touch reaches the flipped guide in its own coordinates, so a drag still moves it under the
+     * finger, and the guide sent and received stays in the photographer's coordinates. The reference photo's drag
+     * reads the screen's coordinates, which the flip leaves alone.
+     */
+    private fun renderMirror(binding: FragmentSubjectBinding, mirrored: Boolean) {
+        renderer?.setMirror(mirrored)
+        val scale = if (mirrored) -1f else 1f
+        for (view in listOf(binding.compositionOverlay, binding.guideOverlay, binding.referenceThumbnail)) {
+            view.scaleX = scale
+        }
     }
 
     /** The grid while connected and the guide, except while the photographer's new ratio comes. */

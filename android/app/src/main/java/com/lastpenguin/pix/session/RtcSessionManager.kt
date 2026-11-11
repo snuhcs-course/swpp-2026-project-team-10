@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -864,7 +864,8 @@ class RtcSessionManager(
             }
 
             is SessionMessage.CameraStateUpdate -> {
-                _peerCamera.value = CameraState(message.zoom, message.exposure, message.flash, message.aspect)
+                _peerCamera.value =
+                    CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
                 _incoming.tryEmit(message)
             }
 

@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -18,6 +19,7 @@ import org.junit.Test
  * Partitions: the whole applied state in camera.state (Design 2.5.1) as the photographer's phone sends it.
  * The first echo with exposure, flash, and ratio already set; a change of the ratio, the flash, or the exposure on
  * this phone (one final state each); a state change that moves only the zoom (no extra state); a change after stop.
+ * The camera in use (#201): the front one already chosen, in the first echo; a switch, one final state each way.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteCameraStateTest {
@@ -65,6 +67,37 @@ class RemoteCameraStateTest {
                 SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, true, -2, FlashMode.ON, AspectRatio.R1_1),
             ),
             sent,
+        )
+        handler.stop()
+    }
+
+    @Test
+    fun start_theFrontCameraAlreadyChosen_isInTheFirstEcho() = runTest {
+        camera.facing.value = CameraFacing.FRONT
+
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        assertEquals(CameraFacing.FRONT, echoes().first().facing)
+        handler.stop()
+    }
+
+    @Test
+    fun cameraSwitch_sendsOneFinalStateEachWay() = runTest {
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        val before = echoes().size
+
+        camera.facing.value = CameraFacing.FRONT
+        runCurrent()
+        camera.facing.value = CameraFacing.BACK
+        runCurrent()
+
+        assertEquals(
+            listOf(CameraFacing.FRONT to true, CameraFacing.BACK to true),
+            echoes().drop(before).map { it.facing to it.final },
         )
         handler.stop()
     }

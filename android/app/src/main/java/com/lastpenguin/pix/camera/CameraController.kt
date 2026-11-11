@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-11, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -50,6 +50,11 @@ data class CameraState(
      * goes off or the camera closes. Not echoed to the subject.
      */
     val torch: Boolean = false,
+    /**
+     * The camera in use, in the photographer's `camera.state` that the subject keeps (#201). The photographer's own
+     * controller leaves it at its default and reports the camera in [CameraController.facing].
+     */
+    val facing: CameraFacing = CameraFacing.BACK,
 )
 
 /**

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -45,9 +45,8 @@ class SubjectGeneratingFragment : Fragment(R.layout.fragment_generating) {
         binding.candidateGrid.addItemDecoration(
             CandidateGridFit(resources.getDimensionPixelSize(R.dimen.pose_card_margin)),
         )
-        // In place of Cancel: Back leaves the photographer's set as it is (R&S 6.9).
-        binding.cancelButton.setText(R.string.back)
-        binding.cancelButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
+        // Back leaves the photographer's set as it is (R&S 6.9).
+        binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToSubject() }
 
         viewLifecycleOwner.lifecycleScope.launch {

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -51,7 +51,8 @@ import org.robolectric.shadows.ShadowToast
  * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
  * gallery in its place, stops the ask for its tip. Opened from Subject view: the session ending goes back to Subject
  * view, which shows what ended it, and stops finding the person; opened from the camera, it stays. A candidate the
- * subject picked says whose pick it is under the title; this phone's own pick and an uploaded photo say nothing.
+ * subject picked says whose pick it is under the title; this phone's own pick and an uploaded photo say nothing. The
+ * title: Guide for a generated pose's outline, Your reference for a photo (#199).
  * In a session (FR-6.15, Design 2.6.5): a chosen pose's outline goes to the subject, with the hint, and Choose another
  * photo keeps it there; a photo from Add a pose guide is not shared and has no hint; the subject's Use this guide that
  * comes first puts the guide on the camera with a notice, as this phone's own tap.
@@ -202,6 +203,19 @@ class ReferenceConfirmFragmentTest {
         pickPhoto()
 
         assertFalse(onScreen { it.chosenByText.isShown })
+    }
+
+    @Test
+    fun aGeneratedPose_isTitledGuide_andAPhotoAfterIt_yourReference() {
+        launch()
+        assertEquals(string(R.string.reference_title), onScreen { it.referenceTitle.text.toString() })
+        scenario!!.onFragment { it.requireActivity().viewModel<ReferenceViewModel>().onCandidatePicked(bitmap()) }
+        idle()
+        assertEquals(string(R.string.pose_guide_title), onScreen { it.referenceTitle.text.toString() })
+
+        pickPhoto()
+
+        assertEquals(string(R.string.reference_title), onScreen { it.referenceTitle.text.toString() })
     }
 
     @Test

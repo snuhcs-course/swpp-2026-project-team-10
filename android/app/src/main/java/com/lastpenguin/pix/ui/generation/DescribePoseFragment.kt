@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -38,11 +38,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks a description used before (FR-4.11), or leaves the
- * field empty for the server to suggest four poses for the scene. Nothing is sent before the one button, *Suggest 4
- * poses* or *Generate 4 poses from this* (Iter3-A13). In a session the subject sees this step too: one field at a time
- * holds the description, and the subject's button goes on here like this phone's own (Design 2.6.5). The first time it
- * opens, its tutorial tips come over it (FR-10.4).
- * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16.
+ * field empty for the server to suggest four poses for the scene. Nothing is sent before the one button at the top
+ * right, *Suggest* or *Generate* (Iter3-A13, #199). Back at the top left returns to the scene photo's review. In a
+ * session
+ * the subject sees this step too: one field at a time holds the description, and the subject's button goes on here like
+ * this phone's own (Design 2.6.5). The first time it opens, its tutorial tips come over it (FR-10.4).
+ * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16; Back Iter4-P2.
  */
 class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 
@@ -56,7 +57,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
         val state = viewModel.uiState.value
         if (state.phase != GenerationUiState.Phase.DESCRIBING || state.scene == null) {
             // Nothing to describe, for example after the app process was restarted on this screen.
-            view.post { if (isAdded) backToCamera() }
+            view.post { if (isAdded) leaveForCamera() }
             return
         }
         binding.sceneImage.showScene(state.scene)
@@ -75,9 +76,9 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
             onForget = viewModel::forget,
         )
         this.form = form
-        binding.cancelButton.setOnClickListener { backToCamera() }
-        // System back is Cancel (R&S 6.9).
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToCamera() }
+        binding.backButton.setOnClickListener { backToReview() }
+        // System back does what Back does (R&S 6.9).
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToReview() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -119,7 +120,17 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
         }
     }
 
-    private fun backToCamera() {
+    /** Back: the scene photo's review on Camera, with the text kept for its *Use*. */
+    private fun backToReview() {
+        hideKeyboard()
+        form?.stopTyping()
+        // Pops first, so that this screen does not take the review's phase for anything to follow.
+        findNavController().popBackStack(R.id.cameraFragment, false)
+        viewModel.backToReview()
+    }
+
+    /** Nothing to describe: the camera, with the step discarded. */
+    private fun leaveForCamera() {
         hideKeyboard()
         viewModel.cancel()
         findNavController().popBackStack(R.id.cameraFragment, false)
@@ -302,7 +313,7 @@ class DescriptionForm(
         val context = binding.root.context
         binding.descriptionCounter.text =
             context.getString(R.string.description_counter, input.length(), DESCRIPTION_MAX_LENGTH)
-        val label = if (input.text.isBlank()) R.string.suggest_four_poses else R.string.generate_four_from_description
+        val label = if (input.text.isBlank()) R.string.suggest_poses else R.string.generate_from_description
         binding.generateButton.setText(label)
         renderClear()
     }

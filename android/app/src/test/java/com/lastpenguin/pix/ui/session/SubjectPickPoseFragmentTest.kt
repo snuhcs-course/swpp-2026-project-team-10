@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -47,10 +47,10 @@ import org.robolectric.shadows.ShadowToast
 /*
  * The subject's Pick a pose (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's set
  * delivered to the container's PoseSyncer. Partitions: the candidates shown as on the photographer's phone, with the
- * hint and without Try other poses; Use this pose sent as a pick and waiting; the set's end by the photographer's
+ * hint and without Regenerate; Select sent as a pick and waiting; the set's end by the photographer's
  * choice or close (a notice and back to Subject view), by this phone's own pick (back without a notice), and an end
  * kept from an earlier set (nothing); a pick no step answers in 5 s (a notice, and it can be tapped again); Back
- * (Subject view, the set kept); the link reconnecting (the candidates kept, Use this pose waiting until it is back);
+ * (Subject view, the set kept); the link reconnecting (the candidates kept, Select waiting until it is back);
  * the session ending (back to Subject view, which shows what ended it); a 9:16 candidate in its own shape (FR-4.3);
  * the ♥ (FR-4.14), which saves the candidate in this phone's library and sends nothing to the photographer's phone.
  */
@@ -132,9 +132,9 @@ class SubjectPickPoseFragmentTest {
         onScreen { binding ->
             assertEquals(2, binding.candidatePager.adapter?.itemCount)
             assertEquals("1 / 2", binding.pageCounter.text.toString())
-            assertEquals(View.GONE, binding.tryOtherButton.visibility)
+            assertEquals(View.GONE, binding.regenerateButton.visibility)
             assertEquals(string(R.string.shared_hint, "Dongje"), binding.sharedHint.text.toString())
-            assertTrue(binding.usePoseButton.isEnabled)
+            assertTrue(binding.selectButton.isEnabled)
         }
     }
 
@@ -163,13 +163,13 @@ class SubjectPickPoseFragmentTest {
         onScreen { it.candidatePager.setCurrentItem(1, false) }
         idle()
 
-        onScreen { it.usePoseButton.performClick() }
+        onScreen { it.selectButton.performClick() }
         idle()
 
         assertEquals(listOf(SessionMessage.PosePick("set1", "pose-2")), picks(modules))
         onScreen { binding ->
-            assertFalse(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertFalse(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertEquals(1, picks(modules).size)
@@ -201,7 +201,7 @@ class SubjectPickPoseFragmentTest {
     fun thisPhonesPickChosen_closesItWithoutANotice() {
         val modules = picking()
         val nav = launch()
-        onScreen { it.usePoseButton.performClick() }
+        onScreen { it.selectButton.performClick() }
         idle()
 
         step(modules, PoseSetStep.CHOSEN, poseId = "pose-1", by = Role.SUBJECT)
@@ -228,22 +228,22 @@ class SubjectPickPoseFragmentTest {
 
         assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
         assertEquals(0, ShadowToast.shownToastCount())
-        assertTrue(onScreen { it.usePoseButton.isEnabled })
+        assertTrue(onScreen { it.selectButton.isEnabled })
     }
 
     @Test
     fun aPickNotAnsweredInTime_saysSo_andCanBeTappedAgain() {
         val modules = picking()
         launch()
-        onScreen { it.usePoseButton.performClick() }
+        onScreen { it.selectButton.performClick() }
         idle()
 
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(PoseSyncer.PICK_TIMEOUT_MS + 100))
 
         assertEquals(string(R.string.pose_pick_failed), ShadowToast.getTextOfLatestToast())
         onScreen { binding ->
-            assertTrue(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertTrue(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertEquals(2, picks(modules).size)
@@ -273,8 +273,8 @@ class SubjectPickPoseFragmentTest {
         assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
         onScreen { binding ->
             assertEquals(2, binding.candidatePager.adapter?.itemCount)
-            assertFalse(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertFalse(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertTrue(picks(modules).isEmpty())
@@ -282,8 +282,8 @@ class SubjectPickPoseFragmentTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         idle()
         onScreen { binding ->
-            assertTrue(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertTrue(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertEquals(1, picks(modules).size)
@@ -323,7 +323,7 @@ class SubjectPickPoseFragmentTest {
             },
         )
         assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
-        // Neither a pick nor anything else: the ♥ stays on this phone, and the first Use this pose still decides.
+        // Neither a pick nor anything else: the ♥ stays on this phone, and the first Select still decides.
         assertEquals(sent, modules.session.sent.size)
     }
 }

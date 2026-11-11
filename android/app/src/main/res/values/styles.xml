@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, and the
-     camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that; radius 999 for chips and pills,
-     16 for buttons and cards, 28 for sheets. -->
+     camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that. Radii (#199): fully round for
+     chips and pills, 12 for small thumbnails, 16 for buttons, fields, info cards, and pose slots, 24 for large cards
+     and images, 28 for sheets. Spacing is 8, 12, 16, or 24 dp, with 20 dp at the screen's sides and bottom. -->
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Type: Manrope for the UI (Pretendard on a phone in Korean: the @font/pix_* aliases), DM Mono for the room code. -->
@@ -178,7 +179,7 @@
         <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
-        <item name="cornerRadius">14dp</item>
+        <item name="cornerRadius">16dp</item>
         <item name="android:textColor">@color/button_text_text</item>
         <item name="rippleColor">@color/pix_ripple</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
@@ -188,6 +189,27 @@
     <style name="Widget.Pix.Button.Text.Small">
         <item name="android:minHeight">40dp</item>
         <item name="android:minWidth">0dp</item>
+    </style>
+
+    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): a 40 dp pill, at least 88 dp
+         wide, in a 48 dp touch height, in the middle of the 56 dp header. Back is at the top left. -->
+    <style name="Widget.Pix.Button.Header">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">88dp</item>
+        <item name="android:insetTop">4dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <!-- The same pill in the camera's 48 dp top bar, such as Use on the scene photo's review: in the middle of the bar,
+         with the bar's 52 dp touch height, whose last 4 dp reach over the image's top edge. -->
+    <style name="Widget.Pix.Button.Header.Camera">
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">4dp</item>
+        <item name="android:insetBottom">8dp</item>
     </style>
 
     <!-- A friend's initial in a circle. -->
@@ -420,6 +442,7 @@
         <item name="chipStrokeColor">@color/pix_outline</item>
         <item name="chipStrokeWidth">1dp</item>
         <item name="chipMinHeight">36dp</item>
+        <item name="chipCornerRadius">18dp</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
         <item name="android:textColor">@color/pix_text_soft</item>
         <item name="rippleColor">@color/pix_ripple</item>
@@ -431,7 +454,7 @@
 
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">
         <item name="cardBackgroundColor">@color/pix_surface</item>
-        <item name="cardCornerRadius">18dp</item>
+        <item name="cardCornerRadius">16dp</item>
         <item name="cardElevation">0dp</item>
         <item name="strokeColor">@color/pose_card_stroke</item>
         <item name="rippleColor">@color/pix_ripple</item>
@@ -465,7 +488,13 @@
     <!-- Matches Widget.Pix.PoseCard, so the image follows the card's corners. -->
     <style name="ShapeAppearance.Pix.PoseImage" parent="">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">18dp</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <!-- A large image of its own, such as a candidate on Pick a pose: the corners of Widget.Pix.Card. -->
+    <style name="ShapeAppearance.Pix.LargeImage" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
     </style>
 
     <style name="ShapeAppearance.Pix.SmallThumbnail" parent="">

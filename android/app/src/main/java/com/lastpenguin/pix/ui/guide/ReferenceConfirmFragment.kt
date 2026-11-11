@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -28,21 +28,19 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * Reference confirm (R&S 6.2): the outline only, with *Use this guide* and *Choose another photo*; under the title,
- * whose pick it is when the subject chose the candidate (FR-6.15). In a session the subject sees the outline of a chosen
- * pose too, and a *Use this guide* of theirs that comes first goes back to the camera like this phone's own (Design
- * 2.6.5). A screenshot cut to its photo (FR-2.10) plays the cut once, keeps the photo in the corner, and offers *Use
- * the whole image*. The outline fades in as its person is found, a screenshot's with its cut (Iter3-A13).
- * Owner: PM (#5); the outline on both phones Iter3-P16; the screenshot's cut #174.
+ * Reference confirm (R&S 6.2): the outline only, with *Use* at the top right and Back at the top left, which returns to
+ * the step before, where another photo or pose can be chosen (#199); on the card, whose pick it is when the subject
+ * chose the candidate (FR-6.15). In a session the subject sees the outline of a chosen pose too, and a *Use* of theirs
+ * that comes first goes back to the camera like this phone's own (Design 2.6.5). A screenshot cut to its photo
+ * (FR-2.10) plays the cut once, keeps the photo in the corner, and offers *Use the whole image*. The outline fades in as
+ * its person is found, a screenshot's with its cut (Iter3-A13).
+ * Owner: PM (#5); the outline on both phones Iter3-P16; the screenshot's cut #174; the top bar Iter4-P2.
  */
 class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
 
     private val viewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
-
-    /** *Choose another photo*; closing the picker keeps the current result. */
-    private val pickPhoto = registerPhotoPicker { uri -> uri?.let(viewModel::onPhotoPicked) }
 
     /** The state this view showed last: a cut plays only when the person was found while it watched. */
     private var shown: ReferenceUiState? = null
@@ -63,7 +61,6 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             viewModel.onUseGuide()
             backToShooting(viewModel)
         }
-        binding.chooseAnotherButton.setOnClickListener { pickPhoto() }
         binding.useWholeImageButton.setOnClickListener { viewModel.onUseWholeImage() }
         leaveWhenTheSessionEnds(viewModel)
 
@@ -74,6 +71,14 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
                 launch {
                     val guides = viewModel.uiState.map { (it as? ReferenceUiState.Ready)?.guide }
                     binding.referenceImage.showOutline(settingsViewModel.guideLook, guides)
+                }
+                launch {
+                    // A generated pose's outline is the guide itself, not a reference photo (#199).
+                    viewModel.fromPose.collect { pose ->
+                        binding.referenceTitle.setText(
+                            if (pose) R.string.pose_guide_title else R.string.reference_title,
+                        )
+                    }
                 }
                 launch {
                     viewModel.chosenBy.collect { name ->

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -129,7 +129,8 @@ class SubjectConfirmFragmentTest {
             assertEquals(View.VISIBLE, binding.referenceImage.visibility)
             assertEquals(View.GONE, binding.referenceProgress.visibility)
             assertEquals(string(R.string.person_found), binding.referenceStatus.text.toString())
-            assertEquals(View.GONE, binding.chooseAnotherButton.visibility)
+            // The photographer's chosen pose: the guide itself (#199).
+            assertEquals(string(R.string.pose_guide_title), binding.referenceTitle.text.toString())
             assertEquals(View.GONE, binding.chosenByText.visibility)
             assertEquals(string(R.string.shared_hint, "Dongje"), binding.sharedHint.text.toString())
             assertTrue(binding.useGuideButton.isEnabled)

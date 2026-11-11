@@ -18,7 +18,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.PoseImage" />
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.LargeImage" />
 
     <!-- ♥ (FR-4.14): saves the pose to this phone's library, or removes it once saved; at the photo's top end. -->
     <com.google.android.material.button.MaterialButton

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.BitmapDrawable
@@ -145,8 +145,8 @@ class SubjectGeneratingFragmentTest {
         onScreen { binding ->
             assertEquals(string(R.string.ready_count, 1, 4), binding.readyCount.text.toString())
             assertNotNull(binding.sceneImage.drawable)
-            // In place of Cancel, which is the photographer's.
-            assertEquals(string(R.string.back), binding.cancelButton.text.toString())
+            // Back at the top left; the set is the photographer's to stop.
+            assertEquals(string(R.string.back), binding.backButton.contentDescription)
         }
     }
 
@@ -227,7 +227,7 @@ class SubjectGeneratingFragmentTest {
         val nav = launch()
         modules.session.sent.clear()
 
-        onScreen { it.cancelButton.performClick() }
+        onScreen { it.backButton.performClick() }
         idle()
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)

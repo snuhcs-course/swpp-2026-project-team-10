@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-09, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-10, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -775,10 +775,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         })
     }
 
-    /** *Cancel*, *Shoot again*, and *Use this photo* of the scene photo step (R&S 6.3, FR-4.1). */
+    /** Back and *Use* of the scene photo step (R&S 6.3, FR-4.1, #199). */
     private fun setupScenePhoto(controls: FragmentCameraBinding) {
-        controls.sceneCancelButton.setOnClickListener { generationViewModel.cancel() }
-        controls.shootAgainButton.setOnClickListener { generationViewModel.retakeScene() }
+        controls.sceneBackButton.setOnClickListener { sceneStepBack() }
         controls.usePhotoButton.setOnClickListener {
             val navController = findNavController()
             // Generate poses asks what to pose before anything is sent (FR-4.8), once a person is found (FR-4.13).
@@ -786,15 +785,46 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 navController.navigate(R.id.action_camera_to_describePose)
             }
         }
-        // System back does the same as the secondary action (R&S 6.9): Shoot again on the photo, Cancel on the camera.
-        // It is enabled only during this step, so back leaves the app from the plain camera as before.
+        // System back does what Back does (R&S 6.9). It is enabled only during this step, so back leaves the app from
+        // the plain camera as before.
         sceneBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
-            if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.REVIEWING) {
-                generationViewModel.retakeScene()
-            } else {
-                generationViewModel.cancel()
-            }
+            sceneStepBack()
         }
+        // The message follows the photo's place, which the room under the bar and the photo's shape decide.
+        controls.sceneReview.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeSceneMessage(controls) }
+    }
+
+    /** Back during the scene photo: from the photo's review, the live camera again; from the live camera, the camera. */
+    private fun sceneStepBack() {
+        if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.REVIEWING) {
+            generationViewModel.retakeScene()
+        } else {
+            generationViewModel.cancel()
+        }
+    }
+
+    /**
+     * The review's message 12 dp under the photo, which fitCenter puts in the middle of the room under the bar; when
+     * the photo leaves it no room above the screen's 20 dp bottom margin, as with 9:16, it lies over the photo's
+     * bottom, on glass (R&S 6.3, #199).
+     */
+    private fun placeSceneMessage(controls: FragmentCameraBinding) {
+        val still = controls.sceneStill
+        val message = controls.sceneMessage
+        val photo = still.drawable ?: return
+        if (still.width == 0 || still.height == 0 || photo.intrinsicWidth <= 0 || photo.intrinsicHeight <= 0) return
+        val density = resources.displayMetrics.density
+        val scale = minOf(
+            still.width.toFloat() / photo.intrinsicWidth,
+            still.height.toFloat() / photo.intrinsicHeight,
+        )
+        val photoBottom = still.top + (still.height + photo.intrinsicHeight * scale) / 2
+        val lowest = controls.sceneReview.height - SCENE_MESSAGE_MARGIN_DP * density - message.height
+        val under = photoBottom + SCENE_MESSAGE_GAP_DP * density
+        val top = minOf(under, lowest)
+        message.translationY = top - message.top
+        message.background =
+            if (top < under) AppCompatResources.getDrawable(requireContext(), R.drawable.bg_chip_glass) else null
     }
 
     private fun render(state: CameraUiState) {
@@ -1026,7 +1056,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val active = isScenePhotoActive(scene)
         sceneBack?.isEnabled = active
         controls.sceneTitle.isVisible = active
-        controls.sceneCancelButton.isVisible = active
+        controls.sceneBackButton.isVisible = active
+        controls.usePhotoButton.isVisible = reviewing
         val session = sessionViewModel.state.value
         controls.shootTogetherButton.isVisible =
             !active && session !is SessionState.Connected && session !is SessionState.Reconnecting
@@ -1034,8 +1065,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // Guide and the thumbnail keep their place, so the shutter stays where it is.
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active
-        controls.sceneStill.isVisible = reviewing
-        controls.sceneStill.setImageBitmap(if (reviewing) scene.scene else null)
+        controls.sceneReview.isVisible = reviewing
+        val photo = scene.scene.takeIf { reviewing }
+        if (controls.sceneStill.tag !== photo) {
+            controls.sceneStill.setImageBitmap(photo)
+            controls.sceneStill.tag = photo
+        }
         // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
         controls.zoomReadout.isInvisible = reviewing
         // The scene photo is a frame of the live preview: a photo's flash, the ratio, and brightness do not apply to it.
@@ -1058,8 +1093,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.editGuideButton.isVisible = false
             controls.tipButtonFrame.isVisible = false
         }
-        controls.captureControls.isVisible = !reviewing
-        controls.sceneReviewControls.isVisible = reviewing
+        // Kept in place under the review, so the bottom panel, which places the preview, keeps its height.
+        controls.captureControls.isInvisible = reviewing
         // Not before the phone has found a person in the photo (FR-4.13).
         controls.usePhotoButton.isEnabled = reviewing && !scene.checkingPerson && !scene.noPerson
         if (!active) return
@@ -1072,17 +1107,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 else -> R.string.scene_title
             },
         )
-        when {
-            noPerson -> showHint(
-                controls.hintText,
-                R.string.scene_no_person_body,
-                R.drawable.ic_alert_small,
+        // Under the photo while it is reviewed: what it is for, or that it has no one in it (FR-4.13).
+        showHint(controls.hintText, null)
+        if (reviewing) {
+            showHint(
+                controls.sceneMessage,
+                if (noPerson) R.string.scene_no_person_body else R.string.scene_review_body,
+                if (noPerson) R.drawable.ic_alert_small else 0,
                 R.color.pix_danger,
             )
-
-            reviewing -> showHint(controls.hintText, R.string.scene_review_body)
-
-            else -> showHint(controls.hintText, null)
+            controls.sceneMessage.setTextColor(
+                requireContext().getColor(if (noPerson) R.color.pix_text_soft else R.color.pix_text_muted),
+            )
         }
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
@@ -1676,6 +1712,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_HOLD_MS = 700L
         private const val FOCUS_RING_FADE_MS = 200L
         private const val CHIP_ICON_DP = 14f
+
+        /** The scene photo's review: its message this far under the photo, and above the screen's bottom (#199). */
+        private const val SCENE_MESSAGE_GAP_DP = 12f
+        private const val SCENE_MESSAGE_MARGIN_DP = 20f
         private const val EXPOSURE_BAR_OVERLAP_DP = 12f
         private const val EXPOSURE_BAR_FADE_MS = 200L
 

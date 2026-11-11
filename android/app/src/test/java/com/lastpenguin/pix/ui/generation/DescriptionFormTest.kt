@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -10,6 +10,7 @@ import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
+import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
@@ -243,9 +244,9 @@ class DescriptionFormTest {
 
     private fun FragmentDescribePoseBinding.label() = generateButton.text.toString()
 
-    private fun FragmentDescribePoseBinding.suggest() = root.context.getString(R.string.suggest_four_poses)
+    private fun FragmentDescribePoseBinding.suggest() = root.context.getString(R.string.suggest_poses)
 
-    private fun FragmentDescribePoseBinding.describe() = root.context.getString(R.string.generate_four_from_description)
+    private fun FragmentDescribePoseBinding.describe() = root.context.getString(R.string.generate_from_description)
 
     @Test
     fun theButton_sendsTheFieldAsTyped_andItsLabelSaysWhatItStarts() {

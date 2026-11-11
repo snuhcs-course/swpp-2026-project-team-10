@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 
 /**
  * *Your reference* on the subject's phone (R&S 6.6, FR-6.15): the outline on the photographer's Reference confirm, as
- * on their phone, without *Choose another photo*. *Use this guide* asks the photographer's phone, whose first use
+ * on their phone. *Use* asks the photographer's phone, whose first use
  * decides, and the screen closes when the confirm ends, saying so when the photographer decided; the guide then comes
  * to Subject view like any guide. It covers Subject view, so it follows the session itself, like the guide screens
  * (Design 2.6.5). The outline fades in as it arrives, as on the photographer's phone (Iter3-A13).
@@ -48,7 +48,8 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentReferenceConfirmBinding.bind(view)
         hadOutline = null
-        binding.chooseAnotherButton.isVisible = false
+        // The outline of the photographer's chosen pose: the guide itself (#199).
+        binding.referenceTitle.setText(R.string.pose_guide_title)
         binding.useGuideButton.setOnClickListener { viewModel.useGuide() }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         // Back leaves the photographer's confirm as it is; Subject view's *Your reference* opens it again.

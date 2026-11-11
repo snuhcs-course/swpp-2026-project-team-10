@@ -1,10 +1,11 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-11, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.isAtZoomStep
@@ -57,6 +58,11 @@ data class SubjectUiState(
     val zoom: Float = 1f,
     /** The photographer's frame (AD-10), from `camera.state`: the video, the grid, and the guide fit to it. */
     val aspect: AspectRatio = AspectRatio.R4_3,
+    /**
+     * The video, the grid, the guide, and the reference photo show as a mirror, so the subject moves the way they see
+     * themselves (#201): for the rear camera, from `camera.state`. The front camera's video comes mirrored already.
+     */
+    val mirrored: Boolean = true,
     /** The photographer's exposure range and EV per index, from `camera.capabilities`; 0..0 hides the control. */
     val exposureRange: IntRange = 0..0,
     val exposureStep: Float = 0f,
@@ -196,6 +202,7 @@ class SubjectViewModel(
                 _uiState.update {
                     it.copy(
                         aspect = camera?.aspect ?: AspectRatio.R4_3,
+                        mirrored = (camera?.facing ?: CameraFacing.BACK) == CameraFacing.BACK,
                         zoom = camera?.zoom?.let { zoom -> shownZoom(zoom, by = null, shown = it.zoom) } ?: it.zoom,
                         exposure = camera?.exposure?.takeUnless { exposureSender.adjusting } ?: it.exposure,
                         flash = camera?.flash ?: it.flash,

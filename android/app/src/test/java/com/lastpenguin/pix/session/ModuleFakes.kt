@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -118,7 +118,8 @@ class FakeSessionManager : SessionManager {
     fun deliver(message: SessionMessage) {
         if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
         if (message is SessionMessage.CameraStateUpdate) {
-            _peerCamera.value = CameraState(message.zoom, message.exposure, message.flash, message.aspect)
+            _peerCamera.value =
+                CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
         }
         check(_incoming.tryEmit(message))
     }

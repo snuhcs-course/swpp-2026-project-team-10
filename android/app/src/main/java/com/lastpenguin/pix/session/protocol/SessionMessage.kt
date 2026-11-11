@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
@@ -393,6 +394,8 @@ sealed interface SessionMessage {
     /**
      * The camera values actually applied, and who changed them. Iteration 2 adds [exposure], [flash], and [aspect],
      * so the subject always has the whole camera state and fits its video, grid, and guide to [aspect] (AD-10).
+     * [facing] is the camera in use (#201): the subject shows the rear camera's video as a mirror. An older phone
+     * sends none, which means the rear camera.
      */
     @Serializable
     @SerialName("camera.state")
@@ -403,6 +406,7 @@ sealed interface SessionMessage {
         val exposure: Int = 0,
         val flash: FlashMode = FlashMode.OFF,
         val aspect: AspectRatio = AspectRatio.R4_3,
+        val facing: CameraFacing = CameraFacing.BACK,
     ) : SessionMessage
 
     @Serializable

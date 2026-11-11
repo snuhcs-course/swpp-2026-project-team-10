@@ -81,6 +81,7 @@
 | 3.1 | 2026-11-09 | Color tokens and a DayNight theme (Iter4-P5, [#202]): the tokens in two sets, page and on the image, and `Theme.Pix` on DayNight but dark until light mode (2.8). |
 | 3.2 | 2026-11-10 | A refused description is kept on neither phone: the description's own request decides, a refusal deletes the entry, `pose.candidate.failed` says `descriptionRejected`, and the subject reads `PoseSyncer.verdicts`; the owner of this task and of Iter4-P6 (2.2, 2.5.1, 2.6.3, 2.9; Iter4-P3, [#200]). |
 | 3.3 | 2026-11-10 | Back on the pose screens (Iter4-P2, [#199]): each screen's Back goes one step back, *Regenerate* on *Pick a pose*, the step's action at the top right, Back on *Generating poses* and *Pick a pose* asking first, as it loses the images, and *Reference confirm* without *Choose another photo*; the decision leaves *Still open* (2.4, 2.5.1, 2.5.3, 2.6.3, 2.6.5). |
+| 3.4 | 2026-11-11 | The subject's video as a mirror with the rear camera too: `camera.state` names the camera in use, and the subject flips the video, the grid, the guide, and the reference photo (2.3, 2.5.1, 2.6.4; Iter4-P4, [#201]). |
 
 </details>
 
@@ -1288,6 +1289,7 @@ data class CameraState(           // the applied values, echoed in camera.state
     val flash: FlashMode = FlashMode.OFF,
     val aspect: AspectRatio = AspectRatio.R4_3,
     val torch: Boolean = false,   // the light is on, once applied (setTorch); not echoed
+    val facing: CameraFacing = CameraFacing.BACK,  // the camera in use, as the subject keeps it from camera.state
 )
 
 // ---- Session --------------------------------------------------------------
@@ -1522,7 +1524,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `session.leave` | both | reliable | `reason` | Leaving on purpose |
 | `ping` / `pong` | both | realtime | `ts` | Round-trip time, every 2 s |
 | `camera.capabilities` | P→S | reliable | `capabilities` | Zoom and exposure ranges, flash, aspect ratios |
-| `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `by`, `final` | The applied camera values, and who changed them |
+| `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `facing`, `by`, `final` | The applied camera values, and who changed them |
 | `camera.zoom.set` | S→P | steps realtime, final reliable | `ratio`, `final` | The subject's pinch or readout tap (FR-7.1) |
 | `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness slider (FR-7.3) |
 | `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
@@ -2599,7 +2601,7 @@ The server derives the height move. It refuses a sentence with a number, a unit,
 
 #### 2.6.4 Video pipeline
 
-- **Capture.** `ImageAnalysis` delivers a 4:3 YUV_420_888 buffer, 960×720 (1280×960 for 16:9, so the crop keeps 720 lines), with `STRATEGY_KEEP_ONLY_LATEST` on its own thread. While streaming, `CameraFrameSource` packs each frame into NV21 from a small pool, crops it to the ratio (960×720, 1280×720, or 720×720), and passes it on with its rotation. The front camera's frames are flipped first (`YuvToNv21.mirror`), because CameraX mirrors only its preview; the subject then sees the photographer's view, and the guide lines up. Likewise the front camera's photo is flipped through EXIF (`PhotoSaver`), its scene photo when turned upright (`CameraFrameCache`), and a focus tap maps to the sensor's other side. A ratio change rebinds analysis, and WebRTC takes the new size without renegotiation. The source scales down only beyond 1280×720 pixels.
+- **Capture.** `ImageAnalysis` delivers a 4:3 YUV_420_888 buffer, 960×720 (1280×960 for 16:9, so the crop keeps 720 lines), with `STRATEGY_KEEP_ONLY_LATEST` on its own thread. While streaming, `CameraFrameSource` packs each frame into NV21 from a small pool, crops it to the ratio (960×720, 1280×720, or 720×720), and passes it on with its rotation. The front camera's frames are flipped first (`YuvToNv21.mirror`), because CameraX mirrors only its preview; the subject then sees the photographer's view, and the guide lines up. Likewise the front camera's photo is flipped through EXIF (`PhotoSaver`), its scene photo when turned upright (`CameraFrameCache`), and a focus tap maps to the sensor's other side. The subject's phone shows the rear camera's video as a mirror, so the subject moves the way they see themselves ([#201]). `camera.state` names the camera in use (`facing`; none from an older phone means the rear one). The renderer flips the video (`setMirror`), since a SurfaceView ignores its own scale. The grid, the guide, and the reference photo flip as views. The guide's coordinates stay the photographer's, and a drag on the flipped guide still moves it under the finger. The front camera's video comes flipped already, so it shows as sent. A ratio change rebinds analysis, and WebRTC takes the new size without renegotiation. The source scales down only beyond 1280×720 pixels.
 - **Encoding.** Hardware H.264 is preferred, with VP8 as the fallback, at up to 30 fps and 2.5 Mbps for every ratio (NFR-12). *Maintain framerate* lowers resolution first on poor networks (NFR-6). A TURN relay keeps the cap and adds latency within NFR-5 (0.8 s).
 - **Rendering.** The subject's `SurfaceViewRenderer` uses aspect-fit scaling, `wrap_content`, centered, so it takes the video's shape. At `match_parent` it would crop the frames, and the overlays would not line up ([#86]). `GuideOverlayView` and `CameraCompositionView` fit the same rectangle from `camera.state` (2.6.2). The whole video area takes the pinch. `videoScrim` darkens the video (It 3, Iter3-A12). It is full until `FrameWatchdog` sees the first frame, then clears in 200 ms. It is 60 % under text and during a ratio change, and blinks to 50 % and back in 120 ms at the photographer's shutter (`photo.shutter`, 2.5.1).
 - **Later optimization.** If CPU or battery use misses NFR-12, switch to a GPU path: a CameraX Preview surface backed by WebRTC's `SurfaceTextureHelper` avoids the YUV copy.

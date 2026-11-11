@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -52,6 +53,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
@@ -59,7 +61,9 @@ import org.robolectric.shadows.ShadowToast
  * Subject view's render paths (R&S 6.6, Testing Documentation 2.1.6), on the real Fragment under FragmentScenario
  * with a container of fakes. Partitions: not connected / connected before the first frame / streaming / frames
  * stopped for 2 s ("camera paused") / streaming again / reconnecting; the photographer's capabilities with and
- * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
+ * without a flash and an exposure range; the camera state's zoom, flash, and ratio; the mirror (#201): the rear
+ * camera's video, grid, guide, and reference photo shown as a mirror, the front camera's as sent, and a drag on the
+ * mirrored guide moving it the way the finger goes; a guide arriving, the edit-mode
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
  * gone with a replaced or removed guide, and moved to another corner on this phone only; the brightness panel and a
  * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
@@ -236,6 +240,60 @@ class SubjectFragmentRenderTest {
             assertEquals(AspectRatio.R16_9.frameAspect, binding.guideOverlay.frameAspect)
             assertEquals("+1.0", binding.brightnessValue.text.toString())
         }
+    }
+
+    // ---- The mirror (#201) ------------------------------------------------------------------------------------
+
+    private fun cameraState(facing: CameraFacing) =
+        SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, facing = facing)
+
+    private fun FragmentSubjectBinding.mirrorShown(): List<Any> = listOf(
+        Shadow.extract<ShadowSurfaceViewRenderer>(liveView).mirror,
+        compositionOverlay.scaleX,
+        guideOverlay.scaleX,
+        referenceThumbnail.scaleX,
+    )
+
+    @Test
+    fun theRearCamera_showsAMirror_andTheFrontOne_asSent() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(cameraState(CameraFacing.BACK))
+        idle()
+        onScreen { binding, _ -> assertEquals(listOf(true, -1f, -1f, -1f), binding.mirrorShown()) }
+
+        // The photographer switches to the front camera, whose video is a mirror already.
+        modules.session.deliver(cameraState(CameraFacing.FRONT))
+        idle()
+        onScreen { binding, _ -> assertEquals(listOf(false, 1f, 1f, 1f), binding.mirrorShown()) }
+    }
+
+    @Test
+    fun aDragOnTheMirroredGuide_movesItTheWayTheFingerGoes() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(cameraState(CameraFacing.BACK))
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        onScreen { binding, _ -> binding.editGuideButton.performClick() }
+        idle()
+
+        val moves = mutableListOf<Float>()
+        onScreen { binding, _ ->
+            binding.guideOverlay.onGesture = { dx, _, _, _ -> moves += dx }
+            val container = binding.videoContainer
+            val x = container.width / 2f
+            val y = container.height / 2f
+            val down = SystemClock.uptimeMillis()
+            for ((action, at) in listOf(MotionEvent.ACTION_DOWN to x, MotionEvent.ACTION_MOVE to x + 40f)) {
+                val event = MotionEvent.obtain(down, down, action, at, y, 0)
+                container.dispatchTouchEvent(event)
+                event.recycle()
+            }
+        }
+
+        // To the right on this mirror is to the photographer's left: the guide's x goes down.
+        assertTrue(moves.toString(), moves.isNotEmpty() && moves.sum() < 0f)
     }
 
     // ---- The photographer's reference photo (FR-3.9) -------------------------------------------------------

@@ -6,14 +6,12 @@
   },
   "flow2_pose_generation": {
     "notes": [
-      "Refused description → “"
+      "Each case says why, in one line (FR-4.7): no connection, over 60 s, the hourly or the day's limit, a harmful prompt, the AI service declining, no one found, or the server. Only no connection, 60 s, and the server offer "
     ],
     "texts": {
       "Leaning on the railing by the river": "강가 난간에 기대기",
       "Sitting on the steps with a coffee": "계단에 앉아 커피 들기",
-      "Crouching next to the dog": "강아지 옆에 쪼그려 앉기",
-      "The request failed or took longer than 60 seconds.": "문제가 생겼거나 60초 넘게 걸렸어요.",
-      "Your photo is kept, so you can try again.": "사진은 그대로 있으니 다시 시도해 보세요."
+      "Crouching next to the dog": "강아지 옆에 쪼그려 앉기"
     }
   },
   "flow3_add_friend": {

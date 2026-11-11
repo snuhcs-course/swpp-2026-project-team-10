@@ -152,8 +152,8 @@
     <string name="describe_label">원하는 포즈</string>
     <string name="describe_hint">예: 벽에 기대고 한 손은 주머니에</string>
     <string name="description_refused">지난 요청이 거절됐어요. 설명이나 사진을 바꿔 다시 시도하세요.</string>
-    <string name="description_rejected_message">AI 서비스가 이 사진으로 “%1$s” 포즈를 생성하지 않았어요.\n설명을 바꾸거나, 카메라로 돌아가 다른 사진을 찍으세요.</string>
-    <string name="generation_no_person_message">AI 서비스가 이 사진에서 사람을 찾지 못했어요.\n인물이 나오게 사진을 다시 찍으세요.</string>
+    <string name="description_rejected_message">유해한 프롬프트 요청을 받았어요.</string>
+    <string name="generation_no_person_message">이 사진에서 사람을 찾지 못했어요.</string>
     <!-- The descriptions used before on Generate poses (FR-4.11): the section, its All / With <name> switch, the line
          shown when nothing was used with that friend, and the ✕ of an entry, for TalkBack. -->
     <string name="history_label">이전에 쓴 설명</string>
@@ -199,7 +199,12 @@
     <string name="peer_closed_describe">%1$s님이 포즈 생성을 닫았어요</string>
     <string name="describe_go_failed">요청을 보내지 못했어요</string>
     <string name="generation_failed_title">포즈를 생성하지 못했어요</string>
-    <string name="generation_failed_message">문제가 생겼거나 60초 넘게 걸렸어요.\n사진은 그대로 있으니 다시 시도해 보세요.</string>
+    <string name="generation_offline_message">서버에 연결하지 못했어요.</string>
+    <string name="generation_timeout_message">포즈 생성이 60초 넘게 걸렸어요.</string>
+    <string name="generation_hourly_limit_message">최근 한 시간 사용량이 초과됐어요.</string>
+    <string name="generation_daily_limit_message">금일 사용량을 초과했어요.</string>
+    <string name="generation_declined_message">AI 서비스가 이 요청을 거절했어요.</string>
+    <string name="generation_server_message">서버에 문제가 생겼어요.</string>
 
     <!-- Flow 3: Share my camera, with the Pix friends; Add a friend (R&S 6.4, 6.7) -->
     <string name="share_my_camera">내 카메라 공유</string>

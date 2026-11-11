@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 # POST /pose-suggestions partitions (Testing Documentation 2.1.6). Scene: a JPEG within the contract, and one that is
 # not a JPEG, too large, or carries EXIF. The model's answer: four usable poses; JSON in a code fence; more than four;
 # a duplicate (in another case); a pose of 100 characters and one of 101; poses with line breaks; an item that is not
@@ -178,7 +178,7 @@ def test_global_suggestion_limit_refuses_every_client(client, image_api, make_im
     settings.suggestion_global_limit = 2
     for _ in range(2):
         assert suggest(client, make_image()).status_code == 200
-    assert "today" in assert_error(suggest(client, make_image()), 429, "RATE_LIMITED")
+    assert "today" in assert_error(suggest(client, make_image()), 429, "DAILY_LIMITED")
     clock.advance(settings.pose_global_window_seconds)
     assert suggest(client, make_image()).status_code == 200
 

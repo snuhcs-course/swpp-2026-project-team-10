@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -17,6 +17,7 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentPickPoseBinding
 import com.lastpenguin.pix.generation.CandidateEvent
+import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.session.PoseSetEnd
 import com.lastpenguin.pix.session.Role
@@ -27,6 +28,7 @@ import com.lastpenguin.pix.ui.generation.PoseKey
 import com.lastpenguin.pix.ui.generation.PosePageAdapter
 import com.lastpenguin.pix.ui.generation.PoseSaveViewModel
 import com.lastpenguin.pix.ui.generation.PoseSlot
+import com.lastpenguin.pix.ui.generation.failureMessage
 import com.lastpenguin.pix.ui.generation.inSet
 import com.lastpenguin.pix.ui.generation.setupPosePager
 import com.lastpenguin.pix.ui.generation.showPosePages
@@ -127,11 +129,18 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 }
 
 /**
- * What the subject's phone says when the photographer's set [end]ed (Design 2.6.5): that the photographer chose or
- * closed it, once *Pick a pose* had it; nothing for this phone's own pick, which the guide answers.
+ * What the subject's phone says when the photographer's set [end]ed (Design 2.6.5): why it failed, as the
+ * photographer's phone says it (#203); that the photographer chose or closed it, once *Pick a pose* had it; nothing
+ * for this phone's own pick, which the guide answers.
  */
 internal fun poseSetEndNotice(context: Context, end: PoseSetEnd, photographer: String?): String? {
-    if (!end.wasPicking || end.by == Role.SUBJECT || photographer == null) return null
+    if (photographer == null) return null
+    end.failure?.let { return poseFailureNotice(context, it, photographer) }
+    if (!end.wasPicking || end.by == Role.SUBJECT) return null
     val text = if (end.step == PoseSetStep.CHOSEN) R.string.peer_chose_pose else R.string.peer_closed_poses
     return context.getString(text, photographer)
 }
+
+/** The photographer's set failed: whose poses, and why, in the line Couldn't create poses shows (FR-4.7, #203). */
+internal fun poseFailureNotice(context: Context, failure: GenerationError, photographer: String): String =
+    context.getString(R.string.peer_poses_failed, photographer) + "\n" + context.getString(failureMessage(failure))

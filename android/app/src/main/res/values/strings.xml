@@ -160,8 +160,8 @@
     <string name="describe_hint">e.g. Leaning on the wall, one hand in a pocket</string>
     <string name="description_counter" translatable="false">%1$d/%2$d</string>
     <string name="description_refused">The last set was refused. Try a different description, or another photo.</string>
-    <string name="description_rejected_message">The AI service would not create poses for “%1$s” with this photo.\nTry a different description, or go back to the camera and take another photo.</string>
-    <string name="generation_no_person_message">The AI service found no one in this photo.\nTake another photo with the person in it.</string>
+    <string name="description_rejected_message">Pix received a harmful prompt.</string>
+    <string name="generation_no_person_message">No one was found in this photo.</string>
     <!-- The descriptions used before on Generate poses (FR-4.11): the section, its All / With <name> switch, the line
          shown when nothing was used with that friend, and the ✕ of an entry, for TalkBack. -->
     <string name="history_label">Used before</string>
@@ -213,7 +213,15 @@
     <string name="peer_closed_describe">%1$s closed Generate poses</string>
     <string name="describe_go_failed">Couldn\'t send your request</string>
     <string name="generation_failed_title">Couldn\'t create poses</string>
-    <string name="generation_failed_message">The request failed or took longer than 60 seconds.\nYour photo is kept, so you can try again.</string>
+    <!-- Couldn't create poses says why, in one line each (FR-4.7, #203): no connection, the 60 s limit, this phone's
+         hourly limit, everyone's limit for the day, the image service declining, a server error. A refused description
+         and no person are above. -->
+    <string name="generation_offline_message">Pix couldn\'t reach the server.</string>
+    <string name="generation_timeout_message">It took longer than 60 seconds.</string>
+    <string name="generation_hourly_limit_message">The hourly limit has been reached.</string>
+    <string name="generation_daily_limit_message">Today\'s limit has been reached.</string>
+    <string name="generation_declined_message">The AI service declined this request.</string>
+    <string name="generation_server_message">The server had a problem.</string>
 
     <!-- Flow 3: Share my camera, with the Pix friends; Add a friend (R&S 6.4, 6.7) -->
     <string name="share_my_camera">Share my camera</string>

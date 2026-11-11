@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.lifecycle.Lifecycle
@@ -89,7 +90,8 @@ import org.robolectric.shadows.ShadowToast
  * all the same). The ♥'s pop (Iter3-A13), with the display's frames paused: a ♥ that saves pops once, and one that
  * removes does not; with animations off, it only fills. A candidate's fade is in PoseCandidateAdapterTest. Couldn't
  * create poses, its actions in the top bar (#199): Try again, a rejected description with no retry, a scene in which
- * the server found no one with Shoot again (FR-4.13), and Back to Generate poses with the photo and the text. The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1), the
+ * the server found no one with no action (FR-4.13), and Back to Generate poses with the photo and the text; each case
+ * of failure with its one-line message, and Try again only for the offline, timeout, and server cases (#203). The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1), the
  * thumbnails, the slots, and the pages in that shape; the four slots of a 9:16 scene whole on screen, centered, and
  * those of 3:4 and 1:1 as wide as half the screen as before; a candidate whose ratio the model rounded shown whole.
  */
@@ -1239,10 +1241,8 @@ class GenerationScreensTest {
 
         s.onFragment { fragment ->
             val binding = FragmentFailureBinding.bind(fragment.requireView())
-            assertEquals(
-                string(R.string.description_rejected_message, "hands on hips"),
-                binding.failureMessage.text.toString(),
-            )
+            // The reason alone; the description is not repeated (#203).
+            assertEquals(string(R.string.description_rejected_message), binding.failureMessage.text.toString())
             // The same description would be refused again.
             assertEquals(View.GONE, binding.topActionButton.visibility)
             binding.backButton.performClick()
@@ -1258,7 +1258,7 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun noPersonInThePhoto_offersToShootAgain() {
+    fun noPersonInThePhoto_saysSo_withNoAction_andBackGoesToGeneratePoses() {
         val modules = modules()
         val (s, nav) = launchPrepared<GenerationFailedFragment>(R.id.generationFailedFragment) {
             failed(modules, it, GenerationError.NO_PERSON)
@@ -1268,18 +1268,44 @@ class GenerationScreensTest {
         s.onFragment { fragment ->
             val binding = FragmentFailureBinding.bind(fragment.requireView())
             assertEquals(string(R.string.generation_no_person_message), binding.failureMessage.text.toString())
-            assertEquals(string(R.string.shoot_again), binding.topActionButton.text.toString())
-            binding.topActionButton.performClick()
+            // No Shoot again any more (#203): Back leads to the photo's review, which takes another.
+            assertEquals(View.GONE, binding.topActionButton.visibility)
+            binding.backButton.performClick()
         }
         idle()
 
-        // The camera takes a new scene photo; the old one and the set are gone.
-        s.onFragment {
-            val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
-            assertEquals(GenerationUiState(phase = GenerationUiState.Phase.FRAMING), state)
-        }
-        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+        assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
         assertEquals(1, modules.generator.runs.size)
+    }
+
+    @Test
+    fun eachFailure_saysWhy_andOnlyAFailureThatMayPassOffersTryAgain() {
+        val cases = mapOf(
+            GenerationError.OFFLINE to (R.string.generation_offline_message to true),
+            GenerationError.TIMEOUT to (R.string.generation_timeout_message to true),
+            GenerationError.RATE_LIMITED to (R.string.generation_hourly_limit_message to false),
+            GenerationError.DAILY_LIMITED to (R.string.generation_daily_limit_message to false),
+            GenerationError.REJECTED to (R.string.description_rejected_message to false),
+            GenerationError.DECLINED to (R.string.generation_declined_message to false),
+            GenerationError.NO_PERSON to (R.string.generation_no_person_message to false),
+            GenerationError.SERVER to (R.string.generation_server_message to true),
+        )
+        assertEquals(GenerationError.entries.toSet(), cases.keys)
+        for ((error, expected) in cases) {
+            val (message, tryAgain) = expected
+            val modules = modules()
+            val (s, _) = launchPrepared<GenerationFailedFragment>(R.id.generationFailedFragment) {
+                failed(modules, it, error)
+            }
+            s.onFragment { fragment ->
+                val binding = FragmentFailureBinding.bind(fragment.requireView())
+                assertEquals("$error", string(R.string.generation_failed_title), binding.failureTitle.text.toString())
+                assertEquals("$error", string(message), binding.failureMessage.text.toString())
+                assertEquals("$error", tryAgain, binding.topActionButton.isVisible)
+                if (tryAgain) assertEquals(string(R.string.try_again), binding.topActionButton.text.toString())
+            }
+            s.close()
+        }
     }
 
     @Test

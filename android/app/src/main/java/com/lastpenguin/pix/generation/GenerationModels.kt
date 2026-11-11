@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -32,8 +32,20 @@ sealed interface PoseRequest {
 /** One pose of a set: [id] names its slot (`pose-1` … `pose-4`), [text] is what the image model is asked for. */
 data class PlannedPose(val id: String, val text: String)
 
-/** Why a candidate failed (Design 2.5.3): [NO_PERSON] is the server finding no one in the scene photo (FR-4.13). */
-enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, NO_PERSON, SERVER }
+/**
+ * Why a candidate, or a whole run, failed (Design 2.5.3; FR-4.7): [RATE_LIMITED] is this phone's hourly limit and
+ * [DAILY_LIMITED] everyone's limit for the day; [REJECTED] is the description filter refusing the text (FR-4.12) and
+ * [DECLINED] the image service refusing the request; [NO_PERSON] is the server finding no one in the scene photo
+ * (FR-4.13).
+ */
+enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, DAILY_LIMITED, REJECTED, DECLINED, NO_PERSON, SERVER }
+
+/**
+ * A run that ended before any pose was planned, as when the suggestions cannot be had, with the [error] the screens
+ * show (FR-4.7). Any other exception that ends a run counts as [GenerationError.SERVER].
+ */
+class GenerationFailedException(val error: GenerationError, cause: Throwable? = null) :
+    Exception("Pose generation failed: $error", cause)
 
 /** What a run reports: the poses of the set once, then one result per pose. */
 sealed interface GenerationEvent {

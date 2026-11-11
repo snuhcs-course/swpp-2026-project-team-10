@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -56,6 +56,7 @@ class MessageCodecTest {
             SessionMessage.PoseStep("set1", PoseSetStep.GENERATING),
             SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-4")),
             SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-4", by = Role.SUBJECT),
+            SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "DAILY_LIMITED"),
             SessionMessage.PoseCandidateBegin("set1", "pose-4", "jpeg", 768, 1024, 151_320, 17),
             SessionMessage.PoseCandidateChunk("set1", "pose-4", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PoseCandidateEnd("set1", "pose-4", 3735928559L),
@@ -144,6 +145,21 @@ class MessageCodecTest {
             SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-2", by = Role.SUBJECT),
             example!!.message,
         )
+    }
+
+    @Test
+    fun `a set's end says why it failed only when it did`() {
+        val closed = Json.parseToJsonElement(codec.encode(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED)))
+        assertEquals(setOf("setId", "step"), closed.jsonObject.getValue("b").jsonObject.keys)
+
+        val failed = SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "OFFLINE")
+        val body = Json.parseToJsonElement(codec.encode(failed)).jsonObject.getValue("b").jsonObject
+        assertEquals(setOf("setId", "step", "failure"), body.keys)
+        assertEquals("OFFLINE", body.getValue("failure").jsonPrimitive.content)
+
+        // Any name: the receiver reads one it does not know as a server error, so a new reason drops no message.
+        val newer = """{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"setId":"s","step":"CLOSED","failure":"NEW"}}"""
+        assertEquals(SessionMessage.PoseStep("s", PoseSetStep.CLOSED, failure = "NEW"), codec.decode(newer)!!.message)
     }
 
     @Test

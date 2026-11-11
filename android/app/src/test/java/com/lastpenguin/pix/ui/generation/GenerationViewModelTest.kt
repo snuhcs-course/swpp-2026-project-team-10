@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -18,6 +18,7 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.GenerationEvent
+import com.lastpenguin.pix.generation.GenerationFailedException
 import com.lastpenguin.pix.generation.PoseGenerator
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
@@ -569,7 +570,7 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun aSetInWhichOnlySomePosesFoundNoOneFailsLikeAnyOther() = runTest {
+    fun aSetInWhichSomePosesFoundNoOne_andTheOtherTimedOut_failsAsNoOne() = runTest {
         generateFromAPhoto()
         val run = generator.runs.single()
 
@@ -579,8 +580,10 @@ class GenerationViewModelTest {
         run.finish()
         runCurrent()
 
+        // No person tells more than the timeout: another try fails the same way (#203; before it, a timeout).
         assertEquals(GenerationUiState.Phase.FAILED, state.phase)
-        assertFalse(state.noPerson)
+        assertEquals(GenerationError.NO_PERSON, state.failure)
+        assertTrue(state.noPerson)
     }
 
     @Test
@@ -798,6 +801,169 @@ class GenerationViewModelTest {
 
         assertEquals(GenerationUiState.Phase.FAILED, state.phase)
         assertFalse(state.descriptionRejected)
+        // Nobody wrote a description to blame: the service refused the request (#203).
+        assertEquals(GenerationError.DECLINED, state.failure)
+    }
+
+    // ---- why a set failed (FR-4.7, #203) -------------------------------------------------------------------------
+
+    @Test
+    fun everyPoseFailingForOneReason_failsForThatReason() = runTest {
+        for (error in GenerationError.entries) {
+            describeAPhoto()
+            model.generate("Wave")
+            runCurrent()
+            generator.runs.last().apply {
+                plan(List(4) { "Wave" })
+                send(*(1..4).map { failed("pose-$it", error) }.toTypedArray())
+                finish()
+            }
+            runCurrent()
+
+            assertEquals(GenerationUiState.Phase.FAILED, state.phase)
+            assertEquals(error, state.failure)
+            // Generate poses says the description was refused, by the filter or by the image service (US-5).
+            val refused = error == GenerationError.REJECTED || error == GenerationError.DECLINED
+            assertEquals("$error", refused, state.descriptionRejected)
+            assertEquals("$error", error == GenerationError.NO_PERSON, state.noPerson)
+            model.cancel()
+        }
+    }
+
+    @Test
+    fun posesFailingForDifferentReasons_failForTheOneThatTellsTheMost() = runTest {
+        fun failsAs(expected: GenerationError, vararg errors: GenerationError) {
+            describeAPhoto()
+            model.generate("Wave")
+            runCurrent()
+            generator.runs.last().apply {
+                plan(List(4) { "Wave" })
+                send(*errors.mapIndexed { i, error -> failed("pose-${i + 1}", error) }.toTypedArray())
+                finish()
+            }
+            runCurrent()
+            assertEquals(errors.joinToString(), expected, state.failure)
+            model.cancel()
+        }
+        // A cause that another try meets again comes first: the limits, the photo, the refusals; then the network.
+        failsAs(
+            GenerationError.DAILY_LIMITED,
+            GenerationError.RATE_LIMITED,
+            GenerationError.SERVER,
+            GenerationError.DAILY_LIMITED,
+            GenerationError.NO_PERSON,
+        )
+        failsAs(
+            GenerationError.RATE_LIMITED,
+            GenerationError.NO_PERSON,
+            GenerationError.REJECTED,
+            GenerationError.OFFLINE,
+            GenerationError.RATE_LIMITED,
+        )
+        failsAs(
+            GenerationError.NO_PERSON,
+            GenerationError.DECLINED,
+            GenerationError.REJECTED,
+            GenerationError.NO_PERSON,
+            GenerationError.TIMEOUT,
+        )
+        failsAs(
+            GenerationError.REJECTED,
+            GenerationError.SERVER,
+            GenerationError.DECLINED,
+            GenerationError.OFFLINE,
+            GenerationError.REJECTED,
+        )
+        failsAs(
+            GenerationError.DECLINED,
+            GenerationError.TIMEOUT,
+            GenerationError.OFFLINE,
+            GenerationError.SERVER,
+            GenerationError.DECLINED,
+        )
+        failsAs(
+            GenerationError.OFFLINE,
+            GenerationError.SERVER,
+            GenerationError.TIMEOUT,
+            GenerationError.OFFLINE,
+            GenerationError.SERVER,
+        )
+        failsAs(
+            GenerationError.TIMEOUT,
+            GenerationError.SERVER,
+            GenerationError.SERVER,
+            GenerationError.TIMEOUT,
+            GenerationError.SERVER,
+        )
+    }
+
+    @Test
+    fun aRunThatEndsBeforeAnyPose_failsForTheReasonItGives_orAsAServerError() = runTest {
+        generateFromAPhoto()
+        // The suggestions reached everyone's limit for the day.
+        generator.runs.single().finish(GenerationFailedException(GenerationError.DAILY_LIMITED))
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.FAILED, state.phase)
+        assertEquals(GenerationError.DAILY_LIMITED, state.failure)
+
+        // Any other exception says nothing the screen can name.
+        model.retry()
+        runCurrent()
+        generator.runs.last().finish(IllegalStateException("Unexpected"))
+        runCurrent()
+        assertEquals(GenerationError.SERVER, state.failure)
+    }
+
+    @Test
+    fun theRunsLimit_reachedBeforeAnyPose_failsAsATimeout() = runTest {
+        generateFromAPhoto()
+
+        advanceTimeBy(LIMIT_MS + 1)
+        runCurrent()
+
+        assertEquals(GenerationUiState.Phase.FAILED, state.phase)
+        assertEquals(GenerationError.TIMEOUT, state.failure)
+    }
+
+    @Test
+    fun theSubjectsPhone_hearsWhyTheSetFailed_withItsEnd_andNothingForASetThatGoesOn() = runTest {
+        generateFromAPhoto()
+        generator.runs.single().apply {
+            plan()
+            send(*(1..4).map { failed("pose-$it", GenerationError.OFFLINE) }.toTypedArray())
+            finish()
+        }
+        runCurrent()
+        assertEquals("close ${share.opened.last()}, failed as OFFLINE", share.calls.last())
+
+        model.retry()
+        runCurrent()
+        generator.runs.last().apply {
+            plan()
+            send(ready("pose-1"), failed("pose-2", GenerationError.OFFLINE))
+            finish()
+        }
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.PICKING, state.phase)
+        assertNull(state.failure)
+        assertFalse(share.calls.any { it.startsWith("close ${share.opened.last()}") })
+    }
+
+    @Test
+    fun theImageServiceDecliningTheDescriptionsOwnRequest_keepsItOutOfTheHistory() = runTest {
+        history.record("Lean on the wall", Role.PHOTOGRAPHER, null)
+        describeAPhoto()
+        model.generate("Lean on the wall")
+        runCurrent()
+        generator.runs.single().apply {
+            plan(listOf("Lean on the wall", "Lean back", "Lean with arms crossed", "Lean and laugh"))
+            send(failed("pose-1", GenerationError.DECLINED), ready("pose-2"))
+        }
+        runCurrent()
+
+        // Both refusals count, the user decided (#200): the entry kept before goes, and the subject's phone is told.
+        assertEquals(emptyList<PromptEntry>(), history.entries.value)
+        assertTrue(share.calls.contains("failed pose-1, the description rejected"))
     }
 
     @Test
@@ -1093,7 +1259,8 @@ class GenerationViewModelTest {
 
         val (first, second, third) = share.opened
         assertEquals(
-            listOf("close $first", "close $second", "close $third"),
+            // The second set ended with nothing at all: the subject's phone hears why, a server error (#203).
+            listOf("close $first", "close $second, failed as SERVER", "close $third"),
             share.calls.filter {
                 it.startsWith("close")
             },
@@ -1716,8 +1883,8 @@ class GenerationViewModelTest {
             calls += "chosen $poseId by $by"
         }
 
-        override fun close(setId: String) {
-            calls += "close $setId"
+        override fun close(setId: String, failure: GenerationError?) {
+            calls += "close $setId" + (failure?.let { ", failed as $it" } ?: "")
         }
     }
 

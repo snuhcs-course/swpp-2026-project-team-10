@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
+import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.followSubjectSets
@@ -27,7 +28,8 @@ import org.junit.Test
  * Photographer, the set (state-based): GENERATING, the planned slots and each failure before the copies (Iter3-A13;
  * none for a set that is not generating), a failure that is the service refusing the description saying so and one
  * that is not saying nothing (Iter4-P3), the refusal of a set that closes in the same change, or that ended before the
- * sender heard of it, sent before its end, each candidate as it arrives, then PICKING with its order, then
+ * sender heard of it, sent before its end, a set closed failing with why and one closed by the user without (#203),
+ * each candidate as it arrives, then PICKING with its order, then
  * CHOSEN with whose pick; CLOSED from GENERATING or PICKING; one end per set, so a close after a choice sends nothing;
  * a candidate or a step after the end is not sent; a candidate that cannot be encoded is left out, also from PICKING.
  * Photographer, the connection: nothing goes while no subject is connected; a sender started later (a reconnect)
@@ -284,6 +286,54 @@ class PoseSyncerTest {
         syncer.startAsSender(backgroundScope)
         runCurrent()
         assertEquals(failures, session.sent.filterIsInstance<SessionMessage.PoseCandidateFailed>())
+    }
+
+    @Test
+    fun `a set that closes failing says why with its end, also after a reconnect`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        val first = Job()
+        syncer.startAsSender(TestScope(testScheduler + first))
+        syncer.open("set1")
+        runCurrent()
+        syncer.close("set1", GenerationError.DAILY_LIMITED)
+        runCurrent()
+        val failed = SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "DAILY_LIMITED")
+        assertEquals(failed, steps().last())
+
+        // A sender started again sends the end alone, with why.
+        first.cancel()
+        session.sent.clear()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+        assertEquals(listOf(failed), steps())
+
+        // A set closed by the user says nothing more.
+        syncer.open("set2")
+        runCurrent()
+        syncer.close("set2")
+        runCurrent()
+        assertEquals(SessionMessage.PoseStep("set2", PoseSetStep.CLOSED), steps().last())
+    }
+
+    @Test
+    fun `the subject's end of a set says why it failed, and a reason it does not know is a server error`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        val ends = mutableListOf<PoseSetEnd>()
+        backgroundScope.launch { syncer.ended.collect { ends += it } }
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        deliverStep("set1", PoseSetStep.GENERATING)
+        session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "NO_PERSON"))
+        deliverStep("set2", PoseSetStep.GENERATING)
+        session.deliver(SessionMessage.PoseStep("set2", PoseSetStep.CLOSED, failure = "SOMETHING_NEW"))
+        deliverStep("set3", PoseSetStep.GENERATING)
+        deliverStep("set3", PoseSetStep.CLOSED)
+        runCurrent()
+
+        assertEquals(listOf(GenerationError.NO_PERSON, GenerationError.SERVER, null), ends.map { it.failure })
     }
 
     @Test

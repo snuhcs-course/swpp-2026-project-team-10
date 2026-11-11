@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -59,8 +59,13 @@ class SubjectGeneratingFragment : Fragment(R.layout.fragment_generating) {
                         if (end.setId != ui.setId) return@collect
                         val name = ui.photographerName
                         if (end.step == PoseSetStep.CLOSED && name != null) {
-                            val text = if (ui.allFailed) R.string.peer_poses_failed else R.string.peer_stopped_poses
-                            Toast.makeText(requireContext(), getString(text, name), Toast.LENGTH_SHORT).show()
+                            // Why, from a photographer that says it (#203); an older one says nothing of it.
+                            val text = end.failure?.let { poseFailureNotice(requireContext(), it, name) }
+                                ?: getString(
+                                    if (ui.allFailed) R.string.peer_poses_failed else R.string.peer_stopped_poses,
+                                    name,
+                                )
+                            Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
                         }
                         backToSubject()
                     }

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-31, reviewed by Dongje Park
+# AI-generated with Claude Code, 2026-11-11, reviewed by Dongje Park
 # POST /pose-tips partitions (Testing Documentation 2.1.6). Photos: a scene and a candidate within the contract, and
 # either one not a JPEG, too large, carrying EXIF, or missing. Pose: one in Korean with extra whitespace, of 100
 # characters and of 101, blank, or missing. The model's answer: usable, with each framing it may judge; JSON in a code
@@ -461,7 +461,7 @@ def test_global_tip_limit_refuses_every_client(client, photos, settings, clock):
     settings.tip_global_limit = 2
     for _ in range(2):
         assert ask(client, photos).status_code == 200
-    assert "today" in assert_error(ask(client, photos), 429, "RATE_LIMITED")
+    assert "today" in assert_error(ask(client, photos), 429, "DAILY_LIMITED")
     clock.advance(settings.pose_global_window_seconds)
     assert ask(client, photos).status_code == 200
 

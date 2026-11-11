@@ -137,7 +137,10 @@ sealed interface SessionMessage {
     /**
      * Where the photographer's set of candidates [setId] is (Design 2.5.1, 2.6.5, Iter3-P16): the subject's *Pick a
      * pose* follows it. [poseIds] are the created candidates in the photographer's order, with PICKING; [poseId] and
-     * [by] say whose *Use this pose* decided, with CHOSEN. A set ends once, with CHOSEN or CLOSED.
+     * [by] say whose *Use this pose* decided, with CHOSEN. With CLOSED, [failure] names why the set failed (FR-4.7,
+     * #203), a `GenerationError` by name: a string, so a name this phone does not know drops no message, and reads as
+     * a server error; none when the user closed it, and none from a photographer of an older version. A set ends once,
+     * with CHOSEN or CLOSED.
      */
     @Serializable
     @SerialName("pose.step")
@@ -147,6 +150,7 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val poseIds: List<String> = emptyList(),
         @EncodeDefault(EncodeDefault.Mode.NEVER) val poseId: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val by: Role? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val failure: String? = null,
     ) : SessionMessage
 
     /**

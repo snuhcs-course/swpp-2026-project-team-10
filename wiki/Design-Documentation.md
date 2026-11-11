@@ -81,7 +81,8 @@
 | 3.1 | 2026-11-09 | Color tokens and a DayNight theme (Iter4-P5, [#202]): the tokens in two sets, page and on the image, and `Theme.Pix` on DayNight but dark until light mode (2.8). |
 | 3.2 | 2026-11-10 | A refused description is kept on neither phone: the description's own request decides, a refusal deletes the entry, `pose.candidate.failed` says `descriptionRejected`, and the subject reads `PoseSyncer.verdicts`; the owner of this task and of Iter4-P6 (2.2, 2.5.1, 2.6.3, 2.9; Iter4-P3, [#200]). |
 | 3.3 | 2026-11-10 | Back on the pose screens (Iter4-P2, [#199]): each screen's Back goes one step back, *Regenerate* on *Pick a pose*, the step's action at the top right, Back on *Generating poses* and *Pick a pose* asking first, as it loses the images, and *Reference confirm* without *Choose another photo*; the decision leaves *Still open* (2.4, 2.5.1, 2.5.3, 2.6.3, 2.6.5). |
-| 3.4 | 2026-11-11 | The subject's video as a mirror with the rear camera too: `camera.state` names the camera in use, and the subject flips the video, the grid, the guide, and the reference photo (2.3, 2.5.1, 2.6.4; Iter4-P4, [#201]). |
+| 3.4 | 2026-11-11 | Why poses failed (Iter4-P6, [#203]): `422 DECLINED` and `429 DAILY_LIMITED` on the server, `GenerationError` and `GenerationFailedException`, the case each failed set names and when it offers *Try again*, and `pose.step`'s `failure` for the subject's phone (2.1, 2.2, 2.5.1, 2.5.3, 2.6.3, 2.6.5, 2.8). |
+| 3.5 | 2026-11-11 | The subject's video as a mirror with the rear camera too: `camera.state` names the camera in use, and the subject flips the video, the grid, the guide, and the reference photo (2.3, 2.5.1, 2.6.4; Iter4-P4, [#201]). |
 
 </details>
 
@@ -493,7 +494,8 @@ interface AppLanguage {                                 // FR-10.2, 2.6.8: Pix's
 
 interface PoseGenerator {                               // POST /pose-suggestions first (suggestions, or a description's
                                                         // variations), while the description's own POST /poses goes out;
-                                                        // emits Planned with four poses, then one CandidateEvent each
+                                                        // emits Planned with four poses, then one CandidateEvent each;
+                                                        // ends with GenerationFailedException(error) before any pose
     fun generate(scene: Bitmap, request: PoseRequest, seed: Long, selfie: Boolean = false): Flow<GenerationEvent>
 }                                                       // selfie: sent with each request (FR-1.14)
 
@@ -821,7 +823,7 @@ classDiagram
     +failed(setId, poseId, descriptionRejected)
     +picking(setId, poseIds)
     +chosen(setId, poseId, by)
-    +close(setId)
+    +close(setId, failure)
   }
   class PoseSyncer {
     +mirror StateFlow~MirrorPoseSet~
@@ -1390,8 +1392,9 @@ sealed interface CandidateEvent : GenerationEvent {
     data class Ready(override val poseId: String, val image: Bitmap) : CandidateEvent
     data class Failed(override val poseId: String, val error: GenerationError) : CandidateEvent
 }
-enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, NO_PERSON, SERVER }
-// every pose REJECTED: another description or photo (US-5); every pose NO_PERSON: another photo
+enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, DAILY_LIMITED, REJECTED, DECLINED, NO_PERSON, SERVER }
+// RATE_LIMITED: this phone's hour; DAILY_LIMITED: everyone's day; REJECTED: the filter; DECLINED: the image service
+class GenerationFailedException(val error: GenerationError) : Exception  // a run that ends before any pose (FR-4.7)
 data class PoseTip(val text: String)                         // how to hold the phone for the chosen pose (FR-4.10)
 data class PoseKey(val setId: String, val poseId: String)    // a ♥ on Pick a pose (FR-4.14); pose ids repeat per set
 data class PromptEntry(val text: String, val usedAt: Long, val role: Role, val partners: Set<String> = emptySet())
@@ -1539,7 +1542,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `pose.scene.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The scene photo, for the subject's *Generate poses* |
 | `pose.description.edit` | S→P | reliable | `descriptionId`, `holding`, `text` | The subject's field takes or returns the description |
 | `pose.description.go` | S→P | reliable | `descriptionId`, `text`, `suggest` | The subject's *Generate poses* button |
-| `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by` | The photographer's set of candidates (FR-6.15) |
+| `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by`, `failure` | The photographer's set of candidates (FR-6.15), and why a closed set failed (FR-4.7) |
 | `pose.planned` | P→S | reliable | `setId`, `poseIds` | The set's slots in order (Iter3-A13) |
 | `pose.candidate.begin` / `.chunk` / `.end` | P→S | reliable | chunks | One candidate, for *Generating poses* and *Pick a pose* |
 | `pose.candidate.failed` | P→S | reliable | `setId`, `poseId`, `descriptionRejected` (only when true) | A candidate that could not be created (Iter3-A13), and whether the service refused the set's description itself (Iter4-P3) |
@@ -1758,9 +1761,9 @@ Planned (FR-7.5, Could): sent after `hello` and at each change of the photograph
 | `GENERATING` | *Generate poses*' button started a set | — |
 | `PICKING` | The photographer's *Pick a pose* opened | `poseIds`: the candidates whose copy went out, in its order |
 | `CHOSEN` | A *Select* decided | `poseId`, `by` |
-| `CLOSED` | No choice: Back, *Regenerate*, or no candidate | — |
+| `CLOSED` | No choice: Back, *Regenerate*, or no candidate | `failure` with no candidate: why, a `GenerationError` by name ([#203]) |
 
-Each set, *Try again* and *Regenerate* included, has a new `setId`.
+Each set, *Try again* and *Regenerate* included, has a new `setId`. `failure` is a string, not an enum, so a subject that does not know a newer name keeps the message and reads it as `SERVER`. An older photographer sends none, and an older subject ignores it.
 
 </details>
 
@@ -2152,16 +2155,16 @@ The sender gets no answer. The photographer's `leave` ends the session. The subj
 
 Base URL `http://<host>/api/v1`, plain HTTP on the course servers (AD-11). Requests and answers are JSON, except the multipart pose requests.
 
-- **Errors.** One shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. A missing or malformed field is `400 INVALID_REQUEST`; `422` is only `REJECTED` or `NO_PERSON`. Framework answers: a plain `413` for a request over 1 MiB, before reading it; `404 {"detail": "Not Found"}`; `405 {"detail": "Method Not Allowed"}`; a plain `500` for an unexpected failure.
+- **Errors.** One shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. A missing or malformed field is `400 INVALID_REQUEST`; `422` is only `REJECTED`, `DECLINED`, or `NO_PERSON`, and `429` is `RATE_LIMITED` or `DAILY_LIMITED`. Framework answers: a plain `413` for a request over 1 MiB, before reading it; `404 {"detail": "Not Found"}`; `405 {"detail": "Method Not Allowed"}`; a plain `500` for an unexpected failure.
 - **Access.** *auth* needs `Authorization: Bearer <access token>` (*Session tokens* below), otherwise `401 UNAUTHENTICATED`. *Pix ID* also needs a chosen Pix ID, otherwise `403 PIX_ID_REQUIRED`. "—" works without an account (FR-5.1).
 - **Outages.** An endpoint that needs the database or the session store answers `503 UNAVAILABLE` when it fails (2.7). The table lists the other errors.
 
 | Endpoint | Access | Purpose | Errors |
 |----|----|----|----|
 | `GET /pose-templates` | — | Default poses by id, for apps before Iteration 2 only | — |
-| `POST /pose-suggestions` (It 2) | — | Four poses for the scene, or a description and three variations; once per set | `400 INVALID_IMAGE`, `422 REJECTED`, `429 RATE_LIMITED` |
-| `POST /poses` | — | One candidate; the app sends a set's four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `422 REJECTED`, `422 NO_PERSON` (It 3), `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
-| `POST /pose-tips` (It 3) | — | How to hold the phone for the chosen candidate (FR-4.10) | `400 INVALID_IMAGE`, `422 REJECTED`, `429 RATE_LIMITED`, `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
+| `POST /pose-suggestions` (It 2) | — | Four poses for the scene, or a description and three variations; once per set | `400 INVALID_IMAGE`, `422 REJECTED`, `429 RATE_LIMITED`, `429 DAILY_LIMITED` (It 4) |
+| `POST /poses` | — | One candidate; the app sends a set's four in parallel | `400 INVALID_IMAGE`, `400 UNKNOWN_TEMPLATE`, `422 REJECTED`, `422 DECLINED` (It 4), `422 NO_PERSON` (It 3), `429 RATE_LIMITED`, `429 DAILY_LIMITED` (It 4), `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
+| `POST /pose-tips` (It 3) | — | How to hold the phone for the chosen candidate (FR-4.10) | `400 INVALID_IMAGE`, `422 REJECTED`, `429 RATE_LIMITED`, `429 DAILY_LIMITED` (It 4), `502 UPSTREAM_ERROR`, `504 UPSTREAM_TIMEOUT` |
 | `POST /auth/signup` (It 2) | — | Account with a Pix ID, display name, and password (FR-5.2, FR-5.11) | `400 PIX_ID_INVALID`, `400 PASSWORD_INVALID`, `409 PIX_ID_TAKEN` |
 | `POST /auth/check-pix-id` (It 2) | — | Whether a Pix ID is free now (FR-5.15) | `400 PIX_ID_INVALID` |
 | `POST /auth/login` (It 2) | — | Sign in with a Pix ID and a password | `401 INVALID_CREDENTIALS` |
@@ -2250,7 +2253,7 @@ Outside `/api/v1`:
 - **Description.** The server trims it and folds each run of whitespace, line breaks included, into one space. It must then have 1–100 Unicode code points, never more than the app's field counts. The app sends a `text/plain; charset=utf-8` part. The text reaches the prompt as written, in Korean or English (2.6.3), and never a log (NFR-13). An empty one counts as left out.
 - **Before counting.** `INVALID_IMAGE`: not a readable JPEG, over 1024 px on its long side, or with EXIF; the server never repairs a photo. `INVALID_REQUEST`: a missing part, a non-integer `seed`, both or neither of `templateId` and `description`, a blank or over-long description, or `selfie` with a `templateId`. None of these reaches a model or the rate limit.
 - **Selfie.** The app sends `selfie` with every request of a front-camera set. It is refused with a template: old apps never send it, and some default poses need both hands or the whole body.
-- **After counting.** The description filter and the person check run at the same time (2.6.3). `REJECTED`: the filter or the image service refused. The service does not say whether it refused the photo or the text, so its message is the same for a description and a template (US-5). `NO_PERSON` (It 3): no person in the scene; `REJECTED` wins when both apply.
+- **After counting.** The description filter and the person check run at the same time (2.6.3). `REJECTED`: the filter refused the text. `DECLINED` (It 4, [#203]): the image service refused; it does not say whether it refused the photo or the text, so its message is the same for a description and a template (US-5). Until Iteration 4 both were `REJECTED`, which an older app still reads them as. `NO_PERSON` (It 3): no person in the scene; `REJECTED` wins when both apply.
 - **Upstream.** `seed` is reduced to 0…2³¹−1, the range the image models accept. `502 UPSTREAM_ERROR`: the image service failed, was unreachable, answered unreadably, or has no API key. `504 UPSTREAM_TIMEOUT`: no answer within `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (60 s). A phone that drops the request cancels the call (2.6.3).
 
 </details>
@@ -2545,7 +2548,7 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 4.  **Progressive results.** *Generating poses* shows four slots, two by two in the scene's shape, narrower and centered for a 9:16 scene (`CandidateGridFit`). A candidate, or its failure, fades in over 200 ms where its spinner was (Iter3-A13). The run ends when all four are done or at 60 s, when open requests are cancelled. With at least one candidate, *Pick a pose* shows each on its own page of a `ViewPager2` (`PosePageAdapter`), in its own shape. The page on screen is the one *Select* takes ([#108]). With none, *Couldn't create poses* opens (FR-4.7). After *Select*, *Pick a pose* stays under *Reference confirm*, whose Back returns to the set (`pickAgain`); the set goes once the screen leaves the back stack. In a session a choice is final, and the set goes at once. The scene photo goes once its tip is asked for.
 5.  **Cancellation.** Back on *Generating poses* cancels the coroutine scope and its HTTP calls. The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
 
-**Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A refused description can still get candidates (Iter4-P3, [#200]). The filter judges each of a set's five requests by itself and lets a request through when it cannot answer in 2 s. One of the description's own requests can pass that way. So can the request for variations, whose variations then pass as other words. The description's own request therefore decides. When a refused pose (`REJECTED`) is the description as written, the set records nothing, and `delete` removes the entry, also one that an earlier set or a build before [#182] kept. A refused variation changes nothing. The photographer's phone says so in `pose.candidate.failed` (`descriptionRejected`, 2.5.1), and the subject's phone then does the same, also when the refusal follows a candidate. When every pose is refused, the refusals and the set's end come as one change. So `PoseSyncer` sends an ended set's refusal before its end, and the subject's history reads a named set from `PoseSyncer.verdicts`, the sets accepted and refused, which keep a set after `mirror` dropped it and after the session ended. A set that is refused and replaced by the next one while the link reconnects sends no refusal (a known gap): an entry the subject's phone kept before then stays. The filter's refusal and the image service's both count (decided 2026-11-10). They share `REJECTED` today, and a code that tells them apart ([#203]) must count for both. A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
+**Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A refused description can still get candidates (Iter4-P3, [#200]). The filter judges each of a set's five requests by itself and lets a request through when it cannot answer in 2 s. One of the description's own requests can pass that way. So can the request for variations, whose variations then pass as other words. The description's own request therefore decides. When a refused pose (`REJECTED`) is the description as written, the set records nothing, and `delete` removes the entry, also one that an earlier set or a build before [#182] kept. A refused variation changes nothing. The photographer's phone says so in `pose.candidate.failed` (`descriptionRejected`, 2.5.1), and the subject's phone then does the same, also when the refusal follows a candidate. When every pose is refused, the refusals and the set's end come as one change. So `PoseSyncer` sends an ended set's refusal before its end, and the subject's history reads a named set from `PoseSyncer.verdicts`, the sets accepted and refused, which keep a set after `mirror` dropped it and after the session ended. A set that is refused and replaced by the next one while the link reconnects sends no refusal (a known gap): an entry the subject's phone kept before then stays. The filter's refusal (`REJECTED`) and the image service's (`DECLINED` since [#203]) both count (decided 2026-11-10). A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
 
 **Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. `PoseSaveViewModel`, scoped to the activity, cuts the person out with `ReferenceGuideMaker.make(image, GENERATED)` and saves the guide as an AI pose. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide. A tap on a filled heart deletes the guide. A newly saved ♥ pops to 125 % and back in 200 ms. Whether a save removed the oldest guide is decided under the store's lock (`GuideSaved`): of two hearts tapped at once with 99 saved, only the second removes one. *Select* on a filled heart reuses its saved guide. Nothing of a ♥ is sent (2.6.5).
 
@@ -2580,7 +2583,7 @@ The server derives the height move. It refuses a sentence with a number, a unit,
 
 **Time limit.** A run has 60 s on the phone, from the button, suggestions and variations included. Each server call to the image API has 60 s (`PIX_POSE_UPSTREAM_TIMEOUT_SECONDS`, then `504 UPSTREAM_TIMEOUT`). The phone's HTTP client waits 65 s and nginx 75 s, so the run's limit decides; a deploy lets requests finish. *Why:* sets usually finish within NFR-4's 20 s and 30 s, but single requests took up to 46 s on a slow day.
 
-**Limits and failures.** Each endpoint counts only requests about to reach a model, per client address and over all clients, and answers `429 RATE_LIMITED` past a limit (2.8, *Privacy*):
+**Limits and failures.** Each endpoint counts only requests about to reach a model, per client address and over all clients, and answers `429 RATE_LIMITED` past the client's limit and `429 DAILY_LIMITED` past the limit for all clients ([#203]; an older app reads both as the first) (2.8, *Privacy*):
 
 | Endpoint | Per client, per hour | All clients, per 24 h |
 |----|----|----|
@@ -2591,9 +2594,9 @@ The server derives the height move. It refuses a sentence with a number, a unit,
 | Failure | Result (texts: R&S 6.3) |
 |----|----|
 | One candidate | Its slot shows the failure; the others go on. |
-| Every candidate | *Couldn't create poses*, with *Try again* at the top right and Back to *Generate poses*; the photo is kept (FR-4.7). |
-| Every pose of a description `REJECTED` | No *Try again*; Back changes the description. The service does not say whether it refused the photo or the text (US-5). |
-| Every pose `NO_PERSON` | *Shoot again* replaces *Try again*. |
+| Every candidate | *Couldn't create poses* says why in one line, with Back to *Generate poses*; the photo is kept (FR-4.7). `failureOf` takes one case from the failed poses and the run's own error: the first of `DAILY_LIMITED`, `RATE_LIMITED`, `NO_PERSON`, `REJECTED`, `DECLINED`, `OFFLINE`, `TIMEOUT`, `SERVER`, since a cause another try would meet again tells more. A suggested set's `REJECTED` is shown as `DECLINED`, since nobody wrote a description. No error at all is `SERVER` ([#203]). |
+| Offline, timeout, server error | *Try again* at the top right. The other cases have none: a limit lasts, a refusal repeats, and a photo without a person needs another photo, which Back reaches through the photo's review. |
+| Suggestions | The run ends before any pose with `GenerationFailedException`, whose error the screen names; a limit is usually reached here first. The run's 60 s limit before any pose is `TIMEOUT`. |
 | Suggestions, over 8 s | The default poses fill in. |
 | Variations, over 10 s | The description fills in. |
 | Filter or person check | The request goes on (fail open). |
@@ -2645,7 +2648,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Swipes and the ♥ stay on each phone (2.6.3, *Saving a pose*).
   - The subject's `pose.pick` counts only while the set is `PICKING` and unchosen. `PickPoseFragment` then uses that candidate and tip (FR-4.10) and says "Joonhyung chose this pose".
   - The end closes the subject's screen with "Dongje chose a pose" or "Dongje closed the poses", unless the subject chose.
-- **Generating poses on both phones (Iter3-A13, [#180]).** `SubjectGeneratingFragment` shows the photographer's slots and failures in order (`pose.planned`, `pose.candidate.failed`). Before them it says "Choosing poses…" or "Creating…", from `DescriptionSyncer.startedScene`. Its Back returns to Subject view, whose button opens it again; the set goes on. With copies, `PICKING` leads on to *Pick a pose*. Otherwise the end returns to Subject view with "Dongje stopped creating poses" or "Dongje's poses couldn't be created".
+- **Generating poses on both phones (Iter3-A13, [#180]).** `SubjectGeneratingFragment` shows the photographer's slots and failures in order (`pose.planned`, `pose.candidate.failed`). Before them it says "Choosing poses…" or "Creating…", from `DescriptionSyncer.startedScene`. Its Back returns to Subject view, whose button opens it again; the set goes on. With copies, `PICKING` leads on to *Pick a pose*. Otherwise the end returns to Subject view with "Dongje stopped creating poses" or "Dongje's poses couldn't be created". A set that failed ends with `failure` (2.5.1), and both this screen and Subject view add the line Dongje's *Couldn't create poses* shows (`poseFailureNotice`, [#203]).
 - **Reference confirm on both phones.** The chosen pose's *Reference confirm* also shows on the subject's *Your reference*. Only the photographer's phone segments the person (FR-4.6).
   - `ConfirmShare` reports `FINDING`, `READY` with the outline's mask (`GuideImageCodec`), and `USED` or `CLOSED`. A confirm from *Add a pose guide* is not shared. A set the subject still holds as `PICKING` shows first.
   - The subject's `guide.confirm.use` counts only while that outline shows. `ReferenceViewModel` then sets the guide with its tip (FR-4.10) and says "Joonhyung used this guide". The guide reaches the subject like any guide.
@@ -2967,7 +2970,7 @@ erDiagram
 - The server never logs request bodies, images, the image API's response bodies, passwords, or tokens. Nor does it log descriptions, suggested poses, or variations, which describe the person in the photo.
 - A scene photo stays in memory until the response. nginx and the app refuse a request over 1 MiB before reading it, so no upload reaches the disk.
 - Each description and pose also goes, without the photo, to the description filter's decision model, TypeSafe's Jev on OpenRouter (2.6.3). A refusal logs only the question and its probability. Each `POST /poses` scene goes to the same model for the person check, which logs only its probability.
-- Rate limits count only requests that reach a model, to bound cost. Each answers `429 RATE_LIMITED` with a message that names the limit:
+- Rate limits count only requests that reach a model, to bound cost. Each answers 429 with a message that names the limit, `RATE_LIMITED` for the client's window and `DAILY_LIMITED` for all clients' ([#203]):
 
 | Request | Per address | All clients | Settings |
 |----|----|----|----|

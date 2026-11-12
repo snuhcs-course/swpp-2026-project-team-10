@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -41,7 +41,8 @@ enum class CaptionAlign { CENTER, START, END }
  * arrow, as real text that TalkBack reads, Korean included. [locate] says where the controls are in this view, or null
  * for one the screen does not show, which then gets no ring or caption; the screen calls [refresh] as they move.
  * Each caption goes on its side of the control, farther away or on another side when it would cover another
- * caption, ring, or the title, and stays inside the system bars; *Got it* takes the first free place of a few.
+ * caption, ring, or the title, and stays inside the system bars. *Got it* takes the first place of a few that no ring or
+ * the title covers, before the captions, so it does not move with the language.
  */
 class CoachMarkLayout @JvmOverloads constructor(
     context: Context,
@@ -179,12 +180,17 @@ class CoachMarkLayout @JvmOverloads constructor(
             titleSpot = spot
         }
 
+        // *Got it* before the captions, from the rings and the title alone, so it stands in the same place in every
+        // language however long the captions run; they keep clear of it (#204).
+        val gotIt = findViewById<View>(R.id.gotItButton)
+        val gotItSpot = gotIt?.let { buttonSpot(it, safe, ringRects + listOfNotNull(titleSpot)) }
+
         // A few passes, each knowing where the other arrows ran in the one before, so no caption sits on an arrow.
         var chosen = arrayOfNulls<Option>(marks.size)
         repeat(PASSES) {
             val previous = chosen
             val next = arrayOfNulls<Option>(marks.size)
-            val texts = listOfNotNull(titleSpot).toMutableList()
+            val texts = listOfNotNull(titleSpot, gotItSpot).toMutableList()
             marks.forEachIndexed { index, mark ->
                 val ring = rings[index]?.first ?: return@forEachIndexed
                 val otherRings = rings.filterIndexed { other, it -> other != index && it != null }.map { it!!.first }
@@ -210,11 +216,7 @@ class CoachMarkLayout @JvmOverloads constructor(
         }
         placed = result
 
-        findViewById<View>(R.id.gotItButton)?.let { button ->
-            val taken =
-                ringRects + listOfNotNull(titleSpot) + chosen.filterNotNull().flatMap { listOf(it.spot, it.corridor) }
-            button.layout(buttonSpot(button, safe, taken))
-        }
+        if (gotIt != null && gotItSpot != null) gotIt.layout(gotItSpot)
 
         arrows.clear()
         for ((index, mark) in marks.withIndex()) {
@@ -389,15 +391,15 @@ class CoachMarkLayout @JvmOverloads constructor(
         return strip
     }
 
-    /** *Got it*: at the bottom's end or middle, else nearest the middle, in the middle or at a side, else the top's end. */
+    /** *Got it*: at the bottom's middle or end, else nearest the middle, in the middle or at a side, else the top's end. */
     private fun buttonSpot(button: View, safe: RectF, taken: List<RectF>): RectF {
         val w = button.measuredWidth.toFloat()
         val h = button.measuredHeight.toFloat()
         fun at(x: Float, y: Float) = RectF(x, y, x + w, y + h)
         val centerX = safe.centerX() - w / 2
         val candidates = buildList {
-            add(at(safe.right - w, safe.bottom - h))
             add(at(centerX, safe.bottom - h))
+            add(at(safe.right - w, safe.bottom - h))
             var offset = 0f
             while (offset < safe.height() / 2) {
                 for (y in listOf(safe.centerY() - h / 2 + offset, safe.centerY() - h / 2 - offset)) {

@@ -21,6 +21,8 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-13] "Which parts change for ✕ and the toggle icon?" (✕ is Remove guide on the guide's panel, and the toggle is the guide-edit button on Camera and Subject view, both drawn as plain icons.)
 - [Joonhyung, 11-13] "For E3, the tutorial never says ✕ takes the guide off, so add it, and make ✕ light red. For E2, a person's outline in guide mode and a camera in camera mode. Draw it for review first." (Flows 1, 4, and 5 were redrawn, with a mock of the guide's tutorial tips.)
 - [Joonhyung, 11-13] "Yes, implement." (`showGuideEditing` sets the toggle's icon from the mode, ✕ takes the danger text color, and the guide's tips gain "Take the guide off". `ic_move` went unused and was removed.)
+- [Joonhyung, 11-13] "Commit and push, with screenshot placeholders on the PR." (A five-slot table for the toggle and the tutorial.)
+- [Joonhyung, 11-13] "The Korean tutorial's *Got it* is in an odd place. Put it in one place for both languages, and commit." (Placed after the captions, *Got it* took whatever was left, which depended on the captions' length. It is now placed first, from the rings alone, at the bottom's middle, and the captions keep clear of it.)
 
 [#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212

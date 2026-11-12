@@ -63,7 +63,8 @@ import org.robolectric.annotation.GraphicsMode
  * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle; the guide's
  * ✕ with its own tip, #204), and
  * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
- * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary).
+ * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary). *Got it* on the guide's
+ * tips stands at the bottom's middle in both languages (#204).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -236,6 +237,21 @@ class TutorialLayoutTest {
         val centerY = (at[1] - origin[1] + button.height / 2).toFloat()
         assertTrue(remove.ring.contains(centerX, centerY))
     }
+
+    /** *Got it* at the bottom's middle, whatever the captions' language (#204): placed before them, from the rings. */
+    private fun assertGotItAtTheBottomMiddle() {
+        val layer = camera(withGuide = true)
+        val button = layer.findViewById<View>(R.id.gotItButton)
+        assertEquals(layer.width / 2f, (button.left + button.right) / 2f, 1f)
+        assertTrue(button.top > layer.height * 0.8f)
+    }
+
+    @Test
+    fun theGuidesGotIt_isAtTheBottomMiddle() = assertGotItAtTheBottomMiddle()
+
+    @Test
+    @Config(qualifiers = "ko-w360dp-h705dp-xxhdpi")
+    fun theGuidesGotIt_isAtTheBottomMiddle_inKorean() = assertGotItAtTheBottomMiddle()
 
     @Test
     fun camera_fits() = assertFits(5) { camera(withGuide = false) }

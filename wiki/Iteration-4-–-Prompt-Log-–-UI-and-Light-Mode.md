@@ -23,6 +23,10 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-13] "Yes, implement." (`showGuideEditing` sets the toggle's icon from the mode, ✕ takes the danger text color, and the guide's tips gain "Take the guide off". `ic_move` went unused and was removed.)
 - [Joonhyung, 11-13] "Commit and push, with screenshot placeholders on the PR." (A five-slot table for the toggle and the tutorial.)
 - [Joonhyung, 11-13] "The Korean tutorial's *Got it* is in an odd place. Put it in one place for both languages, and commit." (Placed after the captions, *Got it* took whatever was left, which depended on the captions' length. It is now placed first, from the rings alone, at the bottom's middle, and the captions keep clear of it.)
+- [Joonhyung, 11-13] "How should the scene photo step be marked?" (#199 had already given it a title, Back, and only the controls it needs; nothing said what to frame, so a photo without a person failed only after the shutter.)
+- [Joonhyung, 11-13] "Framing hint." (Flow 2's *Scene photo* drawn with a chip over the image for review.)
+- [Joonhyung, 11-13] "Yes, implement." ("Frame the place with the person in it" while framing; the review keeps its own message. Testing 4.1 records the wording as already gone.)
+- [Joonhyung, 11-13] "Commit and push. I checked it on the phone. Make a screenshot placeholder on the PR body." (The framing hint checked on a phone.)
 
 [#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212

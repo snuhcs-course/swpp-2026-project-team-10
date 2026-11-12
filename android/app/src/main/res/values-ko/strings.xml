@@ -139,6 +139,7 @@
     <string name="consent_agree">동의하고 계속</string>
     <string name="not_now">나중에</string>
     <string name="scene_title">배경 사진 촬영</string>
+    <string name="scene_framing_hint">사람이 함께 나오게 배경을 찍어요</string>
     <string name="scene_review_title">이 사진을 사용할까요?</string>
     <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
     <string name="shoot_again">다시 촬영</string>

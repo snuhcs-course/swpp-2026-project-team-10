@@ -1108,8 +1108,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 else -> R.string.scene_title
             },
         )
-        // Under the photo while it is reviewed: what it is for, or that it has no one in it (FR-4.13).
-        showHint(controls.hintText, null)
+        // While framing, what to frame (user test P6, #204): the place with the person in it, as the poses need one
+        // (FR-4.13). Under the photo while it is reviewed: what it is for, or that it has no one in it.
+        if (reviewing) {
+            showHint(
+                controls.hintText,
+                null,
+            )
+        } else {
+            showHint(controls.hintText, R.string.scene_framing_hint, R.drawable.ic_pose)
+        }
         if (reviewing) {
             showHint(
                 controls.sceneMessage,

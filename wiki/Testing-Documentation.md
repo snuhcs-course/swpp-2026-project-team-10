@@ -86,7 +86,7 @@
 | 3.3 | 2026-11-10 | Back on the pose screens and the step's action at the top right (Iter4-P2, [#199]) and the question it asks where it loses the images: the state-based and layout partitions, IT-35, and *Changed* notes where earlier scripts name the renamed buttons (2.1.5, 2.1.6, 4.3, Appendix A). |
 | 3.4 | 2026-11-11 | Why poses failed (Iter4-P6, [#203]): the cases and their partitions, IT-36, and IT-22's changed message (2.1.5, 2.1.6, Appendix A). |
 | 3.5 | 2026-11-11 | The subject's video as a mirror with the rear camera too (Iter4-P4, [#201]): the state-based partitions and an *Added* note on IT-18 (2.1.5, 2.1.6, Appendix A). |
-| 3.6 | 2026-11-12 | The step's action as yellow text and Settings in a session (Iter4-P7, [#204]): `HeaderActionTest`, the state-based partitions, and an *Added* note and step on IT-21; E2 and E3 built (2.1.5, 2.1.6, 4.2, Appendix A). |
+| 3.6 | 2026-11-12 | The step's action as yellow text and Settings in a session (Iter4-P7, [#204]): `HeaderActionTest`, the state-based partitions, and an *Added* note and step on IT-21; E2 and E3 built; the user test's wording and scene photo items decided (2.1.5, 2.1.6, 4.1, 4.2, Appendix A). |
 
 </details>
 
@@ -794,11 +794,11 @@ A test with users outside the team, run to find problems early. It is separate f
 |---|---|---|
 | The prompts used before, on *Generate poses* | 5 (P2–P6) | Built: prompt history ([#164], merged 11/3) |
 | Photos saved on both phones | 3 (P1, P4, P5) | Built: session photos on both phones ([#159], merged 11/2) |
-| ‘참고 사진 올리기’ unclear; poses for an occasion (졸업식, 증명사진); similar poses whatever the background; choosing the gender | 3; 1; 1; 1 | Iteration 4: poses by situation ([#209], [#210]); the wording checked again ([#204]) |
+| ‘참고 사진 올리기’ unclear; poses for an occasion (졸업식, 증명사진); similar poses whatever the background; choosing the gender | 3; 1; 1; 1 | Iteration 4: poses by situation ([#209], [#210]); the wording checked again ([#204]). *Decided in Iteration 4:* the wording is already gone; *Add a pose guide* says *Add photo* (c8e2352, [#204]) |
 | An outline alone hides the pose under long hair or a thick coat; the face and arms not marked; the silhouette not fitting the person | 3 (P1, P3, P4) | On hold (the kickoff of 11/7): ML Kit's detection may err too much, and a background overlay did not work well. The tips say how the pose fits the background instead ([#213]) |
 | The photo going to an outside AI service; the photo changed by AI | 4; 1 | No fix decided |
 | The wait for poses | 2, and 1 asking for faster generation | No fix decided |
-| The default suggested poses; no step that sets the scene photo apart from the camera after *AI로 포즈 생성* | 1; 1 | No fix decided for the default poses; Iteration 4: the scene photo step marked on Camera ([#204]) |
+| The default suggested poses; no step that sets the scene photo apart from the camera after *AI로 포즈 생성* | 1; 1 | No fix decided for the default poses; Iteration 4: the scene photo step marked on Camera ([#204]). *Built in Iteration 4:* the step's title and Back in the top bar ([#199]), and "Frame the place with the person in it" over the image while framing ([#204]) |
 | Guidance on the background and the camera's tilt for the pose | 1 (P4) | Iteration 4: the tips ([#213]) |
 | A timer; the shutter on the subject's phone; the guide's color and thickness | 1 each | The guide's color and thickness built ([#163], merged 11/2); no fix decided for the other two |
 

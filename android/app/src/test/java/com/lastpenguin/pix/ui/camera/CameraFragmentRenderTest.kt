@@ -402,8 +402,9 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.referenceThumbnail.visibility)
             assertEquals(View.INVISIBLE, controls.guideButton.visibility)
             assertEquals(View.VISIBLE, controls.captureControls.visibility)
-            // Framing needs no words (FR-10.4); what is sent is said once the photo is shown (FR-4.2).
-            assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            // What to frame, before the shutter (user test P6, #204): the place, with the person in it (FR-4.13).
+            assertEquals(View.VISIBLE, controls.hintText.visibility)
+            assertEquals(string(R.string.scene_framing_hint), controls.hintText.text.toString())
             controls.shutterButton.performClick()
         }
         idle()

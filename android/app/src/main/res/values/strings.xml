@@ -146,6 +146,7 @@
     <string name="consent_agree">Agree and continue</string>
     <string name="not_now">Not now</string>
     <string name="scene_title">Take the scene photo</string>
+    <string name="scene_framing_hint">Frame the place with the person in it</string>
     <string name="scene_review_title">Use this photo?</string>
     <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="shoot_again">Shoot again</string>

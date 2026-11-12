@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-13, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
@@ -71,14 +71,6 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
                 launch {
                     val guides = viewModel.uiState.map { (it as? ReferenceUiState.Ready)?.guide }
                     binding.referenceImage.showOutline(settingsViewModel.guideLook, guides)
-                }
-                launch {
-                    // A generated pose's outline is the guide itself, not a reference photo (#199).
-                    viewModel.fromPose.collect { pose ->
-                        binding.referenceTitle.setText(
-                            if (pose) R.string.pose_guide_title else R.string.reference_title,
-                        )
-                    }
                 }
                 launch {
                     viewModel.chosenBy.collect { name ->

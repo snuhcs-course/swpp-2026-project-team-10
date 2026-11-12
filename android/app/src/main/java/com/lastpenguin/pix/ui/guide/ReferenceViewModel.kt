@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-13, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -90,11 +90,6 @@ class ReferenceViewModel(
      */
     val chosenBy: StateFlow<String?> = _chosenBy.asStateFlow()
 
-    private val _fromPose = MutableStateFlow(false)
-
-    /** The outline is of a generated pose chosen on Pick a pose, so Reference confirm is titled *Guide* (#199). */
-    val fromPose: StateFlow<Boolean> = _fromPose.asStateFlow()
-
     /** The Reference confirm the subject's phone shows too, from a pose chosen on Pick a pose until it ends. */
     private var sharedId: String? = null
 
@@ -176,7 +171,6 @@ class ReferenceViewModel(
     fun onPhotoPicked(uri: Uri) {
         picked = uri
         _chosenBy.value = null
-        _fromPose.value = false
         sharedId?.let(confirms::finding)
         make { maker.make(uri) }
     }
@@ -205,7 +199,6 @@ class ReferenceViewModel(
         saved: ReferenceGuide? = null,
     ) {
         _chosenBy.value = chosenBy
-        _fromPose.value = true
         picked = null
         val id = UUID.randomUUID().toString()
         sharedId = id

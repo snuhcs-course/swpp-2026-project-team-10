@@ -8,5 +8,16 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Dongje, 11-09] "I plan to make Camera and Subject view light too. Does what you built now conflict with light mode later?" (Yes: drawing those two screens dark would have to go, and the 51 views over the image get fixed colors instead; in 9:16 and 1:1 the bottom controls lie over the image, which light mode has to decide.)
 - [Dongje, 11-09] "Take only that part out now." (The dark drawing of the two screens, its test, and the sentences about it were removed; `DayNightThemeTest` checks that Pix starts dark and that the theme follows the configuration.)
 
+## The screens after the user test ([#204])
+
+- [Joonhyung, 11-12] "Check which tasks in #204 are already built." (The top-right actions came with #199 and the "upload a reference photo" wording was already gone. The save notice, ✕, the toggle icon, the scene step, the tests, and the documents were still open.)
+- [Joonhyung, 11-12] "While both phones stream, neither P nor S can reach Settings. Put a Settings button at the top right on both. Also drop the round yellow pill and keep only the yellow text, and draw this in each flow image." (Flows 1, 2, 4, and 5 were redrawn: the action as yellow text, and the gear beside *End session* and *Leave*.)
+- [Joonhyung, 11-12] "Change only the top right, and add the Settings button on the streaming screens." (Full-width primaries and the other yellow buttons stay.)
+- [Joonhyung, 11-12] "Yes, implement." (`Widget.Pix.Button.Header` lost its pill. The gear stays on Camera in a session, except during the scene photo, and Subject view got one. Settings over Subject view goes back to it when the session ends. Tests: `HeaderActionTest` and three in `SettingsOnScreensTest`.)
+- [Joonhyung, 11-12] "Right-align the text at the top right; it leans a little to the left." (The text had been centered in the 88 dp touch area. It now ends at the area's right edge, 20 dp from the screen's.)
+- [Joonhyung, 11-13] "On the uploaded photo's view the title is '참고 사진'. Make it '가이드', and 'Guide Outline' in English, and check the pose generation flow too." (The generated pose already said "가이드". Both now use one title, as does the subject's button for that step.)
+- [Joonhyung, 11-13] "Commit, push, and open the PR, with a table of placeholders for the photos." (This PR.)
+
 [#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
+[#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204

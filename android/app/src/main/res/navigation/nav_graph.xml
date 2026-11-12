@@ -398,6 +398,10 @@
         <action
             android:id="@+id/action_subject_to_describe"
             app:destination="@id/subjectDescribeFragment" />
+        <!-- Settings over Subject view, which it goes back to when the session ends (#204). -->
+        <action
+            android:id="@+id/action_subject_to_settings"
+            app:destination="@id/settingsFragment" />
         <action
             android:id="@+id/action_subject_to_connectionLost"
             app:destination="@id/connectionLostFragment"

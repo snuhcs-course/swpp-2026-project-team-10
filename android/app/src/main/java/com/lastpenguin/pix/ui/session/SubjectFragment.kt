@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-11, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-13, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -204,6 +204,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         (sessionViewModel.state.value as? SessionState.Ended)?.let { view.post { onTransition(it) } }
 
         binding.leaveButton.setOnClickListener { leaveNow() }
+        // Settings in a session (#204): it covers this screen and comes back to it when the session ends.
+        binding.settingsButton.setOnClickListener {
+            val nav = findNavController()
+            if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_settings)
+        }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -668,7 +673,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val describing = describing(ui)
         binding.pickPoseButton.isVisible = picking || generating || confirming || describing
         val label = when {
-            confirming -> R.string.reference_title
+            confirming -> R.string.pose_guide_title
             describing -> R.string.describe_title
             generating -> R.string.generating_title
             else -> R.string.pick_pose_title

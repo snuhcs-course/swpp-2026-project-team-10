@@ -83,6 +83,7 @@
 | 3.3 | 2026-11-10 | Back on the pose screens (Iter4-P2, [#199]): each screen's Back goes one step back, *Regenerate* on *Pick a pose*, the step's action at the top right, Back on *Generating poses* and *Pick a pose* asking first, as it loses the images, and *Reference confirm* without *Choose another photo*; the decision leaves *Still open* (2.4, 2.5.1, 2.5.3, 2.6.3, 2.6.5). |
 | 3.4 | 2026-11-11 | Why poses failed (Iter4-P6, [#203]): `422 DECLINED` and `429 DAILY_LIMITED` on the server, `GenerationError` and `GenerationFailedException`, the case each failed set names and when it offers *Try again*, and `pose.step`'s `failure` for the subject's phone (2.1, 2.2, 2.5.1, 2.5.3, 2.6.3, 2.6.5, 2.8). |
 | 3.5 | 2026-11-11 | The subject's video as a mirror with the rear camera too: `camera.state` names the camera in use, and the subject flips the video, the grid, the guide, and the reference photo (2.3, 2.5.1, 2.6.4; Iter4-P4, [#201]). |
+| 3.6 | 2026-11-12 | Settings in a session: the gear on Camera and Subject view, and Settings going back to Subject view when the session ends (2.6.8; Iter4-P7, [#204]). |
 
 </details>
 
@@ -2732,7 +2733,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 
 #### 2.6.8 Settings (Iteration 3)
 
-The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on Camera's top bar. The gear hides while a session is live and during the scene photo. `SettingsViewModel` is activity-scoped, so each screen applies a change when it shows again.
+The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on Camera's top bar. The gear hides during the scene photo only. In a session it stays beside *End session*, and Subject view has its own beside *Leave* ([#204]). Settings over Subject view covers it, so it watches the session and goes back to Subject view when the session ends, as the guide screens do. On the photographer's phone, Settings leaves Camera, so the subject's video pauses until the photographer comes back. `SettingsViewModel` is activity-scoped, so each screen applies a change when it shows again.
 
 | Section | Rows |
 |----|----|

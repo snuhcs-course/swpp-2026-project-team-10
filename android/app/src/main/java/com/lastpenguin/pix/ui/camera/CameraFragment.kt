@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-10, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-12, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -359,7 +359,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         renderLiveDot(controls, connected)
                         controls.endSessionButton.isVisible = live
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
-                        controls.settingsButton.isVisible = controls.shootTogetherButton.isVisible
+                        // Settings stays in a session too (#204); only the scene photo hides it.
+                        controls.settingsButton.isVisible = !isScenePhotoActive()
                         view.keepScreenOn = live
                     }
                 }
@@ -1061,7 +1062,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val session = sessionViewModel.state.value
         controls.shootTogetherButton.isVisible =
             !active && session !is SessionState.Connected && session !is SessionState.Reconnecting
-        controls.settingsButton.isVisible = controls.shootTogetherButton.isVisible
+        controls.settingsButton.isVisible = !active
         // Guide and the thumbnail keep their place, so the shutter stays where it is.
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active

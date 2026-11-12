@@ -120,7 +120,6 @@
     <string name="replace_guide_title">포즈 가이드를 바꿀까요?</string>
     <string name="keep_current_guide">지금 가이드 유지</string>
     <string name="generate_poses">AI로 포즈 생성</string>
-    <string name="reference_title">참고 사진</string>
     <string name="pose_guide_title">가이드</string>
     <string name="reference_preview_description">참고 사진 속 인물</string>
     <string name="finding_person">인물을 인식하는 중…</string>

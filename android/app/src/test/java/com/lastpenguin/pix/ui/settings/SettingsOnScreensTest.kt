@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-12, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -15,12 +15,14 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.guide.GuideColor
+import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -39,7 +41,9 @@ import org.robolectric.annotation.GraphicsMode
 
 /*
  * What the settings change on the camera screens (FR-10.1, FR-10.3, FR-3.10). Partitions for the gear: shown on the
- * camera, hidden during a session and the scene photo, and opening Settings. For the latency indicator: off (even in a
+ * camera, also during a session (connected or reconnecting, #204), hidden during the scene photo, and opening Settings;
+ * on Subject view, shown and opening Settings; Settings over Subject view goes back to it when the session ends, and
+ * over the camera stays. For the latency indicator: off (even in a
  * session), on without a session, connected with no number yet, with a delay at each color's edge (150 and 300 ms) and
  * above, reconnecting, and during the scene photo; on Subject view, off and on. For the guide: the color of the
  * settings on the overlay, on both screens.
@@ -98,7 +102,7 @@ class SettingsOnScreensTest {
     // ---- The gear (FR-10.1) ----------------------------------------------------------------------------------------
 
     @Test
-    fun theGear_opensSettings_andHidesDuringASessionAndTheScenePhoto() {
+    fun theGear_opensSettings_staysDuringASession_andHidesDuringTheScenePhoto() {
         val modules = launchCamera()
         val nav = camera!!.attachNav(R.id.cameraFragment)
 
@@ -108,13 +112,64 @@ class SettingsOnScreensTest {
 
         modules.session.setState(connected)
         idle()
-        onCamera { controls, _ -> assertEquals(View.GONE, controls.settingsButton.visibility) }
+        onCamera { controls, _ ->
+            assertEquals(View.VISIBLE, controls.settingsButton.visibility)
+            assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
+        }
+        modules.session.setState(SessionState.Reconnecting("s1", since = 0L))
+        idle()
+        onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.settingsButton.visibility) }
         modules.session.setState(SessionState.Idle)
         idle()
         onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.settingsButton.visibility) }
 
         onCamera { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
         onCamera { controls, _ -> assertEquals(View.GONE, controls.settingsButton.visibility) }
+    }
+
+    @Test
+    fun theGear_onSubjectView_opensSettings() {
+        val modules = launchSubject()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.SUBJECT))
+        idle()
+        val nav = subject!!.attachNav(R.id.subjectFragment)
+
+        onSubject { assertEquals(View.VISIBLE, it.settingsButton.visibility) }
+        onSubject { it.settingsButton.performClick() }
+        assertEquals(R.id.settingsFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun settings_overSubjectView_goesBackToItWhenTheSessionEnds() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.SUBJECT))
+        val (scenario, nav) = launchPrepared<SettingsFragment>(R.id.subjectFragment) {}
+        nav.navigate(R.id.action_subject_to_settings)
+        idle()
+        try {
+            assertEquals(R.id.settingsFragment, nav.currentDestination?.id)
+            modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+            idle()
+            assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        } finally {
+            scenario.close()
+        }
+    }
+
+    @Test
+    fun settings_overTheCamera_staysWhenTheSessionEnds() {
+        val modules = TestAppContainer().install()
+        modules.session.setState(connected)
+        val (scenario, nav) = launchPrepared<SettingsFragment>(R.id.cameraFragment) {}
+        nav.navigate(R.id.action_camera_to_settings)
+        idle()
+        try {
+            modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+            idle()
+            assertEquals(R.id.settingsFragment, nav.currentDestination?.id)
+        } finally {
+            scenario.close()
+        }
     }
 
     // ---- The latency indicator (FR-10.3) --------------------------------------------------------------------------

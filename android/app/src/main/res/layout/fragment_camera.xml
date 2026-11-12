@@ -115,7 +115,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
-            <!-- Settings (FR-10.1); like Shoot together, not during a session or the scene photo. -->
+            <!-- Settings (FR-10.1), also in a session beside End session (#204); not during the scene photo. -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/settingsButton"
                 style="@style/Widget.Pix.Button.Icon.TopBar"

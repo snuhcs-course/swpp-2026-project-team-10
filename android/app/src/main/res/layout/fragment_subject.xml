@@ -45,10 +45,22 @@
             android:visibility="gone"
             app:drawableStartCompat="@drawable/ic_status_dot"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/leaveButton"
+            app:layout_constraintEnd_toStartOf="@id/settingsButton"
             app:layout_constraintTop_toTopOf="parent"
             tools:text="@string/latency_value"
             tools:visibility="visible" />
+
+        <!-- Settings (FR-10.1), beside Leave as on the photographer's Camera screen (#204). -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/settingsButton"
+            style="@style/Widget.Pix.Button.Icon.TopBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/settings"
+            app:icon="@drawable/ic_settings"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/leaveButton"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <Button
             android:id="@+id/leaveButton"

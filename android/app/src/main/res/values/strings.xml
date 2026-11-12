@@ -125,9 +125,8 @@
     <string name="replace_guide_title">Replace the pose guide?</string>
     <string name="keep_current_guide">Keep the current guide</string>
     <string name="generate_poses">Generate poses here</string>
-    <string name="reference_title">Your reference</string>
     <!-- Reference confirm's title for a generated pose's outline (#199). -->
-    <string name="pose_guide_title">Guide</string>
+    <string name="pose_guide_title">Guide Outline</string>
     <string name="reference_preview_description">The person from the reference photo</string>
     <string name="finding_person">Finding the person…</string>
     <string name="person_found">Person found</string>

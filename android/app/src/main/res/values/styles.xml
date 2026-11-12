@@ -191,20 +191,26 @@
         <item name="android:minWidth">0dp</item>
     </style>
 
-    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): a 40 dp pill, at least 88 dp
-         wide, in a 48 dp touch height, in the middle of the 56 dp header. Back is at the top left. -->
+    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): yellow text without a pill
+         (#204), faint while disabled, in a touch area at least 88 dp wide and 48 dp high, in the middle of the 56 dp
+         header. The text ends at the area's right edge, so it lines up with the screen's content below. Back is at
+         the top left. -->
     <style name="Widget.Pix.Button.Header">
         <item name="android:minHeight">48dp</item>
         <item name="android:minWidth">88dp</item>
         <item name="android:insetTop">4dp</item>
         <item name="android:insetBottom">4dp</item>
         <item name="android:paddingStart">16dp</item>
-        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingEnd">0dp</item>
+        <item name="android:gravity">end|center_vertical</item>
         <item name="cornerRadius">20dp</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:textColor">@color/button_header_text</item>
+        <item name="rippleColor">@color/pix_ripple</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
     </style>
 
-    <!-- The same pill in the camera's 48 dp top bar, such as Use on the scene photo's review: in the middle of the bar,
+    <!-- The same action in the camera's 48 dp top bar, such as Use on the scene photo's review: in the middle of the bar,
          with the bar's 52 dp touch height, whose last 4 dp reach over the image's top edge. -->
     <style name="Widget.Pix.Button.Header.Camera">
         <item name="android:minHeight">52dp</item>

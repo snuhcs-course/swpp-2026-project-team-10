@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -60,7 +60,8 @@ import org.robolectric.annotation.GraphicsMode
  * The tutorial's tips laid out over each real screen (FR-10.4, NFR-16), on the Galaxy S22's 360 × 705 dp, in English
  * and in Korean, at font scale 1.0 and 1.3 (boundary): every control the screen shows has its ring; every caption, the
  * title, and *Got it* lie inside the screen, whole, and clear of each other and of every ring. Camera, the guide on
- * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle), and
+ * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle; the guide's
+ * ✕ with its own tip, #204), and
  * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
  * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary).
  */
@@ -221,6 +222,22 @@ class TutorialLayoutTest {
     }
 
     @Test
+    fun theGuidesTips_tellWhatTheCrossDoes_aroundIt() {
+        // ✕ takes the guide off (E3, #204): its own tip, a circle around Remove guide.
+        val layer = camera(withGuide = true)
+        val remove = ringOf(layer, R.string.tutorial_remove)
+        assertTrue(remove.round)
+        var root: View? = null
+        scenario!!.onFragment { root = it.requireView() }
+        val button = FragmentCameraBinding.bind(root!!).removeGuideButton
+        val origin = IntArray(2).also(layer::getLocationInWindow)
+        val at = IntArray(2).also(button::getLocationInWindow)
+        val centerX = (at[0] - origin[0] + button.width / 2).toFloat()
+        val centerY = (at[1] - origin[1] + button.height / 2).toFloat()
+        assertTrue(remove.ring.contains(centerX, centerY))
+    }
+
+    @Test
     fun camera_fits() = assertFits(5) { camera(withGuide = false) }
 
     @Test
@@ -228,11 +245,11 @@ class TutorialLayoutTest {
     fun camera_fitsInKorean() = assertFits(5) { camera(withGuide = false) }
 
     @Test
-    fun theGuideOnCamera_fits() = assertFits(4) { camera(withGuide = true) }
+    fun theGuideOnCamera_fits() = assertFits(5) { camera(withGuide = true) }
 
     @Test
     @Config(qualifiers = "ko-w360dp-h705dp-xxhdpi")
-    fun theGuideOnCamera_fitsInKorean() = assertFits(4) { camera(withGuide = true) }
+    fun theGuideOnCamera_fitsInKorean() = assertFits(5) { camera(withGuide = true) }
 
     @Test
     fun addAPoseGuide_fits() = assertFits(3, ::sheet)

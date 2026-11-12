@@ -458,6 +458,7 @@
     <string name="tutorial_edit">이 버튼이 켜져 있을 때만 가이드가 움직여요</string>
     <string name="tutorial_fade">흐리게 하거나 숨길 수 있어요</string>
     <string name="tutorial_save">저장해서 다시 써요</string>
+    <string name="tutorial_remove">올려 둔 가이드를 내려요</string>
     <string name="tutorial_scene">이 사진으로 포즈를 만들어요</string>
     <string name="tutorial_describe">원하는 포즈를 적어요</string>
     <string name="tutorial_suggest">비워 두면 AI가 제안해요</string>

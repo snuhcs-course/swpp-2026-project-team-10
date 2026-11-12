@@ -489,6 +489,7 @@
     <string name="tutorial_edit">The guide moves only while this is on</string>
     <string name="tutorial_fade">Fade it or hide it</string>
     <string name="tutorial_save">Save it to use again</string>
+    <string name="tutorial_remove">Take the guide off</string>
     <string name="tutorial_scene">Poses start from this photo</string>
     <string name="tutorial_describe">Write the pose you want</string>
     <string name="tutorial_suggest">Leave it empty and AI suggests four</string>

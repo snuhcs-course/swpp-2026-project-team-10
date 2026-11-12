@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -125,6 +125,13 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
             TutorialTip(R.string.tutorial_move, CaptionSide.ABOVE, locate = guideOn(R.id.guideOverlay)),
             TutorialTip(R.string.tutorial_edit, CaptionSide.ABOVE, locate = control(R.id.editGuideButton)),
             TutorialTip(R.string.tutorial_save, CaptionSide.ABOVE, locate = control(R.id.saveGuideButton)),
+            // ✕ takes the guide off the camera (E3, #204); above it is Save's caption, so this one goes below.
+            TutorialTip(
+                R.string.tutorial_remove,
+                CaptionSide.BELOW,
+                CaptionAlign.END,
+                locate = control(R.id.removeGuideButton),
+            ),
             TutorialTip(
                 R.string.tutorial_fade,
                 CaptionSide.ABOVE,

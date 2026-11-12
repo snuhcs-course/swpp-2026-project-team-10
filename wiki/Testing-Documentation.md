@@ -86,7 +86,7 @@
 | 3.3 | 2026-11-10 | Back on the pose screens and the step's action at the top right (Iter4-P2, [#199]) and the question it asks where it loses the images: the state-based and layout partitions, IT-35, and *Changed* notes where earlier scripts name the renamed buttons (2.1.5, 2.1.6, 4.3, Appendix A). |
 | 3.4 | 2026-11-11 | Why poses failed (Iter4-P6, [#203]): the cases and their partitions, IT-36, and IT-22's changed message (2.1.5, 2.1.6, Appendix A). |
 | 3.5 | 2026-11-11 | The subject's video as a mirror with the rear camera too (Iter4-P4, [#201]): the state-based partitions and an *Added* note on IT-18 (2.1.5, 2.1.6, Appendix A). |
-| 3.6 | 2026-11-12 | The step's action as yellow text and Settings in a session (Iter4-P7, [#204]): `HeaderActionTest`, the state-based partitions, and an *Added* note and step on IT-21 (2.1.5, 2.1.6, Appendix A). |
+| 3.6 | 2026-11-12 | The step's action as yellow text and Settings in a session (Iter4-P7, [#204]): `HeaderActionTest`, the state-based partitions, and an *Added* note and step on IT-21; E2 and E3 built (2.1.5, 2.1.6, 4.2, Appendix A). |
 
 </details>
 
@@ -837,11 +837,11 @@ The course's heuristic evaluation, held in class on 11/4. Students of other team
 | A request stopped by the daily AI limit showed only *Couldn't create poses*, without the reason, which held up the evaluation | Error recovery · 2 · E3 | Iteration 4: a separate error message for each case of failure ([#203]). The app already tells the limit apart (HTTP 429) but shows the general message |
 | *Generate 4 poses* and *Skip, suggest poses for me* did the same thing with an empty field | Flexibility and efficiency · 2 · E1 | Built: one button, *Suggest 4 poses* or *Generate 4 poses from this* (Iter3-A13, [#180]) |
 | A refused description only says to try another, not why it was refused or how to write one | Error recovery · 1 · E2 | Iteration 4: a separate error message for each case of failure, as above ([#203]) |
-| The toggle that sets whether a pinch moves the guide or zooms the camera needs a clearer icon | Recognition rather than recall · 1 · E2 | Built: a tap shows *Guide* or *Camera* above the toggle for 3 s (Iter3-A15, [#182]). The icon is unchanged; Iteration 4: a clearer icon ([#204]) |
+| The toggle that sets whether a pinch moves the guide or zooms the camera needs a clearer icon | Recognition rather than recall · 1 · E2 | Built: a tap shows *Guide* or *Camera* above the toggle for 3 s (Iter3-A15, [#182]). The icon is unchanged; Iteration 4: a clearer icon ([#204]). *Built in Iteration 4:* a person's outline while the mode is on, a camera while off ([#204]) |
 | The horizon bar is thick | Consistency and standards · 1 · E1 | Built: 1.5 dp instead of 3 dp; the grid, the guide, and the focus mark are thinner too (Iter3-A15, [#182]) |
 | Pinch zoom lags behind the camera; a zoom slider would be easier | Match with the real world · 1 · E1 | Iteration 4: latency closer to the stock camera ([#208], low priority). No fix decided for a slider |
 | One fixed tutorial is not enough for this many features; first users could follow a walkthrough | Help and documentation · 1 · E3 | No fix decided |
-| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole ([#202], [#212]), and a clearer ✕ ([#204]) |
+| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole ([#202], [#212]), and a clearer ✕ ([#204]). *Built in Iteration 4:* the guide's ✕ in light red, and a tutorial tip that it takes the guide off ([#204]) |
 | A saved guide could bring back the zoom and flash it was shot with | Flexibility and efficiency · 0 · E3 | No fix decided |
 | The guide's color and thickness could be set automatically for visibility | Additional · 0 · E1 | No fix decided. Both are set in Settings (FR-3.10) |
 | A switch to turn off the horizon bar; a landscape layout | Additional · 0 · E3 | The bar now hides past a 20° tilt (Iter3-A15, [#182]). No fix decided for a switch or a landscape layout |

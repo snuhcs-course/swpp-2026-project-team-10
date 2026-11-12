@@ -180,8 +180,15 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.guideControls.visibility)
             assertEquals(View.VISIBLE, controls.editGuideButton.visibility)
             assertTrue(controls.editGuideButton.isChecked)
+            // The toggle shows the mode it is in: the person's outline while a pinch moves the guide (E2, #204).
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.icon).createdFromResId)
             assertTrue(controls.editGuideButton.isEnabled)
             assertTrue(controls.guideOverlay.editable)
+            // Remove guide in the light red that sets it apart from the panel's other controls (E3, #204).
+            assertEquals(
+                activityColor(R.color.pix_danger_text),
+                controls.removeGuideButton.iconTint?.defaultColor,
+            )
             assertTrue(controls.opacitySlider.isEnabled)
             assertEquals(string(R.string.guide_opacity_percent, 50), controls.opacityValue.text.toString())
             // How to move it is the tutorial's (FR-10.4): edit mode shows no hint.
@@ -203,11 +210,15 @@ class CameraFragmentRenderTest {
 
         onScreen { controls, _ ->
             assertFalse(controls.editGuideButton.isChecked)
+            // The camera while a pinch zooms (E2, #204).
+            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.icon).createdFromResId)
             assertFalse(controls.guideOverlay.editable)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
             assertEquals(View.VISIBLE, controls.hintText.visibility)
         }
     }
+
+    private fun activityColor(id: Int): Int = ApplicationProvider.getApplicationContext<Application>().getColor(id)
 
     @Test
     fun hiddenGuide_disablesItsControlsAndEndsEditMode() {

@@ -551,13 +551,15 @@
                 android:contentDescription="@string/save_guide"
                 app:icon="@drawable/ic_bookmark" />
 
-            <Button
+            <!-- Remove guide, its ✕ in light red to set it apart from the panel's other controls (E3, #204). -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/removeGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/remove_guide"
-                app:icon="@drawable/ic_close" />
+                app:icon="@drawable/ic_close"
+                app:iconTint="@color/button_danger_text" />
         </LinearLayout>
     </LinearLayout>
 
@@ -631,7 +633,8 @@
                     tools:visibility="visible" />
             </FrameLayout>
 
-            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. -->
+            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. Its icon names
+                 the mode: a person's outline while editing, a camera while a pinch zooms (showGuideEditing, #204). -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/editGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
@@ -641,7 +644,7 @@
                 android:contentDescription="@string/edit_guide"
                 android:visibility="gone"
                 app:backgroundTint="@color/edit_guide_background"
-                app:icon="@drawable/ic_move"
+                app:icon="@drawable/ic_camera"
                 app:iconTint="@color/edit_guide_icon"
                 tools:visibility="visible" />
         </LinearLayout>

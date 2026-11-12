@@ -61,6 +61,7 @@ import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
 import com.lastpenguin.pix.ui.camera.setLabelIcon
 import com.lastpenguin.pix.ui.camera.setReferenceActions
+import com.lastpenguin.pix.ui.camera.showGuideEditing
 import com.lastpenguin.pix.ui.camera.showPinchModeLabel
 import com.lastpenguin.pix.ui.camera.showReference
 import com.lastpenguin.pix.ui.fadeTo
@@ -242,6 +243,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
+                        binding.editGuideButton.showGuideEditing(ui.guideEditing)
                         binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
                         if (ui.guide == null) binding.pinchModeLabel.isVisible = false
                         // Guide-colored once a guide is on the video; it then replaces the guide on both phones.

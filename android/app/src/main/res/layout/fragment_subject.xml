@@ -302,7 +302,7 @@
             android:contentDescription="@string/edit_guide"
             android:visibility="gone"
             app:backgroundTint="@color/edit_guide_background"
-            app:icon="@drawable/ic_move"
+            app:icon="@drawable/ic_camera"
             app:iconTint="@color/edit_guide_icon"
             tools:visibility="visible" />
     </FrameLayout>

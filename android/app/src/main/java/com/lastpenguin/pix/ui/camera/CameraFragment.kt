@@ -875,6 +875,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.editGuideButton.isVisible = state.guide != null
         // Checkable, so TalkBack reads the mode as on or off; the ViewModel decides the state after a tap.
         controls.editGuideButton.isChecked = state.guideEditing
+        controls.editGuideButton.showGuideEditing(state.guideEditing)
         controls.editGuideButton.isEnabled = guideEditable && state.guideState.visible
         controls.guideOverlay.editable = state.guideEditing
         // Computed once per render: while the scene photo is framed the guide is hidden, so the pinch zooms whatever

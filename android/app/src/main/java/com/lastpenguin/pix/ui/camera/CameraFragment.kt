@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-12, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-13, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -939,13 +939,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             else -> showStatus(
                 controls.captureStatus,
                 when (notice) {
-                    CaptureNotice.SAVED -> R.string.photo_saved
                     CaptureNotice.STORAGE_FAILED -> R.string.photo_storage_failed
                     CaptureNotice.CAMERA_UNAVAILABLE -> R.string.photo_camera_closed
                     CaptureNotice.PERMISSION_REQUIRED -> R.string.camera_permission_message
                     CaptureNotice.SAVE_FAILED -> R.string.photo_save_failed
                 },
-                if (notice == CaptureNotice.SAVED) StatusLook.SUCCESS else StatusLook.ERROR,
+                StatusLook.ERROR,
             )
         }
         renderReference(controls, state)
@@ -1598,9 +1597,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         chip.setCompoundDrawablesRelative(drawable, null, null, null)
     }
 
-    private enum class StatusLook { PROGRESS, SUCCESS, ERROR }
+    private enum class StatusLook { PROGRESS, ERROR }
 
-    /** The status chip: saving, "Saved without the guide" in green, or why a photo failed in the danger color. */
+    /** The status chip: saving, or why a photo failed in the danger color. */
     private fun showStatus(chip: TextView, @StringRes text: Int, look: StatusLook) {
         val context = requireContext()
         chip.isVisible = true
@@ -1608,7 +1607,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         chip.setBackgroundResource(
             when (look) {
                 StatusLook.PROGRESS -> R.drawable.bg_chip_glass
-                StatusLook.SUCCESS -> R.drawable.bg_chip_success
                 StatusLook.ERROR -> R.drawable.bg_chip_danger
             },
         )
@@ -1617,11 +1615,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             chip,
             when (look) {
                 StatusLook.PROGRESS -> 0
-                StatusLook.SUCCESS -> R.drawable.ic_check_circle_small
                 StatusLook.ERROR -> R.drawable.ic_alert_small
             },
         )
-        // The check keeps its own two colors; the alert takes the text color.
+        // The alert takes the text color.
         TextViewCompat.setCompoundDrawableTintList(
             chip,
             if (look == StatusLook.ERROR) ColorStateList.valueOf(context.getColor(R.color.pix_danger_text)) else null,

@@ -28,7 +28,6 @@
     <string name="camera_level_aligned">카메라가 수평이에요</string>
     <string name="camera_level_tilted">가운데 막대가 양옆 표시와 나란해지도록 카메라를 기울이세요</string>
     <string name="saving_photo">저장 중…</string>
-    <string name="photo_saved">가이드는 빼고 사진만 저장했어요</string>
     <string name="photo_save_failed">사진을 촬영하거나 저장하지 못했어요. 다시 시도하세요.</string>
     <string name="photo_storage_failed">사진을 저장하지 못했어요. 남은 저장 공간을 확인하고 다시 시도하세요.</string>
     <string name="photo_camera_closed">사진을 촬영하기 전에 카메라가 닫혔어요. 카메라로 돌아가 다시 시도하세요.</string>

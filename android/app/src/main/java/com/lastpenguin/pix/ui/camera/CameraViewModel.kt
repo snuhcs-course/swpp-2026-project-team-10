@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -40,7 +40,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class CaptureNotice { SAVED, SAVE_FAILED, STORAGE_FAILED, CAMERA_UNAVAILABLE, PERMISSION_REQUIRED }
+/** Why the last photo failed. A saved photo has no notice: the thumbnail shows it (FR-1.6, #204). */
+enum class CaptureNotice { SAVE_FAILED, STORAGE_FAILED, CAMERA_UNAVAILABLE, PERMISSION_REQUIRED }
 
 /** What *Save guide* did (FR-3.8), shown as a short notice. */
 enum class GuideSaveNotice {
@@ -153,7 +154,7 @@ data class CameraUiState(
     val canSwitchCamera: Boolean = false,
     val supportsFocusPoint: Boolean = false,
     val isSaving: Boolean = false,
-    /** "Saved without the guide" for [CameraViewModel.NOTICE_MS], or why the last photo failed until the next one. */
+    /** Why the last photo failed, until the next one. */
     val captureNotice: CaptureNotice? = null,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
@@ -170,7 +171,7 @@ data class CameraUiState(
     val guideSaved: Boolean = false,
     /** *Save guide* is writing the guide; the button waits. */
     val savingGuide: Boolean = false,
-    /** The last saved photo, for the thumbnail and "Saved without the guide". */
+    /** The last saved photo, for the thumbnail. */
     val lastPhoto: Uri? = null,
     /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
@@ -198,7 +199,6 @@ class CameraViewModel(
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
-    private var savedNoticeJob: Job? = null
 
     // The quick step a tap asked for until the camera applies it, so that another tap goes on from it (FR-1.3); the
     // readout still shows the applied zoom.
@@ -353,7 +353,6 @@ class CameraViewModel(
     /** Takes a photo, unless one is being saved or the camera is not ready; true when it takes one. */
     fun onShutter(): Boolean {
         if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return false
-        savedNoticeJob?.cancel()
         // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
         _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false, aspectsOpen = false) }
@@ -364,13 +363,9 @@ class CameraViewModel(
             try {
                 camera.takePhoto().fold(
                     onSuccess = { uri ->
-                        _uiState.update { it.copy(lastPhoto = uri, captureNotice = CaptureNotice.SAVED) }
+                        // No notice (FR-1.6, #204): the thumbnail shows the new photo.
+                        _uiState.update { it.copy(lastPhoto = uri) }
                         sessionId?.let { photos.taken(it, uri, takenAt) }
-                        // Only a confirmation (FR-1.6): it goes by itself, while a failure stays until the next photo.
-                        savedNoticeJob = viewModelScope.launch {
-                            delay(NOTICE_MS)
-                            _uiState.update { it.copy(captureNotice = null) }
-                        }
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
@@ -561,7 +556,7 @@ class CameraViewModel(
     }
 
     companion object {
-        /** How long a short notice stays on the Camera screen: "Saved without the guide" and remote action notices. */
+        /** How long a short notice stays on the Camera screen, such as the remote action notices. */
         const val NOTICE_MS = 3_000L
     }
 }

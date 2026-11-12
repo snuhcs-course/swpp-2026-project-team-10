@@ -29,7 +29,6 @@
     <string name="camera_level_aligned">Camera is level</string>
     <string name="camera_level_tilted">Tilt camera to align the center bar with the horizontal markers</string>
     <string name="saving_photo">Saving…</string>
-    <string name="photo_saved">Saved without the guide</string>
     <string name="photo_save_failed">Couldn\'t take or save the photo. Please try again.</string>
     <string name="photo_storage_failed">Couldn\'t write the photo. Check available storage and try again.</string>
     <string name="photo_camera_closed">The camera closed before the photo was taken. Return to the camera and try again.</string>

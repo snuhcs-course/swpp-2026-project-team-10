@@ -17,6 +17,7 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-12] "Right-align the text at the top right; it leans a little to the left." (The text had been centered in the 88 dp touch area. It now ends at the area's right edge, 20 dp from the screen's.)
 - [Joonhyung, 11-13] "On the uploaded photo's view the title is '참고 사진'. Make it '가이드', and 'Guide Outline' in English, and check the pose generation flow too." (The generated pose already said "가이드". Both now use one title, as does the subject's button for that step.)
 - [Joonhyung, 11-13] "Commit, push, and open the PR, with a table of placeholders for the photos." (This PR.)
+- [Joonhyung, 11-13] "Remove the save notice." (A saved photo now shows only in the thumbnail; "Saving…" and the failure reasons stay. The green chip look and its two drawables went with it, and Flow 1 lost the chip.)
 
 [#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212

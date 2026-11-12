@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -264,7 +264,7 @@ class CameraFragmentRenderTest {
     // ---- Shutter and the capture status -----------------------------------------
 
     @Test
-    fun shutter_savesAndEndsEditMode_andTheNoticeGoesAfterThreeSeconds() {
+    fun shutter_savesAndEndsEditMode_withNoNotice() {
         val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/1") }
         val modules = launch(camera)
         modules.guides.setGuide(guide())
@@ -274,16 +274,12 @@ class CameraFragmentRenderTest {
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.captureStatus.visibility)
-            assertEquals(string(R.string.photo_saved), controls.captureStatus.text.toString())
+            // No notice: the thumbnail shows the photo (FR-1.6, #204).
+            assertEquals(View.GONE, controls.captureStatus.visibility)
             assertFalse(controls.editGuideButton.isChecked)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
             assertTrue(controls.galleryButton.isEnabled)
         }
-
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
-
-        onScreen { controls, _ -> assertEquals(View.GONE, controls.captureStatus.visibility) }
     }
 
     @Test

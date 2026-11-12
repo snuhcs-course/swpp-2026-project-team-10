@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-13, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -206,31 +206,17 @@ class CameraViewModelTest {
     }
 
     @Test
-    fun savedNoticeGoesAfterThreeSecondsAndANewPhotoRestartsIt() = runTest {
+    fun aSavedPhoto_updatesTheThumbnail_withNoNotice() = runTest {
         val photo = Uri.parse("content://media/external/images/media/1")
         model.onShutter()
         runCurrent()
         camera.capture.complete(Result.success(photo))
         runCurrent()
-        assertEquals(photo, model.uiState.value.lastPhoto)
-        assertEquals(CaptureNotice.SAVED, model.uiState.value.captureNotice)
 
-        // A second photo before the notice goes shows its own notice for the full time.
-        advanceTimeBy(2_000)
-        camera.capture = CompletableDeferred()
-        model.onShutter()
-        runCurrent()
-        assertNull(model.uiState.value.captureNotice)
-        camera.capture.complete(Result.success(photo))
-        runCurrent()
-        advanceTimeBy(CameraViewModel.NOTICE_MS - 1)
-        runCurrent()
-        assertEquals(CaptureNotice.SAVED, model.uiState.value.captureNotice)
-
-        advanceTimeBy(1)
-        runCurrent()
-        assertNull(model.uiState.value.captureNotice)
+        // No notice (FR-1.6, #204): the thumbnail shows the photo.
         assertEquals(photo, model.uiState.value.lastPhoto)
+        assertFalse(model.uiState.value.isSaving)
+        assertNull(model.uiState.value.captureNotice)
     }
 
     @Test

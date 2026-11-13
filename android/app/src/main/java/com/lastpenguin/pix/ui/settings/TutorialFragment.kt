@@ -94,7 +94,8 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
         tips = listOf(
             TutorialTip(R.string.tutorial_settings, CaptionSide.BELOW, locate = control(R.id.settingsButton)),
             TutorialTip(R.string.tutorial_together, CaptionSide.BELOW, locate = control(R.id.shootTogetherButton)),
-            TutorialTip(R.string.tutorial_guide, CaptionSide.ABOVE, locate = control(R.id.guideButton)),
+            // Rings around the button's icon, not its label, so the closing line fits below it (#204).
+            TutorialTip(R.string.tutorial_guide, CaptionSide.ABOVE, locate = control(R.id.guideButtonIcon)),
             TutorialTip(R.string.tutorial_switch, CaptionSide.ABOVE, locate = control(R.id.switchCameraButton)),
             TutorialTip(R.string.tutorial_shutter, CaptionSide.ABOVE, locate = control(R.id.shutterButton)),
         ),
@@ -151,7 +152,7 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.SUBJECT_VIEW to TutorialTips(
         title = R.string.tutorial_friend_title,
         tips = listOf(
-            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.START, locate = control(R.id.guideButton)),
+            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.START, locate = control(R.id.guideButtonIcon)),
             TutorialTip(R.string.tutorial_friend_zoom, CaptionSide.ABOVE, locate = control(R.id.zoomReadout)),
             TutorialTip(
                 R.string.tutorial_friend_brightness,
@@ -166,9 +167,9 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
 /**
  * The first-use tutorial (FR-10.4, Design 2.6.8): over a screen, the first time it opens, a dimming with a ring and a
  * caption for each control of it the screen shows ([TUTORIAL_TIPS]), drawn by [CoachMarkLayout] over the live screen,
- * so it lines up on every phone and *Got it* leaves exactly what was under it. It is a full-screen dialog among the
+ * so it lines up on every phone and closing them leaves exactly what was under it. It is a full-screen dialog among the
  * screen's child fragments, not a destination of its own, so the camera and a session's video run on under it, a sheet
- * stays open, and the screen still navigates. *Got it* and Back close it, and the screen's tips count as seen. The
+ * stays open, and the screen still navigates. A tap anywhere and Back close it, and the screen's tips count as seen. The
  * tips fade in and out in 200 ms (Iter3-A14); while they fade out, touches and keys go to the screen already.
  * Owner: Settings (#123).
  */
@@ -214,7 +215,9 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
         }
         screenView.viewTreeObserver.addOnPreDrawListener(follow)
         watch = screenView to follow
-        layout.findViewById<View>(R.id.gotItButton).setOnClickListener { close() }
+        // A tap anywhere closes them (#204); the closing line takes it too, so TalkBack can close them from it.
+        layout.setOnClickListener { close() }
+        layout.findViewById<View>(R.id.tutorialCloseHint).setOnClickListener { close() }
         (requireDialog() as ComponentDialog).onBackPressedDispatcher.addCallback(viewLifecycleOwner) { close() }
         // Recreated with the screen, they come at once, as they were.
         if (savedInstanceState == null) {
@@ -224,7 +227,7 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
     }
 
     /**
-     * *Got it* and Back: the tips count as seen at once, the screen under them takes touches and keys at once, and they
+     * A tap anywhere and Back: the tips count as seen at once, the screen under them takes touches and keys at once, and they
      * fade out, then close.
      */
     private fun close() {

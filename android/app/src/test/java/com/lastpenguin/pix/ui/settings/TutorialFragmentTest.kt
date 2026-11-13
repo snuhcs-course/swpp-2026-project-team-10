@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.animation.ValueAnimator
@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
+import android.widget.TextView
 import androidx.activity.ComponentDialog
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
@@ -51,9 +52,9 @@ import org.robolectric.shadows.ShadowChoreographer
  * no caption for a control the screen does not show (no saved guides); a control that appears while they are up gets
  * its ring, and one that moves takes its ring along; a row of saved guides wider than the screen is ringed as far as
  * it shows (boundary). The captions are text, which TalkBack reads, one per ring.
- * Closing (equivalence partitioning): Back on the dialog closes them and marks the screen seen; showing them while
+ * Closing (equivalence partitioning): a tap anywhere on the layer, a tap on its closing line, and Back on the dialog each close them and marks the screen seen; showing them while
  * they are there adds no second layer.
- * Fading (Iter3-A14), with the display's frames paused to see a fade's start: the tips fade in; *Got it* counts them
+ * Fading (Iter3-A14), with the display's frames paused to see a fade's start: the tips fade in; a tap counts them
  * seen at once, lets touches and keys through to the screen at once, and fades them out before they close; with the
  * phone's animations off they come and go at once.
  * Whether a screen's tips are due: not while the stored answer loads or once seen, and still when another screen's are
@@ -225,6 +226,29 @@ class TutorialFragmentTest {
     }
 
     @Test
+    fun aTapAnywhere_closesTheTips_andTheScreenIsSeen() {
+        openSheet()
+
+        layer().performClick()
+        idle()
+
+        assertNull(tips())
+        assertEquals(setOf(TutorialScreen.ADD_GUIDE), modules.appSettings.tutorialSeen.value)
+    }
+
+    @Test
+    fun aTapOnTheClosingLine_closesTheTips() {
+        openSheet()
+        val hint = layer().findViewById<TextView>(R.id.tutorialCloseHint)
+        assertEquals(string(R.string.tutorial_close_hint), hint.text.toString())
+
+        hint.performClick()
+        idle()
+
+        assertNull(tips())
+    }
+
+    @Test
     fun theTips_fadeIn() {
         // Opened with its tips seen, then due again, as after *Show the tutorial again*: an activity started with the
         // frames paused never gets its window's focus.
@@ -241,7 +265,7 @@ class TutorialFragmentTest {
     }
 
     @Test
-    fun gotIt_countsTheTipsSeenAtOnce_letsTheScreenTakeTouches_andFadesThemOut() {
+    fun aTap_countsTheTipsSeenAtOnce_letsTheScreenTakeTouches_andFadesThemOut() {
         openSheet()
         ShadowChoreographer.setPaused(true)
 

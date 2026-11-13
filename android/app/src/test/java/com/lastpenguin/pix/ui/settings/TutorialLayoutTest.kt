@@ -3,6 +3,7 @@ package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
 import android.app.Application
+import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Looper
 import android.view.View
@@ -59,12 +60,12 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The tutorial's tips laid out over each real screen (FR-10.4, NFR-16), on the Galaxy S22's 360 × 705 dp, in English
  * and in Korean, at font scale 1.0 and 1.3 (boundary): every control the screen shows has its ring; every caption, the
- * title, and *Got it* lie inside the screen, whole, and clear of each other and of every ring. Camera, the guide on
+ * title, and the closing line lie inside the screen, whole, and clear of each other and of every ring. Camera, the guide on
  * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle; the guide's
  * ✕ with its own tip, #204), and
  * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
- * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary). *Got it* on the guide's
- * tips stands at the bottom's middle in both languages (#204).
+ * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary). The closing line on the
+ * guide's tips stands at the bottom's middle in both languages, clear of every caption (#204).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -171,7 +172,7 @@ class TutorialLayoutTest {
         return RectF(left, top, left + width, top + height)
     }
 
-    private fun View.label(): String = (this as? TextView)?.text?.toString() ?: "Got it"
+    private fun View.label(): String = (this as? TextView)?.text?.toString() ?: "?"
 
     /** At font scale 1.0 and 1.3, the tips [show] puts up have [rings] rings and fit (see the class comment). */
     private fun assertFits(rings: Int, show: () -> CoachMarkLayout) {
@@ -238,20 +239,26 @@ class TutorialLayoutTest {
         assertTrue(remove.ring.contains(centerX, centerY))
     }
 
-    /** *Got it* at the bottom's middle, whatever the captions' language (#204): placed before them, from the rings. */
-    private fun assertGotItAtTheBottomMiddle() {
+    /** The closing line at the bottom's middle, whatever the captions' language (#204), clear of every caption. */
+    private fun assertCloseHintAtTheBottomMiddle() {
         val layer = camera(withGuide = true)
-        val button = layer.findViewById<View>(R.id.gotItButton)
-        assertEquals(layer.width / 2f, (button.left + button.right) / 2f, 1f)
-        assertTrue(button.top > layer.height * 0.8f)
+        val hint = layer.findViewById<TextView>(R.id.tutorialCloseHint)
+        assertEquals(layer.context.getString(R.string.tutorial_close_hint), hint.text.toString())
+        assertEquals(layer.width / 2f, (hint.left + hint.right) / 2f, 1f)
+        assertTrue(hint.top > layer.height * 0.85f)
+        val spot = Rect(hint.left, hint.top, hint.right, hint.bottom)
+        for (mark in layer.placed.filterNotNull()) {
+            val caption = Rect(mark.caption.left, mark.caption.top, mark.caption.right, mark.caption.bottom)
+            assertFalse(mark.caption.text.toString(), Rect.intersects(spot, caption))
+        }
     }
 
     @Test
-    fun theGuidesGotIt_isAtTheBottomMiddle() = assertGotItAtTheBottomMiddle()
+    fun theGuidesCloseHint_isAtTheBottomMiddle() = assertCloseHintAtTheBottomMiddle()
 
     @Test
     @Config(qualifiers = "ko-w360dp-h705dp-xxhdpi")
-    fun theGuidesGotIt_isAtTheBottomMiddle_inKorean() = assertGotItAtTheBottomMiddle()
+    fun theGuidesCloseHint_isAtTheBottomMiddle_inKorean() = assertCloseHintAtTheBottomMiddle()
 
     @Test
     fun camera_fits() = assertFits(5) { camera(withGuide = false) }

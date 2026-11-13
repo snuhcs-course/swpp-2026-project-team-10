@@ -446,7 +446,7 @@
 
     <string name="settings_tutorial">튜토리얼 다시 보기</string>
     <string name="settings_tutorial_reset">화면마다 튜토리얼이 다시 나와요.</string>
-    <string name="tutorial_got_it">알겠어요</string>
+    <string name="tutorial_close_hint">아무 곳이나 누르면 닫혀요</string>
     <string name="tutorial_settings">언어와 가이드 모양을 바꿔요</string>
     <string name="tutorial_together">다른 폰과 카메라 화면을 실시간으로 공유해요</string>
     <string name="tutorial_guide">사진이나 AI 포즈로 가이드를 더해요</string>

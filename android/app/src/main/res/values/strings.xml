@@ -477,7 +477,7 @@
 
     <string name="settings_tutorial">Show the tutorial again</string>
     <string name="settings_tutorial_reset">The tutorial shows again on each screen.</string>
-    <string name="tutorial_got_it">Got it</string>
+    <string name="tutorial_close_hint">Tap anywhere to close</string>
     <string name="tutorial_settings">Change the language and the guide\'s look</string>
     <string name="tutorial_together">Share your camera live with another phone</string>
     <string name="tutorial_guide">Add a photo or AI pose guide</string>

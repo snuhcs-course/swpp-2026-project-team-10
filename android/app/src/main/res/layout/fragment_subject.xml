@@ -360,6 +360,7 @@
                 android:paddingHorizontal="8dp">
 
                 <ImageView
+                    android:id="@+id/guideButtonIcon"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
                     android:background="@drawable/bg_guide_button"

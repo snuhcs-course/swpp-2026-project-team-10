@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import androidx.lifecycle.ViewModel
@@ -67,7 +67,7 @@ class SettingsViewModel(
             seen != null && screen !in seen && screen !in closed
         }.distinctUntilChanged()
 
-    /** The tips of [screens] closed, by *Got it* or Back: they do not come by themselves again. */
+    /** The tips of [screens] closed, by a tap or Back: they do not come by themselves again. */
     fun tutorialSeen(screens: Set<TutorialScreen>) {
         tutorialClosed.update { it + screens }
         viewModelScope.launch { settings.setTutorialSeen(screens) }

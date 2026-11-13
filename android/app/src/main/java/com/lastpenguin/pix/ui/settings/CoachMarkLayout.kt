@@ -41,8 +41,8 @@ enum class CaptionAlign { CENTER, START, END }
  * arrow, as real text that TalkBack reads, Korean included. [locate] says where the controls are in this view, or null
  * for one the screen does not show, which then gets no ring or caption; the screen calls [refresh] as they move.
  * Each caption goes on its side of the control, farther away or on another side when it would cover another
- * caption, ring, or the title, and stays inside the system bars. *Got it* takes the first place of a few that no ring or
- * the title covers, before the captions, so it does not move with the language.
+ * caption, ring, or the title, and stays inside the system bars. A tap anywhere closes it; the line that says so sits
+ * at the bottom's middle on every screen and in every language, and the captions keep clear of it (#204).
  */
 class CoachMarkLayout @JvmOverloads constructor(
     context: Context,
@@ -108,7 +108,7 @@ class CoachMarkLayout @JvmOverloads constructor(
 
     init {
         setWillNotDraw(false)
-        // Nothing under it takes a touch while it shows; only its own buttons do.
+        // Nothing under it takes a touch while it shows; a tap anywhere on it closes it (its click listener).
         isClickable = true
         isFocusable = false
         ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
@@ -180,17 +180,23 @@ class CoachMarkLayout @JvmOverloads constructor(
             titleSpot = spot
         }
 
-        // *Got it* before the captions, from the rings and the title alone, so it stands in the same place in every
-        // language however long the captions run; they keep clear of it (#204).
-        val gotIt = findViewById<View>(R.id.gotItButton)
-        val gotItSpot = gotIt?.let { buttonSpot(it, safe, ringRects + listOfNotNull(titleSpot)) }
+        // The closing line before the captions, always at the bottom's middle, so it stands on the same line on every
+        // screen and in every language; the captions keep clear of it (#204).
+        val hint = findViewById<View>(R.id.tutorialCloseHint)
+        val hintSpot = hint?.let {
+            val w = it.measuredWidth.toFloat()
+            val h = it.measuredHeight.toFloat()
+            // On the navigation bar's edge, not the captions' margin above it: the only room under the shutter's ring.
+            val bottom = (height - bars.bottom).toFloat()
+            RectF(safe.centerX() - w / 2, bottom - h, safe.centerX() + w / 2, bottom)
+        }
 
         // A few passes, each knowing where the other arrows ran in the one before, so no caption sits on an arrow.
         var chosen = arrayOfNulls<Option>(marks.size)
         repeat(PASSES) {
             val previous = chosen
             val next = arrayOfNulls<Option>(marks.size)
-            val texts = listOfNotNull(titleSpot, gotItSpot).toMutableList()
+            val texts = listOfNotNull(titleSpot, hintSpot).toMutableList()
             marks.forEachIndexed { index, mark ->
                 val ring = rings[index]?.first ?: return@forEachIndexed
                 val otherRings = rings.filterIndexed { other, it -> other != index && it != null }.map { it!!.first }
@@ -216,7 +222,7 @@ class CoachMarkLayout @JvmOverloads constructor(
         }
         placed = result
 
-        if (gotIt != null && gotItSpot != null) gotIt.layout(gotItSpot)
+        if (hint != null && hintSpot != null) hint.layout(hintSpot)
 
         arrows.clear()
         for ((index, mark) in marks.withIndex()) {
@@ -389,30 +395,6 @@ class CoachMarkLayout @JvmOverloads constructor(
         )
         if (side == CaptionSide.START || side == CaptionSide.END) strip.inset(0f, -half)
         return strip
-    }
-
-    /** *Got it*: at the bottom's middle or end, else nearest the middle, in the middle or at a side, else the top's end. */
-    private fun buttonSpot(button: View, safe: RectF, taken: List<RectF>): RectF {
-        val w = button.measuredWidth.toFloat()
-        val h = button.measuredHeight.toFloat()
-        fun at(x: Float, y: Float) = RectF(x, y, x + w, y + h)
-        val centerX = safe.centerX() - w / 2
-        val candidates = buildList {
-            add(at(centerX, safe.bottom - h))
-            add(at(safe.right - w, safe.bottom - h))
-            var offset = 0f
-            while (offset < safe.height() / 2) {
-                for (y in listOf(safe.centerY() - h / 2 + offset, safe.centerY() - h / 2 - offset)) {
-                    add(at(centerX, y))
-                    add(at(safe.right - w, y))
-                    add(at(safe.left, y))
-                }
-                offset += stepGap / 2
-            }
-            add(at(safe.right - w, safe.top))
-        }
-        return candidates.firstOrNull { spot -> safe.contains(spot) && taken.none { it.overlaps(spot) } }
-            ?: candidates.first()
     }
 
     /** A dashed arrow from the caption to its ring, and its head. */

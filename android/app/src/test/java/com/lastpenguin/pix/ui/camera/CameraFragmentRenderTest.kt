@@ -461,7 +461,7 @@ class CameraFragmentRenderTest {
         // The phone found no one (FR-4.13): only Back, which shoots again, helps.
         onScreen { controls, _ ->
             assertEquals(string(R.string.scene_no_person_title), controls.sceneTitle.text.toString())
-            assertEquals(string(R.string.scene_no_person_body), controls.sceneMessage.text.toString())
+            assertEquals(string(R.string.scene_no_person_body), controls.sceneMessage.text.toString().trim())
             assertEquals(View.VISIBLE, controls.sceneReview.visibility)
             assertFalse(controls.usePhotoButton.isEnabled)
             assertTrue(controls.sceneBackButton.isEnabled)

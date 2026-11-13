@@ -328,9 +328,13 @@
                     android:id="@+id/consentRow"
                     layout="@layout/item_setting_row" />
 
+                <!-- Pulled up under the row's 56 dp touch area, so it sits under its title as the latency row's body does
+                     (#204); a touch there still reaches the row. -->
                 <TextView
+                    android:id="@+id/consentBody"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="-12dp"
                     android:paddingHorizontal="16dp"
                     android:text="@string/settings_consent_body"
                     android:textAppearance="@style/TextAppearance.Pix.Body.Small" />

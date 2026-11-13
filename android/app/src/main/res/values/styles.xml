@@ -417,6 +417,17 @@
         <item name="tint">@color/pix_text</item>
     </style>
 
+    <!-- The chevron at the end of a row or card that a tap opens (#204). Its tip is drawn 8 dp inside its 24 dp box,
+         so after the row's 8 dp end padding it is 16 dp from the edge on every screen, as far as Settings' text is
+         from the other edge. -->
+    <style name="Widget.Pix.Chevron" parent="">
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:src">@drawable/ic_chevron_right</item>
+        <item name="tint">@color/pix_text_faint</item>
+    </style>
+
     <!-- One box of the 6-digit room code (R&S 6.7). Six of them fit a 360 dp wide phone. -->
     <style name="Widget.Pix.CodeDigit" parent="">
         <item name="android:layout_width">44dp</item>

@@ -232,12 +232,13 @@ class CoachMarkLayout @JvmOverloads constructor(
     }
 
     /**
-     * The ring around a control: a circle for a round-ish one up to the shutter's size, a capsule otherwise, a little
-     * outside it; a circle around a larger one, such as a tile, would spill over the controls beside it.
+     * The ring around a control: a circle for a near-square one up to the shutter's size, a capsule otherwise, a little
+     * outside it; a circle around a larger one, such as a tile, would spill over the controls beside it, and one around a
+     * portrait photo would cut its corners off (#204).
      */
     private fun ringAround(target: RectF): Pair<RectF, Boolean> {
         val ratio = target.width() / max(target.height(), 1f)
-        return if (ratio in 0.7f..1.4f && max(target.width(), target.height()) <= MAX_ROUND_DP * density) {
+        return if (ratio in 0.8f..1.25f && max(target.width(), target.height()) <= MAX_ROUND_DP * density) {
             val radius = max(target.width(), target.height()) / 2 + ringPad
             RectF(
                 target.centerX() - radius,

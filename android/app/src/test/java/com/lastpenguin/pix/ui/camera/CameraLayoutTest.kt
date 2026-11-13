@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -8,8 +8,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.text.LineBreaker
 import android.os.Looper
 import android.os.SystemClock
+import android.text.Spanned
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -73,7 +75,9 @@ import org.robolectric.annotation.GraphicsMode
  * The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
  * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
- * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right.
+ * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
+ * step's title, while framing and while reviewing, centered on the 48 dp the bar draws, like Back and Use (#204).
+ * A photo without a person: its alert at the start of the message's first line, not at the box's edge (#204).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -202,6 +206,31 @@ class CameraLayoutTest {
         assertEquals(24, (drawnTop + drawnBottom) / 2)
     }
 
+    /** The middle of [this] on the screen, in dp. */
+    private fun View.middle(): Float {
+        val at = IntArray(2).also(::getLocationInWindow)
+        return (at[1] + height / 2f) / resources.displayMetrics.density
+    }
+
+    @Test
+    fun scenePhoto_theTitle_isOnBacksLine_whileFramingAndReviewing() {
+        val screen = camera()
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+        generation.beginScene()
+        idle()
+        val back = screen.controls.sceneBackButton as MaterialButton
+        val density = back.resources.displayMetrics.density
+        // Back draws in the bar above its inset bottom: the 48 dp above the image, whose middle is at 24 dp.
+        val backMiddle = (back.box().top + back.box().bottom - back.insetBottom / density) / 2f
+        assertEquals(24f, backMiddle, 1f)
+        assertEquals("framing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
+
+        (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        generation.takeScene()
+        idle()
+        assertEquals("reviewing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
+    }
+
     @Test
     fun scenePhotoReview_aPhotoThatLeavesNoRoom_hasItsMessageOverItsBottom_onGlass() {
         val screen = camera()
@@ -212,6 +241,24 @@ class CameraLayoutTest {
         assertTrue("${message.box()} over $photo", message.box().top < photo.bottom)
         assertTrue("${message.box()} 20 dp above the bottom", message.box().bottom <= 705 - 20)
         assertNotNull(message.background)
+    }
+
+    @Test
+    fun scenePhotoReview_withoutAPerson_theAlertStartsTheFirstLine_besideItsWords() {
+        val screen = camera()
+        screen.modules.persons.found = false
+        screen.reviewing(300, 400)
+
+        val message = screen.controls.sceneMessage
+        val text = message.text as Spanned
+        // Not at the box's left edge, apart from centered lines (#204): in the text, before the first word.
+        assertTrue(message.compoundDrawablesRelative.all { it == null })
+        val alert = text.getSpans(0, text.length, InlineIconSpan::class.java).single()
+        assertEquals(0, text.getSpanStart(alert))
+        assertEquals(message.context.getString(R.string.scene_no_person_body), text.toString().trim())
+        // Never alone on a line, and two lines break evenly.
+        assertEquals(message.layout.getLineForOffset(0), message.layout.getLineForOffset(1))
+        assertEquals(LineBreaker.BREAK_STRATEGY_BALANCED, message.breakStrategy)
     }
 
     // ---- Ratios -----------------------------------------------------------------------------

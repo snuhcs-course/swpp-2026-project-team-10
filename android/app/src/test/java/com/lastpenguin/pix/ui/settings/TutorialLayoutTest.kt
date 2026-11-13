@@ -19,6 +19,7 @@ import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.MutableLiveData
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
@@ -45,6 +46,7 @@ import com.lastpenguin.pix.ui.guide.AddGuideSheet
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectFragment
 import java.util.concurrent.TimeUnit
+import kotlin.math.hypot
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -64,8 +66,11 @@ import org.robolectric.annotation.GraphicsMode
  * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle; the guide's
  * ✕ with its own tip, #204), and
  * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
- * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary). The closing line on the
- * guide's tips stands at the bottom's middle in both languages, clear of every caption (#204).
+ * the shutter's size and a capsule around a larger one, such as *Add photo*'s tile (boundary), or around a portrait
+ * photo, whose corners a circle would cut (#204). A ring hugs what a control draws, not its touch area (#204): a text
+ * button without a shape (*Generate poses*' action), an icon without one (Save guide, ✕), and a filled or outlined shape
+ * (*Shoot together*); no two rings on a screen overlap. The closing line on the guide's tips stands at the bottom's
+ * middle in both languages, clear of every caption (#204).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -199,6 +204,14 @@ class TutorialLayoutTest {
                     )
                 }
             }
+            for ((index, one) in ringed.withIndex()) {
+                for (other in ringed.drop(index + 1)) {
+                    assertFalse(
+                        "$label: the rings of \"${one.caption.text}\" and \"${other.caption.text}\" overlap",
+                        ringsOverlap(one, other),
+                    )
+                }
+            }
             for ((index, one) in texts.withIndex()) {
                 for (other in texts.drop(index + 1)) {
                     assertFalse(
@@ -212,6 +225,31 @@ class TutorialLayoutTest {
         }
     }
 
+    /** Whether two rings cross: two circles by their distance, else by their bounds. */
+    private fun ringsOverlap(one: CoachMarkLayout.Placed, other: CoachMarkLayout.Placed): Boolean =
+        if (one.round && other.round) {
+            val distance = hypot(one.ring.centerX() - other.ring.centerX(), one.ring.centerY() - other.ring.centerY())
+            distance < (one.ring.width() + other.ring.width()) / 2
+        } else {
+            RectF.intersects(one.ring, other.ring)
+        }
+
+    /** Where [view] is in [layer]. */
+    private fun boundsIn(layer: View, view: View): RectF {
+        val origin = IntArray(2).also(layer::getLocationInWindow)
+        val at = IntArray(2).also(view::getLocationInWindow)
+        val left = (at[0] - origin[0]).toFloat()
+        val top = (at[1] - origin[1]).toFloat()
+        return RectF(left, top, left + view.width, top + view.height)
+    }
+
+    /** The control [id] of the screen under the tips. */
+    private fun <T : View> screenView(id: Int): T {
+        var view: T? = null
+        scenario!!.onFragment { view = it.requireView().findViewById(id) }
+        return view!!
+    }
+
     /** The ring of the tip whose caption is [caption], among those [layer] placed. */
     private fun ringOf(layer: CoachMarkLayout, caption: Int): CoachMarkLayout.Placed =
         layer.placed.filterNotNull().single { it.caption.text == app.getString(caption) }
@@ -221,6 +259,59 @@ class TutorialLayoutTest {
         assertTrue(ringOf(camera(withGuide = false), R.string.tutorial_shutter).round)
         scenario?.close()
         assertFalse(ringOf(sheet(), R.string.tutorial_upload).round)
+    }
+
+    @Test
+    fun aTextButtonsRing_hugsItsText_notItsTouchArea() {
+        // *Generate poses*' action is text without a shape in an 88 x 48 dp touch area, its text at the right (#204).
+        val layer = describe()
+        val ring = ringOf(layer, R.string.tutorial_suggest)
+        val button = screenView<MaterialButton>(R.id.generateButton)
+        val touch = boundsIn(layer, button)
+        val textLeft = touch.left + button.compoundPaddingLeft + button.layout.getLineLeft(0)
+        val textRight = touch.left + button.compoundPaddingLeft + button.layout.getLineRight(0)
+        val density = layer.resources.displayMetrics.density
+        assertFalse(ring.round)
+        assertTrue(
+            "${ring.ring} around $textLeft..$textRight",
+            ring.ring.left < textLeft && ring.ring.right > textRight,
+        )
+        // At most its 8 dp of room and the ring's 5 dp from the text, at either side; lower than the touch area.
+        assertTrue("${ring.ring}", textLeft - ring.ring.left <= 14 * density)
+        assertTrue("${ring.ring}", ring.ring.right - textRight <= 14 * density)
+        assertTrue("${ring.ring} in $touch", ring.ring.height() < touch.height())
+    }
+
+    @Test
+    fun aPortraitPhotosRing_isRounded_andKeepsItsCorners() {
+        // A circle around the 3:4 scene photo would cut its corners off (#204).
+        val layer = describe()
+        val ring = ringOf(layer, R.string.tutorial_scene)
+        val photo = boundsIn(layer, screenView(R.id.sceneImage))
+        assertFalse(ring.round)
+        assertTrue("${ring.ring} around $photo", ring.ring.contains(photo))
+    }
+
+    @Test
+    fun anIconsRing_hugsTheIcon_andAShapesRing_itsShape() {
+        val layer = camera(withGuide = true)
+        val density = layer.resources.displayMetrics.density
+        // Save guide and ✕ draw an icon alone: a 36 dp circle around it, not around the 48 dp touch area.
+        for (caption in listOf(R.string.tutorial_save, R.string.tutorial_remove)) {
+            val ring = ringOf(layer, caption)
+            assertTrue(ring.round)
+            assertEquals(app.getString(caption), 36 * density, ring.ring.width(), 1f)
+        }
+        scenario?.close()
+        // *Shoot together* draws an outlined pill inside its insets: the ring is as tall as the pill and its room.
+        val camera = camera(withGuide = false)
+        val share = screenView<MaterialButton>(R.id.shootTogetherButton)
+        val pill = boundsIn(camera, share).apply {
+            top += share.insetTop
+            bottom -= share.insetBottom
+        }
+        val ring = ringOf(camera, R.string.tutorial_together).ring
+        assertEquals(pill.height() + 10 * density, ring.height(), 1f)
     }
 
     @Test

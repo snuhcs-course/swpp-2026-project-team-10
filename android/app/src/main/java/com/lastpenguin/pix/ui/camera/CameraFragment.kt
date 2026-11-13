@@ -18,6 +18,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.util.Size
 import android.view.MotionEvent
 import android.view.View
@@ -1118,17 +1120,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         } else {
             showHint(controls.hintText, R.string.scene_framing_hint, R.drawable.ic_pose)
         }
-        if (reviewing) {
-            showHint(
-                controls.sceneMessage,
-                if (noPerson) R.string.scene_no_person_body else R.string.scene_review_body,
-                if (noPerson) R.drawable.ic_alert_small else 0,
-                R.color.pix_danger,
-            )
-            controls.sceneMessage.setTextColor(
-                requireContext().getColor(if (noPerson) R.color.pix_text_soft else R.color.pix_text_muted),
-            )
-        }
+        if (reviewing) showSceneMessage(controls.sceneMessage, noPerson)
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false
@@ -1598,6 +1590,37 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(requireContext().getColor(tint)))
     }
 
+    /**
+     * Under the reviewed scene photo: what it is for, or that it has no one in it (FR-4.13). The alert starts the first
+     * line, so it stays beside the words when they wrap to two centered lines (#204).
+     */
+    private fun showSceneMessage(message: TextView, noPerson: Boolean) {
+        val context = requireContext()
+        message.isInvisible = false
+        message.setTextColor(context.getColor(if (noPerson) R.color.pix_text_soft else R.color.pix_text_muted))
+        if (!noPerson) {
+            message.setText(R.string.scene_review_body)
+            return
+        }
+        val density = resources.displayMetrics.density
+        val size = (CHIP_ICON_DP * density).roundToInt()
+        val alert = AppCompatResources.getDrawable(context, R.drawable.ic_alert_small)?.mutate()
+        alert?.setBounds(0, 0, size, size)
+        alert?.setTint(context.getColor(R.color.pix_danger))
+        // A no-break space under the icon, so a line never ends between the icon and the first word.
+        message.text = SpannableStringBuilder(NO_BREAK_SPACE).apply {
+            if (alert != null) {
+                setSpan(
+                    InlineIconSpan(alert, (SCENE_MESSAGE_ICON_GAP_DP * density).roundToInt()),
+                    0,
+                    length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
+            append(getString(R.string.scene_no_person_body))
+        }
+    }
+
     /** Sets [icon] at the start of [chip], at the size of the top bar's icons, or removes it for 0. */
     private fun setChipIcon(chip: TextView, @DrawableRes icon: Int) {
         val size = (CHIP_ICON_DP * resources.displayMetrics.density).roundToInt()
@@ -1723,6 +1746,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         /** The scene photo's review: its message this far under the photo, and above the screen's bottom (#199). */
         private const val SCENE_MESSAGE_GAP_DP = 12f
         private const val SCENE_MESSAGE_MARGIN_DP = 20f
+
+        /** The no-person alert before the message's first word (#204). */
+        private const val SCENE_MESSAGE_ICON_GAP_DP = 6f
+        private const val NO_BREAK_SPACE = "\u00A0"
         private const val EXPOSURE_BAR_OVERLAP_DP = 12f
         private const val EXPOSURE_BAR_FADE_MS = 200L
 

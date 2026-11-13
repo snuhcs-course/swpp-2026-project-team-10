@@ -42,6 +42,7 @@
             android:id="@+id/latencyChip"
             style="@style/Widget.Pix.Chip.Small"
             android:layout_marginEnd="8dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
             android:visibility="gone"
             app:drawableStartCompat="@drawable/ic_status_dot"
             app:layout_constraintBottom_toBottomOf="parent"

@@ -277,8 +277,9 @@
         android:focusable="true"
         android:gravity="center_vertical"
         android:minHeight="72dp"
-        android:paddingHorizontal="14dp"
-        android:paddingVertical="12dp">
+        android:paddingVertical="12dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="8dp">
 
         <FrameLayout
             android:layout_width="40dp"
@@ -316,13 +317,11 @@
                 android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
         </LinearLayout>
 
+        <!-- 8 dp end padding before it, as on every row a tap opens (Widget.Pix.Chevron). -->
         <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_marginStart="8dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_chevron_right"
-            app:tint="@color/pix_text_faint" />
+            android:id="@+id/showCodeChevron"
+            style="@style/Widget.Pix.Chevron"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
     <!-- Tap to copy (FR-5.4). -->

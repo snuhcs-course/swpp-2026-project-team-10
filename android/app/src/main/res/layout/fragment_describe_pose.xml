@@ -39,8 +39,9 @@
                 android:textAppearance="@style/TextAppearance.Pix.Header" />
 
             <!-- The one button (Iter3-A13): Suggest with an empty field, Generate with a description (FR-4.4, FR-4.8,
-                 US-5, #199). DescriptionForm sets its label as the field changes. -->
-            <Button
+                 US-5, #199). DescriptionForm sets its label as the field changes. Named in full, so it is a MaterialButton
+                 under any activity, which the tutorial's ring around its text needs (#204). -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/generateButton"
                 style="@style/Widget.Pix.Button.Header"
                 android:layout_width="wrap_content"

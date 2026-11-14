@@ -1,0 +1,12 @@
+[
+  {"id": "b1", "file": "s18.jpg", "selfie": false, "language": "ko", "situation": "background", "description": "호수를 바라보며 두 팔 활짝 벌리기"},
+  {"id": "b2", "file": "s01.jpg", "selfie": false, "language": "en", "situation": "background", "description": "Walk through the grass and look back with a smile"},
+  {"id": "b3", "file": "s34.jpg", "selfie": false, "language": "ko", "situation": "background", "description": "모래 위에서 신나게 점프하기"},
+  {"id": "h1", "file": "s06.jpg", "selfie": false, "language": "ko", "situation": "half_body", "description": "졸업사진처럼 활짝 웃기"},
+  {"id": "h2", "file": "s19.jpg", "selfie": false, "language": "en", "situation": "half_body", "description": "Lean on the counter and smile softly at the camera"},
+  {"id": "h3", "file": "s50.jpg", "selfie": false, "language": "ko", "situation": "half_body", "description": "창밖을 보며 자연스럽게 웃기"},
+  {"id": "f1", "file": "s37.jpg", "selfie": false, "language": "ko", "situation": "full_body", "description": "가방 들고 한 발 앞으로 내딛기"},
+  {"id": "f2", "file": "s28.jpg", "selfie": false, "language": "en", "situation": "full_body", "description": "Walk toward the camera swinging the shopping bags"},
+  {"id": "f3", "file": "s42.jpg", "selfie": false, "language": "en", "situation": "full_body", "description": "Both hands in the pockets, standing at a slight angle"},
+  {"id": "m1", "file": "s03.jpg", "selfie": false, "language": "en", "situation": "landmark", "description": "Point at the skyline behind you and smile"}
+]

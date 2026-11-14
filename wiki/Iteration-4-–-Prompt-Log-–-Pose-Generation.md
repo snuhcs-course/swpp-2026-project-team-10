@@ -29,6 +29,66 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Dongje, 11-11] "Confirm it as it is and build it. Keep 'prompt'." (Server: `422 DECLINED` for the image service and `429 DAILY_LIMITED` for the day, apart from `REJECTED` and `RATE_LIMITED`. App: two new errors, the suggestions' failure with its reason, one case per failed set chosen in a fixed order, the message and *Try again* only offline, timed out, or after a server error, and the reason on the subject's phone through `pose.step`. Tests first; mutations of the order, the actions, and the reason's name each failed a test.)
 - [Dongje, 11-11] "I think the *Shoot again* button on 7 can go too." (No person now has no action; Back reaches the photo's review.)
 
+## Situation prompts ([#209])
+
+- [Jaewan, 11-13] "I need to test issue #209. We are planning to separate image generation scenarios (the ui will kinda look like [Image #1]), and the six templates we are trying to do is: 배경 강조(background, which covers 바닷가, 여행지, etc) / 인물 강조(person, which covers 졸업사진, 카페, etc) / 랜드마크(landmark) / 증명사진(ID photo) / 기본(default, or we may call this 자동 too) / 셀카(selfie). As before, the user can insert their specific use cases for each, and we need to prepare the prompt templates for each. Can you help me with this? The current prompt formats may go to 기본 and 셀카."
+- [Jaewan, 11-13] "how much did you spendn on openrouter"
+- [Jaewan, 11-13] "never run openrouter calls before i confirm. now tell me how i can see the test results"
+- [Jaewan, 11-13] "keep background wider (v2) and put landmark back to never-wider (v1 framing, plus the "never add a landmark" sentence). then rerun the tests and show me the results, only the current version photos. Use this key (key omitted)"
+- [Jaewan, 11-13] "can we also see a version where we compare the same photo on the different versions"
+- [Jaewan, 11-13] "nono not for v1 and v2, the 배경 강조 vs 인물 강조 vs ..."
+- [Jaewan, 11-13] "for the upstream error image in that report, can you try once more"
+- [Jaewan, 11-13] "judge that too"
+- [Jaewan, 11-13] "what are the current prompts?"
+- [Jaewan, 11-13] "can you try the landmark test with [Image #2] this image"
+- [Jaewan, 11-13] "yes retry and judge"
+- [Jaewan, 11-13] "add that to the first report before"
+- [Jaewan, 11-13] "can you just run the other situations for this image too and add that to the side by side report?"
+- [Jaewan, 11-13] "judge them too"
+- [Jaewan, 11-13] "are we getting pose suggestions according to the situation type? or is the pose suggestion prompt also the same for all situations?"
+- [Jaewan, 11-13] "no. let's just use this for now. now back to report 2. for the eiffel tower photo, the landmark images are terrible i think. the tower is not upstraight, aligned, and hmm it's too small maybe. i'm not sure if there is some good rule photographers use for their filming, but can you improve this?"
+- [Jaewan, 11-14] "skyline, clock tower, bridge -- what are these images?"
+- [Jaewan, 11-14] "test with the eiffel photo and [Image #3] this one. and dont run judges from now on. don't put them into the reports too"
+- [Jaewan, 11-14] "i think we should instruct the user to have the landmark (or part of it which they want to have in the photo) in the scene photo, and the nwe can crop freely"
+- [Jaewan, 11-14] "run the tests again, and for the triumphal arch picture, use this [Image #4]"
+- [Jaewan, 11-14] "not sure, but it seems like v5 kinda mkaes the landmark smaller. i think removing the crowd is okay, since the user may give an input for that. and are we using some professional tips in the prompt?"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "i think v6 is much better. regarding professional tips, do you think we can also enhance the other situations' prompts by adding some professional tips?"
+- [Jaewan, 11-14] "i think they are too restrictive, maybe slightly looser?"
+- [Jaewan, 11-14] "try them"
+- [Jaewan, 11-14] ", and where the pose allows, turn them toward the view / where a small step aside does it, keep anything behind the head, such as a pole or a tree, from seeming to grow out of it -> remove these. and also i think we can revert the selfie phrase. test them again"
+- [Jaewan, 11-14] "yes let's use this, can you cleanup the report to contain only the final prompt photos"
+- [Jaewan, 11-14] "can i share this html file standalone? if not can you give me a minimal standalone file i can share"
+- [Jaewan, 11-14] "can you capture the eiffel tower results (no description) into a png"
+- [Jaewan, 11-14] "i think 증명사진 kinda doesn't fit into this app since people won't really take those images with their phones, right? any other situations we can set?"
+- [Jaewan, 11-14] "let's just remove 증명사진, and split 인물사진 into 전신/반신. i think the current version slightly more prefers 반신"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "do you think 배경 강조 and 전신 may be too similar? or in what scenarios may this differ?"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "okay now we decided to discard #211 (four prompt templates), and just do the current (one template with three rewrites). now can you commit and push the current fixes, and create a PR? before that, if there are changes in dev, merge it. also, the Android UI screens are developed in #210, right? so our current fix is only in the server-side?"
+- [Jaewan, 11-14] "can you give me some png cards i can attach to the pr descriptionn"
+- [Jaewan, 11-14] "don't use my own photos. can you give me a card that tests a single image with all scenarios (except for selfie) from the CC0 scenes?"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "overall can we fix '반신' to '상반신'?"
+- [Jaewan, 11-15] "yes"
+
+## Four prompt templates, tried and dropped ([#211])
+
+- [Jaewan, 11-13] "we also are planning issue #211, not using the paraphrasing llm call and just preparing four prompt templates. hmm, do you think this is a good idea? or would paraphrasing be the better option"
+- [Jaewan, 11-13] "when paraphrasing, do we show the image to the model too? or only the input?"
+- [Jaewan, 11-13] "can you try creating four versions of the 'default' situation prompt, and test with the graudation photo image you used, with the input "졸업사진"? and compare it with the previous three paraphrases version?"
+- [Jaewan, 11-13] "added credit. try it again"
+- [Jaewan, 11-13] "what are the four prompt templates that were used?"
+- [Jaewan, 11-13] "no i want like totally different text (though similar meaning overall)"
+- [Jaewan, 11-13] "i don't like the 'scene story' style prompt"
+- [Jaewan, 11-13] "yeah. can you now show me the full prompts all?"
+- [Jaewan, 11-13] "at least for one we can use the previous prompt cant we"
+- [Jaewan, 11-13] "drop A. and then can you compare this with the parahrased version"
+- [Jaewan, 11-13] "what if we do '일어서서 왼쪽을 보며' with that image"
+- [Jaewan, 11-13] "what is the current paraphrase prompt? how does it make differences"
+
 [#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
 [#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200
 [#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
+[#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
+[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211

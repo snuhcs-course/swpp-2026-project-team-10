@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Dongje Park
 """Four poses for a scene from a vision model, through OpenRouter's chat completions (Design Documentation 2.6.3):
 suggested poses, or a description and three variations of it."""
 
@@ -13,10 +13,10 @@ import httpx2
 from pix_server.config import Settings
 from pix_server.poses.generator import status_phrase
 from pix_server.poses.prompts import (
-    DEFAULT_POSES,
     DESCRIPTION_MAX_LENGTH,
     POSE_COUNT,
     PROMPTS,
+    Situation,
     one_line,
     variation_prompt,
 )
@@ -52,11 +52,10 @@ def usable_poses(answer: str) -> list[str]:
     return usable[:POSE_COUNT]
 
 
-def with_default_poses(poses: list[str], selfie: bool = False) -> list[str]:
-    """Tops `poses` up to POSE_COUNT with the default poses, or the selfie ones for a selfie, in the file's order."""
+def with_default_poses(poses: list[str], situation: Situation = "default") -> list[str]:
+    """Tops `poses` up to POSE_COUNT with the situation's default poses, in the file's order."""
     taken = {pose.casefold() for pose in poses}
-    candidates = PROMPTS.selfie.default_poses if selfie else [default.pose for default in DEFAULT_POSES.values()]
-    defaults = [pose for pose in candidates if pose.casefold() not in taken]
+    defaults = [pose for pose in PROMPTS.situations[situation].default_poses if pose.casefold() not in taken]
     return (poses + defaults)[:POSE_COUNT]
 
 
@@ -65,22 +64,22 @@ class PoseSuggester:
         self._settings = settings
         self._http = http
 
-    async def suggest(self, scene: bytes, selfie: bool = False) -> list[str]:
-        """POSE_COUNT poses for the scene: the model's usable poses, topped up with the default poses. A model that
-        fails, answers late, or answers something unusable still gives a full set, so this never raises for it. A
-        selfie's scene gets the selfie prompt and the selfie default poses (FR-1.14)."""
-        poses = await self._ask(scene, PROMPTS.selfie.suggestion if selfie else PROMPTS.suggestion)
+    async def suggest(self, scene: bytes, situation: Situation = "default") -> list[str]:
+        """POSE_COUNT poses for the scene: the model's usable poses, topped up with the default poses, both the
+        situation's (FR-4.8; a selfie's scene is the `selfie` situation, FR-1.14). A model that fails, answers late, or
+        answers something unusable still gives a full set, so this never raises for it."""
+        poses = await self._ask(scene, PROMPTS.situations[situation].suggestion)
         if len(poses) < POSE_COUNT:
             # Only the count: the poses describe the person in the photo (Design Documentation 2.8, Privacy).
             logger.warning("%d of %d suggested poses usable; the default poses fill the rest", len(poses), POSE_COUNT)
-        return with_default_poses(poses, selfie)
+        return with_default_poses(poses, situation)
 
-    async def vary(self, scene: bytes, description: str, selfie: bool = False) -> list[str]:
+    async def vary(self, scene: bytes, description: str, situation: Situation = "default") -> list[str]:
         """POSE_COUNT poses for a description: the description itself, as checked_pose folds it, then the model's
-        variations of it, from the selfie prompt for a selfie's scene. The description fills in for any variation the
-        model could not give, so this never raises for the model either; a description that checked_pose refuses
-        raises ApiError before any call."""
-        prompt = variation_prompt(description, selfie)
+        variations of it, from the situation's prompt. The description fills in for any variation the model could not
+        give, so this never raises for the model either; a description that checked_pose refuses raises ApiError
+        before any call."""
+        prompt = variation_prompt(description, situation)
         description = one_line(description)
         wanted = POSE_COUNT - 1
         variations = [pose for pose in await self._ask(scene, prompt) if pose.casefold() != description.casefold()]

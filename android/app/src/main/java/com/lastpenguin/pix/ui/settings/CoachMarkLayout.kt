@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -41,7 +41,8 @@ enum class CaptionAlign { CENTER, START, END }
  * arrow, as real text that TalkBack reads, Korean included. [locate] says where the controls are in this view, or null
  * for one the screen does not show, which then gets no ring or caption; the screen calls [refresh] as they move.
  * Each caption goes on its side of the control, farther away or on another side when it would cover another
- * caption, ring, or the title, and stays inside the system bars; *Got it* takes the first free place of a few.
+ * caption, ring, or the title, and stays inside the system bars. A tap anywhere closes it; the line that says so sits
+ * at the bottom's middle on every screen and in every language, and the captions keep clear of it (#204).
  */
 class CoachMarkLayout @JvmOverloads constructor(
     context: Context,
@@ -107,7 +108,7 @@ class CoachMarkLayout @JvmOverloads constructor(
 
     init {
         setWillNotDraw(false)
-        // Nothing under it takes a touch while it shows; only its own buttons do.
+        // Nothing under it takes a touch while it shows; a tap anywhere on it closes it (its click listener).
         isClickable = true
         isFocusable = false
         ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
@@ -179,12 +180,23 @@ class CoachMarkLayout @JvmOverloads constructor(
             titleSpot = spot
         }
 
+        // The closing line before the captions, always at the bottom's middle, so it stands on the same line on every
+        // screen and in every language; the captions keep clear of it (#204).
+        val hint = findViewById<View>(R.id.tutorialCloseHint)
+        val hintSpot = hint?.let {
+            val w = it.measuredWidth.toFloat()
+            val h = it.measuredHeight.toFloat()
+            // On the navigation bar's edge, not the captions' margin above it: the only room under the shutter's ring.
+            val bottom = (height - bars.bottom).toFloat()
+            RectF(safe.centerX() - w / 2, bottom - h, safe.centerX() + w / 2, bottom)
+        }
+
         // A few passes, each knowing where the other arrows ran in the one before, so no caption sits on an arrow.
         var chosen = arrayOfNulls<Option>(marks.size)
         repeat(PASSES) {
             val previous = chosen
             val next = arrayOfNulls<Option>(marks.size)
-            val texts = listOfNotNull(titleSpot).toMutableList()
+            val texts = listOfNotNull(titleSpot, hintSpot).toMutableList()
             marks.forEachIndexed { index, mark ->
                 val ring = rings[index]?.first ?: return@forEachIndexed
                 val otherRings = rings.filterIndexed { other, it -> other != index && it != null }.map { it!!.first }
@@ -210,11 +222,7 @@ class CoachMarkLayout @JvmOverloads constructor(
         }
         placed = result
 
-        findViewById<View>(R.id.gotItButton)?.let { button ->
-            val taken =
-                ringRects + listOfNotNull(titleSpot) + chosen.filterNotNull().flatMap { listOf(it.spot, it.corridor) }
-            button.layout(buttonSpot(button, safe, taken))
-        }
+        if (hint != null && hintSpot != null) hint.layout(hintSpot)
 
         arrows.clear()
         for ((index, mark) in marks.withIndex()) {
@@ -224,12 +232,13 @@ class CoachMarkLayout @JvmOverloads constructor(
     }
 
     /**
-     * The ring around a control: a circle for a round-ish one up to the shutter's size, a capsule otherwise, a little
-     * outside it; a circle around a larger one, such as a tile, would spill over the controls beside it.
+     * The ring around a control: a circle for a near-square one up to the shutter's size, a capsule otherwise, a little
+     * outside it; a circle around a larger one, such as a tile, would spill over the controls beside it, and one around a
+     * portrait photo would cut its corners off (#204).
      */
     private fun ringAround(target: RectF): Pair<RectF, Boolean> {
         val ratio = target.width() / max(target.height(), 1f)
-        return if (ratio in 0.7f..1.4f && max(target.width(), target.height()) <= MAX_ROUND_DP * density) {
+        return if (ratio in 0.8f..1.25f && max(target.width(), target.height()) <= MAX_ROUND_DP * density) {
             val radius = max(target.width(), target.height()) / 2 + ringPad
             RectF(
                 target.centerX() - radius,
@@ -387,30 +396,6 @@ class CoachMarkLayout @JvmOverloads constructor(
         )
         if (side == CaptionSide.START || side == CaptionSide.END) strip.inset(0f, -half)
         return strip
-    }
-
-    /** *Got it*: at the bottom's end or middle, else nearest the middle, in the middle or at a side, else the top's end. */
-    private fun buttonSpot(button: View, safe: RectF, taken: List<RectF>): RectF {
-        val w = button.measuredWidth.toFloat()
-        val h = button.measuredHeight.toFloat()
-        fun at(x: Float, y: Float) = RectF(x, y, x + w, y + h)
-        val centerX = safe.centerX() - w / 2
-        val candidates = buildList {
-            add(at(safe.right - w, safe.bottom - h))
-            add(at(centerX, safe.bottom - h))
-            var offset = 0f
-            while (offset < safe.height() / 2) {
-                for (y in listOf(safe.centerY() - h / 2 + offset, safe.centerY() - h / 2 - offset)) {
-                    add(at(centerX, y))
-                    add(at(safe.right - w, y))
-                    add(at(safe.left, y))
-                }
-                offset += stepGap / 2
-            }
-            add(at(safe.right - w, safe.top))
-        }
-        return candidates.firstOrNull { spot -> safe.contains(spot) && taken.none { it.overlaps(spot) } }
-            ?: candidates.first()
     }
 
     /** A dashed arrow from the caption to its ring, and its head. */

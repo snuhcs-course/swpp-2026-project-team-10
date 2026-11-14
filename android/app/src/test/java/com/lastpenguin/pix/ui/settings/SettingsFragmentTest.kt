@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
@@ -44,7 +44,8 @@ import org.robolectric.shadows.ShadowToast
  * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the
  * account signed in and signed out (Sign in; Friends until #188);
  * notifications, How to use Pix, and About Pix opened; *Show the tutorial again*, which makes every screen's tips due
- * again and says so.
+ * again and says so. The agreement's text right under its row's title, as the indicator's under its own (#204), with the
+ * row still 56 dp tall.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -93,6 +94,23 @@ class SettingsFragmentTest {
                 string(R.string.settings_version, BuildConfig.VERSION_NAME),
                 binding.aboutRow.settingValue.text.toString(),
             )
+        }
+    }
+
+    @Test
+    fun theAgreementsText_sitsUnderItsTitle_andTheRowKeepsItsHeight() {
+        launch()
+
+        onScreen { binding ->
+            val density = binding.root.resources.displayMetrics.density
+            val row = binding.consentRow.root
+            val title = binding.consentRow.settingTitle
+            val body = binding.consentBody
+            val titleTextBottom = row.top + title.bottom - title.paddingBottom
+            // As close as the indicator's text under its title (2 dp), give or take the lines' own room.
+            assertTrue("${body.top - titleTextBottom} px", body.top - titleTextBottom <= 6 * density)
+            assertTrue(body.top >= row.top + title.bottom - title.paddingBottom - 1)
+            assertTrue(row.height >= (56 * density).toInt())
         }
     }
 

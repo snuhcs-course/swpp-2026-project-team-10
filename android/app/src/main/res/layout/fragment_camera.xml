@@ -72,13 +72,15 @@
 
         </LinearLayout>
 
-        <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3). -->
+        <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3). Like the bar's other
+             controls, it centers on the bar above its last 4 dp, which lie over the image (#204). -->
         <TextView
             android:id="@+id/sceneTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="12dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
             android:accessibilityHeading="true"
             android:accessibilityLiveRegion="polite"
             android:text="@string/scene_title"
@@ -96,6 +98,7 @@
             android:id="@+id/latencyChip"
             style="@style/Widget.Pix.Chip.Small"
             android:layout_marginEnd="8dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
             android:accessibilityLiveRegion="none"
             android:visibility="gone"
             app:drawableStartCompat="@drawable/ic_status_dot"
@@ -115,7 +118,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
-            <!-- Settings (FR-10.1); like Shoot together, not during a session or the scene photo. -->
+            <!-- Settings (FR-10.1), also in a session beside End session (#204); not during the scene photo. -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/settingsButton"
                 style="@style/Widget.Pix.Button.Icon.TopBar"
@@ -124,7 +127,9 @@
                 android:contentDescription="@string/settings"
                 app:icon="@drawable/ic_settings" />
 
-            <Button
+            <!-- Named in full, so it is a MaterialButton under any activity, which the tutorial's ring around its pill
+                 needs (#204). -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/shootTogetherButton"
                 style="@style/Widget.Pix.Button.Glass"
                 android:layout_width="wrap_content"
@@ -350,15 +355,14 @@
                 tools:text="@string/hint_guide_hidden"
                 tools:visibility="visible" />
 
-            <!-- Saving, Photo saved, or why a photo failed (FR-1.6). -->
+            <!-- Saving, or why a photo failed (FR-1.6); a saved photo shows only in the thumbnail (#204). -->
             <TextView
                 android:id="@+id/captureStatus"
                 style="@style/Widget.Pix.Chip.Small"
                 android:layout_marginBottom="8dp"
                 android:accessibilityLiveRegion="polite"
                 android:visibility="gone"
-                tools:drawableStartCompat="@drawable/ic_check_circle_small"
-                tools:text="@string/photo_saved"
+                tools:text="@string/photo_save_failed"
                 tools:visibility="visible" />
 
             <!-- What the screen does not show by itself: a hidden guide, or that a pinch zooms (Design 2.6.8). -->
@@ -536,6 +540,7 @@
                 android:id="@+id/opacityValue"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
                 android:gravity="end"
                 android:importantForAccessibility="no"
                 android:minWidth="34dp"
@@ -552,13 +557,15 @@
                 android:contentDescription="@string/save_guide"
                 app:icon="@drawable/ic_bookmark" />
 
-            <Button
+            <!-- Remove guide, its ✕ in light red to set it apart from the panel's other controls (E3, #204). -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/removeGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/remove_guide"
-                app:icon="@drawable/ic_close" />
+                app:icon="@drawable/ic_close"
+                app:iconTint="@color/button_danger_text" />
         </LinearLayout>
     </LinearLayout>
 
@@ -632,7 +639,8 @@
                     tools:visibility="visible" />
             </FrameLayout>
 
-            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. -->
+            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. Its icon names
+                 the mode: a person's outline while editing, a camera while a pinch zooms (showGuideEditing, #204). -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/editGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
@@ -642,7 +650,7 @@
                 android:contentDescription="@string/edit_guide"
                 android:visibility="gone"
                 app:backgroundTint="@color/edit_guide_background"
-                app:icon="@drawable/ic_move"
+                app:icon="@drawable/ic_camera"
                 app:iconTint="@color/edit_guide_icon"
                 tools:visibility="visible" />
         </LinearLayout>
@@ -709,6 +717,7 @@
                     tools:ignore="UselessParent">
 
                     <ImageView
+                        android:id="@+id/guideButtonIcon"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="@drawable/bg_guide_button"
@@ -842,6 +851,7 @@
             android:contentDescription="@string/scene_photo_description"
             android:scaleType="fitCenter" />
 
+        <!-- Two lines break evenly, and the no-person alert starts the first one (showSceneMessage, #204). -->
         <TextView
             android:id="@+id/sceneMessage"
             android:layout_width="wrap_content"
@@ -849,7 +859,7 @@
             android:layout_gravity="top|center_horizontal"
             android:layout_marginHorizontal="20dp"
             android:accessibilityLiveRegion="polite"
-            android:drawablePadding="6dp"
+            android:breakStrategy="balanced"
             android:gravity="center"
             android:paddingHorizontal="12dp"
             android:paddingVertical="6dp"

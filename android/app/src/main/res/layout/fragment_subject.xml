@@ -42,13 +42,26 @@
             android:id="@+id/latencyChip"
             style="@style/Widget.Pix.Chip.Small"
             android:layout_marginEnd="8dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
             android:visibility="gone"
             app:drawableStartCompat="@drawable/ic_status_dot"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/leaveButton"
+            app:layout_constraintEnd_toStartOf="@id/settingsButton"
             app:layout_constraintTop_toTopOf="parent"
             tools:text="@string/latency_value"
             tools:visibility="visible" />
+
+        <!-- Settings (FR-10.1), beside Leave as on the photographer's Camera screen (#204). -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/settingsButton"
+            style="@style/Widget.Pix.Button.Icon.TopBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/settings"
+            app:icon="@drawable/ic_settings"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/leaveButton"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <Button
             android:id="@+id/leaveButton"
@@ -290,7 +303,7 @@
             android:contentDescription="@string/edit_guide"
             android:visibility="gone"
             app:backgroundTint="@color/edit_guide_background"
-            app:icon="@drawable/ic_move"
+            app:icon="@drawable/ic_camera"
             app:iconTint="@color/edit_guide_icon"
             tools:visibility="visible" />
     </FrameLayout>
@@ -348,6 +361,7 @@
                 android:paddingHorizontal="8dp">
 
                 <ImageView
+                    android:id="@+id/guideButtonIcon"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
                     android:background="@drawable/bg_guide_button"

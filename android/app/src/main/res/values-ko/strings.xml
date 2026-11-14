@@ -28,7 +28,6 @@
     <string name="camera_level_aligned">카메라가 수평이에요</string>
     <string name="camera_level_tilted">가운데 막대가 양옆 표시와 나란해지도록 카메라를 기울이세요</string>
     <string name="saving_photo">저장 중…</string>
-    <string name="photo_saved">가이드는 빼고 사진만 저장했어요</string>
     <string name="photo_save_failed">사진을 촬영하거나 저장하지 못했어요. 다시 시도하세요.</string>
     <string name="photo_storage_failed">사진을 저장하지 못했어요. 남은 저장 공간을 확인하고 다시 시도하세요.</string>
     <string name="photo_camera_closed">사진을 촬영하기 전에 카메라가 닫혔어요. 카메라로 돌아가 다시 시도하세요.</string>
@@ -120,7 +119,6 @@
     <string name="replace_guide_title">포즈 가이드를 바꿀까요?</string>
     <string name="keep_current_guide">지금 가이드 유지</string>
     <string name="generate_poses">AI로 포즈 생성</string>
-    <string name="reference_title">참고 사진</string>
     <string name="pose_guide_title">가이드</string>
     <string name="reference_preview_description">참고 사진 속 인물</string>
     <string name="finding_person">인물을 인식하는 중…</string>
@@ -141,6 +139,7 @@
     <string name="consent_agree">동의하고 계속</string>
     <string name="not_now">나중에</string>
     <string name="scene_title">배경 사진 촬영</string>
+    <string name="scene_framing_hint">사람이 함께 나오게 배경을 찍어요</string>
     <string name="scene_review_title">이 사진을 사용할까요?</string>
     <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
     <string name="shoot_again">다시 촬영</string>
@@ -447,7 +446,7 @@
 
     <string name="settings_tutorial">튜토리얼 다시 보기</string>
     <string name="settings_tutorial_reset">화면마다 튜토리얼이 다시 나와요.</string>
-    <string name="tutorial_got_it">알겠어요</string>
+    <string name="tutorial_close_hint">아무 곳이나 누르면 닫혀요</string>
     <string name="tutorial_settings">언어와 가이드 모양을 바꿔요</string>
     <string name="tutorial_together">다른 폰과 카메라 화면을 실시간으로 공유해요</string>
     <string name="tutorial_guide">사진이나 AI 포즈로 가이드를 더해요</string>
@@ -460,6 +459,7 @@
     <string name="tutorial_edit">이 버튼이 켜져 있을 때만 가이드가 움직여요</string>
     <string name="tutorial_fade">흐리게 하거나 숨길 수 있어요</string>
     <string name="tutorial_save">저장해서 다시 써요</string>
+    <string name="tutorial_remove">올려 둔 가이드를 내려요</string>
     <string name="tutorial_scene">이 사진으로 포즈를 만들어요</string>
     <string name="tutorial_describe">원하는 포즈를 적어요</string>
     <string name="tutorial_suggest">비워 두면 AI가 제안해요</string>

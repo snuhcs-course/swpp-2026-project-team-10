@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-12, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -13,6 +13,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
@@ -25,15 +26,18 @@ import com.lastpenguin.pix.databinding.ItemSettingRowBinding
 import com.lastpenguin.pix.guide.GuideColor
 import com.lastpenguin.pix.guide.GuideLook
 import com.lastpenguin.pix.guide.GuideThickness
+import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.Language
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import com.lastpenguin.pix.ui.session.SessionViewModel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
- * Settings (FR-10.1, R&S 6.10), from the gear on Camera. The base brightness, the guide's look, and the latency indicator are kept by
+ * Settings (FR-10.1, R&S 6.10), from the gear on Camera, and in a session from Subject view's too (#204), which this
+ * screen covers, so it goes back to Subject view when the session ends, as the guide screens do. The base brightness, the guide's look, and the latency indicator are kept by
  * [SettingsViewModel]; the language is Android's per-app language, which recreates the screen in it; notifications open
  * Android's settings for Pix; the AI consent can be withdrawn here and is asked for again before the next scene photo.
  * Owner: Settings (#123).
@@ -48,6 +52,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         val binding = FragmentSettingsBinding.bind(view)
         this.binding = binding
         binding.backButton.setOnClickListener { findNavController().popBackStack() }
+        backToSubjectViewWhenTheSessionEnds()
 
         swatches(binding).forEach { (color, swatch) ->
             swatch.color = color.argb
@@ -154,6 +159,21 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         Language.PHONE -> getString(R.string.settings_language_phone)
         Language.ENGLISH -> ENGLISH_NAME
         Language.KOREAN -> KOREAN_NAME
+    }
+
+    /**
+     * Opened from Subject view, Settings covers it, so Subject view does not see the session end: go back to it, which
+     * shows Connection lost or returns to the camera. Over the camera nothing changes, since Camera shows the end itself.
+     */
+    private fun backToSubjectViewWhenTheSessionEnds() {
+        val session = ViewModelProvider(requireActivity(), PixViewModels.Factory)[SessionViewModel::class.java]
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                session.state.collect { state ->
+                    if (state is SessionState.Ended) findNavController().popBackStack(R.id.subjectFragment, false)
+                }
+            }
+        }
     }
 
     private fun chooseLanguage() {

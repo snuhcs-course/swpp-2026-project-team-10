@@ -5,4 +5,6 @@
     <!-- Pick a pose: how much of the next and the previous candidate shows at the sides, and the gap between them. -->
     <dimen name="pose_page_peek">28dp</dimen>
     <dimen name="pose_page_gap">12dp</dimen>
+    <!-- The camera bars' last part, over the image (TOP_BAR_OVERHANG_DP): what is in the bar centers above it. -->
+    <dimen name="top_bar_overhang">4dp</dimen>
 </resources>

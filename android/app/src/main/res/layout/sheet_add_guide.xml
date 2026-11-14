@@ -107,7 +107,9 @@
         android:focusable="true"
         android:gravity="center_vertical"
         android:minHeight="88dp"
-        android:padding="16dp">
+        android:paddingVertical="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp">
 
         <FrameLayout
             android:layout_width="56dp"
@@ -133,12 +135,9 @@
             android:textColor="@color/pix_text" />
 
         <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_marginStart="8dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_chevron_right"
-            app:tint="@color/pix_text_faint" />
+            android:id="@+id/generateChevron"
+            style="@style/Widget.Pix.Chevron"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
     <Button

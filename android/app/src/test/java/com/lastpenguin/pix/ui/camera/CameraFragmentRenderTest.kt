@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -180,8 +180,15 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.guideControls.visibility)
             assertEquals(View.VISIBLE, controls.editGuideButton.visibility)
             assertTrue(controls.editGuideButton.isChecked)
+            // The toggle shows the mode it is in: the person's outline while a pinch moves the guide (E2, #204).
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.icon).createdFromResId)
             assertTrue(controls.editGuideButton.isEnabled)
             assertTrue(controls.guideOverlay.editable)
+            // Remove guide in the light red that sets it apart from the panel's other controls (E3, #204).
+            assertEquals(
+                activityColor(R.color.pix_danger_text),
+                controls.removeGuideButton.iconTint?.defaultColor,
+            )
             assertTrue(controls.opacitySlider.isEnabled)
             assertEquals(string(R.string.guide_opacity_percent, 50), controls.opacityValue.text.toString())
             // How to move it is the tutorial's (FR-10.4): edit mode shows no hint.
@@ -203,11 +210,15 @@ class CameraFragmentRenderTest {
 
         onScreen { controls, _ ->
             assertFalse(controls.editGuideButton.isChecked)
+            // The camera while a pinch zooms (E2, #204).
+            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.icon).createdFromResId)
             assertFalse(controls.guideOverlay.editable)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
             assertEquals(View.VISIBLE, controls.hintText.visibility)
         }
     }
+
+    private fun activityColor(id: Int): Int = ApplicationProvider.getApplicationContext<Application>().getColor(id)
 
     @Test
     fun hiddenGuide_disablesItsControlsAndEndsEditMode() {
@@ -264,7 +275,7 @@ class CameraFragmentRenderTest {
     // ---- Shutter and the capture status -----------------------------------------
 
     @Test
-    fun shutter_savesAndEndsEditMode_andTheNoticeGoesAfterThreeSeconds() {
+    fun shutter_savesAndEndsEditMode_withNoNotice() {
         val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/1") }
         val modules = launch(camera)
         modules.guides.setGuide(guide())
@@ -274,16 +285,12 @@ class CameraFragmentRenderTest {
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.captureStatus.visibility)
-            assertEquals(string(R.string.photo_saved), controls.captureStatus.text.toString())
+            // No notice: the thumbnail shows the photo (FR-1.6, #204).
+            assertEquals(View.GONE, controls.captureStatus.visibility)
             assertFalse(controls.editGuideButton.isChecked)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
             assertTrue(controls.galleryButton.isEnabled)
         }
-
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
-
-        onScreen { controls, _ -> assertEquals(View.GONE, controls.captureStatus.visibility) }
     }
 
     @Test
@@ -395,8 +402,9 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.referenceThumbnail.visibility)
             assertEquals(View.INVISIBLE, controls.guideButton.visibility)
             assertEquals(View.VISIBLE, controls.captureControls.visibility)
-            // Framing needs no words (FR-10.4); what is sent is said once the photo is shown (FR-4.2).
-            assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            // What to frame, before the shutter (user test P6, #204): the place, with the person in it (FR-4.13).
+            assertEquals(View.VISIBLE, controls.hintText.visibility)
+            assertEquals(string(R.string.scene_framing_hint), controls.hintText.text.toString())
             controls.shutterButton.performClick()
         }
         idle()
@@ -453,7 +461,7 @@ class CameraFragmentRenderTest {
         // The phone found no one (FR-4.13): only Back, which shoots again, helps.
         onScreen { controls, _ ->
             assertEquals(string(R.string.scene_no_person_title), controls.sceneTitle.text.toString())
-            assertEquals(string(R.string.scene_no_person_body), controls.sceneMessage.text.toString())
+            assertEquals(string(R.string.scene_no_person_body), controls.sceneMessage.text.toString().trim())
             assertEquals(View.VISIBLE, controls.sceneReview.visibility)
             assertFalse(controls.usePhotoButton.isEnabled)
             assertTrue(controls.sceneBackButton.isEnabled)

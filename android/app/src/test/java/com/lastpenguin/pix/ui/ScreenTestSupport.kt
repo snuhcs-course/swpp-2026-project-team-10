@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.app.Application
@@ -60,9 +60,9 @@ object ScreenTestSupport {
     /** The tips' layer over [host], with its rings and captions, or null with none there. */
     fun tipsOver(host: Fragment): CoachMarkLayout? = TutorialFragment.over(host)?.view as? CoachMarkLayout
 
-    /** Taps *Got it* on the tips over [host]. */
+    /** Taps the tips over [host] anywhere, which closes them. */
     fun closeTips(host: Fragment) {
-        checkNotNull(tipsOver(host)).findViewById<View>(R.id.gotItButton).performClick()
+        checkNotNull(tipsOver(host)).performClick()
     }
 
     fun guide(withReference: Boolean = true) = ReferenceGuide(

@@ -29,7 +29,6 @@
     <string name="camera_level_aligned">Camera is level</string>
     <string name="camera_level_tilted">Tilt camera to align the center bar with the horizontal markers</string>
     <string name="saving_photo">Saving…</string>
-    <string name="photo_saved">Saved without the guide</string>
     <string name="photo_save_failed">Couldn\'t take or save the photo. Please try again.</string>
     <string name="photo_storage_failed">Couldn\'t write the photo. Check available storage and try again.</string>
     <string name="photo_camera_closed">The camera closed before the photo was taken. Return to the camera and try again.</string>
@@ -125,9 +124,8 @@
     <string name="replace_guide_title">Replace the pose guide?</string>
     <string name="keep_current_guide">Keep the current guide</string>
     <string name="generate_poses">Generate poses here</string>
-    <string name="reference_title">Your reference</string>
     <!-- Reference confirm's title for a generated pose's outline (#199). -->
-    <string name="pose_guide_title">Guide</string>
+    <string name="pose_guide_title">Guide Outline</string>
     <string name="reference_preview_description">The person from the reference photo</string>
     <string name="finding_person">Finding the person…</string>
     <string name="person_found">Person found</string>
@@ -148,6 +146,7 @@
     <string name="consent_agree">Agree and continue</string>
     <string name="not_now">Not now</string>
     <string name="scene_title">Take the scene photo</string>
+    <string name="scene_framing_hint">Frame the place with the person in it</string>
     <string name="scene_review_title">Use this photo?</string>
     <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="shoot_again">Shoot again</string>
@@ -478,7 +477,7 @@
 
     <string name="settings_tutorial">Show the tutorial again</string>
     <string name="settings_tutorial_reset">The tutorial shows again on each screen.</string>
-    <string name="tutorial_got_it">Got it</string>
+    <string name="tutorial_close_hint">Tap anywhere to close</string>
     <string name="tutorial_settings">Change the language and the guide\'s look</string>
     <string name="tutorial_together">Share your camera live with another phone</string>
     <string name="tutorial_guide">Add a photo or AI pose guide</string>
@@ -491,6 +490,7 @@
     <string name="tutorial_edit">The guide moves only while this is on</string>
     <string name="tutorial_fade">Fade it or hide it</string>
     <string name="tutorial_save">Save it to use again</string>
+    <string name="tutorial_remove">Take the guide off</string>
     <string name="tutorial_scene">Poses start from this photo</string>
     <string name="tutorial_describe">Write the pose you want</string>
     <string name="tutorial_suggest">Leave it empty and AI suggests four</string>

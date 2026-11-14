@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-13, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -408,6 +408,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.VISIBLE, binding.editGuideButton.visibility)
             assertTrue(binding.editGuideButton.isEnabled)
             assertFalse(binding.editGuideButton.isChecked)
+            // The toggle shows its mode: the camera while a pinch zooms (E2, #204).
+            assertEquals(R.drawable.ic_camera, shadowOf(binding.editGuideButton.icon).createdFromResId)
             assertFalse(binding.guideOverlay.editable)
             binding.editGuideButton.performClick()
         }
@@ -415,6 +417,7 @@ class SubjectFragmentRenderTest {
 
         onScreen { binding, _ ->
             assertTrue(binding.editGuideButton.isChecked)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.icon).createdFromResId)
             assertTrue(binding.guideOverlay.editable)
         }
 
@@ -696,8 +699,8 @@ class SubjectFragmentRenderTest {
         onScreen { binding, _ ->
             assertEquals(string(R.string.peer_checking_guide, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
-            assertEquals(string(R.string.reference_title), binding.pickPoseLabel.text.toString())
-            assertEquals(string(R.string.reference_title), binding.pickPoseButton.contentDescription)
+            assertEquals(string(R.string.pose_guide_title), binding.pickPoseLabel.text.toString())
+            assertEquals(string(R.string.pose_guide_title), binding.pickPoseButton.contentDescription)
         }
 
         // Back keeps it closed, though Subject view renders again; its button opens it again.

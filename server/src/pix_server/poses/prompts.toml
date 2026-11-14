@@ -380,7 +380,7 @@ default_poses = [
     "standing tall with one hand shading the eyes, gazing into the distance",
 ]
 
-# Half body (반신: a graduation, a café, a profile photo): a portrait. The person fills the photo, from the waist or
+# Half body (상반신: a graduation, a café, a profile photo): a portrait. The person fills the photo, from the waist or
 # the chest up unless the pose needs the legs, with the eyes high in the frame and the camera at about eye level; the
 # place stays as it is behind them. Photographers' tips, followed where they fit: cuts between joints rather than at a
 # wrist, an elbow, or the neck, and more room on the side the face turns to. The poses may use what the person already

@@ -2576,7 +2576,7 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 | Situation | Framing | Suggested poses |
 |----|----|----|
 | `background` (배경 강조) | The whole person, small and off-center; the camera level, the horizon off the middle where it can be | The whole body with the view: looking out, arms open, walking, sitting on something there |
-| `half_body` (반신) | Waist or chest up, cut between joints; the eyes high in the frame, with room on the side the face turns to; the camera at eye level | The face and the hands, with what the person holds |
+| `half_body` (상반신) | Waist or chest up, cut between joints; the eyes high in the frame, with room on the side the face turns to; the camera at eye level | The face and the hands, with what the person holds |
 | `full_body` (전신) | The whole person, large, with the feet near the bottom edge; the camera low at the waist and level, so the legs look long | The stance, the legs, and the arms: the weight on one leg, a step, a lean, a look back |
 | `landmark` (랜드마크) | A free crop inside the scene photo that makes the landmark big and keeps every part of it the photo shows, upright; passers-by in front may go; the person on a third, never over it, and not cut at a joint | Pointing at, presenting, looking up at, or "pinching" the landmark |
 | `selfie` | *Selfie prompts* | *Selfie prompts* |

@@ -44,6 +44,7 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Jaewan, 11-14] "증명사진 doesn't fit this app, since people won't take those with their phones, right? Any other situations?" Then: "Remove 증명사진, and split 인물사진 into 전신 and 반신. The current version slightly prefers 반신." (`person` became `half_body`, unchanged. The new `full_body` frames the whole person large, with the feet near the bottom edge and the camera low and level, and may frame wider like background. In 32 candidates on four scenes, all showed the whole person, but legs and shoes hidden in the scene photo were guessed differently in each.)
 - [Jaewan, 11-14] "Do you think 배경 강조 and 전신 may be too similar?" (24 candidates crossed the two on each other's scenes. Where there is a view, the person is about twice as large in 전신 and faces the camera, while 배경 강조 turns them toward the view. They come closest on scenes without a view. Both stay.)
 - [Jaewan, 11-14] "Merge dev, commit and push, and create a PR." (This PR.)
+- [Jaewan, 11-14] "Overall, can we fix 반신 to 상반신?" (The Korean name is now 상반신; the value stays `half_body`.)
 
 ## Four prompt templates, tried and dropped ([#211])
 

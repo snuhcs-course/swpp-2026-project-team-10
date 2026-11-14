@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Dongje Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -15,7 +15,7 @@ from pix_server.poses.description_filter import DescriptionFilter
 from pix_server.poses.generator import PoseGenerator, aspect_ratio, check_scene
 from pix_server.poses.limiter import Kind, PoseLimiter
 from pix_server.poses.person_check import PersonCheck
-from pix_server.poses.prompts import DEFAULT_POSES, checked_pose, pose_prompt
+from pix_server.poses.prompts import DEFAULT_POSES, Situation, checked_pose, pose_prompt
 from pix_server.poses.suggester import PoseSuggester
 from pix_server.poses.tips import Angle, Framing, Height, Language, Level, PoseTipper
 
@@ -83,6 +83,17 @@ async def check_pose(request: Request, scene: bytes, description: str | None) ->
             raise outcome
 
 
+def chosen_situation(situation: Situation | None, selfie: bool) -> Situation:
+    """The situation whose prompts a request gets (FR-4.8): `situation`, or for an app from before Iteration 4, which
+    sends only `selfie`, `selfie` or `default`. A selfie's scene with another situation is refused, because the other
+    prompts turn a selfie into a photo someone else took (Design Documentation 2.6.3)."""
+    if situation is None:
+        return "selfie" if selfie else "default"
+    if selfie and situation != "selfie":
+        raise ApiError(400, "INVALID_REQUEST", "situation: a selfie takes the selfie situation")
+    return situation
+
+
 async def while_connected(request: Request, work: Coroutine[Any, Any, T]) -> T:
     """Runs `work` while the phone stays connected. A phone that cancels closes its connection (Design Documentation
     2.6.3); cancelling `work` then closes ours to the model, so no answer is waited for that nobody will read."""
@@ -110,12 +121,15 @@ async def suggest_poses(
     image: UploadFile,
     # Left out, or empty, for suggested poses; FastAPI reads an empty form field as left out.
     description: Annotated[str | None, Form()] = None,
-    # The scene is a selfie (FR-1.14); apps from before Iteration 3 leave it out.
+    # The situation's prompts (FR-4.8); apps from before Iteration 4 leave it out, and send `selfie` for a selfie.
+    situation: Annotated[Situation | None, Form()] = None,
+    # The scene is a selfie (FR-1.14), as `situation` selfie; apps from before Iteration 3 leave it out.
     selfie: Annotated[bool, Form()] = False,
 ) -> PoseSuggestionsResponse:
     """Four poses for the scene, which the app then sends as the descriptions of its four POST /poses: four poses
-    suggested for the scene, or, with a description, the description and three variations of it; selfie poses for a
-    selfie."""
+    suggested for the scene, or, with a description, the description and three variations of it, each from the
+    situation's prompt."""
+    chosen = chosen_situation(situation, selfie)
     if description is not None:
         checked_pose(description)
     scene = await image.read()
@@ -123,9 +137,9 @@ async def suggest_poses(
     await count(request, "suggestions")
     suggester: PoseSuggester = request.app.state.pose_suggester
     if description is None:
-        return PoseSuggestionsResponse(poses=await suggester.suggest(scene, selfie))
+        return PoseSuggestionsResponse(poses=await suggester.suggest(scene, chosen))
     await judge(request, description)
-    return PoseSuggestionsResponse(poses=await suggester.vary(scene, description, selfie))
+    return PoseSuggestionsResponse(poses=await suggester.vary(scene, description, chosen))
 
 
 @router.post("/poses")
@@ -136,18 +150,21 @@ async def create_pose(
     # FastAPI reads an empty form field as left out, so an empty description with a template asks for the template.
     template_id: Annotated[str | None, Form(alias="templateId")] = None,
     description: Annotated[str | None, Form()] = None,
-    # The scene is a selfie (FR-1.14): the selfie pose prompt; apps from before Iteration 3 leave it out.
+    # The situation's pose prompt (FR-4.8); apps from before Iteration 4 leave it out, and send `selfie` for a selfie.
+    situation: Annotated[Situation | None, Form()] = None,
+    # The scene is a selfie (FR-1.14), as `situation` selfie; apps from before Iteration 3 leave it out.
     selfie: Annotated[bool, Form()] = False,
 ) -> PoseResponse:
     started = time.perf_counter()
     if (template_id is None) == (description is None):
         raise ApiError(400, "INVALID_REQUEST", "templateId or description: send exactly one")
-    if template_id is not None and selfie:
-        # A template is a default pose for an app from before Iteration 2, which never sends `selfie`, and some of them
-        # need both hands or the whole body; a selfie sends its pose as a description.
-        raise ApiError(400, "INVALID_REQUEST", "selfie: send a description, not a templateId")
+    chosen = chosen_situation(situation, selfie)
+    if template_id is not None and chosen != "default":
+        # A template is a default pose for an app from before Iteration 2, which sends neither field, and some of them
+        # need both hands or the whole body; a selfie or another situation sends its pose as a description.
+        raise ApiError(400, "INVALID_REQUEST", "situation: send a description, not a templateId")
     if description is not None:
-        prompt = pose_prompt(description, selfie)
+        prompt = pose_prompt(description, chosen)
     elif (default := DEFAULT_POSES.get(template_id)) is not None:
         # An app from before Iteration 2; its template is a default pose, sent with the same prompt.
         prompt = pose_prompt(default.pose)

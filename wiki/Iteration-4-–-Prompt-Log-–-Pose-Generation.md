@@ -31,26 +31,61 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 
 ## Situation prompts ([#209])
 
-- [Jaewan, 11-13] "I need to test issue #209. We plan to separate the image generation by situation (the UI will look like [a sketch of a row of choices]): 배경 강조 (background: the beach, a trip), 인물 강조 (person: graduation, a café), 랜드마크 (landmark), 증명사진 (ID photo), 기본 (default), and 셀카 (selfie). The user can still type their own description in each. The current prompts may go to 기본 and 셀카." (The agent added `situation` to `POST /pose-suggestions` and `POST /poses`, a `[situations.<name>]` table per situation with its own pose, suggestion, and variation prompts and default poses, and 12 evaluation cases, two of them new landmark photos (`s51`, `s52`). The first run, judged, compared each prompt with the default one on its cases: none broke more rules, but a wider frame made 3 of 24 landmark candidates invent a structure.)
-- [Jaewan, 11-13] "Never run OpenRouter calls before I confirm." (Every later run was stated first, with its image count and cost.)
-- [Jaewan, 11-13] "Keep background wider (v2) and put landmark back to never-wider, plus the 'never add a landmark' sentence. Then rerun the tests and show me only the current version's photos." (Landmark: 0 of 22 candidates broke a rule.)
-- [Jaewan, 11-13] "Not v1 and v2: 배경 강조 vs 인물 강조 vs … on the same photo." Then: "Try the landmark test with [my Eiffel Tower photo], and run the other situations on it too." (A local page shows one scene under every situation. On the Eiffel photo, each situation gave a clearly different photo. The team's own photos stay out of `server/eval`.)
-- [Jaewan, 11-13] "Are we getting pose suggestions according to the situation, or is the suggestion prompt the same for all?" (Each situation has its own suggestion and variation prompts and default poses; `test_pose_suggestions.py` checks it.)
-- [Jaewan, 11-13] "On the Eiffel Tower photo, the landmark images are terrible: the tower is not upright, and it's too small. Is there a rule photographers use? Can you improve this?" (The tower leaned under 1° in 7 of 8; the problem was the kept framing, with the tower at 45 % of the height. The landmark prompt took travel photographers' rules: straight verticals, the landmark filling the frame, the person on a third and never over it.)
-- [Jaewan, 11-14] "Test with the Eiffel photo and [my Arc de Triomphe photo]. Don't run judges from now on, and don't put them into the reports." (The tower grew to about 60 %, but the crowd in front was deleted, and the arch's top was cut.)
-- [Jaewan, 11-14] "We should tell the user to have the landmark, or the part they want, in the scene photo, and then we can crop freely." (FR-4.8 now asks for such a scene photo when *Landmark* is chosen, and the prompt keeps every part of the landmark that the scene photo shows.)
-- [Jaewan, 11-14] "This one makes the landmark smaller. Removing the crowd is okay, since the user may ask for that. Are we using professional tips in the prompt?" (Landmark v6: the tight crop back, the person a few steps back and turned toward the landmark, nothing rising out of the head, and no crop at a joint. The tower reached about 60 % of the height and the arch about 67 %.)
-- [Jaewan, 11-14] "v6 is much better. Can we enhance the other situations' prompts with professional tips too?" Then: "They are too restrictive, maybe slightly looser?", and two clauses removed and the selfie phrase reverted. (Kept: background keeps the horizon off the middle and off the neck; person cuts between joints and leaves room on the side the face turns to. The selfie prompt is the same as `dev`. By eye, the tips change little and break nothing.)
-- [Jaewan, 11-14] "증명사진 doesn't fit this app, since people won't take those with their phones, right? Any other situations?" Then: "Remove 증명사진, and split 인물사진 into 전신 and 반신. The current version slightly prefers 반신." (`person` became `half_body`, unchanged. The new `full_body` frames the whole person large, with the feet near the bottom edge and the camera low and level, and may frame wider like background. In 32 candidates on four scenes, all showed the whole person, but legs and shoes hidden in the scene photo were guessed differently in each.)
-- [Jaewan, 11-14] "Do you think 배경 강조 and 전신 may be too similar?" (24 candidates crossed the two on each other's scenes. Where there is a view, the person is about twice as large in 전신 and faces the camera, while 배경 강조 turns them toward the view. They come closest on scenes without a view. Both stay.)
-- [Jaewan, 11-14] "Merge dev, commit and push, and create a PR." (This PR.)
-- [Jaewan, 11-14] "Overall, can we fix 반신 to 상반신?" (The Korean name is now 상반신; the value stays `half_body`.)
+- [Jaewan, 11-13] "I need to test issue #209. We are planning to separate image generation scenarios (the ui will kinda look like [Image #1]), and the six templates we are trying to do is: 배경 강조(background, which covers 바닷가, 여행지, etc) / 인물 강조(person, which covers 졸업사진, 카페, etc) / 랜드마크(landmark) / 증명사진(ID photo) / 기본(default, or we may call this 자동 too) / 셀카(selfie). As before, the user can insert their specific use cases for each, and we need to prepare the prompt templates for each. Can you help me with this? The current prompt formats may go to 기본 and 셀카."
+- [Jaewan, 11-13] "how much did you spendn on openrouter"
+- [Jaewan, 11-13] "never run openrouter calls before i confirm. now tell me how i can see the test results"
+- [Jaewan, 11-13] "keep background wider (v2) and put landmark back to never-wider (v1 framing, plus the "never add a landmark" sentence). then rerun the tests and show me the results, only the current version photos. Use this key (key omitted)"
+- [Jaewan, 11-13] "can we also see a version where we compare the same photo on the different versions"
+- [Jaewan, 11-13] "nono not for v1 and v2, the 배경 강조 vs 인물 강조 vs ..."
+- [Jaewan, 11-13] "for the upstream error image in that report, can you try once more"
+- [Jaewan, 11-13] "judge that too"
+- [Jaewan, 11-13] "what are the current prompts?"
+- [Jaewan, 11-13] "can you try the landmark test with [Image #2] this image"
+- [Jaewan, 11-13] "yes retry and judge"
+- [Jaewan, 11-13] "add that to the first report before"
+- [Jaewan, 11-13] "can you just run the other situations for this image too and add that to the side by side report?"
+- [Jaewan, 11-13] "judge them too"
+- [Jaewan, 11-13] "are we getting pose suggestions according to the situation type? or is the pose suggestion prompt also the same for all situations?"
+- [Jaewan, 11-13] "no. let's just use this for now. now back to report 2. for the eiffel tower photo, the landmark images are terrible i think. the tower is not upstraight, aligned, and hmm it's too small maybe. i'm not sure if there is some good rule photographers use for their filming, but can you improve this?"
+- [Jaewan, 11-14] "skyline, clock tower, bridge -- what are these images?"
+- [Jaewan, 11-14] "test with the eiffel photo and [Image #3] this one. and dont run judges from now on. don't put them into the reports too"
+- [Jaewan, 11-14] "i think we should instruct the user to have the landmark (or part of it which they want to have in the photo) in the scene photo, and the nwe can crop freely"
+- [Jaewan, 11-14] "run the tests again, and for the triumphal arch picture, use this [Image #4]"
+- [Jaewan, 11-14] "not sure, but it seems like v5 kinda mkaes the landmark smaller. i think removing the crowd is okay, since the user may give an input for that. and are we using some professional tips in the prompt?"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "i think v6 is much better. regarding professional tips, do you think we can also enhance the other situations' prompts by adding some professional tips?"
+- [Jaewan, 11-14] "i think they are too restrictive, maybe slightly looser?"
+- [Jaewan, 11-14] "try them"
+- [Jaewan, 11-14] ", and where the pose allows, turn them toward the view / where a small step aside does it, keep anything behind the head, such as a pole or a tree, from seeming to grow out of it -> remove these. and also i think we can revert the selfie phrase. test them again"
+- [Jaewan, 11-14] "yes let's use this, can you cleanup the report to contain only the final prompt photos"
+- [Jaewan, 11-14] "can i share this html file standalone? if not can you give me a minimal standalone file i can share"
+- [Jaewan, 11-14] "can you capture the eiffel tower results (no description) into a png"
+- [Jaewan, 11-14] "i think 증명사진 kinda doesn't fit into this app since people won't really take those images with their phones, right? any other situations we can set?"
+- [Jaewan, 11-14] "let's just remove 증명사진, and split 인물사진 into 전신/반신. i think the current version slightly more prefers 반신"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "do you think 배경 강조 and 전신 may be too similar? or in what scenarios may this differ?"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "okay now we decided to discard #211 (four prompt templates), and just do the current (one template with three rewrites). now can you commit and push the current fixes, and create a PR? before that, if there are changes in dev, merge it. also, the Android UI screens are developed in #210, right? so our current fix is only in the server-side?"
+- [Jaewan, 11-14] "can you give me some png cards i can attach to the pr descriptionn"
+- [Jaewan, 11-14] "don't use my own photos. can you give me a card that tests a single image with all scenarios (except for selfie) from the CC0 scenes?"
+- [Jaewan, 11-14] "yes"
+- [Jaewan, 11-14] "overall can we fix '반신' to '상반신'?"
+- [Jaewan, 11-15] "yes"
 
 ## Four prompt templates, tried and dropped ([#211])
 
-- [Jaewan, 11-13] "We also plan #211: no paraphrasing LLM call, just four prompt templates. Is this a good idea, or is paraphrasing better?" (The agent advised keeping the variations: in Iteration 3 they followed the request as often as the description did, and they see the photo.)
-- [Jaewan, 11-13] "Try four versions of the default prompt on the graduation photo with '졸업사진', and compare them with the three paraphrases." Then: "I want totally different text, though with a similar meaning", and "I don't like the 'scene story' style." (Today's prompt and three rewrites, a checklist, numbered steps, and the rules first, gave 3 different poses of 4 against the variations' 4; with "일어서서 왼쪽을 보며", 2 against 3. Rewordings of one meaning drift to the same pose.)
-- [Jaewan, 11-14] "We decided to discard #211 and keep one template with three rewrites." (The documents mark it dropped: Design 2.9, R&S 4.1, Testing 3.2.)
+- [Jaewan, 11-13] "we also are planning issue #211, not using the paraphrasing llm call and just preparing four prompt templates. hmm, do you think this is a good idea? or would paraphrasing be the better option"
+- [Jaewan, 11-13] "when paraphrasing, do we show the image to the model too? or only the input?"
+- [Jaewan, 11-13] "can you try creating four versions of the 'default' situation prompt, and test with the graudation photo image you used, with the input "졸업사진"? and compare it with the previous three paraphrases version?"
+- [Jaewan, 11-13] "added credit. try it again"
+- [Jaewan, 11-13] "what are the four prompt templates that were used?"
+- [Jaewan, 11-13] "no i want like totally different text (though similar meaning overall)"
+- [Jaewan, 11-13] "i don't like the 'scene story' style prompt"
+- [Jaewan, 11-13] "yeah. can you now show me the full prompts all?"
+- [Jaewan, 11-13] "at least for one we can use the previous prompt cant we"
+- [Jaewan, 11-13] "drop A. and then can you compare this with the parahrased version"
+- [Jaewan, 11-13] "what if we do '일어서서 왼쪽을 보며' with that image"
+- [Jaewan, 11-13] "what is the current paraphrase prompt? how does it make differences"
 
 [#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
 [#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200

@@ -92,6 +92,7 @@
 | 3.9 | 2026-11-13 | Chevrons and the no-person message (Iter4-P7, [#204]): `ChevronTest` and a new case in `CameraLayoutTest` (2.1.6). |
 | 3.10 | 2026-11-14 | Situation prompts (Iter4-P12, [#209]): the situation partitions and the comparison on `situation_cases.json`; the prompt templates dropped ([#211]) (1.1, 2.1.6, 3.1, 3.2). |
 | 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): its partitions, the pose flow's bar, the scene photo's panel, and the step's animation included, and a step added to IT-7 (2.1.5, 2.1.6, Appendix A). |
+| 3.12 | 2026-11-15 | A flaky signaling test: wait for a closed socket's release before moving the clock (2.1.8). |
 
 </details>
 
@@ -546,6 +547,7 @@ The repository's `CLAUDE.md` files keep the short form.
 
 - Give `create_app` the `turn_api` fake; otherwise `room.create` calls the real Cloudflare.
 - Keep the fake `clock`; the Lua scripts take the time from their caller.
+- A closed socket's place is freed after the test client returns, by a task of its own (`SessionRegistry.disconnect`), which reads the clock when it runs; before moving the clock after closing sockets, wait for it (`released` in `test_signaling.py`), or the test fails only sometimes, mostly on a real Redis.
 - `fcm_api.pushes` is complete when the call returns; the test client waits for background tasks.
 - Test the invitation's 30 s boundary with a decline or a cancel; `POST /invitations/{id}/accept` also fails on the expired room.
 - Send racing requests at once through `httpx`'s `ASGITransport`; they fail only on PostgreSQL (2.1.4).

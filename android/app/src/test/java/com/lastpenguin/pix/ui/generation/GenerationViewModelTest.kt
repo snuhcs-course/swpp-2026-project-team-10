@@ -1199,8 +1199,8 @@ class GenerationViewModelTest {
     // ---- situations (FR-4.8, Iter4-P13) ---------------------------------------------------------------------------
     // Partitions: the situation chosen on Add a pose guide, going with every request of the set, Try again included;
     // the tiles following the camera, front and rear; the camera turned to the chosen situation's; the selfie's tile
-    // off without a front camera; a front camera that fails while a selfie is framed; shooting again; the subject's
-    // phone told the situation.
+    // off without a front camera; a front camera that fails while a selfie is framed, and shooting again after it;
+    // shooting again; the subject's phone told the situation.
 
     @Test
     fun theChosenSituation_goesWithTheScene_toEveryRequestOfTheSet() = runTest {
@@ -1280,6 +1280,22 @@ class GenerationViewModelTest {
         model.takeScene()
         runCurrent()
         assertFalse(state.selfie)
+        assertEquals(Situation.DEFAULT, state.situation)
+    }
+
+    @Test
+    fun shootingAgain_afterTheFrontCameraFailed_keepsAuto() = runTest {
+        model.chooseSituation(Situation.SELFIE)
+        model.beginScene()
+        runCurrent()
+        camera.facing.value = CameraFacing.BACK
+        runCurrent()
+        model.takeScene()
+        runCurrent()
+
+        model.retakeScene()
+
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
         assertEquals(Situation.DEFAULT, state.situation)
     }
 

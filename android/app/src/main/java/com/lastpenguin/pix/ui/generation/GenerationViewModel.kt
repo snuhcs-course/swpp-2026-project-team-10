@@ -368,7 +368,10 @@ class GenerationViewModel(
         }
     }
 
-    /** Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was. */
+    /**
+     * Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was and
+     * the photo's situation, which is the one chosen unless a failed front camera made it *Auto*.
+     */
     fun retakeScene() {
         checking?.cancel()
         _uiState.update {
@@ -377,7 +380,7 @@ class GenerationViewModel(
                 GenerationUiState(
                     phase = GenerationUiState.Phase.FRAMING,
                     light = it.light,
-                    situation = _situationChoice.value,
+                    situation = it.situation,
                 )
             } else {
                 it

@@ -62,7 +62,8 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The tutorial's tips laid out over each real screen (FR-10.4, NFR-16), on the Galaxy S22's 360 × 705 dp, in English
  * and in Korean, at font scale 1.0 and 1.3 (boundary): every control the screen shows has its ring; every caption, the
- * title, and the closing line lie inside the screen, whole, and clear of each other and of every ring. Camera, the guide on
+ * title, and the closing line lie inside the screen, whole, and clear of each other and of every ring, but a caption
+ * on its own ring's edge (*Add a pose guide*'s rows, #210), which crosses that ring only. Camera, the guide on
  * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle; the guide's
  * ✕ with its own tip, #204), and
  * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
@@ -198,6 +199,8 @@ class TutorialLayoutTest {
                     assertTrue("$label: \"${text.label()}\" is cut", drawn <= text.height)
                 }
                 for (mark in ringed) {
+                    // A caption on its ring's edge crosses that ring only (#210).
+                    if (mark.onEdge && text === mark.caption) continue
                     assertFalse(
                         "$label: \"${text.label()}\" covers the ring of \"${mark.caption.text}\"",
                         RectF.intersects(rect, mark.ring),

@@ -165,6 +165,9 @@ class GenerationViewModel(
      */
     val situationChoice: StateFlow<Situation> = _situationChoice.asStateFlow()
 
+    /** Whether *Selfie* can be chosen: only on a phone with a front camera (FR-1.14, FR-4.8). */
+    val selfieAvailable: StateFlow<Boolean> = camera.hasFrontCamera
+
     /** The situation other than a selfie chosen last, which *Add a pose guide* shows again with the rear camera. */
     private var rearChoice = Situation.DEFAULT
 
@@ -227,6 +230,17 @@ class GenerationViewModel(
                 settledLight.value = on
             }
         }
+        // A front camera that cannot be opened gives the rear one back (FR-1.14). A selfie being framed then asks
+        // for what *Auto* needs, the situation its photo gets, rather than for a selfie the camera cannot take.
+        viewModelScope.launch {
+            camera.facing.collect { facing ->
+                if (facing != CameraFacing.BACK) return@collect
+                _uiState.update { state ->
+                    val selfie = state.phase == GenerationUiState.Phase.FRAMING && state.situation == Situation.SELFIE
+                    if (selfie) state.copy(situation = state.situation.forScene(selfie = false)) else state
+                }
+            }
+        }
     }
 
     override fun onCleared() {
@@ -268,8 +282,12 @@ class GenerationViewModel(
         }
     }
 
-    /** A situation's tile on *Add a pose guide* (FR-4.8): chosen for the next scene photo. Nothing is sent. */
+    /**
+     * A situation's tile on *Add a pose guide* (FR-4.8): chosen for the next scene photo. Nothing is sent. *Selfie* is
+     * ignored on a phone without a front camera, whose tile is off.
+     */
     fun chooseSituation(situation: Situation) {
+        if (situation == Situation.SELFIE && !camera.hasFrontCamera.value) return
         if (situation != Situation.SELFIE) rearChoice = situation
         _situationChoice.value = situation
     }

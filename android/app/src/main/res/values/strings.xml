@@ -126,17 +126,11 @@
     <string name="situation_question_body">Pix sets the framing and the poses for it.</string>
     <string name="take_scene_for_poses">Take a scene photo for poses</string>
     <string name="situation_default">Auto</string>
-    <string name="situation_default_example">Pix decides</string>
     <string name="situation_background">Scenery</string>
-    <string name="situation_background_example">Beach, trips</string>
     <string name="situation_half_body">Upper body</string>
-    <string name="situation_half_body_example">Café, portraits</string>
     <string name="situation_full_body">Full body</string>
-    <string name="situation_full_body_example">Outfits</string>
     <string name="situation_landmark">Landmark</string>
-    <string name="situation_landmark_example">Sights</string>
     <string name="situation_selfie">Selfie</string>
-    <string name="situation_selfie_example">Front camera</string>
     <string name="guide_from_photo">Guide from a photo</string>
     <string name="choose_from_gallery">Choose from the gallery</string>
     <string name="my_library">My library</string>

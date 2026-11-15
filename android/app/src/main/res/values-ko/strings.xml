@@ -121,17 +121,11 @@
     <string name="situation_question_body">상황에 맞춰 AI가 구도와 포즈를 잡아 드려요</string>
     <string name="take_scene_for_poses">배경 사진 찍고 포즈 만들기</string>
     <string name="situation_default">자동</string>
-    <string name="situation_default_example">AI가 알아서</string>
     <string name="situation_background">배경 강조</string>
-    <string name="situation_background_example">바닷가·여행지</string>
     <string name="situation_half_body">상반신</string>
-    <string name="situation_half_body_example">카페·졸업사진</string>
     <string name="situation_full_body">전신</string>
-    <string name="situation_full_body_example">옷차림·거리</string>
     <string name="situation_landmark">랜드마크</string>
-    <string name="situation_landmark_example">명소·건물</string>
     <string name="situation_selfie">셀카</string>
-    <string name="situation_selfie_example">전면 카메라</string>
     <string name="guide_from_photo">사진으로 가이드 만들기</string>
     <string name="choose_from_gallery">갤러리에서 고르기</string>
     <string name="my_library">내 보관함</string>

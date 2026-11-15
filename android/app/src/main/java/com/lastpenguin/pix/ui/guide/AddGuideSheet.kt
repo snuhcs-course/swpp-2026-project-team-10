@@ -25,6 +25,7 @@ import com.lastpenguin.pix.ui.generation.SituationTiles
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -92,7 +93,10 @@ class AddGuideSheet : BottomSheetDialogFragment() {
                     launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.ADD_GUIDE)) }
                 }
                 launch { referenceViewModel.savedGuides.collect(savedGuides::render) }
-                launch { generationViewModel.situationChoice.collect(situations::render) }
+                launch {
+                    combine(generationViewModel.situationChoice, generationViewModel.selfieAvailable, ::Pair)
+                        .collect { (chosen, selfie) -> situations.render(chosen, selfie) }
+                }
             }
         }
     }

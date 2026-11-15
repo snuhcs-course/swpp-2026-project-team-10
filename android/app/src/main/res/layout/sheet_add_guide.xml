@@ -78,6 +78,7 @@
             android:background="@drawable/bg_list_card"
             android:orientation="vertical">
 
+            <!-- The tutorial rings this row and My library's, each caption on its ring's edge (#210). -->
             <LinearLayout
                 android:id="@+id/galleryRow"
                 android:layout_width="match_parent"
@@ -90,9 +91,7 @@
                 android:paddingStart="12dp"
                 android:paddingEnd="8dp">
 
-                <!-- The tutorial's ring for the gallery hugs this icon, clear of the saved guides' ring below. -->
                 <FrameLayout
-                    android:id="@+id/galleryIcon"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:background="@drawable/bg_icon_tile">

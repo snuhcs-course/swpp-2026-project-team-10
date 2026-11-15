@@ -9,7 +9,9 @@ import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.databinding.ItemSituationTileBinding
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -35,7 +37,8 @@ import org.robolectric.shadows.ShadowDialog
  * you taking?, no Cancel) or a guide (Replace, with Keep the current guide); the button with consent already given
  * (the scene photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts
  * it), and the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. My
- * library (FR-3.8, FR-3.11): nothing saved (no count); the row, which opens the library and closes the sheet. From
+ * library (FR-3.8, FR-3.11): nothing saved (no count); the row, which opens the library and closes the sheet. The
+ * situations (FR-4.8): a tile tapped is chosen with a check; Selfie's off and dimmed without a front camera. From
  * Subject view (FR-6.15): no situations and no button,
  * Add a pose guide as the title, and Replace only for a guide on the video, not one on this phone's camera.
  */
@@ -110,6 +113,28 @@ class AddGuideSheetTest {
             assertEquals(string(R.string.keep_current_guide), binding.cancelButton.text.toString())
             assertTrue(binding.cancelButton.isShown)
         }
+    }
+
+    @Test
+    fun aTileTapped_isChosenWithACheck_andSelfiesIsOffWithoutAFrontCamera() {
+        val modules = launch(TestAppContainer().apply { camera.hasFrontCamera.value = false })
+        val (landmark, selfie) = onSheet { binding ->
+            ItemSituationTileBinding.bind(binding.situationRowBottom.getChildAt(1)) to
+                ItemSituationTileBinding.bind(binding.situationRowBottom.getChildAt(2))
+        }
+
+        landmark.root.performClick()
+        idle()
+        assertEquals(Situation.LANDMARK, generation.situationChoice.value)
+        assertTrue(landmark.root.isSelected)
+        assertTrue(landmark.situationCheck.isShown)
+        assertFalse(selfie.root.isEnabled)
+        assertEquals(0.38f, selfie.root.alpha, 0.001f)
+
+        modules.camera.hasFrontCamera.value = true
+        idle()
+        assertTrue(selfie.root.isEnabled)
+        assertEquals(1f, selfie.root.alpha, 0.001f)
     }
 
     @Test

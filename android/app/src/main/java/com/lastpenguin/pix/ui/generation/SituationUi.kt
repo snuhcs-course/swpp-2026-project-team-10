@@ -12,8 +12,8 @@ import com.lastpenguin.pix.databinding.ItemSituationTileBinding
 import com.lastpenguin.pix.generation.Situation
 
 /**
- * How the situations show (FR-4.8): their names, their tiles' pictures and the occasions they suit, and what the scene
- * photo's step asks to frame. *Add a pose guide* offers all six in this order, two rows of three: the person's
+ * How the situations show (FR-4.8): their names, their tiles' pictures, and what the scene photo's step asks to
+ * frame. *Add a pose guide* offers all six in this order, two rows of three: the person's
  * framings, then the place's; Generate poses names the one the photo was taken for.
  * Owner: Server/AI/Sync (Iter4-P13).
  */
@@ -48,18 +48,6 @@ internal val Situation.drawing: Int
         Situation.SELFIE -> R.drawable.situation_selfie
     }
 
-/** The occasions a situation suits, under its name on its tile (FR-4.8). */
-@get:StringRes
-internal val Situation.example: Int
-    get() = when (this) {
-        Situation.DEFAULT -> R.string.situation_default_example
-        Situation.BACKGROUND -> R.string.situation_background_example
-        Situation.HALF_BODY -> R.string.situation_half_body_example
-        Situation.FULL_BODY -> R.string.situation_full_body_example
-        Situation.LANDMARK -> R.string.situation_landmark_example
-        Situation.SELFIE -> R.string.situation_selfie_example
-    }
-
 /**
  * What the scene photo's step asks to frame (#204): the landmark for a landmark's poses, which crop inside the photo,
  * and the whole person for full body, whose candidates otherwise guess the legs (FR-4.8, Design 2.6.3).
@@ -88,18 +76,23 @@ internal class SituationTiles(top: LinearLayout, bottom: LinearLayout, onChoose:
             }
             tile.situationImage.setImageResource(situation.drawing)
             tile.situationName.setText(situation.title)
-            tile.situationExample.setText(situation.example)
-            tile.root.contentDescription =
-                row.context.getString(situation.title) + ", " + row.context.getString(situation.example)
+            tile.root.contentDescription = row.context.getString(situation.title)
             tile.root.setOnClickListener { onChoose(situation) }
             row.addView(tile.root)
             situation to tile
         }
 
-    fun render(chosen: Situation) {
+    /** Marks [chosen]; without a front camera ([selfie] false), *Selfie*'s tile is off and dimmed (FR-4.8). */
+    fun render(chosen: Situation, selfie: Boolean = true) {
         tiles.forEach { (situation, tile) ->
+            val usable = situation != Situation.SELFIE || selfie
             tile.root.isSelected = situation == chosen
+            tile.root.isEnabled = usable
+            tile.root.alpha = if (usable) 1f else OFF_TILE_ALPHA
             tile.situationCheck.isVisible = situation == chosen
         }
     }
 }
+
+/** A tile that cannot be chosen, as Material dims a disabled control. */
+private const val OFF_TILE_ALPHA = 0.38f

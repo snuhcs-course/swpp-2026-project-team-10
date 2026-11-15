@@ -1198,8 +1198,9 @@ class GenerationViewModelTest {
 
     // ---- situations (FR-4.8, Iter4-P13) ---------------------------------------------------------------------------
     // Partitions: the situation chosen on Add a pose guide, going with every request of the set, Try again included;
-    // the tiles following the camera, front and rear; the camera turned to the chosen situation's; a rear photo after
-    // the selfie's tile; shooting again; the subject's phone told the situation.
+    // the tiles following the camera, front and rear; the camera turned to the chosen situation's; the selfie's tile
+    // off without a front camera; a front camera that fails while a selfie is framed; shooting again; the subject's
+    // phone told the situation.
 
     @Test
     fun theChosenSituation_goesWithTheScene_toEveryRequestOfTheSet() = runTest {
@@ -1252,14 +1253,32 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun aRearPhoto_afterTheSelfiesTile_isDefault() = runTest {
+    fun withoutAFrontCamera_theSelfiesTileIsOff_andChoosingItDoesNothing() = runTest {
+        assertTrue(model.selfieAvailable.value)
+        camera.hasFrontCamera.value = false
+        assertFalse(model.selfieAvailable.value)
+
+        model.chooseSituation(Situation.LANDMARK)
+        model.chooseSituation(Situation.SELFIE)
+
+        assertEquals(Situation.LANDMARK, model.situationChoice.value)
+    }
+
+    @Test
+    fun aFrontCameraThatFails_whileASelfieIsFramed_asksForAuto_andThePhotoIsDefault() = runTest {
         model.chooseSituation(Situation.SELFIE)
         model.beginScene()
-        // The user turned to the rear camera before the shutter.
+        runCurrent()
+        assertEquals(Situation.SELFIE, state.situation)
+
+        // The front camera could not be bound, and the controller gave the rear one back.
         camera.facing.value = CameraFacing.BACK
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+        assertEquals(Situation.DEFAULT, state.situation)
+
         model.takeScene()
         runCurrent()
-
         assertFalse(state.selfie)
         assertEquals(Situation.DEFAULT, state.situation)
     }
@@ -2069,7 +2088,7 @@ class GenerationViewModelTest {
 
         override fun setFrameSink(sink: FrameSink?) = Unit
         override val facing = MutableStateFlow(CameraFacing.BACK)
-        override val hasFrontCamera: StateFlow<Boolean> = MutableStateFlow(true)
+        override val hasFrontCamera = MutableStateFlow(true)
         override fun setFacing(facing: CameraFacing) {
             this.facing.value = facing
         }

@@ -1199,7 +1199,7 @@ class GenerationViewModelTest {
     // ---- situations (FR-4.8, Iter4-P13) ---------------------------------------------------------------------------
     // Partitions: the situation chosen on Add a pose guide, going with every request of the set, Try again included;
     // the tiles following the camera, front and rear; the camera turned to the chosen situation's; a rear photo after
-    // the selfie's tile; shooting again.
+    // the selfie's tile; shooting again; the subject's phone told the situation.
 
     @Test
     fun theChosenSituation_goesWithTheScene_toEveryRequestOfTheSet() = runTest {
@@ -1212,6 +1212,14 @@ class GenerationViewModelTest {
 
         assertEquals(Situation.LANDMARK, state.situation)
         assertEquals(listOf(Situation.LANDMARK, Situation.LANDMARK), generator.runs.map { it.situation })
+    }
+
+    @Test
+    fun generatePoses_tellsTheSubjectsPhoneTheSituation() = runTest {
+        model.chooseSituation(Situation.LANDMARK)
+        describeAPhoto()
+
+        assertEquals(listOf<String?>("landmark"), descriptions.situations)
     }
 
     @Test
@@ -1903,8 +1911,12 @@ class GenerationViewModelTest {
 
         fun request(request: DescriptionRequest) = check(sent.tryEmit(request))
 
-        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean) {
+        /** The situation each open named. */
+        val situations = mutableListOf<String?>()
+
+        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean, situation: String?) {
             ids += descriptionId
+            situations += situation
             calls += "open '$text'" + if (rejected) " rejected" else ""
         }
 

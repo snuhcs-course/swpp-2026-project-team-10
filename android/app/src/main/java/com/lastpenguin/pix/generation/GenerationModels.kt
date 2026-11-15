@@ -49,6 +49,11 @@ enum class Situation(val apiName: String) {
         this == SELFIE -> DEFAULT
         else -> this
     }
+
+    companion object {
+        /** The situation named [apiName] on the server, or null for none or a name this phone does not know. */
+        fun named(apiName: String?): Situation? = entries.firstOrNull { it.apiName == apiName }
+    }
 }
 
 /** One pose of a set: [id] names its slot (`pose-1` … `pose-4`), [text] is what the image model is asked for. */

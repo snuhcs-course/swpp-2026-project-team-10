@@ -393,7 +393,7 @@ class GenerationViewModel(
         val id = UUID.randomUUID().toString()
         descriptionId = id
         _uiState.update { it.copy(descriptionWriter = null) }
-        descriptions.open(id, scene, state.description, state.descriptionRejected)
+        descriptions.open(id, scene, state.description, state.descriptionRejected, state.situation.apiName)
     }
 
     /** The description field changed; kept so the text survives a rejected set (US-5). Not while the subject types. */

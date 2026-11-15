@@ -88,7 +88,7 @@
 | 3.8 | 2026-11-13 | Tutorial rings around what a control draws, circles only around near-square controls, and the scene photo's caption beside it; the camera bar's title on its icons' line (2.6.2, 2.6.8; [#204]). |
 | 3.9 | 2026-11-13 | The no-person alert at the start of its message's first line (2.6.3; [#204]). |
 | 3.10 | 2026-11-14 | Situation prompts (Iter4-P12, [#209]): `situation` on `POST /pose-suggestions` and `POST /poses`, a `[situations.<name>]` table each, background and full body framing wider, landmark cropping freely, and the comparison with the default prompt; the four prompt templates dropped (Iter4-P14, [#211]), so a description keeps its three variations (2.5.3, 2.6.3, 2.9, *Still open*). |
-| 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): tiles on *Add a pose guide* before the scene photo, the situation's camera and hint, its name on *Generate poses*, and *My library* as a row (2.4, 2.6.2, 2.6.3, 2.6.5). |
+| 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): tiles on *Add a pose guide* before the scene photo, the situation's camera and hint, its name on *Generate poses* on both phones (`pose.description`'s `situation`), and *My library* as a row (2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5, 2.9). |
 
 </details>
 
@@ -1542,7 +1542,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `guide.state` | P→S | steps realtime, final reliable | `state`, `final`, `by` | The guide's place, opacity, and visibility |
 | `guide.clear` | P→S | reliable | none | The guide was removed |
 | `guide.move` | S→P | steps realtime, final reliable | `guideId`, `cx`, `cy`, `height`, `final` | The subject's drag or pinch on the guide (FR-7.2) |
-| `pose.description` | P→S | reliable | `descriptionId`, `step`, `text`, `writer`, `rejected`, `setId` | The photographer's *Generate poses* (FR-6.15) |
+| `pose.description` | P→S | reliable | `descriptionId`, `step`, `text`, `writer`, `rejected`, `setId`, `situation` | The photographer's *Generate poses* (FR-6.15) |
 | `pose.scene.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The scene photo, for the subject's *Generate poses* |
 | `pose.description.edit` | S→P | reliable | `descriptionId`, `holding`, `text` | The subject's field takes or returns the description |
 | `pose.description.go` | S→P | reliable | `descriptionId`, `text`, `suggest` | The subject's *Generate poses* button |
@@ -1812,12 +1812,12 @@ The photographer takes it only while that set is `PICKING` and nobody has chosen
 
 ```json
 { "v": 3, "t": "pose.description", "seq": 4, "ts": 1759212380200,
-  "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "step": "OPEN", "text": "Jumping with both arms up", "writer": "PHOTOGRAPHER" } }
+  "b": { "descriptionId": "0a9c2e4f-6b1d-4c3a-8e5f-7d2b9a1c4e60", "step": "OPEN", "text": "Jumping with both arms up", "writer": "PHOTOGRAPHER", "situation": "landmark" } }
 ```
 
 | `step` | When | Fields |
 |----|----|----|
-| `OPEN` | *Generate poses* opened; again at each change | `text`; `writer`, the phone whose field holds the description, left out while nobody types; `rejected: true` after the service refused the last description, left out otherwise |
+| `OPEN` | *Generate poses* opened; again at each change | `text`; `writer`, the phone whose field holds the description, left out while nobody types; `rejected: true` after the service refused the last description, left out otherwise; `situation`, the scene photo's, by its name on the server (It 4, FR-4.8, [#210]): a string, so a name the subject does not know shows as none, and an older photographer sends none |
 | `STARTED` | A set started from the description, from either phone | `text`, as the set asked for it, empty for suggested poses; `setId`, as `pose.step` names the set |
 | `CLOSED` | Back | — |
 
@@ -2584,7 +2584,7 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 `background` and `full_body` may show more of the place than the scene photo, as if the photographer stepped back, and the tip then says to step back (decided 2026-11-13). They never add a main feature the scene photo does not show. *Known limit:* where the scene photo hides the legs or the feet, `full_body` guesses them, and each candidate guesses other trousers or shoes (2026-11-14). The other situations never frame wider. A selfie takes only `selfie`. `POST /pose-tips` takes no situation ([#213]).
 
-**The choice on the phone (It 4, FR-4.8, [#210]).** *Add a pose guide* offers the six situations as tiles, *Auto* (`default`) first, then the person's framings and the place's. The choice (`GenerationViewModel.situationChoice`) is kept while Pix runs, and the sheet follows the camera as it opens: *Selfie* while the front one is on, the last other choice with the rear one. The scene photo keeps it (`Situation.forScene`: a front-camera photo is always `selfie`, a rear one never), *Generate poses* names it on the photo's card, and every request of the set sends it; another situation needs another photo, since the photo was framed for it. The descriptions used before stay one list for every situation (FR-4.11). The tiles' pictures are WebP files (`drawable-nodpi`) from one image of all six that Gemini drew in one style (2026-11-15), toned down to 65% saturation.
+**The choice on the phone (It 4, FR-4.8, [#210]).** *Add a pose guide* offers the six situations as tiles, *Auto* (`default`) first, then the person's framings and the place's. The choice (`GenerationViewModel.situationChoice`) is kept while Pix runs, and the sheet follows the camera as it opens: *Selfie* while the front one is on, the last other choice with the rear one. The scene photo keeps it (`Situation.forScene`: a front-camera photo is always `selfie`, a rear one never), *Generate poses* names it on the photo's card, on the subject's phone too through `pose.description` (2.5.1), and every request of the set sends it; another situation needs another photo, since the photo was framed for it. The descriptions used before stay one list for every situation (FR-4.11). The tiles' pictures are WebP files (`drawable-nodpi`) from one image of all six that Gemini drew in one style (2026-11-15), toned down to 65% saturation.
 
 **Prompts as data.** The prompts, default poses, and questions are in `server/src/pix_server/poses/prompts.toml`, with the `[situations]`, `[filter]`, and `[person]` tables. The server refuses to start on a missing or doubled placeholder, an empty prompt, or other than four default poses of up to 100 characters. A missing or unknown situation, duplicate default poses in a situation, an incomplete `[filter]` or `[person]` table, or an unknown key also stops it. A mistake therefore fails the tests and the image build, not pose requests. The scripts in `server/scripts/` read the same file, so a change can be tried first; `eval_poses.py` runs the AI module tests (Testing Documentation 3.1).
 
@@ -3198,7 +3198,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The controls turn with the phone (Iter4-P10, [#207]) | 한준형 | 11/19 | Open | 2.1, 2.6.2 |
 | Camera quality and latency, low priority (from #183) (Iter4-P11, [#208]) | 한준형 | 11/19 | Open | 2.8 |
 | Situation prompts, compared with the current prompt (Iter4-P12, [#209]) | 박재완 | 11/19 | Open | 2.5.3, 2.6.3, *Still open* |
-| The situation choice on *Generate poses* (Iter4-P13, [#210]) | 박재완 | 11/19 | Open | 2.1, 2.5.1, 2.6.5 |
+| The situation choice before the scene photo (Iter4-P13, [#210]) | 박재완 | 11/19 | Open | 2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5 |
 | Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Dropped | — |
 | Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
 | Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/19 | Open | 2.6.3 |

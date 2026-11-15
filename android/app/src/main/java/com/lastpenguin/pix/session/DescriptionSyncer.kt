@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -46,8 +46,11 @@ interface DescriptionShare {
     /** The subject's edits and its *Generate 4 poses* or *Skip* for the open description, in the order they came. */
     val requests: Flow<DescriptionRequest>
 
-    /** Generate poses opened as [descriptionId] with the scene photo [scene], in place of any other description. */
-    fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean)
+    /**
+     * Generate poses opened as [descriptionId] with the scene photo [scene], taken for the [situation] (its name on the
+     * server, FR-4.8), in place of any other description.
+     */
+    fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean, situation: String? = null)
 
     /** The description is now [text], with [writer]'s field holding it; null while nobody types. */
     fun update(descriptionId: String, text: String, writer: Role?)
@@ -62,7 +65,8 @@ interface DescriptionShare {
     object None : DescriptionShare {
         override val requests: Flow<DescriptionRequest> = emptyFlow()
 
-        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean) = Unit
+        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean, situation: String?) =
+            Unit
 
         override fun update(descriptionId: String, text: String, writer: Role?) = Unit
 
@@ -79,6 +83,8 @@ data class MirrorDescription(
     val rejected: Boolean = false,
     /** The scene photo's copy, once it arrived. */
     val scene: Bitmap? = null,
+    /** The situation the photo was taken for, by its name on the server (FR-4.8); null from an older photographer. */
+    val situation: String? = null,
 )
 
 /**
@@ -132,15 +138,20 @@ class DescriptionSyncer(
         val writer: Role? = null,
         val rejected: Boolean = false,
         val setId: String? = null,
+        val situation: String? = null,
     ) {
         /**
-         * What the subject is told of it: writer and rejected only while it is open, and the text also with STARTED,
-         * as the set was asked for it and empty for suggested poses, for the subject's prompt history (FR-4.11).
+         * What the subject is told of it: writer, rejected, and the situation only while it is open, and the text also
+         * with STARTED, as the set was asked for it and empty for suggested poses, for the subject's prompt history
+         * (FR-4.11).
          */
         val message: SessionMessage.PoseDescription
             get() = when (step) {
-                DescriptionStep.OPEN -> SessionMessage.PoseDescription(descriptionId, step, text, writer, rejected)
+                DescriptionStep.OPEN ->
+                    SessionMessage.PoseDescription(descriptionId, step, text, writer, rejected, situation = situation)
+
                 DescriptionStep.STARTED -> SessionMessage.PoseDescription(descriptionId, step, text, setId = setId)
+
                 DescriptionStep.CLOSED -> SessionMessage.PoseDescription(descriptionId, step)
             }
     }
@@ -150,8 +161,16 @@ class DescriptionSyncer(
     private val subjectRequests = Channel<DescriptionRequest>(Channel.BUFFERED)
     override val requests: Flow<DescriptionRequest> = subjectRequests.receiveAsFlow()
 
-    override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean) {
-        shared.value = SharedDescription(descriptionId, DescriptionStep.OPEN, scene, text, rejected = rejected)
+    override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean, situation: String?) {
+        shared.value =
+            SharedDescription(
+                descriptionId,
+                DescriptionStep.OPEN,
+                scene,
+                text,
+                rejected = rejected,
+                situation = situation,
+            )
     }
 
     override fun update(descriptionId: String, text: String, writer: Role?) {
@@ -375,6 +394,7 @@ class DescriptionSyncer(
                     message.writer,
                     message.rejected,
                     current?.takeIf { it.descriptionId == message.descriptionId }?.scene,
+                    message.situation,
                 )
             }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -6,6 +6,7 @@ import android.animation.ValueAnimator
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.drawable.StateListDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Looper
@@ -14,6 +15,7 @@ import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -23,8 +25,10 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -49,7 +53,10 @@ import org.robolectric.util.ReflectionHelpers
  * and the held frame turns over, top over bottom (at its start, in each half, and at its end), blurred, or only dimmed
  * on Android 10 and 11. A lens change of the zoom:
  * the held frame stays as it is and goes at once (NFR-19). The shutter: a blink, and the new photo's thumbnail growing
- * in, but not the one there as the screen opens. With the phone's animations off, each change is at its end at once.
+ * in, but not the one there as the screen opens. The scene photo for poses (#210) starting and ending: the title and the
+ * panel at their first frame, the flow's bar from empty, the shutter turning, the preview sliding to its place under
+ * the taller bar and back, and a later change of a bar's height placing it at once. With the phone's animations off,
+ * each change is at its end at once.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -121,6 +128,17 @@ class CameraTransitionTest {
     }
 
     private fun Camera.density() = controls.root.resources.displayMetrics.density
+
+    /** The preview's top as its margin sets it, in dp: where it is laid out, before any slide. */
+    private fun Camera.previewTop(): Float =
+        (controls.previewContainer.layoutParams as ViewGroup.MarginLayoutParams).topMargin / density()
+
+    /** The scene photo for poses, as *Take a scene photo for poses* starts it (#210). */
+    private fun Camera.beginScene() {
+        ViewModelProvider(fragment.requireActivity(), PixViewModels.Factory)[GenerationViewModel::class.java]
+            .beginScene()
+        idle()
+    }
 
     private fun Camera.still(): FloatArray = FloatArray(9).also { controls.aspectStill.imageMatrix.getValues(it) }
 
@@ -333,6 +351,71 @@ class CameraTransitionTest {
     }
 
     @Test
+    fun theScenePhotoStep_startsAndEnds_asAChange() {
+        val screen = camera()
+        val controls = screen.controls
+        val top = screen.previewTop()
+        ShadowChoreographer.setPaused(true)
+
+        screen.beginScene()
+        // Its first frame: the title and the panel not in yet, the panel lower, the flow's bar empty, and the shutter
+        // starting to turn.
+        assertEquals(0f, controls.sceneTitle.alpha, 0f)
+        assertEquals(0f, controls.sceneGuide.alpha, 0f)
+        assertEquals(12f, controls.sceneGuide.translationY / screen.density(), 0.01f)
+        assertEquals(1, controls.sceneProgress.step)
+        assertEquals(0f, controls.sceneProgress.filled, 0f)
+        assertTrue(checkNotNull(screen.fragment.shutterTurn).isRunning)
+        // The taller bar laid out on the next frame: the preview has its place under it, and slides there from where
+        // it was, the frames' catch-up aside.
+        play(16)
+        val lower = screen.previewTop() - top
+        assertEquals(16f, lower, 0.5f)
+        val slide = checkNotNull(screen.fragment.previewSlide)
+        slide.setCurrentFraction(0f)
+        assertEquals(-lower, controls.previewContainer.translationY / screen.density(), 0.5f)
+        slide.setCurrentFraction(0.5f)
+        assertTrue(controls.previewContainer.translationY / screen.density() in -lower + 0.5f..-0.5f)
+        slide.setCurrentFraction(1f)
+
+        play(500)
+        assertEquals(0f, controls.previewContainer.translationY, 0f)
+        assertEquals(1f, controls.sceneTitle.alpha, 0f)
+        assertEquals(1f, controls.sceneGuide.alpha, 0f)
+        assertEquals(0f, controls.sceneGuide.translationY, 0f)
+        assertEquals(0.2f, controls.sceneProgress.filled, 0.001f)
+        assertEquals(R.drawable.bg_shutter_scene, controls.shutterButton.tag)
+        assertTrue(controls.shutterButton.background is StateListDrawable)
+
+        // Back out to the camera: the bar and the panel go at once, the shutter turns white, and the preview slides
+        // up with the camera's own bar.
+        ShadowChoreographer.setPaused(true)
+        controls.sceneBackButton.performClick()
+        idle()
+        assertFalse(controls.sceneProgress.isVisible())
+        assertFalse(controls.sceneGuide.isVisible())
+        assertTrue(checkNotNull(screen.fragment.shutterTurn).isRunning)
+        play(16)
+        assertEquals(top, screen.previewTop(), 0.5f)
+        checkNotNull(screen.fragment.previewSlide).setCurrentFraction(0f)
+        assertEquals(lower, controls.previewContainer.translationY / screen.density(), 0.5f)
+        checkNotNull(screen.fragment.previewSlide).setCurrentFraction(1f)
+
+        play(500)
+        assertEquals(0f, controls.previewContainer.translationY, 0f)
+        assertEquals(R.drawable.bg_shutter, controls.shutterButton.tag)
+        assertTrue(controls.shutterButton.background is StateListDrawable)
+
+        // A later change of the bars' heights, a larger font for one, places the preview at once.
+        val ended = screen.fragment.previewSlide
+        controls.topBar.minHeight = controls.topBar.height + (8 * screen.density()).toInt()
+        play(32)
+        assertEquals(top + 8f, screen.previewTop(), 0.5f)
+        assertTrue(screen.fragment.previewSlide === ended)
+        assertEquals(0f, controls.previewContainer.translationY, 0f)
+    }
+
+    @Test
     fun withAnimationsOff_eachChangeIsAtItsEndAtOnce() {
         val screen = camera()
         setAnimatorScale(0f)
@@ -370,5 +453,17 @@ class CameraTransitionTest {
         screen.camera.photo = Uri.parse("content://media/external/images/media/1")
         screen.controls.shutterButton.performClick()
         assertFalse(screen.controls.previewScrim.isVisible())
+
+        // The scene photo for poses (#210): its title, panel, bar, and shutter, and the preview under the taller bar.
+        screen.beginScene()
+        assertEquals(1f, screen.controls.sceneTitle.alpha, 0f)
+        assertEquals(1f, screen.controls.sceneGuide.alpha, 0f)
+        assertEquals(0f, screen.controls.sceneGuide.translationY, 0f)
+        assertEquals(0.2f, screen.controls.sceneProgress.filled, 0.001f)
+        assertEquals(null, screen.fragment.shutterTurn)
+        assertTrue(screen.controls.shutterButton.background is StateListDrawable)
+        play(16)
+        assertEquals(null, screen.fragment.previewSlide)
+        assertEquals(0f, screen.controls.previewContainer.translationY, 0f)
     }
 }

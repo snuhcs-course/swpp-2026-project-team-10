@@ -14,6 +14,7 @@ import android.graphics.Rect
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -43,6 +44,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.children
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
@@ -156,9 +158,24 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var shown: FramePlace? = null
     private var move: ValueAnimator? = null
 
+    /** Whether the scene photo step showed at the last render; null before this view's first, which animates nothing. */
+    private var sceneShown: Boolean? = null
+
+    /** The preview's next move slides there from where it was, as the step's top bar changes height (#210). */
+    private var slideNextPlace = false
+    private var slide: ValueAnimator? = null
+    private var shutterFade: ValueAnimator? = null
+
     // The move under way, which a test sets to a point between its ends: the display's paused frames catch up at once.
     @VisibleForTesting
     internal val frameMove: ValueAnimator? get() = move
+
+    // The preview's last slide with the scene photo's bar, which a test sets the same way.
+    @VisibleForTesting
+    internal val previewSlide: ValueAnimator? get() = slide
+
+    @VisibleForTesting
+    internal val shutterTurn: ValueAnimator? get() = shutterFade
 
     @VisibleForTesting
     internal val stillFlip: ValueAnimator? get() = flip
@@ -546,6 +563,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         reframing = false
         shown = null
         shownAspect = null
+        sceneShown = null
+        slideNextPlace = false
+        slide?.cancel()
+        slide = null
+        shutterFade?.cancel()
+        shutterFade = null
         binding = null
         sceneBack = null
         aspectsBack = null
@@ -741,9 +764,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val top = place.area.top.roundToInt()
         val bottom = (controls.root.height - place.area.bottom).roundToInt()
         if (params.topMargin != top || params.bottomMargin != bottom) {
+            val from = params.topMargin - top
             params.topMargin = top
             params.bottomMargin = bottom
             container.layoutParams = params
+            if (slideNextPlace && from != 0) {
+                slideNextPlace = false
+                slideFrom(container, from.toFloat())
+            }
         }
         controls.bottomPanel.setBackgroundResource(if (place.area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
         fitToFrame(controls)
@@ -1106,18 +1134,42 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.usePhotoButton.isEnabled = reviewing && !scene.checkingPerson && !scene.noPerson
         // Where the step is in the pose flow, under a bar as tall as the other screens' headers, so their titles and
         // bars line up (#210). While framing, what to frame and what for, on the panel above the shutter, and the
-        // shutter in the accent.
+        // shutter in the accent. Starting or ending the step plays as a change (Motion): the preview slides with the
+        // bar, the title fades in, the flow's bar fills to its step, the panel rises in, and the shutter turns.
+        val before = sceneShown
+        val changed = before != null && before != active
+        sceneShown = active
         controls.sceneProgress.isVisible = active
-        controls.sceneProgress.step = if (reviewing) SCENE_REVIEW_STEP else SCENE_FRAMING_STEP
-        sizeTopBar(controls, active)
-        val framing = active && !reviewing
-        controls.sceneGuide.isVisible = framing
-        if (framing) controls.sceneGuideText.setText(scene.situation.framingHint)
-        val shutter = if (framing) R.drawable.bg_shutter_scene else R.drawable.bg_shutter
-        if (controls.shutterButton.tag != shutter) {
-            controls.shutterButton.setBackgroundResource(shutter)
-            controls.shutterButton.tag = shutter
+        val step = if (reviewing) SCENE_REVIEW_STEP else SCENE_FRAMING_STEP
+        when {
+            before == null -> controls.sceneProgress.step = step
+
+            changed && active -> {
+                controls.sceneProgress.step = 0
+                controls.sceneProgress.moveTo(step)
+            }
+
+            else -> controls.sceneProgress.moveTo(step)
         }
+        if (changed) {
+            // The bar's new height is laid out on the next frame, which posts the preview's new place (placePreview);
+            // a place after that is not this change.
+            slideNextPlace = true
+            controls.root.doOnPreDraw { controls.root.post { slideNextPlace = false } }
+        }
+        sizeTopBar(controls, active)
+        if (changed && active) {
+            controls.sceneTitle.alpha = 0f
+            controls.sceneTitle.fadeTo(1f, Motion.FADE_MS)
+        }
+        val framing = active && !reviewing
+        val guideWasShown = controls.sceneGuide.isVisible
+        controls.sceneGuide.isVisible = framing
+        if (framing) {
+            controls.sceneGuideText.setText(scene.situation.framingHint)
+            if (!guideWasShown && before != null) riseIn(controls.sceneGuide)
+        }
+        turnShutter(controls, framing, animate = changed)
         if (!active) return
 
         val noPerson = reviewing && scene.noPerson
@@ -1140,6 +1192,64 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             showStatus(controls.captureStatus, R.string.scene_shot_failed, StatusLook.ERROR)
         } else {
             controls.captureStatus.isVisible = false
+        }
+    }
+
+    /** The preview from [from] px above or below its new place to it, in [Motion.MOVE_MS], from where it shows now. */
+    private fun slideFrom(container: View, from: Float) {
+        slide?.cancel()
+        slide = null
+        if (!Motion.on()) {
+            container.translationY = 0f
+            return
+        }
+        slide = ValueAnimator.ofFloat(container.translationY + from, 0f).apply {
+            duration = Motion.MOVE_MS
+            interpolator = Motion.STANDARD
+            addUpdateListener { container.translationY = it.animatedValue as Float }
+            start()
+        }
+    }
+
+    /** [view] coming in: up from [RISE_DP] below as it fades in, in [Motion.MOVE_MS]; at once while animations are off. */
+    private fun riseIn(view: View) {
+        view.animate().cancel()
+        if (!Motion.on()) {
+            view.alpha = 1f
+            view.translationY = 0f
+            return
+        }
+        view.alpha = 0f
+        view.translationY = RISE_DP * resources.displayMetrics.density
+        view.animate().alpha(1f).translationY(0f).setDuration(Motion.MOVE_MS).setInterpolator(Motion.STANDARD).start()
+    }
+
+    /**
+     * The shutter in the accent while the scene photo is framed (#210), white otherwise; as the step starts or ends
+     * ([animate]), the new one fades in over the old in [Motion.MOVE_MS]. Its tag names the drawable it shows.
+     */
+    private fun turnShutter(controls: FragmentCameraBinding, scene: Boolean, animate: Boolean) {
+        val want = if (scene) R.drawable.bg_shutter_scene else R.drawable.bg_shutter
+        val button = controls.shutterButton
+        if (button.tag == want) return
+        button.tag = want
+        shutterFade?.cancel()
+        shutterFade = null
+        val from = button.background
+        val to = AppCompatResources.getDrawable(requireContext(), want)?.mutate()
+        if (!animate || !Motion.on() || from == null || to == null) {
+            button.setBackgroundResource(want)
+            return
+        }
+        to.alpha = 0
+        button.background = LayerDrawable(arrayOf(from, to))
+        // An animator rather than a TransitionDrawable, whose fade ignores the phone's animation speed.
+        shutterFade = ValueAnimator.ofInt(0, 255).apply {
+            duration = Motion.MOVE_MS
+            interpolator = Motion.STANDARD
+            addUpdateListener { to.alpha = it.animatedValue as Int }
+            doOnEnd { if (button.tag == want) button.setBackgroundResource(want) }
+            start()
         }
     }
 
@@ -1785,6 +1895,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val CAMERA_BAR_MIN_DP = 52f
         private const val SCENE_BAR_TOP_DP = 8f
         private const val SCENE_BAR_MIN_DP = 68f
+
+        /** How far below its place the scene photo's panel starts as it rises in (#210). */
+        private const val RISE_DP = 12f
 
         /** The no-person alert before the message's first word (#204). */
         private const val SCENE_MESSAGE_ICON_GAP_DP = 6f

@@ -65,7 +65,6 @@
     <string name="delete">Delete</string>
     <string name="saved_guide_open_failed">Couldn\'t open the saved guide.</string>
     <!-- The library (FR-3.11, R&S 6.2): every saved guide, filtered by kind. -->
-    <string name="my_library">My library</string>
     <string name="library_title">Library</string>
     <string name="library_title_description">Library, saved guides: %1$d</string>
     <string name="library_all">All %1$d</string>
@@ -123,7 +122,24 @@
     <string name="add_guide_title">Add a pose guide</string>
     <string name="replace_guide_title">Replace the pose guide?</string>
     <string name="keep_current_guide">Keep the current guide</string>
-    <string name="generate_poses">Generate poses here</string>
+    <string name="situation_question">What are you taking?</string>
+    <string name="situation_question_body">Pix sets the framing and the poses for it.</string>
+    <string name="take_scene_for_poses">Take a scene photo for poses</string>
+    <string name="situation_default">Auto</string>
+    <string name="situation_default_example">Pix decides</string>
+    <string name="situation_background">Scenery</string>
+    <string name="situation_background_example">Beach, trips</string>
+    <string name="situation_half_body">Upper body</string>
+    <string name="situation_half_body_example">Café, portraits</string>
+    <string name="situation_full_body">Full body</string>
+    <string name="situation_full_body_example">Outfits</string>
+    <string name="situation_landmark">Landmark</string>
+    <string name="situation_landmark_example">Sights</string>
+    <string name="situation_selfie">Selfie</string>
+    <string name="situation_selfie_example">Front camera</string>
+    <string name="guide_from_photo">Guide from a photo</string>
+    <string name="choose_from_gallery">Choose from the gallery</string>
+    <string name="my_library">My library</string>
     <!-- Reference confirm's title for a generated pose's outline (#199). -->
     <string name="pose_guide_title">Guide Outline</string>
     <string name="reference_preview_description">The person from the reference photo</string>
@@ -147,6 +163,11 @@
     <string name="not_now">Not now</string>
     <string name="scene_title">Take the scene photo</string>
     <string name="scene_framing_hint">Frame the place with the person in it</string>
+    <string name="scene_framing_hint_background">Frame the view with the person in it</string>
+    <string name="scene_framing_hint_half_body">Frame the person with the place behind them</string>
+    <string name="scene_framing_hint_full_body">Frame the person from head to feet</string>
+    <string name="scene_framing_hint_landmark">Frame the whole landmark with the person in it</string>
+    <string name="scene_framing_hint_selfie">Frame your face with the place behind you</string>
     <string name="scene_review_title">Use this photo?</string>
     <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="shoot_again">Shoot again</string>
@@ -466,7 +487,7 @@
     <string name="help_guide_title">Add a pose guide</string>
     <string name="help_guide_body">Tap Guide and pick a photo of a person. Their outline appears on the camera: drag it to move it, pinch to resize it, and line the person up with it.</string>
     <string name="help_poses_title">Generate poses</string>
-    <string name="help_poses_body">Tap Guide › Generate poses here and take a photo of the scene. AI makes four poses for that person in that place; the one you pick becomes the guide.</string>
+    <string name="help_poses_body">Tap Guide, choose a situation, and take a photo of the scene. AI makes four poses for that person in that place; the one you pick becomes the guide.</string>
     <string name="help_together_title">Shoot together</string>
     <string name="help_together_body">On Shoot together, choose who takes the photo. Invite a Pix friend or show a code to the person in the photo, and their phone shows your camera live, with the same guide.</string>
     <string name="help_remote_title">From the subject\'s phone</string>
@@ -484,7 +505,7 @@
     <string name="tutorial_shutter">Only the photo is saved, never the guide</string>
     <string name="tutorial_switch">Change to the front camera</string>
     <string name="tutorial_upload">Pix traces the person in your photo</string>
-    <string name="tutorial_generate">AI makes four poses for this place</string>
+    <string name="tutorial_generate">Pick a situation, and AI makes four poses for it</string>
     <string name="tutorial_saved">Saved guides wait in My library</string>
     <string name="tutorial_move">Drag to move, pinch to resize</string>
     <string name="tutorial_edit">The guide moves only while this is on</string>

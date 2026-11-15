@@ -87,8 +87,37 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Jaewan, 11-13] "what if we do '일어서서 왼쪽을 보며' with that image"
 - [Jaewan, 11-13] "what is the current paraphrase prompt? how does it make differences"
 
+## The situation choice ([#210])
+
+- [Jaewan, 11-15] "I pushed them. now in a separate branch (assuming this will be merged later), can we do #210? a hypothetical ui design would be similar to [Image #5] this. first implement this on your own ideas and show me the results in screenshots"
+- [Jaewan, 11-15] "that versus something kinda like this: [Image #6] which do you think is betteR?"
+- [Jaewan, 11-15] "yes, rebuild it that way and show screenshots. and one more comparing the entry screen of the two layouts"
+- [Jaewan, 11-15] "the preview images for 'my library' doesn't look good, and the subtitles are too big they almost look like titles. and for v1, why do we need a 'cancel' button? i think we can remove this. give me the comparison screenshots again"
+- [Jaewan, 11-15] "the thumbnail images for the six situations are kinda weird. how did you create them? i like that it's not a realistic image but an illustration, but it's kinda too unnatural. and they all have too similar colors. can you fix these?"
+- [Jaewan, 11-15] "i think we can use image generation models to create this for us. can't we? can you try this with gemini"
+- [Jaewan, 11-15] "yes"
+- [Jaewan, 11-15] "yes try it"
+- [Jaewan, 11-15] "yes this is good. and can you put '상반신' '전신' to the top row and '배경 강조' '랜드마크' to the bottom row? also write '카페.졸업사진' instead of '졸업.카페'. now give me the comparison preview again"
+- [Jaewan, 11-15] "i mean the v1 vs v2 comparison"
+- [Jaewan, 11-15] "why are the bottom button texts different? what is the current text?"
+- [Jaewan, 11-15] "i think a fixed text is good, just '포즈 만들기' / 'Generate poses' maybe? or should we write that the user's going to take a scene photo"
+- [Jaewan, 11-15] "yes"
+- [Jaewan, 11-15] "okay. now can you show me the screenshots for the entire flow again?"
+- [Jaewan, 11-15] "there's no input history here? and for the instructions, write '랜드마크 전체와 인물이 함께 나오게 찍어 주세요" and "머리부터 발끝까지 나오게 찍어 주세요""
+- [Jaewan, 11-15] "should we save history per situatoin? and in the case of selfies, should we restrict the camera to only work in selfie mode? also, should we let the user to change their situation choice after taking the photo? this is kinda weird then why choose it in the first place"
+- [Jaewan, 11-15] "yes do all three and show screenshots. also fix the other situations '찍어요' to '찍어 주세요'"
+- [Jaewan, 11-15] "show the instructions for all other situations. it's okay to just cut only that part of the screenshots"
+- [Jaewan, 11-15] "put this together in the previous png"
+- [Jaewan, 11-15] "the thumbnail images are kinda too cartoon-like, i want them slightly more serious. can we try an update?"
+- [Jaewan, 11-15] "yes"
+- [Jaewan, 11-15] "no.. i don't want realistic, i think it might be just from that the colors are too bright?"
+- [Jaewan, 11-15] "give me those in full screens"
+- [Jaewan, 11-15] "i'll go with 2. give me the flows again"
+- [Jaewan, 11-15] "yes, and then commit, push, and open the PR"
+
 [#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
 [#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200
 [#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
+[#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211

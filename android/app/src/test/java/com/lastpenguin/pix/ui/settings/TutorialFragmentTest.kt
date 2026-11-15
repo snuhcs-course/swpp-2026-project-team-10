@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.animation.ValueAnimator
@@ -50,8 +50,7 @@ import org.robolectric.shadows.ShadowChoreographer
  * The tutorial's tips over a live screen (FR-10.4, Design 2.6.8), here over Add a pose guide, the sheet they open over
  * as it opens from Camera. The layer (state-based): a ring around each control the screen shows, where it is; none and
  * no caption for a control the screen does not show (no saved guides); a control that appears while they are up gets
- * its ring, and one that moves takes its ring along; a row of saved guides wider than the screen is ringed as far as
- * it shows (boundary). The captions are text, which TalkBack reads, one per ring.
+ * its ring, and one that moves takes its ring along. The captions are text, which TalkBack reads, one per ring.
  * Closing (equivalence partitioning): a tap anywhere on the layer, a tap on its closing line, and Back on the dialog each close them and marks the screen seen; showing them while
  * they are there adds no second layer.
  * Fading (Iter3-A14), with the display's frames paused to see a fade's start: the tips fade in; a tap counts them
@@ -146,20 +145,14 @@ class TutorialFragmentTest {
 
         val placed = layer().placed
         assertEquals(3, placed.count { it != null })
-        assertRingAround(placed[0]!!.ring, inLayer(R.id.addPhotoTile))
-        assertRingAround(placed[1]!!.ring, inLayer(R.id.generateButton))
-        assertRingAround(placed[2]!!.ring, inLayer(R.id.savedGuidesList))
-    }
-
-    @Test
-    fun aRowOfSavedGuidesWiderThanTheScreen_isRingedAsFarAsItShows() {
-        openSheet(saved = 10)
-
-        val row = inLayer(R.id.savedGuidesList)
-        val shown = inLayer(R.id.savedGuidesScroll)
-        assertTrue("$row runs past $shown", row.right > shown.right)
-        val saved = RectF(row).apply { intersect(shown) }
-        assertRingAround(layer().placed[2]!!.ring, saved)
+        assertRingAround(placed[0]!!.ring, inLayer(R.id.galleryIcon))
+        assertRingAround(
+            placed[1]!!.ring,
+            RectF(inLayer(R.id.situationRowTop)).apply {
+                union(inLayer(R.id.situationRowBottom))
+            },
+        )
+        assertRingAround(placed[2]!!.ring, inLayer(R.id.libraryCount))
     }
 
     @Test
@@ -189,11 +182,11 @@ class TutorialFragmentTest {
         openSheet()
         val before = RectF(layer().placed[0]!!.ring)
 
-        sheetView().findViewById<View>(R.id.addPhotoTile).translationY = -60f
+        sheetView().findViewById<View>(R.id.galleryIcon).translationY = -60f
         idle()
 
         assertEquals(before.top - 60f, layer().placed[0]!!.ring.top, 1f)
-        assertRingAround(layer().placed[0]!!.ring, inLayer(R.id.addPhotoTile))
+        assertRingAround(layer().placed[0]!!.ring, inLayer(R.id.galleryIcon))
     }
 
     @Test

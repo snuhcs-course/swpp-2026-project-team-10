@@ -1,150 +1,203 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Add a pose guide (R&S 6.2). -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Add a pose guide (R&S 6.2), situation first (FR-4.8): the situations, a guide from a photo, then the button that
+     takes the scene photo for the chosen situation. It opens expanded; on a short screen or a large font, it scrolls. -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:paddingHorizontal="20dp"
-    android:paddingBottom="24dp">
+    android:layout_height="wrap_content">
 
-    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal" />
-
-    <!-- With a guide on the camera, the sheet asks to replace it (FR-3.6); its Cancel keeps the current guide. -->
-    <TextView
-        android:id="@+id/titleText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="4dp"
-        android:accessibilityHeading="true"
-        android:text="@string/add_guide_title"
-        android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
-
-    <!-- My library (FR-3.8, FR-3.11): Add photo, then the newest saved guides; All opens the library. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:gravity="center_vertical"
-        android:minHeight="48dp">
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingBottom="20dp">
 
+        <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal" />
+
+        <!-- What to shoot; from Subject view, Add a pose guide; with a guide on the camera, Replace it (FR-3.6). -->
         <TextView
-            android:id="@+id/libraryTitle"
-            android:layout_width="0dp"
+            android:id="@+id/titleText"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="4dp"
-            android:layout_weight="1"
             android:accessibilityHeading="true"
-            android:text="@string/my_library"
-            android:textAppearance="@style/TextAppearance.Pix.Header" />
+            android:text="@string/situation_question"
+            android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
 
-        <Button
-            android:id="@+id/libraryAllButton"
-            style="@style/Widget.Pix.Button.Text.Small"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <HorizontalScrollView
-        android:id="@+id/savedGuidesScroll"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:scrollbars="none">
-
+        <!-- The situations (FR-4.1, FR-4.8), two rows of three that SituationTiles fills, the last chosen selected. Gone
+             from Subject view. -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:id="@+id/newPosesSection"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
-            <LinearLayout
-                android:id="@+id/addPhotoTile"
-                android:layout_width="84dp"
-                android:layout_height="112dp"
-                android:layout_marginEnd="10dp"
-                android:background="@drawable/bg_add_photo_tile"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:importantForAccessibility="no"
-                    android:src="@drawable/ic_plus"
-                    app:tint="@color/pix_text_soft" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/add_photo"
-                    android:textAppearance="@style/TextAppearance.Pix.Label"
-                    android:textColor="@color/pix_text_muted" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/savedGuidesList"
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginHorizontal="4dp"
+                android:layout_marginTop="4dp"
+                android:text="@string/situation_question_body"
+                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+
+            <LinearLayout
+                android:id="@+id/situationRowTop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal" />
+
+            <LinearLayout
+                android:id="@+id/situationRowBottom"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal" />
         </LinearLayout>
-    </HorizontalScrollView>
 
-    <LinearLayout
-        android:id="@+id/generateButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:background="@drawable/bg_option_card"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:minHeight="88dp"
-        android:paddingVertical="16dp"
-        android:paddingStart="16dp"
-        android:paddingEnd="8dp">
-
-        <FrameLayout
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:background="@drawable/bg_icon_tile_accent">
-
-            <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_gravity="center"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_sparkle"
-                app:tint="@color/pix_on_accent" />
-        </FrameLayout>
-
+        <!-- A guide from a photo (FR-2.7, FR-3.8, FR-3.11): one from the gallery, or one saved before. -->
         <TextView
-            android:layout_width="0dp"
+            android:id="@+id/fromPhotoLabel"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_weight="1"
-            android:text="@string/generate_poses"
-            android:textAppearance="@style/TextAppearance.Pix.Action"
-            android:textColor="@color/pix_text" />
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginTop="20dp"
+            android:accessibilityHeading="true"
+            android:text="@string/guide_from_photo"
+            android:textAppearance="@style/TextAppearance.Pix.Overline" />
 
-        <ImageView
-            android:id="@+id/generateChevron"
-            style="@style/Widget.Pix.Chevron"
-            android:layout_marginStart="8dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_list_card"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/galleryRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="8dp">
+
+                <!-- The tutorial's ring for the gallery hugs this icon, clear of the saved guides' ring below. -->
+                <FrameLayout
+                    android:id="@+id/galleryIcon"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_icon_tile">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_image"
+                        app:tint="@color/pix_text_soft" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="@string/choose_from_gallery"
+                    android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+                    android:textColor="@color/pix_text" />
+
+                <ImageView
+                    android:id="@+id/galleryChevron"
+                    style="@style/Widget.Pix.Chevron"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="56dp"
+                android:background="@color/pix_hairline" />
+
+            <!-- My library: the row opens the library; its count shows while any guide is saved (SavedGuideList). -->
+            <LinearLayout
+                android:id="@+id/libraryRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="8dp">
+
+                <FrameLayout
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_icon_tile">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_bookmark"
+                        app:tint="@color/pix_text_soft" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/libraryTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="@string/my_library"
+                    android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+                    android:textColor="@color/pix_text" />
+
+                <TextView
+                    android:id="@+id/libraryCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                    android:visibility="gone"
+                    tools:text="All 4"
+                    tools:visibility="visible" />
+
+                <ImageView
+                    android:id="@+id/libraryChevron"
+                    style="@style/Widget.Pix.Chevron"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Takes the scene photo for the chosen situation; asks for the agreement first (FR-4.2). -->
+        <Button
+            android:id="@+id/generateButton"
+            style="@style/Widget.Pix.Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/take_scene_for_poses" />
+
+        <!-- Only with a guide on the camera: Keep the current guide (FR-3.6). -->
+        <Button
+            android:id="@+id/cancelButton"
+            style="@style/Widget.Pix.Button.Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/cancel"
+            android:visibility="gone" />
     </LinearLayout>
-
-    <Button
-        android:id="@+id/cancelButton"
-        style="@style/Widget.Pix.Button.Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/cancel" />
-</LinearLayout>
+</androidx.core.widget.NestedScrollView>

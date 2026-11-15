@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -258,7 +258,7 @@ class TutorialLayoutTest {
     fun aRoundControl_getsACircle_upToTheShutter_andALargerOneACapsule() {
         assertTrue(ringOf(camera(withGuide = false), R.string.tutorial_shutter).round)
         scenario?.close()
-        assertFalse(ringOf(sheet(), R.string.tutorial_upload).round)
+        assertFalse(ringOf(sheet(), R.string.tutorial_generate).round)
     }
 
     @Test

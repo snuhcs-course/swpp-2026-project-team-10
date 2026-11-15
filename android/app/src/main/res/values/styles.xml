@@ -514,6 +514,12 @@
         <item name="cornerSize">24dp</item>
     </style>
 
+    <!-- The saved guides at the end of My library's row on Add a pose guide (FR-3.11). -->
+    <style name="ShapeAppearance.Pix.TinyThumbnail" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
     <style name="ShapeAppearance.Pix.SmallThumbnail" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">12dp</item>

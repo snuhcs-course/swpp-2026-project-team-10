@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -42,7 +42,8 @@ import kotlinx.coroutines.launch
  * right, *Suggest* or *Generate* (Iter3-A13, #199). Back at the top left returns to the scene photo's review. In a
  * session
  * the subject sees this step too: one field at a time holds the description, and the subject's button goes on here like
- * this phone's own (Design 2.6.5). The first time it opens, its tutorial tips come over it (FR-10.4).
+ * this phone's own (Design 2.6.5). The photo's card names the situation it was taken for (FR-4.8). The first time it
+ * opens, its tutorial tips come over it (FR-10.4).
  * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16; Back Iter4-P2.
  */
 class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
@@ -76,6 +77,9 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
             onForget = viewModel::forget,
         )
         this.form = form
+        // The situation the photo was taken for (FR-4.8); another needs another photo.
+        binding.situationTag.isVisible = true
+        binding.situationTag.setText(state.situation.title)
         binding.backButton.setOnClickListener { backToReview() }
         // System back does what Back does (R&S 6.9).
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToReview() }

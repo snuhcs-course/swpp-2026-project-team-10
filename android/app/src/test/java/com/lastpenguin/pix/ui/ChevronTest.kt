@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.view.LayoutInflater
@@ -21,8 +21,8 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * Every row or card that a tap opens ends in the same chevron, its tip 16 dp from the right edge (#204):
  * `Widget.Pix.Chevron` after 8 dp of end padding. Partitions: each screen that has one (a Settings row, Friends' Show
- * a code, Account's Add Google and Add a password, and Add a guide's Generate poses here); a row without a tile, a
- * card with a tile, and a card with text only.
+ * a code, Account's Add Google and Add a password, and Add a pose guide's gallery and library rows); a row without a
+ * tile, a row with a tile, a card with a tile, and a card with text only.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -38,7 +38,8 @@ class ChevronTest {
         R.layout.fragment_friends to R.id.showCodeChevron,
         R.layout.sheet_account to R.id.addGoogleChevron,
         R.layout.sheet_account to R.id.addPasswordChevron,
-        R.layout.sheet_add_guide to R.id.generateChevron,
+        R.layout.sheet_add_guide to R.id.galleryChevron,
+        R.layout.sheet_add_guide to R.id.libraryChevron,
     )
 
     /** [id] in [layout], laid out 360 dp wide. */

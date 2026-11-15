@@ -63,7 +63,6 @@
     <string name="delete">삭제</string>
     <string name="saved_guide_open_failed">저장한 가이드를 열지 못했어요.</string>
     <!-- The library (FR-3.11, R&S 6.2): every saved guide, filtered by kind. -->
-    <string name="my_library">내 보관함</string>
     <string name="library_title">보관함</string>
     <string name="library_title_description">보관함, 저장한 가이드 %1$d개</string>
     <string name="library_all">전체 %1$d</string>
@@ -118,7 +117,24 @@
     <string name="add_guide_title">포즈 가이드 추가</string>
     <string name="replace_guide_title">포즈 가이드를 바꿀까요?</string>
     <string name="keep_current_guide">지금 가이드 유지</string>
-    <string name="generate_poses">AI로 포즈 생성</string>
+    <string name="situation_question">어떤 사진을 찍을까요?</string>
+    <string name="situation_question_body">상황에 맞춰 AI가 구도와 포즈를 잡아 드려요</string>
+    <string name="take_scene_for_poses">배경 사진 찍고 포즈 만들기</string>
+    <string name="situation_default">자동</string>
+    <string name="situation_default_example">AI가 알아서</string>
+    <string name="situation_background">배경 강조</string>
+    <string name="situation_background_example">바닷가·여행지</string>
+    <string name="situation_half_body">상반신</string>
+    <string name="situation_half_body_example">카페·졸업사진</string>
+    <string name="situation_full_body">전신</string>
+    <string name="situation_full_body_example">옷차림·거리</string>
+    <string name="situation_landmark">랜드마크</string>
+    <string name="situation_landmark_example">명소·건물</string>
+    <string name="situation_selfie">셀카</string>
+    <string name="situation_selfie_example">전면 카메라</string>
+    <string name="guide_from_photo">사진으로 가이드 만들기</string>
+    <string name="choose_from_gallery">갤러리에서 고르기</string>
+    <string name="my_library">내 보관함</string>
     <string name="pose_guide_title">가이드</string>
     <string name="reference_preview_description">참고 사진 속 인물</string>
     <string name="finding_person">인물을 인식하는 중…</string>
@@ -139,7 +155,12 @@
     <string name="consent_agree">동의하고 계속</string>
     <string name="not_now">나중에</string>
     <string name="scene_title">배경 사진 촬영</string>
-    <string name="scene_framing_hint">사람이 함께 나오게 배경을 찍어요</string>
+    <string name="scene_framing_hint">사람이 함께 나오게 배경을 찍어 주세요</string>
+    <string name="scene_framing_hint_background">사람과 풍경이 함께 나오게 찍어 주세요</string>
+    <string name="scene_framing_hint_half_body">사람과 뒤 배경이 함께 나오게 찍어 주세요</string>
+    <string name="scene_framing_hint_full_body">머리부터 발끝까지 나오게 찍어 주세요</string>
+    <string name="scene_framing_hint_landmark">랜드마크 전체와 인물이 함께 나오게 찍어 주세요</string>
+    <string name="scene_framing_hint_selfie">얼굴과 뒤 배경이 함께 나오게 찍어 주세요</string>
     <string name="scene_review_title">이 사진을 사용할까요?</string>
     <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
     <string name="shoot_again">다시 촬영</string>
@@ -435,7 +456,7 @@
     <string name="help_guide_title">포즈 가이드 추가</string>
     <string name="help_guide_body">가이드를 누르고 사람이 나온 사진을 고르면 그 사람의 윤곽이 카메라에 나타나요. 드래그해 옮기고 두 손가락으로 크기를 맞춘 뒤, 윤곽에 맞춰 서면 돼요.</string>
     <string name="help_poses_title">AI로 포즈 생성</string>
-    <string name="help_poses_body">가이드 › AI로 포즈 생성을 누르고 장면을 찍으면, 그 자리의 그 사람에게 맞는 포즈 4개를 AI가 만들어요. 고른 포즈가 가이드가 돼요.</string>
+    <string name="help_poses_body">가이드에서 상황을 고르고 배경 사진을 찍으면, 그 자리의 그 사람에게 맞는 포즈 4개를 AI가 만들어요. 고른 포즈가 가이드가 돼요.</string>
     <string name="help_together_title">카메라 공유</string>
     <string name="help_together_body">카메라 공유에서 누가 찍을지 고르세요. Pix 친구를 초대하거나 찍힐 사람에게 코드를 보여주면, 상대 폰에 내 카메라 화면이 같은 가이드와 함께 실시간으로 보여요.</string>
     <string name="help_remote_title">찍히는 사람의 폰에서</string>
@@ -453,7 +474,7 @@
     <string name="tutorial_shutter">가이드 없이 사진만 저장돼요</string>
     <string name="tutorial_switch">전면 카메라로 바꿔요</string>
     <string name="tutorial_upload">사진 속 사람의 윤곽을 따요</string>
-    <string name="tutorial_generate">이 장소에 맞는 포즈 4개를 AI가 만들어요</string>
+    <string name="tutorial_generate">상황을 고르면 AI가 포즈 4개를 만들어요</string>
     <string name="tutorial_saved">저장한 가이드는 내 보관함에 모여요</string>
     <string name="tutorial_move">끌어서 옮기고, 두 손가락으로 크기 조절</string>
     <string name="tutorial_edit">이 버튼이 켜져 있을 때만 가이드가 움직여요</string>

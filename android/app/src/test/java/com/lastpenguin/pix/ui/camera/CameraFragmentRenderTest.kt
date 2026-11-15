@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -54,8 +54,8 @@ import org.robolectric.annotation.GraphicsMode
  * to framing) and Use at the top right of the review (#199), its review while the phone looks for a person and without
  * one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, while the
- * scene photo is framed, and in a session (FR-1.14).
+ * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, gone while the
+ * scene photo is framed and back after it, and in a session (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -580,16 +580,21 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun cameraSwitch_staysWhileTheScenePhotoIsFramed() {
+    fun cameraSwitch_waitsWhileTheScenePhotoIsFramed_andComesBackAfter() {
         launch()
 
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
 
+        // The situation chose the camera (FR-4.8); the shutter keeps its place.
         onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.switchCameraButton.visibility)
+            assertEquals(View.INVISIBLE, controls.switchCameraButton.visibility)
             assertEquals(View.INVISIBLE, controls.galleryButton.visibility)
+            controls.sceneBackButton.performClick()
         }
+        idle()
+
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.switchCameraButton.visibility) }
     }
 
     @Test

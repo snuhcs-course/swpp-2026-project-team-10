@@ -7,4 +7,6 @@
     <dimen name="pose_page_gap">12dp</dimen>
     <!-- The camera bars' last part, over the image (TOP_BAR_OVERHANG_DP): what is in the bar centers above it. -->
     <dimen name="top_bar_overhang">4dp</dimen>
+    <!-- Between the situations' tiles on Add a pose guide (FR-4.8). -->
+    <dimen name="situation_tile_gap">8dp</dimen>
 </resources>

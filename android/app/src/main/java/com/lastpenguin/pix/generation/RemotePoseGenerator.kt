@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -30,7 +30,7 @@ import retrofit2.HttpException
  * [PoseGenerator] through the Pix server (Design 2.6.3): `POST /pose-suggestions` for the poses, which are four
  * suggested ones or, for a description, the description and three variations of it; then one `POST /poses` per pose,
  * in parallel, each with the pose as its description. The description's own request goes out at once, before its
- * variations are known.
+ * variations are known. Every request names the set's situation (FR-4.8).
  * Owner: Server/AI/Sync (#7).
  */
 class RemotePoseGenerator(
@@ -46,12 +46,14 @@ class RemotePoseGenerator(
         request: PoseRequest,
         seed: Long,
         selfie: Boolean,
+        situation: Situation,
     ): Flow<GenerationEvent> = channelFlow {
-        // Encoded once and sent with every request, with `selfie` for a selfie's scene only.
+        // Encoded once and sent with every request, with `selfie` for a selfie's scene only, and the situation.
         val photo = withContext(imageDispatcher) { images.encodeScene(scene) }
         val parts = Parts(
             MultipartBody.Part.createFormData("image", "scene.jpg", photo.toRequestBody(JPEG)),
             if (selfie) "true".toRequestBody(TEXT) else null,
+            situation.forScene(selfie).apiName.toRequestBody(TEXT),
         )
         // One seed for the set gives each pose a seed of its own, in the order of the poses (Design 2.6.3, step 3).
         val seeds = Random(seed)
@@ -77,8 +79,8 @@ class RemotePoseGenerator(
         }
     }
 
-    /** What every request of a set sends besides its pose: the scene, and whether it is a selfie. */
-    private class Parts(val image: MultipartBody.Part, val selfie: RequestBody?)
+    /** What every request of a set sends besides its pose: the scene, whether it is a selfie, and the situation. */
+    private class Parts(val image: MultipartBody.Part, val selfie: RequestBody?, val situation: RequestBody)
 
     /**
      * The server's poses for the scene; it answers with its default poses when its model fails, so a failure here is
@@ -87,7 +89,7 @@ class RemotePoseGenerator(
      */
     private suspend fun suggest(parts: Parts): List<String> {
         val answer = try {
-            withTimeoutOrNull(timeoutMs) { api.suggestPoses(parts.image, null, parts.selfie) }
+            withTimeoutOrNull(timeoutMs) { api.suggestPoses(parts.image, null, parts.selfie, parts.situation) }
                 ?: throw SocketTimeoutException("The server did not suggest poses in time")
         } catch (error: CancellationException) {
             throw error
@@ -110,7 +112,7 @@ class RemotePoseGenerator(
         val wanted = POSE_COUNT - 1
         val variations = try {
             val answer = withTimeoutOrNull(VARIATION_TIMEOUT_MS) {
-                api.suggestPoses(parts.image, description.toRequestBody(TEXT), parts.selfie)
+                api.suggestPoses(parts.image, description.toRequestBody(TEXT), parts.selfie, parts.situation)
             }
             if (answer == null) Log.w(TAG, "variations: no answer within $VARIATION_TIMEOUT_MS ms")
             answer?.poses.orEmpty().drop(1).filter { it.isNotBlank() }.take(wanted)
@@ -131,6 +133,7 @@ class RemotePoseGenerator(
                     pose.text.toRequestBody(TEXT),
                     seed.toString().toRequestBody(TEXT),
                     parts.selfie,
+                    parts.situation,
                 )
                 val candidate = withContext(imageDispatcher) {
                     images.decodeCandidate(Base64.getDecoder().decode(answer.image))

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-13, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -76,6 +76,7 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import com.lastpenguin.pix.ui.generation.framingHint
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
@@ -1065,9 +1066,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.shootTogetherButton.isVisible =
             !active && session !is SessionState.Connected && session !is SessionState.Reconnecting
         controls.settingsButton.isVisible = !active
-        // Guide and the thumbnail keep their place, so the shutter stays where it is.
+        // Guide and the thumbnail keep their place, so the shutter stays where it is. The camera is the situation's (FR-4.8):
+        // the front one for a selfie, the rear one otherwise, so the switch waits too.
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active
+        if (active) controls.switchCameraButton.isInvisible = true
         controls.sceneReview.isVisible = reviewing
         val photo = scene.scene.takeIf { reviewing }
         if (controls.sceneStill.tag !== photo) {
@@ -1118,7 +1121,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 null,
             )
         } else {
-            showHint(controls.hintText, R.string.scene_framing_hint, R.drawable.ic_pose)
+            // What the situation needs in the photo (FR-4.8): the landmark, or the whole person for full body.
+            showHint(controls.hintText, scene.situation.framingHint, R.drawable.ic_pose)
         }
         if (reviewing) showSceneMessage(controls.sceneMessage, noPerson)
         // An earlier guide is not part of the scene photo and would be in the way of framing it.

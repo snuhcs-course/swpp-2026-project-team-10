@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-09, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.ScreenLanguages
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -205,8 +206,9 @@ class TestAppContainer(
             request: PoseRequest,
             seed: Long,
             selfie: Boolean,
+            situation: Situation,
         ): Flow<GenerationEvent> {
-            val run = Run(scene, request, selfie).also(runs::add)
+            val run = Run(scene, request, selfie, situation).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -217,7 +219,12 @@ class TestAppContainer(
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest, val selfie: Boolean = false) {
+        class Run(
+            val scene: Bitmap,
+            val request: PoseRequest,
+            val selfie: Boolean = false,
+            val situation: Situation = Situation.DEFAULT,
+        ) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 

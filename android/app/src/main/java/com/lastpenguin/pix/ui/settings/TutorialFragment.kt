@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -104,13 +104,6 @@ private fun controls(@IdRes vararg ids: Int): (View) -> Rect? = { root ->
         .reduceOrNull { all, next -> Rect(all).apply { union(next) } }
 }
 
-/** The part of the control [id] that the scrolling [frame] around it shows, while some does. */
-private fun shownIn(@IdRes id: Int, @IdRes frame: Int): (View) -> Rect? = { root ->
-    val part = root.findViewById<View>(id)?.let(::boundsOnScreen)
-    val shown = root.findViewById<View>(frame)?.let(::boundsOnScreen)
-    part?.takeIf { shown != null && it.intersect(shown) }
-}
-
 /** A touch point on the middle of the guide as drawn on the camera image, while one is: where to drag it. */
 private fun guideOn(@IdRes overlay: Int): (View) -> Rect? = { root ->
     val view = root.findViewById<GuideOverlayView>(overlay)
@@ -145,20 +138,20 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.ADD_GUIDE to TutorialTips(
         title = null,
         tips = listOf(
-            TutorialTip(R.string.tutorial_upload, CaptionSide.ABOVE, locate = control(R.id.addPhotoTile)),
-            // Below *Generate poses here*, the sheet's last card, only Cancel fits, so its caption goes above the library.
+            TutorialTip(R.string.tutorial_upload, CaptionSide.ABOVE, locate = control(R.id.galleryIcon)),
+            // The situations (FR-4.8): a tile chosen, the button below takes the scene photo for it.
             TutorialTip(
                 R.string.tutorial_generate,
                 CaptionSide.ABOVE,
                 overControls = true,
-                locate = control(R.id.generateButton),
+                locate = controls(R.id.situationRowTop, R.id.situationRowBottom),
             ),
             TutorialTip(
                 R.string.tutorial_saved,
                 CaptionSide.ABOVE,
                 CaptionAlign.END,
-                // The saved guides beside *Add photo* (FR-3.11), as far as the row shows them; none, no ring.
-                locate = shownIn(R.id.savedGuidesList, R.id.savedGuidesScroll),
+                // My library's count, while any guide is saved (FR-3.11); none, no ring.
+                locate = control(R.id.libraryCount),
             ),
         ),
     ),

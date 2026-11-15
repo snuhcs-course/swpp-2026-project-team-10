@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -41,7 +41,8 @@ import retrofit2.Response
 // more, fewer, blank, none, a failing status, no connection, no answer in time, and slower than the description's own
 // request. Each pose: an image, each failing status, no connection, no answer in time, an answer that is not an
 // image. The collector cancelled. Selfie (FR-1.14): a selfie's scene, with suggestions and with a description, and
-// another scene.
+// another scene. Situation (FR-4.8): one named, in every request; none; a selfie with another, and a rear scene with
+// the selfie's.
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemotePoseGeneratorTest {
     private val api = FakeApi()
@@ -229,6 +230,35 @@ class RemotePoseGeneratorTest {
     }
 
     @Test
+    fun everyRequest_namesTheSituation() = runTest {
+        generator().generate(
+            testBitmap(),
+            PoseRequest.Described(DESCRIPTION),
+            seed = 7,
+            situation = Situation.LANDMARK,
+        ).toList()
+
+        assertEquals(listOf("landmark"), api.suggestionSituations)
+        assertEquals(List(POSE_COUNT) { "landmark" }, api.poseSituations)
+    }
+
+    @Test
+    fun aSelfie_isAlwaysTheSelfieSituation_andARearScene_neverIs() = runTest {
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7, selfie = true, Situation.FULL_BODY).toList()
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7, selfie = false, Situation.SELFIE).toList()
+
+        assertEquals(listOf("selfie", "default"), api.suggestionSituations)
+    }
+
+    @Test
+    fun withoutASituation_aSceneIsDefault_andASelfieIsSelfie() = runTest {
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7).toList()
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7, selfie = true).toList()
+
+        assertEquals(listOf("default", "selfie"), api.suggestionSituations)
+    }
+
+    @Test
     fun theSetSeedGivesEachPoseItsOwnSeed() = runTest {
         val generator = generator()
         val request = PoseRequest.Described(DESCRIPTION)
@@ -359,6 +389,10 @@ class RemotePoseGeneratorTest {
         /** The `selfie` part of each request, suggestions first in [suggestionSelfies], then poses; null when left out. */
         val suggestionSelfies = mutableListOf<String?>()
         val poseSelfies = mutableListOf<String?>()
+
+        /** The `situation` part of each request, suggestions first, then poses. */
+        val suggestionSituations = mutableListOf<String?>()
+        val poseSituations = mutableListOf<String?>()
         var suggestionDescriptionType: String? = null
         var suggestionImage: ByteArray? = null
         val requests = mutableListOf<Request>()
@@ -371,10 +405,12 @@ class RemotePoseGeneratorTest {
             image: MultipartBody.Part,
             description: RequestBody?,
             selfie: RequestBody?,
+            situation: RequestBody?,
         ): PoseSuggestionsDto {
             val text = description?.text()
             suggestionDescriptions += text
             suggestionSelfies += selfie?.text()
+            suggestionSituations += situation?.text()
             suggestionDescriptionType = description?.contentType()?.toString()
             suggestionImage = Buffer().also(image.body::writeTo).readByteArray()
             return suggestions(text)
@@ -385,9 +421,11 @@ class RemotePoseGeneratorTest {
             description: RequestBody,
             seed: RequestBody,
             selfie: RequestBody?,
+            situation: RequestBody?,
         ): PoseResponseDto {
             val text = description.text()
             poseSelfies += selfie?.text()
+            poseSituations += situation?.text()
             requests += Request(
                 description = text,
                 descriptionType = description.contentType()?.toString(),

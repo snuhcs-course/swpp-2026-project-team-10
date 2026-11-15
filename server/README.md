@@ -458,6 +458,14 @@ uv run scripts/eval_poses.py report run1 run2 run3                             #
 
 `judge` sends only what has no verdict with the current rubric, so a changed rubric judges a whole run again. `report` writes `summary.txt`, `summary.json`, and `report.html`.
 
+To compare the situation prompts with the default ones (Testing 3.1, *Situations*), run the situation cases with their own situations and with `default`, then judge and report both. `--situation` gives every case but the selfies that situation:
+
+```sh
+uv run scripts/eval_poses.py generate --cases eval/situation_cases.json --run situ-own
+uv run scripts/eval_poses.py generate --cases eval/situation_cases.json --run situ-default --situation default
+uv run scripts/eval_poses.py generate --cases eval/situation_cases.json --run situ-x-landmark --situation landmark --only m1 h1 --modes suggested
+```
+
 To check the judge (Testing 3.1, *Judge validation*):
 
 1. `sample` picks 60 candidates of a judged run into `label.html`: half that the judge failed, and half that it passed.

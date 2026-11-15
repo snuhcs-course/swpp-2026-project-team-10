@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-14, reviewed by Jaewan Park and Dongje Park
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
@@ -9,7 +9,8 @@
 # or WEBP; a refusal (403) of a template and of a description, `DECLINED` with one message for both; another failing
 # status; an unreadable answer; no answer in time; no key. Limits: each window full, the client's `RATE_LIMITED` and
 # everyone's day `DAILY_LIMITED`, and a request refused before the image API, which is not counted.
-# Selfie (FR-1.14): `selfie` true, false, left out, and not a boolean; with a template, refused.
+# Situation (FR-4.8): each one, left out, and unknown; with a template, `default` only. `selfie` (FR-1.14, apps before
+# Iteration 4): true, false, left out, and not a boolean; with a situation; with a template, refused.
 import asyncio
 import base64
 import io
@@ -23,11 +24,11 @@ from starlette.formparsers import MultiPartParser
 
 from pix_server.main import MAX_REQUEST_BYTES
 from pix_server.poses.limiter import PoseLimiter
-from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH, pose_prompt
+from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH, SITUATIONS, pose_prompt
 from pix_server.store import Window
 
 
-def create_pose(client, image, template_id="wave", seed="1829304756", description=None, selfie=None):
+def create_pose(client, image, template_id="wave", seed="1829304756", description=None, selfie=None, situation=None):
     data = {"seed": seed}
     if template_id is not None:
         data["templateId"] = template_id
@@ -35,6 +36,8 @@ def create_pose(client, image, template_id="wave", seed="1829304756", descriptio
         data["description"] = description
     if selfie is not None:
         data["selfie"] = selfie
+    if situation is not None:
+        data["situation"] = situation
     return client.post("/api/v1/poses", files={"image": ("scene.jpg", image, "image/jpeg")}, data=data)
 
 
@@ -475,20 +478,55 @@ def test_description_is_not_logged(client, image_api, make_image, caplog, status
     assert "벽에" not in caplog.text
 
 
-@pytest.mark.parametrize(("selfie", "is_selfie"), [("true", True), ("false", False), (None, False)])
-def test_selfie_says_which_pose_prompt_the_image_api_gets(client, image_api, make_image, selfie, is_selfie):
+@pytest.mark.parametrize("situation", SITUATIONS)
+def test_situation_says_which_pose_prompt_the_image_api_gets(client, image_api, make_image, situation):
+    response = create_pose(client, make_image(), template_id=None, description="윙크하며 브이", situation=situation)
+
+    assert response.status_code == 200
+    [payload] = image_api.payloads
+    assert payload["prompt"] == pose_prompt("윙크하며 브이", situation)
+
+
+@pytest.mark.parametrize(("selfie", "situation"), [("true", "selfie"), ("false", "default"), (None, "default")])
+def test_selfie_of_an_older_app_says_which_pose_prompt_the_image_api_gets(
+    client, image_api, make_image, selfie, situation
+):
     response = create_pose(client, make_image(), template_id=None, description="윙크하며 브이", selfie=selfie)
 
     assert response.status_code == 200
     [payload] = image_api.payloads
-    assert payload["prompt"] == pose_prompt("윙크하며 브이", selfie=is_selfie)
+    assert payload["prompt"] == pose_prompt("윙크하며 브이", situation)
 
 
-def test_selfie_with_a_template_is_invalid(client, image_api, make_image):
-    response = create_pose(client, make_image(), template_id="wave", selfie="true")
+@pytest.mark.parametrize("situation", ["landmark", "selfie"])
+def test_selfie_with_a_situation_takes_only_the_selfie_one(client, image_api, make_image, situation):
+    response = create_pose(
+        client, make_image(), template_id=None, description="wink", selfie="true", situation=situation
+    )
 
-    assert "selfie" in assert_error(response, 400, "INVALID_REQUEST")
+    if situation == "selfie":
+        assert image_api.payloads[0]["prompt"] == pose_prompt("wink", "selfie")
+    else:
+        assert "selfie" in assert_error(response, 400, "INVALID_REQUEST")
+        assert image_api.requests == []
+
+
+def test_unknown_situation_is_invalid(client, image_api, make_image):
+    response = create_pose(client, make_image(), template_id=None, description="wink", situation="beach")
+
+    assert_error(response, 400, "INVALID_REQUEST")
     assert image_api.requests == []
+
+
+@pytest.mark.parametrize(("selfie", "situation"), [("true", None), (None, "full_body"), (None, "default")])
+def test_template_takes_only_the_default_situation(client, image_api, make_image, selfie, situation):
+    response = create_pose(client, make_image(), template_id="wave", selfie=selfie, situation=situation)
+
+    if situation == "default":
+        assert image_api.payloads[0]["prompt"] == pose_prompt(DEFAULT_POSES["wave"].pose)
+    else:
+        assert "templateId" in assert_error(response, 400, "INVALID_REQUEST")
+        assert image_api.requests == []
 
 
 def test_selfie_that_is_not_a_boolean_is_invalid(client, image_api, make_image):

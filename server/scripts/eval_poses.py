@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-14, reviewed by Jaewan Park
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["anthropic>=2.1,<3", "httpx2>=2.13.1", "pillow>=12.3.0"]
@@ -10,6 +10,7 @@ the app does, and `judge` has Claude check every candidate, set, and tip against
 with uv, which installs the Anthropic SDK for this script alone:
 
     uv run scripts/eval_poses.py generate --server http://127.0.0.1:8765 --run run1
+    uv run scripts/eval_poses.py generate --run landmark --only s03 --situation landmark  # one situation's prompts
     uv run --env-file .env scripts/eval_poses.py judge run1             # Batch API, half price; waits for the results
     uv run --env-file .env scripts/eval_poses.py judge run1 --now       # direct calls, for a pilot
     uv run scripts/eval_poses.py report run1 run2 run3
@@ -22,7 +23,8 @@ with uv, which installs the Anthropic SDK for this script alone:
 set of suggested poses): the scene prepared like the app's (upright, long side at most 1024 px, JPEG 85, no EXIF);
 without a description, POST /pose-suggestions and then four POST /poses in parallel; with one, POST /poses with the
 description at once and POST /pose-suggestions for three variations (10 s, the description again for any it does not
-get), then the other three. Each request has the app's 60 s limit and `selfie` for a selfie. The time of a set runs
+get), then the other three. Each request has the app's 60 s limit, `selfie` for a selfie, and the case's situation
+(FR-4.8), or the one --situation gives every case; a selfie keeps its own. The time of a set runs
 from its first request to its last candidate. Then one POST /pose-tips for one of the set's candidates, at a long side
 of 768 px, in the case's language. Sets go one at a time by default, as one user's would, so the times are those of
 one phone; --sets-at-once runs several, and the report says so. The server must allow the requests: start a local one
@@ -57,7 +59,7 @@ import subprocess
 import sys
 import time
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -84,6 +86,8 @@ JPEG_QUALITY = 85
 # The candidate's ratio, as the server's `ASPECT_RATIOS` in poses/generator.py: the app's frame closest to the scene's.
 ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
 MODES = ("described", "suggested")
+# The server's situations (`Situation` in poses/prompts.py).
+SITUATIONS = ("default", "background", "half_body", "full_body", "landmark", "selfie")
 
 # The judge (Testing Documentation 3.1). Opus 5.5 always thinks; effort sets how much.
 JUDGE_MODEL = "claude-opus-5-5"
@@ -120,12 +124,23 @@ class Case:
     selfie: bool
     language: str
     description: str
+    situation: str  # `default` when the case names none, `selfie` for a selfie
 
 
 def load_cases(path: Path) -> list[Case]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     scenes = path.parent / "scenes"
-    cases = [Case(c["id"], scenes / c["file"], bool(c["selfie"]), c["language"], c["description"]) for c in raw]
+    cases = [
+        Case(
+            c["id"],
+            scenes / c["file"],
+            bool(c["selfie"]),
+            c["language"],
+            c["description"],
+            c.get("situation", "selfie" if c["selfie"] else "default"),
+        )
+        for c in raw
+    ]
     ids = [case.id for case in cases]
     if len(set(ids)) != len(ids):
         sys.exit(f"{path}: duplicate case ids")
@@ -134,6 +149,8 @@ def load_cases(path: Path) -> list[Case]:
             sys.exit(f"{path}: case {case.id} needs language en or ko and a description of 1-100 characters")
         if not case.scene.is_file():
             sys.exit(f"{path}: case {case.id}: no scene {case.scene}")
+        if case.situation not in SITUATIONS or case.selfie != (case.situation == "selfie"):
+            sys.exit(f"{path}: case {case.id}: situation must be one of {', '.join(SITUATIONS)}, selfie for a selfie")
     return cases
 
 
@@ -212,12 +229,20 @@ def error_code(response: httpx2.Response) -> str:
         return f"HTTP {response.status_code}"
 
 
+def situation_fields(case: Case) -> dict[str, str]:
+    """The form fields that name the case's situation: `selfie`, as every app sends it for a selfie, and `situation`,
+    left out for `default` as an app from before Iteration 4 leaves it out."""
+    fields = {"selfie": "true"} if case.selfie else {}
+    if case.situation != "default":
+        fields["situation"] = case.situation
+    return fields
+
+
 async def suggestions(
-    client: httpx2.AsyncClient, server: str, scene: bytes, selfie: bool, description: str | None, seconds: float
+    client: httpx2.AsyncClient, server: str, scene: bytes, case: Case, description: str | None, seconds: float
 ) -> tuple[list[str], dict]:
     data = {"description": description} if description is not None else {}
-    if selfie:
-        data["selfie"] = "true"
+    data |= situation_fields(case)
     started = time.perf_counter()
     try:
         response = await client.post(
@@ -238,11 +263,9 @@ async def suggestions(
 
 
 async def pose(
-    client: httpx2.AsyncClient, server: str, scene: bytes, selfie: bool, text: str, seed: int, started: float
+    client: httpx2.AsyncClient, server: str, scene: bytes, case: Case, text: str, seed: int, started: float
 ) -> tuple[bytes | None, dict]:
-    data = {"description": text, "seed": str(seed)}
-    if selfie:
-        data["selfie"] = "true"
+    data = {"description": text, "seed": str(seed)} | situation_fields(case)
     record: dict = {"pose": text, "seed": seed}
     try:
         response = await client.post(
@@ -328,23 +351,19 @@ async def run_set(client: httpx2.AsyncClient, server: str, case: Case, mode: str
     suggestion_record: dict
     if mode == "described":
         texts = [case.description]
-        tasks.append(
-            asyncio.create_task(pose(client, server, scene, case.selfie, texts[0], seeds.randrange(2**63), started))
-        )
+        tasks.append(asyncio.create_task(pose(client, server, scene, case, texts[0], seeds.randrange(2**63), started)))
         variations, suggestion_record = await suggestions(
-            client, server, scene, case.selfie, case.description, VARIATION_SECONDS
+            client, server, scene, case, case.description, VARIATION_SECONDS
         )
         variations = variations[1:][: POSE_COUNT - 1]
         suggestion_record["usable"] = len(variations)
         texts += variations + [case.description] * (POSE_COUNT - 1 - len(variations))
     else:
-        texts, suggestion_record = await suggestions(client, server, scene, case.selfie, None, REQUEST_SECONDS)
+        texts, suggestion_record = await suggestions(client, server, scene, case, None, REQUEST_SECONDS)
         texts = texts[:POSE_COUNT]
         suggestion_record["usable"] = len(texts)
     for text in texts[len(tasks) :]:
-        tasks.append(
-            asyncio.create_task(pose(client, server, scene, case.selfie, text, seeds.randrange(2**63), started))
-        )
+        tasks.append(asyncio.create_task(pose(client, server, scene, case, text, seeds.randrange(2**63), started)))
     results = await asyncio.gather(*tasks)
 
     candidates = []
@@ -359,6 +378,7 @@ async def run_set(client: httpx2.AsyncClient, server: str, case: Case, mode: str
         "case": case.id,
         "mode": mode,
         "selfie": case.selfie,
+        "situation": case.situation,
         "language": case.language,
         "description": case.description if mode == "described" else None,
         "poses": texts,
@@ -386,6 +406,9 @@ async def generate(args: argparse.Namespace) -> None:
         cases = [case for case in cases if case.id in set(args.only)]
     if args.limit:
         cases = cases[: args.limit]
+    if args.situation:
+        # A selfie keeps the selfie situation: the others turn a selfie into a photo someone else took.
+        cases = [case if case.selfie else replace(case, situation=args.situation) for case in cases]
     out = run_dir(args.run)
     out.mkdir(parents=True, exist_ok=True)
     server = args.server.rstrip("/")
@@ -406,6 +429,7 @@ async def generate(args: argparse.Namespace) -> None:
             cases=f"{Path(args.cases).name} {sha(Path(args.cases))}",
             prompts=sha(PROMPTS),
             sets_at_once=args.sets_at_once,
+            situation=args.situation,
             # What the server was started with, when it reads the same .env and environment as this script.
             settings={k: v for k, v in os.environ.items() if k.startswith("PIX_") and "SECRET" not in k},
         )
@@ -1144,6 +1168,11 @@ def main() -> None:
     g.add_argument("--only", nargs="+", help="case ids")
     g.add_argument("--limit", type=int, help="only the first N cases, for a pilot")
     g.add_argument("--sets-at-once", type=int, default=1)
+    g.add_argument(
+        "--situation",
+        choices=[name for name in SITUATIONS if name != "selfie"],
+        help="send every case but the selfies with this situation instead of its own",
+    )
 
     j = commands.add_parser("judge", help="have Claude judge a run")
     j.add_argument("run")

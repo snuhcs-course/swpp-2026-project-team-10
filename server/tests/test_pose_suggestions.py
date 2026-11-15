@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Dongje Park
 # POST /pose-suggestions partitions (Testing Documentation 2.1.6). Scene: a JPEG within the contract, and one that is
 # not a JPEG, too large, or carries EXIF. The model's answer: four usable poses; JSON in a code fence; more than four;
 # a duplicate (in another case); a pose of 100 characters and one of 101; poses with line breaks; an item that is not
@@ -7,8 +7,9 @@
 # apart from pose requests; a refused scene not counted; the session store down. Privacy: no pose or body logged.
 # With a description: one in Korean with extra whitespace, of 100 characters and of 101, blank, and empty (asks for
 # suggestions); three usable variations, more than three, one equal to the description or to another, none, a failing
-# or slow model, no key; counted like suggestions; neither the description nor a variation logged. Selfie (FR-1.14):
-# `selfie` true, false, left out, and not a boolean; with and without a description; a failing model with a selfie.
+# or slow model, no key; counted like suggestions; neither the description nor a variation logged. Situation
+# (FR-4.8): each one, left out, and unknown, with and without a description, and a failing model with each; `selfie`
+# (FR-1.14, apps before Iteration 4) true, false, left out, and not a boolean, alone and with each situation.
 import base64
 import json
 
@@ -18,7 +19,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from pix_server.main import create_app
-from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH, PROMPTS, variation_prompt
+from pix_server.poses.prompts import DEFAULT_POSES, DESCRIPTION_MAX_LENGTH, PROMPTS, SITUATIONS, variation_prompt
 
 DEFAULTS = [default.pose for default in DEFAULT_POSES.values()]
 SUGGESTED = ["Lean on the door and smile", "Walk toward the camera", "Sit on the step", "Wave and laugh"]
@@ -35,10 +36,12 @@ def model_suggests(image_api):
     image_api.suggests(SUGGESTED)
 
 
-def suggest(client, image, description=None, selfie=None):
+def suggest(client, image, description=None, selfie=None, situation=None):
     data = {} if description is None else {"description": description}
     if selfie is not None:
         data["selfie"] = selfie
+    if situation is not None:
+        data["situation"] = situation
     return client.post("/api/v1/pose-suggestions", files={"image": ("scene.jpg", image, "image/jpeg")}, data=data)
 
 
@@ -299,25 +302,60 @@ def test_description_and_variations_are_not_logged(client, image_api, make_image
     assert "빨간" not in caplog.text and "red door" not in caplog.text
 
 
-@pytest.mark.parametrize(("selfie", "prompt"), [("true", PROMPTS.selfie.suggestion), ("false", PROMPTS.suggestion)])
-def test_selfie_says_which_suggestion_prompt_the_model_gets(client, image_api, make_image, selfie, prompt):
-    assert suggest(client, make_image(), selfie=selfie).json() == {"poses": SUGGESTED}
+def sent_prompt(image_api):
     [payload] = image_api.suggestion_payloads
     text, _ = payload["messages"][0]["content"]
-    assert text == {"type": "text", "text": prompt}
+    return text["text"]
 
 
-def test_failing_model_gives_the_selfie_default_poses_for_a_selfie(client, image_api, make_image):
+@pytest.mark.parametrize("situation", SITUATIONS)
+def test_situation_says_which_suggestion_prompt_the_model_gets(client, image_api, make_image, situation):
+    assert suggest(client, make_image(), situation=situation).json() == {"poses": SUGGESTED}
+    assert sent_prompt(image_api) == PROMPTS.situations[situation].suggestion
+
+
+@pytest.mark.parametrize("situation", SITUATIONS)
+def test_failing_model_gives_the_situations_default_poses(client, image_api, make_image, situation):
     image_api.suggestion_fails(502)
-    assert suggest(client, make_image(), selfie="true").json()["poses"] == list(PROMPTS.selfie.default_poses)
+    poses = suggest(client, make_image(), situation=situation).json()["poses"]
+    assert poses == list(PROMPTS.situations[situation].default_poses)
 
 
-def test_description_of_a_selfie_is_varied_with_the_selfie_prompt(client, image_api, make_image):
+@pytest.mark.parametrize("situation", SITUATIONS)
+def test_description_is_varied_with_the_situations_prompt(client, image_api, make_image, situation):
     image_api.suggests(VARIATIONS)
-    assert suggest(client, make_image(), DESCRIPTION, selfie="true").json() == {"poses": [DESCRIPTION, *VARIATIONS]}
-    [payload] = image_api.suggestion_payloads
-    text, _ = payload["messages"][0]["content"]
-    assert text == {"type": "text", "text": variation_prompt(DESCRIPTION, selfie=True)}
+    response = suggest(client, make_image(), DESCRIPTION, situation=situation)
+    assert response.json() == {"poses": [DESCRIPTION, *VARIATIONS]}
+    assert sent_prompt(image_api) == variation_prompt(DESCRIPTION, situation)
+
+
+@pytest.mark.parametrize(("selfie", "situation"), [("true", "selfie"), ("false", "default"), (None, "default")])
+def test_selfie_of_an_older_app_says_which_suggestion_prompt_the_model_gets(
+    client, image_api, make_image, selfie, situation
+):
+    assert suggest(client, make_image(), selfie=selfie).json() == {"poses": SUGGESTED}
+    assert sent_prompt(image_api) == PROMPTS.situations[situation].suggestion
+
+
+@pytest.mark.parametrize("situation", SITUATIONS)
+def test_selfie_with_a_situation_takes_only_the_selfie_one(client, image_api, make_image, situation):
+    response = suggest(client, make_image(), selfie="true", situation=situation)
+    if situation == "selfie":
+        assert sent_prompt(image_api) == PROMPTS.situations["selfie"].suggestion
+    else:
+        assert "selfie" in assert_error(response, 400, "INVALID_REQUEST")
+        assert image_api.suggestion_requests == []
+
+
+@pytest.mark.parametrize("situation", ["beach", "Landmark", ""], ids=["unknown", "capitalized", "empty"])
+def test_unknown_situation_is_invalid_or_left_out(client, image_api, make_image, situation):
+    response = suggest(client, make_image(), situation=situation)
+    if situation == "":
+        # FastAPI reads an empty form field as left out, as for a description.
+        assert sent_prompt(image_api) == PROMPTS.suggestion
+    else:
+        assert_error(response, 400, "INVALID_REQUEST")
+        assert image_api.suggestion_requests == []
 
 
 def test_selfie_that_is_not_a_boolean_is_invalid(client, image_api, make_image):

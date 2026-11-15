@@ -87,6 +87,7 @@
 | 3.7 | 2026-11-13 | The tutorial closes with a tap anywhere, with its line at the bottom's middle; *Got it* is gone, and *Guide*'s ring is around its icon (2.6.8; [#204]). |
 | 3.8 | 2026-11-13 | Tutorial rings around what a control draws, circles only around near-square controls, and the scene photo's caption beside it; the camera bar's title on its icons' line (2.6.2, 2.6.8; [#204]). |
 | 3.9 | 2026-11-13 | The no-person alert at the start of its message's first line (2.6.3; [#204]). |
+| 3.10 | 2026-11-14 | Situation prompts (Iter4-P12, [#209]): `situation` on `POST /pose-suggestions` and `POST /poses`, a `[situations.<name>]` table each, background and full body framing wider, landmark cropping freely, and the comparison with the default prompt; the four prompt templates dropped (Iter4-P14, [#211]), so a description keeps its three variations (2.5.3, 2.6.3, 2.9, *Still open*). |
 
 </details>
 
@@ -96,10 +97,8 @@ Audience: the development team. This page describes Pix's design as built throug
 
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
-| Four prompt templates (FR-4.8) | With a description, four templates around one `{pose}` replace the three variations. The default template reads `{pose}` as the user's request, keeps the face and the clothes, and makes one pose per photo (2.6.3). Open: the templates, and requests such as "two photos saluting and two with hands up" (Iter3-P25, [#125]; now [#211]). Open also, from the kickoff of 11/7: whether four templates are needed at all, the belongings kept, and the framing. | 박재완 | Iteration 4 |
 | Offline QR connection (F9) | The photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]; now [#214]). | 조성민 | Iteration 4 |
 | The light mode's colors (FR-10.1) | Light mode follows the phone's setting, with dark kept, on color tokens sorted into *page* and *on the image* ([#202]). Open: the palette, the current black and yellow or a lighter one; the comparison boards are on the team's design canvas ([#212]). | 박동제 | Iteration 4 |
-| Situation prompts (FR-4.8) | A prompt per situation (background, person, landmark, ID photo, default, selfie) behind a `situation` field, compared with the current prompt on the evaluation scenes before the choice is built ([#209], [#210]). Open: which situations keep their own prompt. | 박재완 | Iteration 4 |
 
 **Contents**
 
@@ -2218,6 +2217,7 @@ Outside `/api/v1`:
 // request: multipart/form-data, at most 1 MiB
 //   image        scene.jpg (JPEG, long side ≤ 1024 px, no EXIF), the photo the set's POST /poses send
 //   description  "벽에 기대서 카메라 보며 살짝 웃기"   (optional; checked as in POST /poses)
+//   situation    "landmark"   (It 4, optional: default, background, half_body, full_body, landmark, or selfie)
 //   selfie       "true"   (It 3, optional; a selfie from the front camera; left out means false)
 
 // response 200 without a description: four different poses in English, in slot order
@@ -2233,7 +2233,7 @@ Outside `/api/v1`:
 
 - **Suggestions.** The server keeps the suggestion model's first four poses that differ, ignoring case, each one line of 1–100 characters (2.6.3). Default poses fill the rest, in order. A model that fails, answers nothing usable, or takes over `PIX_SUGGESTION_TIMEOUT_SECONDS` (8 s) gives the four default poses, so the model never fails the request.
 - **Variations.** A `description` is checked as in `POST /poses` before any call, without counting it, and then judged by the description filter (2.6.3). The server keeps the first three usable variations that differ from it; the description fills any gap. An empty `description` counts as left out.
-- **Selfie.** `selfie` true selects the selfie prompts and default poses (2.6.3).
+- **Situation (It 4, [#209]).** `situation` selects that situation's prompts and default poses (2.6.3). Left out, it is `selfie` when `selfie` is true and `default` otherwise, as apps before Iteration 4 send. `selfie` true with another situation is `400 INVALID_REQUEST`, since only the selfie prompts keep a selfie one. An unknown value is `400 INVALID_REQUEST`; an empty one counts as left out.
 - Every call, *Regenerate* included, asks the model again; nothing is cached. No log holds a pose, a description, or a variation.
 
 </details>
@@ -2247,6 +2247,7 @@ Outside `/api/v1`:
 //   description "벽에 기대서 한 손은 주머니에"   (It 2; the user's text or a suggested pose)
 //   templateId  "wave"   (instead of description, from apps before Iteration 2; exactly one of the two)
 //   seed        "1829304756" (an integer)
+//   situation   "landmark"   (It 4, optional, as in POST /pose-suggestions)
 //   selfie      "true"   (It 3, optional, as in POST /pose-suggestions)
 
 // response 200; "templateId" is null for a description, since the app numbers its requests pose-1 … pose-4 (2.3)
@@ -2255,8 +2256,8 @@ Outside `/api/v1`:
 
 - **Result.** `image` is a Base64 JPEG in 3:4, 9:16, or 1:1, whichever is closest to the scene's shape (2.6.3). The server keeps neither photo (FR-4.9). A `templateId` names a default pose, sent in the same prompt as a description.
 - **Description.** The server trims it and folds each run of whitespace, line breaks included, into one space. It must then have 1–100 Unicode code points, never more than the app's field counts. The app sends a `text/plain; charset=utf-8` part. The text reaches the prompt as written, in Korean or English (2.6.3), and never a log (NFR-13). An empty one counts as left out.
-- **Before counting.** `INVALID_IMAGE`: not a readable JPEG, over 1024 px on its long side, or with EXIF; the server never repairs a photo. `INVALID_REQUEST`: a missing part, a non-integer `seed`, both or neither of `templateId` and `description`, a blank or over-long description, or `selfie` with a `templateId`. None of these reaches a model or the rate limit.
-- **Selfie.** The app sends `selfie` with every request of a front-camera set. It is refused with a template: old apps never send it, and some default poses need both hands or the whole body.
+- **Before counting.** `INVALID_IMAGE`: not a readable JPEG, over 1024 px on its long side, or with EXIF; the server never repairs a photo. `INVALID_REQUEST`: a missing part, a non-integer `seed`, both or neither of `templateId` and `description`, a blank or over-long description, a `situation` as `POST /pose-suggestions` refuses it, or a `templateId` with a situation other than `default`. None of these reaches a model or the rate limit.
+- **Situation.** The app sends the set's situation with every request, `selfie` for a front-camera set, which also sends `selfie` true. It selects the pose prompt as in `POST /pose-suggestions`. A template takes only `default`: old apps send neither field, and some default poses need both hands or the whole body.
 - **After counting.** The description filter and the person check run at the same time (2.6.3). `REJECTED`: the filter refused the text. `DECLINED` (It 4, [#203]): the image service refused; it does not say whether it refused the photo or the text, so its message is the same for a description and a template (US-5). Until Iteration 4 both were `REJECTED`, which an older app still reads them as. `NO_PERSON` (It 3): no person in the scene; `REJECTED` wins when both apply.
 - **Upstream.** `seed` is reduced to 0…2³¹−1, the range the image models accept. `502 UPSTREAM_ERROR`: the image service failed, was unreachable, answered unreadably, or has no API key. `504 UPSTREAM_TIMEOUT`: no answer within `PIX_POSE_UPSTREAM_TIMEOUT_SECONDS` (60 s). A phone that drops the request cancels the call (2.6.3).
 
@@ -2568,9 +2569,21 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 **Pose variations.** With a description, the same model gets `variation_prompt`. It writes three variations that keep everything the description says and vary what it leaves open: arms and hands, stance, turn, head, or spot. The server drops a repeat of the description and fills the gaps with the description. *Why:* the image model gives near-identical images for one text and ignores the seed. In 24 sets on three photos (2026-10-21), variations gave 3.4 different poses of 4, against 2.0, and 90 of 96 images followed the description, against 94. *Known limit:* a variation can add something that competes with the request, such as touching a door while walking.
 
-**Selfie prompts (It 3, FR-1.14).** A front-camera scene is a selfie (`GenerationUiState.selfie`). Every request of the set sends `selfie`, and the server uses the `[selfie]` prompts and default poses. They add one rule: one hand holds the phone at arm's length. Only the other hand, the face, the head, and the shoulders pose; the phone never shows; the shot stays a selfie from slightly above the eyes. *Why:* on three Wikimedia Commons selfies (2026-10-29), the general prompts turned all twelve candidates into photos someone else took; the selfie prompts kept all twelve selfies. The scene photo is mirrored like the preview (2.6.4).
+**Selfie prompts (It 3, FR-1.14).** A front-camera scene is a selfie (`GenerationUiState.selfie`). Every request of the set sends `selfie`, and the server uses the selfie situation's prompts and default poses (`[situations.selfie]`). They add one rule: one hand holds the phone at arm's length. Only the other hand, the face, the head, and the shoulders pose; the phone never shows; the shot stays a selfie from slightly above the eyes. *Why:* on three Wikimedia Commons selfies (2026-10-29), the general prompts turned all twelve candidates into photos someone else took; the selfie prompts kept all twelve selfies. The scene photo is mirrored like the preview (2.6.4).
 
-**Prompts as data.** The prompts, default poses, and questions are in `server/src/pix_server/poses/prompts.toml`, with the `[selfie]`, `[filter]`, and `[person]` tables. The server refuses to start on a missing or doubled placeholder, an empty prompt, or other than four default poses of up to 100 characters. A missing `[selfie]` table, duplicate selfie poses, an incomplete `[filter]` or `[person]` table, or an unknown key also stops it. A mistake therefore fails the tests and the image build, not pose requests. The scripts in `server/scripts/` read the same file, so a change can be tried first; `eval_poses.py` runs the AI module tests (Testing Documentation 3.1).
+**Situation prompts (It 4, FR-4.8, [#209]).** Each set has a situation, which every request of the set sends (2.5.3). It selects the prompts and default poses: `default` (the prompts above), `background`, `half_body`, `full_body`, `landmark`, or `selfie`. Each situation but `default` is a `[situations.<name>]` table with the same keys. Its pose prompt keeps the default rules word for word and changes the framing:
+
+| Situation | Framing | Suggested poses |
+|----|----|----|
+| `background` (배경 강조) | The whole person, small and off-center; the camera level, the horizon off the middle where it can be | The whole body with the view: looking out, arms open, walking, sitting on something there |
+| `half_body` (상반신) | Waist or chest up, cut between joints; the eyes high in the frame, with room on the side the face turns to; the camera at eye level | The face and the hands, with what the person holds |
+| `full_body` (전신) | The whole person, large, with the feet near the bottom edge; the camera low at the waist and level, so the legs look long | The stance, the legs, and the arms: the weight on one leg, a step, a lean, a look back |
+| `landmark` (랜드마크) | A free crop inside the scene photo that makes the landmark big and keeps every part of it the photo shows, upright; passers-by in front may go; the person on a third, never over it, and not cut at a joint | Pointing at, presenting, looking up at, or "pinching" the landmark |
+| `selfie` | *Selfie prompts* | *Selfie prompts* |
+
+`background` and `full_body` may show more of the place than the scene photo, as if the photographer stepped back, and the tip then says to step back (decided 2026-11-13). They never add a main feature the scene photo does not show. *Known limit:* where the scene photo hides the legs or the feet, `full_body` guesses them, and each candidate guesses other trousers or shoes (2026-11-14). The other situations never frame wider. A selfie takes only `selfie`. `POST /pose-tips` takes no situation ([#213]).
+
+**Prompts as data.** The prompts, default poses, and questions are in `server/src/pix_server/poses/prompts.toml`, with the `[situations]`, `[filter]`, and `[person]` tables. The server refuses to start on a missing or doubled placeholder, an empty prompt, or other than four default poses of up to 100 characters. A missing or unknown situation, duplicate default poses in a situation, an incomplete `[filter]` or `[person]` table, or an unknown key also stops it. A mistake therefore fails the tests and the image build, not pose requests. The scripts in `server/scripts/` read the same file, so a change can be tried first; `eval_poses.py` runs the AI module tests (Testing Documentation 3.1).
 
 **Image model.** Candidates come from OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), with one format, key, and bill for every vendor. Each request asks for `1K` and the closest `aspect_ratio` of 3:4, 9:16, and 1:1 (AD-10), which the listed models all accept (2026-10-30). A model may round the ratio, such as 896 × 1200 for 3:4, so each screen fits a candidate in its own shape. Nothing is cut, since the guide uses the whole candidate. The scene's thumbnails are 72 dp high. The server converts PNG or WebP to JPEG (quality 90) and turns OpenRouter's `403` into `422 REJECTED`.
 
@@ -3183,7 +3196,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Camera quality and latency, low priority (from #183) (Iter4-P11, [#208]) | 한준형 | 11/19 | Open | 2.8 |
 | Situation prompts, compared with the current prompt (Iter4-P12, [#209]) | 박재완 | 11/19 | Open | 2.5.3, 2.6.3, *Still open* |
 | The situation choice on *Generate poses* (Iter4-P13, [#210]) | 박재완 | 11/19 | Open | 2.1, 2.5.1, 2.6.5 |
-| Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Open | 2.6.3, *Still open* |
+| Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Dropped | — |
 | Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
 | Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/19 | Open | 2.6.3 |
 | The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Open | *Still open*, AD-8 |

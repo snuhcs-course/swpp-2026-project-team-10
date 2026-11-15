@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -24,6 +24,7 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.SUGGESTED
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.planned
 import com.lastpenguin.pix.generation.testBitmap
 import com.lastpenguin.pix.session.DescriptionRequest
@@ -1195,6 +1196,122 @@ class GenerationViewModelTest {
         assertNull(state.tipSource)
     }
 
+    // ---- situations (FR-4.8, Iter4-P13) ---------------------------------------------------------------------------
+    // Partitions: the situation chosen on Add a pose guide, going with every request of the set, Try again included;
+    // the tiles following the camera, front and rear; the camera turned to the chosen situation's; the selfie's tile
+    // off without a front camera; a front camera that fails while a selfie is framed, and shooting again after it;
+    // shooting again; the subject's phone told the situation.
+
+    @Test
+    fun theChosenSituation_goesWithTheScene_toEveryRequestOfTheSet() = runTest {
+        model.chooseSituation(Situation.LANDMARK)
+        generateFromAPhoto()
+        generator.runs.single().finish()
+        runCurrent()
+        model.retry()
+        runCurrent()
+
+        assertEquals(Situation.LANDMARK, state.situation)
+        assertEquals(listOf(Situation.LANDMARK, Situation.LANDMARK), generator.runs.map { it.situation })
+    }
+
+    @Test
+    fun generatePoses_tellsTheSubjectsPhoneTheSituation() = runTest {
+        model.chooseSituation(Situation.LANDMARK)
+        describeAPhoto()
+
+        assertEquals(listOf<String?>("landmark"), descriptions.situations)
+    }
+
+    @Test
+    fun theTiles_followTheCamera() = runTest {
+        model.chooseSituation(Situation.LANDMARK)
+        camera.facing.value = CameraFacing.FRONT
+        model.followCamera()
+        assertEquals(Situation.SELFIE, model.situationChoice.value)
+
+        camera.facing.value = CameraFacing.BACK
+        model.followCamera()
+        assertEquals(Situation.LANDMARK, model.situationChoice.value)
+    }
+
+    @Test
+    fun theSceneStartsWithTheChosenSituationsCamera() = runTest {
+        model.chooseSituation(Situation.SELFIE)
+        model.beginScene()
+        assertEquals(CameraFacing.FRONT, camera.facing.value)
+        model.takeScene()
+        runCurrent()
+        assertTrue(state.selfie)
+        assertEquals(Situation.SELFIE, state.situation)
+
+        model.cancel()
+        model.chooseSituation(Situation.BACKGROUND)
+        model.beginScene()
+        assertEquals(CameraFacing.BACK, camera.facing.value)
+        assertEquals(Situation.BACKGROUND, state.situation)
+    }
+
+    @Test
+    fun withoutAFrontCamera_theSelfiesTileIsOff_andChoosingItDoesNothing() = runTest {
+        assertTrue(model.selfieAvailable.value)
+        camera.hasFrontCamera.value = false
+        assertFalse(model.selfieAvailable.value)
+
+        model.chooseSituation(Situation.LANDMARK)
+        model.chooseSituation(Situation.SELFIE)
+
+        assertEquals(Situation.LANDMARK, model.situationChoice.value)
+    }
+
+    @Test
+    fun aFrontCameraThatFails_whileASelfieIsFramed_asksForAuto_andThePhotoIsDefault() = runTest {
+        model.chooseSituation(Situation.SELFIE)
+        model.beginScene()
+        runCurrent()
+        assertEquals(Situation.SELFIE, state.situation)
+
+        // The front camera could not be bound, and the controller gave the rear one back.
+        camera.facing.value = CameraFacing.BACK
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+        assertEquals(Situation.DEFAULT, state.situation)
+
+        model.takeScene()
+        runCurrent()
+        assertFalse(state.selfie)
+        assertEquals(Situation.DEFAULT, state.situation)
+    }
+
+    @Test
+    fun shootingAgain_afterTheFrontCameraFailed_keepsAuto() = runTest {
+        model.chooseSituation(Situation.SELFIE)
+        model.beginScene()
+        runCurrent()
+        camera.facing.value = CameraFacing.BACK
+        runCurrent()
+        model.takeScene()
+        runCurrent()
+
+        model.retakeScene()
+
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+        assertEquals(Situation.DEFAULT, state.situation)
+    }
+
+    @Test
+    fun shootingAgain_keepsTheChosenSituation() = runTest {
+        model.chooseSituation(Situation.HALF_BODY)
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+
+        model.retakeScene()
+
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+        assertEquals(Situation.HALF_BODY, state.situation)
+    }
+
     // ---- the set on the subject's phone (Design 2.6.5, Iter3-P16) -------------------------------------------------
     // Partitions: each phase change is told (a new set, its planned slots, each created candidate and each that failed,
     // also at the time limit (Iter3-A13), Pick a pose with the pager's order, an end without a choice from GENERATING,
@@ -1795,8 +1912,9 @@ class GenerationViewModelTest {
         assertTrue(model.onDescriptionFocus(true))
     }
 
-    /** *Generate poses here*, the shutter, and *Use this photo*: Generate poses is shown. */
+    /** *Add a pose guide*, *Take the scene photo*, the shutter, and *Use this photo*: Generate poses is shown. */
     private fun TestScope.describeAPhoto() {
+        model.followCamera()
         model.beginScene()
         model.takeScene()
         runCurrent()
@@ -1828,8 +1946,12 @@ class GenerationViewModelTest {
 
         fun request(request: DescriptionRequest) = check(sent.tryEmit(request))
 
-        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean) {
+        /** The situation each open named. */
+        val situations = mutableListOf<String?>()
+
+        override fun open(descriptionId: String, scene: Bitmap, text: String, rejected: Boolean, situation: String?) {
             ids += descriptionId
+            situations += situation
             calls += "open '$text'" + if (rejected) " rejected" else ""
         }
 
@@ -1897,8 +2019,9 @@ class GenerationViewModelTest {
             request: PoseRequest,
             seed: Long,
             selfie: Boolean,
+            situation: Situation,
         ): Flow<GenerationEvent> {
-            val run = Run(scene, request, seed, selfie).also(runs::add)
+            val run = Run(scene, request, seed, selfie, situation).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -1909,7 +2032,13 @@ class GenerationViewModelTest {
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest, val seed: Long, val selfie: Boolean) {
+        class Run(
+            val scene: Bitmap,
+            val request: PoseRequest,
+            val seed: Long,
+            val selfie: Boolean,
+            val situation: Situation,
+        ) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 
@@ -1975,8 +2104,10 @@ class GenerationViewModelTest {
 
         override fun setFrameSink(sink: FrameSink?) = Unit
         override val facing = MutableStateFlow(CameraFacing.BACK)
-        override val hasFrontCamera: StateFlow<Boolean> = MutableStateFlow(true)
-        override fun setFacing(facing: CameraFacing) = Unit
+        override val hasFrontCamera = MutableStateFlow(true)
+        override fun setFacing(facing: CameraFacing) {
+            this.facing.value = facing
+        }
     }
 
     private companion object {

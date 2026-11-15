@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.generation.PromptHistory
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.DescriptionEnd
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.Role
@@ -31,6 +32,8 @@ data class SubjectDescribeUiState(
     /** Whose field holds the description; null while nobody types. */
     val writer: Role? = null,
     val rejected: Boolean = false,
+    /** The situation the photo was taken for (FR-4.8); null from an older photographer. */
+    val situation: Situation? = null,
     /** *Generate 4 poses* or *Suggest 4 poses* was tapped, and the photographer's phone has not answered yet. */
     val waiting: Boolean = false,
     /** The description this screen opened with ended or was replaced: the screen goes back to Subject view. */
@@ -92,6 +95,7 @@ class SubjectDescribeViewModel(
                             text = description.text,
                             writer = description.writer,
                             rejected = description.rejected,
+                            situation = Situation.named(description.situation),
                             waiting = going == description.descriptionId,
                             reconnecting = state is SessionState.Reconnecting,
                             photographerName = name,

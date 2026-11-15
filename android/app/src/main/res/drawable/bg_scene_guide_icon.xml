@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The circle behind the scene photo panel's light bulb (R&S 6.3, #210). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/pix_surface_3" />
+</shape>

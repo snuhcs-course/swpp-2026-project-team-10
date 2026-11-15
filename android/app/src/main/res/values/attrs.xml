@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The pose flow's bar (FlowProgressView, #210). -->
+    <declare-styleable name="FlowProgressView">
+        <!-- The screen's place in the flow, 1 to 5: the scene photo, its review, Generate poses, the set being
+             generated, and Pick a pose. -->
+        <attr name="flowStep" format="integer" />
+    </declare-styleable>
+</resources>

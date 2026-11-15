@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -11,6 +11,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -41,24 +42,38 @@ enum class CaptionAlign { CENTER, START, END }
  * arrow, as real text that TalkBack reads, Korean included. [locate] says where the controls are in this view, or null
  * for one the screen does not show, which then gets no ring or caption; the screen calls [refresh] as they move.
  * Each caption goes on its side of the control, farther away or on another side when it would cover another
- * caption, ring, or the title, and stays inside the system bars. A tap anywhere closes it; the line that says so sits
- * at the bottom's middle on every screen and in every language, and the captions keep clear of it (#204).
+ * caption, ring, or the title, and stays inside the system bars. A caption [Mark.onEdge] sits on its ring's edge
+ * instead, as the label in an outlined field's border, with no arrow ([#210]). A tap anywhere closes it; the line that
+ * says so sits at the bottom's middle on every screen and in every language, and the captions keep clear of it (#204).
  */
 class CoachMarkLayout @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
 ) : FrameLayout(context, attrs) {
 
-    /** One control to explain: its caption, where that goes, and whether its arrow may pass over other controls. */
+    /**
+     * One control to explain: its caption, where that goes, and whether its arrow may pass over other controls. With
+     * [onEdge], the caption sits on the ring's edge on [side] (above or below), lined up at [align], half over the
+     * control, with the ring stopping on both sides of it and no arrow. It keeps to one line, so it covers only the
+     * control's edge, and its text shrinks if it has no room there. Failing that, it goes beside the control only where
+     * nothing is in the way, and otherwise the mark is left out, ring and all, rather than cover other text.
+     */
     data class Mark(
         val caption: CharSequence,
         val side: CaptionSide,
         val align: CaptionAlign = CaptionAlign.CENTER,
         val overControls: Boolean = false,
+        val onEdge: Boolean = false,
     )
 
-    /** A mark as placed: the ring around its control and its caption's side, both in this view. */
-    data class Placed(val ring: RectF, val round: Boolean, val caption: TextView, val side: CaptionSide)
+    /** A mark as placed: the ring around its control and its caption's side, both in this view; [onEdge] as above. */
+    data class Placed(
+        val ring: RectF,
+        val round: Boolean,
+        val caption: TextView,
+        val side: CaptionSide,
+        val onEdge: Boolean = false,
+    )
 
     private val density = resources.displayMetrics.density
     private val margin = 16 * density
@@ -94,6 +109,9 @@ class CoachMarkLayout @JvmOverloads constructor(
 
     private var marks: List<Mark> = emptyList()
     private val captions = mutableListOf<TextView>()
+
+    /** Each caption's own text size, in pixels; one on its ring's edge may take a smaller one to fit there. */
+    private val captionSizes = mutableListOf<Float>()
     private var titleView: TextView? = null
     private var bars: Insets = Insets.NONE
     private var located: List<RectF?> = emptyList()
@@ -122,6 +140,7 @@ class CoachMarkLayout @JvmOverloads constructor(
     fun show(title: CharSequence?, marks: List<Mark>) {
         captions.forEach(::removeView)
         captions.clear()
+        captionSizes.clear()
         titleView?.let(::removeView)
         titleView = title?.let { text ->
             TextView(context).apply {
@@ -137,6 +156,7 @@ class CoachMarkLayout @JvmOverloads constructor(
                 maxWidth = captionMaxWidth.toInt()
             }
             captions += caption
+            captionSizes += caption.textSize
             addView(caption, childCount - 1, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
         }
         requestLayout()
@@ -155,8 +175,20 @@ class CoachMarkLayout @JvmOverloads constructor(
         invalidate()
     }
 
-    /** One way to place a caption: its side, its spot, the arrow's strip, and the width it was measured at. */
-    private class Option(val side: CaptionSide, val spot: RectF, val corridor: RectF, val maxWidth: Int)
+    /**
+     * One way to place a caption: its side, its spot, the arrow's strip, and the width it was measured at; [clean] when
+     * it covers nothing and its arrow crosses nothing it must not, and [onEdge] on its ring's edge, at [textScale] of
+     * its text size.
+     */
+    private class Option(
+        val side: CaptionSide,
+        val spot: RectF,
+        val corridor: RectF,
+        val maxWidth: Int,
+        val clean: Boolean = true,
+        val onEdge: Boolean = false,
+        val textScale: Float = 1f,
+    )
 
     private fun place() {
         val safe = RectF(
@@ -165,7 +197,7 @@ class CoachMarkLayout @JvmOverloads constructor(
             width - bars.right - margin,
             height - bars.bottom - margin,
         )
-        val rings = marks.indices.map { index -> located.getOrNull(index)?.let(::ringAround) }
+        val rings = separated(marks.indices.map { index -> located.getOrNull(index)?.let(::ringAround) })
         val ringRects = rings.mapNotNull { it?.first }
 
         var titleSpot: RectF? = null
@@ -203,7 +235,11 @@ class CoachMarkLayout @JvmOverloads constructor(
                 val otherArrows = previous.filterIndexed { other, it -> other != index && it != null }
                     .map { it!!.corridor }
                 val crossed = if (mark.overControls) texts else texts + otherRings
-                val option = bestOption(mark, index, ring, safe, ringRects + texts + otherArrows, crossed)
+                scaleCaption(index, 1f)
+                val option = edgeOption(mark, index, ring, safe, otherRings + texts + otherArrows)
+                    ?: bestOption(mark, index, ring, safe, ringRects + texts + otherArrows, crossed)
+                        .takeIf { it.clean || !mark.onEdge }
+                    ?: return@forEachIndexed
                 next[index] = option
                 texts += option.spot
             }
@@ -216,9 +252,10 @@ class CoachMarkLayout @JvmOverloads constructor(
             val option = chosen[index]
             caption.isGone = option == null
             if (option == null) return@forEach
+            scaleCaption(index, option.textScale)
             measureCaption(caption, option.maxWidth)
             caption.layout(option.spot)
-            result[index] = Placed(rings[index]!!.first, rings[index]!!.second, caption, option.side)
+            result[index] = Placed(rings[index]!!.first, rings[index]!!.second, caption, option.side, option.onEdge)
         }
         placed = result
 
@@ -227,8 +264,79 @@ class CoachMarkLayout @JvmOverloads constructor(
         arrows.clear()
         for ((index, mark) in marks.withIndex()) {
             val placedMark = result[index] ?: continue
-            arrows += arrow(placedMark, mark.align)
+            if (!placedMark.onEdge) arrows += arrow(placedMark, mark.align)
         }
+    }
+
+    /**
+     * Rings of controls stacked close, such as two list rows, meet no closer than [RING_GAP_DP]: each gives up half of
+     * what they would share, so their dashes never overlap, and as much again on its other side, so it stays centered
+     * on its control.
+     */
+    private fun separated(rings: List<Pair<RectF, Boolean>?>): List<Pair<RectF, Boolean>?> {
+        val gap = RING_GAP_DP * density
+        val out = rings.map { it?.let { (ring, round) -> RectF(ring) to round } }
+        for (a in out.filterNotNull()) {
+            for (b in out.filterNotNull()) {
+                val (upper, lower) = a.first to b.first
+                val side = upper.left < lower.right && lower.left < upper.right
+                val shared = upper.bottom - lower.top
+                val stacked = upper.centerY() < lower.centerY() && shared > -gap &&
+                    shared < min(upper.height(), lower.height()) / 2
+                if (a.second || b.second || !side || !stacked) continue
+                val middle = (upper.bottom + lower.top) / 2
+                val upperShrink = upper.bottom - (middle - gap / 2)
+                val lowerShrink = (middle + gap / 2) - lower.top
+                upper.top += upperShrink
+                upper.bottom -= upperShrink
+                lower.top += lowerShrink
+                lower.bottom -= lowerShrink
+            }
+        }
+        return out
+    }
+
+    /**
+     * [mark]'s caption on its [ring]'s edge, when it asks for that: centered on the top or bottom edge, [EDGE_INSET_DP]
+     * in from the end it lines up with, in one line, its text shrunk to [EDGE_SCALES]' smallest at most so it fits and
+     * the gap it opens in the ring covers none of [blocked] and stays on the screen; none when that fails.
+     */
+    private fun edgeOption(mark: Mark, index: Int, ring: RectF, safe: RectF, blocked: List<RectF>): Option? {
+        if (!mark.onEdge || (mark.side != CaptionSide.ABOVE && mark.side != CaptionSide.BELOW)) return null
+        val caption = captions[index]
+        val inset = EDGE_INSET_DP * density
+        val padX = EDGE_GAP_X_DP * density
+        val maxWidth = max((ring.width() - 2 * (inset + padX)).toInt(), 1)
+        val edge = if (mark.side == CaptionSide.ABOVE) ring.top else ring.bottom
+        for (scale in EDGE_SCALES) {
+            scaleCaption(index, scale)
+            measureCaption(caption, maxWidth)
+            if (caption.lineCount > 1) continue
+            val w = caption.measuredWidth.toFloat()
+            val h = caption.measuredHeight.toFloat()
+            val left = when (mark.align) {
+                CaptionAlign.START -> ring.left + inset + padX
+                CaptionAlign.END -> ring.right - inset - padX - w
+                CaptionAlign.CENTER -> ring.centerX() - w / 2
+            }
+            val spot = RectF(left, edge - h / 2, left + w, edge + h / 2)
+            val gap = edgeGap(spot)
+            if (safe.contains(gap) && blocked.none { it.overlaps(gap) }) {
+                val noArrow = RectF(spot.left, spot.top, spot.left, spot.top)
+                return Option(mark.side, spot, noArrow, maxWidth, onEdge = true, textScale = scale)
+            }
+        }
+        scaleCaption(index, 1f)
+        return null
+    }
+
+    /** The gap a caption at [spot] on its ring's edge opens in the ring: the caption and a little room on each side. */
+    private fun edgeGap(spot: RectF): RectF = RectF(spot).apply {
+        inset(-EDGE_GAP_X_DP * density, -EDGE_GAP_Y_DP * density)
+    }
+
+    private fun scaleCaption(index: Int, scale: Float) {
+        captions[index].setTextSize(TypedValue.COMPLEX_UNIT_PX, captionSizes[index] * scale)
     }
 
     /**
@@ -299,13 +407,13 @@ class CoachMarkLayout @JvmOverloads constructor(
                 }
             }
         }
-        crossing?.let { return it }
+        crossing?.let { return Option(it.side, it.spot, it.corridor, it.maxWidth, clean = false) }
         // Nowhere free: the nearest place on its own side, kept on the screen.
         val near = first!!
         val dx = near.spot.left.coerceIn(safe.left, max(safe.left, safe.right - near.spot.width())) - near.spot.left
         val dy = near.spot.top.coerceIn(safe.top, max(safe.top, safe.bottom - near.spot.height())) - near.spot.top
         val spot = RectF(near.spot).apply { offset(dx, dy) }
-        return Option(near.side, spot, corridor(near.side, mark.align, ring, spot), near.maxWidth)
+        return Option(near.side, spot, corridor(near.side, mark.align, ring, spot), near.maxWidth, clean = false)
     }
 
     /**
@@ -360,14 +468,17 @@ class CoachMarkLayout @JvmOverloads constructor(
             // Straight down (or up) to the control near its aligned end.
             val inset = min(ring.width() / 2, 28 * density)
             val x = (if (align == CaptionAlign.END) ring.right - inset else ring.left + inset)
-                .coerceIn(spot.left + 12 * density, max(spot.left, spot.right - 12 * density))
+                .coerceIn(min(spot.left + 12 * density, spot.centerX()), max(spot.centerX(), spot.right - 12 * density))
             return Course(
                 PointF(x, if (down) spot.bottom + near else spot.top - near),
                 PointF(x, if (down) ring.top - near else ring.bottom + near),
             )
         }
-        val startX = ring.centerX().coerceIn(spot.left + 12 * density, max(spot.left, spot.right - 12 * density))
-        val startY = ring.centerY().coerceIn(spot.top + 8 * density, max(spot.top, spot.bottom - 8 * density))
+        // Within the caption, a little in from its ends; at its middle for one too small for that.
+        val left = spot.left + 12 * density
+        val top = spot.top + 8 * density
+        val startX = ring.centerX().coerceIn(min(left, spot.centerX()), max(spot.centerX(), spot.right - 12 * density))
+        val startY = ring.centerY().coerceIn(min(top, spot.centerY()), max(spot.centerY(), spot.bottom - 8 * density))
         val start = when (side) {
             CaptionSide.ABOVE -> PointF(startX, spot.bottom + near)
             CaptionSide.BELOW -> PointF(startX, spot.top - near)
@@ -442,13 +553,27 @@ class CoachMarkLayout @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), scrimPaint)
         for (mark in placed) mark?.let { drawRing(canvas, it, clearPaint) }
         canvas.restoreToCount(layer)
-        for (mark in placed) mark?.let { drawRing(canvas, it, ringPaint) }
+        for (mark in placed) {
+            if (mark == null) continue
+            // A caption on its ring's edge: the ring stops on both sides of it, as an outlined field's border does.
+            val save = canvas.save()
+            if (mark.onEdge) canvas.clipOutRect(edgeGap(captionRect(mark)))
+            drawRing(canvas, mark, ringPaint)
+            canvas.restoreToCount(save)
+        }
         for ((path, head) in arrows) {
             canvas.drawPath(path, arrowPaint)
             canvas.drawPath(head, headPaint)
         }
         super.dispatchDraw(canvas)
     }
+
+    private fun captionRect(mark: Placed) = RectF(
+        mark.caption.left.toFloat(),
+        mark.caption.top.toFloat(),
+        mark.caption.right.toFloat(),
+        mark.caption.bottom.toFloat(),
+    )
 
     private fun drawRing(canvas: Canvas, mark: Placed, paint: Paint) {
         val ring = mark.ring
@@ -491,5 +616,18 @@ class CoachMarkLayout @JvmOverloads constructor(
 
         /** The longest side of a control a circle goes around: the shutter's 72 dp, and a little more. */
         const val MAX_ROUND_DP = 80f
+
+        /** The least room between the rings of two controls stacked close. */
+        const val RING_GAP_DP = 6f
+
+        /** How far in from its ring's end a caption on the ring's edge starts, past the ring's corner. */
+        const val EDGE_INSET_DP = 16f
+
+        /** The room the ring leaves on each side of a caption on its edge, and above and below it. */
+        const val EDGE_GAP_X_DP = 8f
+        const val EDGE_GAP_Y_DP = 3f
+
+        /** The text sizes a caption on its ring's edge may take, of its own, to find room there. */
+        val EDGE_SCALES = listOf(1f, 0.9f, 0.8f, 0.7f, 0.6f, 0.5f)
     }
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -9,11 +9,10 @@ import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
-import com.lastpenguin.pix.databinding.ItemSavedGuideBinding
+import com.lastpenguin.pix.databinding.ItemSituationTileBinding
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.ReferenceGuide
-import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
@@ -22,7 +21,6 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -35,14 +33,14 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
 /*
- * Add a pose guide (R&S 6.2, FR-3.6, FR-4.2), on the real bottom sheet. Partitions: no guide on the camera (Add)
- * or a guide (Replace, with Keep the current guide); Generate poses here with consent already given (the scene
- * photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts it), and
- * the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. My library
- * (FR-3.8, FR-3.11): nothing saved (Add photo alone); one guide, which a tap puts on the camera, closing the sheet;
- * All, which opens the library and closes the sheet; a configuration change, such as the language, while a guide is
- * still opening (it still opens). From Subject view (FR-6.15): no Generate poses here, and Replace only for a guide on
- * the video, not one on this phone's camera.
+ * Add a pose guide (R&S 6.2, FR-3.6, FR-4.2), on the real bottom sheet. Partitions: no guide on the camera (What are
+ * you taking?, no Cancel) or a guide (Replace, with Keep the current guide); the button with consent already given
+ * (the scene photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts
+ * it), and the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. My
+ * library (FR-3.8, FR-3.11): nothing saved (no count); the row, which opens the library and closes the sheet. The
+ * situations (FR-4.8): a tile tapped is chosen with a check; Selfie's off and dimmed without a front camera. From
+ * Subject view (FR-6.15): no situations and no button,
+ * Add a pose guide as the title, and Replace only for a guide on the video, not one on this phone's camera.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -77,12 +75,12 @@ class AddGuideSheetTest {
     )
 
     @Test
-    fun withoutAGuide_offersToAddOne() {
+    fun withoutAGuide_asksWhatToTake() {
         launch()
 
         onSheet { binding ->
-            assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
-            assertEquals(string(R.string.cancel), binding.cancelButton.text.toString())
+            assertEquals(string(R.string.situation_question), binding.titleText.text.toString())
+            assertFalse(binding.cancelButton.isShown)
         }
     }
 
@@ -92,6 +90,7 @@ class AddGuideSheetTest {
         modules.guides.setGuide(guide())
         launch(modules, fromSubject = true)
         onSheet { binding ->
+            assertEquals(View.GONE, binding.newPosesSection.visibility)
             assertEquals(View.GONE, binding.generateButton.visibility)
             assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
         }
@@ -112,7 +111,30 @@ class AddGuideSheetTest {
         onSheet { binding ->
             assertEquals(string(R.string.replace_guide_title), binding.titleText.text.toString())
             assertEquals(string(R.string.keep_current_guide), binding.cancelButton.text.toString())
+            assertTrue(binding.cancelButton.isShown)
         }
+    }
+
+    @Test
+    fun aTileTapped_isChosenWithACheck_andSelfiesIsOffWithoutAFrontCamera() {
+        val modules = launch(TestAppContainer().apply { camera.hasFrontCamera.value = false })
+        val (landmark, selfie) = onSheet { binding ->
+            ItemSituationTileBinding.bind(binding.situationRowBottom.getChildAt(1)) to
+                ItemSituationTileBinding.bind(binding.situationRowBottom.getChildAt(2))
+        }
+
+        landmark.root.performClick()
+        idle()
+        assertEquals(Situation.LANDMARK, generation.situationChoice.value)
+        assertTrue(landmark.root.isSelected)
+        assertTrue(landmark.situationCheck.isShown)
+        assertFalse(selfie.root.isEnabled)
+        assertEquals(0.38f, selfie.root.alpha, 0.001f)
+
+        modules.camera.hasFrontCamera.value = true
+        idle()
+        assertTrue(selfie.root.isEnabled)
+        assertEquals(1f, selfie.root.alpha, 0.001f)
     }
 
     @Test
@@ -172,76 +194,28 @@ class AddGuideSheetTest {
     }
 
     @Test
-    fun myLibrary_nothingSaved_showsAddPhotoAlone() {
+    fun myLibrary_nothingSaved_showsNoCount() {
         launch()
 
         onSheet { binding ->
-            assertTrue(binding.addPhotoTile.isShown)
-            assertEquals(0, binding.savedGuidesList.childCount)
-            assertFalse(binding.libraryAllButton.isShown)
+            assertTrue(binding.galleryRow.isShown)
+            assertTrue(binding.libraryRow.isShown)
+            assertFalse(binding.libraryCount.isShown)
         }
     }
 
     @Test
-    fun myLibrary_all_opensTheLibraryAndCloses() {
+    fun myLibrary_row_opensTheLibraryAndCloses() {
         val modules = TestAppContainer()
         runBlocking { modules.saved.save(guide(), GuideState()) }
         launch(modules)
         val nav = scenario!!.attachNav(R.id.addGuideSheet)
 
-        onSheet { binding -> binding.libraryAllButton.performClick() }
+        onSheet { binding -> binding.libraryRow.performClick() }
         idle()
 
         assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
         assertFalse(nav.backStack.any { it.destination.id == R.id.addGuideSheet })
-    }
-
-    @Test
-    fun savedGuide_tap_putsItOnTheCameraAndCloses() {
-        val modules = TestAppContainer()
-        runBlocking { modules.saved.save(guide(), GuideState()) }
-        launch(modules)
-
-        onSheet { binding ->
-            assertEquals(string(R.string.library_all, 1), binding.libraryAllButton.text.toString())
-            assertEquals(1, binding.savedGuidesList.childCount)
-            ItemSavedGuideBinding.bind(binding.savedGuidesList.getChildAt(0)).thumbnail.performClick()
-        }
-        idle()
-
-        assertEquals("guide-1", modules.guides.guide.value?.id)
-        assertFalse(sheet.isAdded)
-    }
-
-    /** A saved-guide store whose loads wait until [open] completes, so a test can act while a guide is opening. */
-    private class GatedStore(
-        private val store: SavedGuideStore = SavedGuideStore.InMemory(),
-    ) : SavedGuideStore by store {
-        val open = CompletableDeferred<Unit>()
-
-        override suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>> {
-            open.await()
-            return store.load(id)
-        }
-    }
-
-    @Test
-    fun savedGuide_aConfigurationChange_whileItOpens_stillPutsItOnTheCamera() {
-        val store = GatedStore()
-        val modules = TestAppContainer(saved = store)
-        runBlocking { store.save(guide(), GuideState()) }
-        launch(modules)
-        onSheet { binding ->
-            ItemSavedGuideBinding.bind(binding.savedGuidesList.getChildAt(0)).thumbnail.performClick()
-        }
-        idle()
-
-        scenario!!.recreate()
-        idle()
-        store.open.complete(Unit)
-        idle()
-
-        assertEquals("guide-1", modules.guides.guide.value?.id)
     }
 
     @Test

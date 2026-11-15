@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -72,6 +72,7 @@ class MessageCodecTest {
             SessionMessage.GuideConfirmImageEnd("c1", "g1", 3735928559L),
             SessionMessage.GuideConfirmUse("c1", "g1"),
             SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.SUBJECT, rejected = true),
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", situation = "landmark"),
             SessionMessage.PoseDescription("d1", DescriptionStep.STARTED),
             SessionMessage.PoseDescription("d1", DescriptionStep.STARTED, "wave", setId = "s1"),
             SessionMessage.PoseSceneBegin("d1", "jpeg", 768, 1024, 151_320, 17),
@@ -208,7 +209,7 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `a description sends its text, writer, and rejection only while open, and an unknown step is dropped`() {
+    fun `a description sends its text, writer, rejection, and situation only while open, and drops unknown steps`() {
         val ended = Json.parseToJsonElement(codec.encode(SessionMessage.PoseDescription("d1", DescriptionStep.CLOSED)))
         assertEquals("pose.description", ended.jsonObject.getValue("t").jsonPrimitive.content)
         assertEquals(setOf("descriptionId", "step"), ended.jsonObject.getValue("b").jsonObject.keys)
@@ -220,6 +221,12 @@ class MessageCodecTest {
             SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.PHOTOGRAPHER),
             example!!.message,
         )
+        // The situation (It 4) goes only when there is one; an older photographer sends none.
+        val open = Json.parseToJsonElement(
+            codec.encode(SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", situation = "full_body")),
+        )
+        assertEquals("full_body", open.jsonObject.getValue("b").jsonObject.getValue("situation").jsonPrimitive.content)
+        assertNull((example.message as SessionMessage.PoseDescription).situation)
         val unknownStep = """{"v":3,"t":"pose.description","seq":1,"ts":0,"b":{"descriptionId":"d1","step":"TYPING"}}"""
         assertNull(codec.decode(unknownStep))
         // A go without its text and its choice.

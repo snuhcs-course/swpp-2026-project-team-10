@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -216,7 +216,9 @@ sealed interface SessionMessage {
      * when a set starts from it, or CLOSED. With STARTED, [text] is the set's description as its request has it,
      * empty for suggested poses (FR-4.11); a photographer of an older version sends none, so it is null then. With
      * STARTED, [setId] names the set that started, as `pose.step` names it, so the subject's history waits for that
-     * set's answer and no other (FR-4.11); null from an older photographer.
+     * set's answer and no other (FR-4.11); null from an older photographer. With OPEN, [situation] is the situation the
+     * scene photo was taken for, by its `situation` name on the server (FR-4.8, It 4); a string, so a name this phone does
+     * not know is shown as none rather than dropping the message; null from an older photographer.
      */
     @Serializable
     @SerialName("pose.description")
@@ -227,6 +229,7 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val writer: Role? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val rejected: Boolean = false,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val setId: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val situation: String? = null,
     ) : SessionMessage
 
     /**

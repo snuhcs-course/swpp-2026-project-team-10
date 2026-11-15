@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -20,6 +20,7 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.RemotePoseGenerator
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.session.DescriptionRequest
 import com.lastpenguin.pix.session.DescriptionShare
@@ -49,6 +50,11 @@ data class GenerationUiState(
     val scene: Bitmap? = null,
     /** The scene photo is a selfie from the front camera: the server makes selfie poses of it (FR-1.14). */
     val selfie: Boolean = false,
+    /**
+     * The prompts the set is made with (FR-4.8): the one chosen on *Add a pose guide*, which the photo keeps
+     * ([Situation.forScene]); another needs another photo.
+     */
+    val situation: Situation = Situation.DEFAULT,
     /** What the set was asked for; *Try again* and *Regenerate* ask for it again. */
     val request: PoseRequest? = null,
     /** The description field's text on Generate poses, kept for Back to it and when the service rejects it. */
@@ -151,6 +157,20 @@ class GenerationViewModel(
     /** The descriptions used before, newest first, for Generate poses (FR-4.10). */
     val usedBefore: StateFlow<List<PromptEntry>> = history.entries
 
+    private val _situationChoice = MutableStateFlow(Situation.DEFAULT)
+
+    /**
+     * The situation chosen last on *Add a pose guide* (FR-4.8): the next scene starts with it, and the sheet shows it
+     * selected. Kept while Pix runs.
+     */
+    val situationChoice: StateFlow<Situation> = _situationChoice.asStateFlow()
+
+    /** Whether *Selfie* can be chosen: only on a phone with a front camera (FR-1.14, FR-4.8). */
+    val selfieAvailable: StateFlow<Boolean> = camera.hasFrontCamera
+
+    /** The situation other than a selfie chosen last, which *Add a pose guide* shows again with the rear camera. */
+    private var rearChoice = Situation.DEFAULT
+
     private var generating: Job? = null
     private var shooting: Job? = null
     private var checking: Job? = null
@@ -210,6 +230,17 @@ class GenerationViewModel(
                 settledLight.value = on
             }
         }
+        // A front camera that cannot be opened gives the rear one back (FR-1.14). A selfie being framed then asks
+        // for what *Auto* needs, the situation its photo gets, rather than for a selfie the camera cannot take.
+        viewModelScope.launch {
+            camera.facing.collect { facing ->
+                if (facing != CameraFacing.BACK) return@collect
+                _uiState.update { state ->
+                    val selfie = state.phase == GenerationUiState.Phase.FRAMING && state.situation == Situation.SELFIE
+                    if (selfie) state.copy(situation = state.situation.forScene(selfie = false)) else state
+                }
+            }
+        }
     }
 
     override fun onCleared() {
@@ -236,10 +267,42 @@ class GenerationViewModel(
         viewModelScope.launch { consent.withdraw() }
     }
 
-    /** *Generate poses here*: the Camera screen now takes the scene photo (FR-4.1). Nothing is sent yet. */
+    /**
+     * *Add a pose guide* opened: its tiles follow the camera, so *Selfie* is chosen while the front camera is on and
+     * the last other situation with the rear one (FR-1.14, FR-4.8).
+     */
+    fun followCamera() {
+        val front = camera.facing.value == CameraFacing.FRONT
+        _situationChoice.update { chosen ->
+            when {
+                front -> Situation.SELFIE
+                chosen == Situation.SELFIE -> rearChoice
+                else -> chosen
+            }
+        }
+    }
+
+    /**
+     * A situation's tile on *Add a pose guide* (FR-4.8): chosen for the next scene photo. Nothing is sent. *Selfie* is
+     * ignored on a phone without a front camera, whose tile is off.
+     */
+    fun chooseSituation(situation: Situation) {
+        if (situation == Situation.SELFIE && !camera.hasFrontCamera.value) return
+        if (situation != Situation.SELFIE) rearChoice = situation
+        _situationChoice.value = situation
+    }
+
+    /**
+     * *Take the scene*: the Camera screen now takes the scene photo (FR-4.1) for the chosen situation, whose framing
+     * hint it shows. A selfie is taken with the front camera and the others with the rear one, so the camera turns
+     * to it. Nothing is sent yet.
+     */
     fun beginScene() {
         cancel()
-        _uiState.value = GenerationUiState(phase = GenerationUiState.Phase.FRAMING)
+        val situation = _situationChoice.value
+        val facing = if (situation == Situation.SELFIE) CameraFacing.FRONT else CameraFacing.BACK
+        if (camera.facing.value != facing) camera.setFacing(facing)
+        _uiState.value = GenerationUiState(phase = GenerationUiState.Phase.FRAMING, situation = situation)
     }
 
     /**
@@ -267,6 +330,7 @@ class GenerationViewModel(
                     frame.isSuccess -> state.copy(
                         scene = frame.getOrNull(),
                         selfie = selfie,
+                        situation = state.situation.forScene(selfie),
                         phase = GenerationUiState.Phase.REVIEWING,
                         shotFailed = false,
                         checkingPerson = true,
@@ -304,12 +368,23 @@ class GenerationViewModel(
         }
     }
 
-    /** Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was. */
+    /**
+     * Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was and
+     * the photo's situation, which is the one chosen unless a failed front camera made it *Auto*.
+     */
     fun retakeScene() {
         checking?.cancel()
         _uiState.update {
             val reviewing = it.phase == GenerationUiState.Phase.REVIEWING
-            if (reviewing) GenerationUiState(phase = GenerationUiState.Phase.FRAMING, light = it.light) else it
+            if (reviewing) {
+                GenerationUiState(
+                    phase = GenerationUiState.Phase.FRAMING,
+                    light = it.light,
+                    situation = it.situation,
+                )
+            } else {
+                it
+            }
         }
     }
 
@@ -339,7 +414,7 @@ class GenerationViewModel(
         val id = UUID.randomUUID().toString()
         descriptionId = id
         _uiState.update { it.copy(descriptionWriter = null) }
-        descriptions.open(id, scene, state.description, state.descriptionRejected)
+        descriptions.open(id, scene, state.description, state.descriptionRejected, state.situation.apiName)
     }
 
     /** The description field changed; kept so the text survives a rejected set (US-5). Not while the subject types. */
@@ -563,15 +638,17 @@ class GenerationViewModel(
         // poses have no description to keep.
         describedSet = described.takeIf { it.isNotEmpty() }?.let { DescribedSet(id, it, partner()?.userId) }
         share.open(id)
+        val situation = _uiState.value.situation.forScene(selfie)
         _uiState.value = GenerationUiState(
             scene = scene,
             selfie = selfie,
+            situation = situation,
             request = request,
             description = description,
             setId = id,
             phase = GenerationUiState.Phase.GENERATING,
         )
-        generating = viewModelScope.launch { generate(id, scene, selfie, request) }
+        generating = viewModelScope.launch { generate(id, scene, selfie, situation, request) }
     }
 
     /**
@@ -641,16 +718,24 @@ class GenerationViewModel(
      * the subject's phone hears with the set's end. One limit covers the whole run, the suggestions included, so
      * Generating poses never lasts longer than the 60 s it says (NFR-4).
      */
-    private suspend fun generate(id: String, scene: Bitmap, selfie: Boolean, request: PoseRequest) {
+    private suspend fun generate(
+        id: String,
+        scene: Bitmap,
+        selfie: Boolean,
+        situation: Situation,
+        request: PoseRequest,
+    ) {
         Timings.mark(
             "pose.start",
-            (if (request is PoseRequest.Suggested) "suggested" else "described") + if (selfie) " selfie" else "",
+            (if (request is PoseRequest.Suggested) "suggested" else "described") + " " + situation.apiName,
         )
         // Why the run itself ended early, as the suggestions failing does; null when it ran to its end.
         var stopped: GenerationError? = null
         val inTime = withTimeoutOrNull(limitMs) {
             try {
-                generator.generate(scene, request, Random.nextLong(), selfie).collect { event -> receive(id, event) }
+                generator.generate(scene, request, Random.nextLong(), selfie, situation).collect { event ->
+                    receive(id, event)
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -49,7 +49,7 @@ import org.robolectric.shadows.ShadowToast
 /*
  * The subject's Generate poses (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's
  * description delivered to the container's DescriptionSyncer. Partitions: the scene photo, the text, and the hint as on
- * the photographer's phone; the photographer typing (the field, the chips, and the buttons wait, saying who types) and
+ * the photographer's phone; the situation named on the photo's card, and none from an older photographer; the photographer typing (the field, the chips, and the buttons wait, saying who types) and
  * done; this phone's typing sent while it holds the field and given back when it ends; a description used before sent
  * at once from its chip, and the switch to the ones used with the photographer in an invitation's session; the one
  * button sent and waiting, and with the field cleared by its ✕, asking for suggested poses (Iter3-A13); the
@@ -100,8 +100,9 @@ class SubjectDescribeFragmentTest {
         text: String = "",
         writer: Role? = null,
         id: String = "d1",
+        situation: String? = null,
     ) {
-        modules.session.deliver(SessionMessage.PoseDescription(id, step, text, writer))
+        modules.session.deliver(SessionMessage.PoseDescription(id, step, text, writer, situation = situation))
         idle()
     }
 
@@ -147,6 +148,21 @@ class SubjectDescribeFragmentTest {
             assertTrue(binding.descriptionInput.isEnabled)
             assertTrue(binding.generateButton.isEnabled)
             assertEquals(View.GONE, binding.descriptionTyping.visibility)
+        }
+    }
+
+    @Test
+    fun theSituation_isNamedOnThePhotosCard_andNotWithoutOne() {
+        val modules = describing()
+        launch()
+        // An older photographer names none.
+        onScreen { binding -> assertEquals(View.GONE, binding.situationTag.visibility) }
+
+        step(modules, DescriptionStep.OPEN, "wave", situation = "landmark")
+
+        onScreen { binding ->
+            assertEquals(View.VISIBLE, binding.situationTag.visibility)
+            assertEquals(string(R.string.situation_landmark), binding.situationTag.text.toString())
         }
     }
 

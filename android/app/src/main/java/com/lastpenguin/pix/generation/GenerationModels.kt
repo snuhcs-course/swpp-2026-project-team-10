@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -26,6 +26,33 @@ sealed interface PoseRequest {
             val text = description.trim().split(Regex("\\s+")).joinToString(" ")
             return if (text.isEmpty()) Suggested else Described(text)
         }
+    }
+}
+
+/**
+ * Which prompts the server uses for a set (FR-4.8, Design 2.6.3): each changes the framing and the kind of pose, and
+ * [apiName] is the `situation` sent. [SELFIE] goes with a scene from the front camera only, since the server refuses a
+ * selfie with another situation; [DEFAULT] is the prompts before Iteration 4.
+ */
+enum class Situation(val apiName: String) {
+    DEFAULT("default"),
+    BACKGROUND("background"),
+    HALF_BODY("half_body"),
+    FULL_BODY("full_body"),
+    LANDMARK("landmark"),
+    SELFIE("selfie"),
+    ;
+
+    /** The situation a scene photo gets: a front-camera photo is always a selfie, and a rear-camera one never is. */
+    fun forScene(selfie: Boolean): Situation = when {
+        selfie -> SELFIE
+        this == SELFIE -> DEFAULT
+        else -> this
+    }
+
+    companion object {
+        /** The situation named [apiName] on the server, or null for none or a name this phone does not know. */
+        fun named(apiName: String?): Situation? = entries.firstOrNull { it.apiName == apiName }
     }
 }
 

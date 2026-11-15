@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -10,12 +10,15 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowManager
+import android.widget.HorizontalScrollView
+import android.widget.ScrollView
 import androidx.activity.ComponentDialog
 import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDialogFragment
 import androidx.core.os.bundleOf
+import androidx.core.view.ScrollingView
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -43,6 +46,8 @@ internal class TutorialTip(
     val align: CaptionAlign = CaptionAlign.CENTER,
     val overControls: Boolean = false,
     val locate: (root: View) -> Rect?,
+    /** The caption on the ring's edge, half over the control, with no arrow (`CoachMarkLayout.Mark.onEdge`, [#210]). */
+    val onEdge: Boolean = false,
 )
 
 /** A screen's tips: an optional title, and its controls. */
@@ -95,20 +100,33 @@ private const val ICON_SPOT_DP = 26
 private const val TEXT_ROOM_X_DP = 8
 private const val TEXT_ROOM_Y_DP = 2
 
+/**
+ * What [view] draws on screen, cut to what the scrolling views around it and its window show: a sheet taller than the
+ * screen scrolls, and a control it has scrolled out of view, or shows less than half of, gets no ring ([#210]).
+ */
+private fun shownOnScreen(view: View): Rect? {
+    val drawn = drawnOnScreen(view) ?: return null
+    val shown = Rect(drawn)
+    var parent = view.parent
+    while (parent is View) {
+        if (parent is ScrollingView || parent is ScrollView || parent is HorizontalScrollView) {
+            val frame = boundsOnScreen(parent)
+            if (frame == null || !shown.intersect(frame)) return null
+        }
+        parent = parent.parent
+    }
+    val window = boundsOnScreen(view.rootView)
+    if (window != null && !shown.intersect(window)) return null
+    return shown.takeIf { it.width() * 2 >= drawn.width() && it.height() * 2 >= drawn.height() }
+}
+
 /** The control [id] of the screen, while it shows. */
-private fun control(@IdRes id: Int): (View) -> Rect? = { root -> root.findViewById<View>(id)?.let(::drawnOnScreen) }
+private fun control(@IdRes id: Int): (View) -> Rect? = { root -> root.findViewById<View>(id)?.let(::shownOnScreen) }
 
 /** The controls [ids] of the screen together, those it shows. */
 private fun controls(@IdRes vararg ids: Int): (View) -> Rect? = { root ->
-    ids.toList().mapNotNull { id -> root.findViewById<View>(id)?.let(::drawnOnScreen) }
+    ids.toList().mapNotNull { id -> root.findViewById<View>(id)?.let(::shownOnScreen) }
         .reduceOrNull { all, next -> Rect(all).apply { union(next) } }
-}
-
-/** The part of the control [id] that the scrolling [frame] around it shows, while some does. */
-private fun shownIn(@IdRes id: Int, @IdRes frame: Int): (View) -> Rect? = { root ->
-    val part = root.findViewById<View>(id)?.let(::boundsOnScreen)
-    val shown = root.findViewById<View>(frame)?.let(::boundsOnScreen)
-    part?.takeIf { shown != null && it.intersect(shown) }
 }
 
 /** A touch point on the middle of the guide as drawn on the camera image, while one is: where to drag it. */
@@ -145,20 +163,28 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.ADD_GUIDE to TutorialTips(
         title = null,
         tips = listOf(
-            TutorialTip(R.string.tutorial_upload, CaptionSide.ABOVE, locate = control(R.id.addPhotoTile)),
-            // Below *Generate poses here*, the sheet's last card, only Cancel fits, so its caption goes above the library.
+            // The whole row (#210), its caption on the ring's top edge at the right.
+            TutorialTip(
+                R.string.tutorial_upload,
+                CaptionSide.ABOVE,
+                CaptionAlign.END,
+                locate = control(R.id.galleryRow),
+                onEdge = true,
+            ),
+            // The situations (FR-4.8): a tile chosen, the button below takes the scene photo for it.
             TutorialTip(
                 R.string.tutorial_generate,
                 CaptionSide.ABOVE,
                 overControls = true,
-                locate = control(R.id.generateButton),
+                locate = controls(R.id.situationRowTop, R.id.situationRowBottom),
             ),
+            // My library's whole row (FR-3.11), its caption on the ring's bottom edge at the right.
             TutorialTip(
                 R.string.tutorial_saved,
-                CaptionSide.ABOVE,
+                CaptionSide.BELOW,
                 CaptionAlign.END,
-                // The saved guides beside *Add photo* (FR-3.11), as far as the row shows them; none, no ring.
-                locate = shownIn(R.id.savedGuidesList, R.id.savedGuidesScroll),
+                locate = control(R.id.libraryRow),
+                onEdge = true,
             ),
         ),
     ),
@@ -243,7 +269,9 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
         val screenView = requireParentFragment().requireView()
         layout.show(
             tips.title?.let(::getString),
-            tips.tips.map { CoachMarkLayout.Mark(getString(it.caption), it.side, it.align, it.overControls) },
+            tips.tips.map {
+                CoachMarkLayout.Mark(getString(it.caption), it.side, it.align, it.overControls, it.onEdge)
+            },
         )
         layout.locate = {
             val at = IntArray(2).also(layout::getLocationOnScreen)

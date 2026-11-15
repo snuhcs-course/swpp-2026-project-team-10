@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -51,11 +51,12 @@ import org.robolectric.annotation.GraphicsMode
  * camera status STARTING, READY; a guide added, hidden, removed by the shutter's end of edit mode; a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
  * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
- * to framing) and Use at the top right of the review (#199), its review while the phone looks for a person and without
- * one (FR-4.13), and
+ * to framing) and Use at the top right of the review (#199), the flow's bar at its first and second step, the panel
+ * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
+ * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, while the
- * scene photo is framed, and in a session (FR-1.14).
+ * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, gone while the
+ * scene photo is framed and back after it, and in a session (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -402,9 +403,14 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.referenceThumbnail.visibility)
             assertEquals(View.INVISIBLE, controls.guideButton.visibility)
             assertEquals(View.VISIBLE, controls.captureControls.visibility)
-            // What to frame, before the shutter (user test P6, #204): the place, with the person in it (FR-4.13).
-            assertEquals(View.VISIBLE, controls.hintText.visibility)
-            assertEquals(string(R.string.scene_framing_hint), controls.hintText.text.toString())
+            // What to frame, before the shutter (user test P6, #204), on the panel above it, not on the image (#210):
+            // the place, with the person in it (FR-4.13). The flow's bar at its first step; the shutter in the accent.
+            assertEquals(View.VISIBLE, controls.sceneGuide.visibility)
+            assertEquals(string(R.string.scene_framing_hint), controls.sceneGuideText.text.toString())
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            assertEquals(View.VISIBLE, controls.sceneProgress.visibility)
+            assertEquals(1, controls.sceneProgress.step)
+            assertEquals(R.drawable.bg_shutter_scene, controls.shutterButton.tag)
             controls.shutterButton.performClick()
         }
         idle()
@@ -415,6 +421,8 @@ class CameraFragmentRenderTest {
             assertEquals(string(R.string.scene_review_body), controls.sceneMessage.text.toString())
             assertEquals(View.VISIBLE, controls.sceneMessage.visibility)
             assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            assertEquals(View.GONE, controls.sceneGuide.visibility)
+            assertEquals(2, controls.sceneProgress.step)
             assertEquals(View.VISIBLE, controls.sceneReview.visibility)
             assertNotNull(controls.sceneStill.drawable)
             assertEquals(View.VISIBLE, controls.usePhotoButton.visibility)
@@ -446,6 +454,10 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.cameraSettings.visibility)
             assertEquals(View.VISIBLE, controls.aspectButton.visibility)
             assertEquals(string(R.string.flash_off), controls.flashButton.contentDescription)
+            // The camera as it was: no flow bar, no panel, the white shutter.
+            assertEquals(View.GONE, controls.sceneProgress.visibility)
+            assertEquals(View.GONE, controls.sceneGuide.visibility)
+            assertEquals(R.drawable.bg_shutter, controls.shutterButton.tag)
         }
     }
 
@@ -580,16 +592,21 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun cameraSwitch_staysWhileTheScenePhotoIsFramed() {
+    fun cameraSwitch_waitsWhileTheScenePhotoIsFramed_andComesBackAfter() {
         launch()
 
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
 
+        // The situation chose the camera (FR-4.8); the shutter keeps its place.
         onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.switchCameraButton.visibility)
+            assertEquals(View.INVISIBLE, controls.switchCameraButton.visibility)
             assertEquals(View.INVISIBLE, controls.galleryButton.visibility)
+            controls.sceneBackButton.performClick()
         }
+        idle()
+
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.switchCameraButton.visibility) }
     }
 
     @Test

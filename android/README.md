@@ -132,7 +132,7 @@ Two phones connect over the Pix server, with a room code or an invitation. Then 
 - **Consent.** The app keeps the answer in DataStore (`pose_generation`). To see the notice again, withdraw the agreement in *Settings › AI pose generation*, or clear the app's data.
 - **Watch it.** `adb logcat -s PixTimings PixPoses` shows these lines:
   - `pose.person found` or `pose.person none`: the person check of the scene photo (FR-4.13).
-  - `pose.start described` or `pose.start suggested`.
+  - `pose.start described` or `pose.start suggested`, then the situation, such as `pose.start suggested landmark`.
   - `pose.planned`: the app knows the poses.
   - `pose.first`, then `pose.done 3 of 4 ready` (NFR-4).
   - One `PixPoses` line for each failed request, with the server's error code and message.

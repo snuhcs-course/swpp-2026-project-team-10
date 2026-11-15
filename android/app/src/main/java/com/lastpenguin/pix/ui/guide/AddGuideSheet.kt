@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han, Jaewan Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -6,13 +6,14 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
@@ -20,16 +21,20 @@ import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import com.lastpenguin.pix.ui.generation.SituationTiles
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Add a pose guide, or Replace the pose guide with one on the camera (R&S 6.2): *My library* first, with *Add photo*
- * and the newest saved guides (FR-3.8, FR-3.11), then *Generate poses here*. Opened from Subject view
- * ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and *Generate poses here* waits for the shared steps
- * (FR-6.15, Design 2.6.5).
+ * Add a pose guide, situation first (R&S 6.2, FR-4.8): *What are you taking?* with a tile per situation, the last one
+ * chosen selected, then a guide from a photo, *Choose from the gallery* or *My library*, which opens the library and
+ * says how many are saved (FR-2.7, FR-3.8, FR-3.11), then *Take a scene photo for poses* for the chosen situation
+ * (FR-4.1). With a guide on the camera it replaces that guide, and *Keep the current guide* closes it (FR-3.6). Opened
+ * from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and the situations and the button wait for
+ * the shared steps (FR-6.15, Design 2.6.5).
  * The first time it opens from Camera, its tutorial tips come over it (FR-10.4).
  * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170.
  */
@@ -55,27 +60,32 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = SheetAddGuideBinding.bind(view)
         referenceViewModel.openFor(arguments?.getBoolean(ARG_FROM_SUBJECT) == true)
-        binding.generateButton.isVisible = !referenceViewModel.forSubject
+        val poses = !referenceViewModel.forSubject
+        binding.newPosesSection.isVisible = poses
+        binding.generateButton.isVisible = poses
+        if (poses && savedInstanceState == null) generationViewModel.followCamera()
+        val situations = SituationTiles(binding.situationRowTop, binding.situationRowBottom) {
+            generationViewModel.chooseSituation(it)
+        }
         // The Guide button opens this sheet in both cases; with a guide on the camera it is the way to replace it.
-        if (referenceViewModel.replacing) {
-            binding.titleText.setText(R.string.replace_guide_title)
-            binding.cancelButton.setText(R.string.keep_current_guide)
+        when {
+            referenceViewModel.replacing -> {
+                binding.titleText.setText(R.string.replace_guide_title)
+                binding.cancelButton.setText(R.string.keep_current_guide)
+                binding.cancelButton.isVisible = true
+            }
+
+            !poses -> binding.titleText.setText(R.string.add_guide_title)
         }
 
-        binding.addPhotoTile.setOnClickListener { pickPhoto() }
-        binding.libraryAllButton.setOnClickListener { findNavController().navigate(R.id.action_addGuide_to_library) }
+        binding.galleryRow.setOnClickListener { pickPhoto() }
+        binding.libraryRow.setOnClickListener { findNavController().navigate(R.id.action_addGuide_to_library) }
         binding.generateButton.setOnClickListener {
             if (generationViewModel.needsConsent) showConsentNotice() else takeScenePhoto()
         }
         binding.cancelButton.setOnClickListener { dismiss() }
 
-        val savedGuides = SavedGuideList(
-            binding,
-            showThumbnail = { image, guide ->
-                image.showThumbnail(guide, referenceViewModel, viewLifecycleOwner.lifecycleScope)
-            },
-            onUse = { referenceViewModel.onUseSaved(it.id) },
-        )
+        val savedGuides = SavedGuideList(binding)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 // Its tutorial tips the first time it opens (FR-10.4); from Subject view it lacks the poses they point at.
@@ -84,20 +94,19 @@ class AddGuideSheet : BottomSheetDialogFragment() {
                 }
                 launch { referenceViewModel.savedGuides.collect(savedGuides::render) }
                 launch {
-                    referenceViewModel.savedGuideResults.collect { result ->
-                        when (result) {
-                            SavedGuideResult.USED -> dismiss()
-
-                            SavedGuideResult.FAILED ->
-                                Toast.makeText(
-                                    requireContext(),
-                                    R.string.saved_guide_open_failed,
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                        }
-                    }
+                    combine(generationViewModel.situationChoice, generationViewModel.selfieAvailable, ::Pair)
+                        .collect { (chosen, selfie) -> situations.render(chosen, selfie) }
                 }
             }
+        }
+    }
+
+    /** Opens whole, so the situations and the button show without a drag; Back or a drag down closes it. */
+    override fun onStart() {
+        super.onStart()
+        (dialog as? BottomSheetDialog)?.behavior?.apply {
+            skipCollapsed = true
+            state = BottomSheetBehavior.STATE_EXPANDED
         }
     }
 

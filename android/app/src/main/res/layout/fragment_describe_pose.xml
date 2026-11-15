@@ -49,6 +49,16 @@
                 android:text="@string/suggest_poses" />
         </LinearLayout>
 
+        <!-- Where this screen is in the pose flow (R&S 6.3, #210): Generate poses, 3 of 5. Across the screen, past this
+             layout's padding. -->
+        <com.lastpenguin.pix.ui.FlowProgressView
+            android:id="@+id/flowProgress"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/flow_progress_height"
+            android:layout_marginStart="-20dp"
+            android:layout_marginEnd="-20dp"
+            app:flowStep="3" />
+
         <!-- The scene photo the poses are made from. -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -87,6 +97,22 @@
                     android:layout_marginTop="3dp"
                     android:text="@string/generating_scene_caption"
                     android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+
+                <!-- The situation the photo was taken for (FR-4.8), which a new photo changes; gone on the subject's phone. -->
+                <TextView
+                    android:id="@+id/situationTag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_situation_tag"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textColor="@color/pix_accent"
+                    android:textSize="12sp"
+                    android:visibility="gone"
+                    tools:text="Landmark"
+                    tools:visibility="visible" />
             </LinearLayout>
         </LinearLayout>
 

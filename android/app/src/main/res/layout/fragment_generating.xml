@@ -57,6 +57,16 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Where this screen is in the pose flow (R&S 6.3, #210): the set being generated, 4 of 5. Across the screen, past this
+         layout's padding. -->
+    <com.lastpenguin.pix.ui.FlowProgressView
+        android:id="@+id/flowProgress"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/flow_progress_height"
+        android:layout_marginStart="-20dp"
+        android:layout_marginEnd="-20dp"
+        app:flowStep="4" />
+
     <!-- The scene photo the poses are made from; a waiting state says how long it may take (R&S 6.9). -->
     <LinearLayout
         android:layout_width="match_parent"

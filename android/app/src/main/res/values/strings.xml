@@ -163,6 +163,7 @@
     <string name="scene_framing_hint_landmark">Frame the whole landmark with the person in it</string>
     <string name="scene_framing_hint_selfie">Frame your face with the place behind you</string>
     <string name="scene_review_title">Use this photo?</string>
+    <string name="scene_guide_next">Pix makes four poses from this photo</string>
     <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="shoot_again">Shoot again</string>
     <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>

@@ -155,6 +155,7 @@
     <string name="scene_framing_hint_full_body">머리부터 발끝까지 나오게 찍어 주세요</string>
     <string name="scene_framing_hint_landmark">랜드마크 전체와 인물이 함께 나오게 찍어 주세요</string>
     <string name="scene_framing_hint_selfie">얼굴과 뒤 배경이 함께 나오게 찍어 주세요</string>
+    <string name="scene_guide_next">이 사진으로 AI가 포즈 4개를 만들어요</string>
     <string name="scene_review_title">이 사진을 사용할까요?</string>
     <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
     <string name="shoot_again">다시 촬영</string>

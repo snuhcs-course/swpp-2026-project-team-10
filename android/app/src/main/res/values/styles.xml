@@ -71,6 +71,14 @@
         <item name="android:textColor">@color/pix_text_muted</item>
     </style>
 
+    <!-- What the scene photo for poses should hold, on its panel above the shutter (R&S 6.3, #210). -->
+    <style name="TextAppearance.Pix.Instruction" parent="TextAppearance.Pix.Body">
+        <item name="android:fontFamily">@font/pix_semibold</item>
+        <item name="fontFamily">@font/pix_semibold</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
     <style name="TextAppearance.Pix.Body.Small">
         <item name="android:textSize">13sp</item>
     </style>

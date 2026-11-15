@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -76,7 +76,8 @@ import org.robolectric.annotation.GraphicsMode
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
  * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
  * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
- * step's title, while framing and while reviewing, centered on the 48 dp the bar draws, like Back and Use (#204).
+ * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
+ * screens' headers, 8 dp above a 56 dp row (#204, #210).
  * A photo without a person: its alert at the start of the message's first line, not at the box's edge (#204).
  */
 @RunWith(AndroidJUnit4::class)
@@ -189,13 +190,18 @@ class CameraLayoutTest {
         val photo = screen.controls.sceneStill.pictureBox()
         assertEquals(360, photo.width())
         assertEquals(480, photo.height())
-        // As much room above, under the 48 dp bar, as below, to the screen's bottom at 705 dp.
-        assertTrue("$photo", abs((photo.top - 48) - (705 - photo.bottom)) <= 1)
+        // As much room above, under the bar as tall as the other screens' headers (64 dp, #210), as below, to the
+        // screen's bottom at 705 dp.
+        assertTrue("$photo", abs((photo.top - 64) - (705 - photo.bottom)) <= 1)
         val message = screen.controls.sceneMessage
         assertTrue("${message.box()} under $photo", abs(message.box().top - (photo.bottom + 12)) <= 1)
         assertNull(message.background)
+        // The flow's bar shows over the review, at the bar's bottom edge (#210).
+        assertTrue(screen.controls.sceneProgress.isShown)
+        assertTrue(screen.controls.sceneProgress.z > screen.controls.sceneReview.z)
 
-        // Use draws 40 dp in the middle of the 48 dp bar, its right edge 20 dp from the screen's.
+        // Use draws 40 dp on the header's line, 8 dp under its top and in the middle of its 56 dp row, its right edge
+        // 20 dp from the screen's (#210).
         val use = screen.controls.usePhotoButton as MaterialButton
         val box = use.box()
         val density = use.resources.displayMetrics.density
@@ -203,7 +209,7 @@ class CameraLayoutTest {
         val drawnBottom = box.bottom - (use.insetBottom / density).roundToInt()
         assertEquals(340, box.right)
         assertEquals(40, drawnBottom - drawnTop)
-        assertEquals(24, (drawnTop + drawnBottom) / 2)
+        assertEquals(36, (drawnTop + drawnBottom) / 2)
     }
 
     /** The middle of [this] on the screen, in dp. */
@@ -220,9 +226,10 @@ class CameraLayoutTest {
         idle()
         val back = screen.controls.sceneBackButton as MaterialButton
         val density = back.resources.displayMetrics.density
-        // Back draws in the bar above its inset bottom: the 48 dp above the image, whose middle is at 24 dp.
+        // Back draws in the bar above its inset bottom, which during the scene photo is as tall as the other screens'
+        // headers (#210): 8 dp above a 56 dp row, whose middle is at 36 dp, as theirs.
         val backMiddle = (back.box().top + back.box().bottom - back.insetBottom / density) / 2f
-        assertEquals(24f, backMiddle, 1f)
+        assertEquals(36f, backMiddle, 1f)
         assertEquals("framing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
 
         (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)

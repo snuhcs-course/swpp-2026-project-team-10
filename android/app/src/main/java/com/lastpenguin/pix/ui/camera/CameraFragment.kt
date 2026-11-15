@@ -45,6 +45,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import androidx.core.view.children
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -1103,6 +1104,20 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.captureControls.isInvisible = reviewing
         // Not before the phone has found a person in the photo (FR-4.13).
         controls.usePhotoButton.isEnabled = reviewing && !scene.checkingPerson && !scene.noPerson
+        // Where the step is in the pose flow, under a bar as tall as the other screens' headers, so their titles and
+        // bars line up (#210). While framing, what to frame and what for, on the panel above the shutter, and the
+        // shutter in the accent.
+        controls.sceneProgress.isVisible = active
+        controls.sceneProgress.step = if (reviewing) SCENE_REVIEW_STEP else SCENE_FRAMING_STEP
+        sizeTopBar(controls, active)
+        val framing = active && !reviewing
+        controls.sceneGuide.isVisible = framing
+        if (framing) controls.sceneGuideText.setText(scene.situation.framingHint)
+        val shutter = if (framing) R.drawable.bg_shutter_scene else R.drawable.bg_shutter
+        if (controls.shutterButton.tag != shutter) {
+            controls.shutterButton.setBackgroundResource(shutter)
+            controls.shutterButton.tag = shutter
+        }
         if (!active) return
 
         val noPerson = reviewing && scene.noPerson
@@ -1113,17 +1128,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 else -> R.string.scene_title
             },
         )
-        // While framing, what to frame (user test P6, #204): the place with the person in it, as the poses need one
-        // (FR-4.13). Under the photo while it is reviewed: what it is for, or that it has no one in it.
-        if (reviewing) {
-            showHint(
-                controls.hintText,
-                null,
-            )
-        } else {
-            // What the situation needs in the photo (FR-4.8): the landmark, or the whole person for full body.
-            showHint(controls.hintText, scene.situation.framingHint, R.drawable.ic_pose)
-        }
+        // What to frame is on the panel above the shutter while framing (#210), and under the photo while it is
+        // reviewed is what it is for, or that it has no one in it; the hint chip over the image stays empty.
+        showHint(controls.hintText, null)
         if (reviewing) showSceneMessage(controls.sceneMessage, noPerson)
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
@@ -1133,6 +1140,22 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             showStatus(controls.captureStatus, R.string.scene_shot_failed, StatusLook.ERROR)
         } else {
             controls.captureStatus.isVisible = false
+        }
+    }
+
+    /**
+     * The top bar: the camera's own, or during the scene photo for poses as tall as the other screens' headers, 8 dp
+     * above a 56 dp row, with its overhang over the image (#210). The preview moves with it (placePreview).
+     */
+    private fun sizeTopBar(controls: FragmentCameraBinding, scenePhoto: Boolean) {
+        val density = resources.displayMetrics.density
+        val top = if (scenePhoto) (SCENE_BAR_TOP_DP * density).roundToInt() else 0
+        val min = ((if (scenePhoto) SCENE_BAR_MIN_DP else CAMERA_BAR_MIN_DP) * density).roundToInt()
+        val bar = controls.topBar
+        if (bar.paddingTop != top) bar.updatePadding(top = top)
+        if (bar.minHeight != min) {
+            bar.minHeight = min
+            bar.minimumHeight = min
         }
     }
 
@@ -1750,6 +1773,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         /** The scene photo's review: its message this far under the photo, and above the screen's bottom (#199). */
         private const val SCENE_MESSAGE_GAP_DP = 12f
         private const val SCENE_MESSAGE_MARGIN_DP = 20f
+
+        /** The pose flow's step while the scene photo is framed, and while it is reviewed (FlowProgressView, #210). */
+        private const val SCENE_FRAMING_STEP = 1
+        private const val SCENE_REVIEW_STEP = 2
+
+        /**
+         * The top bar's least height, the camera's (fragment_camera.xml), and during the scene photo the other screens'
+         * header: 8 dp above a 56 dp row, and the 4 dp overhang (#210).
+         */
+        private const val CAMERA_BAR_MIN_DP = 52f
+        private const val SCENE_BAR_TOP_DP = 8f
+        private const val SCENE_BAR_MIN_DP = 68f
 
         /** The no-person alert before the message's first word (#204). */
         private const val SCENE_MESSAGE_ICON_GAP_DP = 6f

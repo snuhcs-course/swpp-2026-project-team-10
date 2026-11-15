@@ -72,8 +72,9 @@
 
         </LinearLayout>
 
-        <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3). Like the bar's other
-             controls, it centers on the bar above its last 4 dp, which lie over the image (#204). -->
+        <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3), in the size of the
+             other screens' titles (#210). Like the bar's other controls, it centers on the bar above its last 4 dp,
+             which lie over the image (#204). -->
         <TextView
             android:id="@+id/sceneTitle"
             android:layout_width="0dp"
@@ -85,7 +86,6 @@
             android:accessibilityLiveRegion="polite"
             android:text="@string/scene_title"
             android:textAppearance="@style/TextAppearance.Pix.Header"
-            android:textSize="14sp"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/topBarActions"
@@ -160,6 +160,20 @@
                 tools:visibility="visible" />
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Where the scene photo is in the pose flow (R&S 6.3, #210): 1 of 5 while it is framed, 2 while it is reviewed.
+         Along the top bar's bottom edge, over the image's top and over the review, as under the other screens'
+         titles. -->
+    <com.lastpenguin.pix.ui.FlowProgressView
+        android:id="@+id/sceneProgress"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/flow_progress_height"
+        android:translationZ="3dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/topBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:visibility="visible" />
 
     <!-- The ratios, opened from the ratio in the top bar (FR-1.13): each drawn in its own shape, the chosen one bright.
          A choice, a touch anywhere else, or Back closes them. -->
@@ -566,6 +580,58 @@
                 android:contentDescription="@string/remove_guide"
                 app:icon="@drawable/ic_close"
                 app:iconTint="@color/button_danger_text" />
+        </LinearLayout>
+
+        <!-- While the scene photo for poses is framed (R&S 6.3, FR-4.8, #210): what to frame for the situation, and what
+             the photo is for. In the space below the image, or over it when it reaches the controls. -->
+        <LinearLayout
+            android:id="@+id/sceneGuide"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginTop="8dp"
+            android:accessibilityLiveRegion="polite"
+            android:background="@drawable/bg_scene_guide"
+            android:gravity="center_vertical"
+            android:padding="16dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <FrameLayout
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_scene_guide_icon">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_lightbulb"
+                    app:tint="@color/pix_text" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/sceneGuideText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Pix.Instruction"
+                    tools:text="@string/scene_framing_hint_landmark" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/scene_guide_next"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

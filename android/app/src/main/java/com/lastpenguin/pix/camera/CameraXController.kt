@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -287,13 +287,14 @@ class CameraXController(
             .build()
         val capture = ImageCapture.Builder()
             .setTargetRotation(rotation)
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setCaptureMode(CaptureTuning.CAPTURE_MODE)
+            .setJpegQuality(CaptureTuning.JPEG_QUALITY)
             .setFlashMode(flash.captureMode)
             .setResolutionSelector(
                 ResolutionSelector.Builder()
                     .setAspectRatioStrategy(aspect)
                     .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
-                    .setAllowedResolutionMode(ResolutionSelector.PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE)
+                    .setAllowedResolutionMode(CaptureTuning.RESOLUTION_MODE)
                     .build(),
             )
             .build()
@@ -493,7 +494,7 @@ class CameraXController(
         }, mainExecutor)
     }
 
-    override suspend fun takePhoto(): Result<Uri> = withContext(Dispatchers.Main.immediate) {
+    override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> = withContext(Dispatchers.Main.immediate) {
         val current = binding
         val capture = current?.capture
         if (_status.value != CameraStatus.READY || capture == null) {
@@ -517,6 +518,12 @@ class CameraXController(
                     photoSaver.outputOptions(mirrored = current.facing == CameraFacing.FRONT),
                     mainExecutor,
                     object : ImageCapture.OnImageSavedCallback {
+                        override fun onCaptureStarted() {
+                            // The camera is taking the picture: the next photo can be asked for (NFR-19).
+                            Timings.mark("camera.capture.started")
+                            if (continuation.isActive) onCaptured()
+                        }
+
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                             val result = output.savedUri?.let { Result.success(it) }
                                 ?: Result.failure(IOException("The saved photo has no gallery URI"))

@@ -360,7 +360,7 @@ class CameraControlsViewModelTest {
         }
 
         // Never completes, so a shutter press keeps the screen saving.
-        override suspend fun takePhoto(): Result<Uri> = awaitCancellation()
+        override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> = awaitCancellation()
         override suspend fun grabFrame(): Result<Bitmap> = Result.failure(UnsupportedOperationException())
         override fun setFrameSink(sink: FrameSink?) = Unit
         override val facing: StateFlow<CameraFacing> = MutableStateFlow(CameraFacing.BACK)

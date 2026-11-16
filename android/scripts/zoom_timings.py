@@ -1,5 +1,5 @@
-# AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
-"""Turns a `PixTimings` logcat dump into the zoom numbers of NFR-19 (Testing Documentation IT-10).
+# AI-generated with Claude Code, 2026-11-16, reviewed by Sungmin Jo and Dongje Park
+"""Turns a `PixTimings` logcat dump into the zoom and shutter numbers of NFR-19 (Testing Documentation IT-10).
 
 Record on the photographer's phone, from `android/`:
 
@@ -7,6 +7,9 @@ Record on the photographer's phone, from `android/`:
     # pinch for about ten seconds, cross 1x a few times, then press the shutter
     adb logcat -d -s PixTimings > zoom.log
     python3 scripts/zoom_timings.py zoom.log
+
+A log of shutter presses alone gives the *Shutter* table: from each press until the camera took the photo, until the
+photo was saved, and the longest time the preview showed no new frame around it.
 
 A frozen frame repeats the zoom of the frame before although the fingers moved (allowing for the camera's lag from
 request to picture): what a stutter looks like.
@@ -281,27 +284,43 @@ def switch_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
 
 
 def capture_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
-    rows = []
-    for start in (m for m in marks if m.name == "camera.capture.start"):
-        end = next(
-            (
-                m
-                for m in marks
-                if start.ms <= m.ms <= start.ms + SWITCH_WINDOW_MS
-                and m.name.startswith("camera.capture.")
-                and m is not start
-            ),
-            None,
-        )
-        window = [f for f in frames if start.ms - 200 <= f.ms <= (end.ms if end else start.ms) + 300]
+    """One row per shutter press, and their medians last. The shutter is free again once the camera has taken the photo
+    (`camera.capture.started`), so photos overlap: each `started` and each result belongs to the oldest press still
+    waiting for one, since the camera takes and saves them in order."""
+    presses: list[dict] = []
+    for mark in marks:
+        if mark.name == "camera.capture.start":
+            presses.append({"start": mark.ms, "taken": None, "end": None, "result": "?"})
+        elif mark.name == "camera.capture.started":
+            waiting = next((p for p in presses if p["taken"] is None and p["end"] is None), None)
+            if waiting:
+                waiting["taken"] = mark.ms
+        elif mark.name in ("camera.capture.saved", "camera.capture.failed"):
+            waiting = next((p for p in presses if p["end"] is None), None)
+            if waiting:
+                waiting["end"] = mark.ms
+                waiting["result"] = mark.name.removeprefix("camera.capture.")
+    values = []
+    for press in presses:
+        start, end = press["start"], press["end"]
+        window = [f for f in frames if start - 200 <= f.ms <= (end if end else start) + 300]
         gaps = intervals(window)
-        rows.append(
-            [
-                fmt(end.ms - start.ms if end else None),
-                end.name.removeprefix("camera.capture.") if end else "?",
-                fmt(max(gaps) if gaps else None),
-            ]
+        values.append(
+            (
+                press["taken"] - start if press["taken"] else None,
+                end - start if end else None,
+                press["result"],
+                max(gaps) if gaps else None,
+            )
         )
+    rows: list[list[object]] = [[fmt(taken), fmt(total), result, fmt(gap)] for taken, total, result, gap in values]
+    if len(values) > 1:
+
+        def median(column: int) -> float | None:
+            found = [value[column] for value in values if value[column] is not None]
+            return statistics.median(found) if found else None
+
+        rows.append([fmt(median(0)), fmt(median(1)), "median", fmt(median(3))])
     return rows
 
 
@@ -336,34 +355,39 @@ def report(marks: list[Mark]) -> str:
                 ],
             )
         )
+    if any(m.name == "zoom.request" for m in marks):
+        out.append(
+            table(
+                "Pinches",
+                [
+                    "#",
+                    "s",
+                    "requests",
+                    "applied",
+                    "lens switches",
+                    "frames",
+                    "interval p50",
+                    "p95",
+                    "max",
+                    "drops",
+                    "frozen while zooming",
+                ],
+                rows,
+            )
+        )
+        out.append(
+            table(
+                "Lens switches",
+                ["switch", "no new frame (ms)", "until READY (ms)", "preview idle (ms)", "last frame held"],
+                switch_rows(marks, frames),
+            )
+        )
     out.append(
         table(
-            "Pinches",
-            [
-                "#",
-                "s",
-                "requests",
-                "applied",
-                "lens switches",
-                "frames",
-                "interval p50",
-                "p95",
-                "max",
-                "drops",
-                "frozen while zooming",
-            ],
-            rows,
+            "Shutter",
+            ["press → taken (ms)", "press → result (ms)", "result", "longest frame gap (ms)"],
+            capture_rows(marks, frames),
         )
-    )
-    out.append(
-        table(
-            "Lens switches",
-            ["switch", "no new frame (ms)", "until READY (ms)", "preview idle (ms)", "last frame held"],
-            switch_rows(marks, frames),
-        )
-    )
-    out.append(
-        table("Shutter", ["press → result (ms)", "result", "longest frame gap (ms)"], capture_rows(marks, frames))
     )
     return "\n".join(out)
 
@@ -378,8 +402,11 @@ def main() -> None:
     else:
         lines = sys.stdin.readlines()
     marks = parse(lines)
-    if not any(m.name == "zoom.request" for m in marks):
-        sys.exit("No zoom.request marks: pinch on the Camera screen of a debug build while logcat records.")
+    if not any(m.name in ("zoom.request", "camera.capture.start") for m in marks):
+        sys.exit(
+            "No zoom.request or camera.capture.start marks: pinch or press the shutter on the Camera screen of a debug"
+            " build while logcat records."
+        )
     print(report(marks))
 
 

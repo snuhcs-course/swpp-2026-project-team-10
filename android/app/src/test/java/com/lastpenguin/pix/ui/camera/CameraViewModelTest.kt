@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-13, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -103,12 +103,101 @@ class CameraViewModelTest {
         runCurrent()
         model.onShutter()
         runCurrent()
+        // The shutter is free again, and the photo is still being saved.
+        camera.captured.single()()
         assertTrue(model.uiState.value.isSaving)
 
         model.onSwitchCamera()
         runCurrent()
 
         assertTrue(camera.facingRequests.isEmpty())
+    }
+
+    // The shutter and the photos in flight (NFR-19, #208). The shutter: busy from the press until the camera took the
+    // photo, then free while the photo is saved. Photos in flight: none, one, or two, each saved or failed; the camera
+    // switch and the ratio wait for all of them. A late "taken" of an earlier photo frees nothing.
+    @Test
+    fun shutter_onceTheCameraTookThePhoto_isFreeWhileThePhotoIsSaved() = runTest {
+        runCurrent()
+        model.onShutter()
+        runCurrent()
+        assertTrue(model.uiState.value.shutterBusy)
+
+        camera.captured.single()()
+
+        assertFalse(model.uiState.value.shutterBusy)
+        assertTrue(model.uiState.value.isSaving)
+    }
+
+    @Test
+    fun shutter_pressedWhileAPhotoIsSaved_takesAnother_andEachPhotoKeepsItsSession() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share, clock = { 1_000 })
+        val first = camera.capture
+        val second = CompletableDeferred<Result<Uri>>()
+        val photo = Uri.parse("content://media/external/images/media/2")
+        sharing.onShutter()
+        runCurrent()
+        camera.captured[0]()
+        share.session = "s2"
+        camera.capture = second
+
+        val taken = sharing.onShutter()
+        runCurrent()
+        first.complete(Result.failure(IOException("Storage full")))
+        second.complete(Result.success(photo))
+        runCurrent()
+
+        assertTrue(taken)
+        assertEquals(2, camera.captureCount)
+        assertEquals(listOf("s1"), share.failed)
+        assertEquals(listOf(Triple("s2", photo, 1_000L)), share.shared)
+        assertEquals(photo, sharing.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun saving_withTwoPhotosInFlight_endsWithTheLastOne() = runTest {
+        val first = camera.capture
+        val second = CompletableDeferred<Result<Uri>>()
+        runCurrent()
+        model.onShutter()
+        runCurrent()
+        camera.captured[0]()
+        camera.capture = second
+        model.onShutter()
+        runCurrent()
+        camera.captured[1]()
+
+        first.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+        assertTrue(model.uiState.value.isSaving)
+        model.onSwitchCamera()
+        model.onAspectChosen(AspectRatio.R16_9)
+        runCurrent()
+        assertTrue(camera.facingRequests.isEmpty())
+        assertTrue(camera.aspectRequests.isEmpty())
+
+        second.complete(Result.success(Uri.parse("content://media/external/images/media/2")))
+        runCurrent()
+        assertFalse(model.uiState.value.isSaving)
+    }
+
+    @Test
+    fun shutter_aLateTakenOfAnEarlierPhoto_doesNotFreeTheNextPress() = runTest {
+        runCurrent()
+        // A camera that never says "taken": the shutter is free once the photo is saved.
+        model.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+        assertFalse(model.uiState.value.shutterBusy)
+        camera.capture = CompletableDeferred()
+        model.onShutter()
+        runCurrent()
+
+        camera.captured[0]()
+
+        assertTrue(model.uiState.value.shutterBusy)
     }
 
     @Test
@@ -235,6 +324,7 @@ class CameraViewModelTest {
         camera.throwOnCapture = true
         model.onShutter()
         runCurrent()
+        assertFalse(model.uiState.value.shutterBusy)
         assertFalse(model.uiState.value.isSaving)
         assertEquals(CaptureNotice.SAVE_FAILED, model.uiState.value.captureNotice)
     }
@@ -373,10 +463,18 @@ class CameraViewModelTest {
         override fun setExposure(index: Int) = Unit
         override fun setFlash(mode: FlashMode) = Unit
         override fun setTorch(on: Boolean) = Unit
-        override fun setAspectRatio(ratio: AspectRatio) = Unit
-        override suspend fun takePhoto(): Result<Uri> {
+        val aspectRequests = mutableListOf<AspectRatio>()
+        override fun setAspectRatio(ratio: AspectRatio) {
+            aspectRequests += ratio
+        }
+
+        /** Each photo's "the camera took it" callback, in shutter order; a test calls one to say so. */
+        val captured = mutableListOf<() -> Unit>()
+
+        override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> {
             captureCount++
             if (throwOnCapture) throw IllegalStateException("Camera closed")
+            captured += onCaptured
             return capture.await()
         }
         override suspend fun grabFrame(): Result<Bitmap> = Result.failure(IllegalStateException("No frame"))

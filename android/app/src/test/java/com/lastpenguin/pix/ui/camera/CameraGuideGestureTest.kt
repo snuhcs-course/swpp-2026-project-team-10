@@ -257,7 +257,9 @@ class CameraGuideGestureTest {
         override fun setTorch(on: Boolean) = Unit
 
         override fun setAspectRatio(ratio: AspectRatio) = Unit
-        override suspend fun takePhoto(): Result<Uri> = error("Guide gestures must not capture photos")
+        override suspend fun takePhoto(
+            onCaptured: () -> Unit,
+        ): Result<Uri> = error("Guide gestures must not capture photos")
         override suspend fun grabFrame(): Result<Bitmap> = error("Guide gestures must not capture frames")
         override fun setFrameSink(sink: FrameSink?) = Unit
         override val facing: StateFlow<CameraFacing> = MutableStateFlow(CameraFacing.BACK)

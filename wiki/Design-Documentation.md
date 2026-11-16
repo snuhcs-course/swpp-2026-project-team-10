@@ -89,6 +89,7 @@
 | 3.9 | 2026-11-13 | The no-person alert at the start of its message's first line (2.6.3; [#204]). |
 | 3.10 | 2026-11-14 | Situation prompts (Iter4-P12, [#209]): `situation` on `POST /pose-suggestions` and `POST /poses`, a `[situations.<name>]` table each, background and full body framing wider, landmark cropping freely, and the comparison with the default prompt; the four prompt templates dropped (Iter4-P14, [#211]), so a description keeps its three variations (2.5.3, 2.6.3, 2.9, *Still open*). |
 | 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): tiles on *Add a pose guide* before the scene photo, the situation's camera and hint, *Selfie* off without a front camera, its name on *Generate poses* on both phones (`pose.description`'s `situation`), the pose flow's bar and the scene photo's panel, the step's start and end animated, *My library* as a row, and the tutorial's rings around the whole rows, cut to what a scrolling view shows (2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5, 2.6.8, 2.9). |
+| 3.12 | 2026-11-16 | Photo capture (Iter4-P11, [#208]): `takePhoto`'s `onCaptured` frees the shutter while the photo is saved, no saving label, and the capture settings in `CaptureTuning` with what the S22 measured (2.1, 2.6.2, 2.8). |
 
 </details>
 
@@ -435,7 +436,9 @@ interface CameraController {
     fun setTorch(on: Boolean)                         // the scene photo's light (FR-4.1); kept across rebinds; none on a
                                                       // lens without a flash; state.torch says when it is on
     fun setAspectRatio(ratio: AspectRatio)            // rebinds with a ViewPort of that ratio (FR-1.13, AD-10)
-    suspend fun takePhoto(): Result<Uri>              // full resolution, chosen ratio, Pictures/Pix, no overlay
+    suspend fun takePhoto(onCaptured: () -> Unit = {}): Result<Uri>
+                                                      // full resolution, chosen ratio, Pictures/Pix, no overlay; returns
+                                                      // once saved; onCaptured when the camera took the picture (2.8)
     suspend fun grabFrame(): Result<Bitmap>           // latest frame, upright: the scene photo (FR-4.1)
     fun setFrameSink(sink: FrameSink?)                // null stops streaming
 }
@@ -649,7 +652,7 @@ classDiagram
     +setFlash(mode)
     +setTorch(on)
     +setAspectRatio(ratio)
-    +takePhoto() Result~Uri~
+    +takePhoto(onCaptured) Result~Uri~
     +grabFrame() Result~Bitmap~
     +setFrameSink(sink)
   }
@@ -2517,7 +2520,7 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 - *New ratio.* The held frame dims to half (`previewScrim`) and blurs 16 dp in 150 ms (`RenderEffect`, Android 12 and later). In 250 ms the image's place, the zoom row, the live dot, and the held frame move to the new ratio's (`FramePlace`, `sceneMove`). The frame scales with the camera image's width around it, `max(width, height × 3/4)`, so the scene lands where the new preview shows it: 4:3 to 16:9 is a third larger, and 16:9 to 1:1 three quarters as large. On the Galaxy S22 the first also moves it 80 dp lower. The grid and guide stay hidden until the new binding streams; then the frame fades out in 200 ms and they fade in (FR-3.7).
 - *Other camera (FR-1.14).* The same hold, with the grid and guide kept. The frame turns over top over bottom in 300 ms (`rotationX`), then fades into the new preview.
 - *Lens change of the zoom.* The held frame goes at once (2.6.5).
-- *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms.
+- *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms. The shutter is disabled only until the camera has taken the picture (`CameraUiState.shutterBusy`), so the next photo can follow while this one is saved. Nothing says that a photo is being saved. *Guide*, *Shoot together*, the camera switch, and the ratio wait until every photo is saved (`isSaving`), because leaving Camera or rebinding would lose a photo ([#208]).
 - *Subject view.* The video area moves the same way when `camera.state.aspect` changes. The grid and guide wait for a frame of the new shape (`FrameWatchdog.shape`, within 2 %) or 2 s (2.6.4).
 
 **The guide's own changes (It 3, Iter3-A13, [#180]).** `GuideOverlayView` animates the guide through its paint's alpha and a scale about its middle. A guide with a new id fades in while growing from 95 % in 250 ms (`Motion.GUIDE_MS`), as the old one fades out. *Hide*, *Remove*, and the return after *Show* fade in 150 ms (`Motion.HIDE_MS`). Moves, resizes, and opacity apply at once, and a drag during an animation moves the guide. The guide already there when a view opens shows without animation. Subject view uses the same view.
@@ -2692,10 +2695,17 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - A pinch holds the bound lens until the ratio is 5 % past the primary's minimum, 0.95× to 1.05× (`CameraZoomPlan.lensFor`, `HOLD_BAND`). The final value picks the lens. `RemoteControlHandler.stop` ends a pinch whose final value never came.
   - A new binding publishes its zoom only after restoring the kept one, so no phone shows the new lens's own 1×.
   - `PreviewHold` keeps the last frame, without a spinner, from `READY` → `STARTING` until `READY` with the preview streaming, at most 2 s. The grid and the guide stay over it (2.6.2, *Changes on screen*).
-  - `Timings` marks `camera.status`, `preview.stream`, and `preview.still`. Debug builds add `zoom.request`, `zoom.apply`, `zoom.lens`, and `zoom.frame` for 1.5 s after each zoom, switch, or shutter. `android/scripts/zoom_timings.py` reports intervals, dropped and frozen frames, latency, and switches (IT-10).
+  - `Timings` marks `camera.status`, `preview.stream`, and `preview.still`. Each photo marks `camera.capture.start`, `.started` (the camera took the picture), and `.saved` or `.failed`. Debug builds add `zoom.request`, `zoom.apply`, `zoom.lens`, and `zoom.frame` for 1.5 s after each zoom, switch, or shutter. `android/scripts/zoom_timings.py` reports intervals, dropped and frozen frames, latency, switches, and each shutter press (IT-10).
   - S23 Ultra, 2026-10-22: no stutter, 30 fps, and no lens switch, since it reaches 0.6× natively ([#93]). S21 and S22, Iteration 3: no stutter by eye, and the last frame at a switch (IT-10).
   - The S21's frame intervals are not measured. `PreviewView`'s `PERFORMANCE` mode is tried with [#208] in Iteration 4 (Iter4-P11, low priority).
-  - The shutter freeze fix (Could) is planned for Iteration 4, with [#208].
+  - The preview still stops at each photo, for 0.13 s (front) to 0.19 s (rear) by the sensor's timestamps on the S22: the camera drops preview frames while it takes a still. The shutter's blink covers part of it (2.6.2). Only zero-shutter-lag shortened it, which Pix does not use (*Photo capture*).
+- **Photo capture (It 4, Iter4-P11, [#208]).** `CaptureTuning` holds every setting of the still capture. Measured on the Galaxy S22 (SM-S901N, Android 15), 8 photos per setting, at 3:4:
+  - *Capture mode: `MINIMIZE_LATENCY`.* `MAXIMIZE_QUALITY`, used until Iteration 4, locks the focus again before every photo. From the press until the camera took the picture: 0.70 s before and 0.26 s now on the front camera, 0.67 s and 0.39 s on the rear one in the dark. The photos are the same: equal mean color, sharpness, and noise.
+  - *JPEG quality: 100,* as `MAXIMIZE_QUALITY` set it. At 95 the front camera's photo is 2.3 MB instead of 4.7 MB and is saved 0.14 s sooner.
+  - *Size: the largest,* also one the camera gives more slowly (`PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE`). On the S22 it changes neither the size, 4080 × 3060 (rear) and 3648 × 2736 (front), nor the timings.
+  - *Zero-shutter-lag is not used.* It took the picture in 0.18 s and stopped the preview for 0.1 s instead of 0.35 s. Its photos carry twice the noise, and CameraX turns it off on the S22's US models for its colors (`ZslDisablerQuirk`), a list the Korean model is not on. It also does not work with the flash on or on auto.
+  - *The shutter is free while a photo is saved.* `takePhoto` calls `onCaptured` when the camera has taken the picture (CameraX's `onCaptureStarted`), and `CameraViewModel` frees the shutter then. CameraX takes the photos asked for meanwhile in order. Saving takes 0.2 s to 0.5 s more at 3:4. At 9:16 and 1:1 CameraX decodes, crops, and encodes the photo again, 0.2 s more on a plain scene; asking the camera for a 16:9 size does not avoid it, since that size is not exactly 16:9.
+  - Not done yet: the photos against the phone's own camera on the same scenes, CameraX Extensions (`HDR`, `NIGHT`), and the S21.
 - **Photos.** Only the photographer takes photos.
 - **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
 

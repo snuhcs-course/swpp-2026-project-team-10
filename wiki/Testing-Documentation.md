@@ -93,6 +93,7 @@
 | 3.10 | 2026-11-14 | Situation prompts (Iter4-P12, [#209]): the situation partitions and the comparison on `situation_cases.json`; the prompt templates dropped ([#211]) (1.1, 2.1.6, 3.1, 3.2). |
 | 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): its partitions, the pose flow's bar, the scene photo's panel, and the step's animation included, and a step added to IT-7 (2.1.5, 2.1.6, Appendix A). |
 | 3.12 | 2026-11-15 | A flaky signaling test: wait for a closed socket's release before moving the clock (2.1.8). |
+| 3.13 | 2026-11-16 | Photo capture (Iter4-P11, [#208]): the shutter's timings from `zoom_timings.py`, also from a log of shutter presses alone, and IT-10's shutter steps (2.1.4, Appendix A). |
 
 </details>
 
@@ -307,7 +308,7 @@ adb logcat -c
 adb logcat -d -s PixTimings > zoom.log && python3 scripts/zoom_timings.py zoom.log
 ```
 
-The script prints Markdown tables: frame intervals, dropped and frozen frames per pinch, new-ratio-to-frame latency, each lens switch (no new frame, until `READY`, preview idle, last frame held), and the shutter. A frozen frame repeats its zoom after a new native ratio was asked for; steps a held lens maps to the same ratio do not count.
+The script prints Markdown tables: frame intervals, dropped and frozen frames per pinch, new-ratio-to-frame latency, each lens switch (no new frame, until `READY`, preview idle, last frame held), and the shutter. The *Shutter* table has a row per press and their medians: from the press until the camera took the photo, until the photo was saved, and the longest time without a new preview frame ([#208]). A log of shutter presses alone gives that table only. A frozen frame repeats its zoom after a new native ratio was asked for; steps a held lens maps to the same ratio do not count.
 
 **Session path** (IT-12, NFR-10; Design 2.6.7; Iter3-P13) — either phone, once connected:
 
@@ -1136,6 +1137,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 1. Zoom from 0.6× to 3× and back.
 2. Make 20 zoom changes: pinches that cross 1× and pinches above it, also from the subject's phone.
 3. Press the shutter, and measure with `zoom_timings.py` (2.1.4).
+4. Added 2026-11-16 ([#208]), since the shutter no longer waits for the save: press the shutter eight times, a few seconds apart, on the rear camera and on the front one. Then press it three times as fast as it allows.
 
 **Expected result**
 
@@ -1143,6 +1145,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - During a pinch within one lens, the frame interval's p95 stays within 1.5 times its median.
 - A lens switch shows the last frame, not the spinner.
 - The `Timings` numbers go in the PR.
+- Added 2026-11-16 ([#208]): nothing says that a photo is being saved. The three fast presses give three photos in the gallery. The *Shutter* table's medians go in the PR with those of the build before.
 
 ### IT-11 procedure
 

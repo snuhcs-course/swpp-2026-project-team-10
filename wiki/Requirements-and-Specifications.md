@@ -70,6 +70,7 @@
 | 3.8 | 2026-11-13 | Every chevron's tip 16 dp from its card's edge, and the no-person alert at the start of its message; Figures 1–3, 3b, 6, and 7 redrawn to match (6.3, 6.9; [#204]). |
 | 3.9 | 2026-11-14 | A prompt and four default poses per situation; background and full body may frame wider; landmark asks for a scene photo that holds the landmark (FR-4.4, FR-4.8; Iter4-P12, [#209]). The prompt templates out of Iteration 4 (4.1; [#211]). |
 | 3.10 | 2026-11-15 | The situation chosen first on *Add a pose guide*, its hint on the scene photo, the camera it takes, *Selfie* off without a front camera, and its name on *Generate poses* on both phones; the tutorial's rings around the whole rows; the pose flow's bar, and the scene photo's panel and accent shutter; *My library* as a row; the prompt templates' plan gone (FR-3.11, FR-4.1, FR-4.4, FR-4.8, US-4, 6.2, 6.3, 6.6, 6.10; Iter4-P13, [#210]). |
+| 3.11 | 2026-11-16 | The shutter takes the next photo while one is saved, and nothing says that a photo is being saved (FR-1.6, NFR-19; Iter4-P11, [#208]). |
 
 </details>
 
@@ -200,7 +201,7 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 | FR-1.3 | The camera screen has a shutter and a readout of the applied zoom. A pinch zooms within the phone's range, relative to the primary rear camera; below 1× only where the hardware allows. With the **guide-edit mode** toggle on, drags and pinches move the guide; a new guide turns it on, and a photo or hiding the guide turns it off. A tap on the zoom readout steps through the widest zoom below 1× (0.6× on most phones), 1×, and 2×; TalkBack's zoom actions also work. For 3 s, a label read by TalkBack names each step and, over the toggle, what a pinch moves: *Guide* or *Camera*. A new label replaces the last ([#182]). | Must | It 1 / It 2 / It 3 |
 | FR-1.4 | A tap on the preview sets focus and exposure there and resets the brightness to the base (FR-1.11), also on a camera without focus points ([#182]). | Should | It 2 |
 | FR-1.5 | Photos are saved at full resolution to the gallery's "Pix" album, without the guide or any control. A photo taken with the phone held sideways is saved as a landscape photo, as the phone was held ([#206]). | Must | It 1 / It 4 |
-| FR-1.6 | After saving, the thumbnail updates, with no notice ([#204]; until Iteration 4 a notice said the photo has no guide). A tap on the thumbnail opens the photo in the gallery. | Must | It 1 / It 4 |
+| FR-1.6 | After saving, the thumbnail updates, with no notice ([#204]; until Iteration 4 a notice said the photo has no guide). Nothing says that a photo is being saved, and the shutter takes the next photo meanwhile ([#208]). A tap on the thumbnail opens the photo in the gallery. | Must | It 1 / It 4 |
 | FR-1.7 | If saving fails, for example on full storage, Pix says why and keeps the camera and guide as they were. | Must | It 1 |
 | FR-1.8 | The camera screen has *Guide* and *Shoot together*. | Must | It 1 |
 | FR-1.9 | A 3×3 grid divides the image in the chosen ratio into equal thirds, without letterbox bars (FR-1.13). | Must | It 1 |
@@ -636,7 +637,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 | NFR-16 | Usability | Controls on *Subject view* are at least 48 dp and reachable with one thumb. Every failure screen says what happened and offers a way back, and a retry where another try may pass ([#203]). A first-time user can add a guide and take a photo without help. | Hallway test with 5 people: at least 4 finish "add a guide and shoot" within 1 minute. |
 | NFR-17 | Compatibility | Pix's screens are portrait; photos are taken sideways too, with the controls turned (FR-1.5, FR-1.15, It 4). Pix runs from Android 10 (API 29). Test devices: Galaxy S22, Galaxy S23 Ultra, and Galaxy S21. | Full test pass on every test device each iteration. |
 | NFR-18 | Scalability | The server handles at least 50 sessions at the same time (100 users), sized for demos and the UAT, not a public launch. | Load test script. |
-| NFR-19 | Performance | Zooming does not stutter: the photographer's preview and the subject's live view stay continuous through every zoom change. Crossing below 1× shows no loading pause or blank preview; if a lens must switch, the last frame stays on screen. Could (It 4): no short freeze when the shutter is pressed. | `Timings` marks on the Galaxy S21 and S22, with before and after numbers in the PR; 20 zoom changes per phone. |
+| NFR-19 | Performance | Zooming does not stutter: the photographer's preview and the subject's live view stay continuous through every zoom change. Crossing below 1× shows no loading pause or blank preview; if a lens must switch, the last frame stays on screen. Could (It 4): no short freeze when the shutter is pressed. It 4 ([#208]): the shutter is free again once the camera has taken the photo, not once the photo is saved. | `Timings` marks on the Galaxy S21 and S22, with before and after numbers in the PR; 20 zoom changes per phone. |
 
 ---
 

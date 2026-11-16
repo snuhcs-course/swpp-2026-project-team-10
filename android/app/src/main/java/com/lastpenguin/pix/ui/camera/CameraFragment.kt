@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -943,9 +943,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             !granted && shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
         // The held last frame stands for a camera that is about to stream again, so it shows no spinner.
         controls.cameraProgress.isVisible = granted && !ready && !unavailable && previewHold?.holding != true
-        controls.shutterButton.isEnabled = ready && !state.isSaving
-        controls.shutterButton.contentDescription =
-            getString(if (state.isSaving) R.string.saving_photo else R.string.shutter)
+        // Free again once the camera took the photo, while it is saved (NFR-19); the ways off Camera and the camera's
+        // changes wait for the save, since leaving or rebinding would lose the photo.
+        controls.shutterButton.isEnabled = ready && !state.shutterBusy
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
@@ -962,14 +962,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
         controls.zoomReadout.contentDescription = getString(R.string.camera_zoom_description, ratio)
         controls.zoomReadout.isEnabled = ready && state.maxZoom > state.minZoom
-        // The round shutter has no label, so saving is shown where the result appears next.
-        val notice = state.captureNotice
-        when {
-            state.isSaving -> showStatus(controls.captureStatus, R.string.saving_photo, StatusLook.PROGRESS)
+        // Saving shows nothing, as on the phone's own camera: the thumbnail is the result (FR-1.6). A failure says why.
+        when (val notice = state.captureNotice) {
+            null -> controls.captureStatus.isVisible = false
 
-            notice == null -> controls.captureStatus.isVisible = false
-
-            else -> showStatus(
+            else -> showFailure(
                 controls.captureStatus,
                 when (notice) {
                     CaptureNotice.STORAGE_FAILED -> R.string.photo_storage_failed
@@ -977,7 +974,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     CaptureNotice.PERMISSION_REQUIRED -> R.string.camera_permission_message
                     CaptureNotice.SAVE_FAILED -> R.string.photo_save_failed
                 },
-                StatusLook.ERROR,
             )
         }
         renderReference(controls, state)
@@ -1189,7 +1185,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideControls.isVisible = false
         controls.tipBanner.isVisible = false
         if (scene.shotFailed) {
-            showStatus(controls.captureStatus, R.string.scene_shot_failed, StatusLook.ERROR)
+            showFailure(controls.captureStatus, R.string.scene_shot_failed)
         } else {
             controls.captureStatus.isVisible = false
         }
@@ -1766,31 +1762,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         chip.setCompoundDrawablesRelative(drawable, null, null, null)
     }
 
-    private enum class StatusLook { PROGRESS, ERROR }
-
-    /** The status chip: saving, or why a photo failed in the danger color. */
-    private fun showStatus(chip: TextView, @StringRes text: Int, look: StatusLook) {
+    /** The status chip: why a photo failed, in the danger color. */
+    private fun showFailure(chip: TextView, @StringRes text: Int) {
         val context = requireContext()
         chip.isVisible = true
         chip.setText(text)
-        chip.setBackgroundResource(
-            when (look) {
-                StatusLook.PROGRESS -> R.drawable.bg_chip_glass
-                StatusLook.ERROR -> R.drawable.bg_chip_danger
-            },
-        )
-        chip.setTextColor(context.getColor(if (look == StatusLook.ERROR) R.color.pix_danger_text else R.color.pix_text))
-        setChipIcon(
-            chip,
-            when (look) {
-                StatusLook.PROGRESS -> 0
-                StatusLook.ERROR -> R.drawable.ic_alert_small
-            },
-        )
+        chip.setBackgroundResource(R.drawable.bg_chip_danger)
+        chip.setTextColor(context.getColor(R.color.pix_danger_text))
+        setChipIcon(chip, R.drawable.ic_alert_small)
         // The alert takes the text color.
         TextViewCompat.setCompoundDrawableTintList(
             chip,
-            if (look == StatusLook.ERROR) ColorStateList.valueOf(context.getColor(R.color.pix_danger_text)) else null,
+            ColorStateList.valueOf(context.getColor(R.color.pix_danger_text)),
         )
     }
 

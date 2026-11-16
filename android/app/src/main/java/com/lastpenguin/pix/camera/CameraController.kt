@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-11, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -135,8 +135,13 @@ interface CameraController {
     /** Rebinds the use cases with a viewport of [ratio], after any photo being saved (FR-1.13). */
     fun setAspectRatio(ratio: AspectRatio)
 
-    /** Full resolution in the chosen aspect ratio to Pictures/Pix, never with the guide (FR-1.5). */
-    suspend fun takePhoto(): Result<Uri>
+    /**
+     * Full resolution in the chosen aspect ratio to Pictures/Pix, never with the guide (FR-1.5). Returns once the photo
+     * is saved or has failed. [onCaptured] runs on the main thread when the camera has taken the picture, which is when
+     * the next photo can be asked for while this one is still being saved (NFR-19); a photo that fails before that
+     * never calls it.
+     */
+    suspend fun takePhoto(onCaptured: () -> Unit = {}): Result<Uri>
 
     /**
      * Copies the latest live frame before suspending, then crops and rotates it upright (FR-4.1).

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -153,6 +153,9 @@ data class CameraUiState(
     /** False hides the camera switch: the phone has no front camera, or the cameras are not known yet. */
     val canSwitchCamera: Boolean = false,
     val supportsFocusPoint: Boolean = false,
+    /** From the shutter until the camera has taken the photo: the shutter waits, so one tap is one photo (NFR-19). */
+    val shutterBusy: Boolean = false,
+    /** A photo is being saved, or several: the camera switch, the ratio, and the ways off Camera wait for them. */
     val isSaving: Boolean = false,
     /** Why the last photo failed, until the next one. */
     val captureNotice: CaptureNotice? = null,
@@ -346,22 +349,63 @@ class CameraViewModel(
         }
     }
 
+    // Photos asked for and not yet saved or failed; touched on the main thread only.
+    private var photosInFlight = 0
+
+    // The newest press's work; each press publishes its result after the one before it.
+    private var lastShot: Job? = null
+
     fun bindCamera(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
         camera.bind(owner, surfaceProvider)
     }
 
-    /** Takes a photo, unless one is being saved or the camera is not ready; true when it takes one. */
+    /**
+     * Takes a photo, unless the camera is not ready or has not yet taken the photo of the press before; true when it
+     * takes one. The shutter is free again as soon as the camera took the picture, while the photo is still being
+     * saved (NFR-19), so photos can follow each other; [CameraUiState.isSaving] lasts until all of them are done. Their
+     * results are published in shutter order.
+     */
     fun onShutter(): Boolean {
-        if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return false
+        if (_uiState.value.shutterBusy || camera.status.value != CameraStatus.READY) return false
         // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
-        _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false, aspectsOpen = false) }
+        photosInFlight++
+        _uiState.update {
+            it.copy(
+                shutterBusy = true,
+                isSaving = true,
+                captureNotice = null,
+                guideEditing = false,
+                aspectsOpen = false,
+            )
+        }
         val takenAt = clock()
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
         val sessionId = photos.shutter()
-        viewModelScope.launch {
+        // The press before, for the order below.
+        val earlier = lastShot
+        lastShot = viewModelScope.launch {
+            // This press's own hold on the shutter: the "taken" of an earlier photo, come late, must not free it.
+            var held = true
+            fun free() {
+                if (!held) return
+                held = false
+                _uiState.update { it.copy(shutterBusy = false) }
+            }
             try {
-                camera.takePhoto().fold(
+                val result = try {
+                    camera.takePhoto(onCaptured = ::free)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Result.failure(error)
+                }
+                // A camera that never said "taken", or a photo that failed before it.
+                free()
+                // In shutter order, whatever order the saves end in: the thumbnail is the newest photo, and the
+                // session sends the photos as they were taken (PhotoSyncer).
+                earlier?.join()
+                result.fold(
                     onSuccess = { uri ->
                         // No notice (FR-1.6, #204): the thumbnail shows the new photo.
                         _uiState.update { it.copy(lastPhoto = uri) }
@@ -373,13 +417,10 @@ class CameraViewModel(
                         _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
                     },
                 )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                sessionId?.let(photos::notTaken)
-                _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
             } finally {
-                _uiState.update { it.copy(isSaving = false) }
+                free()
+                photosInFlight--
+                _uiState.update { it.copy(isSaving = photosInFlight > 0) }
             }
         }
         return true

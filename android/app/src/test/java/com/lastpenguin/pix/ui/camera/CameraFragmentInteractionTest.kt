@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -49,6 +49,7 @@ import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -413,6 +414,30 @@ class CameraFragmentInteractionTest {
             idle()
             onScreen { controls, _ -> assertEquals(string(message), controls.captureStatus.text.toString()) }
         }
+    }
+
+    // A photo being saved (NFR-19, #208): the shutter is free for the next photo, the ways off Camera and the camera
+    // switch wait for the save, and nothing on screen says "saving".
+    @Test
+    fun whileAPhotoIsSaved_theShutterIsFree_andTheGuideAndTheSwitchWait_withNoStatus() {
+        val camera = FakeCameraController().apply {
+            photo = Uri.parse("content://media/external/images/media/1")
+            saving = CompletableDeferred()
+        }
+        launch(camera)
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.shutterButton.isEnabled)
+            assertFalse(controls.guideButton.isEnabled)
+            assertFalse(controls.switchCameraButton.isEnabled)
+            assertFalse(controls.captureStatus.isVisible)
+        }
+        camera.saving?.complete(Unit)
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.guideButton.isEnabled) }
     }
 
     // ---- Zoom, sliders, focus, and the ratio -----------------------------------------------

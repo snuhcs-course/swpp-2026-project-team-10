@@ -2093,7 +2093,9 @@ class GenerationViewModelTest {
 
         override fun setAspectRatio(ratio: AspectRatio) = Unit
 
-        override suspend fun takePhoto(): Result<Uri> = Result.failure(UnsupportedOperationException())
+        override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> = Result.failure(
+            UnsupportedOperationException(),
+        )
 
         override suspend fun grabFrame(): Result<Bitmap> {
             grabs++

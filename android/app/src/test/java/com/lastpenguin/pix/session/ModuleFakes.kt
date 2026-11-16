@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -239,9 +239,15 @@ class FakeCameraController(
     /** When set, [takePhoto] fails with it, so a screen test can see each failure's message. */
     var photoFailure: Throwable? = null
 
-    override suspend fun takePhoto(): Result<Uri> {
+    /** When set, [takePhoto] waits for it once the camera took the photo: a photo that is still being saved. */
+    var saving: CompletableDeferred<Unit>? = null
+
+    override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> {
         photoFailure?.let { return Result.failure(it) }
-        return photo?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+        val saved = photo?.let { Result.success(it) } ?: return Result.failure(UnsupportedOperationException())
+        onCaptured()
+        saving?.await()
+        return saved
     }
 
     override suspend fun grabFrame(): Result<Bitmap> =

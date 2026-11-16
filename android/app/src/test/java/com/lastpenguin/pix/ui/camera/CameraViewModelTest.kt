@@ -114,8 +114,9 @@ class CameraViewModelTest {
     }
 
     // The shutter and the photos in flight (NFR-19, #208). The shutter: busy from the press until the camera took the
-    // photo, then free while the photo is saved. Photos in flight: none, one, or two, each saved or failed; the camera
-    // switch and the ratio wait for all of them. A late "taken" of an earlier photo frees nothing.
+    // photo, then free while the photo is saved. Photos in flight: none, one, or two, each saved or failed, in shutter
+    // order or the newer one first; the camera switch and the ratio wait for all of them. A late "taken" of an earlier
+    // photo frees nothing.
     @Test
     fun shutter_onceTheCameraTookThePhoto_isFreeWhileThePhotoIsSaved() = runTest {
         runCurrent()
@@ -180,6 +181,34 @@ class CameraViewModelTest {
         second.complete(Result.success(Uri.parse("content://media/external/images/media/2")))
         runCurrent()
         assertFalse(model.uiState.value.isSaving)
+    }
+
+    @Test
+    fun photos_savedOutOfOrder_arePublishedInShutterOrder() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share, clock = { 1_000 })
+        val first = camera.capture
+        val second = CompletableDeferred<Result<Uri>>()
+        val older = Uri.parse("content://media/external/images/media/1")
+        val newer = Uri.parse("content://media/external/images/media/2")
+        sharing.onShutter()
+        runCurrent()
+        camera.captured[0]()
+        camera.capture = second
+        sharing.onShutter()
+        runCurrent()
+
+        // The newer photo is saved first: it waits for the older one.
+        second.complete(Result.success(newer))
+        runCurrent()
+        assertTrue(share.shared.isEmpty())
+        assertNull(sharing.uiState.value.lastPhoto)
+        first.complete(Result.success(older))
+        runCurrent()
+
+        assertEquals(listOf(older, newer), share.shared.map { it.second })
+        assertEquals(newer, sharing.uiState.value.lastPhoto)
+        assertFalse(sharing.uiState.value.isSaving)
     }
 
     @Test

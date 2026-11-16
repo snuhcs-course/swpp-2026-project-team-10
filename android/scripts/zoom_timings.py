@@ -285,32 +285,60 @@ def switch_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
 
 def capture_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
     """One row per shutter press, and their medians last. The shutter is free again once the camera has taken the photo
-    (`camera.capture.started`), so photos overlap: each `started` and each result belongs to the oldest press still
-    waiting for one, since the camera takes and saves them in order."""
+    (`camera.capture.started`), so photos overlap: a mark belongs to the press with its `id`. A log of a build without
+    ids gives each mark to the oldest press still waiting for one, which is right while the photos do not overlap.
+
+    The longest frame gap of a photo is the longest wait for the frame after one that came from 200 ms before the camera
+    took the photo (before the press, in a log without `started`) until 300 ms after its result, and no later than
+    200 ms before the next photo was taken. So each stop of the preview counts for one photo, and a press that failed
+    before the camera took a photo has none."""
     presses: list[dict] = []
+    by_id: dict[str, dict] = {}
     for mark in marks:
-        if mark.name == "camera.capture.start":
-            presses.append({"start": mark.ms, "taken": None, "end": None, "result": "?"})
-        elif mark.name == "camera.capture.started":
-            waiting = next((p for p in presses if p["taken"] is None and p["end"] is None), None)
-            if waiting:
-                waiting["taken"] = mark.ms
-        elif mark.name in ("camera.capture.saved", "camera.capture.failed"):
-            waiting = next((p for p in presses if p["end"] is None), None)
-            if waiting:
-                waiting["end"] = mark.ms
-                waiting["result"] = mark.name.removeprefix("camera.capture.")
+        if not mark.name.startswith("camera.capture."):
+            continue
+        kind = mark.name.removeprefix("camera.capture.")
+        key = mark.field("id")
+        if kind == "start":
+            press = {"start": mark.ms, "taken": None, "end": None, "result": "?"}
+            presses.append(press)
+            if key:
+                by_id[key] = press  # an app that started again counts from 1 again: the newest press has the id
+        elif kind == "started":
+            press = (
+                by_id.get(key) if key else next((p for p in presses if p["taken"] is None and p["end"] is None), None)
+            )
+            if press and press["taken"] is None:
+                press["taken"] = mark.ms
+        elif kind in ("saved", "failed"):
+            press = by_id.get(key) if key else next((p for p in presses if p["end"] is None), None)
+            if press and press["end"] is None:
+                press["end"] = mark.ms
+                press["result"] = kind
+    with_taken = any(press["taken"] for press in presses)
+    anchors = [press["taken"] if with_taken else press["start"] for press in presses]
+    waits = [
+        (a.ms, (b.sensor_us - a.sensor_us) / 1000)
+        for a, b in zip(frames, frames[1:])
+        if a.lens == b.lens and b.sensor_us > a.sensor_us
+    ]
     values = []
-    for press in presses:
+    for press, anchor in zip(presses, anchors):
         start, end = press["start"], press["end"]
-        window = [f for f in frames if start - 200 <= f.ms <= (end if end else start) + 300]
-        gaps = intervals(window)
+        gap = None
+        if anchor is not None:
+            until = (end if end else start) + 300
+            later = [other for other in anchors if other is not None and other > anchor]
+            if later:
+                until = min(until, min(later) - 200)
+            found = [wait for at, wait in waits if anchor - 200 <= at < until]
+            gap = max(found) if found else None
         values.append(
             (
                 press["taken"] - start if press["taken"] else None,
                 end - start if end else None,
                 press["result"],
-                max(gaps) if gaps else None,
+                gap,
             )
         )
     rows: list[list[object]] = [[fmt(taken), fmt(total), result, fmt(gap)] for taken, total, result, gap in values]

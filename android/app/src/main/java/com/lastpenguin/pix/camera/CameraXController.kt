@@ -115,6 +115,9 @@ class CameraXController(
     // only a successfully applied request separately; the zoom observer publishes nothing until it is restored, so the
     // reset never replaces the user's framing on either phone.
     private var retainedZoom = 1f
+
+    // The photos asked for since the app started, for the timing marks; main thread only.
+    private var shots = 0
     private var pendingZoom: Float? = null
 
     // Whether pendingZoom is the last value of a pinch; until it is, the bound lens is held (CameraZoomPlan.lensFor).
@@ -500,6 +503,9 @@ class CameraXController(
         if (_status.value != CameraStatus.READY || capture == null) {
             return@withContext Result.failure(IllegalStateException("The camera is not ready"))
         }
+        // Photos overlap now that the shutter is free while one is saved: each photo's marks carry its number, so a
+        // reader of the log knows which press a result belongs to (scripts/zoom_timings.py).
+        val shot = "id=${++shots}"
         suspendCancellableCoroutine { continuation ->
             current.capturesInFlight++
             var finished = false
@@ -512,7 +518,7 @@ class CameraXController(
             }
             try {
                 extendTrace()
-                Timings.mark("camera.capture.start")
+                Timings.mark("camera.capture.start", shot)
                 capture.takePicture(
                     // As the mirrored preview showed it, so the photo matches the guide placed on it (FR-1.14).
                     photoSaver.outputOptions(mirrored = current.facing == CameraFacing.FRONT),
@@ -520,7 +526,7 @@ class CameraXController(
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onCaptureStarted() {
                             // The camera is taking the picture: the next photo can be asked for (NFR-19).
-                            Timings.mark("camera.capture.started")
+                            Timings.mark("camera.capture.started", shot)
                             if (continuation.isActive) onCaptured()
                         }
 
@@ -528,23 +534,23 @@ class CameraXController(
                             val result = output.savedUri?.let { Result.success(it) }
                                 ?: Result.failure(IOException("The saved photo has no gallery URI"))
                             if (result.isSuccess) {
-                                Timings.mark("camera.capture.saved")
+                                Timings.mark("camera.capture.saved", shot)
                             } else {
-                                Timings.mark("camera.capture.failed", "missing_uri")
+                                Timings.mark("camera.capture.failed", "$shot missing_uri")
                             }
                             finishCapture()
                             if (continuation.isActive) continuation.resume(result)
                         }
 
                         override fun onError(exception: ImageCaptureException) {
-                            Timings.mark("camera.capture.failed", "code=${exception.imageCaptureError}")
+                            Timings.mark("camera.capture.failed", "$shot code=${exception.imageCaptureError}")
                             finishCapture()
                             if (continuation.isActive) continuation.resume(Result.failure(exception))
                         }
                     },
                 )
             } catch (error: Exception) {
-                Timings.mark("camera.capture.failed", error.javaClass.simpleName)
+                Timings.mark("camera.capture.failed", "$shot ${error.javaClass.simpleName}")
                 finishCapture()
                 if (continuation.isActive) continuation.resume(Result.failure(error))
             }

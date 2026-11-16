@@ -352,6 +352,9 @@ class CameraViewModel(
     // Photos asked for and not yet saved or failed; touched on the main thread only.
     private var photosInFlight = 0
 
+    // The newest press's work; each press publishes its result after the one before it.
+    private var lastShot: Job? = null
+
     fun bindCamera(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
         camera.bind(owner, surfaceProvider)
     }
@@ -359,7 +362,8 @@ class CameraViewModel(
     /**
      * Takes a photo, unless the camera is not ready or has not yet taken the photo of the press before; true when it
      * takes one. The shutter is free again as soon as the camera took the picture, while the photo is still being
-     * saved (NFR-19), so photos can follow each other; [CameraUiState.isSaving] lasts until all of them are done.
+     * saved (NFR-19), so photos can follow each other; [CameraUiState.isSaving] lasts until all of them are done. Their
+     * results are published in shutter order.
      */
     fun onShutter(): Boolean {
         if (_uiState.value.shutterBusy || camera.status.value != CameraStatus.READY) return false
@@ -378,7 +382,9 @@ class CameraViewModel(
         val takenAt = clock()
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
         val sessionId = photos.shutter()
-        viewModelScope.launch {
+        // The press before, for the order below.
+        val earlier = lastShot
+        lastShot = viewModelScope.launch {
             // This press's own hold on the shutter: the "taken" of an earlier photo, come late, must not free it.
             var held = true
             fun free() {
@@ -387,7 +393,19 @@ class CameraViewModel(
                 _uiState.update { it.copy(shutterBusy = false) }
             }
             try {
-                camera.takePhoto(onCaptured = ::free).fold(
+                val result = try {
+                    camera.takePhoto(onCaptured = ::free)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Result.failure(error)
+                }
+                // A camera that never said "taken", or a photo that failed before it.
+                free()
+                // In shutter order, whatever order the saves end in: the thumbnail is the newest photo, and the
+                // session sends the photos as they were taken (PhotoSyncer).
+                earlier?.join()
+                result.fold(
                     onSuccess = { uri ->
                         // No notice (FR-1.6, #204): the thumbnail shows the new photo.
                         _uiState.update { it.copy(lastPhoto = uri) }
@@ -399,13 +417,7 @@ class CameraViewModel(
                         _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
                     },
                 )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                sessionId?.let(photos::notTaken)
-                _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
             } finally {
-                // A camera that never said "taken", or a photo that failed before it.
                 free()
                 photosInFlight--
                 _uiState.update { it.copy(isSaving = photosInFlight > 0) }

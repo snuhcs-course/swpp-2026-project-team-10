@@ -308,7 +308,7 @@ adb logcat -c
 adb logcat -d -s PixTimings > zoom.log && python3 scripts/zoom_timings.py zoom.log
 ```
 
-The script prints Markdown tables: frame intervals, dropped and frozen frames per pinch, new-ratio-to-frame latency, each lens switch (no new frame, until `READY`, preview idle, last frame held), and the shutter. The *Shutter* table has a row per press and their medians: from the press until the camera took the photo, until the photo was saved, and the longest time without a new preview frame ([#208]). A log of shutter presses alone gives that table only. A frozen frame repeats its zoom after a new native ratio was asked for; steps a held lens maps to the same ratio do not count.
+The script prints Markdown tables: frame intervals, dropped and frozen frames per pinch, new-ratio-to-frame latency, each lens switch (no new frame, until `READY`, preview idle, last frame held), and the shutter. The *Shutter* table has a row per press and their medians: from the press until the camera took the photo, until the photo was saved, and the longest time without a new preview frame ([#208]). A mark belongs to the press with its `id`, and each stop of the preview counts for one photo, also when photos overlap. A log of shutter presses alone gives that table only. A frozen frame repeats its zoom after a new native ratio was asked for; steps a held lens maps to the same ratio do not count.
 
 **Session path** (IT-12, NFR-10; Design 2.6.7; Iter3-P13) — either phone, once connected:
 

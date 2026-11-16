@@ -216,7 +216,12 @@ class FakeCameraController(
         if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(torch = on)
     }
 
-    override fun setAspectRatio(ratio: AspectRatio) = Unit
+    /** Every ratio asked for, in order; the state changes only when a test sets it. */
+    val aspectRequests = mutableListOf<AspectRatio>()
+
+    override fun setAspectRatio(ratio: AspectRatio) {
+        aspectRequests += ratio
+    }
 
     /** The camera chosen (FR-1.14); a phone with a front camera unless a test says otherwise. */
     override val facing = MutableStateFlow(CameraFacing.BACK)

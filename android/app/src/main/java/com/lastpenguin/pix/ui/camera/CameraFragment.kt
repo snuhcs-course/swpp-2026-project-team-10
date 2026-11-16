@@ -161,18 +161,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /** Whether the scene photo step showed at the last render; null before this view's first, which animates nothing. */
     private var sceneShown: Boolean? = null
 
-    /** The preview's next move slides there from where it was, as the step's top bar changes height (#210). */
-    private var slideNextPlace = false
-    private var slide: ValueAnimator? = null
+    /** Whether the panel that says what to frame was to show at the last render; null before this view's first. */
+    private var sceneGuideShown: Boolean? = null
+
+    /** The panel is fading out after a touch; other renders of the step leave the fade alone. */
+    private var sceneGuideFading = false
+
     private var shutterFade: ValueAnimator? = null
 
     // The move under way, which a test sets to a point between its ends: the display's paused frames catch up at once.
     @VisibleForTesting
     internal val frameMove: ValueAnimator? get() = move
-
-    // The preview's last slide with the scene photo's bar, which a test sets the same way.
-    @VisibleForTesting
-    internal val previewSlide: ValueAnimator? get() = slide
 
     @VisibleForTesting
     internal val shutterTurn: ValueAnimator? get() = shutterFade
@@ -302,6 +301,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
             if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
+                // The ratios close, as at the camera's own shutter: a shutter that no touch came with, as with
+                // TalkBack, would leave them open for Back from the review (#231).
+                viewModel.setAspectsOpen(false)
                 generationViewModel.takeScene()
             } else if (viewModel.onShutter()) {
                 // The preview blinks as the photo is taken (FR-1.5).
@@ -564,9 +566,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         shown = null
         shownAspect = null
         sceneShown = null
-        slideNextPlace = false
-        slide?.cancel()
-        slide = null
+        sceneGuideShown = null
+        sceneGuideFading = false
         shutterFade?.cancel()
         shutterFade = null
         binding = null
@@ -764,14 +765,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val top = place.area.top.roundToInt()
         val bottom = (controls.root.height - place.area.bottom).roundToInt()
         if (params.topMargin != top || params.bottomMargin != bottom) {
-            val from = params.topMargin - top
             params.topMargin = top
             params.bottomMargin = bottom
             container.layoutParams = params
-            if (slideNextPlace && from != 0) {
-                slideNextPlace = false
-                slideFrom(container, from.toFloat())
-            }
         }
         controls.bottomPanel.setBackgroundResource(if (place.area.underControls > 0f) R.drawable.bg_scrim_bottom else 0)
         fitToFrame(controls)
@@ -998,7 +994,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             ) {
                 viewModel.setAspectsOpen(false)
             }
+            // The scene photo's panel goes at a touch anywhere, which still does what it does there (#231).
+            generationViewModel.dismissSceneHint()
         }
+        // Clickable as well, like the tip's banner, so TalkBack can take it away.
+        controls.sceneGuide.setOnClickListener { generationViewModel.dismissSceneHint() }
         controls.tipButton.setOnClickListener { viewModel.onTipButton() }
         controls.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
         ViewCompat.replaceAccessibilityAction(
@@ -1104,15 +1104,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
         controls.zoomReadout.isInvisible = reviewing
-        // The scene photo is a frame of the live preview: a photo's flash, the ratio, and brightness do not apply to it.
-        // While the scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1). It says on
-        // only once the camera has the light on, so it never claims a light that is not.
+        // The scene photo is a frame of the live preview: a photo's flash and brightness do not apply to it. While the
+        // scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1). It says on only once
+        // the camera has the light on, so it never claims a light that is not. The ratio is the frame's, so it is
+        // chosen here as on Camera (#231), until the photo is taken.
         if (active) {
             val light = !reviewing && camera.hasFlash
-            controls.cameraSettings.isVisible = light
-            controls.aspectButton.isVisible = false
-            controls.aspectPanel.isVisible = false
-            aspectsBack?.isEnabled = false
+            controls.cameraSettings.isVisible = !reviewing
+            if (reviewing) {
+                controls.aspectPanel.isVisible = false
+                aspectsBack?.isEnabled = false
+            }
             controls.flashButton.isVisible = light
             controls.flashButton.isEnabled = ready
             controls.flashButton.setIconResource(if (camera.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
@@ -1128,10 +1130,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.captureControls.isInvisible = reviewing
         // Not before the phone has found a person in the photo (FR-4.13).
         controls.usePhotoButton.isEnabled = reviewing && !scene.checkingPerson && !scene.noPerson
-        // Where the step is in the pose flow, under a bar as tall as the other screens' headers, so their titles and
-        // bars line up (#210). While framing, what to frame and what for, on the panel above the shutter, and the
-        // shutter in the accent. Starting or ending the step plays as a change (Motion): the preview slides with the
-        // bar, the title fades in, the flow's bar fills to its step, the panel rises in, and the shutter turns.
+        // Where the step is in the pose flow, under the camera's own bar, so the image stays where it is (#231). While
+        // framing, what to frame and what for, on the panel above the shutter until a touch takes it away, and the
+        // shutter in the accent. Starting or ending the step plays as a change (Motion): the title fades in, the
+        // flow's bar fills to its step, the panel rises in, and the shutter turns.
         val before = sceneShown
         val changed = before != null && before != active
         sceneShown = active
@@ -1147,24 +1149,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
             else -> controls.sceneProgress.moveTo(step)
         }
-        if (changed) {
-            // The bar's new height is laid out on the next frame, which posts the preview's new place (placePreview);
-            // a place after that is not this change.
-            slideNextPlace = true
-            controls.root.doOnPreDraw { controls.root.post { slideNextPlace = false } }
-        }
-        sizeTopBar(controls, active)
         if (changed && active) {
             controls.sceneTitle.alpha = 0f
             controls.sceneTitle.fadeTo(1f, Motion.FADE_MS)
         }
         val framing = active && !reviewing
-        val guideWasShown = controls.sceneGuide.isVisible
-        controls.sceneGuide.isVisible = framing
-        if (framing) {
-            controls.sceneGuideText.setText(scene.situation.framingHint)
-            if (!guideWasShown && before != null) riseIn(controls.sceneGuide)
-        }
+        showSceneGuide(controls, scene, shown = framing && scene.sceneHint, animate = before != null)
         turnShutter(controls, framing, animate = changed)
         if (!active) return
 
@@ -1191,19 +1181,51 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    /** The preview from [from] px above or below its new place to it, in [Motion.MOVE_MS], from where it shows now. */
-    private fun slideFrom(container: View, from: Float) {
-        slide?.cancel()
-        slide = null
-        if (!Motion.on()) {
-            container.translationY = 0f
+    /**
+     * The panel that says what to frame (R&S 6.3): it rises in when the step starts, and fades out when a touch takes
+     * it away while the scene is still framed ([GenerationUiState.sceneHint], #231); it goes at once with the step.
+     */
+    private fun showSceneGuide(
+        controls: FragmentCameraBinding,
+        scene: GenerationUiState,
+        shown: Boolean,
+        animate: Boolean,
+    ) {
+        val panel = controls.sceneGuide
+        if (shown) {
+            controls.sceneGuideText.setText(scene.situation.framingHint)
+            if (sceneGuideShown == true) return
+            sceneGuideShown = true
+            sceneGuideFading = false
+            panel.animate().cancel()
+            panel.alpha = 1f
+            panel.isVisible = true
+            if (animate) riseIn(panel)
             return
         }
-        slide = ValueAnimator.ofFloat(container.translationY + from, 0f).apply {
-            duration = Motion.MOVE_MS
-            interpolator = Motion.STANDARD
-            addUpdateListener { container.translationY = it.animatedValue as Float }
-            start()
+        val was = sceneGuideShown
+        sceneGuideShown = false
+        val framing = scene.phase == GenerationUiState.Phase.FRAMING
+        when {
+            // A touch took it away while the scene is still framed.
+            was == true && framing && panel.isVisible -> {
+                sceneGuideFading = true
+                panel.fadeTo(0f, Motion.HIDE_MS) {
+                    sceneGuideFading = false
+                    if (sceneGuideShown == false) panel.isVisible = false
+                }
+            }
+
+            // The same touch changed something else on the step, the light or the ratios, which renders it again:
+            // the fade goes on.
+            sceneGuideFading && framing -> Unit
+
+            // The step ended or its photo was taken: gone at once. Nothing to do while it is already gone.
+            was != false || panel.isVisible -> {
+                sceneGuideFading = false
+                panel.animate().cancel()
+                panel.isVisible = false
+            }
         }
     }
 
@@ -1246,22 +1268,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             addUpdateListener { to.alpha = it.animatedValue as Int }
             doOnEnd { if (button.tag == want) button.setBackgroundResource(want) }
             start()
-        }
-    }
-
-    /**
-     * The top bar: the camera's own, or during the scene photo for poses as tall as the other screens' headers, 8 dp
-     * above a 56 dp row, with its overhang over the image (#210). The preview moves with it (placePreview).
-     */
-    private fun sizeTopBar(controls: FragmentCameraBinding, scenePhoto: Boolean) {
-        val density = resources.displayMetrics.density
-        val top = if (scenePhoto) (SCENE_BAR_TOP_DP * density).roundToInt() else 0
-        val min = ((if (scenePhoto) SCENE_BAR_MIN_DP else CAMERA_BAR_MIN_DP) * density).roundToInt()
-        val bar = controls.topBar
-        if (bar.paddingTop != top) bar.updatePadding(top = top)
-        if (bar.minHeight != min) {
-            bar.minHeight = min
-            bar.minimumHeight = min
         }
     }
 
@@ -1870,14 +1876,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         /** The pose flow's step while the scene photo is framed, and while it is reviewed (FlowProgressView, #210). */
         private const val SCENE_FRAMING_STEP = 1
         private const val SCENE_REVIEW_STEP = 2
-
-        /**
-         * The top bar's least height, the camera's (fragment_camera.xml), and during the scene photo the other screens'
-         * header: 8 dp above a 56 dp row, and the 4 dp overhang (#210).
-         */
-        private const val CAMERA_BAR_MIN_DP = 52f
-        private const val SCENE_BAR_TOP_DP = 8f
-        private const val SCENE_BAR_MIN_DP = 68f
 
         /** How far below its place the scene photo's panel starts as it rises in (#210). */
         private const val RISE_DP = 12f

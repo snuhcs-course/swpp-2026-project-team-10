@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -115,6 +115,81 @@ class GenerationViewModelTest {
         val run = generator.runs.single()
         assertSame(camera.frame, run.scene)
         assertEquals(PoseRequest.Described("벽에 기대서 웃기"), run.request)
+    }
+
+    // The framing hint (R&S 6.3, #231): shown when the step starts, gone at a touch, and back only when the step
+    // starts again; Back from the review, which shoots again, keeps it gone, also after a set was generated.
+    @Test
+    fun sceneHint_isShownWhenTheStepStarts_andGoneOnceDismissed() = runTest {
+        model.beginScene()
+        assertTrue(state.sceneHint)
+
+        model.dismissSceneHint()
+
+        assertFalse(state.sceneHint)
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+    }
+
+    @Test
+    fun sceneHint_dismissed_staysGoneAfterBackFromTheReview() = runTest {
+        model.beginScene()
+        model.dismissSceneHint()
+        model.takeScene()
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+
+        model.retakeScene()
+
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+        assertFalse(state.sceneHint)
+    }
+
+    @Test
+    fun sceneHint_dismissed_staysGoneAfterASetAndTheStepsBackToTheCamera() = runTest {
+        model.beginScene()
+        model.dismissSceneHint()
+        model.takeScene()
+        runCurrent()
+        model.useScene()
+        model.generate("벽에 기대서 웃기")
+        runCurrent()
+        val run = generator.runs.single()
+        run.plan(List(4) { "벽에 기대서 웃기" })
+        run.send(*(1..4).map { ready("pose-$it") }.toTypedArray())
+        run.finish()
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.PICKING, state.phase)
+
+        // Back on Pick a pose, on Generate poses, and on the review: the camera again, with no new start of the step.
+        model.describeAgain()
+        model.backToReview()
+        model.retakeScene()
+
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+        assertFalse(state.sceneHint)
+    }
+
+    @Test
+    fun sceneHint_dismissed_isShownAgainWhenTheStepStartsAgain() = runTest {
+        model.beginScene()
+        model.dismissSceneHint()
+
+        model.beginScene()
+
+        assertTrue(state.sceneHint)
+    }
+
+    @Test
+    fun sceneHint_outsideFraming_isNotDismissed() = runTest {
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+
+        // A touch on the review, such as on Back, is not a touch on the hint's screen.
+        model.dismissSceneHint()
+        model.retakeScene()
+
+        assertTrue(state.sceneHint)
     }
 
     @Test

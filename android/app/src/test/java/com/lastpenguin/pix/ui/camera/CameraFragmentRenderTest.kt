@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -392,10 +392,11 @@ class CameraFragmentRenderTest {
             assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
             assertEquals(View.VISIBLE, controls.sceneBackButton.visibility)
             assertEquals(View.GONE, controls.usePhotoButton.visibility)
-            // The flash button stays, as the light for the scene photo; the ratio and brightness go.
+            // The flash button stays, as the light for the scene photo, and the ratio, which is the photo's (#231);
+            // brightness goes.
             assertEquals(View.VISIBLE, controls.flashButton.visibility)
             assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
-            assertEquals(View.GONE, controls.aspectButton.visibility)
+            assertEquals(View.VISIBLE, controls.aspectButton.visibility)
             assertEquals(View.GONE, controls.exposureBar.visibility)
             assertEquals(View.GONE, controls.guideOverlay.visibility)
             assertEquals(View.GONE, controls.guideControls.visibility)
@@ -558,7 +559,11 @@ class CameraFragmentRenderTest {
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
 
-        onScreen { controls, _ -> assertEquals(View.GONE, controls.cameraSettings.visibility) }
+        // The ratio stays (#231), without a light beside it.
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.flashButton.visibility)
+            assertEquals(View.VISIBLE, controls.aspectButton.visibility)
+        }
     }
 
     // ---- Selfie mode (FR-1.14) -------------------------------------------------------------

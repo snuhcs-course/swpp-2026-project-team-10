@@ -39,6 +39,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.shoot
+import com.lastpenguin.pix.ui.ScreenTestSupport
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
@@ -438,6 +439,84 @@ class CameraFragmentInteractionTest {
         camera.saving?.complete(Unit)
         idle()
         onScreen { controls, _ -> assertTrue(controls.guideButton.isEnabled) }
+    }
+
+    // ---- The scene photo step (#231) --------------------------------------------------------
+    // The panel that says what to frame: shown when the step starts; a touch anywhere, here on the image, takes it away
+    // and still does what it does there; Back from the review keeps it away; another start shows it again. The ratio:
+    // on the bar while framing, and chosen as on Camera.
+
+    @Test
+    fun scenePhoto_aTouchAnywhere_takesThePanelAway_andOnlyAnotherStartShowsItAgain() {
+        val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
+        launch(camera)
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.sceneGuide.isShown) }
+
+        onScreen { controls, _ ->
+            val at = Pointer(0, controls.root.width / 2f, controls.root.height / 3f)
+            touch(controls.root, MotionEvent.ACTION_DOWN, at)
+            touch(controls.root, MotionEvent.ACTION_UP, at)
+        }
+        idle()
+        onScreen { controls, _ -> assertFalse(controls.sceneGuide.isShown) }
+
+        // Shoot, and Back from the review: the camera again, without the panel.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
+            assertFalse(controls.sceneGuide.isShown)
+        }
+
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.sceneGuide.isShown) }
+    }
+
+    @Test
+    fun scenePhoto_whileFraming_theRatioIsChosenAsOnCamera_andIsNotOnTheReview() {
+        val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
+        val modules = launch(camera)
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectButton.isShown)
+            controls.aspectButton.performClick()
+        }
+        idle()
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectPanel.isShown)
+            controls.aspect916Option.performClick()
+        }
+        idle()
+        assertEquals(listOf(AspectRatio.R16_9), camera.aspectRequests)
+        assertEquals(AspectRatio.R16_9, runBlocking { modules.settings.aspectRatio() })
+        onScreen { controls, _ -> assertFalse(controls.aspectPanel.isShown) }
+
+        // The photo is taken: its ratio is the photo's, so the review has no ratio to choose.
+        onScreen { controls, _ ->
+            controls.aspectButton.performClick()
+            controls.shutterButton.performClick()
+        }
+        idle()
+        onScreen { controls, _ ->
+            assertFalse(controls.aspectButton.isShown)
+            assertFalse(controls.aspectPanel.isShown)
+        }
+
+        // The ratios were open at a shutter that no touch closed them for, as with TalkBack: Back from the review
+        // shows the camera without them.
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectButton.isShown)
+            assertFalse(controls.aspectPanel.isShown)
+        }
     }
 
     // ---- Zoom, sliders, focus, and the ratio -----------------------------------------------

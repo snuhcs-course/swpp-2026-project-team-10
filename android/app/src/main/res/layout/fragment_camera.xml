@@ -32,11 +32,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/back"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
             android:visibility="gone"
             app:icon="@drawable/ic_arrow_back"
-            app:iconSize="24dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -73,19 +70,26 @@
         </LinearLayout>
 
         <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3), in the size of the
-             other screens' titles (#210). Like the bar's other controls, it centers on the bar above its last 4 dp,
-             which lie over the image (#204). -->
+             bar's own action, since the bar stays the camera's (#231), and smaller where a long title at a large font
+             would not fit on its line beside the light and the ratio. Like the bar's other controls, it centers on the
+             bar above its last 4 dp, which lie over the image (#204). -->
         <TextView
             android:id="@+id/sceneTitle"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="12dp"
+            android:layout_height="0dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="8dp"
             android:layout_marginBottom="@dimen/top_bar_overhang"
             android:accessibilityHeading="true"
             android:accessibilityLiveRegion="polite"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeTextType="uniform"
+            android:gravity="center_vertical"
+            android:maxLines="1"
             android:text="@string/scene_title"
-            android:textAppearance="@style/TextAppearance.Pix.Header"
+            android:textAppearance="@style/TextAppearance.Pix.Action.Small"
+            android:textColor="@color/pix_text"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/topBarActions"
@@ -583,28 +587,30 @@
         </LinearLayout>
 
         <!-- While the scene photo for poses is framed (R&S 6.3, FR-4.8, #210): what to frame for the situation, and what
-             the photo is for. In the space below the image, or over it when it reaches the controls. -->
+             the photo is for, until a touch anywhere takes it away (#231). In the space below the image, or over it
+             when it reaches the controls, so it is see-through like the other panels over the image, and small. -->
         <LinearLayout
             android:id="@+id/sceneGuide"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="4dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:accessibilityLiveRegion="polite"
-            android:background="@drawable/bg_scene_guide"
+            android:background="@drawable/bg_glass_panel"
             android:gravity="center_vertical"
-            android:padding="16dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
             android:visibility="gone"
             tools:visibility="visible">
 
             <FrameLayout
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="@drawable/bg_scene_guide_icon">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
                     android:layout_gravity="center"
                     android:importantForAccessibility="no"
                     android:src="@drawable/ic_lightbulb"
@@ -614,7 +620,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -623,14 +629,17 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textAppearance="@style/TextAppearance.Pix.Instruction"
+                    android:textSize="14sp"
                     tools:text="@string/scene_framing_hint_landmark" />
 
                 <TextView
+                    android:id="@+id/sceneGuideNext"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="2dp"
                     android:text="@string/scene_guide_next"
-                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

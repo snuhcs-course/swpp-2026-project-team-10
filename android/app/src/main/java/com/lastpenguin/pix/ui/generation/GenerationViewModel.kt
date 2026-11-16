@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -92,6 +92,11 @@ data class GenerationUiState(
      * (FR-4.1). It is on only while the scene is framed, and stays chosen when Back on the review shoots again.
      */
     val light: Boolean = false,
+    /**
+     * The panel that says what to frame is shown (R&S 6.3, #231): from the step's start until a touch anywhere takes it
+     * away. Back on the review keeps it gone; only another start of the step shows it again.
+     */
+    val sceneHint: Boolean = true,
     /**
      * Whose *Select* took a candidate of this set (Design 2.6.5): this phone's, or in a session the subject's, which
      * Pick a pose then goes on with as with its own. The first one decides; nothing is selected after it, unless this
@@ -369,8 +374,9 @@ class GenerationViewModel(
     }
 
     /**
-     * Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was and
-     * the photo's situation, which is the one chosen unless a failed front camera made it *Auto*.
+     * Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was, the
+     * framing hint gone if it was, and the photo's situation, which is the one chosen unless a failed front camera made
+     * it *Auto*.
      */
     fun retakeScene() {
         checking?.cancel()
@@ -381,7 +387,21 @@ class GenerationViewModel(
                     phase = GenerationUiState.Phase.FRAMING,
                     light = it.light,
                     situation = it.situation,
+                    sceneHint = it.sceneHint,
                 )
+            } else {
+                it
+            }
+        }
+    }
+
+    /** A touch anywhere while the scene is framed (#231): the panel that says what to frame goes away. */
+    fun dismissSceneHint() {
+        _uiState.update {
+            if (it.phase == GenerationUiState.Phase.FRAMING &&
+                it.sceneHint
+            ) {
+                it.copy(sceneHint = false)
             } else {
                 it
             }
@@ -647,6 +667,8 @@ class GenerationViewModel(
             description = description,
             setId = id,
             phase = GenerationUiState.Phase.GENERATING,
+            // Back from here leads to the camera again without a new start of the step (#231).
+            sceneHint = _uiState.value.sceneHint,
         )
         generating = viewModelScope.launch { generate(id, scene, selfie, situation, request) }
     }

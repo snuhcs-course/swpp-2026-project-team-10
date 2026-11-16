@@ -15,5 +15,10 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Sungmin, 11-08] "So in Iteration 4 the Design document is numbered 3.0, 3.1, 3.2, like that? And did the prompt log go up in the Korean original, or was it the English translation?"
 - [Sungmin, 11-08] "Post the English translation, and from now on post the prompts translated into English."
 
+## The sidebar's Prompt History ([#232])
+
+- [Dongje, 11-16] "On the wiki, opening Prompt History shows a circle and an arrow together. Can you take the circle away?" (Each Prompt History list was a list item holding a `<details>`, so the sidebar drew the item's bullet beside the summary's arrow. The `<details>` now sits in the list without an item around it, since the wiki drops inline styles; GitHub's renderer keeps that structure.)
+
 [#198]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/198
 [#218]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/218
+[#232]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/232

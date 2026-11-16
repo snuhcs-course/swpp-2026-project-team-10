@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The panel above the shutter while the scene photo for poses is framed (R&S 6.3, #210). -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <corners android:radius="16dp" />
-    <solid android:color="@color/pix_surface_2" />
-</shape>

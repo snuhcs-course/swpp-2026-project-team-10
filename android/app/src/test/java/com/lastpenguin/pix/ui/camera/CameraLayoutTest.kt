@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -32,6 +32,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.NormalizedRect
@@ -62,6 +63,9 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+
+/** How much of a 4:3 image's bottom the scene photo's panel may cover on the S22 when its hint takes two lines, in dp (#231). */
+private const val SCENE_PANEL_OVER_IMAGE_DP = 16
 
 /*
  * The camera screens' layout on the Galaxy S22's app area, 360 x 705 dp (R&S 6.2, 6.6; Testing Documentation 2.1.6).
@@ -190,9 +194,9 @@ class CameraLayoutTest {
         val photo = screen.controls.sceneStill.pictureBox()
         assertEquals(360, photo.width())
         assertEquals(480, photo.height())
-        // As much room above, under the bar as tall as the other screens' headers (64 dp, #210), as below, to the
-        // screen's bottom at 705 dp.
-        assertTrue("$photo", abs((photo.top - 64) - (705 - photo.bottom)) <= 1)
+        // As much room above, under the camera's own bar (48 dp above its overhang, #231), as below, to the screen's
+        // bottom at 705 dp.
+        assertTrue("$photo", abs((photo.top - 48) - (705 - photo.bottom)) <= 1)
         val message = screen.controls.sceneMessage
         assertTrue("${message.box()} under $photo", abs(message.box().top - (photo.bottom + 12)) <= 1)
         assertNull(message.background)
@@ -200,8 +204,8 @@ class CameraLayoutTest {
         assertTrue(screen.controls.sceneProgress.isShown)
         assertTrue(screen.controls.sceneProgress.z > screen.controls.sceneReview.z)
 
-        // Use draws 40 dp on the header's line, 8 dp under its top and in the middle of its 56 dp row, its right edge
-        // 20 dp from the screen's (#210).
+        // Use draws 40 dp in the middle of the bar above its overhang, on Back's line, its right edge 20 dp from the
+        // screen's (#210, #231).
         val use = screen.controls.usePhotoButton as MaterialButton
         val box = use.box()
         val density = use.resources.displayMetrics.density
@@ -209,13 +213,37 @@ class CameraLayoutTest {
         val drawnBottom = box.bottom - (use.insetBottom / density).roundToInt()
         assertEquals(340, box.right)
         assertEquals(40, drawnBottom - drawnTop)
-        assertEquals(36, (drawnTop + drawnBottom) / 2)
+        assertEquals(24, (drawnTop + drawnBottom) / 2)
     }
 
     /** The middle of [this] on the screen, in dp. */
     private fun View.middle(): Float {
         val at = IntArray(2).also(::getLocationInWindow)
         return (at[1] + height / 2f) / resources.displayMetrics.density
+    }
+
+    // The scene photo step (#231): its bar is the Camera screen's own, in height, icons, and where the image starts,
+    // while framing and on the review; the title on Back's line; the ratio fits beside the light, also at font scale
+    // 1.3; the panel that says what to frame is see-through, below a 4:3 image when its hint is on one line and over
+    // its last dp when the hint takes two (every situation's hint), and over a 16:9 one.
+    @Test
+    fun scenePhoto_theBar_isTheCamerasOwn_whileFramingAndReviewing() {
+        val screen = camera()
+        val bar = screen.controls.topBar.box()
+        val image = screen.controls.previewContainer.box().top
+        val icon = (screen.controls.flashButton as MaterialButton).iconSize
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+
+        generation.beginScene()
+        idle()
+        assertEquals("framing", bar, screen.controls.topBar.box())
+        assertEquals("framing", image, screen.controls.previewContainer.box().top)
+        assertEquals(icon, (screen.controls.sceneBackButton as MaterialButton).iconSize)
+
+        (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        generation.takeScene()
+        idle()
+        assertEquals("reviewing", bar, screen.controls.topBar.box())
     }
 
     @Test
@@ -226,16 +254,87 @@ class CameraLayoutTest {
         idle()
         val back = screen.controls.sceneBackButton as MaterialButton
         val density = back.resources.displayMetrics.density
-        // Back draws in the bar above its inset bottom, which during the scene photo is as tall as the other screens'
-        // headers (#210): 8 dp above a 56 dp row, whose middle is at 36 dp, as theirs.
+        // Back draws in the bar above its inset bottom, the 4 dp that lie over the image.
         val backMiddle = (back.box().top + back.box().bottom - back.insetBottom / density) / 2f
-        assertEquals(36f, backMiddle, 1f)
+        assertEquals(24f, backMiddle, 1f)
         assertEquals("framing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
 
         (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
         generation.takeScene()
         idle()
         assertEquals("reviewing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
+    }
+
+    @Test
+    fun scenePhoto_theBarFits_withTheLightTheRatioAndTheTitle_alsoAtFontScale130() {
+        for (scale in listOf(1f, 1.3f)) {
+            val screen = camera(fontScale = scale)
+            screen.activity.viewModel<GenerationViewModel>().beginScene()
+            idle()
+            val bar = screen.controls.topBar.box()
+            val parts = listOf(
+                screen.controls.sceneBackButton,
+                screen.controls.flashButton,
+                screen.controls.aspectButton,
+                screen.controls.sceneTitle,
+            )
+            for (part in parts) {
+                assertTrue(
+                    "$scale: ${part.box()} shown in $bar",
+                    part.isShown && bar.contains(part.box()),
+                )
+            }
+            for ((left, right) in parts.zipWithNext()) {
+                assertTrue("$scale: ${left.box()} before ${right.box()}", left.box().right <= right.box().left)
+            }
+            val title = screen.controls.sceneTitle
+            assertEquals("$scale: the title on one line", 1, title.lineCount)
+            assertEquals("$scale: the title whole", 0, title.layout.getEllipsisCount(0))
+        }
+    }
+
+    @Test
+    fun scenePhoto_thePanel_isSeeThrough_belowA43Image_orOverItsLastDpWhenItsHintTakesTwoLines() {
+        val screen = camera()
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+        val lines = mutableSetOf<Int>()
+        for (situation in Situation.entries) {
+            generation.chooseSituation(situation)
+            generation.beginScene()
+            idle()
+
+            val panel = screen.controls.sceneGuide
+            val image = screen.controls.previewContainer.box()
+            val over = image.bottom - panel.box().top
+            val hint = screen.controls.sceneGuideText.lineCount
+            lines += hint
+            assertEquals(R.drawable.bg_glass_panel, shadowOf(panel.background).createdFromResId)
+            // A hint on one line leaves the image whole; a longer one, in English, covers its last dp.
+            assertTrue(
+                "$situation: ${panel.box()} over $image",
+                over <= if (hint ==
+                    1
+                ) {
+                    0
+                } else {
+                    SCENE_PANEL_OVER_IMAGE_DP
+                },
+            )
+            assertTrue("$situation: above the shutter", panel.box().bottom <= screen.controls.shutterButton.box().top)
+        }
+        assertEquals("hints of one line and of two", setOf(1, 2), lines)
+    }
+
+    @Test
+    fun scenePhoto_thePanel_isOverA169Image_aboveTheShutter() {
+        val screen = camera()
+        screen.ratio(AspectRatio.R16_9)
+        screen.activity.viewModel<GenerationViewModel>().beginScene()
+        idle()
+
+        val panel = screen.controls.sceneGuide.box()
+        assertTrue("$panel inside the image", screen.controls.previewContainer.box().contains(panel))
+        assertTrue("$panel above the shutter", panel.bottom <= screen.controls.shutterButton.box().top)
     }
 
     @Test

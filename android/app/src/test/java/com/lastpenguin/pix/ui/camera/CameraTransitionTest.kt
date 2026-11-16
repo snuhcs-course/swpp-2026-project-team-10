@@ -405,8 +405,8 @@ class CameraTransitionTest {
         assertEquals(0f, controls.previewContainer.translationY, 0f)
     }
 
-    // The scene photo's panel at a touch (#231): it fades out in Motion.HIDE_MS and is gone, and at once with the
-    // phone's animations off.
+    // The scene photo's panel at a touch (#231): it fades out in Motion.HIDE_MS and is gone, also when the touch
+    // changes something else on the step, and at once with the phone's animations off.
     @Test
     fun theScenePhotosPanel_fadesOutAtATouch() {
         val screen = camera()
@@ -419,6 +419,11 @@ class CameraTransitionTest {
         screen.generation().dismissSceneHint()
         idle()
         // Its first frame: still there, on its way out.
+        assertTrue(controls.sceneGuide.isVisible())
+
+        // The same touch turned the light on, which renders the step again: the fade goes on.
+        screen.generation().toggleLight()
+        idle()
         assertTrue(controls.sceneGuide.isVisible())
 
         play(500)

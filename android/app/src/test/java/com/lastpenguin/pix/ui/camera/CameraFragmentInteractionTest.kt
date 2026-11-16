@@ -508,6 +508,15 @@ class CameraFragmentInteractionTest {
             assertFalse(controls.aspectButton.isShown)
             assertFalse(controls.aspectPanel.isShown)
         }
+
+        // The ratios were open at a shutter that no touch closed them for, as with TalkBack: Back from the review
+        // shows the camera without them.
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectButton.isShown)
+            assertFalse(controls.aspectPanel.isShown)
+        }
     }
 
     // ---- Zoom, sliders, focus, and the ratio -----------------------------------------------

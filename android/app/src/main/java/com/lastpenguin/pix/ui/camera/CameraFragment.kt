@@ -164,6 +164,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     /** Whether the panel that says what to frame was to show at the last render; null before this view's first. */
     private var sceneGuideShown: Boolean? = null
 
+    /** The panel is fading out after a touch; other renders of the step leave the fade alone. */
+    private var sceneGuideFading = false
+
     private var shutterFade: ValueAnimator? = null
 
     // The move under way, which a test sets to a point between its ends: the display's paused frames catch up at once.
@@ -298,6 +301,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
             if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
+                // The ratios close, as at the camera's own shutter: a shutter that no touch came with, as with
+                // TalkBack, would leave them open for Back from the review (#231).
+                viewModel.setAspectsOpen(false)
                 generationViewModel.takeScene()
             } else if (viewModel.onShutter()) {
                 // The preview blinks as the photo is taken (FR-1.5).
@@ -561,6 +567,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         shownAspect = null
         sceneShown = null
         sceneGuideShown = null
+        sceneGuideFading = false
         shutterFade?.cancel()
         shutterFade = null
         binding = null
@@ -1189,6 +1196,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.sceneGuideText.setText(scene.situation.framingHint)
             if (sceneGuideShown == true) return
             sceneGuideShown = true
+            sceneGuideFading = false
             panel.animate().cancel()
             panel.alpha = 1f
             panel.isVisible = true
@@ -1197,12 +1205,27 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         val was = sceneGuideShown
         sceneGuideShown = false
-        val dismissed = was == true && scene.phase == GenerationUiState.Phase.FRAMING
-        if (dismissed && panel.isVisible) {
-            panel.fadeTo(0f, Motion.HIDE_MS) { if (sceneGuideShown == false) panel.isVisible = false }
-        } else if (was != false || panel.isVisible) {
-            panel.animate().cancel()
-            panel.isVisible = false
+        val framing = scene.phase == GenerationUiState.Phase.FRAMING
+        when {
+            // A touch took it away while the scene is still framed.
+            was == true && framing && panel.isVisible -> {
+                sceneGuideFading = true
+                panel.fadeTo(0f, Motion.HIDE_MS) {
+                    sceneGuideFading = false
+                    if (sceneGuideShown == false) panel.isVisible = false
+                }
+            }
+
+            // The same touch changed something else on the step, the light or the ratios, which renders it again:
+            // the fade goes on.
+            sceneGuideFading && framing -> Unit
+
+            // The step ended or its photo was taken: gone at once. Nothing to do while it is already gone.
+            was != false || panel.isVisible -> {
+                sceneGuideFading = false
+                panel.animate().cancel()
+                panel.isVisible = false
+            }
         }
     }
 

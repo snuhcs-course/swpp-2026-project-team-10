@@ -667,6 +667,8 @@ class GenerationViewModel(
             description = description,
             setId = id,
             phase = GenerationUiState.Phase.GENERATING,
+            // Back from here leads to the camera again without a new start of the step (#231).
+            sceneHint = _uiState.value.sceneHint,
         )
         generating = viewModelScope.launch { generate(id, scene, selfie, situation, request) }
     }

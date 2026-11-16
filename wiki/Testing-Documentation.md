@@ -94,6 +94,7 @@
 | 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): its partitions, the pose flow's bar, the scene photo's panel, and the step's animation included, and a step added to IT-7 (2.1.5, 2.1.6, Appendix A). |
 | 3.12 | 2026-11-15 | A flaky signaling test: wait for a closed socket's release before moving the clock (2.1.8). |
 | 3.13 | 2026-11-16 | Photo capture (Iter4-P11, [#208]): the shutter's timings from `zoom_timings.py`, also from a log of shutter presses alone, and IT-10's shutter steps (2.1.4, Appendix A). |
+| 3.14 | 2026-11-16 | The scene photo step (Iter4-P21, [#231]): IT-7's steps for its top bar, its panel, and the ratio (Appendix A). |
 
 </details>
 
@@ -1092,12 +1093,14 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 1. Take a scene photo, type a description, and tap *Generate 4 poses*.
 2. With the same photo and an empty field, tap *Suggest 4 poses*. *Changed in Iter3-A13 ("Skip" is gone; "Suggest 4 poses", the one button with an empty field, takes its place); was: "Skip, suggest poses for me".*
 3. *Added in Iter4-P13 ([#210]):* in front of a landmark, choose *Landmark* on *Add a pose guide*, tap *Take a scene photo for poses*, take the photo, then tap *Suggest*.
+4. *Added in Iter4-P21 ([#231]):* on the Galaxy S22, start the scene photo at 3:4 and look at the top bar and the panel. Touch the image. Change the ratio to 9:16 beside the light, take the photo, and tap Back on the review. Then start the step again from *Add a pose guide*.
 
 **Expected result**
 
 - Four candidates that follow the description: the first within 20 s, all within 30 s.
 - Without a description: four different poses that suit the scene, in the same times counted from the tap, the suggestions included.
 - *Landmark* (step 3): the scene photo asks for the whole landmark with the person and has no camera switch; *Generate poses* names *Landmark* on the photo's card; the candidates keep the landmark big and upright beside the person (FR-4.8).
+- The scene photo step (step 4): the top bar is as tall as Camera's, and the image does not move when the step starts. The panel is see-through and, in Korean, under the 3:4 image. The touch takes it away. The photo and the candidates are 9:16. After Back from the review the panel stays away, and it is back when the step starts again (R&S 6.3).
 
 ### IT-8 procedure
 
@@ -2105,6 +2108,7 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
 [#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
+[#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
 [#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213

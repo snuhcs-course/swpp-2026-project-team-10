@@ -972,12 +972,12 @@ UAT cycle 1, held in class on 11/16. Two students of other teams ran the five st
 
 | Problem | Story · step · tester · satisfaction | What follows |
 |---|---|---|
-| While both phones pinch the zoom at once, the readout flickers, and how far the zoom has gone is hard to tell. T2 suggests that while one phone zooms, the other cannot | US-12 · 3 · T1, T2 · 3, 3 | No fix decided |
-| The subject cannot see the session's photos in Pix. *Subject view* has no thumbnail, and after leaving, Camera's thumbnail does not show them: they are only in the phone's gallery | US-12 · 11 · T1, T2 · 3, — | Iteration 5: the session's photos in Pix on the subject's phone |
-| The notice that the subject left shows only briefly on the photographer's phone. A photographer who is not looking at the screen misses it | US-10 · 6 · T1 · 4 | No fix decided |
-| The live view is a little less sharp after reconnecting | US-10 · 5 · T2 · — | No fix decided |
-| A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | The team | Iteration 5: a fix |
-| The reference thumbnail cannot be hidden | The team | Iteration 5: a way to hide it |
+| While both phones pinch the zoom at once, the zoom jumps back and forth between the two, so the image shakes and the readout flickers. T2 suggests that while one phone zooms, the other cannot | US-12 · 3 · T1, T2 · 3, 3 | Iteration 4: one phone zooms at a time (Iter4-A3, [#236]) |
+| The subject cannot see the session's photos in Pix. *Subject view* has no thumbnail, and after leaving, Camera's thumbnail does not show them: they are only in the phone's gallery | US-12 · 11 · T1, T2 · 3, — | Iteration 4: a photo thumbnail on *Subject view*, and the received photos in Camera's thumbnail (Iter4-A2, [#235]) |
+| The notice that the subject left shows only briefly on the photographer's phone. A photographer who is not looking at the screen misses it | US-10 · 6 · T1 · 4 | Iteration 4: the notice stays longer (Iter4-A5, [#238]) |
+| The live view is a little less sharp after reconnecting | US-10 · 5 · T2 · — | Iteration 4: measured first, then fixed or its cause recorded (Iter4-A5, [#238]) |
+| A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | The team | Iteration 4: the subject's phone sends the photo too (Iter4-A1, [#234]) |
+| The reference thumbnail cannot be hidden | The team | Iteration 4: a swipe to the side hides it, and its changes are animated (Iter4-A4, [#237]) |
 
 **For UAT cycle 2** (11/23, Iteration 5). The changes that follow from cycle 1:
 
@@ -2150,3 +2150,8 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
 [#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
 [#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
+[#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
+[#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
+[#236]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/236
+[#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
+[#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238

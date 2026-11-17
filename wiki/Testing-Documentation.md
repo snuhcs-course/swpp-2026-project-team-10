@@ -972,9 +972,9 @@ UAT cycle 1, held in class on 11/16. Two students of other teams ran the five st
 
 | Problem | Story · step · tester · satisfaction | What follows |
 |---|---|---|
-| While both phones pinch the zoom at once, the readout flickers, and how far the zoom has gone is hard to tell. One phone's pinch could hold the other's (T2) | US-12 · 3 · T1, T2 · 3, 3 | No fix decided |
+| While both phones pinch the zoom at once, the readout flickers, and how far the zoom has gone is hard to tell. T2 suggests that while one phone zooms, the other cannot | US-12 · 3 · T1, T2 · 3, 3 | No fix decided |
 | The subject cannot see the session's photos in Pix. *Subject view* has no thumbnail, and after leaving, Camera's thumbnail does not show them: they are only in the phone's gallery | US-12 · 11 · T1, T2 · 3, — | Iteration 5: the session's photos in Pix on the subject's phone |
-| "… left" goes too soon on the photographer's phone for someone looking away | US-10 · 6 · T1 · 4 | No fix decided |
+| The notice that the subject left shows only briefly on the photographer's phone. A photographer who is not looking at the screen misses it | US-10 · 6 · T1 · 4 | No fix decided |
 | The live view is a little less sharp after reconnecting | US-10 · 5 · T2 · — | No fix decided |
 | A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | The team | Iteration 5: a fix |
 | The reference thumbnail cannot be hidden | The team | Iteration 5: a way to hide it |

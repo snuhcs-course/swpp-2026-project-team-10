@@ -91,6 +91,7 @@
 | 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): tiles on *Add a pose guide* before the scene photo, the situation's camera and hint, *Selfie* off without a front camera, its name on *Generate poses* on both phones (`pose.description`'s `situation`), the pose flow's bar and the scene photo's panel, the step's start and end animated, *My library* as a row, and the tutorial's rings around the whole rows, cut to what a scrolling view shows (2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5, 2.6.8, 2.9). |
 | 3.12 | 2026-11-16 | Photo capture (Iter4-P11, [#208]): `takePhoto`'s `onCaptured` frees the shutter while the photo is saved, results in shutter order, no saving label, and the capture settings in `CaptureTuning` with what the S22 measured (2.1, 2.6.2, 2.8). |
 | 3.13 | 2026-11-16 | The scene photo step (Iter4-P21, [#231]): Camera's own top bar with the ratio, the preview in one place, a small see-through panel that a touch takes away (`GenerationUiState.sceneHint`), and no slide of the preview (2.6.3). |
+| 3.14 | 2026-11-17 | The UAT's date (Iter4-P8, [#205]): cycle 1 on 11/16 alone, above the Iteration 4 tasks (2.9). |
 
 </details>
 
@@ -3196,7 +3197,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Camera quality and latency closer to the stock camera (Iter3-A16, #183) | 한준형 | 11/6 | Moved to Iteration 4 ([#208]) | — |
 | Who takes the photo, chosen before connecting (Iter3-A17, [#188]) | 조성민 | 11/6 | Done | 2.1, 2.6.6 |
 
-**Iteration 4 tasks** (from the kickoff of 2026-11-07; Iteration 4 runs 11/8–11/20, with the UAT in class on 11/16 and 11/18):
+**Iteration 4 tasks** (from the kickoff of 2026-11-07; Iteration 4 runs 11/8–11/20, with UAT cycle 1 in class on 11/16):
 
 | Task | Owner | Due | Status | Design |
 |----|----|----|----|----|

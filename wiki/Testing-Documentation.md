@@ -968,7 +968,7 @@ UAT cycle 1, held in class on 11/16. Two students of other teams ran the five st
 - T1's overall comment: Pix is clean to use, and the planned actions give the intended results. What is left is small errors and the usability problems found on the way.
 - The 70 steps hardly fit in the session's 45 minutes.
 
-**Problems found and what follows.** The testers' comments, lowest satisfaction first, then what the team saw in the session.
+**Problems found and what follows.** The testers' comments in the sheet, lowest satisfaction first, then what they said during the session, outside the sheet's steps.
 
 | Problem | Story · step · tester · satisfaction | What follows |
 |---|---|---|
@@ -976,8 +976,8 @@ UAT cycle 1, held in class on 11/16. Two students of other teams ran the five st
 | The subject cannot see the session's photos in Pix. *Subject view* has no thumbnail, and after leaving, Camera's thumbnail does not show them: they are only in the phone's gallery | US-12 · 11 · T1, T2 · 3, — | Iteration 4: a photo thumbnail on *Subject view*, and the received photos in Camera's thumbnail (Iter4-A2, [#235]) |
 | The notice that the subject left shows only briefly on the photographer's phone. A photographer who is not looking at the screen misses it | US-10 · 6 · T1 · 4 | Iteration 4: the notice stays longer (Iter4-A5, [#238]) |
 | The live view is a little less sharp after reconnecting | US-10 · 5 · T2 · — | Iteration 4: measured first, then fixed or its cause recorded (Iter4-A5, [#238]) |
-| A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | The team | Iteration 4: the subject's phone sends the photo too (Iter4-A1, [#234]) |
-| The reference thumbnail cannot be hidden | The team | Iteration 4: a swipe to the side hides it, and its changes are animated (Iter4-A4, [#237]) |
+| A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | Said by the testers in the session | Iteration 4: the subject's phone sends the photo too (Iter4-A1, [#234]) |
+| The reference thumbnail cannot be hidden | Said by the testers in the session | Iteration 4: a swipe to the side hides it, and its changes are animated (Iter4-A4, [#237]) |
 
 **For UAT cycle 2** (11/23, Iteration 5). The changes that follow from cycle 1:
 

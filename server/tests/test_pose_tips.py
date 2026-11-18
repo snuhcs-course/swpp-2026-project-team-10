@@ -54,7 +54,7 @@ WANT = {
 }
 # As a test writes the model's two answers: `now` is the scene's and `want` the candidate's.
 ANSWER = {"now": NOW, "want": WANT}
-TEXT = "Move much closer.\nHold the phone at your waist, tilted up a little."
+TEXT = "Move in close.\nHold the phone at your waist, tilted up a little."
 SAME = "Keep the same distance."
 KO_SAME = "지금 거리를 유지하세요."
 # How the phone is held for `photo()` as it is: level at the chest.
@@ -145,7 +145,7 @@ def test_tip_comes_from_the_model_for_the_scene_and_the_candidate(client, image_
 
 def test_tip_is_written_in_the_screens_language_from_the_same_requests(client, image_api, photos):
     assert said(ask(client, photos, language="ko")) == [
-        "훨씬 가까이 다가가세요.",
+        "가까이 다가가세요.",
         "폰은 허리 높이에서 살짝 위로 기울여 드세요.",
     ]
     korean = image_api.tip_payloads
@@ -222,8 +222,8 @@ def tip_for(client, image_api, photos, now, want, language=None):
         # A wider shot with a box as much taller: the same person, the same distance.
         (photo(100, 700, shot="knees up"), photo(100, 900, shot="full body"), "keep", SAME),
         # One and a half times by both measures is a big move; the same the other way.
-        (photo(300, 600), photo(200, 650), "closer", "Move much closer."),
-        (photo(200, 650), photo(300, 600), "back", "Step back a lot."),
+        (photo(300, 600), photo(200, 650), "closer", "Move in close."),
+        (photo(200, 650), photo(300, 600), "back", "Step far back."),
         # A big move by the head alone is said as a move, not as a big one.
         (photo(300, 700, head=60), photo(250, 730, head=90), "closer", "Move a little closer."),
     ],
@@ -248,8 +248,8 @@ def test_move_is_said_when_the_head_and_the_whole_person_agree(client, image_api
 @pytest.mark.parametrize(
     ("shot", "little", "much", "korean"),
     [
-        ("full body", "Move a little closer.", "Move much closer.", "조금 다가가세요."),
-        ("knees up", "Move a little closer.", "Move much closer.", "조금 다가가세요."),
+        ("full body", "Move a little closer.", "Move in close.", "조금 다가가세요."),
+        ("knees up", "Move a little closer.", "Move in close.", "조금 다가가세요."),
         # A close shot is reached with the zoom: a phone held that close bends the face.
         ("waist up", "Zoom in a little.", "Zoom in a lot.", "줌을 조금 당기세요."),
         ("chest up", "Zoom in a little.", "Zoom in a lot.", "줌을 조금 당기세요."),
@@ -477,14 +477,14 @@ def test_sentences_come_in_the_order_a_photographer_acts_on_them(client, image_a
     want = photo(100, 700, left=650, right=950, posture="on the ground", level="chest", tilt="up", head_top=20)
     response = tip_for(client, image_api, photos, now, want)
     assert said(response) == [
-        "Move much closer.",
+        "Move in close.",
         "Hold the phone low at a crouch, tilted up a little.",
         "Put the person on the right of the frame.",
         "Leave almost no room above the head.",
         "Hold the phone upright so the lines behind the person are level.",
     ]
     assert said(tip_for(client, image_api, photos, now, want, language="ko")) == [
-        "훨씬 가까이 다가가세요.",
+        "가까이 다가가세요.",
         "폰은 쪼그려 앉아 살짝 위로 기울여 드세요.",
         "사람을 화면 오른쪽에 두세요.",
         "머리 위는 거의 남기지 마세요.",

@@ -115,10 +115,11 @@ distance = """
 Distance: the tip says to move closer or to zoom in only when the person is clearly bigger in photo 2 than in photo 1
 (photo 2 shows less of the body, or as much of it with a clearly taller person; walking closer and zooming in are
 judged alike), to step back only when the person is clearly smaller, and to keep the same distance only when the
-person is about as big. Compare by eye how big the person is in the two photos. "Much closer", "a lot", or "much"
-needs a person about one and a half times as big or more, or as much smaller; fail it for a small change. Fail when
-the direction is wrong, or when the tip says to keep the distance for a person who is clearly bigger or clearly
-smaller. A tip that says to fit the person to the guide's outline passes.
+person is about as big. Compare by eye how big the person is in the two photos. A big move ("Move in close", "Zoom in
+a lot", "Step far back", and in Korean "가까이", "많이", "멀리") needs a person about one and a half times as big or more, or
+as much smaller; fail it for a small change. Fail when the direction is wrong, or when the tip says to keep the
+distance for a person who is clearly bigger or clearly smaller. A tip that says to fit the person to the guide's
+outline passes.
 """
 
 phone = """

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -12,8 +12,8 @@ import android.os.Build
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
+import androidx.core.view.ViewCompat
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.Navigation
@@ -25,7 +25,9 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
@@ -34,9 +36,9 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -55,8 +57,9 @@ import org.robolectric.util.ReflectionHelpers
  * the held frame stays as it is and goes at once (NFR-19). The shutter: a blink, and the new photo's thumbnail growing
  * in, but not the one there as the screen opens. The scene photo for poses (#210) starting and ending: the title and the
  * panel at their first frame, the flow's bar from empty, the shutter turning, the preview staying where it is under
- * the camera's own bar (#231), a change of a bar's height placing it at once, and the panel fading out at a touch. With
- * the phone's animations off, each change is at its end at once.
+ * the camera's own bar (#231), a change of a bar's height placing it at once, and the panel fading out at a touch. The
+ * reference thumbnail (#237): hidden, shown again, enlarged, and made small, each from where it was, at its first
+ * frame and at its end. With the phone's animations off, each change is at its end at once, the thumbnail's too.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -68,20 +71,22 @@ class CameraTransitionTest {
         val camera: FakeCameraController,
     )
 
+    @get:Rule
+    val activities = OwnActivities()
+
     @After
     fun tearDown() {
         ShadowChoreographer.setPaused(false)
         setAnimatorScale(1f)
     }
 
+    private lateinit var modules: TestAppContainer
+
     private fun camera(): Camera {
         val app = ApplicationProvider.getApplicationContext<Application>()
         shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
-        val modules = TestAppContainer(camera = FakeCameraController(hasFlash = true, exposureRange = -6..6)).install()
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
-            get().setTheme(R.style.Theme_Pix)
-        }
-            .setup().get()
+        modules = TestAppContainer(camera = FakeCameraController(hasFlash = true, exposureRange = -6..6)).install()
+        val activity = activities.start(R.style.Theme_Pix)
         val nav = TestNavHostController(activity).apply { setGraph(R.navigation.nav_graph) }
         Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
         val fragment = CameraFragment()
@@ -428,6 +433,97 @@ class CameraTransitionTest {
 
         play(500)
         assertFalse(controls.sceneGuide.isVisible())
+    }
+
+    // The reference thumbnail (#237): it settles into its place, its size, and its fade from where it was, in
+    // Motion.THUMBNAIL_MS, laid out at its new size at once and drawn at its old one first.
+
+    /** A guide with a reference photo on the camera: its small thumbnail, 54 x 72 dp, in the top-left corner. */
+    private fun Camera.thumbnail(): View {
+        modules.guides.setGuide(guide())
+        play(500)
+        assertEquals(12f * density(), controls.referenceThumbnail.translationX, 0f)
+        return controls.referenceThumbnail
+    }
+
+    @Test
+    fun theReferenceThumbnail_hiddenAndShown_slidesAndFadesFromWhereItWas() {
+        val screen = camera()
+        val thumbnail = screen.thumbnail()
+        val corner = 12f * screen.density()
+        val hidden = (16f - 54f) * screen.density()
+        ShadowChoreographer.setPaused(true)
+
+        assertTrue(ViewCompat.performAccessibilityAction(thumbnail, R.id.hide_reference, null))
+        idle()
+        // Its first frame: still whole in its corner.
+        assertEquals(corner, thumbnail.translationX, 0f)
+        assertEquals(1f, thumbnail.alpha, 0f)
+        // At its end: only its peek in the preview, see-through, under its handle.
+        play(500)
+        assertEquals(hidden, thumbnail.translationX, 0f)
+        assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha, 0f)
+        assertTrue(screen.controls.referenceHandle.isVisible())
+
+        ShadowChoreographer.setPaused(true)
+        thumbnail.performClick()
+        idle()
+        assertEquals(hidden, thumbnail.translationX, 0f)
+        play(500)
+        assertEquals(corner, thumbnail.translationX, 0f)
+        assertEquals(1f, thumbnail.alpha, 0f)
+        assertFalse(screen.controls.referenceHandle.isVisible())
+    }
+
+    @Test
+    fun theReferenceThumbnail_enlargedAndMadeSmall_growsAndShrinksFromTheSizeItHad() {
+        val screen = camera()
+        val thumbnail = screen.thumbnail()
+        val small = thumbnail.layoutParams.width
+        ShadowChoreographer.setPaused(true)
+
+        thumbnail.performClick()
+        idle()
+        // Laid out at its new size at once, and drawn at its old size until the first frame.
+        val large = thumbnail.layoutParams.width
+        assertEquals(180f * screen.density(), large.toFloat(), 1f)
+        assertEquals(small.toFloat() / large, thumbnail.scaleX, 0.001f)
+        assertEquals(thumbnail.scaleX, thumbnail.scaleY, 0.001f)
+        play(500)
+        assertEquals(1f, thumbnail.scaleX, 0f)
+
+        ShadowChoreographer.setPaused(true)
+        thumbnail.performClick()
+        idle()
+        assertEquals(small, thumbnail.layoutParams.width)
+        assertEquals(large.toFloat() / small, thumbnail.scaleX, 0.001f)
+        play(500)
+        assertEquals(1f, thumbnail.scaleX, 0f)
+    }
+
+    @Test
+    fun withAnimationsOff_theReferenceThumbnailIsInItsPlaceAndSizeAtOnce() {
+        val screen = camera()
+        val thumbnail = screen.thumbnail()
+        setAnimatorScale(0f)
+        // Nothing may wait for a display frame.
+        ShadowChoreographer.setPaused(true)
+
+        assertTrue(ViewCompat.performAccessibilityAction(thumbnail, R.id.hide_reference, null))
+        idle()
+        assertEquals((16f - 54f) * screen.density(), thumbnail.translationX, 0f)
+        assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha, 0f)
+
+        thumbnail.performClick()
+        idle()
+        assertEquals(12f * screen.density(), thumbnail.translationX, 0f)
+        assertEquals(1f, thumbnail.alpha, 0f)
+
+        thumbnail.performClick()
+        idle()
+        assertEquals(180f * screen.density(), thumbnail.layoutParams.width.toFloat(), 1f)
+        assertEquals(1f, thumbnail.scaleX, 0f)
+        assertEquals(1f, thumbnail.scaleY, 0f)
     }
 
     @Test

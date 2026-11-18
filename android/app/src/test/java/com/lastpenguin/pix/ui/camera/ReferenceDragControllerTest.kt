@@ -1,7 +1,6 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
-import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -15,8 +14,12 @@ import org.junit.runner.RunWith
 
 /*
  * Partitions for the reference thumbnail's touches (FR-3.9), single-finger MotionEvents as the thumbnail receives them.
- * A tap, and a move within the touch slop (both a tap); a drag past the slop (follows the finger, kept inside the
- * area); a drag released in each quarter of the area (that corner); a drag the system cancels (no corner).
+ * A tap, and a move within the touch slop (both a tap); a drag past the slop (follows the finger, inside the area's
+ * height, and sideways out to where only its peek shows, fading as it goes); a drag released in each quarter of the
+ * area (that corner, shown); a drag the system cancels (no drop).
+ * Hiding (#237): released with more than half of it past the side, and with half or less (hidden, and its corner);
+ * flung toward its side, and dragged as far slowly (hidden, and its corner). A hidden thumbnail: a tap on its strip,
+ * a drag back in, and one that ends still out. The handle beside a hidden thumbnail: its touches are the thumbnail's.
  */
 @RunWith(AndroidJUnit4::class)
 class ReferenceDragControllerTest {
@@ -38,7 +41,7 @@ class ReferenceDragControllerTest {
     }
 
     @Test
-    fun drag_pastTheSlop_followsTheFingerAndStaysInsideTheArea() = onMain {
+    fun drag_pastTheSlop_followsTheFinger_outToThePeekSidewaysAndInsideTheAreasHeight() = onMain {
         val fixture = fixture()
         val view = fixture.view
 
@@ -47,10 +50,19 @@ class ReferenceDragControllerTest {
         assertTrue(fixture.controller.isDragging)
         assertEquals(331f, view.translationX)
         assertEquals(531f, view.translationY)
+        assertEquals(1f, view.alpha)
 
+        // To the right, it goes out until only its peek of 42 px is in the 1080 px wide preview; up, it stops.
         touch(view, MotionEvent.ACTION_MOVE, 5_000f, -5_000f)
-        assertEquals(923f, view.translationX)
+        assertEquals(1_038f, view.translationX)
         assertEquals(31f, view.translationY)
+        assertEquals(REFERENCE_HIDDEN_ALPHA, view.alpha, 0.001f)
+
+        // To the left the same, and down it stops above the guide's controls.
+        touch(view, MotionEvent.ACTION_MOVE, -5_000f, 5_000f)
+        assertEquals(-84f, view.translationX)
+        assertEquals(1_478f, view.translationY)
+        assertEquals(REFERENCE_HIDDEN_ALPHA, view.alpha, 0.001f)
         assertEquals(0, fixture.taps)
     }
 
@@ -67,52 +79,158 @@ class ReferenceDragControllerTest {
 
             drag(fixture.view, dx = move.first, dy = move.second)
 
-            assertEquals(listOf(corner), fixture.drops)
+            assertEquals(listOf(ReferenceDrop(corner, hidden = false)), fixture.drops)
             assertFalse(fixture.controller.isDragging)
             assertEquals(0, fixture.taps)
         }
     }
 
     @Test
-    fun drag_cancelledBySystem_reportsNoCorner() = onMain {
+    fun drag_cancelledBySystem_reportsNoDrop() = onMain {
         val fixture = fixture()
 
         touch(fixture.view, MotionEvent.ACTION_DOWN, 100f, 100f)
         touch(fixture.view, MotionEvent.ACTION_MOVE, 600f, 900f)
         touch(fixture.view, MotionEvent.ACTION_CANCEL, 600f, 900f)
 
-        assertEquals(listOf<ReferenceCorner?>(null), fixture.drops)
+        assertEquals(listOf<ReferenceDrop?>(null), fixture.drops)
         assertFalse(fixture.controller.isDragging)
         assertEquals(0, fixture.taps)
     }
 
-    private class Fixture(val view: View, val drops: MutableList<ReferenceCorner?>) {
+    // ---- hiding (#237) ----------------------------------------------------------------------------------------------
+
+    @Test
+    fun drag_releasedWithMoreThanHalfOfItPastTheSide_dropsHiddenThere() = onMain {
+        // The thumbnail is 126 px wide at x = 31: 95 px to the left puts its center one pixel past the side.
+        val out = fixture()
+        drag(out.view, dx = -95f, dy = 0f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = true)), out.drops)
+
+        val half = fixture()
+        drag(half.view, dx = -94f, dy = 0f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = false)), half.drops)
+
+        // At the right side, from the top-right corner at x = 923.
+        val right = fixture(x = 923f)
+        drag(right.view, dx = 95f, dy = 0f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_RIGHT, hidden = true)), right.drops)
+    }
+
+    @Test
+    fun drag_flungTowardItsSide_dropsHidden_andAsFarSlowlyDoesNot() = onMain {
+        // 60 px in 20 ms is 3000 px/s, over the fling's 2100 px/s, with the thumbnail's center still in the preview.
+        val flung = fixture()
+        touchAt(flung.view, MotionEvent.ACTION_DOWN, 300f, 100f, time = 1_000)
+        touchAt(flung.view, MotionEvent.ACTION_MOVE, 270f, 100f, time = 1_010)
+        touchAt(flung.view, MotionEvent.ACTION_MOVE, 240f, 100f, time = 1_020)
+        touchAt(flung.view, MotionEvent.ACTION_UP, 240f, 100f, time = 1_020)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = true)), flung.drops)
+
+        val slow = fixture()
+        touchAt(slow.view, MotionEvent.ACTION_DOWN, 300f, 100f, time = 1_000)
+        touchAt(slow.view, MotionEvent.ACTION_MOVE, 270f, 100f, time = 1_300)
+        touchAt(slow.view, MotionEvent.ACTION_MOVE, 240f, 100f, time = 1_600)
+        touchAt(slow.view, MotionEvent.ACTION_UP, 240f, 100f, time = 1_600)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = false)), slow.drops)
+
+        // A fast start that ended in a pause is not a fling: only the last moves count.
+        val paused = fixture()
+        touchAt(paused.view, MotionEvent.ACTION_DOWN, 300f, 100f, time = 1_000)
+        touchAt(paused.view, MotionEvent.ACTION_MOVE, 240f, 100f, time = 1_020)
+        touchAt(paused.view, MotionEvent.ACTION_MOVE, 240f, 100f, time = 1_400)
+        touchAt(paused.view, MotionEvent.ACTION_UP, 240f, 100f, time = 1_400)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = false)), paused.drops)
+    }
+
+    @Test
+    fun hiddenThumbnail_tappedOnItsStrip_isATap() = onMain {
+        val fixture = fixture(x = -84f)
+
+        drag(fixture.view, dx = 0f, dy = 0f)
+
+        assertEquals(1, fixture.taps)
+        assertTrue(fixture.drops.isEmpty())
+        assertEquals(-84f, fixture.view.translationX)
+    }
+
+    @Test
+    fun hiddenThumbnail_draggedBackIn_dropsShownInItsCorner_andLeftOutStaysHidden() = onMain {
+        val back = fixture(x = -84f)
+        touch(back.view, MotionEvent.ACTION_DOWN, 100f, 100f)
+        touch(back.view, MotionEvent.ACTION_MOVE, 300f, 100f)
+        // It comes with the finger, and is itself again once it is inside.
+        assertEquals(116f, back.view.translationX)
+        assertEquals(1f, back.view.alpha)
+        touch(back.view, MotionEvent.ACTION_UP, 300f, 100f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = false)), back.drops)
+
+        // Pulled a little and let go with most of it still out: hidden again.
+        val out = fixture(x = -84f)
+        drag(out.view, dx = 20f, dy = 0f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = true)), out.drops)
+    }
+
+    @Test
+    fun touchesOnTheHandle_areTheThumbnails() = onMain {
+        val fixture = fixture(x = -84f)
+        val handle = View(instrumentation.targetContext).apply { layout(0, 0, 126, 189) }
+        fixture.controller.listenOn(handle)
+
+        drag(handle, dx = 0f, dy = 0f)
+        assertEquals(1, fixture.taps)
+
+        touch(handle, MotionEvent.ACTION_DOWN, 100f, 100f)
+        touch(handle, MotionEvent.ACTION_MOVE, 300f, 100f)
+        assertEquals(116f, fixture.view.translationX)
+        touch(handle, MotionEvent.ACTION_UP, 300f, 100f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = false)), fixture.drops)
+    }
+
+    private class Fixture(val view: View, val drops: MutableList<ReferenceDrop?>) {
         var taps = 0
         lateinit var controller: ReferenceDragController
     }
 
-    /** A small thumbnail, 126 × 189 px, in the top-left corner of [area]. */
-    private fun fixture(): Fixture {
+    /**
+     * A small thumbnail, 126 × 189 px, at [x] in the top of [area], in a preview 1080 px wide: its peek is 42 px
+     * (16 dp), and a fling is 2100 px/s (800 dp/s).
+     */
+    private fun fixture(x: Float = 31f): Fixture {
         val view = View(instrumentation.targetContext).apply {
             layout(0, 0, 126, 189)
-            translationX = 31f
+            translationX = x
             translationY = 31f
         }
         val fixture = Fixture(view, mutableListOf())
-        fixture.controller = ReferenceDragController(view, { area }, { fixture.taps++ }) { fixture.drops += it }
+        fixture.controller = ReferenceDragController(
+            view,
+            area = { area },
+            previewWidth = { 1080 },
+            peek = 42,
+            flingSpeed = 2_100f,
+            onTap = { fixture.taps++ },
+        ) { fixture.drops += it }
         return fixture
     }
 
-    /** Down at (100, 100), one move by ([dx], [dy]), and up there. */
+    /** Down at (100, 100), one move by ([dx], [dy]), and up there, each a long moment after the last. */
     private fun drag(view: View, dx: Float, dy: Float) {
-        touch(view, MotionEvent.ACTION_DOWN, 100f, 100f)
-        touch(view, MotionEvent.ACTION_MOVE, 100f + dx, 100f + dy)
-        touch(view, MotionEvent.ACTION_UP, 100f + dx, 100f + dy)
+        touchAt(view, MotionEvent.ACTION_DOWN, 100f, 100f, time = 1_000)
+        touchAt(view, MotionEvent.ACTION_MOVE, 100f + dx, 100f + dy, time = 2_000)
+        touchAt(view, MotionEvent.ACTION_UP, 100f + dx, 100f + dy, time = 3_000)
     }
 
+    /** A touch without a speed: every event a second after the one before. */
+    private var clock = 10_000L
+
     private fun touch(view: View, action: Int, x: Float, y: Float) {
-        val now = SystemClock.uptimeMillis()
-        val event = MotionEvent.obtain(now, now, action, x, y, 0)
+        clock += 1_000
+        touchAt(view, action, x, y, clock)
+    }
+
+    private fun touchAt(view: View, action: Int, x: Float, y: Float, time: Long) {
+        val event = MotionEvent.obtain(time, time, action, x, y, 0)
         try {
             view.dispatchTouchEvent(event)
         } finally {

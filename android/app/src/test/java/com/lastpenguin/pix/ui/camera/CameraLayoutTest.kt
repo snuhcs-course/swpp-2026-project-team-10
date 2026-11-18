@@ -20,6 +20,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
@@ -43,6 +44,9 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.OwnActivities
+import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -57,9 +61,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -84,6 +88,8 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
  * screens' headers, 8 dp above a 56 dp row (#204, #210).
  * A photo without a person: its alert at the start of the message's first line, not at the box's edge (#204).
+ * The reference thumbnail hidden at the side (#237), in each corner: 16 dp of it in the preview, and its handle 48 dp
+ * wide over that strip, inside the preview and above the zoom row; shown again, whole in its corner.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -100,15 +106,17 @@ class CameraLayoutTest {
         val modules: TestAppContainer,
     )
 
+    @get:Rule
+    val activities = OwnActivities()
+
+    private fun activity(): AppCompatActivity = activities.start(R.style.Theme_Pix)
+
     private fun camera(fontScale: Float = 1f): Camera {
         if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
         val app = ApplicationProvider.getApplicationContext<Application>()
         shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
         val modules = TestAppContainer(camera = FakeCameraController(hasFlash = true, exposureRange = -6..6)).install()
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
-            get().setTheme(R.style.Theme_Pix)
-        }
-            .setup().get()
+        val activity = activity()
         val nav = TestNavHostController(activity).apply { setGraph(R.navigation.nav_graph) }
         Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
         val fragment = CameraFragment()
@@ -158,6 +166,46 @@ class CameraLayoutTest {
         val density = resources.displayMetrics.density
         fun dp(px: Number) = (px.toFloat() / density).roundToInt()
         return Rect(dp(at[0]), dp(at[1]), dp(at[0] + width), dp(at[1] + height))
+    }
+
+    // ---- The reference thumbnail hidden at the side (#237) ------------------------------------------
+
+    @Test
+    fun aHiddenThumbnail_leavesItsPeekAtItsCornersSide_underAHandleATouchTargetWide() {
+        val screen = camera()
+        val controls = screen.controls
+        // A 3:4 reference photo: small, its thumbnail is 54 x 72 dp.
+        screen.modules.guides.setGuide(guide())
+        val model = ViewModelProvider(screen.fragment, PixViewModels.Factory)[CameraViewModel::class.java]
+        val preview = controls.previewContainer.box()
+
+        for (corner in ReferenceCorner.entries) {
+            model.setReferenceCorner(corner)
+            model.setReferenceHidden(true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+
+            val thumbnail = controls.referenceThumbnail.box()
+            val strip = Rect(thumbnail).apply { intersect(preview) }
+            // Only 16 dp of it are in the preview, at its corner's side and height, and see-through.
+            assertEquals("$corner", 16, strip.width())
+            assertEquals("$corner", if (corner.isLeft) preview.left else preview.right - 16, strip.left)
+            assertEquals("$corner", 72, thumbnail.height())
+            assertEquals("$corner", REFERENCE_HIDDEN_ALPHA, controls.referenceThumbnail.alpha, 0f)
+            // Its handle: a touch target wide from that side, over the strip, in the preview above the zoom row.
+            val handle = controls.referenceHandle.box()
+            assertTrue("$corner", controls.referenceHandle.isShown)
+            assertEquals("$corner", 48, handle.width())
+            assertEquals("$corner", if (corner.isLeft) preview.left else preview.right - 48, handle.left)
+            assertTrue("$corner: $handle over $strip", handle.contains(strip))
+            assertTrue("$corner", handle.top >= preview.top && handle.bottom <= controls.zoomRow.box().top)
+        }
+
+        // Shown again, it is whole in its corner, and nothing lies over the preview's side.
+        model.setReferenceHidden(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        assertFalse(controls.referenceHandle.isShown)
+        assertTrue(preview.contains(controls.referenceThumbnail.box()))
+        assertEquals(1f, controls.referenceThumbnail.alpha, 0f)
     }
 
     // ---- The scene photo's review ----------------------------------------------------------------
@@ -684,10 +732,7 @@ class CameraLayoutTest {
     @Test
     fun subjectView_placesTheVideoLikeTheCamera_withTheZoomRowAboveTheCaption() {
         val modules = TestAppContainer().install()
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
-            get().setTheme(R.style.Theme_Pix)
-        }
-            .setup().get()
+        val activity = activity()
         val fragment = SubjectFragment()
         activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
@@ -724,10 +769,7 @@ class CameraLayoutTest {
     private fun subjectWithTip(fontScale: Float = 1f): FragmentSubjectBinding {
         if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
         val modules = TestAppContainer().install()
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
-            get().setTheme(R.style.Theme_Pix)
-        }
-            .setup().get()
+        val activity = activity()
         val fragment = SubjectFragment()
         activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))

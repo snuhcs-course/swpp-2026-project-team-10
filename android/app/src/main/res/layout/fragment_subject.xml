@@ -148,6 +148,18 @@
             tools:ignore="RtlHardcoded"
             tools:visibility="visible" />
 
+        <!-- A hidden thumbnail's strip is too narrow for a finger (FR-3.9, #237): this lies over it, a touch target
+             wide, and its touches are the thumbnail's. Sized and placed in code; nothing to TalkBack, which uses the
+             thumbnail's own actions. -->
+        <View
+            android:id="@+id/referenceHandle"
+            android:layout_width="48dp"
+            android:layout_height="72dp"
+            android:layout_gravity="top|left"
+            android:importantForAccessibility="no"
+            android:visibility="gone"
+            tools:ignore="RtlHardcoded" />
+
         <!-- The photographer's camera is streaming (FR-6.6, FR-6.8): the light at the video's top right, placed in code;
              its description names the photographer. -->
         <com.lastpenguin.pix.ui.camera.LiveDotView

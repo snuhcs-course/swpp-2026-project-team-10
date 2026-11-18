@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.annotation.SuppressLint
@@ -6,18 +6,29 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 
+/** The moves of a drag that say how fast it ended: those of its last [FLING_WINDOW_MS]. */
+private const val FLING_WINDOW_MS = 100L
+
 /**
  * Touch input for the reference thumbnail on the Camera screen (FR-3.9). A tap goes to [onTap], which enlarges the
- * thumbnail or makes it small again. A drag past the touch slop moves it with the finger, kept inside [area], and on
- * release reports the nearest corner to [onDrop], so the thumbnail never stays anywhere else; a cancelled drag
- * reports null, and the caller puts the thumbnail back in its corner. The view is placed by its translation.
+ * thumbnail or makes it small again, or shows a hidden one. A drag past the touch slop moves it with the finger:
+ * inside [area]'s height, and sideways out of the preview until only its [peek] shows, fading as it goes (#237). On
+ * release it reports to [onDrop] the nearest corner and whether it is hidden there ([dropReference]), so the thumbnail
+ * never stays anywhere else; a cancelled drag reports null, and the caller puts the thumbnail back where it was. The
+ * view is placed by its translation.
  */
 internal class ReferenceDragController(
     private val view: View,
     /** Where the thumbnail may be, in its parent's pixels; read at every step. */
     private val area: () -> ReferenceArea,
+    /** The preview's width, whose sides a hidden thumbnail waits at; read at every step. */
+    private val previewWidth: () -> Int,
+    /** How much of a hidden thumbnail stays inside the preview, in pixels. */
+    private val peek: Int,
+    /** How fast a drag toward the side must end to hide the thumbnail, in pixels a second. */
+    private val flingSpeed: Float,
     private val onTap: () -> Unit,
-    private val onDrop: (ReferenceCorner?) -> Unit,
+    private val onDrop: (ReferenceDrop?) -> Unit,
 ) {
     /** While true, the finger places the thumbnail and the screen must not move it. */
     var isDragging: Boolean = false
@@ -28,32 +39,53 @@ internal class ReferenceDragController(
     private var startX = 0f
     private var startY = 0f
 
+    /** Where the finger was and when, for the speed the drag ends with: time in ms, then x and y. */
+    private val moves = ArrayDeque<Triple<Long, Float, Float>>()
+
     init {
         view.setOnClickListener { onTap() }
-        attach()
+        listenOn(view)
     }
 
+    /**
+     * Takes [source]'s touches as the thumbnail's own: the thumbnail itself, and the wider handle that lies over a
+     * hidden thumbnail's strip, which alone is too narrow for a finger.
+     */
     @SuppressLint("ClickableViewAccessibility") // A tap still goes through performClick, as TalkBack's does.
-    private fun attach() {
-        view.setOnTouchListener { _, event ->
+    fun listenOn(source: View) {
+        source.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    // The thumbnail may still be gliding into a corner: it starts from where it is now.
+                    // The thumbnail may still be gliding to its place: it starts from where it is now.
                     view.animate().cancel()
                     downX = event.rawX
                     downY = event.rawY
                     startX = view.translationX
                     startY = view.translationY
                     isDragging = false
+                    moves.clear()
+                    remember(event)
                 }
 
-                MotionEvent.ACTION_MOVE -> move(event.rawX - downX, event.rawY - downY)
+                MotionEvent.ACTION_MOVE -> {
+                    remember(event)
+                    move(event.rawX - downX, event.rawY - downY)
+                }
 
                 MotionEvent.ACTION_UP -> if (isDragging) {
                     isDragging = false
-                    val centerX = view.translationX + view.width / 2f
-                    val centerY = view.translationY + view.height / 2f
-                    onDrop(nearestCorner(centerX, centerY, area()))
+                    val (velocityX, velocityY) = speedAt(event.eventTime)
+                    onDrop(
+                        dropReference(
+                            centerX = view.translationX + view.width / 2f,
+                            centerY = view.translationY + view.height / 2f,
+                            velocityX = velocityX,
+                            velocityY = velocityY,
+                            area = area(),
+                            previewWidth = previewWidth(),
+                            flingSpeed = flingSpeed,
+                        ),
+                    )
                 } else {
                     view.performClick()
                 }
@@ -67,13 +99,32 @@ internal class ReferenceDragController(
         }
     }
 
+    private fun remember(event: MotionEvent) {
+        moves.addLast(Triple(event.eventTime, event.rawX, event.rawY))
+        while (moves.first().first < event.eventTime - FLING_WINDOW_MS) moves.removeFirst()
+    }
+
+    /** The finger's speed over its last moves before [time], in pixels a second; none after a pause. */
+    private fun speedAt(time: Long): Pair<Float, Float> {
+        val recent = moves.filter { it.first >= time - FLING_WINDOW_MS }
+        val first = recent.firstOrNull() ?: return 0f to 0f
+        val last = recent.last()
+        val seconds = (last.first - first.first) / 1000f
+        if (seconds <= 0f) return 0f to 0f
+        return (last.second - first.second) / seconds to (last.third - first.third) / seconds
+    }
+
     private fun move(dx: Float, dy: Float) {
         if (!isDragging && dx * dx + dy * dy <= slop.toFloat() * slop) return
         isDragging = true
         val bounds = area()
-        val maxX = maxOf(bounds.left, bounds.right - view.width).toFloat()
+        val width = previewWidth()
         val maxY = maxOf(bounds.top, bounds.bottom - view.height).toFloat()
-        view.translationX = (startX + dx).coerceIn(bounds.left.toFloat(), maxX)
+        // Sideways it may leave the preview, as far as a hidden thumbnail is out.
+        val minX = minOf(bounds.left, peek - view.width).toFloat()
+        val maxX = maxOf(bounds.left, bounds.right - view.width, width - peek).toFloat()
+        view.translationX = (startX + dx).coerceIn(minX, maxX)
         view.translationY = (startY + dy).coerceIn(bounds.top.toFloat(), maxY)
+        view.alpha = referenceAlpha(view.translationX, view.width, width, peek)
     }
 }

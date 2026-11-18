@@ -1695,7 +1695,7 @@ Sent once per guide, after the guide's image and `guide.state`, so the subject d
 
 - The photographer sends the tip once it has arrived, and `guide.tip.clear` when the guide has no tip: no guide, a tip still asked for or failed, or a saved copy of the guide, which keeps the guide's id.
 - A sender started after a reconnect sends what the guide has now, a tip or a clear (2.6.7).
-- The subject keeps the last tip by `guideId` and shows its button only while that guide is on the video, so the tip and the guide's image may arrive in either order.
+- The subject keeps the last tip by `guideId` and shows its button only while that guide is on the video, so the tip and the guide's image may arrive in either order. A guide the photographer hides closes an open tip, so the guide shown again brings back the button alone.
 - `text` is the tip as the server wrote it, a sentence on each line, in the photographer's screen language.
 
 </details>
@@ -2624,8 +2624,8 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 The model only describes; the server decides and writes.
 
-1. **Two requests.** The server asks the tip model about the scene and about the candidate at once, each in a request of its own with `tip_prompt`. Asked about both photos in one request, the model gave the candidate the scene's shot and camera. A request without an answer after 4 s is sent a second time, and the first answer wins: a tip needs both answers, and without the second request 26 of 300 tips ran into the 10 s limit on a slow day (2026-11-17).
-2. **The description** of a photo, as a JSON schema: the box around the person, the box around their head, the shot (full body, knees up, waist up, chest up), the posture (standing, seated, on the ground), the part of the person the camera is level with (knees, waist, chest, face, above), the tilt, and whether a horizon or another long level line is there, level or leaning (`horizon`). The candidate's request adds `tip_candidate`, which says what the photo is, and carries the pose in quotation marks, as data. The model writes no words of the tip.
+1. **Two requests.** The server asks the tip model about the scene and about the candidate at once, each in a request of its own with `tip_prompt`. Asked about both photos in one request, the model gave the candidate the scene's shot and camera. A request without an answer after 4 s is sent a second time, and the first of the two that answers with 200 wins: a tip needs both answers, and without the second request 26 of 300 tips ran into the 10 s limit on a slow day (2026-11-17). A try that fails waits for the other, and is the answer only when both fail.
+2. **The description** of a photo, as a JSON schema: the box around the person, the box around their head (four zeros when the head does not show, which the server reads as no head), the shot (full body, knees up, waist up, chest up), the posture (standing, seated, on the ground), the part of the person the camera is level with (knees, waist, chest, face, above), the tilt, and whether a horizon or another long level line is there, level or leaning (`horizon`). The candidate's request adds `tip_candidate`, which says what the photo is, and carries the pose in quotation marks, as data. The model writes no words of the tip.
 3. **The distance** comes from two measures of how much bigger the person is in the candidate: the head's height, and the whole person's height (the box's height divided by the shot's share of a body). Each says closer at 1.18 times or more, farther at 1/1.18 or less, and the same otherwise. The server decides a distance only when both agree; otherwise `framing` is `unsure`. The move is "much" when both measures say 1.4 times or more.
 4. **The phone** is held level with the part the candidate shows, by the person's posture:
 

@@ -456,9 +456,9 @@ uv run --env-file .env scripts/eval_poses.py judge run1                        #
 uv run scripts/eval_poses.py report run1 run2 run3                             # each run, then all together
 ```
 
-`judge` sends only what has no verdict with the current rubric, so a changed rubric judges a whole run again. `report` writes `summary.txt`, `summary.json`, and `report.html`.
+`judge` sends only what has no verdict with the current rubric, so a changed rubric judges a whole run again. It judges the poses and the suggestions; the tips are checked by us, below. `report` writes `summary.txt`, `summary.json`, and `report.html`.
 
-After a change to the tip's prompt or words, ask a run's tips again for the same candidates, without paying for new images. We check the tips ourselves, not the judge (Testing 3.1): `sample --kind tip` writes `label-tips.html`, each of us answers every sentence in a browser and downloads the labels, and `agree --kind tip` counts the tips that match their pose into `tip-check.txt`.
+After a change to the tip's prompt or words, ask a run's tips again for the same candidates, without paying for new images. We check the tips ourselves, not the judge (Testing 3.1): `sample --kind tip` writes `label-tips.html`, each of us answers every sentence in a browser and downloads the labels, and `agree --kind tip` counts the tips that match their pose into `tip-check.txt` and `tip-check.json`, where `report` reads the tips' metric.
 
 ```sh
 uv run scripts/eval_poses.py retip run1                                        # keeps the tips before in each set

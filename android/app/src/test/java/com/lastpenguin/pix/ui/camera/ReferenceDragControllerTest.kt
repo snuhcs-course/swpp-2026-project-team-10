@@ -22,6 +22,7 @@ import org.junit.runner.RunWith
  * a drag back in, and one that ends still out. The handle beside a hidden thumbnail: its touches are the thumbnail's.
  * The lift: at the last move's place (above), carrying the last of the move (counted for the place and the speed), and
  * far from the touch with no move between (a drag). A thumbnail narrower than the peek: out to just over half of it.
+ * A drag begun while the thumbnail glides: from where it is when the finger passes the slop, not where it was pressed.
  */
 @RunWith(AndroidJUnit4::class)
 class ReferenceDragControllerTest {
@@ -161,6 +162,19 @@ class ReferenceDragControllerTest {
         touchAt(jumped.view, MotionEvent.ACTION_UP, 800f, 1_100f, time = 3_000)
         assertEquals(0, jumped.taps)
         assertEquals(listOf(ReferenceDrop(ReferenceCorner.BOTTOM_RIGHT, hidden = false)), jumped.drops)
+    }
+
+    @Test
+    fun drag_begunWhileTheThumbnailGlides_goesOnFromWhereItIsThen() = onMain {
+        // A press does not stop a glide, so the thumbnail has moved on by the time the finger passes the slop.
+        val fixture = fixture()
+        touch(fixture.view, MotionEvent.ACTION_DOWN, 100f, 100f)
+        fixture.view.translationX = 200f
+        fixture.view.translationY = 300f
+        touch(fixture.view, MotionEvent.ACTION_MOVE, 150f, 140f)
+
+        assertEquals(250f, fixture.view.translationX)
+        assertEquals(340f, fixture.view.translationY)
     }
 
     @Test

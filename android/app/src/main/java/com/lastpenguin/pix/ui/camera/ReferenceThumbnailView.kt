@@ -6,6 +6,7 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.view.View
@@ -15,6 +16,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
+import com.google.android.material.imageview.ShapeableImageView
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.ui.Motion
 import kotlin.math.abs
@@ -30,6 +32,9 @@ internal const val REFERENCE_HANDLE_DP = 48f
 
 /** How fast a drag toward the side must end to hide the thumbnail, in dp a second: a flick, not a slow move. */
 internal const val REFERENCE_FLING_DP = 800f
+
+/** The smallest scale a thumbnail's corners and line are kept for; below it they would outgrow the view. */
+private const val MIN_DRAWN_SCALE = 0.05f
 
 /** TalkBack's way to move the reference thumbnail: an action id and its label for each corner. */
 private val REFERENCE_MOVES = mapOf(
@@ -52,16 +57,38 @@ internal fun View.stopReferenceGlide() {
 }
 
 /**
+ * Draws this thumbnail's corners and line as at rest while the view is drawn at [scale] (#237): a view drawn smaller
+ * than it is laid out would show them smaller too, and they would jump at the start of every glide. The radius and
+ * the line's width at rest are read once, before any glide changes them.
+ */
+private fun ImageView.keepShapeAt(scale: Float) {
+    val image = this as? ShapeableImageView ?: return
+    val rest = getTag(R.id.reference_shape) as? FloatArray ?: run {
+        val box = RectF(0f, 0f, layoutParams.width.toFloat(), layoutParams.height.toFloat())
+        floatArrayOf(image.shapeAppearanceModel.topLeftCornerSize.getCornerSize(box), image.strokeWidth)
+            .also { setTag(R.id.reference_shape, it) }
+    }
+    val drawn = scale.coerceAtLeast(MIN_DRAWN_SCALE)
+    val line = rest[1] / drawn
+    if (image.strokeWidth == line) return
+    image.shapeAppearanceModel = image.shapeAppearanceModel.withCornerSize(rest[0] / drawn)
+    image.strokeWidth = line
+}
+
+/**
  * Shows [photo] in this thumbnail where [place] says (FR-3.9), or hides it for null; [place] returns null while the
  * thumbnail must not move (a drag, or a screen not laid out yet). [mirrored], it is flipped left to right, as Subject
  * view shows the rear camera (#201). The image and the size are set only when they change, as each would lay the
  * screen out again.
  *
  * A thumbnail already shown glides into its new place, size, and alpha from where the finger or the last change left
- * it, in [Motion.THUMBNAIL_MS] (#237). Its size is laid out once, at the end's, and it is drawn at the size it has on
- * the way by its scale, about its middle, which is also what the flip turns about; so this alone sets its scale. A
- * call for the place a glide is already going to leaves that glide alone, or every render of the screen would start
- * it anew. With animations off, and when it first shows, it is there at once.
+ * it, in [Motion.THUMBNAIL_MS] (#237). Laying it out at every size on the way would lay the screen out every frame,
+ * so it is laid out once, at the larger of the two sizes, and drawn smaller by its scale: growing, at its new size
+ * from the start, and shrinking, at its old size until the end. So the photo is never a small one blown up, and its
+ * corners and line stay as at rest ([keepShapeAt]). It scales about its middle, which is also what the flip turns
+ * about; so this alone sets its scale. A call for the place a glide is already going to leaves that glide alone, or
+ * every render of the screen would start it anew. With animations off, when it first shows, and with another photo,
+ * it is there at once.
  */
 internal fun ImageView.showReference(
     photo: Bitmap?,
@@ -78,7 +105,8 @@ internal fun ImageView.showReference(
         scaleY = 1f
         return
     }
-    if ((drawable as? BitmapDrawable)?.bitmap !== photo) setImageBitmap(photo)
+    val samePhoto = (drawable as? BitmapDrawable)?.bitmap === photo
+    if (!samePhoto) setImageBitmap(photo)
     val placement = place(photo)
     if (placement == null) {
         scaleX = flip * abs(scaleX)
@@ -95,45 +123,74 @@ internal fun ImageView.showReference(
     val fromLeft = translationX + (params.width - fromWidth) / 2f
     val fromTop = translationY + (params.height - fromHeight) / 2f
     val fromAlpha = alpha
-    if (params.width != placement.width || params.height != placement.height) {
+    val toLeft = placement.x.toFloat()
+    val toTop = placement.y.toFloat()
+    val toWidth = placement.width.toFloat()
+    val toHeight = placement.height.toFloat()
+
+    /** Draws the thumbnail with its box at ([left], [top]), [width] by [height], in the size it is laid out at. */
+    fun draw(left: Float, top: Float, width: Float, height: Float, alpha: Float) {
+        val laidOutWidth = params.width.coerceAtLeast(1)
+        val laidOutHeight = params.height.coerceAtLeast(1)
+        scaleX = flip * width / laidOutWidth
+        scaleY = height / laidOutHeight
+        translationX = left - (laidOutWidth - width) / 2f
+        translationY = top - (laidOutHeight - height) / 2f
+        this.alpha = alpha
+        keepShapeAt(scaleY)
+    }
+
+    /** Lays the thumbnail out at its new size, where a glide's size differs from it. */
+    fun layOut() {
+        if (params.width == placement.width && params.height == placement.height) return
         params.width = placement.width
         params.height = placement.height
         layoutParams = params
     }
-    val toWidth = placement.width.toFloat()
-    val toHeight = placement.height.toFloat()
 
-    /** Draws the thumbnail [along] its way: 0 where it was, and 1 at its place, exactly. */
-    fun draw(along: Float) {
-        fun between(from: Float, to: Float) = from * (1f - along) + to * along
-        val width = between(fromWidth, toWidth)
-        val height = between(fromHeight, toHeight)
-        scaleX = flip * width / toWidth.coerceAtLeast(1f)
-        scaleY = height / toHeight.coerceAtLeast(1f)
-        translationX = between(fromLeft, placement.x.toFloat()) - (toWidth - width) / 2f
-        translationY = between(fromTop, placement.y.toFloat()) - (toHeight - height) / 2f
-        alpha = between(fromAlpha, placement.alpha)
+    /** At its place, laid out at its own size. */
+    fun rest() {
+        layOut()
+        draw(toLeft, toTop, toWidth, toHeight, placement.alpha)
     }
-    val there = fromLeft == placement.x.toFloat() && fromTop == placement.y.toFloat() &&
-        fromWidth == toWidth && fromHeight == toHeight && fromAlpha == placement.alpha
-    if (!shown || !Motion.on() || fromWidth <= 0f || fromHeight <= 0f || there) {
-        draw(1f)
+    val there = fromLeft == toLeft && fromTop == toTop && fromWidth == toWidth && fromHeight == toHeight &&
+        fromAlpha == placement.alpha
+    if (!shown || !samePhoto || !Motion.on() || fromWidth <= 0f || fromHeight <= 0f || there) {
+        rest()
         return
     }
+    if (placement.width > params.width) layOut()
     val animator = ValueAnimator.ofFloat(0f, 1f)
     animator.duration = Motion.THUMBNAIL_MS
     animator.interpolator = Motion.STANDARD
-    animator.addUpdateListener { draw(it.animatedValue as Float) }
+    animator.addUpdateListener {
+        val along = it.animatedValue as Float
+        fun between(from: Float, to: Float) = from * (1f - along) + to * along
+        draw(
+            left = between(fromLeft, toLeft),
+            top = between(fromTop, toTop),
+            width = between(fromWidth, toWidth),
+            height = between(fromHeight, toHeight),
+            alpha = between(fromAlpha, placement.alpha),
+        )
+    }
     animator.addListener(
         object : AnimatorListenerAdapter() {
-            // At its end, and when a finger or another change stops it.
+            private var stopped = false
+
+            override fun onAnimationCancel(animation: Animator) {
+                stopped = true
+            }
+
+            // At its end, and when a finger or another change stops it where it is.
             override fun onAnimationEnd(animation: Animator) {
                 if (referenceGlide === animation) setTag(R.id.reference_glide, null)
+                if (!stopped) rest()
             }
         },
     )
     setTag(R.id.reference_glide, ReferenceGlide(placement, mirrored, animator))
-    draw(0f)
+    draw(fromLeft, fromTop, fromWidth, fromHeight, fromAlpha)
     animator.start()
 }
 

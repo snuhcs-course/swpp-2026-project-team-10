@@ -56,12 +56,8 @@ internal class ReferenceDragController(
         source.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    // The thumbnail may still be gliding to its place: it starts from where it is now.
-                    view.stopReferenceGlide()
                     downX = event.rawX
                     downY = event.rawY
-                    startX = view.translationX
-                    startY = view.translationY
                     isDragging = false
                     moves.clear()
                     remember(event)
@@ -125,8 +121,15 @@ internal class ReferenceDragController(
     }
 
     private fun move(dx: Float, dy: Float) {
-        if (!isDragging && dx * dx + dy * dy <= slop.toFloat() * slop) return
-        isDragging = true
+        if (!isDragging) {
+            if (dx * dx + dy * dy <= slop.toFloat() * slop) return
+            // The drag begins. A thumbnail still gliding to its place stops only now, and goes with the finger from
+            // where it is: a tap leaves the glide running, or a second tap would hold it still while it is pressed.
+            view.stopReferenceGlide()
+            startX = view.translationX
+            startY = view.translationY
+            isDragging = true
+        }
         val bounds = area()
         val width = previewWidth()
         val maxY = maxOf(bounds.top, bounds.bottom - view.height).toFloat()

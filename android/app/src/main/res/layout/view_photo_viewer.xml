@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The session's photos (FR-1.6, FR-6.14; R&S 6.5, 6.6), over Camera on the photographer's phone and over Subject view
-     on the subject's: each whole, one page each, opened at the newest, under a header with Back, and which one of how
-     many below. It covers the screen inside Pix, so the session and its video go on under it; the phone's gallery would
+     on the subject's: each whole, one page each, opened at the newest, under a header with Back alone, no title, and
+     which one of how many below. It covers the screen inside Pix, so the session and its video go on under it; the phone's gallery would
      put Pix in the background. It takes every touch, so none reaches the screen under it; its holder keeps it above all of
      the screen. -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -33,17 +33,6 @@
             android:id="@+id/photoViewerBack"
             style="@style/Widget.Pix.Header.Back"
             android:contentDescription="@string/back" />
-
-        <TextView
-            android:id="@+id/photoViewerTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:accessibilityHeading="true"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textAppearance="@style/TextAppearance.Pix.Header"
-            tools:text="@string/session_photo_title" />
     </LinearLayout>
 
     <androidx.viewpager2.widget.ViewPager2

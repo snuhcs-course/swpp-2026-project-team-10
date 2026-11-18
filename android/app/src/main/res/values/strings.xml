@@ -110,10 +110,8 @@
     <string name="session_photo_not_sent">Couldn\'t send a photo to %1$s</string>
     <string name="session_photos_not_sent">Couldn\'t send %1$d photos to %2$s</string>
     <string name="open_session_photo">Open the newest photo</string>
-    <string name="session_photo_title">%1$s\'s photo</string>
-    <string name="session_photo_title_unnamed">Photo</string>
+    <string name="session_photo">Photo</string>
     <string name="session_photo_unavailable">This photo is no longer in your album.</string>
-    <string name="session_photo_title_yours">Your photo</string>
     <string name="photo_page_counter" translatable="false">%1$d / %2$d</string>
     <string name="photo_page_counter_description">Photo %1$d of %2$d</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>

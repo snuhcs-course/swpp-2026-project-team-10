@@ -84,8 +84,9 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
  * The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
- * its session photo's thumbnail (Iter4-A2) on Guide's icon line where Camera's thumbnail is, clear of the buttons
- * beside Guide with each of their labels at font scale 1 and 1.3. The session photos' viewer over the whole screen,
+ * its session photo's thumbnail (Iter4-A2) on Guide's icon line, shown before any photo, Guide where Camera's is and
+ * the thumbnail as far from the right edge, and the button beside it where Camera's shutter is, clear of both, with each of its labels at
+ * font scale 1 and 1.3. The session photos' viewer over the whole screen,
  * on Subject view and on Camera.
  * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
  * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
@@ -747,9 +748,20 @@ class CameraLayoutTest {
     }
 
     private fun assertThumbnailBesideGuide(fontScale: Float) {
-        val cameras = camera(fontScale).controls.galleryButton.box()
+        val camera = camera(fontScale).controls
+        val camerasGuide = camera.guideButtonIcon.box()
+        val shutter = camera.shutterButton.box()
         val binding = subjectView(fontScale)
-        binding.galleryButton.visibility = View.VISIBLE
+        // Shown from the start, empty until the session's first photo (FR-6.14).
+        assertTrue("the thumbnail shows before any photo", binding.galleryButton.isShown)
+        // Guide where Camera's is, at its size, within a pixel's rounding (R&S 6.6).
+        val guideIcon = binding.guideButtonIcon.box()
+        assertTrue(
+            "$guideIcon where Camera's is, $camerasGuide",
+            abs(guideIcon.centerX() - camerasGuide.centerX()) <= 1,
+        )
+        assertEquals(camerasGuide.centerY(), guideIcon.centerY())
+        assertEquals(camerasGuide.width(), guideIcon.width())
         binding.pickPoseButton.visibility = View.VISIBLE
         val labels = listOf(
             R.string.pick_pose_title,
@@ -761,21 +773,32 @@ class CameraLayoutTest {
             binding.pickPoseLabel.setText(label)
             idle()
             val thumbnail = binding.galleryButton.box()
-            val row = binding.guideRow.box()
+            val guide = binding.guideButton.box()
+            val pick = binding.pickPoseButton.box()
             val text = binding.pickPoseLabel.text
             assertEquals("$text: on Guide's icon line", binding.guideButtonIcon.box().centerY(), thumbnail.centerY())
-            assertTrue("$text: $row clear of $thumbnail", row.right <= thumbnail.left)
-            assertTrue("$text: $thumbnail where Camera's is, $cameras", abs(thumbnail.right - cameras.right) <= 1)
+            // Pick a pose in the shutter's place, clear of Guide and of the thumbnail.
+            assertTrue(
+                "$text: $pick centered where the shutter is, $shutter",
+                abs(pick.centerX() - shutter.centerX()) <= 1,
+            )
+            assertTrue("$text: $guide clear of $pick", guide.right <= pick.left)
+            assertTrue("$text: $pick clear of $thumbnail", pick.right <= thumbnail.left)
+            // As far from the right edge as Guide is from the left: the right third's middle, as on Camera.
+            assertTrue(
+                "$text: $thumbnail mirrors $guideIcon",
+                abs((360 - thumbnail.centerX()) - guideIcon.centerX()) <= 1,
+            )
             assertTrue("$text: $thumbnail inside the screen", thumbnail.right <= 360 && thumbnail.bottom <= 705)
         }
     }
 
     @Test
-    fun subjectView_thePhotosThumbnail_isOnGuidesLineWhereCamerasIs_clearOfTheButtonsBesideGuide() =
+    fun subjectView_theBottomRow_isCamerasRow_guideAtTheLeft_theThumbnailAtTheRight_pickAPoseInTheMiddle() =
         assertThumbnailBesideGuide(fontScale = 1f)
 
     @Test
-    fun subjectView_thePhotosThumbnail_isClearOfTheButtonsBesideGuide_atFontScale1_3() =
+    fun subjectView_theBottomRow_isCamerasRow_atFontScale1_3() =
         assertThumbnailBesideGuide(fontScale = 1.3f)
 
     /**

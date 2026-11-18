@@ -62,13 +62,11 @@ internal class PhotoViewer(
         return binding
     }
 
-    /** Shows [photos] under [title] while [open]; each opening starts at the newest. */
-    fun render(photos: List<Uri>, open: Boolean, title: String) {
+    /** Shows [photos] while [open], under Back alone; each opening starts at the newest. */
+    fun render(photos: List<Uri>, open: Boolean) {
         if (!open && built == null) return
         val binding = build()
         val viewer = binding.root
-        binding.photoViewerTitle.text = title
-        pages.description = title
         hideScreen(open)
         val shown = viewer.isVisible && viewer.tag != CLOSING
         if (open) {
@@ -132,9 +130,6 @@ private class PhotoPages(
 
     private var photos: List<Uri> = emptyList()
 
-    /** What TalkBack says of each photo: the viewer's title. */
-    var description: String = ""
-
     fun show(next: List<Uri>) {
         val before = photos
         if (next == before) return
@@ -163,7 +158,8 @@ private class PhotoPages(
         val message = page.binding.photoPageMessage
         page.reading?.cancel()
         image.setImageDrawable(null)
-        image.contentDescription = description
+        // No title on screen; TalkBack says "Photo", and the counter which one of how many.
+        image.contentDescription = image.context.getString(R.string.session_photo)
         message.isVisible = false
         page.reading = scope.launch {
             val picture = withContext(Dispatchers.IO) {

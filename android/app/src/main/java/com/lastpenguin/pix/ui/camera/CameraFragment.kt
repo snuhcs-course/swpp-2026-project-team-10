@@ -936,11 +936,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.galleryButton.isEnabled = state.lastPhoto != null
         controls.galleryButton.contentDescription =
             getString(if (state.sessionPhotos != null) R.string.open_session_photo else R.string.open_last_photo)
-        photoViewer?.render(
-            state.sessionPhotos.orEmpty(),
-            state.photosOpen,
-            getString(R.string.session_photo_title_yours),
-        )
+        photoViewer?.render(state.sessionPhotos.orEmpty(), state.photosOpen)
         photosBack?.isEnabled = state.photosOpen
         // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
         controls.switchCameraButton.isVisible = state.canSwitchCamera

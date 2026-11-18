@@ -464,10 +464,8 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ ->
             assertTrue(photoViewerOn(controls.root).root.isShown)
             assertSame(picture, photoViewerOn(controls.root).pageShows())
-            assertEquals(
-                string(R.string.session_photo_title_yours),
-                photoViewerOn(controls.root).photoViewerTitle.text.toString(),
-            )
+            // No title, and one photo has no counter.
+            assertEquals(emptyList<String>(), photoViewerOn(controls.root).textsShown())
         }
 
         // System Back closes it, and the session goes on.

@@ -102,8 +102,9 @@ import org.webrtc.VideoSink
  * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
  * the photographer describes or creates poses, picks one, or checks its guide, the video says so, and their *Generate
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
- * The session's newest photo is a thumbnail at the bottom right, as on Camera, which opens the session's photos in a
- * viewer over the screen, inside Pix, so the session goes on (FR-6.14).
+ * The bottom row is Camera's: *Guide* at the left, and the session's newest photo as a thumbnail at the right, empty
+ * until the first, which opens the session's photos in a viewer over the screen, inside Pix, so the session goes on
+ * (FR-6.14).
  * System back closes the viewer, or else asks first (R&S 6.9). The first time the video shows, the tutorial's tips of
  * this screen come over it (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as
  * their frame does, and blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and
@@ -280,10 +281,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         )
                         renderSaveGuide(binding, ui)
                         renderTip(binding, ui)
-                        binding.galleryButton.isVisible = ui.lastPhoto != null
-                        val photoTitle = ui.photographerName?.let { getString(R.string.session_photo_title, it) }
-                            ?: getString(R.string.session_photo_title_unnamed)
-                        photoViewer.render(ui.photos, ui.photosOpen, photoTitle)
+                        binding.galleryButton.isEnabled = ui.lastPhoto != null
+                        photoViewer.render(ui.photos, ui.photosOpen)
                         renderPoses(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)

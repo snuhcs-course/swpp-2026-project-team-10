@@ -26,6 +26,7 @@ import com.lastpenguin.pix.ui.camera.counterReads
 import com.lastpenguin.pix.ui.camera.pageSaysUnavailable
 import com.lastpenguin.pix.ui.camera.pageShows
 import com.lastpenguin.pix.ui.camera.photoViewerOn
+import com.lastpenguin.pix.ui.camera.textsShown
 import java.io.IOException
 import java.time.Duration
 import kotlinx.coroutines.CoroutineScope
@@ -49,10 +50,10 @@ import org.robolectric.shadows.ShadowDialog
 /*
  * The session's photos on Subject view (FR-6.14, R&S 6.6; Iter4-A2), on the real Fragment with a container of fakes
  * and the real PhotoSyncer, whose album saves each photo the photographer sends.
- * The thumbnail (state-based): none before the first photo, nor any viewer built yet, nor for one the album could not
- * save; the first photo's, then a newer one's in its place.
- * The viewer (state-based): the session's photos over the video, opened at the newest and named after the
- * photographer, with the session going on and the screen staying; a swipe shows the earlier ones, with which one of
+ * The thumbnail (state-based): empty and taking no tap before the first photo, with no viewer built yet, and for one
+ * the album could not save; the first photo's, then a newer one's in its place.
+ * The viewer (state-based): the session's photos over the video, opened at the newest under Back alone, with no title,
+ * with the session going on and the screen staying; a swipe shows the earlier ones, with which one of
  * how many, and each opening starts at the newest again; a newer photo while it is open is one more page, the page on
  * screen staying, and the thumbnail's; its Back and the system's close it without asking to leave; a photo that cannot
  * be read says so; the photographer's step that starts while it is open waits until it closes; the session's end
@@ -137,14 +138,19 @@ class SubjectSessionPhotoTest {
     // ---- The thumbnail ----------------------------------------------------------------------
 
     @Test
-    fun beforeAnyPhoto_thereIsNoThumbnail() {
+    fun beforeAnyPhoto_theThumbnailIsEmpty_andATapOpensNothing() {
         launch()
 
         onScreen { binding, _ ->
-            assertEquals(View.GONE, binding.galleryButton.visibility)
-            // The viewer is built when it first opens.
-            assertNull(binding.root.findViewById(R.id.photoViewer))
+            assertTrue(binding.galleryButton.isShown)
+            assertFalse(binding.galleryButton.isEnabled)
+            assertNull(binding.thumbnailShows())
+            binding.galleryButton.performClick()
         }
+        settle()
+
+        // The viewer is built when it first opens.
+        onScreen { binding, _ -> assertNull(binding.root.findViewById(R.id.photoViewer)) }
     }
 
     @Test
@@ -153,7 +159,7 @@ class SubjectSessionPhotoTest {
 
         modules.photo("p1")
         onScreen { binding, _ ->
-            assertTrue(binding.galleryButton.isShown)
+            assertTrue(binding.galleryButton.isEnabled)
             assertSame(thumbnails[saved("p1")], binding.thumbnailShows())
         }
 
@@ -162,13 +168,16 @@ class SubjectSessionPhotoTest {
     }
 
     @Test
-    fun aPhotoTheAlbumCouldNotSave_showsNoThumbnail() {
+    fun aPhotoTheAlbumCouldNotSave_leavesTheThumbnailEmpty() {
         val modules = launch()
         modules.albumFails = true
 
         modules.photo("p1")
 
-        onScreen { binding, _ -> assertEquals(View.GONE, binding.galleryButton.visibility) }
+        onScreen { binding, _ ->
+            assertFalse(binding.galleryButton.isEnabled)
+            assertNull(binding.thumbnailShows())
+        }
     }
 
     // ---- The viewer -------------------------------------------------------------------------
@@ -186,10 +195,8 @@ class SubjectSessionPhotoTest {
             assertTrue(binding.viewer().root.isShown)
             assertSame(pictures[saved("p2")], binding.viewerShows())
             assertEquals("2 / 2", binding.viewer().counterReads())
-            assertEquals(
-                string(R.string.session_photo_title, "Dongje"),
-                binding.viewer().photoViewerTitle.text.toString(),
-            )
+            // No title: Back, the photo, and which one of how many.
+            assertEquals(listOf("2 / 2"), binding.viewer().textsShown())
             assertFalse(binding.viewer().pageSaysUnavailable())
         }
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)

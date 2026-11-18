@@ -19,9 +19,10 @@ data class PoseResponseDto(
 )
 
 /**
- * `POST /pose-tips`: [text] is what the app shows. The rest says the same in fields: `framing` (`closer`, `back`,
- * `keep`), `hold` (where to hold the phone: `crouching`, `waist`, `chest`, `eye`, `above head`), `height` against
- * the scene (`raise`, `lower`, `keep`), and `angle` (`up`, `level`, `down`).
+ * `POST /pose-tips`: [text] is what the app shows, a sentence on each line (#213). The rest says what the server
+ * decided in fields: `framing` (`closer`, `back`, `keep`, or `unsure` when the tip names no move), `hold` (where to
+ * hold the phone: `crouching`, `waist`, `chest`, `eye`, `above head`), `height` against the scene (`raise`, `lower`,
+ * `keep`), and `angle` (`up`, `level`, `down`).
  */
 @Serializable
 data class PoseTipDto(

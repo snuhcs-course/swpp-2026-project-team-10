@@ -1,8 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.guide.GuideSaved
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
@@ -20,6 +21,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.PoseSetStep
@@ -30,8 +32,10 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -707,6 +711,107 @@ class SubjectViewModelTest {
         runCurrent()
         assertNull(model.uiState.value.poseStep)
         assertTrue("a new set opens again", model.claimSetOpening("set2"))
+    }
+
+    // The photographer's tip of the guide on the video (FR-4.10, #213), state-based: none; a tip before its guide,
+    // with its guide, with another guide, and after its guide went; closed until the tip button, which opens and
+    // closes it and takes its dot away; a touch anywhere closes an open one; new words for the same guide keep the
+    // banner as it is; a tip that goes takes the banner with it, and one that comes back starts closed.
+
+    private val tip = PoseTip("Move a little closer.\nHold the phone at your waist, tilted up a little.")
+
+    private fun tipMessage(guideId: String, tip: PoseTip = this.tip) = SessionMessage.GuideTip(guideId, tip.text)
+
+    private fun TestScope.withTips(): SubjectViewModel {
+        val tips = TipSyncer(session, MutableStateFlow(null))
+        val model = SubjectViewModel(session, mirror, references, FakeRemoteVideo(), tips = tips)
+        connect()
+        tips.startAsReceiver(backgroundScope)
+        runCurrent()
+        return model
+    }
+
+    @Test
+    fun thePhotographersTip_isThereOnlyWithItsGuide_andClosedUntilTheButton() = runTest {
+        val model = withTips()
+        assertNull(model.uiState.value.tip)
+
+        // The tip can come before the guide's image has.
+        session.deliver(tipMessage("g1"))
+        runCurrent()
+        assertNull(model.uiState.value.tip)
+
+        mirror.setGuide(fakeGuide("g1"))
+        runCurrent()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = true), model.uiState.value.tip)
+
+        model.onTipButton()
+        assertEquals(SubjectTip("g1", tip, open = true, unseen = false), model.uiState.value.tip)
+        model.onTipButton()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = false), model.uiState.value.tip)
+    }
+
+    @Test
+    fun aTouchAnywhere_closesAnOpenTip_andLeavesAClosedOneAsItIs() = runTest {
+        val model = withTips()
+        mirror.setGuide(fakeGuide("g1"))
+        session.deliver(tipMessage("g1"))
+        runCurrent()
+
+        model.onAnyTouch()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = true), model.uiState.value.tip)
+
+        model.onTipButton()
+        model.onAnyTouch()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = false), model.uiState.value.tip)
+    }
+
+    @Test
+    fun anotherGuide_hasNoTipUntilItsOwnComes_whichStartsClosed() = runTest {
+        val model = withTips()
+        mirror.setGuide(fakeGuide("g1"))
+        session.deliver(tipMessage("g1"))
+        runCurrent()
+        model.onTipButton()
+
+        mirror.setGuide(fakeGuide("g2"))
+        runCurrent()
+        assertNull(model.uiState.value.tip)
+
+        val other = PoseTip("Step back.")
+        session.deliver(tipMessage("g2", other))
+        runCurrent()
+        assertEquals(SubjectTip("g2", other, open = false, unseen = true), model.uiState.value.tip)
+
+        mirror.setGuide(null)
+        runCurrent()
+        assertNull(model.uiState.value.tip)
+    }
+
+    @Test
+    fun newWordsForTheSameGuide_keepTheBannerAsItIs_andATipThatGoesTakesItAway() = runTest {
+        val model = withTips()
+        mirror.setGuide(fakeGuide("g1"))
+        session.deliver(tipMessage("g1"))
+        runCurrent()
+        model.onTipButton()
+
+        val korean = PoseTip("조금 다가가세요.")
+        session.deliver(tipMessage("g1", korean))
+        runCurrent()
+        assertEquals(SubjectTip("g1", korean, open = true, unseen = false), model.uiState.value.tip)
+
+        session.deliver(SessionMessage.GuideTipClear)
+        runCurrent()
+        assertNull(model.uiState.value.tip)
+        // Nothing to open or close without a tip.
+        model.onTipButton()
+        model.onAnyTouch()
+        assertNull(model.uiState.value.tip)
+
+        session.deliver(tipMessage("g1"))
+        runCurrent()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = true), model.uiState.value.tip)
     }
 
     private companion object {

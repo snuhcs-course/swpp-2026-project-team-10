@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -20,6 +20,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -718,4 +719,84 @@ class CameraLayoutTest {
         idle()
         assertEveryControlAtLeast48(binding.root, "Subject view")
     }
+
+    /** Subject view in a session, with a guide on the video and the photographer's tip of it, its banner closed. */
+    private fun subjectWithTip(fontScale: Float = 1f): FragmentSubjectBinding {
+        if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
+        val modules = TestAppContainer().install()
+        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
+            get().setTheme(R.style.Theme_Pix)
+        }
+            .setup().get()
+        val fragment = SubjectFragment()
+        activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.session.deliver(
+            SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(0.6f, 1f, 2f), -6..6, 0.5f, true)),
+        )
+        // The widest readout the row shows.
+        modules.session.deliver(SessionMessage.CameraStateUpdate(zoom = 10f, by = Role.PHOTOGRAPHER, final = true))
+        modules.tipSync.startAsReceiver(fragment.viewLifecycleOwner.lifecycleScope)
+        modules.mirror.setGuide(
+            ReferenceGuide(
+                id = "g1",
+                mask = Bitmap.createBitmap(4, 8, Bitmap.Config.ARGB_8888),
+                outline = Bitmap.createBitmap(4, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.TRANSPARENT) },
+                aspect = 0.5f,
+                source = GuideSource.GENERATED,
+                anchor = NormalizedRect(0.2f, 0.1f, 0.8f, 0.95f),
+            ),
+        )
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        // The longest tip the server writes: every sentence it has, one on a line.
+        modules.session.deliver(
+            SessionMessage.GuideTip(
+                "g1",
+                "Move until the person fits the guide's outline, then take it.\n" +
+                    "Hold the phone above your head, tilted down a little.\n" +
+                    "Put the person on the right of the frame.\nLeave almost no room above the head.\n" +
+                    "Hold the phone upright so the lines behind the person are level.",
+            ),
+        )
+        idle()
+        return FragmentSubjectBinding.bind(fragment.requireView())
+    }
+
+    private fun assertTheTipFitsOnSubjectView(binding: FragmentSubjectBinding, font: String) {
+        // The row: brightness and the tip at its start, clear of the readout; Save guide and the toggle at its end.
+        val row = binding.zoomRow.box()
+        val brightness = binding.brightnessButton.box()
+        val tip = binding.tipButtonFrame.box()
+        val readout = binding.zoomReadout.box()
+        assertTrue("$font: the tip button shows", binding.tipButtonFrame.isShown)
+        assertEquals("$font: the tip button beside the brightness", brightness.right, tip.left)
+        assertTrue("$font: $tip clear of the readout $readout", tip.right <= readout.left)
+        assertTrue("$font: the readout clear of Save guide", readout.right <= binding.saveGuideButton.box().left)
+        assertTrue("$font: in the row", tip.top >= row.top && tip.bottom <= row.bottom)
+        assertEveryControlAtLeast48(binding.root, "Subject view with a tip, $font")
+
+        // Open, the tip is whole on the screen above the caption, and the row moves above it.
+        binding.tipButton.performClick()
+        idle()
+        val banner = binding.tipBanner.box()
+        assertTrue("$font: the banner shows", binding.tipBanner.isShown)
+        // Every sentence shows: at least a line each, none cut off at the end.
+        val words = binding.tipText
+        assertTrue("$font: ${words.lineCount} lines", words.lineCount >= 5)
+        assertEquals("$font: the last line is whole", 0, words.layout.getEllipsisCount(words.lineCount - 1))
+        assertTrue("$font: the text is as tall as its lines", words.height >= words.layout.height)
+        assertTrue("$font: $banner above the caption", banner.bottom <= binding.bottomPanel.box().top)
+        assertTrue("$font: $banner under the top bar", banner.top >= binding.topBar.box().bottom)
+        assertTrue("$font: the row above the banner", binding.zoomRow.box().bottom <= banner.top)
+        assertEveryControlAtLeast48(binding.root, "Subject view with the tip open, $font")
+    }
+
+    @Test
+    fun subjectView_theTipButtonIsClearOfTheReadout_andItsCardOpensAboveTheCaption() =
+        assertTheTipFitsOnSubjectView(subjectWithTip(), "font scale 1")
+
+    @Test
+    fun subjectView_theTipButtonIsClearOfTheReadout_andItsCardOpensAboveTheCaption_atFontScale1_3() =
+        assertTheTipFitsOnSubjectView(subjectWithTip(fontScale = 1.3f), "font scale 1.3")
 }

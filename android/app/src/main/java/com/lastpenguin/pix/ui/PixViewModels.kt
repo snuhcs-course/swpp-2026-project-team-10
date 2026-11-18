@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -78,6 +78,7 @@ object PixViewModels {
                 container.confirmSyncer,
                 container.descriptionSyncer,
                 container.photoSyncer,
+                container.tipSyncer,
             )
         }
         initializer { InvitationViewModel(container.invitationManager, container.authRepository) }
@@ -92,6 +93,7 @@ object PixViewModels {
                 container.poseSyncer,
                 container.confirmSyncer,
                 container.descriptionSyncer,
+                container.tipSyncer,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }

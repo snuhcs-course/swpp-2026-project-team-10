@@ -3,7 +3,6 @@ package com.lastpenguin.pix.ui.account
 
 import android.view.LayoutInflater
 import android.view.View
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
@@ -16,12 +15,13 @@ import com.lastpenguin.pix.databinding.FragmentAddFriendBinding
 import com.lastpenguin.pix.databinding.FragmentPixIdSetupBinding
 import com.lastpenguin.pix.databinding.FragmentSignInBinding
 import com.lastpenguin.pix.databinding.FragmentSignUpBinding
+import com.lastpenguin.pix.ui.OwnActivities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 
 /*
  * Partitions for the account forms on their real layouts (US-6, US-7; FR-5.2, FR-5.3, FR-5.5, FR-5.8, FR-5.11,
@@ -37,7 +37,10 @@ import org.robolectric.Robolectric
  */
 @RunWith(AndroidJUnit4::class)
 class AccountFormsTest {
-    private val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+    @get:Rule
+    val activities = OwnActivities()
+
+    private val activity = activities.start()
     private val inflater = LayoutInflater.from(activity)
     private val calls = mutableListOf<String>()
     private val red = ContextCompat.getColor(activity, R.color.pix_danger_text)

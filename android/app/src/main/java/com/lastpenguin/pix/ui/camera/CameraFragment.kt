@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -627,22 +627,30 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     /**
      * The reference thumbnail (FR-3.9): a tap enlarges it or makes it small again, and a drag drops it into the
-     * nearest corner. TalkBack gets the same tap and an action for each other corner.
+     * nearest corner, or hides it at that corner's side when it is let go mostly out of the preview or flung there
+     * (#237). A hidden one leaves a strip, which a tap or a drag brings back. TalkBack gets the same tap, an action
+     * for each other corner, and one to hide it.
      */
     private fun setupReference(controls: FragmentCameraBinding) {
         val thumbnail = controls.referenceThumbnail
+        val density = resources.displayMetrics.density
         referenceDrag = ReferenceDragController(
             thumbnail,
             area = { referenceArea(controls) },
-            onTap = { viewModel.setReferenceExpanded(!viewModel.uiState.value.referenceExpanded) },
-        ) { corner ->
-            corner?.let(viewModel::setReferenceCorner)
+            previewWidth = { controls.previewContainer.width },
+            peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+            flingSpeed = REFERENCE_FLING_DP * density,
+            onTap = viewModel::onReferenceTap,
+        ) { drop ->
+            drop?.let(viewModel::onReferenceDropped)
             renderReference(controls, viewModel.uiState.value)
-        }
+        }.also { it.listenOn(controls.referenceHandle) }
         thumbnail.setReferenceActions(
             expanded = { viewModel.uiState.value.referenceExpanded },
             corner = { viewModel.uiState.value.referenceCorner },
+            hidden = { viewModel.uiState.value.referenceHidden },
             moveTo = viewModel::setReferenceCorner,
+            setHidden = viewModel::setReferenceHidden,
         )
         // The corners follow the preview's size and the panels at its bottom, which grow when brightness or a notice
         // opens; both are known only after layout.
@@ -1041,19 +1049,33 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // toggle's label takes the hint's place while it shows.
         controls.hintText.isInvisible = controls.hintText.text.isNullOrEmpty() ||
             (reference != null && state.referenceExpanded) || controls.toggleLabel.isVisible
+        val dragging = referenceDrag?.isDragging == true
+        var placed: ReferencePlacement? = null
         controls.referenceThumbnail.showReference(reference) { photo ->
-            if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) {
+            if (dragging || controls.previewContainer.width == 0) {
                 null
             } else {
+                val density = resources.displayMetrics.density
                 placeReference(
                     aspect = photo.width.toFloat() / photo.height,
                     expanded = state.referenceExpanded,
                     corner = state.referenceCorner,
-                    smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
+                    smallLongSide = (REFERENCE_SMALL_DP * density).roundToInt(),
                     previewWidth = controls.previewContainer.width,
                     area = referenceArea(controls),
-                )
+                    hidden = state.referenceHidden,
+                    peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+                ).also { placed = it }
             }
+        }
+        // The handle stays as it is through a drag, which may have begun on it.
+        if (!dragging) {
+            controls.referenceHandle.showReferenceHandle(
+                placement = placed.takeIf { reference != null && state.referenceHidden },
+                corner = state.referenceCorner,
+                previewWidth = controls.previewContainer.width,
+                area = referenceArea(controls),
+            )
         }
     }
 

@@ -35,6 +35,7 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.ReferenceCorner
+import com.lastpenguin.pix.ui.camera.ReferenceDrop
 import com.lastpenguin.pix.ui.camera.ToggleLabel
 import com.lastpenguin.pix.ui.camera.toggleSaved
 import kotlinx.coroutines.channels.Channel
@@ -110,6 +111,13 @@ data class SubjectUiState(
     val referenceExpanded: Boolean = false,
     /** The thumbnail's corner on this phone; never sent, so each phone keeps its own. */
     val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
+    /**
+     * The thumbnail is put away at its corner's side of the video, with a strip of it left to pull it back by
+     * (FR-3.9, #237). On this phone only, like its size and corner; another guide's thumbnail shows again. A hidden
+     * thumbnail is never [referenceExpanded]: hiding makes it small, so its strip is the small one's and it comes
+     * back small.
+     */
+    val referenceHidden: Boolean = false,
     /** Whether the guide on the video is among this phone's saved guides (FR-6.16): *Save guide* is filled then. */
     val guideSaved: Boolean = false,
     val savingGuide: Boolean = false,
@@ -283,7 +291,14 @@ class SubjectViewModel(
         viewModelScope.launch {
             mirror.guide.collect { guide ->
                 val previous = _uiState.value.guide
-                _uiState.update { it.copy(guide = guide, guideEditing = it.guideEditing && guide != null) }
+                _uiState.update {
+                    it.copy(
+                        guide = guide,
+                        guideEditing = it.guideEditing && guide != null,
+                        // The same guide's thumbnail stays put away; another guide's photo is new, so it shows.
+                        referenceHidden = it.referenceHidden && guide != null && guide.id == it.guide?.id,
+                    )
+                }
                 // A gesture never crosses guide identities (Design 2.6.2): a removed or replaced guide ends it.
                 if (guide?.id != previous?.id) guideSender.cancel()
             }
@@ -419,14 +434,43 @@ class SubjectViewModel(
         return true
     }
 
-    /** A tap on the reference thumbnail enlarges it or makes it small again (FR-3.9). */
+    /** A tap on the reference thumbnail enlarges it or makes it small again (FR-3.9). A hidden one stays small. */
     fun setReferenceExpanded(expanded: Boolean) {
-        _uiState.update { it.copy(referenceExpanded = expanded && it.reference != null) }
+        _uiState.update { it.copy(referenceExpanded = expanded && it.reference != null && !it.referenceHidden) }
     }
 
     /** A drag or TalkBack moves the thumbnail to [corner], on this phone only. */
     fun setReferenceCorner(corner: ReferenceCorner) {
         _uiState.update { it.copy(referenceCorner = corner) }
+    }
+
+    /** Puts the thumbnail away at its corner's side, small, or shows it again (#237), on this phone only. */
+    fun setReferenceHidden(hidden: Boolean) {
+        _uiState.update {
+            val hides = hidden && it.reference != null
+            it.copy(referenceHidden = hides, referenceExpanded = it.referenceExpanded && !hides)
+        }
+    }
+
+    /** A drag let the thumbnail go: into [drop]'s corner, or hidden, and small, at that corner's side (#237). */
+    fun onReferenceDropped(drop: ReferenceDrop) {
+        _uiState.update {
+            val hides = drop.hidden && it.reference != null
+            it.copy(
+                referenceCorner = drop.corner,
+                referenceHidden = hides,
+                referenceExpanded = it.referenceExpanded && !hides,
+            )
+        }
+    }
+
+    /** A tap on the thumbnail: a hidden one comes back, small, and a shown one changes its size (FR-3.9). */
+    fun onReferenceTap() {
+        if (_uiState.value.referenceHidden) {
+            setReferenceHidden(false)
+        } else {
+            setReferenceExpanded(!_uiState.value.referenceExpanded)
+        }
     }
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */

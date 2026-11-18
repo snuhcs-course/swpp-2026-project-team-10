@@ -14,6 +14,7 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -21,6 +22,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -39,6 +41,9 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RoomCodeSheetTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private var scenario: FragmentScenario<RoomCodeSheet>? = null
     private lateinit var sheet: RoomCodeSheet
 
@@ -72,10 +77,7 @@ class RoomCodeSheetTest {
     /** The sheet over an AppCompat activity, as in the app; without one, the notes' start icons are not laid out. */
     private fun showOverAppCompat(): SheetRoomCodeBinding {
         TestAppContainer().install()
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java)
-            .apply { get().setTheme(R.style.Theme_Pix) }
-            .setup()
-            .get()
+        val activity = activities.start(R.style.Theme_Pix)
         val sheet = RoomCodeSheet()
         sheet.show(activity.supportFragmentManager, null)
         idle()
@@ -96,7 +98,7 @@ class RoomCodeSheetTest {
     @Test
     fun aConfigurationChange_whileTheCodeWaits_keepsTheRoomAndTheCode() {
         val modules = TestAppContainer().install()
-        val controller = Robolectric.buildActivity(AppCompatActivity::class.java).setup()
+        val controller = activities.keep(Robolectric.buildActivity(AppCompatActivity::class.java).setup())
         RoomCodeSheet().show(controller.get().supportFragmentManager, "roomCode")
         idle()
         modules.session.setState(SessionState.Waiting("482915"))

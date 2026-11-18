@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -36,7 +36,10 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.camera.REFERENCE_HIDDEN_ALPHA
+import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
 import java.time.Duration
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -54,6 +57,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
@@ -65,7 +69,9 @@ import org.robolectric.shadows.ShadowToast
  * camera's video, grid, guide, and reference photo shown as a mirror, the front camera's as sent, and a drag on the
  * mirrored guide moving it the way the finger goes; a guide arriving, the edit-mode
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
- * gone with a replaced or removed guide, and moved to another corner on this phone only; the brightness panel and a
+ * gone with a replaced or removed guide, moved to another corner on this phone only, and hidden at the video's side
+ * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
+ * and small when it is back; #237), a mirror through each change of its size; the brightness panel and a
  * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
@@ -92,6 +98,7 @@ class SubjectFragmentRenderTest {
 
     @After
     fun tearDown() {
+        ShadowChoreographer.setPaused(false)
         scenario?.close()
         receiving.cancel()
     }
@@ -269,6 +276,45 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
+    fun theMirroredReferencePhoto_staysAMirror_shownEnlargedAndWhileItChangesSize() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(cameraState(CameraFacing.BACK))
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        var small = 0
+        var left = 0f
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            assertEquals(-1f, thumbnail.scaleX)
+            small = thumbnail.width
+            left = thumbnail.translationX
+            ShadowChoreographer.setPaused(true)
+            thumbnail.performClick()
+        }
+        idle()
+        // The first frame of growing: drawn as small as it was, flipped, with its left side where it was.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            val large = thumbnail.layoutParams.width
+            assertTrue(large > small * 2)
+            assertEquals(-small.toFloat() / large, thumbnail.scaleX, 0.001f)
+            assertEquals(left, thumbnail.translationX + (large - small) / 2f, 0.5f)
+        }
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            assertEquals(-1f, binding.referenceThumbnail.scaleX)
+            assertEquals(left, binding.referenceThumbnail.translationX)
+        }
+
+        // The front camera's video is a mirror already: the photo is as sent, at once.
+        modules.session.deliver(cameraState(CameraFacing.FRONT))
+        idle()
+        onScreen { binding, _ -> assertEquals(1f, binding.referenceThumbnail.scaleX) }
+    }
+
+    @Test
     fun aDragOnTheMirroredGuide_movesItTheWayTheFingerGoes() {
         val modules = launch()
         connect(modules)
@@ -384,6 +430,85 @@ class SubjectFragmentRenderTest {
         }
         // Nothing goes to the photographer: each phone keeps its own corner.
         assertEquals(sent, modules.session.sent.size)
+    }
+
+    @Test
+    fun theReferenceThumbnail_hidesAtTheVideosSide_andComesBackAtATap_onThisPhoneOnly() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        val sent = modules.session.sent.size
+
+        // A flick to the left, from its corner at the top left.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            drag(thumbnail, -thumbnail.width - ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // Only its peek is in the video, see-through, under a handle a touch target wide.
+            assertEquals((peek - thumbnail.width).toFloat(), thumbnail.translationX)
+            assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha)
+            assertTrue(binding.referenceHandle.isShown)
+            assertEquals(0f, binding.referenceHandle.translationX)
+            // A tap on the handle is a tap on the strip.
+            drag(binding.referenceHandle, 0f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            assertTrue(binding.referenceThumbnail.translationX > 0f)
+            assertEquals(1f, binding.referenceThumbnail.alpha)
+            assertFalse(binding.referenceHandle.isShown)
+        }
+        // Nothing goes to the photographer: hidden is this phone's alone, like the corner.
+        assertEquals(sent, modules.session.sent.size)
+    }
+
+    @Test
+    fun theReferenceThumbnail_hiddenWhileEnlarged_leavesTheSmallStrip_andComesBackSmall() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        var small = 0 to 0
+        onScreen { binding, _ ->
+            small = binding.referenceThumbnail.width to binding.referenceThumbnail.height
+            binding.referenceThumbnail.performClick()
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+
+        // Enlarged in the top-left corner, dragged to the left until most of it is out of the video.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            assertTrue(thumbnail.width > small.first * 2)
+            drag(thumbnail, -thumbnail.width - ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, fragment ->
+            val thumbnail = binding.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // What stays is the small thumbnail's strip, and TalkBack hears a hidden thumbnail.
+            assertEquals(small, thumbnail.width to thumbnail.height)
+            // Still the rear camera's mirror, like the video, at its full size.
+            assertEquals(-1f, thumbnail.scaleX)
+            assertEquals(1f, thumbnail.scaleY)
+            assertEquals((peek - small.first).toFloat(), thumbnail.translationX)
+            assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha)
+            assertEquals(
+                fragment.getString(R.string.reference_hidden),
+                thumbnail.createAccessibilityNodeInfo().stateDescription?.toString(),
+            )
+            drag(binding.referenceHandle, 0f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            assertEquals(small, binding.referenceThumbnail.width to binding.referenceThumbnail.height)
+            assertEquals(1f, binding.referenceThumbnail.alpha)
+            assertFalse(binding.referenceHandle.isShown)
+        }
     }
 
     private fun drag(view: View, dx: Float, dy: Float) {

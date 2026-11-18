@@ -92,6 +92,7 @@
 | 3.12 | 2026-11-16 | Photo capture (Iter4-P11, [#208]): `takePhoto`'s `onCaptured` frees the shutter while the photo is saved, results in shutter order, no saving label, and the capture settings in `CaptureTuning` with what the S22 measured (2.1, 2.6.2, 2.8). |
 | 3.13 | 2026-11-16 | The scene photo step (Iter4-P21, [#231]): Camera's own top bar with the ratio, the preview in one place, a small see-through panel that a touch takes away (`GenerationUiState.sceneHint`), and no slide of the preview (2.6.3). |
 | 3.14 | 2026-11-18 | Better pose tips (Iter4-P16, [#213]): the model describes each photo in its own request, the server derives the distance from two measures and writes the tip's sentences, and `guide.tip` sends the tip to the subject's phone (2.1, 2.2, 2.5.1, 2.5.3, 2.6.3, Figures 7 and 8). |
+| 3.15 | 2026-11-18 | The reference thumbnail hides at the side (Iter4-A4, [#237]): `dropReference`, a strip of the small thumbnail under a touch-target handle, `referenceHidden` on each phone, and its changes animated by `showReference` (2.6.2, 2.9). |
 
 </details>
 
@@ -2546,6 +2547,7 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 - *Other camera (FR-1.14).* The same hold, with the grid and guide kept. The frame turns over top over bottom in 300 ms (`rotationX`), then fades into the new preview.
 - *Lens change of the zoom.* The held frame goes at once (2.6.5).
 - *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms. The shutter is disabled only until the camera has taken the picture (`CameraUiState.shutterBusy`), so the next photo can follow while this one is saved. Nothing says that a photo is being saved. *Guide*, *Shoot together*, the camera switch, and the ratio wait until every photo is saved (`isSaving`), because leaving Camera or rebinding would lose a photo ([#208]).
+- *Reference thumbnail (FR-3.9, [#237]).* It follows the finger. At a release, a tap, or a move by TalkBack it settles into its place, size, and opacity in 200 ms (`Motion.THUMBNAIL_MS`, `showReference`). It is laid out once, at the larger of the two sizes, and drawn smaller by its scale, about its middle: growing, at the new size from the start, and shrinking, at the old size until the end. So the photo is never a small one enlarged. Its corner radius and line are divided by that scale at every frame, so they look as at rest (`keepShapeAt`). The same scale flips it for Subject view's mirror, so only `showReference` sets the thumbnail's scale (`mirrored`). A render for the place a glide is already going to leaves the glide running, and so does a press: a second tap turns the glide back from the size it has then, and only a drag stops it, holding the thumbnail by the box it is drawn at then. It shows its end at once when it first appears, with another photo, and with animations off.
 - *Subject view.* The video area moves the same way when `camera.state.aspect` changes. The grid and guide wait for a frame of the new shape (`FrameWatchdog.shape`, within 2 %) or 2 s (2.6.4).
 
 **The guide's own changes (It 3, Iter3-A13, [#180]).** `GuideOverlayView` animates the guide through its paint's alpha and a scale about its middle. A guide with a new id fades in while growing from 95 % in 250 ms (`Motion.GUIDE_MS`), as the old one fades out. *Hide*, *Remove*, and the return after *Show* fade in 150 ms (`Motion.HIDE_MS`). Moves, resizes, and opacity apply at once, and a drag during an animation moves the guide. The guide already there when a view opens shows without animation. Subject view uses the same view.
@@ -2563,6 +2565,8 @@ The clamp (`GuideGeometry.clamp`): the guide's normalized width is `height × as
 **The library (FR-3.8, FR-3.11, It 3, [#170]).** *Add a pose guide* has *Choose from the gallery* and *My library*, which shows *All N* while guides are saved ([#210]) and opens `LibraryFragment` in the sheet's place, so Back returns to the camera: a grid filtered by kind, newest first, where a tap puts a guide on the camera at its *Starting position* and a long press deletes after asking. Thumbnails load as cells show, through a 24 MB `LruCache`. From Subject view, the library offers the guide to the photographer and leaves when the session ends. The screens: R&S 6.2.
 
 **Overlay rendering.** `GuideOverlayView` draws the outline with `opacity` as `Paint.alpha`, in this phone's line color and thickness (2.6.8), clipped to the image, and nothing while `visible == false`. The reference thumbnail (FR-3.9) is a separate view, never in the stream or photos. It starts top left with a 72 dp long side; a tap enlarges it to half the preview's width, or less to fit. A drag drops it into the nearest corner (`ReferenceDragController`), which TalkBack offers as actions. The corner persists, and a new guide starts small. Subject view shows the same thumbnail from `MirrorReference`, with its own corner, which is never sent (It 3, [#132]); it stays while the guide is hidden.
+
+**Hiding the thumbnail (It 4, [#237]).** A drag may take the thumbnail out of the preview sideways, and it fades as it goes (`referenceAlpha`). `dropReference` decides at release: hidden when its center is past the preview's side, or when the drag ended toward the nearer side at 800 dp/s or faster and more sideways than up or down. The speed is the finger's over its last 100 ms, so a pause before release is no flick; the release event counts for the place and the speed, since it can carry the last of the move. A hidden thumbnail is small, at its corner's height, with 16 dp of it inside the preview at 55 % opacity, or just under half of a thumbnail narrower than 32 dp, as a very tall photo's is (`referencePeek`), so more than half of it is always out; hiding ends the enlarged state, so it comes back small. The strip is too narrow for a finger: a transparent handle 48 dp wide and at least as tall lies over it, inside the thumbnail's area, passes its touches to the same controller, and keeps the system's back gesture off that edge (`setSystemGestureExclusionRects`). A tap on the strip or a drop inside the preview shows the thumbnail again. TalkBack has *Hide at the side* beside the corner actions, and a hidden thumbnail says *Hidden* and offers *Show*. `referenceHidden` is in each screen's state, never sent. It is kept for the same guide, also for its saved copy, by the guide's id, and another guide's thumbnail shows again.
 
 #### 2.6.3 Pose generation
 
@@ -3260,6 +3264,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Dropped | — |
 | Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
 | Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/17 | Done | 2.5.1, 2.5.3, 2.6.3 |
+| The reference thumbnail hides at the side, and its changes are animated (Iter4-A4, [#237]) | 박동제 | 11/20 | Done | 2.6.2 |
 | The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Open | *Still open*, AD-8 |
 | Integration tests for the Iteration 4 flows (Iter4-P18, [#215]) | 조성민 | 11/19 | Open | Testing Documentation |
 | Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Open | — |
@@ -3384,6 +3389,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
 [#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
+[#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
 [#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213

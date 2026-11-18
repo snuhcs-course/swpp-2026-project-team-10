@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-16, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -41,6 +41,9 @@ class ChannelRouterTest {
         )
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideImageChunk("g", 0, "AA==")))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideClear))
+        // The guide's tip and its end, in order with each other (#213).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideTip("g", "Step back.")))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideTipClear))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Leave(EndReason.LEFT)))
         // The slots and a failure come in order with the set's other messages (Iter3-A13).
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PosePlanned("set1", listOf("pose-1"))))

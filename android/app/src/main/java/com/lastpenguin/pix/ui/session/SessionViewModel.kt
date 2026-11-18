@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -29,6 +29,7 @@ import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.CameraViewModel
 import kotlinx.coroutines.Job
@@ -109,6 +110,7 @@ class SessionViewModel(
     private val confirmSyncer: ConfirmSyncer? = null,
     private val descriptionSyncer: DescriptionSyncer? = null,
     private val photoSyncer: PhotoSyncer? = null,
+    private val tipSyncer: TipSyncer? = null,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -379,6 +381,7 @@ class SessionViewModel(
                     poseSyncer?.startAsReceiver(this)
                     confirmSyncer?.startAsReceiver(this)
                     descriptionSyncer?.startAsReceiver(this)
+                    tipSyncer?.startAsReceiver(this)
                     photoSyncer?.startAsReceiver(this)
                     launch { photoSyncer?.received?.collect(::onPhotoReceived) }
                 }
@@ -418,8 +421,8 @@ class SessionViewModel(
         }
 
         // Stopped while reconnecting and started again at Connected, so the subject gets the capabilities, the
-        // camera's state, the guide, Generate poses, the pose set, and the Reference confirm again, whatever a drop
-        // lost (Design 2.6.7).
+        // camera's state, the guide and its tip, Generate poses, the pose set, and the Reference confirm again, whatever
+        // a drop lost (Design 2.6.7).
         val liveNow = connected?.role == Role.PHOTOGRAPHER
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {
@@ -454,6 +457,7 @@ class SessionViewModel(
                     poseSyncer?.startAsSender(this)
                     confirmSyncer?.startAsSender(this)
                     descriptionSyncer?.startAsSender(this)
+                    tipSyncer?.startAsSender(this)
                 }
             }
         }

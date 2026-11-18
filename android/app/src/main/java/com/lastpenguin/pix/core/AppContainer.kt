@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-10, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -73,6 +73,7 @@ import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.WebRtcRuntime
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
@@ -148,6 +149,8 @@ class AppContainer(
     val descriptionSyncer: DescriptionSyncer,
     /** Each photo taken in a session, for the subject's "Pix" album (FR-6.14, Design 2.6.5). */
     val photoSyncer: PhotoSyncer,
+    /** The tip of the guide on the photographer's camera, on Subject view at a tap (FR-4.10, #213). */
+    val tipSyncer: TipSyncer,
     val remoteControlHandler: RemoteControlHandler,
     /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
     val mobileDataNotice: MobileDataNotice,
@@ -259,6 +262,7 @@ class AppContainer(
             // screen is in front, once the server accepted its description.
             val promptHistory = DataStorePromptHistory(appContext, appScope)
             promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
+            val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
             return AppContainer(
                 cameraController = cameraController,
                 cameraSettings = DataStoreCameraSettings(appContext),
@@ -270,7 +274,7 @@ class AppContainer(
                 poseGenerator = RemotePoseGenerator(pixApi),
                 personDetector = RuleBasedPersonDetector(MlKitPersonSignals()),
                 poseTipper = poseTipper,
-                poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage),
+                poseTips = poseTips,
                 generationConsent = DataStoreGenerationConsent(appContext),
                 promptHistory = promptHistory,
                 authRepository = authRepository,
@@ -283,6 +287,7 @@ class AppContainer(
                 poseSyncer = poseSyncer,
                 confirmSyncer = ConfirmSyncer(rtcSessionManager, MaskGuideImageCodec()),
                 descriptionSyncer = descriptionSyncer,
+                tipSyncer = TipSyncer(rtcSessionManager, poseTips.onCamera),
                 photoSyncer = PhotoSyncer(
                     rtcSessionManager,
                     ContentPhotoReader(appContext.contentResolver),

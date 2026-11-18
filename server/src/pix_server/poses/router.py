@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -42,7 +42,7 @@ class PoseResponse(BaseModel):
 
 
 class PoseTipResponse(BaseModel):
-    text: str  # the sentence the app shows
+    text: str  # what the app shows: a sentence on each line (#213)
     framing: Framing
     hold: Level  # where to hold the phone, by the photographer's posture
     height: Height  # compared with where the phone was for the scene
@@ -194,11 +194,11 @@ async def pose_tip(
     scene: UploadFile,
     candidate: UploadFile,
     pose: Annotated[str, Form()],
-    # The language of the phone's screens, in which the sentence is written (FR-10.2); apps before it leave it out.
+    # The language of the phone's screens, in which the tip is written (FR-10.2); apps before it leave it out.
     language: Annotated[Language, Form()] = "en",
 ) -> PoseTipResponse:
-    """How to hold the phone for the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate,
-    and the pose it was made with, the sentence in the language of the phone's screens (Design Documentation 2.6.3)."""
+    """How to take the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate, and the pose
+    it was made with, the tip in the language of the phone's screens (Design Documentation 2.6.3)."""
     prompted = checked_pose(pose, "pose")
     scene_bytes = await scene.read()
     check_scene(scene_bytes)
@@ -209,4 +209,10 @@ async def pose_tip(
     tipper: PoseTipper = request.app.state.pose_tipper
     # A tip the phone stopped waiting for, because the user took another candidate, is not waited for either.
     tip = await while_connected(request, tipper.tip(scene_bytes, candidate_bytes, prompted, language))
-    return PoseTipResponse(text=tip.text, framing=tip.framing, hold=tip.hold, height=tip.height, angle=tip.angle)
+    return PoseTipResponse(
+        text=tip.text,
+        framing=tip.framing,
+        hold=tip.hold,
+        height=tip.height,
+        angle=tip.angle,
+    )

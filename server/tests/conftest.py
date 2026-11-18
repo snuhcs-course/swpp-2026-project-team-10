@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 import asyncio
 import base64
 import io
@@ -46,14 +46,27 @@ def encode_image(image_format: str = "JPEG", size: tuple[int, int] = (768, 1024)
     return buffer.getvalue()
 
 
+# The tip model's two answers as a test writes them in one dict: `now` is the scene's description, and `want` with
+# the other fields the candidate's (ImageApi.tips).
 TIP = {
-    "shot": "full body",
-    "pose": "standing",
-    "camera_now": "chest",
-    "camera_best": "waist",
-    "angle": "up",
-    "framing": "closer",
-    "text": "Zoom in or take a step closer, hold the phone at your waist and tilt it up a little - the legs look longer.",
+    "now": {
+        "box": [300, 350, 750, 650],
+        "head": [300, 450, 370, 550],
+        "shot": "full body",
+        "posture": "standing",
+        "level": "chest",
+        "tilt": "level",
+        "horizon": "none",
+    },
+    "want": {
+        "box": [80, 250, 980, 750],
+        "head": [80, 400, 250, 600],
+        "shot": "knees up",
+        "posture": "standing",
+        "level": "waist",
+        "tilt": "up",
+        "horizon": "none",
+    },
 }
 
 SUGGESTED_POSES = [
@@ -67,8 +80,10 @@ SUGGESTED_POSES = [
 class ImageApi:
     """Stands in for OpenRouter. The Image API records each request in `requests` and answers with `status` and
     `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
-    `suggestion_status` and `suggestion_body` after `suggestion_delay`, except tip requests (the `tip` schema), which
-    go to `tip_requests` and get `tip_status` and `tip_body` after `tip_delay`. The Decisions API records the
+    `suggestion_status` and `suggestion_body` after `suggestion_delay`, except a tip's two requests (the `tip_scene`
+    and `tip_candidate` schemas), which go to `tip_requests` and get `tip_status` and the `tip_bodies` entry of their
+    schema after `tip_delay`, or after the next of `tip_delays` for that schema, with the next of `tip_statuses` for
+    it when there is one. The Decisions API records the
     description filter's requests in `filter_requests` and answers with `filter_status` and `filter_body` after
     `filter_delay`, by default probabilities that let every description through; the person check's (the `person`
     question) go to `person_requests` and get `person_status` and `person_body` after `person_delay`, by default a
@@ -83,6 +98,11 @@ class ImageApi:
         self.delay = 0.0
         self.suggestion_delay = 0.0
         self.tip_delay = 0.0
+        # The waits of a schema's next tip requests, in turn, before `tip_delay` applies again.
+        self.tip_delays: dict[str, list[float]] = {}
+        # The statuses of a schema's next tip requests, in turn, before `tip_status` applies again: one that is not
+        # 200 answers with an upstream error.
+        self.tip_statuses: dict[str, list[int]] = {}
         self.filter_delay = 0.0
         self.person_delay = 0.0
         self.cancelled = asyncio.Event()
@@ -113,16 +133,22 @@ class ImageApi:
         self.suggestion_body = {"error": {"code": status, "message": message}}
 
     def tips(self, fields: dict) -> None:
-        self.tip_answers(json.dumps(fields))
+        """The tip model's two answers from one dict: `now` describes the scene and `want` the candidate. A dict
+        without one of them, or with something else in its place, answers as badly."""
+        self.tip_answers(scene=json.dumps(fields.get("now", {})), candidate=json.dumps(fields.get("want", {})))
 
-    def tip_answers(self, content: object) -> None:
-        """The tip model's message, as written; `tips` writes the JSON the schema asks for."""
+    def tip_answers(self, scene: object, candidate: object) -> None:
+        """The tip model's message about the scene and its message about the candidate, as written."""
         self.tip_status = 200
-        self.tip_body: object = {"choices": [{"message": {"role": "assistant", "content": content}}]}
+        self.tip_bodies: dict[str, object] = {
+            "tip_scene": {"choices": [{"message": {"role": "assistant", "content": scene}}]},
+            "tip_candidate": {"choices": [{"message": {"role": "assistant", "content": candidate}}]},
+        }
 
     def tip_fails(self, status: int, message: str = "Provider returned error") -> None:
         self.tip_status = status
-        self.tip_body = {"error": {"code": status, "message": message}}
+        error = {"error": {"code": status, "message": message}}
+        self.tip_bodies = {"tip_scene": error, "tip_candidate": error}
 
     def judges(self, malicious: float, injection: float) -> None:
         """The filter's probability of yes for each question, in the Decisions API's shape."""
@@ -173,7 +199,9 @@ class ImageApi:
 
     @property
     def tip_payloads(self) -> list[dict]:
-        return [json.loads(request.content) for request in self.tip_requests]
+        """The scene's request first, then the candidate's, whichever reached the model first."""
+        payloads = [json.loads(request.content) for request in self.tip_requests]
+        return sorted(payloads, key=lambda payload: payload["response_format"]["json_schema"]["name"], reverse=True)
 
     async def __call__(self, request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/api/alpha/decisions" and "person" in json.loads(request.content)["questions"]:
@@ -185,10 +213,14 @@ class ImageApi:
             await self.wait(self.filter_delay)
             return httpx2.Response(self.filter_status, json=self.filter_body)
         schema = json.loads(request.content or b"{}").get("response_format", {}).get("json_schema", {})
-        if request.url.path == "/api/v1/chat/completions" and schema.get("name") == "tip":
+        if request.url.path == "/api/v1/chat/completions" and schema.get("name") in self.tip_bodies:
             self.tip_requests.append(request)
-            await self.wait(self.tip_delay)
-            return httpx2.Response(self.tip_status, json=self.tip_body)
+            waits, statuses = self.tip_delays.get(schema["name"]), self.tip_statuses.get(schema["name"])
+            status = statuses.pop(0) if statuses else None
+            await self.wait(waits.pop(0) if waits else self.tip_delay)
+            if status not in (None, 200):
+                return httpx2.Response(status, json={"error": {"code": status, "message": "Provider returned error"}})
+            return httpx2.Response(self.tip_status, json=self.tip_bodies[schema["name"]])
         if request.url.path == "/api/v1/chat/completions":
             self.suggestion_requests.append(request)
             await self.wait(self.suggestion_delay)

@@ -11,11 +11,23 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 
 ## The session's photos on the subject's phone ([#235])
 
-- [Jaewan, 11-18] "Fix issue #235." (The issue left open where the photo opens. The agent chose a viewer inside Pix, since the phone's gallery puts Pix in the background, and said so. It found that the 60 s background limit the issue names applies only to the photographer's phone. Built test-first, each new test failing on an assertion: the session's newest photo in `PhotoSyncer`, Subject view's thumbnail on *Guide*'s line where Camera's sits, the viewer over the screen, which holds the photographer's next step until it closes, and Camera's thumbnail after the session. Seven mutations of the code each failed a test. R&S, Design, Testing, IT-20, and Flow 5 were updated.)
-- [Jaewan, 11-18] "Give me screenshots of the fix. Open the emulator with Galaxy S22." (No S22 AVD existed, so the agent made one at 360 × 780 dp and ran a room-code session through the AWS server with a second emulator as the photographer, its camera on the emulator's virtual room, never the webcam. The thumbnail, the viewer, Back to the same session, and Camera's thumbnail after *Leave* all showed as built.)
-- [Jaewan, 11-18] "Close the emulators."
-- [Jaewan, 11-18] "Add some description for what each photo is in the overview png." Then: "No, just simple and short, and in white background. I need to post that to the GitHub PR." (Six screenshots with a short label under each, on white.)
-- [Jaewan, 11-18] "Commit and push this and open a PR." (This PR.)
+- [Jaewan, 11-18] "fix issue #235"
+- [Jaewan, 11-18] "give me screenshots of the fix. Open the emulator with Galaxy S22"
+- [Jaewan, 11-18] "close the emulators"
+- [Jaewan, 11-18] "add some description for what each photo is in the overview png"
+- [Jaewan, 11-18] "commit and push this and open a pr"
+- [Jaewan, 11-18] "does the gallery show all images that were taken 'within this app launch'? or 'within this share session'?"
+- [Jaewan, 11-18] "what about in  other cases? like the photographer view, or when not using sharing?"
+- [Jaewan, 11-18] "oh so if we tap it, then we can see all images in the phone? not only those saved during the current app launch? is this the normal case?"
+- [Jaewan, 11-18] "wouldn't it be better to just always show the newest photo in the phone whether it took or recieved from pix, regardless of it being in or after a sharing session? what's your thoughts on this"
+- [Jaewan, 11-18] "is the gallery opened within pix? or does it open the gallery app"
+- [Jaewan, 11-18] "what if multiple photos were taken during a session?"
+- [Jaewan, 11-18] "we can't save and show multiple photos?"
+- [Jaewan, 11-18] "what was the behavior before this PR?"
+- [Jaewan, 11-18] "should we show the photographer only the photos taken during the session too? like the subject? or leave it as now"
+- [Jaewan, 11-18] "why 3? and for 4, so you mean the photographer also only shows photos taken during the session? what if the initial thumbnail had a photo taken from before?"
+- [Jaewan, 11-18] "let's just not show the first thumbnail in this case, just the same as the subject"
+- [Jaewan, 11-18] "how long will this take"
 
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235

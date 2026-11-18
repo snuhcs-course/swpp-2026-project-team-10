@@ -281,9 +281,7 @@ class AppContainer(
             return AppContainer(
                 cameraController = cameraController,
                 albumPhotos = album.photos,
-                photoDeleter = PhotoDeleter { uri ->
-                    album.delete(uri).also { gone -> if (gone) photoSyncer.forget(uri) }
-                },
+                photoDeleter = PhotoDeleter { uri -> photoSyncer.delete(uri, album, appScope) },
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,

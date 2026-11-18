@@ -3,6 +3,7 @@ package com.lastpenguin.pix.session
 
 import android.net.Uri
 import com.lastpenguin.pix.camera.PhotoAlbum
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.session.protocol.PhotoRefusal
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import java.io.ByteArrayInputStream
@@ -73,8 +74,11 @@ import org.robolectric.RobolectricTestRunner
  * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
  * each photo taken in the session joins them, and one whose session ended before it was saved, or one taken outside a
  * session, does not; they stay through a reconnect and end with the
- * session, and the next session starts with none; a photo deleted from the viewer leaves them, and one not theirs
- * changes nothing.
+ * session, and the next session starts with none.
+ * Delete (state-based, fault injection; FR-1.16, #247): a photo neither waiting nor going is deleted at once and leaves
+ * the session's photos, one not theirs leaves them as they are, and one the album cannot delete stays in them; on the
+ * photographer's phone a photo waiting to go, or going, leaves them at once but stays on the phone until it has reached
+ * the subject, or until the session ends, and is deleted then.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -103,6 +107,16 @@ class PhotoSyncerTest {
             saved += SavedPhoto(photoId, takenAt, file.readBytes())
             Result.success(uri("saved/$photoId"))
         }
+    }
+
+    /** Pix's album's delete: the photo goes from MediaStore, so it can no longer be read, unless [deleteFails]. */
+    private val deleted = mutableListOf<Uri>()
+    private var deleteFails = false
+    private val deleter = PhotoDeleter { uri ->
+        if (deleteFails) return@PhotoDeleter false
+        deleted += uri
+        photos.remove(uri)
+        true
     }
 
     private val parts: File get() = File(folder.root, "parts")
@@ -970,18 +984,72 @@ class PhotoSyncerTest {
     }
 
     @Test
-    fun `a photo deleted from the viewer leaves the session's photos, and the others stay`() = runTest {
+    fun `a photo deleted while it goes or waits to go still reaches the subject, and is deleted once it has gone`() =
+        runTest {
+            val (syncer, failed) = sender()
+            syncer.shoot(photo("1", 10), takenAt = 1)
+            syncer.shoot(photo("2", 10), takenAt = 2)
+            runCurrent()
+
+            // Photo 1 is going, photo 2 waits behind it: both leave the viewer, and both stay to be read.
+            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertTrue(syncer.delete(uri("2"), deleter, backgroundScope))
+            runCurrent()
+            assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+            assertTrue(deleted.isEmpty())
+
+            deliverSaved(begins[0].photoId)
+            runCurrent()
+            assertEquals(listOf(uri("1")), deleted)
+            assertEquals(listOf(1L, 2L), begins.map { it.takenAt })
+
+            deliverSaved(begins[1].photoId)
+            runCurrent()
+            assertEquals(listOf(uri("1"), uri("2")), deleted)
+            assertEquals(0, failed())
+        }
+
+    @Test
+    fun `a photo deleted while it waits to go is deleted when its session ends`() = runTest {
         val (syncer, _) = sender()
         syncer.shoot(photo("1", 10), takenAt = 1)
         syncer.shoot(photo("2", 10), takenAt = 2)
+        runCurrent()
+        syncer.delete(uri("2"), deleter, backgroundScope)
+        runCurrent()
+        assertTrue(deleted.isEmpty())
 
-        syncer.forget(uri("1"))
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        syncer.drop()
+        runCurrent()
 
-        assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
-        // A photo not the session's changes nothing.
-        syncer.forget(uri("9"))
-        assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
+        assertEquals(listOf(uri("2")), deleted)
     }
+
+    @Test
+    fun `a photo not on its way is deleted at once, one not the session's changes nothing, and one kept stays`() =
+        runTest {
+            val (syncer, _) = sender()
+            syncer.shoot(photo("1", 10), takenAt = 1)
+            runCurrent()
+            deliverSaved(begins[0].photoId)
+            syncer.shoot(photo("2", 10), takenAt = 2)
+            runCurrent()
+            deliverSaved(begins[1].photoId)
+            runCurrent()
+
+            deleteFails = true
+            assertFalse(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(listOf(uri("1"), uri("2")), syncer.sessionPhotos.first())
+
+            deleteFails = false
+            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(listOf(uri("1")), deleted)
+            assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
+
+            assertTrue(syncer.delete(uri("9"), deleter, backgroundScope))
+            assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
+        }
 
     @Test
     fun `a photo taken outside a session is none of the session's`() = runTest {

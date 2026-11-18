@@ -164,13 +164,19 @@ class TestAppContainer(
     /** Whether a delete fails, as for a photo another app owns. */
     var deleteFails = false
 
-    private val deleter = PhotoDeleter { uri ->
+    /** Pix's album's own delete, as `PixAlbumPhotos.delete`. */
+    private val albumDeleter = PhotoDeleter { uri ->
         if (deleteFails) return@PhotoDeleter false
         deleted += uri
         album.value -= uri
-        photos.forget(uri)
         true
     }
+
+    /**
+     * The viewer's delete, through the real `PhotoSyncer` as in the app. A screen test starts no sender, so a photo
+     * taken in a session waits to go and is deleted only after its session.
+     */
+    private val deleter = PhotoDeleter { uri -> photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main)) }
 
     val container = AppContainer(
         cameraController = camera,

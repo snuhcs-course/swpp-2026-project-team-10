@@ -128,6 +128,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var brightnessIdleJob: Job? = null
     private var exposureBarHiding = false
 
+    /** The focus box is beside the brightness bar, so it stays as long as the bar does and goes with it (Design 2.8). */
+    private var focusRingWithBar = false
+
     // The last frame stays on screen through a ratio change or a lens switch, until the rebound preview streams
     // again (NFR-19, Design 2.6.2, 2.6.5).
     private var previewHold: PreviewHold? = null
@@ -569,6 +572,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         binding?.exposureBar?.finishDrag()
         brightnessAnchor = null
         exposureBarHiding = false
+        focusRingWithBar = false
         move?.let {
             move = null
             it.cancel()
@@ -1400,12 +1404,19 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 bar.alpha = 1f
                 bar.isVisible = true
             }
-        } else if (bar.isVisible && !exposureBarHiding) {
-            bar.finishDrag()
-            exposureBarHiding = true
-            bar.animate().alpha(0f).setDuration(EXPOSURE_BAR_FADE_MS).withEndAction {
-                exposureBarHiding = false
-                bar.isVisible = false
+        } else {
+            if (bar.isVisible && !exposureBarHiding) {
+                bar.finishDrag()
+                exposureBarHiding = true
+                bar.animate().alpha(0f).setDuration(EXPOSURE_BAR_FADE_MS).withEndAction {
+                    exposureBarHiding = false
+                    bar.isVisible = false
+                }
+            }
+            // The focus box beside it fades out with it, for any reason the bar goes.
+            if (focusRingWithBar) {
+                focusRingWithBar = false
+                fadeFocusRing(controls.focusRing, delay = 0L, duration = EXPOSURE_BAR_FADE_MS)
             }
         }
     }
@@ -1496,7 +1507,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
         if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return
         viewModel.onFocusTap((x - frame.left) / frame.width, (y - frame.top) / frame.height)
-        if (state.supportsFocusPoint) showFocusRing(controls, x, y)
+        // A box left beside the bar by an earlier tap goes when this camera shows none, as the bar moves on alone.
+        if (focusRingWithBar && !state.supportsFocusPoint) {
+            fadeFocusRing(controls.focusRing, delay = 0L, duration = FOCUS_RING_FADE_MS)
+        }
+        focusRingWithBar = state.supportsFocusPoint && hasBrightness
+        if (state.supportsFocusPoint) showFocusRing(controls, x, y, alone = !hasBrightness)
         // Brightness is set beside where the camera focused (FR-1.11, Design 2.8), or where the tap was on a camera
         // that cannot focus on a point.
         if (hasBrightness) {
@@ -1507,7 +1523,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    private fun showFocusRing(controls: FragmentCameraBinding, x: Float, y: Float) {
+    /**
+     * The focus box at the tap, shrinking into place (FR-1.4). [alone], without a brightness bar, it fades by itself
+     * after a moment; beside the bar it stays until the bar goes, and goes with it (showExposureBar).
+     */
+    private fun showFocusRing(controls: FragmentCameraBinding, x: Float, y: Float, alone: Boolean) {
         val ring = controls.focusRing
         ring.animate().cancel()
         ring.translationX = x - ring.layoutParams.width / 2f
@@ -1516,10 +1536,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         ring.scaleX = FOCUS_RING_START_SCALE
         ring.scaleY = FOCUS_RING_START_SCALE
         ring.isVisible = true
-        ring.animate().scaleX(1f).scaleY(1f).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
-            ring.animate().alpha(0f).setStartDelay(FOCUS_RING_HOLD_MS).setDuration(FOCUS_RING_FADE_MS)
-                .withEndAction { ring.isVisible = false }
+        // The start delay stays with the view's animator, so a fade before would hold the shrink back.
+        ring.animate().scaleX(1f).scaleY(1f).setStartDelay(0L).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
+            if (alone) fadeFocusRing(ring, delay = FOCUS_RING_HOLD_MS, duration = FOCUS_RING_FADE_MS)
         }
+    }
+
+    private fun fadeFocusRing(ring: View, delay: Long, duration: Long) {
+        ring.animate().cancel()
+        ring.animate().alpha(0f).setStartDelay(delay).setDuration(duration).withEndAction { ring.isVisible = false }
     }
 
     /**

@@ -64,6 +64,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
 
 /*
  * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4, FR-1.5,
@@ -83,7 +84,8 @@ import org.robolectric.annotation.GraphicsMode
  * stream state; *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept
  * while other state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its
  * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
- * edge, on the left; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
+ * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
+ * gone after it, or, on a camera without brightness, fading by itself; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
  * pinch mode's label over the guide-edit toggle, Camera then Guide.
  * A photo taken with the phone held sideways, saved as held (FR-1.5, #206).
  */
@@ -835,7 +837,9 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(4, camera.exposureRequests.last())
 
-        // A new focus drops what the drag added, and keeps the base.
+        // A new focus drops what the drag added, and keeps the base; past the double-tap time, or the detector would take
+        // the two taps for one double tap.
+        shadowOf(Looper.getMainLooper()).idleFor(ViewConfiguration.getDoubleTapTimeout() + 100L, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
         idle()
         assertEquals(2, camera.exposureRequests.last())
@@ -914,6 +918,70 @@ class CameraFragmentInteractionTest {
         }
         shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.exposureBar.isShown) }
+    }
+
+    @Test
+    fun theFocusBox_staysAsLongAsTheBrightnessBar_andTheTwoGoTogether() {
+        launch(FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true))
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+        // Past the moment the box used to fade by itself.
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_DOWN, Pointer(1, 24f, 64f))
+        }
+
+        // Held past the idle time: both stay.
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_UP, Pointer(1, 24f, 64f))
+        }
+
+        // Let go: both whole until the idle time, and both gone right after it.
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS - 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = true) }
+        shadowOf(Looper.getMainLooper()).idleFor(500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = false) }
+
+        // A second tap shows both again.
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            assertEquals(1f, controls.focusRing.scaleX, 0f)
+        }
+    }
+
+    @Test
+    fun onACameraWithoutBrightness_theFocusBoxFadesByItself() {
+        launch(FakeCameraController(supportsFocusPoint = true))
+        // The display's frames held, so the box is seen before its animation runs to its end.
+        ShadowChoreographer.setPaused(true)
+        try {
+            onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+            idle()
+            onScreen { controls, _ ->
+                assertTrue(controls.focusRing.isShown)
+                assertFalse(controls.exposureBar.isShown)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+
+        onScreen { controls, _ -> assertFalse(controls.focusRing.isShown) }
+    }
+
+    /** The focus box and the brightness bar, both whole and in view, or both gone. */
+    private fun assertBoth(controls: FragmentCameraBinding, shown: Boolean) {
+        assertEquals("focus box", shown, controls.focusRing.isShown)
+        assertEquals("brightness bar", shown, controls.exposureBar.isShown)
+        if (shown) {
+            assertEquals(1f, controls.focusRing.alpha, 0f)
+            assertEquals(1f, controls.exposureBar.alpha, 0f)
+        }
     }
 
     /** A tap to focus at [x] on the preview's middle line. */

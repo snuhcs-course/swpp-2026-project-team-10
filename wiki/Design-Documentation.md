@@ -96,6 +96,7 @@
 | 3.16 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): the thumbnail from the session's photos and a viewer inside Pix on *Subject view* and on the photographer's Camera, and outside a session the album's newest photo (`NewestAlbumPhoto`); *Subject view*'s bottom row as Camera's (2.6.5, Figures 6 and 7). |
 | 3.17 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): `PhoneTurns` with its dead band, each photo saved as held, the scene photo turned upright for 4:3 and 16:9 candidates, and a pose's guide turned back into the frame (2.6.2, 2.6.3, 2.8). |
 | 3.18 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): `TurningIcons` turns the icons, the ratio, the bottom row's labels, and *Share*'s letters upright as the phone is held, on Camera and Subject view, and the layout stays; *Share* names *Shoot together*'s button (2.1, 2.6.2). |
+| 3.19 | 2026-11-18 | The focus box stays as long as the brightness bar beside it, and the two go together (2.8; [#207]). |
 
 </details>
 
@@ -3191,6 +3192,7 @@ erDiagram
 - It applies it when the range is first known, when the range or step changes (another camera), and when the setting changes. Each tap to focus drops a drag's change and sets the base again; the setting stays.
 - TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`CameraFragment.BRIGHTNESS_IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
 - The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view keeps its brightness button and horizontal slider (2.6.5).
+- Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`focusRingWithBar`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
 
 **Language** (FR-10.2)
 

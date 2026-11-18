@@ -52,8 +52,9 @@ class NewestAlbumPhoto(
         resolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             arrayOf(MediaStore.Images.Media._ID),
-            // MediaStore keeps the path with a slash at the end.
-            "${MediaStore.Images.Media.RELATIVE_PATH} IN (?, ?)",
+            // MediaStore keeps the path with a slash at the end. A photo still pending has no bytes to show yet;
+            // MediaStore leaves it out by default, and this says so for any provider that does not.
+            "${MediaStore.Images.Media.RELATIVE_PATH} IN (?, ?) AND ${MediaStore.MediaColumns.IS_PENDING} = 0",
             arrayOf("$PIX_ALBUM_PATH/", PIX_ALBUM_PATH),
             "${MediaStore.Images.Media.DATE_ADDED} DESC, ${MediaStore.Images.Media._ID} DESC",
         )?.use { rows ->

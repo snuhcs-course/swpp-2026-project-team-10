@@ -70,8 +70,9 @@ import org.robolectric.RobolectricTestRunner
  * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
  * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
  * subject's phone each saved photo joins them in order, and a refused or broken photo, one the album fails to save, and
- * one saved before do not; on the photographer's each photo taken in the session joins them, and one whose session
- * ended before it was saved, or one taken outside a session, does not; they stay through a reconnect and end with the
+ * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
+ * each photo taken in the session joins them, and one whose session ended before it was saved, or one taken outside a
+ * session, does not; they stay through a reconnect and end with the
  * session, and the next session starts with none.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -90,7 +91,11 @@ class PhotoSyncerTest {
 
     private val saved = mutableListOf<SavedPhoto>()
     private var albumFails = false
+
+    /** Runs while the album saves, as another session that starts during a slow save. */
+    private var whileSaving: () -> Unit = {}
     private val album = PhotoAlbum { file, photoId, takenAt ->
+        whileSaving()
         if (albumFails) {
             Result.failure(IOException("The disk is full"))
         } else {
@@ -931,6 +936,20 @@ class PhotoSyncerTest {
             session.setState(SessionState.Connected("s_2", PeerInfo("Dongje", null), Role.SUBJECT))
             assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
         }
+
+    @Test
+    fun `a photo saved after its session ended, once another started, joins neither`() = runTest {
+        val (syncer, _, _) = receiver()
+        deliverWhole("p1", jpeg(10))
+        whileSaving = {
+            session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+            session.setState(SessionState.Connected("s_2", PeerInfo("Dongje", null), Role.SUBJECT))
+        }
+
+        deliverWhole("p2", jpeg(10))
+
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+    }
 
     @Test
     fun `each photo taken here in a session joins its photos, and one of an ended session does not`() = runTest {

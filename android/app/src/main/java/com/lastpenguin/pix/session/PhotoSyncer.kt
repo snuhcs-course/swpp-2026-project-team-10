@@ -120,8 +120,12 @@ class PhotoSyncer(
         state.liveSessionId()?.let { id -> kept?.takeIf { it.sessionId == id }?.photos.orEmpty() }
     }.distinctUntilChanged()
 
-    /** [uri] is one more photo of [sessionId] in this phone's album. */
+    /**
+     * [uri] is one more photo of [sessionId] in this phone's album, while that session still runs: a save that ends
+     * after it, once another started, would put the photo in the other session and take that one's photos away.
+     */
     private fun keep(sessionId: String, uri: Uri) {
+        if (currentSession() != sessionId) return
         kept.update { old -> Kept(sessionId, old?.takeIf { it.sessionId == sessionId }?.photos.orEmpty() + uri) }
     }
 
@@ -382,10 +386,12 @@ class PhotoSyncer(
             photo.crc.value == end.crc32 && photo.startsAsJpeg
         if (!whole) return fail(photo, PhotoRefusal.BROKEN)
         photo.close()
+        // The session the photo came in, before the save, which takes its time and outlasts a session that ends.
+        val sessionId = currentSession()
         album.save(photo.file, end.photoId, photo.begin.takenAt).fold(
             onSuccess = { uri ->
                 saved += end.photoId
-                currentSession()?.let { keep(it, uri) }
+                sessionId?.let { keep(it, uri) }
                 answer(end.photoId, null)
                 Timings.mark("photo.applied", "saved ${end.photoId}")
             },

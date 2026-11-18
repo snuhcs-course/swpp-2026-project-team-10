@@ -26,7 +26,8 @@ import org.robolectric.Robolectric
 
 /*
  * The newest photo in Pix's album (FR-1.6, Design 2.6.5; Iter4-A2), through a small provider in place of MediaStore.
- * The query (state-based): Pix's own album, newest first; the first row is the newest, and an empty album has none.
+ * The query (state-based): Pix's own album, published photos only, newest first; the first row is the newest, and an
+ * empty album has none.
  * Changes (state-based): a change anywhere in MediaStore reads it again, so a new photo is the newest and a deleted
  * newest gives the one before, or none.
  * Failures (fault injection): a query that throws gives none, not a crash, and the next change reads again.
@@ -89,7 +90,7 @@ class NewestAlbumPhotoTest {
     }
 
     @Test
-    fun `the newest is the first photo of Pix's album, newest first`() = runTest {
+    fun `the newest is the first published photo of Pix's album, newest first`() = runTest {
         store.rows = listOf(12, 11)
 
         val album = album()
@@ -99,6 +100,8 @@ class NewestAlbumPhotoTest {
         assertEquals(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, query.uri)
         assertTrue(query.selection, query.selection!!.contains(MediaStore.Images.Media.RELATIVE_PATH))
         assertTrue(query.args.toString(), "Pictures/Pix/" in query.args)
+        // Only a published photo: one still pending has no bytes to show yet.
+        assertTrue(query.selection, query.selection!!.contains("${MediaStore.MediaColumns.IS_PENDING} = 0"))
         assertTrue(query.sortOrder, query.sortOrder!!.startsWith("${MediaStore.Images.Media.DATE_ADDED} DESC"))
     }
 

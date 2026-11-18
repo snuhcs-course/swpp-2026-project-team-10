@@ -12,9 +12,11 @@ import android.graphics.text.LineBreaker
 import android.os.Looper
 import android.os.SystemClock
 import android.text.Spanned
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -32,6 +34,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.databinding.ViewPhotoViewerBinding
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideSource
@@ -51,6 +54,7 @@ import com.lastpenguin.pix.ui.session.SubjectFragment
 import java.time.Duration
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -61,6 +65,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -79,7 +84,8 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
  * its session photo's thumbnail (Iter4-A2) on Guide's icon line where Camera's thumbnail is, clear of the buttons
- * beside Guide with each of their labels at font scale 1 and 1.3, and its viewer over the whole screen.
+ * beside Guide with each of their labels at font scale 1 and 1.3. The session photos' viewer over the whole screen,
+ * on Subject view and on Camera.
  * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
  * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
  * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
@@ -94,6 +100,17 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
     instrumentedPackages = ["org.webrtc"],
 )
 class CameraLayoutTest {
+    /**
+     * Each test's screens, destroyed after it. A screen left alive keeps its activity's SessionViewModel registered
+     * with the process lifecycle, which holds the whole screen and its themes for the rest of the run.
+     */
+    private val screens = mutableListOf<ActivityController<AppCompatActivity>>()
+
+    @After
+    fun destroyScreens() {
+        screens.forEach { it.pause().stop().destroy() }
+    }
+
     private class Camera(
         val activity: AppCompatActivity,
         val fragment: CameraFragment,
@@ -109,7 +126,7 @@ class CameraLayoutTest {
         val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
             get().setTheme(R.style.Theme_Pix)
         }
-            .setup().get()
+            .setup().also(screens::add).get()
         val nav = TestNavHostController(activity).apply { setGraph(R.navigation.nav_graph) }
         Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
         val fragment = CameraFragment()
@@ -689,7 +706,7 @@ class CameraLayoutTest {
         val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
             get().setTheme(R.style.Theme_Pix)
         }
-            .setup().get()
+            .setup().also(screens::add).get()
         val fragment = SubjectFragment()
         activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
@@ -760,18 +777,32 @@ class CameraLayoutTest {
     fun subjectView_thePhotosThumbnail_isClearOfTheButtonsBesideGuide_atFontScale1_3() =
         assertThumbnailBesideGuide(fontScale = 1.3f)
 
-    @Test
-    fun subjectView_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() {
-        val binding = subjectView()
-
-        binding.photoViewer.visibility = View.VISIBLE
+    /**
+     * The session photos' viewer, shown: over the whole screen, Back at the top left, and the photo from under the header
+     * to 12 dp over the counter, 24 dp over the bottom, in place while the counter is not shown yet.
+     */
+    private fun assertViewerCoversTheScreen(holder: FrameLayout) {
+        val viewer = ViewPhotoViewerBinding.inflate(LayoutInflater.from(holder.context), holder, true)
+        viewer.root.visibility = View.VISIBLE
         idle()
 
-        assertEquals(Rect(0, 0, 360, 705), binding.photoViewer.box())
-        val back = binding.photoViewerBack.box()
+        assertEquals(Rect(0, 0, 360, 705), viewer.root.box())
+        val back = viewer.photoViewerBack.box()
         assertTrue("$back at the top left", back.left <= 8 && back.top <= 16)
         assertTrue("$back takes taps on 48 dp", back.width() >= 48 && back.height() >= 48)
-        assertTrue(binding.photoViewerImage.box().top >= binding.photoViewerHeader.box().bottom)
-        assertEquals(705 - 24, binding.photoViewerImage.box().bottom)
+        val pages = viewer.photoViewerPages.box()
+        val counter = viewer.photoViewerCounter.box()
+        assertTrue("$pages under the header", pages.top >= viewer.photoViewerHeader.box().bottom)
+        assertEquals(View.INVISIBLE, viewer.photoViewerCounter.visibility)
+        assertEquals(counter.top - 12, pages.bottom)
+        assertEquals(705 - 24, counter.bottom)
     }
+
+    @Test
+    fun subjectView_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() =
+        assertViewerCoversTheScreen(subjectView().photoViewerHolder)
+
+    @Test
+    fun camera_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() =
+        assertViewerCoversTheScreen(camera().controls.photoViewerHolder)
 }

@@ -43,6 +43,7 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.FramePlace
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
+import com.lastpenguin.pix.ui.camera.PhotoViewer
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
 import com.lastpenguin.pix.ui.camera.REFERENCE_MARGIN_DP
@@ -78,19 +79,14 @@ import com.lastpenguin.pix.ui.settings.renderLatency
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
 import java.text.DecimalFormat
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
 import org.webrtc.VideoFrame
@@ -105,8 +101,8 @@ import org.webrtc.VideoSink
  * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
  * the photographer describes or creates poses, picks one, or checks its guide, the video says so, and their *Generate
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
- * The session's newest photo is a thumbnail at the bottom right, as on Camera, which opens the photo in a viewer over
- * the screen, inside Pix, so the session goes on (FR-6.14).
+ * The session's newest photo is a thumbnail at the bottom right, as on Camera, which opens the session's photos in a
+ * viewer over the screen, inside Pix, so the session goes on (FR-6.14).
  * System back closes the viewer, or else asks first (R&S 6.9). The first time the video shows, the tutorial's tips of
  * this screen come over it (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as
  * their frame does, and blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and
@@ -208,9 +204,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
         }
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
-        // The session's newest photo opens over the video, inside Pix, so the session goes on (FR-6.14).
-        binding.galleryButton.setOnClickListener { viewModel.openLastPhoto() }
-        binding.photoViewerBack.setOnClickListener { viewModel.closePhoto() }
+        // The session's photos open over the video, inside Pix, so the session goes on (FR-6.14).
+        binding.galleryButton.setOnClickListener { viewModel.openPhotos() }
+        val photoViewer = PhotoViewer(binding.photoViewerHolder, viewLifecycleOwner.lifecycleScope, { photoOf(it) }) {
+            viewModel.closePhotos()
+        }
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         binding.pickPoseButton.setOnClickListener {
@@ -235,7 +233,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_settings)
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
-            if (viewModel.uiState.value.openPhoto != null) viewModel.closePhoto() else confirmLeave()
+            if (viewModel.uiState.value.photosOpen) viewModel.closePhotos() else confirmLeave()
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -280,7 +278,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         )
                         renderSaveGuide(binding, ui)
                         binding.galleryButton.isVisible = ui.lastPhoto != null
-                        renderViewer(binding, ui)
+                        val photoTitle = ui.photographerName?.let { getString(R.string.session_photo_title, it) }
+                            ?: getString(R.string.session_photo_title_unnamed)
+                        photoViewer.render(ui.photos, ui.photosOpen, photoTitle)
                         renderPoses(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
@@ -293,11 +293,6 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 launch {
                     showPhotoThumbnails(viewModel.uiState.map { it.lastPhoto }, binding.galleryThumbnail) {
                         thumbnailOf(it)
-                    }
-                }
-                launch {
-                    viewModel.uiState.map { it.openPhoto }.distinctUntilChanged().collectLatest { uri ->
-                        uri?.let { showPhoto(binding, it) }
                     }
                 }
                 // Its tutorial tips once the photographer's video shows, a moment later so the video comes first, and not
@@ -549,7 +544,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.connectingText.isVisible = text
         binding.liveDot.isVisible = streaming && !stalled
         // Not while a pose step's text or the session photo covers the video, which then is not what the tips show.
-        videoShowing.value = streaming && !stalled && poses == null && viewModel.uiState.value.openPhoto == null
+        videoShowing.value = streaming && !stalled && poses == null && !viewModel.uiState.value.photosOpen
         binding.connectingText.text = when {
             reconnecting -> getString(R.string.reconnecting)
             !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
@@ -684,58 +679,6 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         return super.onCreateAnimator(transit, enter, nextAnim)
     }
 
-    /**
-     * The session photo's viewer (FR-6.14): it fades in over the whole screen when the thumbnail is tapped and out at
-     * Back, and while it is open TalkBack reads only it. Its picture goes once it is closed.
-     */
-    private fun renderViewer(binding: FragmentSubjectBinding, ui: SubjectUiState) {
-        val viewer = binding.photoViewer
-        val title = ui.photographerName?.let { getString(R.string.session_photo_title, it) }
-            ?: getString(R.string.session_photo_title_unnamed)
-        binding.photoViewerTitle.text = title
-        binding.photoViewerImage.contentDescription = title
-        val open = ui.openPhoto != null
-        val under = when {
-            open -> View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-            else -> View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
-        }
-        for (i in 0 until binding.root.childCount) {
-            binding.root.getChildAt(i).takeIf { it !== viewer }?.importantForAccessibility = under
-        }
-        if (open == (viewer.isVisible && viewer.tag != CLOSING)) return
-        if (open) {
-            viewer.tag = null
-            if (!viewer.isVisible) viewer.alpha = 0f
-            viewer.isVisible = true
-            viewer.fadeTo(1f, Motion.FADE_MS)
-        } else {
-            viewer.tag = CLOSING
-            viewer.fadeTo(0f, Motion.FADE_MS) {
-                viewer.isVisible = false
-                viewer.tag = null
-                binding.photoViewerImage.setImageDrawable(null)
-                binding.photoViewerMessage.isVisible = false
-            }
-        }
-    }
-
-    /** The photo [uri] in the viewer, read off the main thread, or why it is not there: gone from the album. */
-    private suspend fun showPhoto(binding: FragmentSubjectBinding, uri: Uri) {
-        binding.photoViewerImage.setImageDrawable(null)
-        binding.photoViewerMessage.isVisible = false
-        val picture = withContext(Dispatchers.IO) {
-            try {
-                photoOf(uri)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                null
-            }
-        }
-        binding.photoViewerImage.setImageBitmap(picture)
-        binding.photoViewerMessage.isVisible = picture == null
-    }
-
     /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */
     private fun renderSaveGuide(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val button = binding.saveGuideButton
@@ -773,7 +716,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.pickPoseLabel.setText(label)
         binding.pickPoseButton.contentDescription = getString(label)
         // A step that starts while the session photo is open here waits, and opens as the viewer closes.
-        if (ui.openPhoto != null) return
+        if (ui.photosOpen) return
         val confirmId = ui.confirmId
         val setId = ui.poseSetId
         val describeId = ui.describeId
@@ -1058,8 +1001,5 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         const val SHAPE_TOLERANCE = 0.02f
         const val VIDEO_DIM = 0.6f
         const val SHUTTER_DIM = 0.5f
-
-        /** The viewer's tag while it fades out. */
-        const val CLOSING = "closing"
     }
 }

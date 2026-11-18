@@ -106,6 +106,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var binding: FragmentCameraBinding? = null
     private var sceneBack: OnBackPressedCallback? = null
     private var aspectsBack: OnBackPressedCallback? = null
+    private var photosBack: OnBackPressedCallback? = null
+    private var photoViewer: PhotoViewer? = null
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
@@ -181,6 +183,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     // The last photo's thumbnail, off the main thread; a test stands in for MediaStore, which has no photos on the JVM.
     @VisibleForTesting
     internal var thumbnailOf: (Uri) -> Bitmap? = { uri -> requireContext().photoThumbnail(uri) }
+
+    // A session photo in the viewer, the same way.
+    @VisibleForTesting
+    internal var photoOf: (Uri) -> Bitmap? = { uri -> requireContext().photoToView(uri) }
 
     // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
     private var previewArea = PreviewArea(0f, 0f, 0f)
@@ -304,7 +310,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             }
         }
         setupScenePhoto(controls)
-        controls.galleryButton.setOnClickListener { openLastPhoto() }
+        controls.galleryButton.setOnClickListener { onThumbnailTap() }
+        photoViewer = PhotoViewer(controls.photoViewerHolder, viewLifecycleOwner.lifecycleScope, { photoOf(it) }) {
+            viewModel.closeSessionPhotos()
+        }
+        // After the other screens' Backs, so it comes first: the viewer is over all of them.
+        photosBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
+            viewModel.closeSessionPhotos()
+        }
         // Selfie mode (FR-1.14): the last frame stays up, blurred, and turns over while the other camera opens.
         controls.switchCameraButton.setOnClickListener {
             previewHold?.hold()
@@ -483,7 +496,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     }
                 }
                 launch {
-                    // A photo just taken, or one from a session's photographer, grows into the thumbnail (FR-1.6).
+                    // A new photo, taken here or received, grows into the thumbnail (FR-1.6).
                     showPhotoThumbnails(viewModel.uiState.map { it.lastPhoto }, controls.galleryThumbnail) {
                         thumbnailOf(it)
                     }
@@ -519,6 +532,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     override fun onDestroyView() {
+        photoViewer = null
+        photosBack = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
         referenceDrag = null
@@ -919,6 +934,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
+        controls.galleryButton.contentDescription =
+            getString(if (state.sessionPhotos != null) R.string.open_session_photo else R.string.open_last_photo)
+        photoViewer?.render(
+            state.sessionPhotos.orEmpty(),
+            state.photosOpen,
+            getString(R.string.session_photo_title_yours),
+        )
+        photosBack?.isEnabled = state.photosOpen
         // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
         controls.switchCameraButton.isVisible = state.canSwitchCamera
         controls.switchCameraButton.isEnabled = granted && !state.isSaving
@@ -1797,6 +1820,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             delay(CameraViewModel.NOTICE_MS)
             controls.noticeText.isVisible = false
         }
+    }
+
+    /**
+     * The thumbnail (FR-1.6): in a session, the session's photos over the camera, inside Pix, so the session and the
+     * subject's video go on; otherwise the newest photo in the phone's gallery.
+     */
+    private fun onThumbnailTap() {
+        if (viewModel.uiState.value.sessionPhotos == null) return openLastPhoto()
+        viewModel.setAspectsOpen(false)
+        viewModel.openSessionPhotos()
     }
 
     private fun openLastPhoto() {

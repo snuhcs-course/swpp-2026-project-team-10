@@ -108,6 +108,8 @@
     <string name="session_photo_title">%1$s님의 사진</string>
     <string name="session_photo_title_unnamed">사진</string>
     <string name="session_photo_unavailable">이 사진은 더 이상 앨범에 없어요.</string>
+    <string name="session_photo_title_yours">내 사진</string>
+    <string name="photo_page_counter_description">사진 %2$d장 중 %1$d번째</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>

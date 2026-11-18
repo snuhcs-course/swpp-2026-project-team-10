@@ -22,6 +22,10 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.camera.counterReads
+import com.lastpenguin.pix.ui.camera.pageSaysUnavailable
+import com.lastpenguin.pix.ui.camera.pageShows
+import com.lastpenguin.pix.ui.camera.photoViewerOn
 import java.io.IOException
 import java.time.Duration
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -44,12 +49,14 @@ import org.robolectric.shadows.ShadowDialog
 /*
  * The session's photos on Subject view (FR-6.14, R&S 6.6; Iter4-A2), on the real Fragment with a container of fakes
  * and the real PhotoSyncer, whose album saves each photo the photographer sends.
- * The thumbnail (state-based): none before the first photo, nor for one the album could not save; the first photo's,
- * then a newer one's in its place.
- * The viewer (state-based): the thumbnail's photo opened over the video, named after the photographer, with the session
- * going on and the screen staying; a newer photo while it is open keeps the photo opened and changes the thumbnail;
- * its Back and the system's close it without asking to leave; a photo that cannot be read says so; the photographer's
- * step that starts while it is open waits until it closes; the session's end returns to Camera.
+ * The thumbnail (state-based): none before the first photo, nor any viewer built yet, nor for one the album could not
+ * save; the first photo's, then a newer one's in its place.
+ * The viewer (state-based): the session's photos over the video, opened at the newest and named after the
+ * photographer, with the session going on and the screen staying; a swipe shows the earlier ones, with which one of
+ * how many, and each opening starts at the newest again; a newer photo while it is open is one more page, the page on
+ * screen staying, and the thumbnail's; its Back and the system's close it without asking to leave; a photo that cannot
+ * be read says so; the photographer's step that starts while it is open waits until it closes; the session's end
+ * returns to Camera.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -116,7 +123,11 @@ class SubjectSessionPhotoTest {
     private fun FragmentSubjectBinding.thumbnailShows(): Bitmap? =
         (galleryThumbnail.drawable as? BitmapDrawable)?.bitmap
 
-    private fun FragmentSubjectBinding.viewerShows(): Bitmap? = (photoViewerImage.drawable as? BitmapDrawable)?.bitmap
+    private fun FragmentSubjectBinding.viewer() = photoViewerOn(root)
+
+    private fun FragmentSubjectBinding.viewerShows(): Bitmap? = viewer().pageShows()
+
+    private fun saved(photoId: String) = TestAppContainer.savedPhoto(photoId)
 
     private fun openThumbnail() {
         onScreen { binding, _ -> binding.galleryButton.performClick() }
@@ -129,7 +140,11 @@ class SubjectSessionPhotoTest {
     fun beforeAnyPhoto_thereIsNoThumbnail() {
         launch()
 
-        onScreen { binding, _ -> assertEquals(View.GONE, binding.galleryButton.visibility) }
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.galleryButton.visibility)
+            // The viewer is built when it first opens.
+            assertNull(binding.root.findViewById(R.id.photoViewer))
+        }
     }
 
     @Test
@@ -139,11 +154,11 @@ class SubjectSessionPhotoTest {
         modules.photo("p1")
         onScreen { binding, _ ->
             assertTrue(binding.galleryButton.isShown)
-            assertSame(thumbnails[TestAppContainer.savedPhoto("p1")], binding.thumbnailShows())
+            assertSame(thumbnails[saved("p1")], binding.thumbnailShows())
         }
 
         modules.photo("p2")
-        onScreen { binding, _ -> assertSame(thumbnails[TestAppContainer.savedPhoto("p2")], binding.thumbnailShows()) }
+        onScreen { binding, _ -> assertSame(thumbnails[saved("p2")], binding.thumbnailShows()) }
     }
 
     @Test
@@ -159,36 +174,66 @@ class SubjectSessionPhotoTest {
     // ---- The viewer -------------------------------------------------------------------------
 
     @Test
-    fun theThumbnail_opensItsPhotoOverTheVideo_andTheSessionGoesOn() {
+    fun theThumbnail_opensTheNewestPhotoOverTheVideo_andTheSessionGoesOn() {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
         modules.photo("p1")
+        modules.photo("p2")
 
         openThumbnail()
 
         onScreen { binding, _ ->
-            assertTrue(binding.photoViewer.isShown)
-            assertSame(pictures[TestAppContainer.savedPhoto("p1")], binding.viewerShows())
-            assertEquals(string(R.string.session_photo_title, "Dongje"), binding.photoViewerTitle.text.toString())
-            assertEquals(View.GONE, binding.photoViewerMessage.visibility)
+            assertTrue(binding.viewer().root.isShown)
+            assertSame(pictures[saved("p2")], binding.viewerShows())
+            assertEquals("2 / 2", binding.viewer().counterReads())
+            assertEquals(
+                string(R.string.session_photo_title, "Dongje"),
+                binding.viewer().photoViewerTitle.text.toString(),
+            )
+            assertFalse(binding.viewer().pageSaysUnavailable())
         }
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
         assertTrue(modules.session.leaves.isEmpty())
     }
 
     @Test
-    fun aNewerPhotoWhileTheViewerIsOpen_keepsThePhotoOpened_andChangesTheThumbnail() {
+    fun aSwipe_showsTheEarlierPhotos_andTheNextOpeningStartsAtTheNewest() {
+        val modules = launch()
+        modules.photo("p1")
+        modules.photo("p2")
+        openThumbnail()
+
+        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
+        settle()
+        onScreen { binding, _ ->
+            assertSame(pictures[saved("p1")], binding.viewerShows())
+            assertEquals("1 / 2", binding.viewer().counterReads())
+        }
+
+        onScreen { binding, _ -> binding.viewer().photoViewerBack.performClick() }
+        settle()
+        openThumbnail()
+        onScreen { binding, _ ->
+            assertSame(pictures[saved("p2")], binding.viewerShows())
+            assertEquals("2 / 2", binding.viewer().counterReads())
+        }
+    }
+
+    @Test
+    fun aNewerPhotoWhileTheViewerIsOpen_isOneMorePage_andThePageOnScreenStays() {
         val modules = launch()
         modules.photo("p1")
         openThumbnail()
+        onScreen { binding, _ -> assertNull(binding.viewer().counterReads()) }
 
         modules.photo("p2")
 
         onScreen { binding, _ ->
-            assertTrue(binding.photoViewer.isShown)
+            assertTrue(binding.viewer().root.isShown)
             assertNotNull(binding.viewerShows())
-            assertSame(pictures[TestAppContainer.savedPhoto("p1")], binding.viewerShows())
-            assertSame(thumbnails[TestAppContainer.savedPhoto("p2")], binding.thumbnailShows())
+            assertSame(pictures[saved("p1")], binding.viewerShows())
+            assertEquals("1 / 2", binding.viewer().counterReads())
+            assertSame(thumbnails[saved("p2")], binding.thumbnailShows())
         }
     }
 
@@ -198,15 +243,15 @@ class SubjectSessionPhotoTest {
         modules.photo("p1")
         openThumbnail()
 
-        onScreen { binding, _ -> binding.photoViewerBack.performClick() }
+        onScreen { binding, _ -> binding.viewer().photoViewerBack.performClick() }
         idle()
-        onScreen { binding, _ -> assertEquals(View.GONE, binding.photoViewer.visibility) }
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.viewer().root.visibility) }
 
         openThumbnail()
         onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
         idle()
 
-        onScreen { binding, _ -> assertEquals(View.GONE, binding.photoViewer.visibility) }
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.viewer().root.visibility) }
         assertNull(ShadowDialog.getLatestDialog())
         assertTrue(modules.session.leaves.isEmpty())
     }
@@ -220,8 +265,8 @@ class SubjectSessionPhotoTest {
         openThumbnail()
 
         onScreen { binding, _ ->
-            assertTrue(binding.photoViewer.isShown)
-            assertTrue(binding.photoViewerMessage.isShown)
+            assertTrue(binding.viewer().root.isShown)
+            assertTrue(binding.viewer().pageSaysUnavailable())
             assertNull(binding.viewerShows())
         }
     }
@@ -236,9 +281,9 @@ class SubjectSessionPhotoTest {
         modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING))
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        onScreen { binding, _ -> assertTrue(binding.photoViewer.isShown) }
+        onScreen { binding, _ -> assertTrue(binding.viewer().root.isShown) }
 
-        onScreen { binding, _ -> binding.photoViewerBack.performClick() }
+        onScreen { binding, _ -> binding.viewer().photoViewerBack.performClick() }
         idle()
 
         assertEquals(R.id.subjectGeneratingFragment, nav.currentDestination?.id)

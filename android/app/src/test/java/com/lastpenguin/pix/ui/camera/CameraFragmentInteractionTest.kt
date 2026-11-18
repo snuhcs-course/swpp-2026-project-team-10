@@ -52,14 +52,11 @@ import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,7 +70,9 @@ import org.robolectric.annotation.GraphicsMode
  * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
  * together, Use this photo, which opens nothing for a photo without a person) and system back during the scene photo
  * step; End session; the gallery button with and
- * without an app to open the photo, and after a session as the subject, the last photo received (FR-6.14, Iter4-A2);
+ * without an app to open the photo; outside a session the album's newest in the gallery, and in a session as the
+ * photographer none until the session's first photo, then the session's photos in Pix's viewer, which system Back and
+ * the session's end close (FR-1.6, Iter4-A2);
  * each capture failure's message; the subject's zoom, brightness, flash, and guide
  * moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view on mobile data (FR-6.13); the
  * zoom accessibility actions
@@ -405,35 +404,89 @@ class CameraFragmentInteractionTest {
         }
     }
 
+    /** Lets the screen's reads on Dispatchers.IO, such as the thumbnail's, finish and reach the screen. */
+    private fun settle() {
+        idle()
+        Thread.sleep(300)
+        idle()
+    }
+
+    private fun FragmentCameraBinding.thumbnailShows(): Bitmap? = (galleryThumbnail.drawable as? BitmapDrawable)?.bitmap
+
     @Test
-    fun galleryButton_afterASessionAsTheSubject_showsAndOpensTheLastPhotoReceived() {
+    fun galleryButton_outsideASession_showsTheAlbumsNewest_andOpensItInTheGallery() {
         val modules = launch()
         val picture = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
         onScreen { _, fragment -> fragment.thumbnailOf = { picture } }
-        val receiving = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        try {
-            modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
-            modules.photos.startAsReceiver(receiving)
-            modules.deliverPhoto("p1")
-            modules.deliverPhoto("p2")
-            modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
-            receiving.cancel()
-            idle()
-            // The thumbnail is read off the main thread.
-            Thread.sleep(300)
-            idle()
 
-            onScreen { controls, _ ->
-                assertTrue(controls.galleryButton.isEnabled)
-                assertSame(picture, (controls.galleryThumbnail.drawable as BitmapDrawable).bitmap)
-                controls.galleryButton.performClick()
-            }
-            val view = nextIntent()
-            assertEquals(Intent.ACTION_VIEW, view?.action)
-            assertEquals(TestAppContainer.savedPhoto("p2"), view?.data)
-        } finally {
-            receiving.cancel()
+        // Received in an earlier session, or taken before Pix opened.
+        modules.album.value = TestAppContainer.savedPhoto("p1")
+        settle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.galleryButton.isEnabled)
+            assertSame(picture, controls.thumbnailShows())
+            controls.galleryButton.performClick()
         }
+        val view = nextIntent()
+        assertEquals(Intent.ACTION_VIEW, view?.action)
+        assertEquals(TestAppContainer.savedPhoto("p1"), view?.data)
+    }
+
+    @Test
+    fun galleryButton_inASessionAsThePhotographer_isEmptyUntilItsFirstPhoto_andOpensItsPhotosInPix() {
+        val taken = Uri.parse("content://media/external/images/media/20")
+        val modules = launch(FakeCameraController().apply { photo = taken })
+        val thumbnail = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val picture = Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { thumbnail }
+            fragment.photoOf = { picture }
+        }
+        modules.album.value = TestAppContainer.savedPhoto("p0")
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.PHOTOGRAPHER))
+        settle()
+        onScreen { controls, _ ->
+            assertFalse(controls.galleryButton.isEnabled)
+            assertNull(controls.thumbnailShows())
+        }
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        settle()
+        onScreen { controls, _ ->
+            assertTrue(controls.galleryButton.isEnabled)
+            assertSame(thumbnail, controls.thumbnailShows())
+            controls.galleryButton.performClick()
+        }
+        settle()
+
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            assertTrue(photoViewerOn(controls.root).root.isShown)
+            assertSame(picture, photoViewerOn(controls.root).pageShows())
+            assertEquals(
+                string(R.string.session_photo_title_yours),
+                photoViewerOn(controls.root).photoViewerTitle.text.toString(),
+            )
+        }
+
+        // System Back closes it, and the session goes on.
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility) }
+        assertTrue(modules.session.leaves.isEmpty())
+
+        // The session's end closes the viewer, and the thumbnail is the album's newest again, in the gallery.
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settle()
+        modules.album.value = taken
+        modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        settle()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility)
+            controls.galleryButton.performClick()
+        }
+        assertEquals(taken, nextIntent()?.data)
     }
 
     @Test

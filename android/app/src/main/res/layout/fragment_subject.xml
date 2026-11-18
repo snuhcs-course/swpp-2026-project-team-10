@@ -431,7 +431,7 @@
 
     <!-- The session's newest photo (FR-6.14), Camera's thumbnail: a 40 dp image in a 48 dp touch area (NFR-16), on
          Guide's icon line (the panel's 8 dp padding and half the 36 dp icon), where Camera's sits beside the camera
-         switch. Shown once a photo is saved here; a tap opens it in the viewer below. -->
+         switch. Shown once a photo is saved here; a tap opens the session's photos in the viewer below. -->
     <FrameLayout
         android:id="@+id/galleryButton"
         android:layout_width="48dp"
@@ -465,78 +465,16 @@
             app:strokeWidth="1.5dp" />
     </FrameLayout>
 
-    <!-- The session photo's viewer (FR-6.14, R&S 6.6): the photo the thumbnail showed, whole, under a header with
-         Back. It covers the screen inside Pix, so the session and its video go on under it; the phone's gallery would
-         put Pix in the background. It takes every touch, so none reaches the video. -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/photoViewer"
+    <!-- The session's photos (FR-6.14, R&S 6.6), over the whole screen. Built in this empty holder when it first opens,
+         so a screen that never opens it builds no pager. -->
+    <FrameLayout
+        android:id="@+id/photoViewerHolder"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@color/camera_bar"
-        android:clickable="true"
-        android:focusable="false"
-        android:importantForAccessibility="no"
         android:outlineProvider="none"
-        android:translationZ="2dp"
-        android:visibility="gone"
+        android:translationZ="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <LinearLayout
-            android:id="@+id/photoViewerHeader"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical"
-            android:minHeight="56dp"
-            android:paddingHorizontal="20dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
-
-            <ImageButton
-                android:id="@+id/photoViewerBack"
-                style="@style/Widget.Pix.Header.Back"
-                android:contentDescription="@string/back" />
-
-            <TextView
-                android:id="@+id/photoViewerTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:accessibilityHeading="true"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.Pix.Header"
-                tools:text="@string/session_photo_title" />
-        </LinearLayout>
-
-        <ImageView
-            android:id="@+id/photoViewerImage"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_marginBottom="24dp"
-            android:scaleType="fitCenter"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/photoViewerHeader" />
-
-        <!-- A photo deleted from the album since, or one that cannot be read. -->
-        <TextView
-            android:id="@+id/photoViewerMessage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="20dp"
-            android:gravity="center"
-            android:text="@string/session_photo_unavailable"
-            android:textAppearance="@style/TextAppearance.Pix.Body"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/photoViewerHeader" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
+        app:layout_constraintTop_toTopOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>

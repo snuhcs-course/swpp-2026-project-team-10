@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.camera
 
 import android.content.ContentValues
@@ -14,6 +14,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+
+/** Where Pix keeps its photos, those taken here and those received in a session: the gallery's "Pix" album. */
+internal val PIX_ALBUM_PATH = "${Environment.DIRECTORY_PICTURES}/Pix"
 
 /** The gallery's "Pix" album, for a photo that comes from the other phone (FR-6.14). */
 fun interface PhotoAlbum {
@@ -31,7 +34,7 @@ class PhotoSaver(private val context: Context) : PhotoAlbum {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, displayName(Date(), UUID.randomUUID().toString()))
             put(MediaStore.Images.Media.MIME_TYPE, MIME_TYPE)
-            put(MediaStore.Images.Media.RELATIVE_PATH, ALBUM_PATH)
+            put(MediaStore.Images.Media.RELATIVE_PATH, PIX_ALBUM_PATH)
         }
         // CameraX manages the pending MediaStore row and removes it if writing fails.
         // API 29+ permits writing app-owned images without a storage permission.
@@ -50,7 +53,7 @@ class PhotoSaver(private val context: Context) : PhotoAlbum {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, displayName(Date(takenAt), photoId))
             put(MediaStore.Images.Media.MIME_TYPE, MIME_TYPE)
-            put(MediaStore.Images.Media.RELATIVE_PATH, ALBUM_PATH)
+            put(MediaStore.Images.Media.RELATIVE_PATH, PIX_ALBUM_PATH)
             put(MediaStore.Images.Media.DATE_TAKEN, takenAt)
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
@@ -90,6 +93,5 @@ class PhotoSaver(private val context: Context) : PhotoAlbum {
     private companion object {
         const val TAG = "PixPhotoSaver"
         const val MIME_TYPE = "image/jpeg"
-        val ALBUM_PATH = "${Environment.DIRECTORY_PICTURES}/Pix"
     }
 }

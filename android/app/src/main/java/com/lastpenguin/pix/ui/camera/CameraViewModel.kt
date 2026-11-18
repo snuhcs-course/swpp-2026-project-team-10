@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -175,8 +175,15 @@ data class CameraUiState(
     val guideSaved: Boolean = false,
     /** *Save guide* is writing the guide; the button waits. */
     val savingGuide: Boolean = false,
-    /** The newest photo saved on this phone, taken here or sent by a session's photographer, for the thumbnail. */
+    /**
+     * The thumbnail's photo (FR-1.6): in a session, the session's newest, none until its first; otherwise the newest in
+     * Pix's album, taken here or received.
+     */
     val lastPhoto: Uri? = null,
+    /** The photos of the session running now, oldest first, for the viewer (FR-1.6); null outside a session. */
+    val sessionPhotos: List<Uri>? = null,
+    /** The viewer of [sessionPhotos] is open over the camera (FR-1.6). */
+    val photosOpen: Boolean = false,
     /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
     /** The pose tip of the guide on the camera (FR-4.10), or null when it has none. */
@@ -196,11 +203,10 @@ class CameraViewModel(
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
     /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
     private val photos: PhotoShare = PhotoShare.None,
-    /**
-     * The newest photo the other phone sent to this one in a session (FR-6.14, `PhotoSyncer.lastReceived`): the
-     * thumbnail shows it after the session, as a photo taken here, until a newer one.
-     */
-    private val receivedPhotos: StateFlow<Uri?> = MutableStateFlow(null),
+    /** The newest photo in Pix's album (`NewestAlbumPhoto`, FR-1.6), taken here or received in a session. */
+    private val albumPhoto: StateFlow<Uri?> = MutableStateFlow(null),
+    /** The photos of the session running now (`PhotoSyncer.sessionPhotos`, FR-1.6); null outside a session. */
+    private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
     /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
@@ -223,6 +229,11 @@ class CameraViewModel(
 
     /** One label per toggle, the newest replacing one not yet shown; the screen shows it for [NOTICE_MS]. */
     val toggleLabels: Flow<ToggleLabel> = _toggleLabels.receiveAsFlow()
+
+    // The thumbnail's sources (FR-1.6): outside a session the newest in Pix's album, or the photo just saved here before
+    // MediaStore tells of it; in a session the session's photos alone.
+    private var newestSaved: Uri? = null
+    private var thisSession: List<Uri>? = null
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
@@ -279,8 +290,16 @@ class CameraViewModel(
             camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
         }
         viewModelScope.launch {
-            // A photo the session's photographer sent is the newest here too, until this phone takes one (FR-6.14).
-            receivedPhotos.filterNotNull().collect { uri -> _uiState.update { it.copy(lastPhoto = uri) } }
+            albumPhoto.collect { uri ->
+                newestSaved = uri
+                showNewestPhoto()
+            }
+        }
+        viewModelScope.launch {
+            sessionPhotos.collect { photos ->
+                thisSession = photos
+                showNewestPhoto()
+            }
         }
         viewModelScope.launch {
             camera.zoom.collect { zoom ->
@@ -329,6 +348,29 @@ class CameraViewModel(
             state.tip?.takeIf { it.open }?.let { state.copy(tip = it.copy(open = false)) }
                 ?: state
         }
+    }
+
+    /** In a session, the session's newest photo, none until its first; otherwise the newest saved here (FR-1.6). */
+    private fun showNewestPhoto() {
+        val session = thisSession
+        _uiState.update {
+            it.copy(
+                lastPhoto = if (session != null) session.lastOrNull() else newestSaved,
+                sessionPhotos = session,
+                // The viewer goes with the session.
+                photosOpen = it.photosOpen && !session.isNullOrEmpty(),
+            )
+        }
+    }
+
+    /** A tap on the thumbnail in a session opens the session's photos over the camera (FR-1.6). */
+    fun openSessionPhotos() {
+        _uiState.update { it.copy(photosOpen = !it.sessionPhotos.isNullOrEmpty()) }
+    }
+
+    /** The viewer's Back, or the system's, closes it. */
+    fun closeSessionPhotos() {
+        _uiState.update { it.copy(photosOpen = false) }
     }
 
     /** The ratios under the top bar open or close (FR-1.13). */
@@ -417,8 +459,10 @@ class CameraViewModel(
                 earlier?.join()
                 result.fold(
                     onSuccess = { uri ->
-                        // No notice (FR-1.6, #204): the thumbnail shows the new photo.
-                        _uiState.update { it.copy(lastPhoto = uri) }
+                        // No notice (FR-1.6, #204): the thumbnail shows the new photo, in a session once it is the
+                        // session's.
+                        newestSaved = uri
+                        showNewestPhoto()
                         sessionId?.let { photos.taken(it, uri, takenAt) }
                     },
                     onFailure = { error ->

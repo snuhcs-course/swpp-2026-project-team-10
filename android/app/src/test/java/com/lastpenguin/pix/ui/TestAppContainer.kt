@@ -60,6 +60,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import org.robolectric.RuntimeEnvironment
 
@@ -140,9 +141,13 @@ class TestAppContainer(
     /** Whether the subject's album refuses the photographer's photos, as a full disk does (FR-6.14). */
     var albumFails = false
 
+    /** The newest photo in Pix's album (FR-1.6), which a test sets: no MediaStore here tells of a saved photo. */
+    val album = MutableStateFlow<Uri?>(null)
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
+        albumPhoto = album,
         guideRepository = guides,
         mirrorGuideRepository = mirror,
         mirrorReference = reference,

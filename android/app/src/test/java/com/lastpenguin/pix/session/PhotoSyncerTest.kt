@@ -68,10 +68,11 @@ import org.robolectric.RobolectricTestRunner
  * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
  * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
  * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
- * Subject, the newest photo (state-based; Iter4-A2): none before the first; each saved photo becomes the session's
- * newest and the last received; a refused or broken photo, one the album fails to save, and one saved before change
- * neither; the session's end clears the session's photo and keeps the last received, and the next session starts
- * without one.
+ * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
+ * subject's phone each saved photo joins them in order, and a refused or broken photo, one the album fails to save, and
+ * one saved before do not; on the photographer's each photo taken in the session joins them, and one whose session
+ * ended before it was saved, or one taken outside a session, does not; they stay through a reconnect and end with the
+ * session, and the next session starts with none.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -871,23 +872,32 @@ class PhotoSyncerTest {
         assertEquals(1, shutters)
     }
 
+    // ---- The session's photos ----------------------------------------------------------------------------------
+
     @Test
-    fun `each saved photo becomes the session's newest and the last received`() = runTest {
-        val (syncer, _, _) = receiver()
-        assertNull(syncer.sessionPhoto.value)
-        assertNull(syncer.lastReceived.value)
+    fun `there are no session photos outside a session, and none yet at its start`() = runTest {
+        val syncer = syncer()
+        assertNull(syncer.sessionPhotos.first())
+        session.setState(SessionState.Waiting("123456"))
+        assertNull(syncer.sessionPhotos.first())
 
-        deliverWhole("p1", jpeg(10))
-        assertEquals(uri("saved/p1"), syncer.sessionPhoto.value)
-        assertEquals(uri("saved/p1"), syncer.lastReceived.value)
+        connectedAs(Role.SUBJECT)
 
-        deliverWhole("p2", jpeg(10))
-        assertEquals(uri("saved/p2"), syncer.sessionPhoto.value)
-        assertEquals(uri("saved/p2"), syncer.lastReceived.value)
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
     }
 
     @Test
-    fun `a photo refused, broken, unsaved, or already saved changes neither`() = runTest {
+    fun `each photo saved here joins the session's photos, in the order they came`() = runTest {
+        val (syncer, _, _) = receiver()
+
+        deliverWhole("p1", jpeg(10))
+        deliverWhole("p2", jpeg(10))
+
+        assertEquals(listOf(uri("saved/p1"), uri("saved/p2")), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `a photo refused, broken, unsaved, or already saved does not join them`() = runTest {
         val (syncer, _, _) = receiver()
         deliverWhole("p1", jpeg(10))
         deliverWhole("p2", jpeg(10))
@@ -903,23 +913,50 @@ class PhotoSyncerTest {
         albumFails = true
         deliverWhole("p5", jpeg(10))
 
-        assertEquals(uri("saved/p2"), syncer.sessionPhoto.value)
-        assertEquals(uri("saved/p2"), syncer.lastReceived.value)
+        assertEquals(listOf(uri("saved/p1"), uri("saved/p2")), syncer.sessionPhotos.first())
     }
 
     @Test
-    fun `the session's end clears its photo and keeps the last received, and the next starts without one`() = runTest {
-        val (syncer, job, _) = receiver()
-        deliverWhole("p1", jpeg(10))
+    fun `the session's photos stay through a reconnect, end with it, and the next session starts with none`() =
+        runTest {
+            val (syncer, _, _) = receiver()
+            deliverWhole("p1", jpeg(10))
 
-        job.cancel()
-        runCurrent()
-        assertNull(syncer.sessionPhoto.value)
-        assertEquals(uri("saved/p1"), syncer.lastReceived.value)
+            session.setState(SessionState.Reconnecting("s_1", since = 0))
+            assertEquals(listOf(uri("saved/p1")), syncer.sessionPhotos.first())
 
-        syncer.startAsReceiver(backgroundScope)
-        runCurrent()
-        assertNull(syncer.sessionPhoto.value)
-        assertEquals(uri("saved/p1"), syncer.lastReceived.value)
+            session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+            assertNull(syncer.sessionPhotos.first())
+
+            session.setState(SessionState.Connected("s_2", PeerInfo("Dongje", null), Role.SUBJECT))
+            assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+        }
+
+    @Test
+    fun `each photo taken here in a session joins its photos, and one of an ended session does not`() = runTest {
+        val (syncer, _) = sender()
+
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("2", 10), takenAt = 2)
+        assertEquals(listOf(uri("1"), uri("2")), syncer.sessionPhotos.first())
+
+        // Saving takes seconds: this one's session ends, and another starts, before it is saved.
+        val shutter = syncer.shutter()!!
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        session.setState(SessionState.Connected("s_2", PeerInfo("Dongje", null), Role.PHOTOGRAPHER))
+        syncer.taken(shutter, photo("3", 10), takenAt = 3)
+
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `a photo taken outside a session is none of the session's`() = runTest {
+        val syncer = syncer()
+        session.setState(SessionState.Waiting("123456"))
+        syncer.shoot(photo("1", 10), takenAt = 1)
+
+        connectedAs(Role.PHOTOGRAPHER)
+
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
     }
 }

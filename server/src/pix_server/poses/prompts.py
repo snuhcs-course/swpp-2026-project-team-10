@@ -23,8 +23,8 @@ PERSON_QUESTION = "person"
 Situation = Literal["default", "background", "half_body", "full_body", "landmark", "selfie"]
 SITUATIONS: tuple[Situation, ...] = get_args(Situation)
 # The languages a tip is written in, and the names of the sentences and words it is written with (prompts.toml,
-# [tip_words]): the move closer, by walking or with the zoom, or farther back, each also as a big one; nothing to
-# change, and the guide's outline to match; where the phone is held, its tilt, and the sentence that joins them; the
+# [tip_words]): the move closer, by walking or with the zoom, or farther back, each also as a big one; the same
+# distance, and the guide's outline to match; where the phone is held, its tilt, and the sentence that joins them; the
 # side of the frame, the room above the head, and a leaning line.
 TIP_LANGUAGES = ("en", "ko")
 TIP_WORDS = (
@@ -34,7 +34,7 @@ TIP_WORDS = (
     "zoom_much",
     "back",
     "back_much",
-    "stay",
+    "same",
     "guide",
     "crouching",
     "waist",

@@ -42,12 +42,6 @@ SHOTS = ("full body", "knees up", "waist up", "chest up")
 BODY_SHARE = {"full body": 1.0, "knees up": 0.75, "waist up": 0.5, "chest up": 0.3}
 # The shots a photographer reaches with the zoom: a phone held that close bends the face.
 CLOSE_SHOTS: tuple[str, ...] = ("waist up", "chest up")
-# Where a standing photographer holds the phone unasked: a tip says such a hold only when the scene was taken far
-# from it, FAR_STEPS heights or more away or with another tilt. A height next to the scene's is not said, since the
-# model tells neighbouring heights apart poorly (20 of 100 tips had a usual hold that differed from the scene's, 13 of
-# them by one height; 2026-11-18).
-USUAL_HOLDS: tuple[str, ...] = ("chest", "eye")
-FAR_STEPS = 2
 # How the person is, and the part of them the camera is level with, lowest first.
 POSTURES = ("standing", "seated", "on the ground")
 PARTS = ("knees", "waist", "chest", "face", "above")
@@ -213,18 +207,16 @@ def fields_of(answer: str) -> dict | None:
 def usable_tip(scene: str, candidate: str, language: Language = "en") -> PoseTip | None:
     """The tip for the model's two answers, or None when either description cannot be read.
 
-    A tip is a few sentences, one on a line, that say only what is not as usual (#213), in the order a photographer
-    acts on them:
-    - the move closer or farther back, a big one said so, and with the zoom when the candidate is a close shot; or
-      to match the person to the guide's outline, when the two measures of the distance do not agree, so that a tip
-      never leaves the distance out where it may have changed;
-    - the phone's height and tilt, unless it is level at the chest or the eyes, where a standing photographer holds
-      it, and the scene was taken about so too: within a height of it and with the same tilt;
+    A tip is a few sentences, one on a line, in the order a photographer acts on them (#213). The first two are
+    always there, so that every tip says how far to stand and how to hold the phone; the rest only when they apply:
+    - the distance: the move closer or farther back, a big one said so, and with the zoom when the candidate is a
+      close shot; to keep the distance, when it is the same; or to match the person to the guide's outline, when the
+      two measures of the distance do not agree;
+    - the phone's height and tilt, as the candidate was taken, also when the scene was taken so;
     - the side of the frame the person is on when it is not the middle, and the room above the head when the photo
       leaves almost none or plenty;
     - to hold the phone upright when a level line leans in the scene and not in the candidate, where it may lean on
-      purpose.
-    With nothing of these to say, the distance being the same, the tip is one sentence: to take the photo as it is."""
+      purpose."""
     scene_fields, fields = fields_of(scene), fields_of(candidate)
     if scene_fields is None or fields is None:
         return None
@@ -243,16 +235,15 @@ def usable_tip(scene: str, candidate: str, language: Language = "en") -> PoseTip
         sentences.append(words["back_much" if much else "back"])
     elif framing == "unsure":
         sentences.append(words["guide"])
-    if hold not in USUAL_HOLDS or angle != "level" or abs(step) >= FAR_STEPS or angle != now.tilt:
-        sentences.append(words["phone"].format(hold=words[hold.replace(" ", "_")], tilt=words[angle]))
+    else:
+        sentences.append(words["same"])
+    sentences.append(words["phone"].format(hold=words[hold.replace(" ", "_")], tilt=words[angle]))
     if want.side != "middle":
         sentences.append(words[want.side])
     if want.head_top is not None and not TIGHT_ROOM <= want.head_top <= PLENTY_ROOM:
         sentences.append(words["room_none" if want.head_top < TIGHT_ROOM else "room_plenty"])
     if now.horizon == "tilted" and want.horizon != "tilted":
         sentences.append(words["upright"])
-    if not sentences:
-        sentences.append(words["stay"])
     return PoseTip("\n".join(sentences), framing, hold, height, angle)
 
 

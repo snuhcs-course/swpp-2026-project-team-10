@@ -9,15 +9,15 @@
 # bigger or smaller, both a little bigger or smaller, a tighter or a wider shot of the same height, a wider shot of
 # the same person; a big move by both measures and by one alone; the zoom for a close shot; the two measures apart and
 # a head missing from either photo, which name no move. The phone: each part of the person the camera is level with,
-# for a person standing, seated, and on the ground, against the scene's, lower, higher, or the same, with each tilt;
-# said, or the usual hold, which is not, unless the scene was taken two heights from it or with another tilt. The
-# frame: the person on the left, on the right, in the middle, and a little off it; the room above the head, almost
-# none, plenty, at each edge of the usual, and without a head. A level line: leaning in the scene, in both photos,
-# level, and none. All of them at once, in their order, and none of them, with the same distance or without one.
-# Upstream: a refusal (403), a failing status, an unreadable body, no answer in time, no connection, no key. The
-# phone: staying connected, or dropping the request while the model works. Limits: each window full, counted apart
-# from poses and suggestions; refused input not counted; the session store down. Privacy: neither the pose nor the
-# answer nor the upstream body is logged. Language (FR-10.2): `ko`, `en`, left out, and another value.
+# for a person standing, seated, and on the ground, against the scene's, lower, higher, or the same, with each tilt,
+# said also when it is the scene's hold. The frame: the person on the left, on the right, in the middle, and a little
+# off it; the room above the head, almost none, plenty, at each edge of the usual, and without a head. A level line:
+# leaning in the scene, in both photos, level, and none. The same distance, which is said too. All of them at once, in
+# their order, and only the distance and the phone. Upstream: a refusal (403), a failing status, an unreadable body,
+# no answer in time, no connection, no key. The phone: staying connected, or dropping the request while the model
+# works. Limits: each window full, counted apart from poses and suggestions; refused input not counted; the session
+# store down. Privacy: neither the pose nor the answer nor the upstream body is logged. Language (FR-10.2): `ko`,
+# `en`, left out, and another value.
 import asyncio
 import base64
 import json
@@ -55,7 +55,11 @@ WANT = {
 # As a test writes the model's two answers: `now` is the scene's and `want` the candidate's.
 ANSWER = {"now": NOW, "want": WANT}
 TEXT = "Move much closer.\nHold the phone at your waist, tilted up a little."
-STAY = "Take it from where you are, as it is."
+SAME = "Keep the same distance."
+KO_SAME = "지금 거리를 유지하세요."
+# How the phone is held for `photo()` as it is: level at the chest.
+CHEST = "Hold the phone at your chest, not tilted."
+KO_CHEST = "폰은 가슴 높이에서 수평으로 드세요."
 GUIDE = "Move until the person fits the guide's outline, then take it."
 
 
@@ -194,6 +198,11 @@ def photo(
     }
 
 
+def also(sentence: str | None) -> list[str]:
+    """A sentence that comes after the distance and the phone, when it is said."""
+    return [sentence] if sentence else []
+
+
 def tip_for(client, image_api, photos, now, want, language=None):
     image_api.tips({"now": now, "want": want})
     return ask(client, photos, language=language)
@@ -205,13 +214,13 @@ def tip_for(client, image_api, photos, now, want, language=None):
         # The same shot, the person and their head clearly bigger: 450 to 540 of the photo's 1000 is 1.2 times.
         (photo(300, 750), photo(230, 770), "closer", "Move a little closer."),
         # Under 1.18 times, either way: a box drawn a little differently moves nobody.
-        (photo(300, 750), photo(280, 800), "keep", STAY),
-        (photo(280, 800), photo(300, 750), "keep", STAY),
+        (photo(300, 750), photo(280, 800), "keep", SAME),
+        (photo(280, 800), photo(300, 750), "keep", SAME),
         (photo(230, 770), photo(300, 750), "back", "Step back a little."),
         # A tighter shot of the same height in the photo shows a bigger person: knees up is three quarters of them.
         (photo(100, 900, shot="full body"), photo(100, 900, shot="knees up"), "closer", "Move a little closer."),
         # A wider shot with a box as much taller: the same person, the same distance.
-        (photo(100, 700, shot="knees up"), photo(100, 900, shot="full body"), "keep", STAY),
+        (photo(100, 700, shot="knees up"), photo(100, 900, shot="full body"), "keep", SAME),
         # One and a half times by both measures is a big move; the same the other way.
         (photo(300, 600), photo(200, 650), "closer", "Move much closer."),
         (photo(200, 650), photo(300, 600), "back", "Step back a lot."),
@@ -233,7 +242,7 @@ def tip_for(client, image_api, photos, now, want, language=None):
 def test_move_is_said_when_the_head_and_the_whole_person_agree(client, image_api, photos, now, want, framing, sentence):
     response = tip_for(client, image_api, photos, now, want)
     assert response.json()["framing"] == framing
-    assert said(response) == [sentence]
+    assert said(response) == [sentence, CHEST]
 
 
 @pytest.mark.parametrize(
@@ -249,9 +258,9 @@ def test_move_is_said_when_the_head_and_the_whole_person_agree(client, image_api
 def test_move_closer_is_the_zooms_for_a_close_shot(client, image_api, photos, shot, little, much, korean):
     # The same shot in both photos, so only the person's size says which way; the head keeps clear of the top.
     small, bigger, big = (photo(top, bottom, shot=shot) for top, bottom in ((300, 600), (280, 640), (200, 800)))
-    assert said(tip_for(client, image_api, photos, small, bigger)) == [little]
-    assert said(tip_for(client, image_api, photos, small, bigger, language="ko")) == [korean]
-    assert said(tip_for(client, image_api, photos, small, big)) == [much]
+    assert said(tip_for(client, image_api, photos, small, bigger)) == [little, CHEST]
+    assert said(tip_for(client, image_api, photos, small, bigger, language="ko")) == [korean, KO_CHEST]
+    assert said(tip_for(client, image_api, photos, small, big)) == [much, CHEST]
 
 
 @pytest.mark.parametrize(
@@ -275,9 +284,10 @@ def test_no_move_is_said_when_the_two_measures_do_not_agree(client, image_api, p
     response = tip_for(client, image_api, photos, now, want)
     assert response.json()["framing"] == "unsure"
     # The guide's outline is what to go by, so that the distance is not left out where it may have changed.
-    assert said(response) == [GUIDE]
+    assert said(response) == [GUIDE, CHEST]
     assert said(tip_for(client, image_api, photos, now, want, language="ko")) == [
-        "사람이 가이드 선에 꼭 맞게 거리를 맞춰 찍으세요."
+        "사람이 가이드 선에 꼭 맞게 거리를 맞춰 찍으세요.",
+        KO_CHEST,
     ]
     # Beside another sentence too, first, where the move would stand.
     assert said(tip_for(client, image_api, photos, now, want | {"tilt": "up"})) == [
@@ -288,7 +298,7 @@ def test_no_move_is_said_when_the_two_measures_do_not_agree(client, image_api, p
 
 def test_move_is_said_just_over_the_ratio_by_both_measures(client, image_api, photos):
     response = tip_for(client, image_api, photos, photo(100, 600, head=100), photo(100, 700, head=119))
-    assert (response.json()["framing"], said(response)) == ("closer", ["Move a little closer."])
+    assert (response.json()["framing"], said(response)) == ("closer", ["Move a little closer.", CHEST])
 
 
 @pytest.mark.parametrize(
@@ -326,14 +336,6 @@ def test_phone_is_held_level_with_the_part_of_the_person_the_camera_shows(client
             "폰은 눈높이에서 살짝 아래로 기울여 드세요.",
         ),
         (
-            ("standing", "chest"),
-            ("standing", "chest", "up"),
-            "chest",
-            "keep",
-            "Hold the phone at your chest, tilted up a little.",
-            "폰은 가슴 높이에서 살짝 위로 기울여 드세요.",
-        ),
-        (
             ("standing", "waist"),
             ("standing", "above", "down"),
             "above head",
@@ -349,7 +351,24 @@ def test_phone_is_held_level_with_the_part_of_the_person_the_camera_shows(client
             "Hold the phone low at a crouch, not tilted.",
             "폰은 쪼그려 앉아 수평으로 드세요.",
         ),
-        # A hold that is not the usual one is said also when the scene was taken so.
+        # Held as the scene was taken, also level at the chest or the eyes, where a standing photographer holds it
+        # anyway: said all the same, so that every tip says how to hold the phone (decided 2026-11-18).
+        (
+            ("standing", "chest"),
+            ("standing", "chest", "level"),
+            "chest",
+            "keep",
+            "Hold the phone at your chest, not tilted.",
+            "폰은 가슴 높이에서 수평으로 드세요.",
+        ),
+        (
+            ("standing", "face"),
+            ("standing", "face", "level"),
+            "eye",
+            "keep",
+            "Hold the phone at eye level, not tilted.",
+            "폰은 눈높이에서 수평으로 드세요.",
+        ),
         (
             ("standing", "waist", "up"),
             ("standing", "waist", "up"),
@@ -358,41 +377,18 @@ def test_phone_is_held_level_with_the_part_of_the_person_the_camera_shows(client
             "Hold the phone at your waist, tilted up a little.",
             "폰은 허리 높이에서 살짝 위로 기울여 드세요.",
         ),
-        # Held level at the chest or the eyes, as a standing photographer holds it anyway: decided, and not said,
-        # with the scene taken so, or a height away.
-        (("standing", "face"), ("standing", "face", "level"), "eye", "keep", None, None),
-        (("standing", "waist"), ("standing", "chest", "level"), "chest", "raise", None, None),
-        (("standing", "above"), ("standing", "face", "level"), "eye", "lower", None, None),
         # The same part of a person who sat down: the phone goes down with them, to the chest.
-        (("standing", "face"), ("seated", "face", "level"), "chest", "lower", None, None),
-        # The usual hold is said when the scene was taken two heights from it, lower or higher, or with another tilt.
         (
-            ("on the ground", "chest"),
-            ("standing", "chest", "level"),
-            "chest",
-            "raise",
-            "Hold the phone at your chest, not tilted.",
-            "폰은 가슴 높이에서 수평으로 드세요.",
-        ),
-        (
-            ("standing", "above"),
-            ("standing", "chest", "level"),
+            ("standing", "face"),
+            ("seated", "face", "level"),
             "chest",
             "lower",
             "Hold the phone at your chest, not tilted.",
             "폰은 가슴 높이에서 수평으로 드세요.",
         ),
-        (
-            ("standing", "face", "down"),
-            ("standing", "face", "level"),
-            "eye",
-            "keep",
-            "Hold the phone at eye level, not tilted.",
-            "폰은 눈높이에서 수평으로 드세요.",
-        ),
     ],
 )
-def test_phone_is_held_as_the_candidate_shows_and_said_when_it_is_not_usual_or_far_from_the_scenes(
+def test_phone_is_always_said_held_as_the_candidate_shows(
     client, image_api, photos, now, want, hold, height, phone, korean
 ):
     described = (
@@ -402,10 +398,8 @@ def test_phone_is_held_as_the_candidate_shows_and_said_when_it_is_not_usual_or_f
     response = tip_for(client, image_api, photos, *described)
     body = response.json()
     assert (body["hold"], body["height"], body["angle"]) == (hold, height, want[2])
-    assert said(response) == [phone or STAY]
-    assert said(tip_for(client, image_api, photos, *described, language="ko")) == [
-        korean or "지금 자리에서 그대로 찍으면 돼요."
-    ]
+    assert said(response) == [SAME, phone]
+    assert said(tip_for(client, image_api, photos, *described, language="ko")) == [KO_SAME, korean]
 
 
 @pytest.mark.parametrize(
@@ -425,9 +419,11 @@ def test_side_of_the_frame_is_said_when_the_candidate_has_the_person_off_the_mid
     # Wherever the person was in the scene: the tip says how the candidate is framed.
     for scene in (photo(), photo(left=left, right=right)):
         want = photo(left=left, right=right)
-        assert said(tip_for(client, image_api, photos, scene, want)) == [sentence or STAY]
+        assert said(tip_for(client, image_api, photos, scene, want)) == [SAME, CHEST, *also(sentence)]
         assert said(tip_for(client, image_api, photos, scene, want, language="ko")) == [
-            korean or "지금 자리에서 그대로 찍으면 돼요."
+            KO_SAME,
+            KO_CHEST,
+            *also(korean),
         ]
 
 
@@ -448,12 +444,10 @@ def test_room_above_the_head_is_said_when_it_is_almost_none_or_plenty(
 ):
     # The scene's head is where the candidate's is, so nothing else is said.
     now, want = photo(head_top=head_top), photo(head_top=head_top)
-    assert said(tip_for(client, image_api, photos, now, want)) == [sentence or STAY]
-    assert said(tip_for(client, image_api, photos, now, want, language="ko")) == [
-        korean or "지금 자리에서 그대로 찍으면 돼요."
-    ]
+    assert said(tip_for(client, image_api, photos, now, want)) == [SAME, CHEST, *also(sentence)]
+    assert said(tip_for(client, image_api, photos, now, want, language="ko")) == [KO_SAME, KO_CHEST, *also(korean)]
     # The room is the candidate's: the scene's says nothing of it.
-    assert said(tip_for(client, image_api, photos, photo(head_top=head_top), photo(head_top=100))) == [STAY]
+    assert said(tip_for(client, image_api, photos, photo(head_top=head_top), photo(head_top=100))) == [SAME, CHEST]
 
 
 @pytest.mark.parametrize(
@@ -472,12 +466,10 @@ def test_phone_is_held_upright_when_a_level_line_leans_in_the_scene_alone(
     client, image_api, photos, scene_line, wanted_line, advised
 ):
     now, want = photo(horizon=scene_line), photo(horizon=wanted_line)
-    assert said(tip_for(client, image_api, photos, now, want)) == [
-        "Hold the phone upright so the lines behind the person are level." if advised else STAY
-    ]
-    assert said(tip_for(client, image_api, photos, now, want, language="ko")) == [
-        "배경의 가로선이 기울지 않게 폰을 바로 세우세요." if advised else "지금 자리에서 그대로 찍으면 돼요."
-    ]
+    upright = "Hold the phone upright so the lines behind the person are level." if advised else None
+    korean = "배경의 가로선이 기울지 않게 폰을 바로 세우세요." if advised else None
+    assert said(tip_for(client, image_api, photos, now, want)) == [SAME, CHEST, *also(upright)]
+    assert said(tip_for(client, image_api, photos, now, want, language="ko")) == [KO_SAME, KO_CHEST, *also(korean)]
 
 
 def test_sentences_come_in_the_order_a_photographer_acts_on_them(client, image_api, photos):
@@ -500,9 +492,10 @@ def test_sentences_come_in_the_order_a_photographer_acts_on_them(client, image_a
     ]
 
 
-def test_nothing_unusual_is_one_sentence_that_says_so(client, image_api, photos):
+def test_the_distance_and_the_phone_are_said_when_nothing_differs(client, image_api, photos):
     response = tip_for(client, image_api, photos, photo(), photo())
-    assert response.json() == {"text": STAY, "framing": "keep", "hold": "chest", "height": "keep", "angle": "level"}
+    text = f"{SAME}\n{CHEST}"
+    assert response.json() == {"text": text, "framing": "keep", "hold": "chest", "height": "keep", "angle": "level"}
 
 
 # ---- The model's answers ---------------------------------------------------------------------------------------------

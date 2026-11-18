@@ -114,8 +114,6 @@ ANGLES = ["up", "level", "down"]
 SHOTS = ["full body", "knees up", "waist up", "chest up"]
 BODY_SHARE = {"full body": 1.0, "knees up": 0.75, "waist up": 0.5, "chest up": 0.3}
 CLOSE_SHOTS = ("waist up", "chest up")
-USUAL_HOLDS = ("chest", "eye")
-FAR_STEPS = 2
 POSTURES = ["standing", "seated", "on the ground"]
 PARTS = ["knees", "waist", "chest", "face", "above"]
 HOLDS = {
@@ -191,8 +189,8 @@ def move(ratio: float) -> str:
 
 def tip_lines(answer: dict, language: str, words: dict) -> dict | None:
     """The decisions and the sentences the server makes of the model's two answers, `now` for the scene and `want` for
-    the candidate; None when it would refuse them. As on the server, a tip says only what is not as
-    usual, and one sentence when there is nothing of that."""
+    the candidate; None when it would refuse them. As on the server, a tip always says the distance and
+    the phone, and the rest only when it applies."""
     now, want = seen(answer.get("now")), seen(answer.get("want"))
     if now is None or want is None:
         return None
@@ -214,16 +212,15 @@ def tip_lines(answer: dict, language: str, words: dict) -> dict | None:
         lines.append(words["back_much" if much else "back"])
     elif framing == "unsure":
         lines.append(words["guide"])
-    if hold not in USUAL_HOLDS or angle != "level" or abs(step) >= FAR_STEPS or angle != now["tilt"]:
-        lines.append(words["phone"].format(hold=words[hold.replace(" ", "_")], tilt=words[angle]))
+    else:
+        lines.append(words["same"])
+    lines.append(words["phone"].format(hold=words[hold.replace(" ", "_")], tilt=words[angle]))
     if want["side"] != "middle":
         lines.append(words[want["side"]])
     if want["head_top"] is not None and not TIGHT_ROOM <= want["head_top"] <= PLENTY_ROOM:
         lines.append(words["room_none" if want["head_top"] < TIGHT_ROOM else "room_plenty"])
     if now["horizon"] == "tilted" and want["horizon"] != "tilted":
         lines.append(words["upright"])
-    if not lines:
-        lines.append(words["stay"])
     return {
         "framing": framing,
         "much": much,

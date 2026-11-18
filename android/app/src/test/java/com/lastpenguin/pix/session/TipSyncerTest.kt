@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.generation.GuideTip
@@ -41,7 +41,7 @@ class TipSyncerTest {
     private fun syncer() = TipSyncer(session, onCamera)
 
     private val railing = PoseTip("Move a little closer.\nHold the phone at your waist, tilted up a little.")
-    private val steps = PoseTip("Take it from where you are, as it is.")
+    private val steps = PoseTip("Keep the same distance.\nHold the phone at your chest, not tilted.")
 
     private fun ready(guideId: String, tip: PoseTip) = GuideTip(guideId, TipState.Ready(tip))
 

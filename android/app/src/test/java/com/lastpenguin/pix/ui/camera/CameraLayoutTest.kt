@@ -46,6 +46,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.ScreenTestSupport
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
@@ -206,6 +207,38 @@ class CameraLayoutTest {
         assertFalse(controls.referenceHandle.isShown)
         assertTrue(preview.contains(controls.referenceThumbnail.box()))
         assertEquals(1f, controls.referenceThumbnail.alpha, 0f)
+    }
+
+    @Test
+    fun aHiddenThumbnailOfAWidePhoto_keepsItsHandleInsideTheThumbnailsArea() {
+        val screen = camera()
+        val controls = screen.controls
+        // A 4:1 panorama: small, its thumbnail is 72 x 18 dp, shorter than the handle's 48 dp.
+        screen.modules.guides.setGuide(guide().copy(reference = ScreenTestSupport.bitmap(400, 100)))
+        val model = ViewModelProvider(screen.fragment, PixViewModels.Factory)[CameraViewModel::class.java]
+        // Where a thumbnail may be: from its top in a top corner to its bottom in a bottom one.
+        val shown = ReferenceCorner.entries.associateWith { corner ->
+            model.setReferenceCorner(corner)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+            controls.referenceThumbnail.box()
+        }
+        val top = shown.getValue(ReferenceCorner.TOP_LEFT).top
+        val bottom = shown.getValue(ReferenceCorner.BOTTOM_LEFT).bottom
+        assertEquals(18, shown.getValue(ReferenceCorner.TOP_LEFT).height())
+
+        for (corner in ReferenceCorner.entries) {
+            model.setReferenceCorner(corner)
+            model.setReferenceHidden(true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+
+            val strip = controls.referenceThumbnail.box().apply { intersect(controls.previewContainer.box()) }
+            val handle = controls.referenceHandle.box()
+            // Still a touch target tall and over the strip, with its extra height toward the middle of the preview.
+            assertEquals("$corner", 48, handle.height())
+            assertTrue("$corner: $handle over $strip", handle.contains(strip))
+            assertTrue("$corner: $handle in $top..$bottom", handle.top >= top && handle.bottom <= bottom)
+            model.setReferenceHidden(false)
+        }
     }
 
     // ---- The scene photo's review ----------------------------------------------------------------

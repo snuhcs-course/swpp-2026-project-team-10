@@ -197,10 +197,16 @@ internal fun ImageView.showReference(
 /**
  * Lays this handle over the strip of a thumbnail hidden at [corner]'s side of a preview [previewWidth] wide (#237),
  * or takes it away while the thumbnail is not hidden ([placement] null). It is a touch target wide and at least as
- * tall, centered on the strip, and the system's back swipe from that edge leaves it alone, so the strip can be
- * pulled.
+ * tall, centered on the strip but inside [area]: over a strip shorter than a touch target, as a wide photo's is, its
+ * extra height reaches toward the preview's middle, not over the controls below or out of the preview. The system's
+ * back swipe from that edge leaves it alone, so the strip can be pulled.
  */
-internal fun View.showReferenceHandle(placement: ReferencePlacement?, corner: ReferenceCorner, previewWidth: Int) {
+internal fun View.showReferenceHandle(
+    placement: ReferencePlacement?,
+    corner: ReferenceCorner,
+    previewWidth: Int,
+    area: ReferenceArea,
+) {
     isVisible = placement != null
     if (placement == null) return
     val touch = (REFERENCE_HANDLE_DP * resources.displayMetrics.density).roundToInt()
@@ -212,7 +218,8 @@ internal fun View.showReferenceHandle(placement: ReferencePlacement?, corner: Re
         layoutParams = params
     }
     translationX = if (corner.isLeft) 0f else (previewWidth - touch).toFloat()
-    translationY = placement.y - (height - placement.height) / 2f
+    val lowest = maxOf(area.top, area.bottom - height).toFloat()
+    translationY = (placement.y - (height - placement.height) / 2f).coerceIn(area.top.toFloat(), lowest)
     ViewCompat.setSystemGestureExclusionRects(this, listOf(Rect(0, 0, touch, height)))
 }
 

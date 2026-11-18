@@ -22,7 +22,8 @@ import org.junit.runner.RunWith
  * a drag back in, and one that ends still out. The handle beside a hidden thumbnail: its touches are the thumbnail's.
  * The lift: at the last move's place (above), carrying the last of the move (counted for the place and the speed), and
  * far from the touch with no move between (a drag). A thumbnail narrower than the peek: out to just over half of it.
- * A drag begun while the thumbnail glides: from where it is when the finger passes the slop, not where it was pressed.
+ * A drag begun while the thumbnail glides: from where it is when the finger passes the slop, not where it was pressed,
+ * and held by the size it is drawn at then, smaller than it is laid out.
  */
 @RunWith(AndroidJUnit4::class)
 class ReferenceDragControllerTest {
@@ -178,6 +179,38 @@ class ReferenceDragControllerTest {
     }
 
     @Test
+    fun thumbnailTakenWhileItChangesSize_isHeldByTheSizeItIsDrawnAt() = onMain {
+        // Stopped halfway through shrinking: laid out 400 x 600 px and drawn at half of that, 200 x 300, about its
+        // middle, with its drawn left and top at the area's.
+        val fixture = fixture(width = 400, height = 600)
+        val view = fixture.view
+        view.scaleX = 0.5f
+        view.scaleY = 0.5f
+        view.translationX = 31f - 100f
+        view.translationY = 31f - 150f
+        fun left() = view.translationX + 100f
+        fun top() = view.translationY + 150f
+
+        touch(view, MotionEvent.ACTION_DOWN, 100f, 100f)
+        touch(view, MotionEvent.ACTION_MOVE, 150f, 140f)
+        assertEquals(81f to 71f, left() to top())
+
+        // Out to the left, its peek of 42 px stays in the preview; down, it stops with its drawn bottom at the area's.
+        touch(view, MotionEvent.ACTION_MOVE, -5_000f, 5_000f)
+        assertEquals(42f, left() + 200f)
+        assertEquals(1_667f, top() + 300f)
+        assertEquals(REFERENCE_HIDDEN_ALPHA, view.alpha, 0.001f)
+        touch(view, MotionEvent.ACTION_UP, -5_000f, 5_000f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.BOTTOM_LEFT, hidden = true)), fixture.drops)
+
+        // To the right and up the same.
+        touch(view, MotionEvent.ACTION_DOWN, 100f, 100f)
+        touch(view, MotionEvent.ACTION_MOVE, 5_000f, -5_000f)
+        assertEquals(1_038f, left())
+        assertEquals(31f, top())
+    }
+
+    @Test
     fun narrowThumbnail_dragsOutUntilJustOverHalfOfItIsOut_andHidesThere() = onMain {
         // 24 px wide, narrower than the 42 px peek: 11 px of it stay, so its center is past the side.
         val left = fixture(width = 24)
@@ -246,12 +279,12 @@ class ReferenceDragControllerTest {
     }
 
     /**
-     * A small thumbnail, [width] × 189 px (126 for a 2:3 photo), at [x] in the top of [area], in a preview 1080 px
-     * wide: its peek is 42 px (16 dp), and a fling is 2100 px/s (800 dp/s).
+     * A small thumbnail, [width] × [height] px (126 × 189 for a 2:3 photo), at [x] in the top of [area], in a preview
+     * 1080 px wide: its peek is 42 px (16 dp), and a fling is 2100 px/s (800 dp/s).
      */
-    private fun fixture(x: Float = 31f, width: Int = 126): Fixture {
+    private fun fixture(x: Float = 31f, width: Int = 126, height: Int = 189): Fixture {
         val view = View(instrumentation.targetContext).apply {
-            layout(0, 0, width, 189)
+            layout(0, 0, width, height)
             translationX = x
             translationY = 31f
         }

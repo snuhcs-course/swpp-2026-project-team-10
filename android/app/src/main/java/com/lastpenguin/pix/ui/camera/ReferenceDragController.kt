@@ -5,6 +5,8 @@ import android.annotation.SuppressLint
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** The moves of a drag that say how fast it ended: those of its last [FLING_WINDOW_MS]. */
 private const val FLING_WINDOW_MS = 100L
@@ -36,6 +38,8 @@ internal class ReferenceDragController(
     private val slop = ViewConfiguration.get(view.context).scaledTouchSlop
     private var downX = 0f
     private var downY = 0f
+
+    /** The drawn box's left and top when the drag began. */
     private var startX = 0f
     private var startY = 0f
 
@@ -73,6 +77,7 @@ internal class ReferenceDragController(
                     val (velocityX, velocityY) = speedAt(event.eventTime)
                     onDrop(
                         dropReference(
+                            // The view scales about its middle, so this is the drawn box's middle too.
                             centerX = view.translationX + view.width / 2f,
                             centerY = view.translationY + view.height / 2f,
                             velocityX = velocityX,
@@ -126,19 +131,30 @@ internal class ReferenceDragController(
             // The drag begins. A thumbnail still gliding to its place stops only now, and goes with the finger from
             // where it is: a tap leaves the glide running, or a second tap would hold it still while it is pressed.
             view.stopReferenceGlide()
-            startX = view.translationX
-            startY = view.translationY
+            startX = view.translationX + insetX
+            startY = view.translationY + insetY
             isDragging = true
         }
         val bounds = area()
         val width = previewWidth()
-        val maxY = maxOf(bounds.top, bounds.bottom - view.height).toFloat()
+        val wide = drawnWidth
+        val maxY = maxOf(bounds.top.toFloat(), bounds.bottom - drawnHeight)
         // Sideways it may leave the preview, as far as a hidden thumbnail is out.
-        val inside = referencePeek(view.width, peek)
-        val minX = minOf(bounds.left, inside - view.width).toFloat()
-        val maxX = maxOf(bounds.left, bounds.right - view.width, width - inside).toFloat()
-        view.translationX = (startX + dx).coerceIn(minX, maxX)
-        view.translationY = (startY + dy).coerceIn(bounds.top.toFloat(), maxY)
-        view.alpha = referenceAlpha(view.translationX, view.width, width, peek)
+        val inside = referencePeek(wide.roundToInt(), peek)
+        val minX = minOf(bounds.left.toFloat(), inside - wide)
+        val maxX = maxOf(bounds.left.toFloat(), bounds.right - wide, (width - inside).toFloat())
+        val left = (startX + dx).coerceIn(minX, maxX)
+        view.translationX = left - insetX
+        view.translationY = (startY + dy).coerceIn(bounds.top.toFloat(), maxY) - insetY
+        view.alpha = referenceAlpha(left, wide.roundToInt(), width, peek)
     }
+
+    // The thumbnail's box as drawn. A glide the drag stopped leaves the view drawn smaller than it is laid out, about
+    // its middle, and the finger holds what is drawn: its place, how far it may go, and its fade follow that box.
+    private val drawnWidth: Float get() = view.width * abs(view.scaleX)
+    private val drawnHeight: Float get() = view.height * view.scaleY
+
+    /** How far the drawn box's left and top are inside the view's own, which the translation places. */
+    private val insetX: Float get() = (view.width - drawnWidth) / 2f
+    private val insetY: Float get() = (view.height - drawnHeight) / 2f
 }

@@ -1074,6 +1074,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 placement = placed.takeIf { reference != null && state.referenceHidden },
                 corner = state.referenceCorner,
                 previewWidth = controls.previewContainer.width,
+                area = referenceArea(controls),
             )
         }
     }

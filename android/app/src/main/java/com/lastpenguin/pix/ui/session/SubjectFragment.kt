@@ -634,6 +634,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 placement = placed.takeIf { ui.reference != null && ui.referenceHidden },
                 corner = ui.referenceCorner,
                 previewWidth = container.width,
+                area = referenceArea(binding),
             )
         }
     }

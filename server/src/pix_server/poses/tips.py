@@ -305,15 +305,24 @@ class PoseTipper:
         return tip
 
     async def _ask(self, payload: dict, headers: dict) -> httpx2.Response:
-        """The model's response to one request, which is sent again when it is slow (HEDGE_SECONDS): whichever of the
-        two answers first, and the other is dropped."""
+        """The model's response to one request, which is sent again when it is slow (HEDGE_SECONDS). A request that
+        answers before that is the answer, whatever it says. Of the two tries, the first that answers with 200 wins
+        and the other is dropped; one that fails, with another status or without a connection, waits for the other,
+        since the second try is there to get an answer, and is the answer only when both fail."""
         calls = [asyncio.ensure_future(self._http.post(API_URL, json=payload, headers=headers))]
         try:
             done, _ = await asyncio.wait(calls, timeout=HEDGE_SECONDS)
-            if not done:
-                calls.append(asyncio.ensure_future(self._http.post(API_URL, json=payload, headers=headers)))
-                done, _ = await asyncio.wait(calls, return_when=asyncio.FIRST_COMPLETED)
-            return next(iter(done)).result()
+            if done:
+                return calls[0].result()
+            calls.append(asyncio.ensure_future(self._http.post(API_URL, json=payload, headers=headers)))
+            waiting, failed = set(calls), None
+            while waiting:
+                done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+                for call in done:
+                    if call.exception() is None and call.result().status_code == 200:
+                        return call.result()
+                    failed = failed or call
+            return failed.result()
         finally:
             for call in calls:
                 call.cancel()

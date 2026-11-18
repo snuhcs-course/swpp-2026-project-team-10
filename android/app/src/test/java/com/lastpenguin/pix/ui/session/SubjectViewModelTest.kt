@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -716,7 +716,8 @@ class SubjectViewModelTest {
     // The photographer's tip of the guide on the video (FR-4.10, #213), state-based: none; a tip before its guide,
     // with its guide, with another guide, and after its guide went; closed until the tip button, which opens and
     // closes it and takes its dot away; a touch anywhere closes an open one; new words for the same guide keep the
-    // banner as it is; a tip that goes takes the banner with it, and one that comes back starts closed.
+    // banner as it is; a tip that goes takes the banner with it, and one that comes back starts closed; a guide the
+    // photographer hides closes an open tip, which stays closed when the guide shows again.
 
     private val tip = PoseTip("Move a little closer.\nHold the phone at your waist, tilted up a little.")
 
@@ -786,6 +787,33 @@ class SubjectViewModelTest {
         mirror.setGuide(null)
         runCurrent()
         assertNull(model.uiState.value.tip)
+    }
+
+    @Test
+    fun aGuideThePhotographerHides_closesAnOpenTip_whichStaysClosedWhenTheGuideShowsAgain() = runTest {
+        val model = withTips()
+        mirror.setGuide(fakeGuide("g1"))
+        session.deliver(tipMessage("g1"))
+        runCurrent()
+        model.onTipButton()
+        assertEquals(SubjectTip("g1", tip, open = true, unseen = false), model.uiState.value.tip)
+
+        // Hidden with its guide, the tip must not come back open by itself: only the button opens it (FR-4.10).
+        mirror.update(final = true) { it.copy(visible = false) }
+        runCurrent()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = false), model.uiState.value.tip)
+        mirror.update(final = true) { it.copy(visible = true) }
+        runCurrent()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = false), model.uiState.value.tip)
+
+        // A closed tip, also one not looked at yet, is left as it is.
+        session.deliver(SessionMessage.GuideTipClear)
+        runCurrent()
+        session.deliver(tipMessage("g1"))
+        runCurrent()
+        mirror.update(final = true) { it.copy(visible = false) }
+        runCurrent()
+        assertEquals(SubjectTip("g1", tip, open = false, unseen = true), model.uiState.value.tip)
     }
 
     @Test

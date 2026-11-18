@@ -644,6 +644,42 @@ def test_slow_answer_is_asked_again_and_the_first_answer_wins(client, image_api,
     assert image_api.cancelled.is_set()
 
 
+@pytest.mark.parametrize(
+    ("delays", "statuses"),
+    [
+        # The first request fails late, just before its second try answers.
+        ([0.15, 0.2], [503, 200]),
+        # The second try fails at once, and the first request answers after it.
+        ([0.3, 0.0], [200, 429]),
+    ],
+    ids=["the first request fails", "the second try fails"],
+)
+def test_failure_of_one_of_the_two_tries_waits_for_the_other(client, image_api, photos, monkeypatch, delays, statuses):
+    # A second try is there to get an answer: a failure that happens to come first must not cost the one on its way.
+    monkeypatch.setattr(tips, "HEDGE_SECONDS", 0.05)
+    image_api.tip_delays = {"tip_scene": list(delays)}
+    image_api.tip_statuses = {"tip_scene": list(statuses)}
+    response = ask(client, photos)
+    assert response.status_code == 200 and response.json()["text"] == TEXT
+    assert len(image_api.tip_requests) == 3
+
+
+def test_both_tries_failing_is_an_upstream_error(client, image_api, photos, monkeypatch):
+    monkeypatch.setattr(tips, "HEDGE_SECONDS", 0.05)
+    image_api.tip_delays = {"tip_scene": [0.15, 0.05]}
+    image_api.tip_statuses = {"tip_scene": [503, 503]}
+    assert_error(ask(client, photos), 502, "UPSTREAM_ERROR")
+    assert len(image_api.tip_requests) == 3
+
+
+def test_failure_before_a_second_try_is_the_answer(client, image_api, photos, monkeypatch):
+    # Not slow, so not asked again: the endpoint fails as before instead of retrying every upstream error.
+    monkeypatch.setattr(tips, "HEDGE_SECONDS", 0.3)
+    image_api.tip_statuses = {"tip_scene": [503]}
+    assert_error(ask(client, photos), 502, "UPSTREAM_ERROR")
+    assert len(image_api.tip_requests) == 2
+
+
 def test_answers_in_time_are_asked_once(client, image_api, photos, monkeypatch):
     monkeypatch.setattr(tips, "HEDGE_SECONDS", 0.3)
     image_api.tip_delay = 0.05

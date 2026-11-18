@@ -36,9 +36,10 @@ import org.robolectric.annotation.GraphicsMode
  * The photographer's tip on Subject view (R&S 6.6, FR-4.10, #213; Testing Documentation 2.1.6), on the real Fragment
  * with the test modules' TipSyncer as the session runs it. The button (equivalence partitioning of what the guide on
  * the video has): no guide, a guide without a tip, a tip of another guide, a tip of the guide on the video, a hidden
- * guide, a tip the photographer's phone took back. The banner (state-based): closed when the tip comes, with the
- * button's dot; opened by the button with the tip's sentences, one on a line; closed by the button, by a touch anywhere, which still reaches the control it lands on, and by a click on itself;
- * closed again for another guide's tip.
+ * guide, which closes an open tip for good, a tip the photographer's phone took back. The banner (state-based): closed
+ * when the tip comes, with the button's dot; opened by the button with the tip's sentences, one on a line; closed by
+ * the button, by a touch anywhere, which still reaches the control it lands on, and by a click on itself; closed again
+ * for another guide's tip.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -141,7 +142,7 @@ class SubjectTipScreenTest {
     }
 
     @Test
-    fun aHiddenGuide_hidesTheTipAndItsButton_untilItShowsAgain() {
+    fun aHiddenGuide_hidesTheTipAndItsButton_andOnlyTheButtonComesBackWithIt() {
         launch()
         guideOnVideo()
         tipArrives()
@@ -155,12 +156,17 @@ class SubjectTipScreenTest {
             assertFalse(controls.tipBanner.isShown)
         }
 
+        // The tip never opens by itself, so the one that was open stays closed until the button.
         modules.mirror.update(final = true) { it.copy(visible = true) }
         idle()
         onScreen { controls, _ ->
             assertTrue(controls.tipButtonFrame.isShown)
-            assertTrue(controls.tipBanner.isShown)
+            assertFalse(controls.tipBanner.isShown)
+            assertEquals(View.GONE, controls.tipDot.visibility)
+            controls.tipButton.performClick()
         }
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
     }
 
     // ---- the banner ---------------------------------------------------------------------------------------------

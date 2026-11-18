@@ -82,7 +82,8 @@ class ImageApi:
     `body` after `delay`; chat completions, which suggest poses, record theirs in `suggestion_requests` and answer with
     `suggestion_status` and `suggestion_body` after `suggestion_delay`, except a tip's two requests (the `tip_scene`
     and `tip_candidate` schemas), which go to `tip_requests` and get `tip_status` and the `tip_bodies` entry of their
-    schema after `tip_delay`, or after the next of `tip_delays` for that schema. The Decisions API records the
+    schema after `tip_delay`, or after the next of `tip_delays` for that schema, with the next of `tip_statuses` for
+    it when there is one. The Decisions API records the
     description filter's requests in `filter_requests` and answers with `filter_status` and `filter_body` after
     `filter_delay`, by default probabilities that let every description through; the person check's (the `person`
     question) go to `person_requests` and get `person_status` and `person_body` after `person_delay`, by default a
@@ -99,6 +100,9 @@ class ImageApi:
         self.tip_delay = 0.0
         # The waits of a schema's next tip requests, in turn, before `tip_delay` applies again.
         self.tip_delays: dict[str, list[float]] = {}
+        # The statuses of a schema's next tip requests, in turn, before `tip_status` applies again: one that is not
+        # 200 answers with an upstream error.
+        self.tip_statuses: dict[str, list[int]] = {}
         self.filter_delay = 0.0
         self.person_delay = 0.0
         self.cancelled = asyncio.Event()
@@ -211,8 +215,11 @@ class ImageApi:
         schema = json.loads(request.content or b"{}").get("response_format", {}).get("json_schema", {})
         if request.url.path == "/api/v1/chat/completions" and schema.get("name") in self.tip_bodies:
             self.tip_requests.append(request)
-            waits = self.tip_delays.get(schema["name"])
+            waits, statuses = self.tip_delays.get(schema["name"]), self.tip_statuses.get(schema["name"])
+            status = statuses.pop(0) if statuses else None
             await self.wait(waits.pop(0) if waits else self.tip_delay)
+            if status not in (None, 200):
+                return httpx2.Response(status, json={"error": {"code": status, "message": "Provider returned error"}})
             return httpx2.Response(self.tip_status, json=self.tip_bodies[schema["name"]])
         if request.url.path == "/api/v1/chat/completions":
             self.suggestion_requests.append(request)

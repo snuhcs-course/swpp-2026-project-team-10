@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -345,6 +345,9 @@ class SubjectViewModel(
                         },
                         // A guide the photographer hid cannot be edited, so the mode ends and the pinch zooms again.
                         guideEditing = it.guideEditing && state.visible,
+                        // Its tip is hidden with it, and closed: shown again, the guide brings back the button
+                        // alone, since only the button opens the tip (FR-4.10).
+                        tip = it.tip?.let { tip -> if (state.visible) tip else tip.copy(open = false) },
                     )
                 }
             }

@@ -31,17 +31,18 @@ one phone; --sets-at-once runs several, and the report says so. The server must 
 with raised limits (README, *Evaluate the AI modules*). Everything goes to scripts/out/eval/<run>/, one folder per set,
 and a set that is there is never made again, so an interrupted run continues where it stopped. `retip` asks a run's
 tips again for the same candidates, after a change to the tip's prompt or rules: the images stay, the tips before are
-kept in each set's `tips_before`, and their judgments are set aside.
+kept in each set's `tips_before`, and their judgments are set aside, those still on their way in a batch included.
 
-`judge` sends Claude (claude-opus-5-5) one request per candidate with the scene and the candidate, one per suggested
-set with its four poses, and one per tip with the scene, the candidate, and the tip's lines, each with its rubric and a
-JSON schema; verdicts go to judgments.jsonl with the rubric's hash, and a request already judged is not sent again. It
-reads ANTHROPIC_API_KEY. `report` counts the rules each candidate breaks, the requests it follows, the times, the
-suggested sets whose four poses all differ, and the tips that match their pose or hold a number or unit; with several
-runs it gives each run and all together, with 95 % intervals. `sample`, `agree`, and `judge --repeat` check the judge
-(3.1, *Judge validation*). The tips are checked by us, not by the judge: `sample --kind tip` writes label-tips.html,
-where each of us answers every sentence of every tip, and `agree --kind tip` counts the tips that match their pose
-from those answers. `person` puts the phone's person check (the app's PersonCheckEval on a device) and
+`judge` sends Claude (claude-opus-5-5) one request per candidate with the scene and the candidate and one per suggested
+set with its four poses, each with its rubric and a JSON schema; verdicts go to judgments.jsonl with the rubric's hash,
+and a request already judged is not sent again. It reads ANTHROPIC_API_KEY. `report` counts the rules each candidate
+breaks, the requests it follows, the times, the suggested sets whose four poses all differ, and the tips that match
+their pose or hold a number or unit; with several runs it gives each run and all together, with 95 % intervals.
+`sample`, `agree`, and `judge --repeat` check the judge (3.1, *Judge validation*). The tips are checked by us, not by
+the judge: `sample --kind tip` writes label-tips.html, where each of us answers every sentence of every tip, and
+`agree --kind tip` counts the tips that match their pose from those answers into tip-check.json, which is where
+`report` takes the tips' metric from. `judge --kinds tip` still has Claude read the tips, to try the rubric; its
+verdicts are not reported. `person` puts the phone's person check (the app's PersonCheckEval on a device) and
 the server's (try_person_check.py) together, as the app runs them. The photos go to the Pix server's models and to
 Anthropic.
 """
@@ -77,10 +78,6 @@ from try_pose_tips import MEASURE
 # The rules a tip is judged by (eval/rubrics.toml, [tip]); a tip matches its pose when it keeps them all. The names the
 # judge reads the tip's lines under.
 TIP_RULES = ("distance", "phone", "frame", "rest")
-
-
-def tip_matches(verdicts: dict) -> bool:
-    return all(verdicts[rule] == "pass" for rule in TIP_RULES)
 
 
 SERVER = Path(__file__).resolve().parents[1]
@@ -525,6 +522,7 @@ async def retip(args: argparse.Namespace) -> None:
         append_jsonl(out / "judgments.retipped.jsonl", stale)
         kept = [row for row in rows if row.get("id") not in replaced]
         judged.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in kept), encoding="utf-8")
+    pending = set_aside_pending(out / "batches.json", replaced)
     meta_path = out / "run.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
     meta.setdefault("retipped", []).append(
@@ -535,10 +533,36 @@ async def retip(args: argparse.Namespace) -> None:
             "prompts": sha(PROMPTS),
             "tips": len(replaced),
             "judgments_set_aside": len(stale),
+            "pending_set_aside": pending,
         }
     )
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"{len(replaced)} tips asked again in {out}; {len(stale)} judgments of the tips before set aside")
+    print(
+        f"{len(replaced)} tips asked again in {out}; {len(stale)} judgments of the tips before set aside, "
+        f"and {pending} still on their way"
+    )
+
+
+def set_aside_pending(batches_path: Path, replaced: set[str]) -> int:
+    """Marks the requests of `replaced` items in the batches not collected yet as stale, and says how many: a batch
+    sent with `judge --no-wait` before a retip still holds the tip before, and its verdict, collected under the same
+    id and rubric, would be reported for the new tip. A stale request's verdict goes to judgments.retipped.jsonl when
+    its batch is collected, and the item is sent again."""
+    if not batches_path.exists():
+        return 0
+    batches = json.loads(batches_path.read_text(encoding="utf-8"))
+    count = 0
+    for entry in batches:
+        if entry.get("collected"):
+            continue
+        known = set(entry.get("stale", ()))
+        stale = [cid for cid in entry["ids"] if split_custom_id(cid)[0] in replaced and cid not in known]
+        if stale:
+            entry["stale"] = [*entry.get("stale", ()), *stale]
+            count += len(stale)
+    if count:
+        batches_path.write_text(json.dumps(batches, indent=2), encoding="utf-8")
+    return count
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -713,7 +737,8 @@ def judge_batch(
     client = anthropic.Anthropic(max_retries=4)
     path, batches_path = out / "judgments.jsonl", out / "batches.json"
     batches = json.loads(batches_path.read_text(encoding="utf-8")) if batches_path.exists() else []
-    pending = {cid for b in batches if not b.get("collected") for cid in b["ids"]}
+    # A request set aside by `retip` is of the tip before, so it does not stand for its item, which is sent again.
+    pending = {cid for b in batches if not b.get("collected") for cid in b["ids"] if cid not in b.get("stale", ())}
     # Every item of the run, so a batch sent by an earlier call with other options is still collected.
     by_item = {item.id: item for item in items}
     fresh = [custom_id(item.id, rep) for item, rep in todo if custom_id(item.id, rep) not in pending]
@@ -737,15 +762,19 @@ def judge_batch(
             batch = client.messages.batches.retrieve(entry["id"])
             if batch.processing_status != "ended":
                 continue
-            rows = []
+            rows, stale = [], []
             for result in client.messages.batches.results(entry["id"]):
                 item_id, rep = split_custom_id(result.custom_id)
                 item = by_item.get(item_id)
                 if result.result.type == "succeeded" and item is not None:
-                    rows.append(judgment_row(item, rep, result.result.message, True, entry["rubric"]))
+                    row = judgment_row(item, rep, result.result.message, True, entry["rubric"])
+                    (stale if result.custom_id in entry.get("stale", ()) else rows).append(row)
                 else:
                     print(f"{result.custom_id}: {result.result.type}; it is sent again next time")
             append_jsonl(path, rows)
+            if stale:
+                append_jsonl(out / "judgments.retipped.jsonl", stale)
+                print(f"batch {entry['id']}: {len(stale)} verdicts of tips asked again since, set aside")
             entry["collected"] = True
             batches_path.write_text(json.dumps(batches, indent=2), encoding="utf-8")
             print(f"batch {entry['id']}: {len(rows)} verdicts, about ${sum(r['cost'] for r in rows):.2f}")
@@ -767,7 +796,9 @@ def judge(args: argparse.Namespace) -> None:
     rubrics = load_rubrics()
     rubric = sha(RUBRICS)
     every = items_of(out, rubrics)
-    items = [item for item in every if not args.kinds or item.kind in args.kinds]
+    # The tips are checked by us (`agree --kind tip`), so Claude reads them only when asked to.
+    kinds = args.kinds or ("pose", "suggestions")
+    items = [item for item in every if item.kind in kinds]
     reps = [0]
     if args.repeat > 1 or args.sample:
         sample = json.loads((out / "sample.json").read_text(encoding="utf-8"))
@@ -827,7 +858,24 @@ def percentile(values: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))]
 
 
-def metrics(sets: list[dict], verdicts: dict[str, dict]) -> list[tuple[str, str]]:
+def tip_checks(out: Path) -> dict[str, dict]:
+    """Our check of the run's tips, by tip id: the sentences that were checked and whether most of us found every
+    one of them right (`agree --kind tip`). Empty before that."""
+    path = out / "tip-check.json"
+    if not path.exists():
+        return {}
+    return {entry["id"]: entry for entry in json.loads(path.read_text(encoding="utf-8"))["tips"]}
+
+
+def tip_verdict(tip_record: dict, check: dict | None) -> str | None:
+    """Our verdict on this tip, pass or fail, or None when we have not checked it: a check of other sentences is of
+    the tip before a retip, and one we did not answer whole has no verdict."""
+    if not check or check["lines"] != (tip_record.get("text") or "").split("\n"):
+        return None
+    return check.get("verdict")
+
+
+def metrics(sets: list[dict], verdicts: dict[str, dict], checks: dict[str, dict]) -> list[tuple[str, str]]:
     lines: list[tuple[str, str]] = []
     candidates = [(s, c) for s in sets for c in s["candidates"]]
     made = [(s, c) for s, c in candidates if c["ok"]]
@@ -895,14 +943,19 @@ def metrics(sets: list[dict], verdicts: dict[str, dict]) -> list[tuple[str, str]
     tips = [s["tip"] for s in sets if s.get("tip")]
     answered = [t for t in tips if t.get("text")]
     lines.append(("  tips answered", share(len(answered), len(tips))))
-    rows = [
-        verdicts[f"tip-{s['case']}-{s['mode'][0]}"]["verdicts"]
+    # Ours, not the judge's (3.1): the tips most of us found right in every sentence.
+    ours = [
+        verdict
         for s in sets
-        if f"tip-{s['case']}-{s['mode'][0]}" in verdicts
+        if s.get("tip") and (verdict := tip_verdict(s["tip"], checks.get(f"tip-{s['case']}-{s['mode'][0]}")))
     ]
-    lines.append(("  match their pose", share(sum(tip_matches(v) for v in rows), len(rows))))
-    for rule in TIP_RULES:
-        lines.append((f"    {rule}", share(sum(v[rule] == "pass" for v in rows), len(rows))))
+    lines.append(("  checked by us", f"{len(ours)} of {len(answered)}"))
+    lines.append(
+        (
+            "  match their pose, by most of us",
+            share(ours.count("pass"), len(ours)) if ours else "not checked yet (sample and agree with --kind tip)",
+        )
+    )
     lines.append(
         ("  with numbers or units (should be 0)", share(sum(bool(t.get("measure")) for t in answered), len(answered)))
     )
@@ -913,7 +966,7 @@ def report(args: argparse.Namespace) -> None:
     runs = [run_dir(name) for name in args.runs]
     sections = []
     for out in runs:
-        sections.append((out.name, metrics(load_sets(out), latest_verdicts(out))))
+        sections.append((out.name, metrics(load_sets(out), latest_verdicts(out), tip_checks(out))))
     if len(runs) > 1:
         sections.append(("all runs", pooled_metrics(runs)))
     text = []
@@ -937,14 +990,17 @@ def report(args: argparse.Namespace) -> None:
 
 def pooled_metrics(runs: list[Path]) -> list[tuple[str, str]]:
     """Every run's sets and verdicts together, each case named after its run so the keys stay apart."""
-    sets, verdicts = [], {}
+    sets, verdicts, checks = [], {}, {}
     for out in runs:
         for s in load_sets(out):
             sets.append({**s, "case": f"{out.name}.{s['case']}"})
         for key, row in latest_verdicts(out).items():
             kind, case, rest = key.split("-", 2)
             verdicts[f"{kind}-{out.name}.{case}-{rest}"] = row
-    return metrics(sets, verdicts)
+        for key, check in tip_checks(out).items():
+            kind, case, rest = key.split("-", 2)
+            checks[f"{kind}-{out.name}.{case}-{rest}"] = check
+    return metrics(sets, verdicts, checks)
 
 
 def thumbnail(path: Path, long_side: int = 360) -> str:
@@ -953,10 +1009,11 @@ def thumbnail(path: Path, long_side: int = 360) -> str:
 
 
 def write_report_html(target: Path, runs: list[Path]) -> None:
-    """Every candidate with its verdicts, the failures first, to read what the judge saw."""
+    """Every candidate with its verdicts, the failures first, to read what the judge saw; each tip with ours."""
     rows = []
     for out in runs:
         verdicts = latest_verdicts(out)
+        checks = tip_checks(out)
         for s in load_sets(out):
             folder = out / "sets" / f"{s['case']}-{s['mode']}"
             key = f"{s['case']}-{s['mode'][0]}"
@@ -985,13 +1042,10 @@ def write_report_html(target: Path, runs: list[Path]) -> None:
             if sug:
                 extra += f"<p class={sug['verdicts']['all_different']}>All four different: {html.escape(sug['answer']['all_different']['reason'])}</p>"
             tip_record = s.get("tip") or {}
-            tip_row = verdicts.get(f"tip-{key}")
             if tip_record:
                 said = tip_record.get("text") or tip_record.get("code", "")
-                failed = [rule for rule in TIP_RULES if tip_row and tip_row["verdicts"][rule] != "pass"]
-                judged = "".join(f" — {rule}: {html.escape(tip_row['answer'][rule]['reason'])}" for rule in failed)
-                cls = ("pass" if tip_matches(tip_row["verdicts"]) else "fail") if tip_row else ""
-                extra += f"<p class={cls}>Tip for {tip_record.get('candidate')}: {html.escape(said)}{judged}</p>"
+                cls = tip_verdict(tip_record, checks.get(f"tip-{key}")) or ""
+                extra += f"<p class={cls}>Tip for {tip_record.get('candidate')}: {html.escape(said)}</p>"
             bad_set = any("c bad" in cell for cell in cells)
             title = [out.name, s["case"], s["mode"]]
             if s["selfie"]:
@@ -1225,6 +1279,15 @@ def tip_check(args: argparse.Namespace) -> None:
         return hits, total
 
     lines.append(f"{'tips that match their pose, by most of us':<44} {share(*matching(by_most))}")
+
+    def verdict_of(item: dict) -> str | None:
+        answers = [by_most(item["id"], str(n)) for n in range(1, len(item["lines"]) + 1)]
+        return None if not all(answers) else "pass" if all(a == "pass" for a in answers) else "fail"
+
+    checked = [{"id": item["id"], "lines": item["lines"], "verdict": verdict_of(item)} for item in items]
+    (out / "tip-check.json").write_text(
+        json.dumps({"labelers": names, "tips": checked}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     for name, person in zip(names, people, strict=True):
         hits, total = matching(lambda item_id, key, person=person: answer(person, item_id, key))
         lines.append(f"{'    by ' + name:<44} {share(hits, total)}")
@@ -1423,7 +1486,12 @@ def main() -> None:
     j.add_argument("run")
     j.add_argument("--now", action="store_true", help="direct calls at full price instead of the Batch API")
     j.add_argument("--no-wait", action="store_true", help="send the batches and stop; run again to collect")
-    j.add_argument("--kinds", nargs="+", choices=("pose", "suggestions", "tip"))
+    j.add_argument(
+        "--kinds",
+        nargs="+",
+        choices=("pose", "suggestions", "tip"),
+        help="default: pose and suggestions; the tips are checked by us, and Claude's verdicts on them are not reported",
+    )
     j.add_argument("--repeat", type=int, default=1, help="judge the sample of `sample` this many times in all")
     j.add_argument("--sample", action="store_true", help="only the sample of `sample`, to try a changed rubric on it")
     j.add_argument("--limit", type=int, help="at most N judgments, for a pilot")

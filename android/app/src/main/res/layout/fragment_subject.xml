@@ -2,8 +2,9 @@
 <!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1–7.3). No shutter: only the photographer takes photos. A pinch on
      the video zooms the photographer's camera while guide-edit mode is off (AD-17); with it on, drags and pinches
      move the photographer's guide. The brightness slider and the flash button are the photographer's controls. The
-     video is placed as on the Camera screen (previewArea, in code), and the zoom row and the caption lie above it. -->
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     video is placed as on the Camera screen (previewArea, in code), and the zoom row and the caption lie above it. The
+     root reports the end of every touch, which closes the photographer's tip (FR-4.10). -->
+<com.lastpenguin.pix.ui.camera.TouchWatchingLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -175,8 +176,8 @@
             tools:visibility="visible" />
     </FrameLayout>
 
-    <!-- Right above the caption, as the Camera screen's panels sit above its shutter: the photographer's brightness
-         (FR-7.3), opened from the button beside the readout; the value is in EV. -->
+    <!-- Right above the caption, as the Camera screen's panels sit above its shutter: the photographer's tip (FR-4.10)
+         and their brightness (FR-7.3), each opened from its button in the zoom row; the brightness is in EV. -->
     <LinearLayout
         android:id="@+id/bottomOverlays"
         android:layout_width="0dp"
@@ -189,6 +190,43 @@
         app:layout_constraintBottom_toTopOf="@id/bottomPanel"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
+
+        <!-- The photographer's tip of the guide on the video (FR-4.10, #213), as on their Camera screen: the tip's
+             sentences, one on a line. Closed until the tip button; a touch anywhere closes it again. Translucent, so
+             the video shows through. -->
+        <LinearLayout
+            android:id="@+id/tipBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:accessibilityLiveRegion="polite"
+            android:background="@drawable/bg_glass_panel"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="48dp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:id="@+id/tipIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_lightbulb"
+                app:tint="@color/pix_accent" />
+
+            <TextView
+                android:id="@+id/tipText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:textAppearance="@style/TextAppearance.Pix.Body"
+                tools:text="Move a little closer.\nHold the phone at your waist, tilted up a little." />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/brightnessPanel"
@@ -234,8 +272,10 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- The Camera screen's row: brightness button, zoom readout (FR-7.1), Save guide (FR-6.16), and the guide-edit
-         mode toggle, over the bottom of the video (placed in code). -->
+    <!-- The Camera screen's row: the brightness button and the photographer's tip (FR-4.10) at its start, the zoom
+         readout (FR-7.1), then Save guide (FR-6.16) and the guide-edit mode toggle, over the bottom of the video
+         (placed in code). The tip is at the start, where there is room: three buttons at the end reach the readout
+         on a narrow phone. -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
@@ -247,20 +287,57 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Opens the brightness slider above (FR-7.3); checked while it is open. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/brightnessButton"
-            style="@style/Widget.Pix.Button.Icon"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="start|center_vertical"
-            android:checkable="true"
-            android:contentDescription="@string/brightness"
-            android:visibility="gone"
-            app:backgroundTint="@color/brightness_button_background"
-            app:icon="@drawable/ic_brightness"
-            app:iconTint="@color/brightness_button_icon"
-            tools:visibility="visible" />
+            android:gravity="center_vertical">
+
+            <!-- Opens the brightness slider above (FR-7.3); checked while it is open. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/brightnessButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checkable="true"
+                android:contentDescription="@string/brightness"
+                android:visibility="gone"
+                app:backgroundTint="@color/brightness_button_background"
+                app:icon="@drawable/ic_brightness"
+                app:iconTint="@color/brightness_button_icon"
+                tools:visibility="visible" />
+
+            <!-- Opens the photographer's tip while the guide on the video has one (FR-4.10, #213); the dot says there
+                 is a tip not yet looked at, since the tip never opens by itself here. -->
+            <FrameLayout
+                android:id="@+id/tipButtonFrame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/tipButton"
+                    style="@style/Widget.Pix.Button.Icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/show_tip"
+                    app:icon="@drawable/ic_lightbulb" />
+
+                <ImageView
+                    android:id="@+id/tipDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="7dp"
+                    android:layout_marginEnd="6dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_status_dot"
+                    android:visibility="gone"
+                    app:tint="@color/pix_accent"
+                    tools:visibility="visible" />
+            </FrameLayout>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/zoomReadout"
@@ -477,4 +554,4 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+</com.lastpenguin.pix.ui.camera.TouchWatchingLayout>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -11,6 +11,9 @@ import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.camera.PhotoAlbum
+import com.lastpenguin.pix.generation.GuideTip
+import com.lastpenguin.pix.generation.PoseTip
+import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeCameraController
@@ -31,6 +34,8 @@ import com.lastpenguin.pix.session.SessionEntry
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.SharedTip
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.shoot
@@ -43,6 +48,7 @@ import java.util.zip.CRC32
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -77,6 +83,8 @@ import org.junit.runner.RunWith
  * photo is a notice, which waits for the activity; one saved before this phone has seen Connected is noticed at once,
  * and one that failed then waits for that session's name. A room this phone waits in alone, as after its subject left
  * (#188): ended for the subject's way in; Idle (nothing to end); a session with someone in it or on its way (kept).
+ * The guide's tip (#213, Design 2.5.1): the photographer sends it once connected and again after a reconnect, not while
+ * waiting alone; the subject keeps it from Connecting on, through a reconnect, until the session ends.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -154,6 +162,87 @@ class SessionViewModelTest {
     }
 
     private val noAlbum = PhotoAlbum { _, _, _ -> Result.failure(IOException("No album")) }
+
+    private val tipOnCamera = MutableStateFlow<GuideTip?>(null)
+    private val tip = PoseTip("Move a little closer.\nHold the phone at your waist, tilted up a little.")
+
+    /** A ViewModel with the syncer of the guide's tip (#213), whose tip on Camera is [tipOnCamera]. */
+    private fun withTips(): Pair<SessionViewModel, TipSyncer> {
+        val tips = TipSyncer(session, tipOnCamera)
+        val syncer = GuideSyncer(
+            session,
+            InMemoryGuideRepository(),
+            InMemoryGuideRepository(),
+            codec,
+            FakeGuideReferenceCodec(),
+            MirrorReference(),
+            dispatcher,
+        )
+        val tipModel = SessionViewModel(
+            session,
+            camera,
+            syncer,
+            RemoteControlHandler(session, camera, InMemoryGuideRepository()),
+            mobileData,
+            invitations,
+            tipSyncer = tips,
+        )
+        store.put("tips", tipModel)
+        return tipModel to tips
+    }
+
+    private fun tipsSent() = session.sent.filter { it is SessionMessage.GuideTip || it is SessionMessage.GuideTipClear }
+
+    @Test
+    fun theGuidesTip_goesToTheSubjectOnceConnected_andAgainAfterAReconnect() = runTest(dispatcher) {
+        val (tipModel, _) = withTips()
+        tipOnCamera.value = GuideTip("g1", TipState.Ready(tip))
+        tipModel.startRoom()
+        session.setState(SessionState.Waiting(CODE))
+        runCurrent()
+        // Alone in its room: no one to tell.
+        assertEquals(emptyList<SessionMessage>(), tipsSent())
+
+        val live = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        session.setState(live)
+        runCurrent()
+        val sent = SessionMessage.GuideTip("g1", tip.text)
+        assertEquals(listOf<SessionMessage>(sent), tipsSent())
+
+        // The tip went while the link was down; the subject hears so when it is back.
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        tipOnCamera.value = null
+        runCurrent()
+        assertEquals(listOf<SessionMessage>(sent), tipsSent())
+        session.setState(live)
+        runCurrent()
+        assertEquals(listOf(sent, SessionMessage.GuideTipClear), tipsSent())
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        runCurrent()
+    }
+
+    @Test
+    fun theSubject_keepsThePhotographersTip_fromJoiningUntilTheSessionEnds() = runTest(dispatcher) {
+        val (tipModel, tips) = withTips()
+        tipModel.joinRoom(CODE)
+        session.setState(SessionState.Connecting("s1"))
+        runCurrent()
+        // The photographer's side is connected first and sends at once: the tip is read before this phone's Connected.
+        session.deliver(SessionMessage.GuideTip("g1", tip.text))
+        runCurrent()
+        assertEquals(SharedTip("g1", tip), tips.mirror.value)
+
+        connected()
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        assertEquals(SharedTip("g1", tip), tips.mirror.value)
+
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        assertNull(tips.mirror.value)
+    }
 
     @Test
     fun aPhotoNotSentDuringTheSession_waitsForTheCameraScreen() = runTest(dispatcher) {

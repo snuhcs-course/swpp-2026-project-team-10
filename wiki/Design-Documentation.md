@@ -91,7 +91,8 @@
 | 3.11 | 2026-11-15 | The situation choice (Iter4-P13, [#210]): tiles on *Add a pose guide* before the scene photo, the situation's camera and hint, *Selfie* off without a front camera, its name on *Generate poses* on both phones (`pose.description`'s `situation`), the pose flow's bar and the scene photo's panel, the step's start and end animated, *My library* as a row, and the tutorial's rings around the whole rows, cut to what a scrolling view shows (2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5, 2.6.8, 2.9). |
 | 3.12 | 2026-11-16 | Photo capture (Iter4-P11, [#208]): `takePhoto`'s `onCaptured` frees the shutter while the photo is saved, results in shutter order, no saving label, and the capture settings in `CaptureTuning` with what the S22 measured (2.1, 2.6.2, 2.8). |
 | 3.13 | 2026-11-16 | The scene photo step (Iter4-P21, [#231]): Camera's own top bar with the ratio, the preview in one place, a small see-through panel that a touch takes away (`GenerationUiState.sceneHint`), and no slide of the preview (2.6.3). |
-| 3.14 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): the thumbnail from the session's photos and a viewer inside Pix on *Subject view* and on the photographer's Camera, and outside a session the album's newest photo (`NewestAlbumPhoto`) (2.6.5, Figures 6 and 7). |
+| 3.14 | 2026-11-18 | Better pose tips (Iter4-P16, [#213]): the model describes each photo in its own request, the server derives the distance from two measures and writes the tip's sentences, and `guide.tip` sends the tip to the subject's phone (2.1, 2.2, 2.5.1, 2.5.3, 2.6.3, Figures 7 and 8). |
+| 3.15 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): the thumbnail from the session's photos and a viewer inside Pix on *Subject view* and on the photographer's Camera, and outside a session the album's newest photo (`NewestAlbumPhoto`) (2.6.5, Figures 6 and 7). |
 
 </details>
 
@@ -378,7 +379,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               GuideImageCodec, GuideSyncer, GuideReference (GuideReferenceCodec, MirrorReference),
 │               PoseSyncer (PoseShare, MirrorPoseSet), PoseCandidates (PoseCandidateCodec),
 │               ConfirmSyncer (ConfirmShare, MirrorConfirm), DescriptionSyncer (DescriptionShare, MirrorDescription),
-│               PhotoSyncer (PhotoShare, PhotoReader), RemoteControlHandler, MobileDataNotice
+│               PhotoSyncer (PhotoShare, PhotoReader), TipSyncer, RemoteControlHandler, MobileDataNotice
 │  ├─ protocol/  SessionMessage*, MessageCodec, ChannelRouter
 │  └─ signaling/ SignalMessage*, SignalCodec
 └─ core/        AppContainer (creates every module), Timings (timing logs), network/PixApi* (PixApi, PixAuthApi,
@@ -977,6 +978,9 @@ classDiagram
   DescriptionSyncer ..|> DescriptionShare
   DescriptionSyncer --> SessionManager
   SubjectViewModel --> DescriptionSyncer : the photographer's Generate poses
+  TipSyncer --> SessionManager
+  TipSyncer --> PoseTips : the tip of the guide on Camera
+  SubjectViewModel --> TipSyncer : the photographer's tip
   SubjectDescribeViewModel --> DescriptionSyncer
   SubjectDescribeViewModel --> PromptHistory : this phone's descriptions
   PhotoSyncer ..|> PhotoShare
@@ -1557,6 +1561,8 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `guide.reference.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The guide's reference photo, for the subject's thumbnail (FR-3.9) |
 | `guide.state` | P→S | steps realtime, final reliable | `state`, `final`, `by` | The guide's place, opacity, and visibility |
 | `guide.clear` | P→S | reliable | none | The guide was removed |
+| `guide.tip` (It 4) | P→S | reliable | `guideId`, `text` | The tip of the guide on the photographer's camera (FR-4.10) |
+| `guide.tip.clear` (It 4) | P→S | reliable | none | That guide has no tip, or none any more |
 | `guide.move` | S→P | steps realtime, final reliable | `guideId`, `cx`, `cy`, `height`, `final` | The subject's drag or pinch on the guide (FR-7.2) |
 | `pose.description` | P→S | reliable | `descriptionId`, `step`, `text`, `writer`, `rejected`, `setId`, `situation` | The photographer's *Generate poses* (FR-6.15) |
 | `pose.scene.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The scene photo, for the subject's *Generate poses* |
@@ -1686,6 +1692,23 @@ Sent once per guide, after the guide's image and `guide.state`, so the subject d
 ```json
 { "v": 3, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
 ```
+
+</details>
+
+<details>
+<summary><code>guide.tip</code> and <code>guide.tip.clear</code> · reliable · P→S · It 4</summary>
+
+```jsonc
+{ "v": 3, "t": "guide.tip", "seq": 431, "ts": 1759212353410,
+  "b": { "guideId": "5f0c2b9e",
+         "text": "Move a little closer.\nHold the phone at your waist, tilted up a little." } }
+{ "v": 3, "t": "guide.tip.clear", "seq": 440, "ts": 1759212360118, "b": {} }
+```
+
+- The photographer sends the tip once it has arrived, and `guide.tip.clear` when the guide has no tip: no guide, a tip still asked for or failed, or a saved copy of the guide, which keeps the guide's id.
+- A sender started after a reconnect sends what the guide has now, a tip or a clear (2.6.7).
+- The subject keeps the last tip by `guideId` and shows its button only while that guide is on the video, so the tip and the guide's image may arrive in either order. A guide the photographer hides closes an open tip, so the guide shown again brings back the button alone.
+- `text` is the tip as the server wrote it, a sentence on each line, in the photographer's screen language.
 
 </details>
 
@@ -2291,15 +2314,16 @@ Outside `/api/v1`:
 //   language   "en"   (FR-10.2: "en" or "ko"; left out means "en")
 
 // response 200; the app shows only "text"
-{ "text": "Zoom in or take a step closer, hold the phone at your waist and tilt it up a little - the legs look longer.",
+{ "text": "Move a little closer.\nHold the phone at your waist, tilted up a little.",
   "framing": "closer", "hold": "waist", "height": "lower", "angle": "up" }
-// framing: closer | back | keep · hold: crouching | waist | chest | eye | above head
+// text (It 4): a sentence on each line: the distance and the phone always, the rest when it applies (2.6.3)
+// framing: closer | back | keep | unsure (It 4: no move is named) · hold: crouching | waist | chest | eye | above head
 // height, against the phone's place for the scene: raise | lower | keep · angle: up | level | down
 ```
 
 - The app asks when the user takes a candidate, never for a selfie.
 - `422 REJECTED`: the description filter refused `pose`, or the tip model declined the photos.
-- `502 UPSTREAM_ERROR` includes an answer the server cannot show: a number or a unit, over 160 characters (80 in Korean), or another language (2.6.3). `504 UPSTREAM_TIMEOUT` comes after `PIX_TIP_TIMEOUT_SECONDS` (10 s).
+- `502 UPSTREAM_ERROR` includes a description of a photo that the server cannot read (2.6.3). `504 UPSTREAM_TIMEOUT` comes after `PIX_TIP_TIMEOUT_SECONDS` (10 s).
 - Tips count in rate-limit windows of their own (2.7).
 
 </details>
@@ -2608,16 +2632,36 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 **Image model.** Candidates come from OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), with one format, key, and bill for every vendor. Each request asks for `1K` and the closest `aspect_ratio` of 3:4, 9:16, and 1:1 (AD-10), which the listed models all accept (2026-10-30). A model may round the ratio, such as 896 × 1200 for 3:4, so each screen fits a candidate in its own shape. Nothing is cut, since the guide uses the whole candidate. The scene's thumbnails are 72 dp high. The server converts PNG or WebP to JPEG (quality 90) and turns OpenRouter's `403` into `422 REJECTED`.
 
-**Pose tips (It 3, FR-4.10).** When *Reference confirm* finds the person in a chosen candidate, `PoseTips` calls `POST /pose-tips` with the scene, the candidate (at most 768 px), and the pose. The one request takes 2–3.5 s, hidden behind that screen. The tip model fills `tip_prompt`'s JSON schema: the shot, the pose, the phone's height now and best, the angle, the framing, and then one sentence. Height and angle follow photographers' rules:
+**Pose tips (It 3, FR-4.10; rebuilt in It 4, [#213]).** When *Reference confirm* finds the person in a chosen candidate, `PoseTips` calls `POST /pose-tips` with the scene, the candidate (at most 768 px), and the pose. The request takes about 2.8 s (median of 100, 90 % within 3.5 s), hidden behind that screen.
 
-| Shot | Phone | Angle |
-|----|----|----|
-| Full body, standing, walking, or leaning | at the waist | up a little |
-| Knees up or waist up | at the chest | level |
-| Chest up | at eye level | down a little |
-| Sitting or crouching | crouching | level |
+The model only describes; the server decides and writes.
 
-The server derives the height move. It refuses a sentence with a number, a unit, or a degree, over 160 characters, or with a letter outside the requested script (Latin for `en`, Hangul for `ko`). For the screens' language `ko`, it adds `tip_korean`: a 해요체 sentence of at most 80 characters, with "조금" instead of counts. Korean counts, units, and degrees are refused (한 걸음, 몇 미터까지, 구 도까지), while 한쪽, 구도, or 파라미터 pass (`KOREAN_MEASURES` in `tips.py`). After a language change, also on Android 10–12 (2.6.8), `PoseTips` asks again. A newer guide, another photo, or Back on *Reference confirm* cancels the request, also on the server; the one for the guide on Camera stays until another guide replaces it. A saved guide and a selfie's candidate get no tip. *Why Korean this way:* on 16 pairs, three rounds per language (2026-10-30), every Korean sentence was usable (31–58 characters). Its decisions matched English's in 13 of 16 pairs, within English's own spread: 7 of 16 pairs stable in English, 12 of 16 in Korean.
+1. **Two requests.** The server asks the tip model about the scene and about the candidate at once, each in a request of its own with `tip_prompt`. Asked about both photos in one request, the model gave the candidate the scene's shot and camera. A request without an answer after 4 s is sent a second time, and the first of the two that answers with 200 wins: a tip needs both answers, and without the second request 26 of 300 tips ran into the 10 s limit on a slow day (2026-11-17). A try that fails waits for the other, and is the answer only when both fail.
+2. **The description** of a photo, as a JSON schema: the box around the person, the box around their head (four zeros when the head does not show, which the server reads as no head), the shot (full body, knees up, waist up, chest up), the posture (standing, seated, on the ground), the part of the person the camera is level with (knees, waist, chest, face, above), the tilt, and whether a horizon or another long level line is there, level or leaning (`horizon`). The candidate's request adds `tip_candidate`, which says what the photo is, and carries the pose in quotation marks, as data. The model writes no words of the tip.
+3. **The distance** comes from two measures of how much bigger the person is in the candidate: the head's height, and the whole person's height (the box's height divided by the shot's share of a body). Each says closer at 1.18 times or more, farther at 1/1.18 or less, and the same otherwise. The server decides a distance only when both agree; otherwise `framing` is `unsure`. The move is "much" when both measures say 1.4 times or more.
+4. **The phone** is held level with the part the candidate shows, by the person's posture:
+
+   | The camera is level with | Standing | Seated | On the ground |
+   |----|----|----|----|
+   | Above the head | above the head | at eye level | at the chest |
+   | Face | at eye level | at the chest | at the waist |
+   | Chest | at the chest | at the waist | crouching |
+   | Waist | at the waist | crouching | crouching |
+   | Knees | crouching | crouching | crouching |
+
+5. **The sentences** come in this order, in words from `[tip_words]` in the screens' language. `text` is the sentences, one on a line. The first two are in every tip; the others only when they apply.
+   - *The distance*: closer or farther back, a little or much; to keep the same distance, when both measures say so; or, when the distance is `unsure`, to fit the person to the guide's outline. For a waist-up or chest-up candidate the move closer is "Zoom in", because a phone held that close bends the face.
+   - *The phone*: the height and the tilt the candidate was taken with, also when the scene was taken so.
+   - *The side*: left or right, when the middle of the person's box in the candidate is over 12 % of the width off the middle.
+   - *The room above the head*: almost none when the head's top is within 6 % of the candidate's top edge, plenty when it is over 25 % below it.
+   - *Upright*: to hold the phone upright, when the scene's level line leans and the candidate's does not.
+   - A photo's description that cannot be read fails the request.
+
+*Why two measures:* on the 100 pairs of an evaluation run (2026-11-16), we read by eye the 44 where the measures or the earlier tip disagreed. The earlier single request named a wrong distance in 18 of them. Each measure alone was wrong in 11 to 15: the head under a hat or a hood, the body when the shot was misread. Together they named a distance in 68 of the 100 pairs, 2 of them wrong. *Why the distance and the phone are always said:* a tip that said them only when they differed was built first (2026-11-17). Of 100 such tips, 57 were one sentence, the phone came in 33, and 19 said nothing about a distance that may have changed, so the tips read as if parts were missing (decided 2026-11-18). *Why nothing about the brightness:* a sentence to raise it for a backlit scene was built and taken out (2026-11-18). The candidate keeps the scene's light, never over 0.3 stops brighter in 100 pairs, so the two photos give no difference to say. Asked whether a scene needs its brightness changed, the model answered "fine" for all 50 scenes, but also for 9 of 12 copies made two stops darker or a stop and a half brighter; the scenes it called backlit looked well lit. The photographer sees the brightness on the preview anyway. *Why the move does not name the shot:* naming it ("Closer, a knees-up shot") was tried, and 5 of 100 tips named a shot the candidate did not show, mostly waist up for knees up. *Why the server writes every word, and nothing about the background:* the first build (2026-11-16) was a card of labeled lines (*Place*, *Framing*, *Phone*) with the model's phrases for the place and for what of the background to keep. In the team's review (2026-11-17) the place did not help take the photo and the labels were not needed, so both went. A prompt that asked the model for the whole tip was tried on 3 pairs: it read well, but its distances were wrong or vague, and it told the person how to pose. A newer or larger model (`gemini-3.5-flash-lite`, `gemini-3.8-flash`) was no better on the 44 hardest pairs and up to twice as slow.
+
+After a language change, also on Android 10–12 (2.6.8), `PoseTips` asks again. A newer guide, another photo, or Back on *Reference confirm* cancels the request, also on the server, which cancels both model requests. The tip for the guide on Camera stays until another guide replaces it. A saved guide and a selfie's candidate get no tip.
+
+Camera shows `text` in its banner. In a session `TipSyncer` sends the tip of the guide on Camera to the subject's phone (`guide.tip`, 2.5.1), where a button on Subject view opens it; it never opens by itself there.
 
 **Time limit.** A run has 60 s on the phone, from the button, suggestions and variations included. Each server call to the image API has 60 s (`PIX_POSE_UPSTREAM_TIMEOUT_SECONDS`, then `504 UPSTREAM_TIMEOUT`). The phone's HTTP client waits 65 s and nginx 75 s, so the run's limit decides; a deploy lets requests finish. *Why:* sets usually finish within NFR-4's 20 s and 30 s, but single requests took up to 46 s on a slow day.
 
@@ -3232,7 +3276,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The situation choice before the scene photo (Iter4-P13, [#210]) | 박재완 | 11/19 | Open | 2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5 |
 | Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Dropped | — |
 | Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
-| Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/19 | Open | 2.6.3 |
+| Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/17 | Done | 2.5.1, 2.5.3, 2.6.3 |
 | The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Open | *Still open*, AD-8 |
 | Integration tests for the Iteration 4 flows (Iter4-P18, [#215]) | 조성민 | 11/19 | Open | Testing Documentation |
 | Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Open | — |

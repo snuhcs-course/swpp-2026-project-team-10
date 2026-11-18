@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -51,6 +51,8 @@ class MessageCodecTest {
             SessionMessage.GuideImageEnd("g1", 3735928559L),
             SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, false), false),
             SessionMessage.GuideClear,
+            SessionMessage.GuideTip("g1", "Move a little closer.\nHold the phone at your waist, tilted up a little."),
+            SessionMessage.GuideTipClear,
             SessionMessage.ZoomSet(2f),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
             SessionMessage.PoseStep("set1", PoseSetStep.GENERATING),
@@ -238,6 +240,34 @@ class MessageCodecTest {
     fun `guide clear has an empty body`() {
         val envelope = Json.parseToJsonElement(codec.encode(SessionMessage.GuideClear)).jsonObject
         assertEquals("guide.clear", envelope.getValue("t").jsonPrimitive.content)
+        assertEquals(0, envelope.getValue("b").jsonObject.size)
+    }
+
+    // The tip of the guide on the camera for the subject's phone (#213): the server's text, a sentence on each line.
+    @Test
+    fun `a guide tip carries its guide and its text`() {
+        val tip = SessionMessage.GuideTip("g1", "Move a little closer.\nLeave almost no room above the head.")
+        val envelope = Json.parseToJsonElement(codec.encode(tip)).jsonObject
+        assertEquals("guide.tip", envelope.getValue("t").jsonPrimitive.content)
+        val body = envelope.getValue("b").jsonObject
+        assertEquals("g1", body.getValue("guideId").jsonPrimitive.content)
+        assertEquals(tip.text, body.getValue("text").jsonPrimitive.content)
+        assertEquals(tip, codec.decode(codec.encode(tip))!!.message)
+    }
+
+    @Test
+    fun `a guide tip with a field from a later app is still read`() {
+        val text = """
+            {"v": 3, "t": "guide.tip", "seq": 7, "ts": 0,
+             "b": {"guideId": "g1", "text": "Step back a little.", "lines": [{"kind": "frame", "text": "x"}]}}
+        """.trimIndent()
+        assertEquals(SessionMessage.GuideTip("g1", "Step back a little."), codec.decode(text)!!.message)
+    }
+
+    @Test
+    fun `guide tip clear has an empty body`() {
+        val envelope = Json.parseToJsonElement(codec.encode(SessionMessage.GuideTipClear)).jsonObject
+        assertEquals("guide.tip.clear", envelope.getValue("t").jsonPrimitive.content)
         assertEquals(0, envelope.getValue("b").jsonObject.size)
     }
 

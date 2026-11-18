@@ -1402,16 +1402,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         viewModel.onAspectChosen(aspect)
     }
 
-    /** Whether [event], in [root]'s coordinates, is on this view as it shows. */
-    private fun View.isUnder(event: MotionEvent, root: View): Boolean {
-        if (!isShown) return false
-        val at = IntArray(2).also(::getLocationInWindow)
-        val origin = IntArray(2).also(root::getLocationInWindow)
-        val x = event.x + origin[0] - at[0]
-        val y = event.y + origin[1] - at[1]
-        return x >= 0f && x < width && y >= 0f && y < height
-    }
-
     /** An exposure index in EV, such as "+0.7" or "0". */
     private fun formatEv(index: Int): String = ExposureScale.formatEv(index, viewModel.uiState.value.exposureStep)
 

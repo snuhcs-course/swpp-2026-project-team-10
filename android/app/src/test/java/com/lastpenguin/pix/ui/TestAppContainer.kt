@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -44,6 +44,7 @@ import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.settings.AppLanguage
@@ -124,6 +125,9 @@ class TestAppContainer(
     val descriptions =
         DescriptionSyncer(session, FakePoseCandidateCodec { ScreenTestSupport.bitmap(60, 80) }, Dispatchers.Unconfined)
 
+    /** The photographer's tip of the guide on the subject's phone (#213), from this container's own tips. */
+    val tipSync = TipSyncer(session, tips.onCamera)
+
     /**
      * The session's photos, the same way; a screen test sends none. The subject's album saves each photo as
      * [savedPhoto] of its id unless [albumFails]; nothing is written.
@@ -170,6 +174,7 @@ class TestAppContainer(
         confirmSyncer = confirms,
         descriptionSyncer = descriptions,
         photoSyncer = photos,
+        tipSyncer = tipSync,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
         appSettings = appSettings,

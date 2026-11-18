@@ -129,7 +129,7 @@ import org.robolectric.annotation.GraphicsMode
  * session; Couldn't create poses,
  * failed, refused, and without a person; Who takes the photo?; Share my camera signed out, and with a friend, a request,
  * and a sent request; Sent requests; Add a friend; Sign in; Sign up; Pix ID setup; Account; the room code; See their
- * camera; Session not found; Subject view,
+ * camera; Session not found; Subject view, with the photographer's tip closed and open,
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
  * viewer (Iter4-A2), and with the delay shown; Settings, signed in; How to use Pix; About Pix. On each, no visible text, hint, or content
@@ -209,8 +209,11 @@ class KoreanScreensTest {
         modules.guides.setGuide(guide)
         assertKorean(screen())
 
-        // tip_korean's longest kind of sentence: a move, a height, an angle, and why, at the server's 80 characters.
-        val tip = "줌을 당기거나 조금 다가가서 쪼그려 앉아 상대 눈높이에 맞추고 폰을 수평으로 드세요 - 내려다보지 않아서 표정과 자세가 훨씬 자연스러워 보여요."
+        // The longest tip the server writes (#213): every sentence it has, one on a line.
+        val tip =
+            "사람이 가이드 선에 꼭 맞게 거리를 맞춰 찍으세요.\n폰은 머리 위로 들어 살짝 아래로 기울여 드세요.\n" +
+                "사람을 화면 오른쪽에 두세요.\n머리 위는 거의 남기지 마세요.\n" +
+                "배경의 가로선이 기울지 않게 폰을 바로 세우세요."
         modules.tipper.requests.single().tip(tip)
         val root = screen()
         assertEquals(tip, FragmentCameraBinding.bind(root).tipText.text.toString())
@@ -781,6 +784,37 @@ class KoreanScreensTest {
     fun subjectView_withASessionPhotoThatCannotBeRead_isInKorean() {
         subjectViewWithAPhotoOpen(readable = false)
         assertKorean(screen(), *people)
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_withThePhotographersTipOpen_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.session.deliver(
+            SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(1f, 2f), -4..4, 0.5f, true)),
+        )
+        modules.tipSync.startAsReceiver(receiving)
+        modules.mirror.setGuide(guide())
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        // The longest tip the photographer's phone sends (#213), as on its own Camera screen.
+        val tip =
+            "사람이 가이드 선에 꼭 맞게 거리를 맞춰 찍으세요.\n폰은 머리 위로 들어 살짝 아래로 기울여 드세요.\n" +
+                "사람을 화면 오른쪽에 두세요.\n머리 위는 거의 남기지 마세요.\n" +
+                "배경의 가로선이 기울지 않게 폰을 바로 세우세요."
+        modules.session.deliver(SessionMessage.GuideTip(guide().id, tip))
+        idle()
+        assertKorean(screen(), *people)
+
+        scenario!!.onFragment { FragmentSubjectBinding.bind(it.requireView()).tipButton.performClick() }
+        idle()
+        val root = screen()
+        assertEquals(tip, FragmentSubjectBinding.bind(root).tipText.text.toString())
+        assertEquals(true, FragmentSubjectBinding.bind(root).tipBanner.isShown)
+        assertKorean(root, *people)
     }
 
     /** The photographer's set PICKING on the subject's phone, with two candidates. */

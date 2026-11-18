@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -58,6 +58,7 @@ import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import com.lastpenguin.pix.ui.camera.framePlace
 import com.lastpenguin.pix.ui.camera.guideSaveIcon
 import com.lastpenguin.pix.ui.camera.guideSaveTint
+import com.lastpenguin.pix.ui.camera.isUnder
 import com.lastpenguin.pix.ui.camera.lerp
 import com.lastpenguin.pix.ui.camera.photoThumbnail
 import com.lastpenguin.pix.ui.camera.photoToView
@@ -211,6 +212,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
+        setupTip(binding)
         binding.pickPoseButton.setOnClickListener {
             val ui = viewModel.uiState.value
             when {
@@ -277,6 +279,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             if (ui.guide == null) R.string.guide_add_description else R.string.guide_change_description,
                         )
                         renderSaveGuide(binding, ui)
+                        renderTip(binding, ui)
                         binding.galleryButton.isVisible = ui.lastPhoto != null
                         val photoTitle = ui.photographerName?.let { getString(R.string.session_photo_title, it) }
                             ?: getString(R.string.session_photo_title_unnamed)
@@ -677,6 +680,39 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     override fun onCreateAnimator(transit: Int, enter: Boolean, nextAnim: Int): Animator? {
         if (!enter && nextAnim != 0) renderer?.isInvisible = true
         return super.onCreateAnimator(transit, enter, nextAnim)
+    }
+
+    /**
+     * The photographer's tip (FR-4.10, #213): the tip button opens and closes it, a touch anywhere closes it and still
+     * does what it does where it lands, and the banner is clickable as well, so TalkBack can close it.
+     */
+    private fun setupTip(binding: FragmentSubjectBinding) {
+        binding.root.onTouchEnd = { event ->
+            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again.
+            if (!binding.tipButtonFrame.isUnder(event, binding.root)) viewModel.onAnyTouch()
+        }
+        binding.tipButton.setOnClickListener { viewModel.onTipButton() }
+        binding.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
+        ViewCompat.replaceAccessibilityAction(
+            binding.tipBanner,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.close_tip),
+        ) { _, _ ->
+            viewModel.onAnyTouch()
+            true
+        }
+    }
+
+    /**
+     * The photographer's tip of the guide on the video (FR-4.10, #213): its button while that guide has one and shows,
+     * with a dot until the tip was opened, and the banner only once the button opened it.
+     */
+    private fun renderTip(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        val tip = ui.tip?.takeIf { ui.guide != null && ui.guideState.visible }
+        binding.tipButtonFrame.isVisible = tip != null
+        binding.tipDot.isVisible = tip?.unseen == true
+        binding.tipBanner.isVisible = tip?.open == true
+        binding.tipText.text = tip?.tip?.text
     }
 
     /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */

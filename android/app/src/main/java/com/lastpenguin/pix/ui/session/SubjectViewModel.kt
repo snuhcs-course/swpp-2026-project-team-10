@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.guide.GuideGeometry
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
@@ -29,6 +30,8 @@ import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.SharedTip
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
@@ -47,7 +50,23 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Subject view (R&S 6.6, FR-3.9, FR-6.6, FR-6.15, FR-6.16, FR-7.1–7.3). */
+/**
+ * The photographer's tip of the guide on the video, as Subject view shows it (FR-4.10, #213): closed until the tip
+ * button, whose dot says there is a tip not yet looked at; a touch anywhere closes it again.
+ */
+data class SubjectTip(val guideId: String, val tip: PoseTip, val open: Boolean = false, val unseen: Boolean = true)
+
+/**
+ * The tip after a change of what the photographer sent for the guide on the video ([shared]): another guide's tip, or
+ * one that comes back, starts closed; new words for the same guide leave the banner as it is; none without a tip.
+ */
+internal fun nextSubjectTip(previous: SubjectTip?, shared: SharedTip?): SubjectTip? = when {
+    shared == null -> null
+    previous?.guideId == shared.guideId -> previous.copy(tip = shared.tip)
+    else -> SubjectTip(shared.guideId, shared.tip)
+}
+
+/** Subject view (R&S 6.6, FR-3.9, FR-4.10, FR-6.6, FR-6.15, FR-6.16, FR-7.1–7.3). */
 data class SubjectUiState(
     /** For "Dongje's camera"; arrives in `hello`. */
     val photographerName: String? = null,
@@ -111,6 +130,8 @@ data class SubjectUiState(
     val confirmId: String? = null,
     /** The photographer's open *Generate poses* (Design 2.6.5), which this phone shows too; null when there is none. */
     val describeId: String? = null,
+    /** The photographer's tip of the guide on the video (FR-4.10, #213); null while that guide has none. */
+    val tip: SubjectTip? = null,
     /** The session's photos in this phone's album (FR-6.14), oldest first; the newest is the thumbnail. */
     val photos: List<Uri> = emptyList(),
     /** The viewer of [photos] is open over the video (FR-6.14). */
@@ -149,6 +170,7 @@ class SubjectViewModel(
     private val poses: PoseSyncer? = null,
     private val confirms: ConfirmSyncer? = null,
     private val descriptions: DescriptionSyncer? = null,
+    private val tips: TipSyncer? = null,
     /** The session's photos in this phone's album (`PhotoSyncer.sessionPhotos`, FR-6.14); null outside a session. */
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
 ) : ViewModel() {
@@ -304,6 +326,13 @@ class SubjectViewModel(
             }
                 .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
         }
+        tips?.let { syncer ->
+            viewModelScope.launch {
+                // A tip shows only with its own guide, whichever of the two arrives first (Design 2.5.1).
+                combine(mirror.guide, syncer.mirror) { guide, shared -> shared?.takeIf { it.guideId == guide?.id } }
+                    .collect { shared -> _uiState.update { it.copy(tip = nextSubjectTip(it.tip, shared)) } }
+            }
+        }
         poses?.let { syncer ->
             viewModelScope.launch {
                 syncer.mirror.collect { set ->
@@ -337,9 +366,27 @@ class SubjectViewModel(
                         },
                         // A guide the photographer hid cannot be edited, so the mode ends and the pinch zooms again.
                         guideEditing = it.guideEditing && state.visible,
+                        // Its tip is hidden with it, and closed: shown again, the guide brings back the button
+                        // alone, since only the button opens the tip (FR-4.10).
+                        tip = it.tip?.let { tip -> if (state.visible) tip else tip.copy(open = false) },
                     )
                 }
             }
+        }
+    }
+
+    /** The tip button: the tip opens, and is no longer unseen; another tap while it is open closes it (FR-4.10). */
+    fun onTipButton() {
+        _uiState.update { state ->
+            val tip = state.tip ?: return@update state
+            state.copy(tip = tip.copy(open = !tip.open, unseen = false))
+        }
+    }
+
+    /** A touch anywhere on the screen ended: an open tip closes, as on the Camera screen. */
+    fun onAnyTouch() {
+        _uiState.update { state ->
+            state.tip?.takeIf { it.open }?.let { state.copy(tip = it.copy(open = false)) } ?: state
         }
     }
 

@@ -46,10 +46,13 @@ import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.PhotoViewer
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
+import com.lastpenguin.pix.ui.camera.REFERENCE_FLING_DP
 import com.lastpenguin.pix.ui.camera.REFERENCE_MARGIN_DP
+import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
 import com.lastpenguin.pix.ui.camera.REFERENCE_SMALL_DP
 import com.lastpenguin.pix.ui.camera.ReferenceArea
 import com.lastpenguin.pix.ui.camera.ReferenceDragController
+import com.lastpenguin.pix.ui.camera.ReferencePlacement
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.ToggleLabel
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
@@ -72,6 +75,7 @@ import com.lastpenguin.pix.ui.camera.showGuideEditing
 import com.lastpenguin.pix.ui.camera.showPhotoThumbnails
 import com.lastpenguin.pix.ui.camera.showPinchModeLabel
 import com.lastpenguin.pix.ui.camera.showReference
+import com.lastpenguin.pix.ui.camera.showReferenceHandle
 import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.TutorialFragment
@@ -476,7 +480,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun renderMirror(binding: FragmentSubjectBinding, mirrored: Boolean) {
         renderer?.setMirror(mirrored)
         val scale = if (mirrored) -1f else 1f
-        for (view in listOf(binding.compositionOverlay, binding.guideOverlay, binding.referenceThumbnail)) {
+        // The reference photo's flip is set with its size, which is its scale too (showReference).
+        for (view in listOf(binding.compositionOverlay, binding.guideOverlay)) {
             view.scaleX = scale
         }
     }
@@ -586,22 +591,29 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     /**
      * The photographer's reference photo (FR-3.9), as on their Camera screen: a tap enlarges it or makes it small,
-     * and a drag drops it into the nearest corner of this phone's video, which the photographer never sees.
+     * and a drag drops it into the nearest corner of this phone's video, or hides it at that corner's side (#237),
+     * none of which the photographer sees.
      */
     private fun setupReference(binding: FragmentSubjectBinding) {
         val thumbnail = binding.referenceThumbnail
+        val density = resources.displayMetrics.density
         referenceDrag = ReferenceDragController(
             thumbnail,
             area = { referenceArea(binding) },
-            onTap = { viewModel.setReferenceExpanded(!viewModel.uiState.value.referenceExpanded) },
-        ) { corner ->
-            corner?.let(viewModel::setReferenceCorner)
+            previewWidth = { binding.videoContainer.width },
+            peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+            flingSpeed = REFERENCE_FLING_DP * density,
+            onTap = viewModel::onReferenceTap,
+        ) { drop ->
+            drop?.let(viewModel::onReferenceDropped)
             renderReference(binding, viewModel.uiState.value)
-        }
+        }.also { it.listenOn(binding.referenceHandle) }
         thumbnail.setReferenceActions(
             expanded = { viewModel.uiState.value.referenceExpanded },
             corner = { viewModel.uiState.value.referenceCorner },
+            hidden = { viewModel.uiState.value.referenceHidden },
             moveTo = viewModel::setReferenceCorner,
+            setHidden = viewModel::setReferenceHidden,
         )
         // The corners follow the video's size and the slider above Guide, known only after layout.
         val relayout = View.OnLayoutChangeListener {
@@ -623,22 +635,39 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.bottomOverlays.addOnLayoutChangeListener(relayout)
     }
 
-    /** The thumbnail in its corner, small or enlarged, while the photographer's reference photo is here. */
+    /**
+     * The thumbnail in its corner, small or enlarged, or hidden at that corner's side with its handle over the strip
+     * (#237), while the photographer's reference photo is here.
+     */
     private fun renderReference(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val container = binding.videoContainer
-        binding.referenceThumbnail.showReference(ui.reference) { photo ->
-            if (referenceDrag?.isDragging == true || container.width == 0) {
+        val dragging = referenceDrag?.isDragging == true
+        var placed: ReferencePlacement? = null
+        binding.referenceThumbnail.showReference(ui.reference, mirrored = ui.mirrored) { photo ->
+            if (dragging || container.width == 0) {
                 null
             } else {
+                val density = resources.displayMetrics.density
                 placeReference(
                     aspect = photo.width.toFloat() / photo.height,
                     expanded = ui.referenceExpanded,
                     corner = ui.referenceCorner,
-                    smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
+                    smallLongSide = (REFERENCE_SMALL_DP * density).roundToInt(),
                     previewWidth = container.width,
                     area = referenceArea(binding),
-                )
+                    hidden = ui.referenceHidden,
+                    peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+                ).also { placed = it }
             }
+        }
+        // The handle stays as it is through a drag, which may have begun on it.
+        if (!dragging) {
+            binding.referenceHandle.showReferenceHandle(
+                placement = placed.takeIf { ui.reference != null && ui.referenceHidden },
+                corner = ui.referenceCorner,
+                previewWidth = container.width,
+                area = referenceArea(binding),
+            )
         }
     }
 

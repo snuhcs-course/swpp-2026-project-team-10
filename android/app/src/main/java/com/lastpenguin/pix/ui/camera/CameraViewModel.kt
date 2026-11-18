@@ -171,6 +171,12 @@ data class CameraUiState(
     val referenceExpanded: Boolean = false,
     /** The preview corner the reference thumbnail sits in, kept from one guide to the next. */
     val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
+    /**
+     * The reference thumbnail is put away at its corner's side of the preview, with a strip of it left to pull it
+     * back by (FR-3.9, #237). On this phone only; another guide's thumbnail shows again. A hidden thumbnail is never
+     * [referenceExpanded]: hiding makes it small, so its strip is the small one's and it comes back small.
+     */
+    val referenceHidden: Boolean = false,
     /** The guide on the camera is one of the saved guides (FR-3.8), so *Save guide* shows it as saved. */
     val guideSaved: Boolean = false,
     /** *Save guide* is writing the guide; the button waits. */
@@ -313,7 +319,15 @@ class CameraViewModel(
                     // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
                     val editing = guide != null && (guide !== it.guide || it.guideEditing)
                     val expanded = it.referenceExpanded && guide === it.guide
-                    it.copy(guide = guide, guideEditing = editing, referenceExpanded = expanded)
+                    // A saved copy keeps the guide's id and its photo, so it stays hidden; another guide's photo
+                    // is one the user has not seen, so it shows.
+                    val hidden = it.referenceHidden && guide != null && guide.id == it.guide?.id
+                    it.copy(
+                        guide = guide,
+                        guideEditing = editing,
+                        referenceExpanded = expanded,
+                        referenceHidden = hidden,
+                    )
                 }
             }
         }
@@ -614,14 +628,50 @@ class CameraViewModel(
         _toggleLabels.trySend(if (guides.state.value.visible) ToggleLabel.GuideShown else ToggleLabel.GuideHidden)
     }
 
-    /** A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). */
+    /**
+     * A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). A hidden one stays
+     * small.
+     */
     fun setReferenceExpanded(expanded: Boolean) {
-        _uiState.update { it.copy(referenceExpanded = expanded && it.guide?.reference != null) }
+        _uiState.update {
+            it.copy(referenceExpanded = expanded && it.guide?.reference != null && !it.referenceHidden)
+        }
     }
 
     /** A drag drops the reference thumbnail into one of the preview's corners, and nowhere else (FR-3.9). */
     fun setReferenceCorner(corner: ReferenceCorner) {
         _uiState.update { it.copy(referenceCorner = corner) }
+    }
+
+    /**
+     * Puts the reference thumbnail away at its corner's side, small, or shows it again (#237); nothing without one.
+     */
+    fun setReferenceHidden(hidden: Boolean) {
+        _uiState.update {
+            val hides = hidden && it.guide?.reference != null
+            it.copy(referenceHidden = hides, referenceExpanded = it.referenceExpanded && !hides)
+        }
+    }
+
+    /** A drag let the thumbnail go: into [drop]'s corner, or hidden, and small, at that corner's side (#237). */
+    fun onReferenceDropped(drop: ReferenceDrop) {
+        _uiState.update {
+            val hides = drop.hidden && it.guide?.reference != null
+            it.copy(
+                referenceCorner = drop.corner,
+                referenceHidden = hides,
+                referenceExpanded = it.referenceExpanded && !hides,
+            )
+        }
+    }
+
+    /** A tap on the thumbnail: a hidden one comes back, small, and a shown one changes its size (FR-3.9). */
+    fun onReferenceTap() {
+        if (_uiState.value.referenceHidden) {
+            setReferenceHidden(false)
+        } else {
+            setReferenceExpanded(!_uiState.value.referenceExpanded)
+        }
     }
 
     /**

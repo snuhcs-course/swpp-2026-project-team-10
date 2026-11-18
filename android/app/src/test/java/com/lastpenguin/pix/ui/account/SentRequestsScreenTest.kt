@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
@@ -13,12 +12,13 @@ import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.databinding.FragmentSentRequestsBinding
+import com.lastpenguin.pix.ui.OwnActivities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 
 /*
  * Partitions for Sent requests (R&S 6.4; FR-5.16), on the real layout: none (the empty card), several (each with its
@@ -27,6 +27,9 @@ import org.robolectric.Robolectric
  */
 @RunWith(AndroidJUnit4::class)
 class SentRequestsScreenTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private val withdrawn = mutableListOf<String>()
     private val account = Account("u_1", "test1", "Test Account 1", hasPassword = true, hasGoogle = false)
     private val sent = listOf(
@@ -35,7 +38,7 @@ class SentRequestsScreenTest {
     )
 
     private fun screen(): Pair<FragmentSentRequestsBinding, SentRequestsScreen> {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val binding = FragmentSentRequestsBinding.inflate(LayoutInflater.from(activity))
         activity.setContentView(binding.root)
         return binding to SentRequestsScreen(binding) { withdrawn += it.id }

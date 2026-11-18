@@ -51,6 +51,7 @@ import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -65,27 +66,25 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 
 /*
- * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4,
- * FR-1.5, FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the
- * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
- * together, Use this photo, which opens nothing for a photo without a person) and system back during the scene photo
- * step; End session; the gallery button with and
- * without an app to open the photo; outside a session the album's newest in the gallery, and in a session as the
- * photographer none until the session's first photo, then the session's photos in Pix's viewer, which system Back and
- * the session's end close (FR-1.6, Iter4-A2);
- * each capture failure's message; the subject's zoom, brightness, flash, and guide
- * moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view on mobile data (FR-6.13); the
- * zoom accessibility actions
- * and a tap on the readout through the quick steps (0.6×, 1×, 2×, back to 0.6×), by touch and by TalkBack; the
- * reference thumbnail's tap, drag,
- * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button with its ratios (opened by the button,
- * closed by a choice, the button, a touch elsewhere, and Back; the ratio the camera has changing nothing); the
- * preview's stream state;
- * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept while other
- * state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its place, a drag
- * up and down, kept up while held, gone after the idle time), on the right and, near the image's right edge, on the
- * left; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the pinch mode's
- * label over the guide-edit toggle, Camera then Guide.
+ * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4, FR-1.5,
+ * FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the request's
+ * answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot together, Use
+ * this photo, which opens nothing for a photo without a person) and system back during the scene photo step; End
+ * session; the gallery button with and without an app to open the photo; outside a session the album's newest in the
+ * gallery, and in a session as the photographer none until the session's first photo, then the session's photos in
+ * Pix's viewer, which system Back and the session's end close (FR-1.6, Iter4-A2); each capture failure's message; the subject's
+ * zoom, brightness, flash, and guide moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view
+ * on mobile data (FR-6.13); the zoom accessibility actions and a tap on the readout through the quick steps (0.6×, 1×,
+ * 2×, back to 0.6×), by touch and by TalkBack; the reference thumbnail's tap, drag, and TalkBack moves, and hiding it
+ * at the side (#237: a drag mostly past the side, its strip with the handle over it, a tap on the handle, TalkBack's
+ * *Hide at the side* and its tap on a hidden one, another guide; hidden while enlarged, the small strip, and small when
+ * it is back); the sliders, a pinch, a tap to focus, and the ratio button with its ratios (opened by the button, closed
+ * by a choice, the button, a touch elsewhere, and Back; the ratio the camera has changing nothing); the preview's
+ * stream state; *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept
+ * while other state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its
+ * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
+ * edge, on the left; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
+ * pinch mode's label over the guide-edit toggle, Camera then Guide.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -405,7 +404,7 @@ class CameraFragmentInteractionTest {
     }
 
     /** Lets the screen's reads on Dispatchers.IO, such as the thumbnail's, finish and reach the screen. */
-    private fun settle() {
+    private fun settleReads() {
         idle()
         Thread.sleep(300)
         idle()
@@ -421,7 +420,7 @@ class CameraFragmentInteractionTest {
 
         // Received in an earlier session, or taken before Pix opened.
         modules.album.value = TestAppContainer.savedPhoto("p1")
-        settle()
+        settleReads()
 
         onScreen { controls, _ ->
             assertTrue(controls.galleryButton.isEnabled)
@@ -445,20 +444,20 @@ class CameraFragmentInteractionTest {
         }
         modules.album.value = TestAppContainer.savedPhoto("p0")
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.PHOTOGRAPHER))
-        settle()
+        settleReads()
         onScreen { controls, _ ->
             assertFalse(controls.galleryButton.isEnabled)
             assertNull(controls.thumbnailShows())
         }
 
         onScreen { controls, _ -> controls.shutterButton.performClick() }
-        settle()
+        settleReads()
         onScreen { controls, _ ->
             assertTrue(controls.galleryButton.isEnabled)
             assertSame(thumbnail, controls.thumbnailShows())
             controls.galleryButton.performClick()
         }
-        settle()
+        settleReads()
 
         assertNull(nextIntent())
         onScreen { controls, _ ->
@@ -476,10 +475,10 @@ class CameraFragmentInteractionTest {
 
         // The session's end closes the viewer, and the thumbnail is the album's newest again, in the gallery.
         onScreen { controls, _ -> controls.galleryButton.performClick() }
-        settle()
+        settleReads()
         modules.album.value = taken
         modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
-        settle()
+        settleReads()
         onScreen { controls, _ ->
             assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility)
             controls.galleryButton.performClick()
@@ -1065,6 +1064,121 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(ReferenceCorner.BOTTOM_RIGHT, viewModel.uiState.value.referenceCorner)
     }
+
+    @Test
+    fun referenceThumbnail_draggedMostlyPastTheSide_hidesThere_andATapOnItsHandleBringsItBack() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+        val viewModel = cameraViewModel()
+
+        // From the top-left corner, to the left until most of it is out of the preview.
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            val out = thumbnail.width + ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f
+            touch(thumbnail, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(thumbnail, MotionEvent.ACTION_MOVE, Pointer(1, 5f - out, 5f))
+            touch(thumbnail, MotionEvent.ACTION_UP, Pointer(1, 5f - out, 5f))
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceHidden)
+        assertEquals(ReferenceCorner.TOP_LEFT, viewModel.uiState.value.referenceCorner)
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // Only its peek is inside, see-through, with the handle over it.
+            assertEquals((peek - thumbnail.width).toFloat(), thumbnail.translationX)
+            assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha)
+            assertTrue(controls.referenceHandle.isShown)
+            // TalkBack hears that it is hidden, and its tap shows it; there is nothing to move or to hide.
+            val info = controls.referenceThumbnail.createAccessibilityNodeInfo()
+            val labels = info.actionList.map { it.label?.toString() }
+            assertEquals(string(R.string.reference_hidden), info.stateDescription?.toString())
+            assertTrue(labels.contains(string(R.string.show_reference)))
+            assertFalse(labels.contains(string(R.string.hide_reference)))
+            assertFalse(labels.contains(string(R.string.move_reference_top_right)))
+
+            touch(controls.referenceHandle, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(controls.referenceHandle, MotionEvent.ACTION_UP, Pointer(1, 5f, 5f))
+        }
+        settle()
+        assertFalse(viewModel.uiState.value.referenceHidden)
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            assertTrue(thumbnail.translationX > 0f)
+            assertEquals(1f, thumbnail.alpha)
+            assertFalse(controls.referenceHandle.isShown)
+            // Shown, TalkBack can hide it beside the moves.
+            val labels = thumbnail.createAccessibilityNodeInfo().actionList.map { it.label?.toString() }
+            assertTrue(labels.contains(string(R.string.hide_reference)))
+            assertTrue(ViewCompat.performAccessibilityAction(thumbnail, R.id.hide_reference, null))
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceHidden)
+
+        // Another guide's thumbnail shows again, in the corner the last one had.
+        modules.guides.setGuide(guide().copy(id = "another"))
+        settle()
+        assertFalse(viewModel.uiState.value.referenceHidden)
+        onScreen { controls, _ ->
+            assertEquals(1f, controls.referenceThumbnail.alpha)
+            assertFalse(controls.referenceHandle.isShown)
+        }
+    }
+
+    @Test
+    fun referenceThumbnail_hiddenWhileEnlarged_leavesTheSmallStrip_andComesBackSmall() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+        val viewModel = cameraViewModel()
+        var small = 0 to 0
+        onScreen { controls, _ ->
+            small = controls.referenceThumbnail.width to controls.referenceThumbnail.height
+            controls.referenceThumbnail.performClick()
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceExpanded)
+
+        // Enlarged in the top-left corner, to the left until most of it is out of the preview.
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            assertTrue(thumbnail.width > small.first * 2)
+            val out = thumbnail.width + ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f
+            touch(thumbnail, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(thumbnail, MotionEvent.ACTION_MOVE, Pointer(1, 5f - out, 5f))
+            touch(thumbnail, MotionEvent.ACTION_UP, Pointer(1, 5f - out, 5f))
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceHidden)
+        assertFalse(viewModel.uiState.value.referenceExpanded)
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // What stays is the small thumbnail's strip, at its size and with its peek inside.
+            assertEquals(small, thumbnail.width to thumbnail.height)
+            assertEquals(1f, thumbnail.scaleX)
+            assertEquals(1f, thumbnail.scaleY)
+            assertEquals((peek - small.first).toFloat(), thumbnail.translationX)
+            // The handle over it is no taller than a touch target, as over any small strip.
+            assertEquals(maxOf(small.second, dp(REFERENCE_HANDLE_DP, thumbnail)), controls.referenceHandle.height)
+
+            touch(controls.referenceHandle, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(controls.referenceHandle, MotionEvent.ACTION_UP, Pointer(1, 5f, 5f))
+        }
+        settle()
+        assertFalse(viewModel.uiState.value.referenceHidden)
+        assertFalse(viewModel.uiState.value.referenceExpanded)
+        onScreen { controls, _ ->
+            assertEquals(small, controls.referenceThumbnail.width to controls.referenceThumbnail.height)
+            assertEquals(1f, controls.referenceThumbnail.alpha)
+        }
+    }
+
+    private fun dp(value: Float, view: View): Int = (value * view.resources.displayMetrics.density).roundToInt()
+
+    /** Every change played to its end, the thumbnail's glide included. */
+    private fun settle() = shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(400))
 
     // ---- The preview's stream state ------------------------------------------------------
 

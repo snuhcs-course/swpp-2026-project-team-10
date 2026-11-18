@@ -5,15 +5,14 @@ import android.graphics.Color
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.annotation.GraphicsMode
 
 /*
@@ -25,10 +24,10 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HeaderActionTest {
-    private val activity = Robolectric.buildActivity(AppCompatActivity::class.java)
-        .apply { get().setTheme(R.style.Theme_Pix) }
-        .setup()
-        .get()
+    @get:Rule
+    val activities = OwnActivities()
+
+    private val activity = activities.start(R.style.Theme_Pix)
 
     private fun action(layout: Int, id: Int): MaterialButton =
         LayoutInflater.from(activity).inflate(layout, null).findViewById<View>(id) as MaterialButton

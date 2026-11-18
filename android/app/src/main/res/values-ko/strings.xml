@@ -81,6 +81,9 @@
     <string name="move_reference_top_right">오른쪽 위로 옮기기</string>
     <string name="move_reference_bottom_left">왼쪽 아래로 옮기기</string>
     <string name="move_reference_bottom_right">오른쪽 아래로 옮기기</string>
+    <string name="hide_reference">옆으로 숨기기</string>
+    <string name="show_reference">다시 보기</string>
+    <string name="reference_hidden">숨김</string>
     <string name="edit_guide">가이드 편집</string>
     <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
     <string name="tip_preparing">팁 준비 중…</string>

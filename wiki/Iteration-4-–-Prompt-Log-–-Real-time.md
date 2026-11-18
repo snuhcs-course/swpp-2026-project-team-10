@@ -29,5 +29,11 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Jaewan, 11-18] "let's just not show the first thumbnail in this case, just the same as the subject"
 - [Jaewan, 11-18] "how long will this take"
 
+## The reference thumbnail for a guide from the subject ([#234])
+
+- [Jaewan, 11-18] "fix issue #234"
+- [Jaewan, 11-18] "yes"
+
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
+[#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235

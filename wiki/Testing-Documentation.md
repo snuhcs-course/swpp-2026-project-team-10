@@ -98,10 +98,11 @@
 | 3.15 | 2026-11-18 | Better pose tips (Iter4-P16, [#213]): 50 of a run's tips checked by the four of us, a sentence at a time (`label-tips.html`), not by the judge, with a 90 % threshold beside the original, and the other 50 read through Claude Code; `retip`; the tests of the tip's two requests, its sentences, and the subject's tip; IT-17's tip steps (1.1, 2.1.5, 3.1, Appendix A). |
 | 3.16 | 2026-11-18 | Hiding the reference thumbnail (Iter4-A4, [#237]): its tests, IT-14's steps on two phones, and the `OwnActivities` rule that takes down an activity a test set up (1.1, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
 | 3.17 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): its owner, the state-based and layout partitions, `SubjectSessionPhotoTest` and `NewestAlbumPhotoTest`, `TestAppContainer`'s album fakes, why a session screen a test builds stays in memory, and an *Added* step on IT-20 (1.1, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
-| 3.18 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): the phone's turn, the photos, the scene photo, and a pose's guide by quarter turn, the dead band's edges, the server's landscape ratios, and IT-37 (1.1, 2.1.5, 2.1.6, Appendix A). |
-| 3.19 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): the icons and the labels that turn by quarter turn on both screens, what stays, a half turn, a turn during a turn, animations off, and IT-38 (1.1, 2.1.6, Appendix A). |
-| 3.20 | 2026-11-18 | The focus box and the brightness bar going together: a state-based partition (2.1.6). |
-| 3.21 | 2026-11-18 | The tutorial's rings on turned controls, the scene photo without *End session*, and IT-38's tips step (2.1.6, Appendix A). |
+| 3.18 | 2026-11-18 | The reference thumbnail for a guide from the subject (Iter4-A1, [#234]): its owner, its tests in `GuideFromSubjectTest` and `CameraFragmentRenderTest`, the codec fakes' `decodeAs`, and a step on IT-15 (1.1, 2.1.5, 2.1.8, Appendix A). |
+| 3.19 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): the phone's turn, the photos, the scene photo, and a pose's guide by quarter turn, the dead band's edges, the server's landscape ratios, and IT-37 (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 3.20 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): the icons and the labels that turn by quarter turn on both screens, what stays, a half turn, a turn during a turn, animations off, and IT-38 (1.1, 2.1.6, Appendix A). |
+| 3.21 | 2026-11-18 | The focus box and the brightness bar going together: a state-based partition (2.1.6; [#207]). |
+| 3.22 | 2026-11-18 | The tutorial's rings on turned controls, the scene photo without *End session*, and IT-38's tips step (2.1.6, Appendix A; [#207]). |
 
 </details>
 
@@ -182,6 +183,7 @@ One member writes and maintains each component's tests, following the module own
 | The reference thumbnail hidden at the side (Iter4-A4) | ViewModels, Views | `ui/camera/`, `ui/session/` | 박동제 |
 | The QR connection (Iter4-P17) | Managers, Views | `session/`, `ui/session/` | 조성민 |
 | The session's photos on both phones (Iter4-A2) | Managers, ViewModels, Views | `session/`, `camera/`, `ui/session/`, `ui/camera/` | 박재완 |
+| The reference thumbnail for a guide from the subject (Iter4-A1) | Managers, Views | `session/` (`GuideFromSubjectTest`), `ui/camera/` (`CameraFragmentRenderTest`) | 박재완 |
 | Integration tests, Iteration 2 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 (Iter2-P21) | 한준형 |
 | Integration tests, Iteration 3 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 | 박재완 |
 | Integration tests, Iteration 4 flows; the UAT (Iter4-P18, P8) | Across components (two phones, public server); testers outside the team | 2.1.5, 4.3, 4.4 | 조성민 |
@@ -410,7 +412,7 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-12 | Room-code session across networks (Iter3-P13) | Two phones, AWS server with TURN; different Wi-Fi, Wi-Fi + cellular, cellular + cellular; one Wi-Fi with `-Ppix.relayOnly=true` | Live view within 10 s in every pair; `relay` where no direct path exists. Of 10 sessions per pair, ≥ 90 % connect (NFR-10); delay ≤ 0.8 s over relay or cellular (NFR-5). | FR-6.5, FR-6.13, NFR-5, NFR-10 | [steps](#it-12-procedure) |
 | IT-13 | Korean | S21, S22, and S23 Ultra in Korean | Every screen in Korean and Pretendard, nothing cut off, overlapping, or broken inside a word. English when Japanese is the phone's only language. Korean pose tips have no numbers or units. | FR-10.2 · Iteration 3 | [steps](#it-13-procedure) |
 | IT-14 | Reference thumbnail on Subject view (Iter3-A1). *Added in Iter4-A4 ([#237]): hiding it at the side, on two phones.* | Emulator photographer, S22 subject; Mac server; same Wi-Fi | The subject's thumbnail shows the reference within 3 s, follows hiding, replacing, and removing, and returns after a rejoin without a resend. *Added in Iter4-A4:* a drag or a flick hides it at the side on that phone alone, a tap on its strip shows it, and the system's Back swipe from the strip moves it. | FR-3.9, NFR-13 | [steps](#it-14-procedure) |
-| IT-15 | Guide from the subject's phone (Iter3-P9) | Two phones, AWS server, same Wi-Fi | The subject's guide shows at the same place on both phones within 0.3 s, with no resend after a rejoin. Of two at once, the later at the photographer wins. | US-16, FR-6.15, FR-6.16, NFR-7 | [steps](#it-15-procedure) |
+| IT-15 | Guide from the subject's phone (Iter3-P9). *Added in Iter4-A1 ([#234]): its reference thumbnail on the photographer's Camera.* | Two phones, AWS server, same Wi-Fi | The subject's guide shows at the same place on both phones within 0.3 s, with no resend after a rejoin. Of two at once, the later at the photographer wins. *Added in Iter4-A1:* the photographer's Camera shows the guide's reference thumbnail within 3 s, and it goes with the guide. | US-16, FR-6.15, FR-6.16, NFR-7 | [steps](#it-15-procedure) |
 | IT-16 | Network switch during a session (Iter3-P14) | As IT-4; the subject on Wi-Fi with mobile data on | No crash. The session comes back over cellular within 10 s, or shows *Connection lost* and *Reconnect* works. | NFR-11 · Iteration 3 | [steps](#it-16-procedure) |
 | IT-17 | *Generate poses*, *Pick a pose*, and *Reference confirm* on both phones; *Save guide* on Subject view (Iter3-P16) | Two phones, AWS server; same Wi-Fi, then the subject on cellular | On Wi-Fi the subject's *Generate poses* follows within 2 s, *Pick a pose* within 3 s, *Your reference* within 2 s; typed text within 1 s. Both phones end with one choice. *Added in Iter4-P16 ([#213]):* the photographer's tip opens on Subject view at a tap. | US-16, FR-6.15, FR-6.16, NFR-7; US-15, FR-4.10 | [steps](#it-17-procedure) |
 | IT-18 | Selfie mode (Iter3-P12) | The S22; an emulator subject with a Mac server | Mirrored preview; the saved photo matches it. Every candidate is a selfie of the same person and place. The subject's video is mirrored too. *Added in Iter4-P4 ([#201]): with the rear camera too, the subject's video shows as a mirror.* | FR-1.14, FR-6.6 · Iteration 3 | [steps](#it-18-procedure) |
@@ -493,7 +495,7 @@ The repository's `CLAUDE.md` files keep the short form.
 | `AppLanguage.InMemory` | Per-app language, which Robolectric's Android 16 does not keep | Chosen through `AppLanguage` |
 | `AppSettings.InMemory` | Stored settings | `resetTutorial` makes tips due again; `setTutorialSeen` only adds (`TutorialFragmentTest`) |
 | `GuideOutlines(dispatcher = Dispatchers.Unconfined)` | Outline tracing dispatcher | No wait (Iter3-P23) |
-| Fakes of `GuideImageCodec`, `GuideReferenceCodec` | Guide syncer's bitmap work | — |
+| Fakes of `GuideImageCodec`, `GuideReferenceCodec` | Guide syncer's bitmap work | `decodeAs` gives a real bitmap for a screen that draws it; `TestAppContainer.syncer` uses such fakes on `Dispatchers.Unconfined`, so a screen test can deliver a guide from the subject (Iter4-A1) |
 | `SubjectSegmenter` test double | ML Kit segmenter | Returns a confidence field (`MlKitReferenceGuideMakerTest`) |
 | `camera/FakeImageProxy` | CameraX frame | YUV_420_888 planes, strides, crop, rotation |
 | Fake `CapturerObserver` | WebRTC capturer | Gets plain-Java `NV21Buffer` and `VideoFrame`; native crop and scale stay with IT-8 |
@@ -1248,11 +1250,13 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 2. The subject opens a guide saved on its own phone.
 3. The photographer moves the guide. The subject leaves and joins again.
 4. Both phones choose a guide at almost the same moment.
+5. *Added in Iter4-A1 ([#234]):* the subject adds a guide from a gallery photo again. The photographer enlarges its thumbnail, then removes the guide.
 
 **Expected result**
 
 - The subject's guide shows at the same place on both phones within 0.3 s, starting where the person stands in the subject's reference.
 - The photographer sees "… set a pose guide". Its log has `guide.applied image <id>` and no `guide.sent image <id>` for that guide.
+- *Added in Iter4-A1:* the photographer's Camera shows the guide's reference thumbnail within 3 s of the subject's *Use this guide* (`guide.sent reference <id> … to the photographer` in the subject's log, `guide.applied reference <id>` in the photographer's). The photographer's log has no `guide.sent reference <id>` for that guide. The thumbnail goes with the removed guide.
 - After the join, the image is not sent again.
 - Of two guides chosen at once, both phones end with the one that reached the photographer later. If the other was the subject's, the subject's phone says "Couldn't send the guide".
 
@@ -2183,6 +2187,7 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
 [#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
+[#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211

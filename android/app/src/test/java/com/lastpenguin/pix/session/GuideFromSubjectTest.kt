@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideSource
@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,10 +26,12 @@ import org.junit.Test
  * Photographer, adoption (equivalence partitioning): an image from the subject becomes the guide at its anchor, with
  * no image sent back and its first state by the subject, and is reported once; it replaces a guide already there; a
  * missing source counts as GALLERY and GENERATED is kept; an image that cannot be decoded leaves the guide as it was;
- * a guide chosen after the adoption sends its own image once.
+ * a guide chosen after the adoption sends its own image once. Its reference photo (#234): the one sent before its
+ * image is kept with it and not sent back; one of another guide, or a broken one, is not.
  * Boundary of the anchor (usable): 0 and 1, just outside, not finite, and without area; an unusable one starts the
  * guide centered.
- * Subject, the offered guide (state-based): drawn at once at its anchor and sent with anchor and source; kept when a
+ * Subject, the offered guide (state-based): drawn at once at its anchor and sent with anchor and source, after its
+ * reference photo when it has one; kept when a
  * state names it, while the photographer's own messages wait; dropped after the deadline, which draws the
  * photographer's guide and state again and reports it, also the guide a reconnecting subject's mirror kept; still
  * adopted after a clear that came first; an answer after the deadline still finds its image; an offer while not
@@ -45,6 +48,7 @@ class GuideFromSubjectTest {
     private val guides = InMemoryGuideRepository()
     private val mirror = InMemoryGuideRepository()
     private val codec = FakeGuideImageCodec()
+    private val references = FakeGuideReferenceCodec()
     private val mirrorReference = MirrorReference()
 
     private val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
@@ -55,7 +59,7 @@ class GuideFromSubjectTest {
             guides,
             mirror,
             codec,
-            FakeGuideReferenceCodec(),
+            references,
             mirrorReference,
             StandardTestDispatcher(testScheduler),
         )
@@ -72,6 +76,15 @@ class GuideFromSubjectTest {
         session.deliver(image.begin(anchor, source))
         for (i in image.chunks.indices) session.deliver(image.chunk(i))
         session.deliver(image.end())
+    }
+
+    /** The subject's reference photo of [id] as the photographer receives it, before the guide's image. */
+    private fun deliverReferenceFromSubject(id: String, broken: Boolean = false) {
+        val reference = FakeGuideReferenceCodec().encode(fakeGuide(id).copy(reference = fakeBitmap()))!!
+        session.deliver(reference.begin())
+        val chunks = if (broken) reference.chunks.indices.drop(1) else reference.chunks.indices
+        for (i in chunks) session.deliver(reference.chunk(i))
+        session.deliver(reference.end())
     }
 
     /** The photographer's own image of [id] as the subject receives it. */
@@ -143,6 +156,53 @@ class GuideFromSubjectTest {
     }
 
     @Test
+    fun `the reference photo sent before the subject's image stays with the guide and is not sent back`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+        session.sent.clear()
+
+        deliverReferenceFromSubject("s1")
+        deliverFromSubject("s1")
+        runCurrent()
+
+        assertEquals("s1", guides.guide.value?.id)
+        assertNotNull("the Camera screen's thumbnail", guides.guide.value?.reference)
+        assertEquals(listOf("reference:s1"), references.decoded)
+        assertTrue("no reference goes back", session.sent.none { it is SessionMessage.GuideReferenceBegin })
+        assertTrue(references.encoded.isEmpty())
+    }
+
+    @Test
+    fun `a reference photo of another guide or a broken one does not go with the subject's guide`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        deliverReferenceFromSubject("s0")
+        deliverFromSubject("s1")
+        runCurrent()
+        assertEquals("s1", guides.guide.value?.id)
+        assertNull(guides.guide.value?.reference)
+
+        deliverReferenceFromSubject("s2", broken = true)
+        deliverFromSubject("s2")
+        runCurrent()
+        assertEquals("s2", guides.guide.value?.id)
+        assertNull(guides.guide.value?.reference)
+
+        // A reference goes with its own image only, not with the next.
+        deliverReferenceFromSubject("s3")
+        deliverFromSubject("s3")
+        runCurrent()
+        assertNotNull(guides.guide.value?.reference)
+        deliverFromSubject("s4")
+        runCurrent()
+        assertEquals("s4", guides.guide.value?.id)
+        assertNull(guides.guide.value?.reference)
+    }
+
+    @Test
     fun `an image that cannot be decoded leaves the photographer's guide`() = runTest {
         guides.setGuide(fakeGuide("p1"))
         connectedAs(Role.PHOTOGRAPHER)
@@ -195,6 +255,7 @@ class GuideFromSubjectTest {
         codec.onEncode = { guide ->
             if (guide.id == "p1" && !arrived) {
                 arrived = true
+                deliverReferenceFromSubject("s1")
                 deliverFromSubject("s1")
             }
         }
@@ -202,11 +263,32 @@ class GuideFromSubjectTest {
         runCurrent()
 
         assertEquals("s1", guides.guide.value?.id)
+        assertNotNull(guides.guide.value?.reference)
         assertEquals(listOf("p1"), sentImages())
         assertEquals("s1" to Role.SUBJECT, states().last().let { it.state.guideId to it.by })
-        // Nothing of the first guide follows the adopted guide's state.
+        // Nothing of the first guide follows the adopted guide's state, and the subject's photo does not go back.
         val adopted = session.sent.indexOfFirst { it is SessionMessage.GuideStateUpdate && it.state.guideId == "s1" }
         assertTrue(session.sent.drop(adopted).none { it is SessionMessage.GuideReferenceBegin && it.guideId == "p1" })
+        assertTrue(session.sent.none { it is SessionMessage.GuideReferenceBegin && it.guideId == "s1" })
+    }
+
+    @Test
+    fun `a guide adopted while the first guide's reference is encoded does not send its photo back`() = runTest {
+        guides.setGuide(fakeGuide("p1").copy(reference = fakeBitmap()))
+        connectedAs(Role.PHOTOGRAPHER)
+        references.onEncode = { guide ->
+            if (guide.id == "p1") {
+                deliverReferenceFromSubject("s1")
+                deliverFromSubject("s1")
+            }
+        }
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+
+        assertEquals("s1", guides.guide.value?.id)
+        assertNotNull(guides.guide.value?.reference)
+        assertEquals(listOf("p1"), references.encoded)
+        assertTrue(session.sent.none { it is SessionMessage.GuideReferenceBegin && it.guideId == "s1" })
     }
 
     @Test
@@ -269,6 +351,29 @@ class GuideFromSubjectTest {
         assertEquals(box, begin.anchor)
         assertEquals(GuideSource.GENERATED, begin.source)
         assertTrue(session.sent.last() is SessionMessage.GuideImageEnd)
+    }
+
+    @Test
+    fun `an offered guide's reference photo goes before its image`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        syncer.offer(mine("s1").copy(reference = fakeBitmap()))
+        runCurrent()
+
+        val order = session.sent.mapNotNull { message ->
+            when (message) {
+                is SessionMessage.GuideReferenceBegin -> "reference ${message.guideId}"
+                is SessionMessage.GuideReferenceEnd -> "reference end"
+                is SessionMessage.GuideImageBegin -> "image ${message.guideId}"
+                is SessionMessage.GuideImageEnd -> "image end"
+                else -> null
+            }
+        }
+        assertEquals(listOf("reference s1", "reference end", "image s1", "image end"), order)
+        assertEquals("s1", mirrorReference.reference.value?.guideId)
     }
 
     @Test

@@ -94,10 +94,11 @@
 | 3.14 | 2026-11-18 | Better pose tips (Iter4-P16, [#213]): the model describes each photo in its own request, the server derives the distance from two measures and writes the tip's sentences, and `guide.tip` sends the tip to the subject's phone (2.1, 2.2, 2.5.1, 2.5.3, 2.6.3, Figures 7 and 8). |
 | 3.15 | 2026-11-18 | The reference thumbnail hides at the side (Iter4-A4, [#237]): `dropReference`, a strip of the small thumbnail under a touch-target handle, `referenceHidden` on each phone, and its changes animated by `showReference` (2.6.2, 2.9). |
 | 3.16 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): the thumbnail from the session's photos and a viewer inside Pix on *Subject view* and on the photographer's Camera, and outside a session the album's newest photo (`NewestAlbumPhoto`); *Subject view*'s bottom row as Camera's (2.6.5, Figures 6 and 7). |
-| 3.17 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): `PhoneTurns` with its dead band, each photo saved as held, the scene photo turned upright for 4:3 and 16:9 candidates, and a pose's guide turned back into the frame (2.6.2, 2.6.3, 2.8). |
-| 3.18 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): `TurningIcons` turns the icons, the ratio, the zoom readout, and the bottom row's labels upright as the phone is held, on Camera and Subject view, and the layout stays (2.6.2). |
-| 3.19 | 2026-11-18 | The focus box stays as long as the brightness bar beside it, and the two go together (2.8; [#207]). |
-| 3.20 | 2026-11-18 | *End session* hides during the scene photo, and a tutorial ring stays on a control that turns (2.6.3, 2.6.8; [#207]). |
+| 3.17 | 2026-11-18 | The reference thumbnail for a guide from the subject (Iter4-A1, [#234]): `guide.reference.*` goes S→P before the guide's image, and the photographer adopts the guide with it (2.3, 2.5.1, 2.6.2, 2.6.5, 2.9). |
+| 3.18 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): `PhoneTurns` with its dead band, each photo saved as held, the scene photo turned upright for 4:3 and 16:9 candidates, and a pose's guide turned back into the frame (2.6.2, 2.6.3, 2.8). |
+| 3.19 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): `TurningIcons` turns the icons, the ratio, the zoom readout, and the bottom row's labels upright as the phone is held, on Camera and Subject view, and the layout stays (2.6.2). |
+| 3.20 | 2026-11-18 | The focus box stays as long as the brightness bar beside it, and the two go together (2.8; [#207]). |
+| 3.21 | 2026-11-18 | *End session* hides during the scene photo, and a tutorial ring stays on a control that turns (2.6.3, 2.6.8; [#207]). |
 
 </details>
 
@@ -1281,8 +1282,8 @@ data class ReferenceGuide(
     val source: GuideSource,
     val anchor: NormalizedRect? = null,   // the mask's box in the reference photo (person + 2 % margin), where a new guide
                                           // starts (FR-3.1); the subject gets it for Save guide (FR-6.16, Iter3-P16)
-    val reference: Bitmap? = null,        // the photo, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); null on
-                                          // the subject, whose copy arrives in guide.reference.* and stays in MirrorReference
+    val reference: Bitmap? = null,        // the photo, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); the
+                                          // subject keeps the photographer's in MirrorReference (guide.reference.*)
     val crop: PhotoCrop? = null,          // the screenshot it was cut from (FR-2.10); null for a whole image or a generated
                                           // pose; never sent or saved
 )
@@ -1563,7 +1564,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5) |
 | `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5; Could, Iteration 5) |
 | `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
-| `guide.reference.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The guide's reference photo, for the subject's thumbnail (FR-3.9) |
+| `guide.reference.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's reference photo, for the other phone's thumbnail (FR-3.9); S→P for a guide made on the subject's phone |
 | `guide.state` | P→S | steps realtime, final reliable | `state`, `final`, `by` | The guide's place, opacity, and visibility |
 | `guide.clear` | P→S | reliable | none | The guide was removed |
 | `guide.tip` (It 4) | P→S | reliable | `guideId`, `text` | The tip of the guide on the photographer's camera (FR-4.10) |
@@ -1589,7 +1590,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | Transfer | Ids | Format and size | The receiver refuses | The subject keeps it |
 |----|----|----|----|----|
 | `guide.image.*` | `guideId` | `mask-png`: the smoothed mask as an 8-bit gray PNG, ≤ 720 px tall, a few KB | A PNG over 1280 px wide or 720 px tall, read from its header before inflating | As the guide; S→P, the photographer adopts it |
-| `guide.reference.*` | `guideId` | `jpeg`, quality 85, long side ≤ 512 px | A photo over 512 px | In memory (`MirrorReference`) until another guide or `guide.clear`; *Save guide* stores it with the guide |
+| `guide.reference.*` | `guideId` | `jpeg`, quality 85, long side ≤ 512 px | A photo over 512 px | In memory (`MirrorReference`) until another guide or `guide.clear`; *Save guide* stores it with the guide; S→P, the photographer adopts it with its guide |
 | `pose.candidate.*` | `setId`, `poseId` | `jpeg`, quality 85, else 70 or 55 to fit 1 MiB; long side ≤ 1024 px | Over 1024 px or 1 MiB, at `begin` | In memory, with its set; the ♥ on *Pick a pose* can save it (FR-4.14) |
 | `pose.scene.*` | `descriptionId` | As a candidate | As a candidate | In memory, with its description; never saved |
 | `guide.confirm.image.*` | `confirmId`, `guideId` | `mask-png`, as `guide.image.*` | Over 1280 px wide or 720 px tall, at `begin`; an outline its copy is not `READY` with | In memory, on *Your reference* only; never saved |
@@ -1638,7 +1639,7 @@ Sent when the session connects and at each change. For example, `hasFlash` is fa
 Only the smoothed mask travels, never the reference's pixels (AD-6, AD-15). `MaskPng` writes and reads it losslessly on both phones. `aspect` is the mask's width / height. `anchor` is the mask's box in its reference photo, in fractions, right and bottom exclusive (`ReferenceGuide.anchor`); `source` is `GALLERY` or `GENERATED`. Each goes only when the guide has it.
 
 - **P→S.** Skipped when `hello` reported the same `haveGuideId`. The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor` and `source` for *Save guide*.
-- **S→P.** The photographer adopts the guide, under the same `guideId`, in place of its own, starting at `anchor` (FR-3.1). It answers with `guide.state` `by: SUBJECT` and no image (2.6.5, *Guide from the subject*). An anchor that is not finite, lies outside 0..1, or has no area starts the guide centered; a missing `source` means `GALLERY`. No reference photo goes S→P, so the photographer shows no thumbnail for that guide (FR-3.9). A refused image leaves the photographer's guide as it was. Without a `guide.state` that names the guide within 5 s, the subject shows the photographer's guide again.
+- **S→P.** The photographer adopts the guide, under the same `guideId`, in place of its own, starting at `anchor` (FR-3.1). It answers with `guide.state` `by: SUBJECT` and no image (2.6.5, *Guide from the subject*). An anchor that is not finite, lies outside 0..1, or has no area starts the guide centered; a missing `source` means `GALLERY`. The guide's reference photo comes just before its image (`guide.reference.*`), and the photographer adopts the guide with it, for its thumbnail (FR-3.9). A refused image leaves the photographer's guide as it was. Without a `guide.state` that names the guide within 5 s, the subject shows the photographer's guide again.
 
 </details>
 
@@ -1665,7 +1666,7 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
 </details>
 
 <details>
-<summary><code>guide.reference.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · P→S</summary>
+<summary><code>guide.reference.begin</code> / <code>.chunk</code> / <code>.end</code> · reliable · both</summary>
 
 ```json
 { "v": 3, "t": "guide.reference.begin", "seq": 11, "ts": 1759212345780,
@@ -1673,7 +1674,8 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
          "width": 384, "height": 512, "bytes": 41210, "chunks": 5 } }
 ```
 
-Sent once per guide, after the guide's image and `guide.state`, so the subject draws the guide first. Skipped for a guide without a reference photo, and when `hello` reported the same `haveReferenceId`. The subject shows it only with its guide (FR-3.9, AD-6).
+- **P→S.** Sent once per guide, after the guide's image and `guide.state`, so the subject draws the guide first. Skipped for a guide without a reference photo, and when `hello` reported the same `haveReferenceId`. The subject shows it only with its guide (FR-3.9, AD-6).
+- **S→P.** Sent just before the image of a guide made on the subject's phone, since a guide does not change once set. The photographer keeps it only for the image that follows with the same `guideId`, and never sends it back. A guide without a reference photo sends none, and its guide has no thumbnail.
 
 </details>
 
@@ -2587,7 +2589,7 @@ The clamp (`GuideGeometry.clamp`): the guide's normalized width is `height × as
 
 **The library (FR-3.8, FR-3.11, It 3, [#170]).** *Add a pose guide* has *Choose from the gallery* and *My library*, which shows *All N* while guides are saved ([#210]) and opens `LibraryFragment` in the sheet's place, so Back returns to the camera: a grid filtered by kind, newest first, where a tap puts a guide on the camera at its *Starting position* and a long press deletes after asking. Thumbnails load as cells show, through a 24 MB `LruCache`. From Subject view, the library offers the guide to the photographer and leaves when the session ends. The screens: R&S 6.2.
 
-**Overlay rendering.** `GuideOverlayView` draws the outline with `opacity` as `Paint.alpha`, in this phone's line color and thickness (2.6.8), clipped to the image, and nothing while `visible == false`. The reference thumbnail (FR-3.9) is a separate view, never in the stream or photos. It starts top left with a 72 dp long side; a tap enlarges it to half the preview's width, or less to fit. A drag drops it into the nearest corner (`ReferenceDragController`), which TalkBack offers as actions. The corner persists, and a new guide starts small. Subject view shows the same thumbnail from `MirrorReference`, with its own corner, which is never sent (It 3, [#132]); it stays while the guide is hidden.
+**Overlay rendering.** `GuideOverlayView` draws the outline with `opacity` as `Paint.alpha`, in this phone's line color and thickness (2.6.8), clipped to the image, and nothing while `visible == false`. The reference thumbnail (FR-3.9) is a separate view, never in the stream or photos. It starts top left with a 72 dp long side; a tap enlarges it to half the preview's width, or less to fit. A drag drops it into the nearest corner (`ReferenceDragController`), which TalkBack offers as actions. The corner persists, and a new guide starts small. Subject view shows the same thumbnail from `MirrorReference`, with its own corner, which is never sent (It 3, [#132]); it stays while the guide is hidden. A guide from the subject has the subject's reference photo, so Camera shows its thumbnail too ([#234]).
 
 **Hiding the thumbnail (It 4, [#237]).** A drag may take the thumbnail out of the preview sideways, and it fades as it goes (`referenceAlpha`). `dropReference` decides at release: hidden when its center is past the preview's side, or when the drag ended toward the nearer side at 800 dp/s or faster and more sideways than up or down. The speed is the finger's over its last 100 ms, so a pause before release is no flick; the release event counts for the place and the speed, since it can carry the last of the move. A hidden thumbnail is small, at its corner's height, with 16 dp of it inside the preview at 55 % opacity, or just under half of a thumbnail narrower than 32 dp, as a very tall photo's is (`referencePeek`), so more than half of it is always out; hiding ends the enlarged state, so it comes back small. The strip is too narrow for a finger: a transparent handle 48 dp wide and at least as tall lies over it, inside the thumbnail's area, passes its touches to the same controller, and keeps the system's back gesture off that edge (`setSystemGestureExclusionRects`). A tap on the strip or a drop inside the preview shows the thumbnail again. TalkBack has *Hide at the side* beside the corner actions, and a hidden thumbnail says *Hidden* and offers *Show*. `referenceHidden` is in each screen's state, never sent. It is kept for the same guide, also for its saved copy, by the guide's id, and another guide's thumbnail shows again.
 
@@ -2721,8 +2723,8 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `RemoteControlHandler` drops a move for a missing, hidden, or replaced guide. Otherwise the photographer's `GuideRepository` clamps and applies it, and `GuideSyncer` echoes `guide.state` with `by: SUBJECT`.
   - During the gesture the subject takes only `visible` and `opacity` from the mirror. The first `guide.state` after the final value settles the guide. Of two moves, the later wins (FR-7.6).
 - **Guide from the subject (It 3, FR-6.15, FR-6.16, [#113]).** *Guide* on Subject view opens *Add a pose guide* with the subject's *My library* (2.6.2), without the situations and their button.
-  - `ReferenceViewModel` hands the guide to `GuideSyncer.offer`. The mirror shows it at once, at its `anchor` clamped for the narrowest frame, with its reference photo. `guide.image.*` sends it with `anchor` and `source` (2.5.1).
-  - The photographer adopts it with `attribute(SUBJECT)` and sends no image back. Camera says "Joonhyung set a pose guide". The guide is then the photographer's own, to move, hide, save, or remove.
+  - `ReferenceViewModel` hands the guide to `GuideSyncer.offer`. The mirror shows it at once, at its `anchor` clamped for the narrowest frame, with its reference photo. `guide.reference.*` sends the photo, then `guide.image.*` the guide with `anchor` and `source` (2.5.1).
+  - The photographer adopts it with `attribute(SUBJECT)` and its reference photo, which Camera shows as the thumbnail ([#234]). It sends neither back. Camera says "Joonhyung set a pose guide". The guide is then the photographer's own, to move, hide, save, or remove.
   - The subject sets other guide messages aside until a `guide.state` names its guide. Without a connection, or after 5 s without that state (`OFFER_TIMEOUT_MS`), it says "Couldn't send the guide" and shows the photographer's guide.
   - Of two guides chosen at once, the later to arrive wins (AD-7). The subject shows a reference photo only for the guide on its video.
   - *Reference confirm* and *No person found* return to Subject view when the session ends.
@@ -3294,6 +3296,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
 | Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/17 | Done | 2.5.1, 2.5.3, 2.6.3 |
 | The reference thumbnail hides at the side, and its changes are animated (Iter4-A4, [#237]) | 박동제 | 11/20 | Done | 2.6.2 |
+| The reference thumbnail for a guide from the subject (Iter4-A1, [#234]) | 박재완 | 11/20 | Done | 2.5.1, 2.6.2, 2.6.5 |
 | The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Open | *Still open*, AD-8 |
 | Integration tests for the Iteration 4 flows (Iter4-P18, [#215]) | 조성민 | 11/19 | Open | Testing Documentation |
 | Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Open | — |
@@ -3418,6 +3421,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
 [#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
+[#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211

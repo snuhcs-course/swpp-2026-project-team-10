@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -13,9 +13,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * The guide's reference photo as it travels to the subject, for Subject view's thumbnail only (FR-3.9, AD-6): a copy
- * at most [JpegGuideReferenceCodec.MAX_LONG_SIDE] on its long side, split into the `guide.reference.*` messages of
- * Design 2.5.1 like the guide image. It is never drawn as the guide, never saved, and never goes through the server.
+ * The guide's reference photo as it travels to the other phone, for its thumbnail only (FR-3.9, AD-6): a copy at most
+ * [JpegGuideReferenceCodec.MAX_LONG_SIDE] on its long side, split into the `guide.reference.*` messages of Design
+ * 2.5.1 like the guide image. The photographer's goes to Subject view, and a guide made on the subject's phone takes
+ * its own to the photographer's Camera screen (#234). It is never drawn as the guide and never goes through the server.
  * Owner: Real-time (#9), with the reference from #132.
  */
 class EncodedGuideReference(
@@ -35,7 +36,7 @@ class EncodedGuideReference(
     fun end() = SessionMessage.GuideReferenceEnd(guideId, crc32)
 }
 
-/** Subject: collects one reference's chunks with the guide image's checks ([GuideImageAssembler]). */
+/** Collects one reference's chunks with the guide image's checks ([GuideImageAssembler]), on either phone. */
 class GuideReferenceAssembler private constructor(
     val begin: SessionMessage.GuideReferenceBegin,
     private val image: GuideImageAssembler,
@@ -91,7 +92,7 @@ class JpegGuideReferenceCodec : GuideReferenceCodec {
 
     override fun decode(format: String, bytes: ByteArray): Bitmap? {
         if (format != FORMAT) return null
-        // The size first, without the pixels: a photo larger than the photographer may send is refused before it
+        // The size first, without the pixels: a photo larger than the other phone may send is refused before it
         // can take the memory of a full decode.
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)

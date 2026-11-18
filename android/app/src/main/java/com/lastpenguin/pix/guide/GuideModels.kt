@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -27,8 +27,9 @@ data class ReferenceGuide(
      */
     val anchor: NormalizedRect? = null,
     /**
-     * The reference photo itself, long side at most 512 px, for the Camera screen's corner thumbnail only (FR-3.9).
-     * Never sent to the subject and never drawn as the guide; null on the subject.
+     * The reference photo itself, long side at most 512 px, for the corner thumbnail only (FR-3.9). It goes to the
+     * other phone apart from the mask (`guide.reference.*`, Design 2.5.1) and is never drawn as the guide; a guide
+     * adopted from the subject has the subject's, and the subject keeps the photographer's in `MirrorReference`.
      */
     val reference: Bitmap? = null,
     /**

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -383,8 +383,11 @@ class FakeGuideImageCodec(private val decodeAs: (guideId: String) -> ReferenceGu
     }
 }
 
-/** Encodes a guide's reference as its id's bytes when it has one, and decodes any `fake` bytes, with no graphics. */
-class FakeGuideReferenceCodec : GuideReferenceCodec {
+/**
+ * Encodes a guide's reference as its id's bytes when it has one, and decodes any `fake` bytes, with no graphics; a
+ * screen test that draws the decoded photo passes [decodeAs] with a real bitmap, as for [FakeGuideImageCodec].
+ */
+class FakeGuideReferenceCodec(private val decodeAs: () -> Bitmap = { fakeBitmap() }) : GuideReferenceCodec {
     val encoded = mutableListOf<String>()
     val decoded = mutableListOf<String>()
 
@@ -401,7 +404,7 @@ class FakeGuideReferenceCodec : GuideReferenceCodec {
     override fun decode(format: String, bytes: ByteArray): Bitmap? {
         if (format != "fake") return null
         decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
-        return fakeBitmap()
+        return decodeAs()
     }
 }
 

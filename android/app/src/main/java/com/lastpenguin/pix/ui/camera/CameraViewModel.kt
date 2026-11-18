@@ -221,8 +221,11 @@ class CameraViewModel(
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
 ) : ViewModel() {
 
-    /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5). */
+    /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5, FR-1.15). */
     fun watchPhoneTurn(owner: LifecycleOwner) = phoneTurns.watch(owner)
+
+    /** How the phone is held, which the controls' icons turn with (FR-1.15). */
+    val phoneTurn: StateFlow<Int> = phoneTurns.turn
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()

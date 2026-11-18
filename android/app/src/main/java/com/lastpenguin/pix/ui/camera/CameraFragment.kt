@@ -113,6 +113,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var pinchZoom: PinchZoomController? = null
     private var referenceDrag: ReferenceDragController? = null
     private var opacitySlider: TrackedSliderController? = null
+
+    /** The icons that turn with the phone (FR-1.15), while the view is there; a test looks inside a turn. */
+    internal var turningIcons: TurningIcons? = null
+        private set
     private var previewLogged = false
     private var noticeJob: Job? = null
     private var toggleLabelJob: Job? = null
@@ -276,6 +280,25 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
         viewModel.watchPhoneTurn(viewLifecycleOwner)
+        // The icons turn with the phone (FR-1.15), and so do the ratio, Share's letters, and Guide with its label; the
+        // other texts, the shutter, and the layout stay.
+        controls.aspectButton.labelTurn = LabelTurn.WHOLE
+        controls.shootTogetherButton.labelTurn = LabelTurn.LETTERS
+        turningIcons = TurningIcons(
+            buttons = listOf(
+                controls.sceneBackButton,
+                controls.flashButton,
+                controls.aspectButton,
+                controls.settingsButton,
+                controls.shootTogetherButton,
+                controls.hideGuideButton,
+                controls.saveGuideButton,
+                controls.removeGuideButton,
+                controls.tipButton,
+                controls.editGuideButton,
+            ),
+            views = listOf(controls.guideButton, controls.switchCameraIcon, controls.galleryThumbnail),
+        )
         controls.cameraActionButton.setOnClickListener {
             if (hasCameraPermission()) {
                 bindCamera()
@@ -340,6 +363,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
+                launch { viewModel.phoneTurn.collect { turningIcons?.turnTo(it) } }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
                 // The guide in the settings' color and thickness (FR-3.10).
                 launch {
@@ -540,6 +564,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         referenceDrag = null
         opacitySlider?.finishInteraction()
         opacitySlider = null
+        turningIcons?.stop()
+        turningIcons = null
         binding?.exposureBar?.finishDrag()
         brightnessAnchor = null
         exposureBarHiding = false

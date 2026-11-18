@@ -15,6 +15,8 @@
 
     <!-- Flow 1: Camera -->
     <string name="shoot_together">Shoot together</string>
+    <!-- Camera's top bar: short, so each letter can turn with the phone (FR-1.15). -->
+    <string name="share">Share</string>
     <string name="camera_permission_message">Pix needs camera access to show the viewfinder and take photos. Allow camera access in Settings.</string>
     <string name="camera_unavailable">Camera unavailable. Close other apps using the camera, check camera access, then try again.</string>
     <string name="starting_camera">Starting camera</string>

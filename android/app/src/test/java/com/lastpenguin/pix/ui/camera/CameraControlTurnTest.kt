@@ -1,0 +1,231 @@
+// AI-generated with Claude Code, 2026-11-18, reviewed by Joonhyung Han
+package com.lastpenguin.pix.ui.camera
+
+import android.Manifest
+import android.animation.ValueAnimator
+import android.app.Application
+import android.graphics.drawable.RotateDrawable
+import android.os.Looper
+import android.text.Spanned
+import android.view.View
+import androidx.navigation.Navigation
+import androidx.navigation.testing.TestNavHostController
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.lastpenguin.pix.R
+import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.OwnActivities
+import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.TestAppContainer
+import java.time.Duration
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
+
+/*
+ * The Camera screen's icons turning with the phone (FR-1.15, #207, R&S 6.2, Design 2.6.2) on the Galaxy S22's app
+ * area, 360 x 705 dp.
+ * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees. What turns: the top bar's icons, the ratio
+ * as a word, Share's icon and each of its letters, the guide's icon buttons, the tip's, the guide-edit toggle's, Guide
+ * with its label, the camera switch's icon, and the gallery thumbnail. What stays: the zoom readout, the shutter, the
+ * preview and what is drawn over it, the reference thumbnail, and every control's place and size. TalkBack still names
+ * Share as Shoot together. A turn as the screen opens, at once; a later one, all together and smoothly; with the phone's
+ * animations off, at once. A new icon, the flash's next one, keeps the turn.
+ */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w360dp-h705dp-xxhdpi")
+class CameraControlTurnTest {
+    @get:Rule
+    val activities = OwnActivities()
+
+    private lateinit var modules: TestAppContainer
+    private lateinit var fragment: CameraFragment
+
+    @After
+    fun tearDown() {
+        ShadowChoreographer.setPaused(false)
+        setAnimatorScale(1f)
+    }
+
+    private fun setAnimatorScale(scale: Float) {
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType)
+            .invoke(null, scale)
+    }
+
+    private fun play(ms: Long) {
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms))
+        ShadowChoreographer.setPaused(true)
+    }
+
+    /** The Camera screen, with the phone held at [turn] as it opens; frames paused before it opens when [paused]. */
+    private fun camera(turn: Int = 0, paused: Boolean = false): FragmentCameraBinding {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        modules = TestAppContainer(camera = FakeCameraController(hasFlash = true)).install()
+        modules.turns.set(turn)
+        val activity = activities.start(R.style.Theme_Pix)
+        val nav = TestNavHostController(activity).apply { setGraph(R.navigation.nav_graph) }
+        Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
+        if (paused) ShadowChoreographer.setPaused(true)
+        fragment = CameraFragment()
+        activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
+        idle()
+        return FragmentCameraBinding.bind(fragment.requireView())
+    }
+
+    private fun FragmentCameraBinding.turningButtons(): List<TurningButton> = listOf(
+        sceneBackButton,
+        flashButton,
+        aspectButton,
+        settingsButton,
+        shootTogetherButton,
+        hideGuideButton,
+        saveGuideButton,
+        removeGuideButton,
+        tipButton,
+        editGuideButton,
+    )
+
+    /** Guide turns with its label, as one block. */
+    private fun FragmentCameraBinding.turningViews(): List<View> = listOf(
+        guideButton,
+        switchCameraIcon,
+        galleryThumbnail,
+    )
+
+    /** Views that never turn as a whole: the buttons whose icon or label turns, the readout, the shutter, the preview. */
+    private fun FragmentCameraBinding.stayingViews(): List<View> = listOf(
+        shootTogetherButton,
+        aspectButton,
+        zoomReadout,
+        shutterButton,
+        switchCameraButton,
+        galleryButton,
+        previewContainer,
+        guideOverlay,
+        compositionOverlay,
+        exposureBar,
+        referenceThumbnail,
+        topBar,
+        bottomPanel,
+    )
+
+    /** Every control's place and size, which a turn never changes. */
+    private fun FragmentCameraBinding.places(): List<List<Int>> =
+        (turningButtons() + turningViews() + stayingViews()).map { listOf(it.left, it.top, it.right, it.bottom) }
+
+    private fun TurningButton.drawnAt(): Float = (icon as RotateDrawable).level * 360f / 10_000f
+
+    private fun FragmentCameraBinding.assertIconsAt(degrees: Float) {
+        for (button in turningButtons()) {
+            val name = resources().getResourceEntryName(button.id)
+            assertEquals(name, degrees, button.turn, 0f)
+            if (button.icon != null) {
+                assertEquals(name, Math.floorMod(degrees.toInt(), 360).toFloat(), button.drawnAt(), 0.05f)
+            }
+        }
+        for (view in turningViews()) {
+            assertEquals(resources().getResourceEntryName(view.id), degrees, view.rotation, 0f)
+        }
+    }
+
+    private fun FragmentCameraBinding.resources() = root.resources
+
+    @Test
+    fun heldEachWay_theIconsStandUpright_andTheTextsTheShutterAndThePlacesStay() {
+        val screen = camera()
+        val places = screen.places()
+        val texts = listOf(screen.shootTogetherButton.text, screen.aspectButton.text, screen.zoomReadout.text)
+
+        for ((turn, degrees) in listOf(90 to -90f, 180 to 180f, 270 to 90f, 0 to 0f)) {
+            modules.turns.set(turn)
+            play(Motion.TURN_MS * 2)
+
+            screen.assertIconsAt(degrees)
+            for (view in screen.stayingViews()) {
+                assertEquals("$turn ${screen.resources().getResourceEntryName(view.id)}", 0f, view.rotation, 0f)
+            }
+            assertEquals("$turn", places, screen.places())
+            assertEquals(
+                "$turn",
+                texts,
+                listOf(screen.shootTogetherButton.text, screen.aspectButton.text, screen.zoomReadout.text),
+            )
+        }
+    }
+
+    @Test
+    fun theRatioTurnsAsAWord_andShareLetterByLetter_whileTalkBackStillSaysShootTogether() {
+        val screen = camera()
+
+        assertEquals(LabelTurn.WHOLE, screen.aspectButton.labelTurn)
+        assertEquals(LabelTurn.LETTERS, screen.shootTogetherButton.labelTurn)
+        assertEquals(LabelTurn.NONE, screen.settingsButton.labelTurn)
+        assertEquals("Share", screen.shootTogetherButton.text.toString())
+        assertEquals("Shoot together", screen.shootTogetherButton.contentDescription)
+        for (button in listOf(screen.aspectButton, screen.shootTogetherButton)) {
+            val text = button.text as Spanned
+            assertEquals(1, text.getSpans(0, text.length, TurnedLabelSpan::class.java).size)
+        }
+    }
+
+    @Test
+    fun aScreenOpenedSideways_hasItsIconsTurnedAtOnce() {
+        val screen = camera(turn = 270, paused = true)
+
+        screen.assertIconsAt(90f)
+    }
+
+    @Test
+    fun aTurn_turnsTheIconsTogether_andSmoothly() {
+        val screen = camera()
+        ShadowChoreographer.setPaused(true)
+
+        modules.turns.set(90)
+        idle()
+        checkNotNull(fragment.turningIcons?.turning).setCurrentFraction(0.5f)
+
+        val halfway = screen.galleryThumbnail.rotation
+        assertTrue("$halfway", halfway > -90f && halfway < 0f)
+        for (button in screen.turningButtons()) assertEquals(halfway, button.turn, 0f)
+        for (view in screen.turningViews()) assertEquals(halfway, view.rotation, 0f)
+        play(Motion.TURN_MS)
+        screen.assertIconsAt(-90f)
+    }
+
+    @Test
+    fun withAnimationsOff_theIconsAreThereAtOnce() {
+        val screen = camera()
+        setAnimatorScale(0f)
+        ShadowChoreographer.setPaused(true)
+
+        modules.turns.set(90)
+        idle()
+
+        screen.assertIconsAt(-90f)
+    }
+
+    @Test
+    fun theFlashsNextIcon_keepsTheTurn() {
+        val screen = camera(turn = 90)
+        val before = shadowOf(screen.flashButton.plainIcon).createdFromResId
+
+        screen.flashButton.performClick()
+        idle()
+
+        assertNotEquals(before, shadowOf(screen.flashButton.plainIcon).createdFromResId)
+        screen.assertIconsAt(-90f)
+    }
+}

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -182,7 +182,7 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.editGuideButton.visibility)
             assertTrue(controls.editGuideButton.isChecked)
             // The toggle shows the mode it is in: the person's outline while a pinch moves the guide (E2, #204).
-            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.icon).createdFromResId)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
             assertTrue(controls.editGuideButton.isEnabled)
             assertTrue(controls.guideOverlay.editable)
             // Remove guide in the light red that sets it apart from the panel's other controls (E3, #204).
@@ -212,7 +212,7 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ ->
             assertFalse(controls.editGuideButton.isChecked)
             // The camera while a pinch zooms (E2, #204).
-            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.icon).createdFromResId)
+            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
             assertFalse(controls.guideOverlay.editable)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
             assertEquals(View.VISIBLE, controls.hintText.visibility)

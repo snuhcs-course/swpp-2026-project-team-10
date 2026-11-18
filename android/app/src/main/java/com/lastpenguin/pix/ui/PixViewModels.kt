@@ -99,6 +99,7 @@ object PixViewModels {
                 container.descriptionSyncer,
                 container.tipSyncer,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
+                phoneTurns = container.phoneTurns,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }

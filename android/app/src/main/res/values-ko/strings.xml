@@ -15,6 +15,7 @@
 
     <!-- Flow 1: Camera -->
     <string name="shoot_together">카메라 공유</string>
+    <string name="share">공유</string>
     <string name="camera_permission_message">뷰파인더를 보여 주고 사진을 촬영하려면 카메라 권한이 필요해요. 설정에서 카메라 접근을 허용하세요.</string>
     <string name="camera_unavailable">카메라를 사용할 수 없어요. 카메라를 사용하는 다른 앱을 닫고 카메라 권한을 확인한 뒤 다시 시도하세요.</string>
     <string name="starting_camera">카메라 시작 중</string>

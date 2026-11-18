@@ -55,7 +55,8 @@ import org.robolectric.annotation.GraphicsMode
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
  * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, gone while the
+ * a session connected and a peer leaving, and the scene photo step in a session, without End session until it ends,
+ * a reconnect included; the camera switch on a phone with and without a front camera, gone while the
  * scene photo is framed and back after it, and in a session (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
@@ -664,6 +665,49 @@ class CameraFragmentRenderTest {
 
         onScreen { controls, _ ->
             assertEquals(View.GONE, controls.liveDot.visibility)
+            assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
+            assertEquals(View.GONE, controls.shootTogetherButton.visibility)
+        }
+    }
+
+    @Test
+    fun inASession_theScenePhotoStepHidesEndSession_keepsItsTitles_andEndSessionComesBackAfterIt() {
+        val camera = FakeCameraController().apply { frame = bitmap(300, 400) }
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.endSessionButton.visibility)
+            assertEquals(View.GONE, controls.shootTogetherButton.visibility)
+            assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
+        }
+
+        // A reconnect during the step does not bring it back.
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.endSessionButton.visibility) }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        // The review keeps its title beside Use.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
+            assertEquals(View.VISIBLE, controls.usePhotoButton.visibility)
+            assertEquals(View.GONE, controls.endSessionButton.visibility)
+        }
+
+        // Back to framing, then out of the step: End session is back.
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.sceneTitle.visibility)
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
             assertEquals(View.GONE, controls.shootTogetherButton.visibility)
         }

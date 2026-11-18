@@ -199,17 +199,18 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             onZoom = viewModel::onZoomGesture,
         )
         setupZoomAccessibility(binding.zoomReadout)
-        // The icons turn with this phone, held as the subject holds it, and so do Guide and Pick a pose with their
-        // labels (FR-1.15); the other texts and the layout stay.
+        // The icons turn with this phone, held as the subject holds it, and so do the zoom readout and Guide and Pick a
+        // pose with their labels (FR-1.15); the other texts and the layout stay.
         viewModel.watchPhoneTurn(viewLifecycleOwner)
         turningIcons = TurningIcons(
-            buttons = listOf(
+            controls = listOf(
                 binding.flashButton,
                 binding.settingsButton,
                 binding.brightnessButton,
                 binding.tipButton,
                 binding.saveGuideButton,
                 binding.editGuideButton,
+                binding.zoomReadout,
             ),
             views = listOf(binding.guideButton, binding.pickPoseButton, binding.galleryThumbnail),
         )

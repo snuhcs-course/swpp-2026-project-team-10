@@ -14,6 +14,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.camera.Turnable
 import com.lastpenguin.pix.ui.camera.TurningButton
 import java.time.Duration
 import org.junit.After
@@ -28,8 +29,8 @@ import org.robolectric.annotation.GraphicsMode
  * Subject view's icons turning with the subject's own phone (FR-1.15, #207, R&S 6.6, Design 2.6.2) on the Galaxy
  * S22's app area, 360 x 705 dp.
  * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees. What turns: the top bar's icons, the
- * brightness, tip, save, and guide-edit buttons' icons, Guide and Pick a pose each with its label, and the photo
- * thumbnail. What stays: the other texts (Leave, the zoom readout), the video and what is drawn over it, the reference
+ * brightness, tip, save, and guide-edit buttons' icons, the zoom readout as a word, Guide and Pick a pose each with
+ * its label, and the photo thumbnail. What stays: Leave, the video and what is drawn over it, the reference
  * thumbnail, and every control's place and size. The turn is this phone's own: nothing is sent to the photographer.
  */
 @RunWith(AndroidJUnit4::class)
@@ -59,8 +60,9 @@ class SubjectControlTurnTest {
         return modules to binding!!
     }
 
-    private fun FragmentSubjectBinding.turningButtons(): List<TurningButton> =
-        listOf(flashButton, settingsButton, brightnessButton, tipButton, saveGuideButton, editGuideButton)
+    /** The controls that turn what they draw: the buttons' icons and the zoom readout. */
+    private fun FragmentSubjectBinding.turningButtons(): List<View> =
+        listOf(flashButton, settingsButton, brightnessButton, tipButton, saveGuideButton, editGuideButton, zoomReadout)
 
     /** Guide and Pick a pose turn with their labels, each as one block; the thumbnail turns whole. */
     private fun FragmentSubjectBinding.turningViews(): List<View> = listOf(
@@ -96,10 +98,12 @@ class SubjectControlTurnTest {
             modules.turns.set(turn)
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(Motion.TURN_MS * 2))
 
-            for (button in screen.turningButtons()) {
-                val name = screen.root.resources.getResourceEntryName(button.id)
-                assertEquals("$turn $name", degrees, button.turn, 0f)
-                assertEquals("$turn $name", Math.floorMod(degrees.toInt(), 360).toFloat(), button.drawnAt(), 0.05f)
+            for (control in screen.turningButtons()) {
+                val name = screen.root.resources.getResourceEntryName(control.id)
+                assertEquals("$turn $name", degrees, (control as Turnable).turn, 0f)
+                if (control is TurningButton) {
+                    assertEquals("$turn $name", Math.floorMod(degrees.toInt(), 360).toFloat(), control.drawnAt(), 0.05f)
+                }
             }
             for (view in screen.turningViews()) {
                 assertEquals("$turn", degrees, view.rotation, 0f)

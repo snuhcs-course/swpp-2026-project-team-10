@@ -132,16 +132,13 @@
                 app:icon="@drawable/ic_settings" />
 
             <!-- Named in full, so it is a MaterialButton under any activity, which the tutorial's ring around its pill
-                 needs (#204). Share, short so its letters can turn (FR-1.15), would sit in the middle of Material's
-                 88 dp; 48 dp keeps the touch target (NFR-16), and TalkBack says Shoot together. -->
+                 needs (#204). -->
             <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/shootTogetherButton"
                 style="@style/Widget.Pix.Button.Glass"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="48dp"
-                android:contentDescription="@string/shoot_together"
-                android:text="@string/share"
+                android:text="@string/shoot_together"
                 app:icon="@drawable/ic_people" />
 
             <!-- Takes the place of Shoot together while a subject is connected (FR-6.10). -->
@@ -674,7 +671,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <TextView
+        <com.lastpenguin.pix.ui.camera.TurningLabel
             android:id="@+id/zoomReadout"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"

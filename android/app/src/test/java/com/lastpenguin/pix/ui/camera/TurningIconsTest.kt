@@ -19,6 +19,7 @@ import java.time.Duration
 import kotlin.math.roundToInt
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,11 +32,10 @@ import org.robolectric.shadows.ShadowChoreographer
  * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees, and -90 and 450 taken as 270 and 90; a
  * quarter turn either way, a half turn, and no turn; a turn from rest and one during a turn; the phone's animations on
  * and off. The button: its icon turned with its background and the button itself as they are, and a new icon keeping
- * the turn; a label that stays, one that turns as a word, and one that turns letter by letter, each keeping its width,
- * and a new label keeping its turn. Letters: drawn from the start at 0 and 90 degrees the other way (a quarter
- * counterclockwise on the screen), and from the end at 90 and 180.
+ * the turn; a label that stays and one that turns as a word, keeping its width, and a new label keeping its turn. A
+ * text that turns, as the zoom readout does: each text it is given, keeping its width.
  * Boundary: a half turn, the one way both are as short, goes clockwise; the angle after a turn past 180 is read back
- * between -180 and 180; the letters' order changes past 45 degrees clockwise and at 135 counterclockwise.
+ * between -180 and 180.
  */
 @RunWith(AndroidJUnit4::class)
 class TurningIconsTest {
@@ -213,9 +213,9 @@ class TurningIconsTest {
         assertEquals(there, view.rotation, 0f)
     }
 
-    /** What a [TurnedLabelSpan] draws: each drawText's first index, its x, and the angle the canvas was turned by. */
+    /** The angles a [TurnedLabelSpan] turns the canvas by before each text it draws. */
     private class Recorder : Canvas(Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888)) {
-        val drawn = mutableListOf<Triple<Int, Float, Float>>()
+        val drawn = mutableListOf<Float>()
         private var turned = 0f
 
         override fun rotate(degrees: Float) {
@@ -224,23 +224,16 @@ class TurningIconsTest {
         }
 
         override fun drawText(text: CharSequence, start: Int, end: Int, x: Float, y: Float, paint: Paint) {
-            drawn += Triple(start, x, turned)
+            drawn += turned
             turned = 0f
         }
-    }
-
-    private fun drawn(word: String, letters: Boolean, degrees: Float): List<Triple<Int, Float, Float>> {
-        val paint = Paint().apply { textSize = 40f }
-        val recorder = Recorder()
-        TurnedLabelSpan(letters) { degrees }.draw(recorder, word, 0, word.length, 10f, 0, 60, 80, paint)
-        return recorder.drawn
     }
 
     @Test
     fun aLabel_staysUnlessItsButtonTurnsIt() {
         val button = button()
 
-        assertEquals(LabelTurn.NONE, button.labelTurn)
+        assertFalse(button.turnsLabel)
         assertTrue(button.text !is Spanned)
     }
 
@@ -248,51 +241,44 @@ class TurningIconsTest {
     fun aTurningLabel_keepsItsWidth_andANewLabelKeepsTheTurn() {
         val upright = TurningButton(context).apply { text = "16:9" }
         val turned = TurningButton(context).apply {
-            labelTurn = LabelTurn.WHOLE
+            turnsLabel = true
             text = "3:4"
         }
 
         turned.text = "16:9"
-        val paint = turned.paint
 
         val span = (turned.text as Spanned).getSpans(0, 4, TurnedLabelSpan::class.java).single()
-        assertEquals(upright.paint.measureText("16:9").roundToInt(), span.getSize(paint, turned.text, 0, 4, null))
+        assertEquals(
+            upright.paint.measureText("16:9").roundToInt(),
+            span.getSize(turned.paint, turned.text, 0, 4, null),
+        )
         assertEquals("16:9", turned.text.toString())
     }
 
     @Test
     fun aWord_turnsAsOne_aboutItsMiddle() {
-        val drawn = drawn("3:4", letters = false, degrees = -90f)
+        val recorder = Recorder()
 
-        assertEquals(listOf(0), drawn.map { it.first })
-        assertEquals(-90f, drawn.single().third, 0.01f)
+        TurnedLabelSpan { -90f }.draw(recorder, "3:4", 0, 3, 10f, 0, 60, 80, Paint().apply { textSize = 40f })
+
+        assertEquals(listOf(-90f), recorder.drawn)
     }
 
     @Test
-    fun letters_eachTurn_andReadFromTheStart_atTheEdgeOfEachOrder() {
-        val width = Paint().apply { textSize = 40f }.measureText("공")
-        for ((degrees, order) in listOf(
-            0f to listOf(0, 1),
-            -90f to listOf(0, 1),
-            90f to listOf(1, 0),
-            180f to listOf(1, 0),
-        )) {
-            val drawn = drawn("공유", letters = true, degrees = degrees)
+    fun aTurningText_turnsEachTextItIsGiven_andKeepsItsWidth() {
+        val label = TurningLabel(context).apply { text = "1.0×" }
+        label.turn = 90f
 
-            assertEquals("$degrees", order, drawn.map { it.first })
-            assertEquals("$degrees", listOf(10f, 10f + width), drawn.map { it.second })
-            for (letter in drawn) assertEquals("$degrees", degrees, letter.third, 0.01f)
-        }
-    }
+        label.text = "2.0×"
 
-    @Test
-    fun theLettersOrder_changesPast45Clockwise_andAt135Counterclockwise() {
-        assertEquals(false, readsBackward(45f))
-        assertEquals(true, readsBackward(45.5f))
-        assertEquals(false, readsBackward(-134.5f))
-        assertEquals(true, readsBackward(-135f))
-        assertEquals(true, readsBackward(-270f))
-        assertEquals(false, readsBackward(270f))
-        assertEquals(false, readsBackward(-360f))
+        val text = label.text as Spanned
+        val span = text.getSpans(0, text.length, TurnedLabelSpan::class.java).single()
+        assertEquals(
+            label.paint.measureText("2.0×").roundToInt(),
+            span.getSize(label.paint, text, 0, text.length, null),
+        )
+        val recorder = Recorder()
+        span.draw(recorder, text, 0, text.length, 0f, 0, 20, 30, label.paint)
+        assertEquals(listOf(90f), recorder.drawn)
     }
 }

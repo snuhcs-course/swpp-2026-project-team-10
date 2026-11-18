@@ -283,12 +283,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
         viewModel.watchPhoneTurn(viewLifecycleOwner)
-        // The icons turn with the phone (FR-1.15), and so do the ratio, Share's letters, and Guide with its label; the
+        // The icons turn with the phone (FR-1.15), and so do the ratio, the zoom readout, and Guide with its label; the
         // other texts, the shutter, and the layout stay.
-        controls.aspectButton.labelTurn = LabelTurn.WHOLE
-        controls.shootTogetherButton.labelTurn = LabelTurn.LETTERS
+        controls.aspectButton.turnsLabel = true
         turningIcons = TurningIcons(
-            buttons = listOf(
+            controls = listOf(
                 controls.sceneBackButton,
                 controls.flashButton,
                 controls.aspectButton,
@@ -299,6 +298,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 controls.removeGuideButton,
                 controls.tipButton,
                 controls.editGuideButton,
+                controls.zoomReadout,
             ),
             views = listOf(controls.guideButton, controls.switchCameraIcon, controls.galleryThumbnail),
         )
@@ -414,7 +414,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         val connected = state as? SessionState.Connected
                         val live = connected != null || state is SessionState.Reconnecting
                         renderLiveDot(controls, connected)
-                        controls.endSessionButton.isVisible = live
+                        // The scene photo's top bar has only Back, the light, the ratio, its title, and Use.
+                        controls.endSessionButton.isVisible = live && !isScenePhotoActive()
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
                         // Settings stays in a session too (#204); only the scene photo hides it.
                         controls.settingsButton.isVisible = !isScenePhotoActive()
@@ -1134,8 +1135,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.sceneBackButton.isVisible = active
         controls.usePhotoButton.isVisible = reviewing
         val session = sessionViewModel.state.value
-        controls.shootTogetherButton.isVisible =
-            !active && session !is SessionState.Connected && session !is SessionState.Reconnecting
+        val live = session is SessionState.Connected || session is SessionState.Reconnecting
+        controls.shootTogetherButton.isVisible = !active && !live
+        // End session too leaves the scene photo's bar to its title and Use, and comes back after the step.
+        controls.endSessionButton.isVisible = !active && live
         controls.settingsButton.isVisible = !active
         // Guide and the thumbnail keep their place, so the shutter stays where it is. The camera is the situation's (FR-4.8):
         // the front one for a selfie, the rear one otherwise, so the switch waits too.

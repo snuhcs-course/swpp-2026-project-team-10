@@ -22,6 +22,7 @@ import com.lastpenguin.pix.ui.TestAppContainer
 import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -36,11 +37,11 @@ import org.robolectric.shadows.ShadowChoreographer
  * The Camera screen's icons turning with the phone (FR-1.15, #207, R&S 6.2, Design 2.6.2) on the Galaxy S22's app
  * area, 360 x 705 dp.
  * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees. What turns: the top bar's icons, the ratio
- * as a word, Share's icon and each of its letters, the guide's icon buttons, the tip's, the guide-edit toggle's, Guide
- * with its label, the camera switch's icon, and the gallery thumbnail. What stays: the zoom readout, the shutter, the
- * preview and what is drawn over it, the reference thumbnail, and every control's place and size. TalkBack still names
- * Share as Shoot together. A turn as the screen opens, at once; a later one, all together and smoothly; with the phone's
- * animations off, at once. A new icon, the flash's next one, keeps the turn.
+ * and the zoom readout as words, Shoot together's icon, the guide's icon buttons, the tip's, the guide-edit toggle's,
+ * Guide with its label, the camera switch's icon, and the gallery thumbnail. What stays: Shoot together's label, the
+ * shutter, the preview and what is drawn over it, the reference thumbnail, and every control's place and size. A turn
+ * as the screen opens, at once; a later one, all together and smoothly; with the phone's animations off, at once. A new
+ * icon, the flash's next one, keeps the turn.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -85,7 +86,9 @@ class CameraControlTurnTest {
         return FragmentCameraBinding.bind(fragment.requireView())
     }
 
-    private fun FragmentCameraBinding.turningButtons(): List<TurningButton> = listOf(
+    /** The controls that turn what they draw: the buttons' icons, the ratio, and the zoom readout. */
+    private fun FragmentCameraBinding.turningButtons(): List<View> = listOf(
+        zoomReadout,
         sceneBackButton,
         flashButton,
         aspectButton,
@@ -129,11 +132,11 @@ class CameraControlTurnTest {
     private fun TurningButton.drawnAt(): Float = (icon as RotateDrawable).level * 360f / 10_000f
 
     private fun FragmentCameraBinding.assertIconsAt(degrees: Float) {
-        for (button in turningButtons()) {
-            val name = resources().getResourceEntryName(button.id)
-            assertEquals(name, degrees, button.turn, 0f)
-            if (button.icon != null) {
-                assertEquals(name, Math.floorMod(degrees.toInt(), 360).toFloat(), button.drawnAt(), 0.05f)
+        for (control in turningButtons()) {
+            val name = resources().getResourceEntryName(control.id)
+            assertEquals(name, degrees, (control as Turnable).turn, 0f)
+            if (control is TurningButton && control.icon != null) {
+                assertEquals(name, Math.floorMod(degrees.toInt(), 360).toFloat(), control.drawnAt(), 0.05f)
             }
         }
         for (view in turningViews()) {
@@ -167,17 +170,15 @@ class CameraControlTurnTest {
     }
 
     @Test
-    fun theRatioTurnsAsAWord_andShareLetterByLetter_whileTalkBackStillSaysShootTogether() {
+    fun theRatioAndTheZoomReadout_turnAsWords_whileShootTogethersLabelStays() {
         val screen = camera()
 
-        assertEquals(LabelTurn.WHOLE, screen.aspectButton.labelTurn)
-        assertEquals(LabelTurn.LETTERS, screen.shootTogetherButton.labelTurn)
-        assertEquals(LabelTurn.NONE, screen.settingsButton.labelTurn)
-        assertEquals("Share", screen.shootTogetherButton.text.toString())
-        assertEquals("Shoot together", screen.shootTogetherButton.contentDescription)
-        for (button in listOf(screen.aspectButton, screen.shootTogetherButton)) {
-            val text = button.text as Spanned
-            assertEquals(1, text.getSpans(0, text.length, TurnedLabelSpan::class.java).size)
+        assertTrue(screen.aspectButton.turnsLabel)
+        assertFalse(screen.shootTogetherButton.turnsLabel)
+        assertEquals("Shoot together", screen.shootTogetherButton.text.toString())
+        assertFalse(screen.shootTogetherButton.text is Spanned)
+        for (text in listOf(screen.aspectButton.text, screen.zoomReadout.text)) {
+            assertEquals(1, (text as Spanned).getSpans(0, text.length, TurnedLabelSpan::class.java).size)
         }
     }
 
@@ -199,7 +200,7 @@ class CameraControlTurnTest {
 
         val halfway = screen.galleryThumbnail.rotation
         assertTrue("$halfway", halfway > -90f && halfway < 0f)
-        for (button in screen.turningButtons()) assertEquals(halfway, button.turn, 0f)
+        for (control in screen.turningButtons()) assertEquals(halfway, (control as Turnable).turn, 0f)
         for (view in screen.turningViews()) assertEquals(halfway, view.rotation, 0f)
         play(Motion.TURN_MS)
         screen.assertIconsAt(-90f)

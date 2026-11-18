@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
@@ -181,6 +182,8 @@ class SubjectViewModel(
     private val tips: TipSyncer? = null,
     /** The session's photos in this phone's album (`PhotoSyncer.sessionPhotos`, FR-6.14); null outside a session. */
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
+    /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
+    private val deleter: PhotoDeleter = PhotoDeleter { false },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubjectUiState())
@@ -190,6 +193,11 @@ class SubjectViewModel(
 
     /** One notice per *Save guide* tap, as on the Camera screen; kept until the screen reads it. */
     val guideSaveNotices: Flow<GuideSaveNotice> = _guideSaveNotices.receiveAsFlow()
+
+    private val _photoNotDeleted = Channel<Unit>(Channel.BUFFERED)
+
+    /** One per photo the viewer could not delete, for its notice; kept until the screen reads it. */
+    val photoNotDeleted: Flow<Unit> = _photoNotDeleted.receiveAsFlow()
 
     private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
 
@@ -463,6 +471,16 @@ class SubjectViewModel(
     /** The viewer's Back, or the system's, closes it; the video is there as it was. */
     fun closePhotos() {
         _uiState.update { it.copy(photosOpen = false) }
+    }
+
+    /**
+     * The viewer's Delete, once asked (FR-6.14): the deleter drops the photo from the session's photos, and so from
+     * the viewer and the thumbnail, or it stays, and [photoNotDeleted] says so.
+     */
+    fun deletePhoto(uri: Uri) {
+        viewModelScope.launch {
+            if (!deleter.delete(uri)) _photoNotDeleted.trySend(Unit)
+        }
     }
 
     /** A tap on the reference thumbnail enlarges it or makes it small again (FR-3.9). A hidden one stays small. */

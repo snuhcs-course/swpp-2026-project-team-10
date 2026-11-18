@@ -17,7 +17,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -25,16 +25,18 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 
 /*
- * The newest photo in Pix's album (FR-1.6, Design 2.6.5; Iter4-A2), through a small provider in place of MediaStore.
- * The query (state-based): Pix's own album, published photos only, newest first; the first row is the newest, and an
- * empty album has none.
- * Changes (state-based): a change anywhere in MediaStore reads it again, so a new photo is the newest and a deleted
- * newest gives the one before, or none.
+ * The photos in Pix's album (FR-1.6, Design 2.6.5), through a small provider in place of MediaStore.
+ * The query (state-based): Pix's own album, published photos only, asked newest first and kept oldest first, so the
+ * newest is the last; an empty album has none.
+ * Changes (state-based): a change anywhere in MediaStore reads it again, so a new photo joins at the end and a deleted
+ * one leaves, the newest too.
  * Failures (fault injection): a query that throws gives none, not a crash, and the next change reads again.
+ * Delete (state-based, fault injection): the photo's row goes from MediaStore, which then tells of the change; a photo
+ * already gone counts as deleted; one MediaStore refuses is not, with no crash.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalCoroutinesApi::class)
-class NewestAlbumPhotoTest {
+class PixAlbumPhotosTest {
 
     /** Answers each query with [rows], the ids as MediaStore would sort them, and records what was asked. */
     class FakeMediaStore : ContentProvider() {
@@ -42,7 +44,9 @@ class NewestAlbumPhotoTest {
 
         var rows: List<Long> = emptyList()
         var fails = false
+        var refusesDelete = false
         val queries = mutableListOf<Query>()
+        val deleted = mutableListOf<Uri>()
 
         override fun onCreate() = true
 
@@ -62,7 +66,14 @@ class NewestAlbumPhotoTest {
 
         override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?) = 0
 
-        override fun delete(uri: Uri, selection: String?, args: Array<out String>?) = 0
+        override fun delete(uri: Uri, selection: String?, args: Array<out String>?): Int {
+            if (refusesDelete) throw SecurityException("Another app's photo")
+            val id = uri.lastPathSegment!!.toLong()
+            if (id !in rows) return 0
+            deleted += uri
+            rows = rows - id
+            return 1
+        }
 
         override fun getType(uri: Uri): String? = null
     }
@@ -75,8 +86,8 @@ class NewestAlbumPhotoTest {
         store = Robolectric.setupContentProvider(FakeMediaStore::class.java, MediaStore.AUTHORITY)
     }
 
-    private fun TestScope.album(): NewestAlbumPhoto {
-        val album = NewestAlbumPhoto(resolver, backgroundScope, StandardTestDispatcher(testScheduler))
+    private fun TestScope.album(): PixAlbumPhotos {
+        val album = PixAlbumPhotos(resolver, backgroundScope, StandardTestDispatcher(testScheduler))
         runCurrent()
         return album
     }
@@ -90,12 +101,12 @@ class NewestAlbumPhotoTest {
     }
 
     @Test
-    fun `the newest is the first published photo of Pix's album, newest first`() = runTest {
-        store.rows = listOf(12, 11)
+    fun `the photos are Pix's published ones, oldest first, the newest last`() = runTest {
+        store.rows = listOf(12, 11, 10)
 
         val album = album()
 
-        assertEquals(photo(12), album.newest.value)
+        assertEquals(listOf(photo(10), photo(11), photo(12)), album.photos.value)
         val query = store.queries.last()
         assertEquals(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, query.uri)
         assertTrue(query.selection, query.selection!!.contains(MediaStore.Images.Media.RELATIVE_PATH))
@@ -107,37 +118,67 @@ class NewestAlbumPhotoTest {
 
     @Test
     fun `an empty album has none`() = runTest {
-        assertNull(album().newest.value)
+        assertEquals(emptyList<Uri>(), album().photos.value)
     }
 
     @Test
-    fun `a change reads the album again, for a new photo and for the newest deleted`() = runTest {
-        store.rows = listOf(11)
+    fun `a change reads the album again, for a new photo and for one deleted`() = runTest {
+        store.rows = listOf(11, 10)
         val album = album()
 
-        store.rows = listOf(12, 11)
+        store.rows = listOf(12, 11, 10)
         changed(12)
-        assertEquals(photo(12), album.newest.value)
+        assertEquals(listOf(photo(10), photo(11), photo(12)), album.photos.value)
 
-        store.rows = listOf(11)
-        changed(12)
-        assertEquals(photo(11), album.newest.value)
+        store.rows = listOf(12, 10)
+        changed(11)
+        assertEquals(listOf(photo(10), photo(12)), album.photos.value)
 
         store.rows = emptyList()
-        changed(11)
-        assertNull(album.newest.value)
+        changed(10)
+        assertEquals(emptyList<Uri>(), album.photos.value)
     }
 
     @Test
     fun `a query that fails gives none, and the next change reads again`() = runTest {
         store.fails = true
         val album = album()
-        assertNull(album.newest.value)
+        assertEquals(emptyList<Uri>(), album.photos.value)
 
         store.fails = false
         store.rows = listOf(11)
         changed(11)
 
-        assertEquals(photo(11), album.newest.value)
+        assertEquals(listOf(photo(11)), album.photos.value)
+    }
+
+    @Test
+    fun `a photo deleted goes from MediaStore, and the album loses it at the change MediaStore tells of`() = runTest {
+        store.rows = listOf(11, 10)
+        val album = album()
+
+        assertTrue(album.delete(photo(11)))
+        assertEquals(listOf(photo(11)), store.deleted)
+        changed(11)
+
+        assertEquals(listOf(photo(10)), album.photos.value)
+    }
+
+    @Test
+    fun `a photo already gone counts as deleted`() = runTest {
+        store.rows = listOf(10)
+        val album = album()
+
+        assertTrue(album.delete(photo(11)))
+    }
+
+    @Test
+    fun `a delete that MediaStore refuses is not done, and does not crash`() = runTest {
+        store.rows = listOf(10)
+        val album = album()
+        store.refusesDelete = true
+
+        assertFalse(album.delete(photo(10)))
+        assertEquals(listOf(photo(10)), album.photos.value)
     }
 }

@@ -34,6 +34,15 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Jaewan, 11-18] "fix issue #234"
 - [Jaewan, 11-18] "yes"
 
+## Pix's photos in Pix's own viewer, as in a gallery app ([#247])
+
+- [Jaewan, 11-18] "when not in the session, can we only view the latest image from the album? can't scroll through all images?"
+- [Jaewan, 11-18] "i'm on samsung galaxy but it doesn't scroll, we can only see that specific photo only. also it doesn't the app, it just opens inside pix, though the ui just looks like the gallery app not pix's own. can you check for this?"
+- [Jaewan, 11-18] "yes i want scrolling. can you do this fix in a new branch?"
+- [Jaewan, 11-18] "can we make this pix in-app viewer more like a normal gallery app? for example small thumbnails at the bottom"
+- [Jaewan, 11-18] "add all. and i think we don't need the (7/12) counter?"
+
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
 [#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
+[#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247

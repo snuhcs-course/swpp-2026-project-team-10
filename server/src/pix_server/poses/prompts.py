@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-14, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 """The prompts for the image, suggestion, and tip models, the description filter's and the person check's questions, and
 the default poses, read from prompts.toml (Design Documentation 2.6.3)."""
 
@@ -22,6 +22,35 @@ PERSON_QUESTION = "person"
 # file, and each other one a [situations.<name>] table.
 Situation = Literal["default", "background", "half_body", "full_body", "landmark", "selfie"]
 SITUATIONS: tuple[Situation, ...] = get_args(Situation)
+# The languages a tip is written in, and the names of the sentences and words it is written with (prompts.toml,
+# [tip_words]): the move closer, by walking or with the zoom, or farther back, each also as a big one; nothing to
+# change, and the guide's outline to match; where the phone is held, its tilt, and the sentence that joins them; the
+# side of the frame, the room above the head, and a leaning line.
+TIP_LANGUAGES = ("en", "ko")
+TIP_WORDS = (
+    "closer",
+    "closer_much",
+    "zoom",
+    "zoom_much",
+    "back",
+    "back_much",
+    "stay",
+    "guide",
+    "crouching",
+    "waist",
+    "chest",
+    "eye",
+    "above_head",
+    "up",
+    "level",
+    "down",
+    "phone",
+    "left",
+    "right",
+    "room_none",
+    "room_plenty",
+    "upright",
+)
 # Double quotation marks, typographic and full-width ones included. In a prompt each becomes a single one, so the user's
 # words cannot close the quotation marks they are placed in.
 QUOTES = str.maketrans(dict.fromkeys('"“”„‟″＂«»', "'"))
@@ -51,9 +80,12 @@ class Prompts:
     pose: str
     suggestion: str
     variation: str
+    # Asked of the scene and of the candidate, each by itself.
     tip: str
-    # Added after `tip` for a phone whose screens are in Korean (FR-10.2).
-    tip_korean: str
+    # Added after `tip` for the candidate, whose pose comes with it.
+    tip_candidate: str
+    # The sentences and words a tip is written with, by the language of the screens: {language: {TIP_WORDS name: text}}.
+    tip_words: dict[str, dict[str, str]]
     default_poses: dict[str, DefaultPose]
     # Every situation, `default` included, which holds the prompts above and the default poses' `pose`.
     situations: dict[Situation, SituationPrompts]
@@ -90,7 +122,8 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         "suggestion_prompt",
         "variation_prompt",
         "tip_prompt",
-        "tip_korean",
+        "tip_candidate",
+        "tip_words",
         "default_poses",
         "situations",
         "filter",
@@ -102,7 +135,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
     suggestion = text(data, "suggestion_prompt", "")
     variation = with_placeholder(data, "variation_prompt", "", DESCRIPTION_PLACEHOLDER)
     tip = text(data, "tip_prompt", "")
-    tip_korean = text(data, "tip_korean", "")
+    tip_candidate = text(data, "tip_candidate", "")
     entries = data.get("default_poses")
     if not isinstance(entries, list) or len(entries) != POSE_COUNT:
         raise ValueError(f"{path.name}: exactly {POSE_COUNT} [[default_poses]] are needed")
@@ -124,7 +157,41 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
     situations |= load_situations(data.get("situations"), path)
     filter_questions = load_filter(data.get("filter"), path)
     person = load_person(data.get("person"), path)
-    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, situations, filter_questions, person)
+    tip_words = load_tip_words(data.get("tip_words"), path)
+    return Prompts(
+        pose,
+        suggestion,
+        variation,
+        tip,
+        tip_candidate,
+        tip_words,
+        poses,
+        situations,
+        filter_questions,
+        person,
+    )
+
+
+def load_tip_words(table: object, path: Path) -> dict[str, dict[str, str]]:
+    """The [tip_words] table of the prompts file: for each of TIP_LANGUAGES every name of TIP_WORDS, a phrase on one
+    line, and `phone` with {hold} and {tilt} once each. Raises ValueError like load_prompts."""
+    if not isinstance(table, dict) or set(table) != set(TIP_LANGUAGES):
+        raise ValueError(f"{path.name}: [tip_words] needs a table for each of {', '.join(TIP_LANGUAGES)} and no other")
+    words: dict[str, dict[str, str]] = {}
+    for language in TIP_LANGUAGES:
+        entries = table[language]
+        if not isinstance(entries, dict) or set(entries) != set(TIP_WORDS):
+            raise ValueError(f"{path.name}: tip_words.{language} needs exactly {', '.join(TIP_WORDS)}")
+        phrases: dict[str, str] = {}
+        for name in TIP_WORDS:
+            value = entries[name]
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{path.name}: tip_words.{language}.{name} must be a non-empty string")
+            phrases[name] = one_line(value)
+        if phrases["phone"].count("{hold}") != 1 or phrases["phone"].count("{tilt}") != 1:
+            raise ValueError(f"{path.name}: tip_words.{language}.phone must hold {{hold}} and {{tilt}} exactly once")
+        words[language] = phrases
+    return words
 
 
 def load_situations(table: object, path: Path) -> dict[Situation, SituationPrompts]:

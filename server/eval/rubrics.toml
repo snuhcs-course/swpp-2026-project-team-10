@@ -100,21 +100,45 @@ pose different. Fail when any two of the four would give nearly the same photo, 
 
 [tip]
 intro = """
-Photo 1 is the scene as the photographer took it from where they stand. Photo 2 is the photo they now want: the same
-person in a new pose, made by an AI that may have framed the person more tightly or moved the camera a little. Pix
-showed the photographer the tip below, which tells them how to hold the phone to take photo 2. The person's pose
-itself is shown elsewhere in the app, so the tip is only about the phone.
+Photo 1 is the scene as the photographer took it from where they stand. Photo 2 is the photo they now want to take for
+real: the same person in a new pose, made from photo 1 by an AI that may have framed the person more tightly or moved
+the camera a little. Pix showed the photographer the tip below, which helps them take photo 2 from where they took
+photo 1. The tip is a few sentences, one on a line, and says only what is not as usual: a move closer, by walking or
+with the zoom, or farther back; how to hold the phone, when it is not simply held level at the chest or the eyes, or
+when photo 1 was taken far from that hold; the side of the frame to put the person on, and the room to leave above
+their head, when these are not the middle and a little room; to hold the phone upright. Where Pix cannot tell how far
+to move, the tip says to move until the person fits the guide's outline. A tip with nothing of these to say is one
+sentence, to take the photo as it is. The person's pose itself is shown elsewhere in the app. What the tip does not
+say is not judged: judge only what it says, and pass a rule the tip says nothing about.
 """
 
-matches_pose = """
-Matches its pose: the tip suits photo 2's shot and pose by these photographers' rules, which are what Pix promises:
-- distance: "closer" (zoom in or step closer) only when photo 2 shows less of the body or a clearly bigger person than
-  photo 1, "back" only when it shows clearly more, and nothing about distance when the framing is about the same;
-- a person sitting or crouching: crouch, so the phone is at their eye level, and keep it level;
-- otherwise, a full body standing, walking, or leaning: the phone at the photographer's waist, tilted up a little;
-  knee-up or waist-up: at the chest, level; chest-up: at eye level, tilted down a little;
-- but when photo 2 is clearly taken from below or from above, a tip that keeps that look also passes.
-Fail when the distance, the height, or the angle the tip asks for contradicts photo 2, or when the tip tells the
-person how to pose instead of the photographer how to hold the phone. A tip that leaves out a part (for example the
-reason) is judged only on what it says.
+distance = """
+Distance: the tip says to move closer or to zoom in only when the person is clearly bigger in photo 2 than in photo 1
+(photo 2 shows less of the body, or as much of it with a clearly taller person; walking closer and zooming in are
+judged alike), to step back only when the person is clearly smaller, and to take the photo "from where you are, as it
+is" only when the person is about as big. Compare by eye how big the person is in the two photos. "Much closer", "a
+lot", or "much" needs a person about one and a half times as big or more, or as much smaller; fail it for a small
+change. Fail when the direction is wrong, or when the tip says to take the photo as it is for a person who is clearly
+bigger or clearly smaller. A tip that names no move, or says to fit the person to the guide's outline, passes.
 """
+
+phone = """
+Phone: the height and the tilt suit how photo 2 is taken. Pass when photo 2 could have been taken from that height
+with that tilt. The height is hard to read from a photo, so the next height up or down also passes (waist for chest,
+chest for eye level). Fail when the tip contradicts photo 2: a low phone or an upward tilt for a photo that looks
+down on the person, a high phone or a downward tilt for one that looks up at them, or crouching for a photo clearly
+taken standing.
+"""
+
+frame = """
+Frame: when the tip names a side of the frame for the person, the person is clearly on that side in photo 2, not in
+the middle or on the other side. When it says to leave almost no room above the head, the head reaches or nearly
+reaches the top edge of photo 2; when it says to leave plenty of room, photo 2 has a wide space above the head, about
+a quarter of its height or more. Fail when photo 2 clearly shows otherwise.
+"""
+
+rest = """
+The rest: the tip says to hold the phone upright only when a horizon or another long level line clearly leans in photo
+1; fail it when no such line leans.
+"""
+

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -210,6 +210,91 @@ class CameraViewModelTest {
         assertEquals(listOf(older, newer), share.shared.map { it.second })
         assertEquals(newer, sharing.uiState.value.lastPhoto)
         assertFalse(sharing.uiState.value.isSaving)
+    }
+
+    // Camera's thumbnail (FR-1.6; Iter4-A2): outside a session the newest in Pix's album, taken here or received, and a
+    // photo taken here at once; in a session only the session's newest, none until its first; after it, the album's
+    // newest again. The session's photos open only in a session with photos, and close with the session.
+    private fun photo(id: Int): Uri = Uri.parse("content://media/external/images/media/$id")
+
+    @Test
+    fun lastPhoto_outsideASession_isTheAlbumsNewest_orThePhotoJustTaken() = runTest {
+        val album = MutableStateFlow<Uri?>(photo(10))
+        val shooting = CameraViewModel(camera, guides, albumPhoto = album)
+        runCurrent()
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(11)))
+        runCurrent()
+        assertEquals(photo(11), shooting.uiState.value.lastPhoto)
+
+        // One received in a session, then the newest deleted in the gallery, then all of them.
+        album.value = photo(12)
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+        album.value = photo(10)
+        runCurrent()
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+        album.value = null
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun lastPhoto_inASession_isOnlyTheSessionsNewest_noneUntilItsFirst_andTheAlbumsAfterIt() = runTest {
+        val album = MutableStateFlow<Uri?>(photo(10))
+        val session = MutableStateFlow<List<Uri>?>(null)
+        val shooting = CameraViewModel(camera, guides, albumPhoto = album, sessionPhotos = session)
+        runCurrent()
+
+        session.value = emptyList()
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+        assertEquals(emptyList<Uri>(), shooting.uiState.value.sessionPhotos)
+
+        // A photo saved here that is not the session's, such as one pressed before it started, stays out of it.
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(11)))
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+
+        session.value = listOf(photo(12))
+        album.value = photo(12)
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+
+        session.value = null
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+        assertNull(shooting.uiState.value.sessionPhotos)
+    }
+
+    @Test
+    fun sessionPhotos_openOnlyInASessionWithPhotos_andCloseWithTheSession() = runTest {
+        val session = MutableStateFlow<List<Uri>?>(null)
+        val shooting = CameraViewModel(camera, guides, sessionPhotos = session)
+        runCurrent()
+        shooting.openSessionPhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+        session.value = emptyList()
+        runCurrent()
+        shooting.openSessionPhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        session.value = listOf(photo(11))
+        runCurrent()
+        shooting.openSessionPhotos()
+        assertTrue(shooting.uiState.value.photosOpen)
+        shooting.closeSessionPhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        shooting.openSessionPhotos()
+        session.value = null
+        runCurrent()
+        assertFalse(shooting.uiState.value.photosOpen)
     }
 
     @Test

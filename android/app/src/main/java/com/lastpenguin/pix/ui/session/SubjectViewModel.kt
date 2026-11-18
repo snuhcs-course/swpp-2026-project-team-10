@@ -1,7 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -138,7 +140,15 @@ data class SubjectUiState(
     val describeId: String? = null,
     /** The photographer's tip of the guide on the video (FR-4.10, #213); null while that guide has none. */
     val tip: SubjectTip? = null,
+    /** The session's photos in this phone's album (FR-6.14), oldest first; the newest is the thumbnail. */
+    val photos: List<Uri> = emptyList(),
+    /** The viewer of [photos] is open over the video (FR-6.14). */
+    val photosOpen: Boolean = false,
 ) {
+    /** The thumbnail's photo, none until the session's first. */
+    val lastPhoto: Uri?
+        get() = photos.lastOrNull()
+
     val canZoom: Boolean
         get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
 
@@ -154,7 +164,8 @@ data class SubjectUiState(
  * at most every [SEND_INTERVAL_MS] and the final value right away ([StepSender]), and the photographer's echo in
  * `camera.state` or `guide.state` decides what stays once the gesture is over (Design 2.6.5). The guide on the video
  * can be saved on this phone, and the photographer's Generate poses ([descriptions]), set of candidates ([poses]),
- * and Reference confirm ([confirms]) show here while they are open.
+ * and Reference confirm ([confirms]) show here while they are open. The session's newest photo ([sessionPhotos]) is a
+ * thumbnail that opens the session's photos in a viewer over the video (FR-6.14).
  * Owner: Real-time (#8 live view, #10 remote zoom, #57 remote controls), with the guide from #9; *Save guide*, the
  * photographer's candidates, and their Reference confirm Iter3-P16.
  */
@@ -168,6 +179,8 @@ class SubjectViewModel(
     private val confirms: ConfirmSyncer? = null,
     private val descriptions: DescriptionSyncer? = null,
     private val tips: TipSyncer? = null,
+    /** The session's photos in this phone's album (`PhotoSyncer.sessionPhotos`, FR-6.14); null outside a session. */
+    private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubjectUiState())
@@ -221,6 +234,14 @@ class SubjectViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            sessionPhotos.collect { photos ->
+                // The viewer goes with the session's photos, which end with it.
+                _uiState.update {
+                    it.copy(photos = photos.orEmpty(), photosOpen = it.photosOpen && !photos.isNullOrEmpty())
+                }
+            }
+        }
         // The photographer may have echoed a state before this screen existed; later echoes come through incoming.
         session.peerCamera.value?.let { camera ->
             _uiState.update { it.copy(zoom = camera.zoom, exposure = camera.exposure, flash = camera.flash) }
@@ -432,6 +453,16 @@ class SubjectViewModel(
         if (describeOpenedFor == describeId) return false
         describeOpenedFor = describeId
         return true
+    }
+
+    /** A tap on the thumbnail opens the session's photos over the video, at the newest (FR-6.14). */
+    fun openPhotos() {
+        _uiState.update { it.copy(photosOpen = it.photos.isNotEmpty()) }
+    }
+
+    /** The viewer's Back, or the system's, closes it; the video is there as it was. */
+    fun closePhotos() {
+        _uiState.update { it.copy(photosOpen = false) }
     }
 
     /** A tap on the reference thumbnail enlarges it or makes it small again (FR-3.9). A hidden one stays small. */

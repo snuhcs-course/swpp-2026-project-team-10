@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -221,7 +221,8 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.SUBJECT_VIEW to TutorialTips(
         title = R.string.tutorial_friend_title,
         tips = listOf(
-            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.START, locate = control(R.id.guideButtonIcon)),
+            // Guide is at the left, as on Camera, so its caption takes the empty middle.
+            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.END, locate = control(R.id.guideButtonIcon)),
             TutorialTip(R.string.tutorial_friend_zoom, CaptionSide.ABOVE, locate = control(R.id.zoomReadout)),
             TutorialTip(
                 R.string.tutorial_friend_brightness,

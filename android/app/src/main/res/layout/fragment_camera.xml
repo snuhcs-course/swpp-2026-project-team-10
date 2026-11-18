@@ -953,4 +953,17 @@
             android:textAppearance="@style/TextAppearance.Pix.Body.Small"
             tools:text="@string/scene_review_body" />
     </FrameLayout>
+
+    <!-- In a session, the session's photos (FR-1.6, R&S 6.5), over the whole screen and the camera, which goes on.
+         Built in this empty holder when it first opens, so a screen that never opens it builds no pager. -->
+    <FrameLayout
+        android:id="@+id/photoViewerHolder"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:outlineProvider="none"
+        android:translationZ="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 </com.lastpenguin.pix.ui.camera.TouchWatchingLayout>

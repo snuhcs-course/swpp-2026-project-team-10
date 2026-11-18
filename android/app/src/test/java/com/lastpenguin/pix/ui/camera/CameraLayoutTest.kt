@@ -12,9 +12,11 @@ import android.graphics.text.LineBreaker
 import android.os.Looper
 import android.os.SystemClock
 import android.text.Spanned
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +36,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.databinding.ViewPhotoViewerBinding
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideSource
@@ -85,7 +88,11 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * ratio's area as the camera rebinds (Iter3-A12; until then it kept its place and the old ratio's area until the new
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
  * The zoom readout's tap
- * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
+ * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
+ * its session photo's thumbnail (Iter4-A2) on Guide's icon line, shown before any photo, Guide where Camera's is and
+ * the thumbnail as far from the right edge, and the button beside it where Camera's shutter is, clear of both, with each of its labels at
+ * font scale 1 and 1.3. The session photos' viewer over the whole screen,
+ * on Subject view and on Camera.
  * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
  * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
  * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
@@ -780,8 +787,9 @@ class CameraLayoutTest {
 
     // ---- Subject view -----------------------------------------------------------------------
 
-    @Test
-    fun subjectView_placesTheVideoLikeTheCamera_withTheZoomRowAboveTheCaption() {
+    /** Subject view connected to a photographer framing in 16:9, with their video streaming. */
+    private fun subjectView(fontScale: Float = 1f): FragmentSubjectBinding {
+        if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
         val modules = TestAppContainer().install()
         val activity = activity()
         val fragment = SubjectFragment()
@@ -800,7 +808,12 @@ class CameraLayoutTest {
             ),
         )
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
-        val binding = FragmentSubjectBinding.bind(fragment.requireView())
+        return FragmentSubjectBinding.bind(fragment.requireView())
+    }
+
+    @Test
+    fun subjectView_placesTheVideoLikeTheCamera_withTheZoomRowAboveTheCaption() {
+        val binding = subjectView()
 
         val video = binding.videoContainer.box()
         assertEquals(binding.topBar.box().bottom - TOP_BAR_OVERHANG_DP.toInt(), video.top)
@@ -812,9 +825,93 @@ class CameraLayoutTest {
         binding.editGuideButton.visibility = View.VISIBLE
         binding.brightnessButton.visibility = View.VISIBLE
         binding.brightnessPanel.visibility = View.VISIBLE
+        binding.galleryButton.visibility = View.VISIBLE
         idle()
         assertEveryControlAtLeast48(binding.root, "Subject view")
     }
+
+    private fun assertThumbnailBesideGuide(fontScale: Float) {
+        val camera = camera(fontScale).controls
+        val camerasGuide = camera.guideButtonIcon.box()
+        val shutter = camera.shutterButton.box()
+        val binding = subjectView(fontScale)
+        // Shown from the start, empty until the session's first photo (FR-6.14).
+        assertTrue("the thumbnail shows before any photo", binding.galleryButton.isShown)
+        // Guide where Camera's is, at its size, within a pixel's rounding (R&S 6.6).
+        val guideIcon = binding.guideButtonIcon.box()
+        assertTrue(
+            "$guideIcon where Camera's is, $camerasGuide",
+            abs(guideIcon.centerX() - camerasGuide.centerX()) <= 1,
+        )
+        assertEquals(camerasGuide.centerY(), guideIcon.centerY())
+        assertEquals(camerasGuide.width(), guideIcon.width())
+        binding.pickPoseButton.visibility = View.VISIBLE
+        val labels = listOf(
+            R.string.pick_pose_title,
+            R.string.generating_title,
+            R.string.describe_title,
+            R.string.pose_guide_title,
+        )
+        for (label in labels) {
+            binding.pickPoseLabel.setText(label)
+            idle()
+            val thumbnail = binding.galleryButton.box()
+            val guide = binding.guideButton.box()
+            val pick = binding.pickPoseButton.box()
+            val text = binding.pickPoseLabel.text
+            assertEquals("$text: on Guide's icon line", binding.guideButtonIcon.box().centerY(), thumbnail.centerY())
+            // Pick a pose in the shutter's place, clear of Guide and of the thumbnail.
+            assertTrue(
+                "$text: $pick centered where the shutter is, $shutter",
+                abs(pick.centerX() - shutter.centerX()) <= 1,
+            )
+            assertTrue("$text: $guide clear of $pick", guide.right <= pick.left)
+            assertTrue("$text: $pick clear of $thumbnail", pick.right <= thumbnail.left)
+            // As far from the right edge as Guide is from the left: the right third's middle, as on Camera.
+            assertTrue(
+                "$text: $thumbnail mirrors $guideIcon",
+                abs((360 - thumbnail.centerX()) - guideIcon.centerX()) <= 1,
+            )
+            assertTrue("$text: $thumbnail inside the screen", thumbnail.right <= 360 && thumbnail.bottom <= 705)
+        }
+    }
+
+    @Test
+    fun subjectView_theBottomRow_isCamerasRow_guideAtTheLeft_theThumbnailAtTheRight_pickAPoseInTheMiddle() =
+        assertThumbnailBesideGuide(fontScale = 1f)
+
+    @Test
+    fun subjectView_theBottomRow_isCamerasRow_atFontScale1_3() =
+        assertThumbnailBesideGuide(fontScale = 1.3f)
+
+    /**
+     * The session photos' viewer, shown: over the whole screen, Back at the top left, and the photo from under the header
+     * to 12 dp over the counter, 24 dp over the bottom, in place while the counter is not shown yet.
+     */
+    private fun assertViewerCoversTheScreen(holder: FrameLayout) {
+        val viewer = ViewPhotoViewerBinding.inflate(LayoutInflater.from(holder.context), holder, true)
+        viewer.root.visibility = View.VISIBLE
+        idle()
+
+        assertEquals(Rect(0, 0, 360, 705), viewer.root.box())
+        val back = viewer.photoViewerBack.box()
+        assertTrue("$back at the top left", back.left <= 8 && back.top <= 16)
+        assertTrue("$back takes taps on 48 dp", back.width() >= 48 && back.height() >= 48)
+        val pages = viewer.photoViewerPages.box()
+        val counter = viewer.photoViewerCounter.box()
+        assertTrue("$pages under the header", pages.top >= viewer.photoViewerHeader.box().bottom)
+        assertEquals(View.INVISIBLE, viewer.photoViewerCounter.visibility)
+        assertEquals(counter.top - 12, pages.bottom)
+        assertEquals(705 - 24, counter.bottom)
+    }
+
+    @Test
+    fun subjectView_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() =
+        assertViewerCoversTheScreen(subjectView().photoViewerHolder)
+
+    @Test
+    fun camera_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() =
+        assertViewerCoversTheScreen(camera().controls.photoViewerHolder)
 
     /** Subject view in a session, with a guide on the video and the photographer's tip of it, its banner closed. */
     private fun subjectWithTip(fontScale: Float = 1f): FragmentSubjectBinding {

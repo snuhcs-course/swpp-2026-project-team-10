@@ -93,7 +93,8 @@
 | 3.13 | 2026-11-16 | The scene photo step (Iter4-P21, [#231]): Camera's own top bar with the ratio, the preview in one place, a small see-through panel that a touch takes away (`GenerationUiState.sceneHint`), and no slide of the preview (2.6.3). |
 | 3.14 | 2026-11-18 | Better pose tips (Iter4-P16, [#213]): the model describes each photo in its own request, the server derives the distance from two measures and writes the tip's sentences, and `guide.tip` sends the tip to the subject's phone (2.1, 2.2, 2.5.1, 2.5.3, 2.6.3, Figures 7 and 8). |
 | 3.15 | 2026-11-18 | The reference thumbnail hides at the side (Iter4-A4, [#237]): `dropReference`, a strip of the small thumbnail under a touch-target handle, `referenceHidden` on each phone, and its changes animated by `showReference` (2.6.2, 2.9). |
-| 3.16 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): `PhoneTurns` with its dead band, each photo saved as held, the scene photo turned upright for 4:3 and 16:9 candidates, and a pose's guide turned back into the frame (2.6.2, 2.6.3, 2.8). |
+| 3.16 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): the thumbnail from the session's photos and a viewer inside Pix on *Subject view* and on the photographer's Camera, and outside a session the album's newest photo (`NewestAlbumPhoto`); *Subject view*'s bottom row as Camera's (2.6.5, Figures 6 and 7). |
+| 3.17 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): `PhoneTurns` with its dead band, each photo saved as held, the scene photo turned upright for 4:3 and 16:9 candidates, and a pose's guide turned back into the frame (2.6.2, 2.6.3, 2.8). |
 
 </details>
 
@@ -362,7 +363,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               flow share one activity-scoped ViewModel; PixViewModels builds every ViewModel from the AppContainer;
 │               ScreenTransitions (PixNavHostFragment, ScreenNavigator, ScreenMotion) and Motion
 ├─ camera/      CameraController*, CameraXController, CameraSettings (aspect ratio in DataStore), PhotoSaver (PhotoAlbum),
-│               CameraZoom, CameraZoomPlan, CameraFrameCache
+│               NewestAlbumPhoto, CameraZoom, CameraZoomPlan, CameraFrameCache
 ├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore*, GuideLook* (GuideColor,
 │               GuideThickness, GuideOutlines), InMemoryGuideRepository, MlKitReferenceGuideMaker, FileSavedGuideStore,
 │               GuideGeometry, SubjectSegmenter, MaskSmoothing (functions), OutlineExtractor, MaskPng,
@@ -619,6 +620,8 @@ classDiagram
     +onTipButton()
     +onSaveGuide()
     +onRemoveGuide()
+    +openSessionPhotos()
+    +closeSessionPhotos()
   }
   class ReferenceViewModel {
     +uiState StateFlow~ReferenceUiState~
@@ -669,6 +672,9 @@ classDiagram
   class PhotoSaver {
     +outputOptions(mirrored) OutputFileOptions
     +save(file, photoId, takenAt) Result~Uri~
+  }
+  class NewestAlbumPhoto {
+    +newest StateFlow~Uri~
   }
   class CameraSettings {
     <<interface>>
@@ -734,6 +740,7 @@ classDiagram
   CameraViewModel --> SavedGuideStore
   CameraXController ..|> CameraController
   CameraXController --> PhotoSaver
+  CameraViewModel --> NewestAlbumPhoto : the thumbnail outside a session
   MlKitReferenceGuideMaker ..|> ReferenceGuideMaker
   MlKitReferenceGuideMaker --> ScreenshotPhoto : cut a screenshot first
   ScreenshotPhoto --> SharedPostCard : a post shared in a story
@@ -874,6 +881,7 @@ classDiagram
     +sendFailed Flow~Unit~
     +received Flow~Boolean~
     +shutters Flow~Unit~
+    +sessionPhotos Flow~List~
     +startAsSender(scope)
     +startAsReceiver(scope)
     +drop() Int
@@ -919,6 +927,8 @@ classDiagram
     +setReferenceCorner(corner)
     +onSaveGuide()
     +claimSetOpening(setId) Boolean
+    +openPhotos()
+    +closePhotos()
   }
   class SubjectDescribeViewModel {
     +usedBefore StateFlow
@@ -979,6 +989,8 @@ classDiagram
   PhotoSyncer --> SessionManager
   PhotoSyncer --> PhotoAlbum : the subject's Pix album
   CameraViewModel --> PhotoShare : each photo taken in a session
+  CameraViewModel --> PhotoSyncer : the session's photos
+  SubjectViewModel --> PhotoSyncer : the session's photos
 ```
 
 *Figure 7. Session, synchronization, and remote-control classes. `OkHttpSignalingClient` and `WebRtcPeerConnectionClient` are the real clients. `SessionViewModel` runs every syncer for the session. The subject's pinch calls `onZoomGesture(ratio, final)`; its guide gestures, brightness, and flash reach `RemoteControlHandler` the same way (2.6.5).*
@@ -2713,7 +2725,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Shared steps (It 3, FR-6.15, US-16, [#120]).** Only the photographer's phone generates poses. Its *Generate poses*, *Generating poses*, *Pick a pose*, and *Reference confirm* also show on the subject's phone (2.5.1).
   - The photographer's syncer sends each step while connected, with images encoded off the main thread. After a reconnect it sends the current step, or only its end (2.6.7).
   - The subject's syncer keeps a mirror in memory (`MirrorDescription`, `MirrorPoseSet`, `MirrorConfirm`) through a reconnect, until its end, the next one, or the session's end.
-  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button beside *Guide* opens it. One that arrives under *Add a pose guide* opens when the sheet closes.
+  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button in the middle of the bottom row, where Camera's shutter is, opens it. One that arrives under *Add a pose guide* opens when the sheet closes.
   - The subject's paused video says "Dongje is describing a pose…", "Dongje is creating poses…", "Dongje is picking a pose…", or "Dongje is checking the guide…".
   - The first request to reach the photographer's phone decides (AD-7). One unanswered for 5 s says "Couldn't send your request", "Couldn't send your pick", or "Couldn't send your choice".
   - Each subject screen follows the session itself. The shared screens say "… sees this too".
@@ -2741,6 +2753,11 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the phones' 64- and 256-message buffers.
   - The subject writes chunks to a cache file. At `photo.end`, `PhotoAlbum` saves it to Pictures/Pix through a pending MediaStore row dated `takenAt`. `photo.saved` answers, `ok: true` again for a repeat.
   - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
+  - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
+  - In a session, both phones' thumbnails show only the newest of these, so neither shows a photo from before. Both thumbnails are empty until the session's first photo. *Subject view*'s bottom row is Camera's, in thirds: *Guide* in the middle of the left third, where Camera's is, and the thumbnail in the middle of the right third (`showPhotoThumbnails`), on *Guide*'s icon line.
+  - A tap on either opens the session's photos in a viewer over the whole screen, inside Pix (`PhotoViewer`): one page each, opened at the newest, under Back alone, with no title, decoded to the screen's long side (`photoToView`). The phone's gallery would put Pix in the background, where the video stops and, on the photographer's phone, the session ends after 60 s (2.8, *Lifecycle*).
+  - A newer photo adds a page and keeps the page on screen. Back closes the viewer, and so does the session's end. On the subject's phone, a step the photographer starts meanwhile opens once it closes. While it is open, TalkBack reads only the viewer.
+  - Outside a session, Camera's thumbnail is the newest photo in Pix's album, taken here or received (`NewestAlbumPhoto`), and a tap opens it in the phone's gallery (FR-1.6). It is read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves the one before. Without a storage permission Pix sees only the photos it saved, so after a reinstall the thumbnail is empty until the next.
   - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
   - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
 - **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter2-P17; left out of Iteration 4 at its kickoff); only the message exists.
@@ -3396,6 +3413,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
 [#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
+[#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212

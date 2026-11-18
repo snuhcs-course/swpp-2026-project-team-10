@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -41,7 +41,9 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseTips.onCamera,
                 container.photoSyncer,
-                container.appSettings.baseBrightness,
+                albumPhoto = container.albumPhoto,
+                sessionPhotos = container.photoSyncer.sessionPhotos,
+                baseBrightness = container.appSettings.baseBrightness,
                 phoneTurns = container.phoneTurns,
             )
         }
@@ -96,6 +98,7 @@ object PixViewModels {
                 container.confirmSyncer,
                 container.descriptionSyncer,
                 container.tipSyncer,
+                sessionPhotos = container.photoSyncer.sessionPhotos,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }

@@ -867,8 +867,9 @@ class CameraLayoutTest {
         assertThumbnailBesideGuide(fontScale = 1.3f)
 
     /**
-     * The session photos' viewer, shown: over the whole screen, Back at the top left, and the photo from under the header
-     * to 12 dp over the counter, 24 dp over the bottom, in place while the counter is not shown yet.
+     * The photo viewer, shown: over the whole screen, Back at the top left and Share and Delete at the top right, their
+     * icons as far from the edges as Back's, each taking taps on 48 dp, and the photo from under the header to 12 dp
+     * over the strip of thumbnails, 48 dp tall and 24 dp over the bottom, in place while it is not shown yet.
      */
     private fun assertViewerCoversTheScreen(holder: FrameLayout) {
         val viewer = ViewPhotoViewerBinding.inflate(LayoutInflater.from(holder.context), holder, true)
@@ -880,11 +881,22 @@ class CameraLayoutTest {
         assertTrue("$back at the top left", back.left <= 8 && back.top <= 16)
         assertTrue("$back takes taps on 48 dp", back.width() >= 48 && back.height() >= 48)
         val pages = viewer.photoViewerPages.box()
-        val counter = viewer.photoViewerCounter.box()
+        val strip = viewer.photoViewerStrip.box()
+        val share = viewer.photoViewerShare.box()
+        val delete = viewer.photoViewerDelete.box()
         assertTrue("$pages under the header", pages.top >= viewer.photoViewerHeader.box().bottom)
-        assertEquals(View.INVISIBLE, viewer.photoViewerCounter.visibility)
-        assertEquals(counter.top - 12, pages.bottom)
-        assertEquals(705 - 24, counter.bottom)
+        // Share, then Delete at the header's end, on Back's line, as in a gallery app.
+        assertEquals("$delete as far from the right as $back from the left", 360 - back.left, delete.right)
+        assertTrue("$share before $delete, after $back", share.right <= delete.left && share.left >= back.right)
+        for (button in listOf(share, delete)) {
+            assertTrue("$button takes taps on 48 dp", button.width() >= 48 && button.height() >= 48)
+            assertTrue("$button on Back's line, $back", abs(button.centerY() - back.centerY()) <= 1)
+        }
+        // The strip of thumbnails at the bottom, each taking taps on 48 dp; in place while there is one photo.
+        assertEquals(View.INVISIBLE, viewer.photoViewerStrip.visibility)
+        assertEquals(48, strip.height())
+        assertEquals(strip.top - 12, pages.bottom)
+        assertEquals(705 - 24, strip.bottom)
     }
 
     @Test

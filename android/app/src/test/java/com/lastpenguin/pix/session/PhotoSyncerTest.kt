@@ -73,7 +73,8 @@ import org.robolectric.RobolectricTestRunner
  * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
  * each photo taken in the session joins them, and one whose session ended before it was saved, or one taken outside a
  * session, does not; they stay through a reconnect and end with the
- * session, and the next session starts with none.
+ * session, and the next session starts with none; a photo deleted from the viewer leaves them, and one not theirs
+ * changes nothing.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -966,6 +967,20 @@ class PhotoSyncerTest {
         syncer.taken(shutter, photo("3", 10), takenAt = 3)
 
         assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `a photo deleted from the viewer leaves the session's photos, and the others stay`() = runTest {
+        val (syncer, _) = sender()
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("2", 10), takenAt = 2)
+
+        syncer.forget(uri("1"))
+
+        assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
+        // A photo not the session's changes nothing.
+        syncer.forget(uri("9"))
+        assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
     }
 
     @Test

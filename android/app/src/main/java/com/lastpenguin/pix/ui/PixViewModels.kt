@@ -41,8 +41,9 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseTips.onCamera,
                 container.photoSyncer,
-                albumPhoto = container.albumPhoto,
+                albumPhotos = container.albumPhotos,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
+                deleter = container.photoDeleter,
                 baseBrightness = container.appSettings.baseBrightness,
             )
         }
@@ -97,6 +98,7 @@ object PixViewModels {
                 container.descriptionSyncer,
                 container.tipSyncer,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
+                deleter = container.photoDeleter,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }

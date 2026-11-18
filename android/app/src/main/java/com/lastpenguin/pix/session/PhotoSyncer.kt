@@ -129,6 +129,11 @@ class PhotoSyncer(
         kept.update { old -> Kept(sessionId, old?.takeIf { it.sessionId == sessionId }?.photos.orEmpty() + uri) }
     }
 
+    /** [uri] was deleted from this phone (FR-1.6): it leaves the session's photos, and the viewer's. */
+    fun forget(uri: Uri) {
+        kept.update { old -> old?.let { Kept(it.sessionId, it.photos - uri) } }
+    }
+
     // ---- Photographer -----------------------------------------------------------------------------------------
 
     private data class Outgoing(val photoId: String, val uri: Uri, val takenAt: Long)

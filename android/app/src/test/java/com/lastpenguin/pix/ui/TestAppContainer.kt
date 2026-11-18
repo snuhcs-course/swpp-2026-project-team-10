@@ -10,6 +10,7 @@ import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.generation.GenerationConsent
@@ -154,13 +155,28 @@ class TestAppContainer(
     /** Whether the subject's album refuses the photographer's photos, as a full disk does (FR-6.14). */
     var albumFails = false
 
-    /** The newest photo in Pix's album (FR-1.6), which a test sets: no MediaStore here tells of a saved photo. */
-    val album = MutableStateFlow<Uri?>(null)
+    /** The photos in Pix's album (FR-1.6), oldest first, which a test sets: no MediaStore here tells of a saved photo. */
+    val album = MutableStateFlow<List<Uri>>(emptyList())
+
+    /** The photos the viewer deleted, in order; each leaves [album] and the session's photos unless [deleteFails]. */
+    val deleted = mutableListOf<Uri>()
+
+    /** Whether a delete fails, as for a photo another app owns. */
+    var deleteFails = false
+
+    private val deleter = PhotoDeleter { uri ->
+        if (deleteFails) return@PhotoDeleter false
+        deleted += uri
+        album.value -= uri
+        photos.forget(uri)
+        true
+    }
 
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
-        albumPhoto = album,
+        albumPhotos = album,
+        photoDeleter = deleter,
         guideRepository = guides,
         mirrorGuideRepository = mirror,
         mirrorReference = reference,

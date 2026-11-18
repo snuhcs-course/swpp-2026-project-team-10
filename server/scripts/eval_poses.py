@@ -1078,6 +1078,25 @@ def write_report_html(target: Path, runs: list[Path]) -> None:
 # sample, agree, and the consistency check: how far to trust the judge
 
 
+def sample_stamp(answered: list[dict]) -> str:
+    """A short hash of what a label page asks: its items with their sentences or rules. The page keeps a labeler's
+    answers under it and writes it into the download, so answers given to one sample are never shown on, counted
+    for, or read as another: after a retip the same tip id has other sentences."""
+    return hashlib.sha256(json.dumps(answered, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
+
+
+def check_labels(path: str, person: dict, run: str, kind: str, stamp: str | None) -> None:
+    """Stops on a label file that is not of this run's page: another run, the other kind of page, or another sample
+    of the run, as after a retip. An older file without these fields is taken as it is when `stamp` is None."""
+    for field, expected in (("run", run), ("kind", kind), ("sample", stamp)):
+        got = person.get(field)
+        if expected is not None and got != expected and (got is not None or stamp is not None):
+            sys.exit(
+                f"{path}: its {field} is {got!r}, not {expected!r}; the labels must come from this run's current "
+                f"page (sample again and download them from it)"
+            )
+
+
 def sample_tips(args: argparse.Namespace) -> None:
     """The run's tips for us to check, in label-tips.html: each with the scene, the candidate, and the tip's
     sentences as the app shows them, to answer one sentence at a time, and then whether the tip leaves out something
@@ -1103,8 +1122,10 @@ def sample_tips(args: argparse.Namespace) -> None:
                 "candidate": thumbnail(folder / f"c{tip_record['candidate']}.jpg", 520),
             }
         )
+    answered = [{"id": e["id"], "lines": e["lines"]} for e in entries]
+    stamp = sample_stamp(answered)
     (out / "tip-sample.json").write_text(
-        json.dumps({"seed": args.seed, "items": [{"id": e["id"], "lines": e["lines"]} for e in entries]}, indent=2),
+        json.dumps({"seed": args.seed, "sample": stamp, "items": answered}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     rules_html = f"<dt>What a tip is</dt><dd>{html.escape(rubrics['tip']['intro'])}</dd>" + "".join(
@@ -1125,6 +1146,7 @@ def sample_tips(args: argparse.Namespace) -> None:
         .replace("{{TITLE}}", "Check tips")
         .replace("{{INTRO}}", intro)
         .replace("{{KIND}}", "tips")
+        .replace("{{SAMPLE}}", stamp)
         .replace("{{RULES_TITLE}}", "When a sentence is right, in full")
     )
     (out / "label-tips.html").write_text(page, encoding="utf-8")
@@ -1175,8 +1197,10 @@ def sample(args: argparse.Namespace) -> None:
                 "candidate": thumbnail(folder / f"c{c['index']}.jpg", 640),
             }
         )
+    stamp = sample_stamp([{"id": e["id"], "rules": e["rules"]} for e in entries])
     (out / "sample.json").write_text(
-        json.dumps({"seed": args.seed, "items": [{"id": e["id"]} for e in entries]}, indent=2), encoding="utf-8"
+        json.dumps({"seed": args.seed, "sample": stamp, "items": [{"id": e["id"]} for e in entries]}, indent=2),
+        encoding="utf-8",
     )
     rules_html = "".join(
         f"<dt>{RULE_NAMES[r]}</dt><dd>{html.escape(rubrics['pose'][r])}</dd>" for r in (*KEEP_RULES, "follows_request")
@@ -1193,6 +1217,7 @@ def sample(args: argparse.Namespace) -> None:
             "is the original, photo 2 the AI's edit. The rules:",
         )
         .replace("{{KIND}}", "poses")
+        .replace("{{SAMPLE}}", stamp)
         .replace("{{RULES_TITLE}}", "The rules in full (the same text the judge reads)")
     )
     (out / "label.html").write_text(page, encoding="utf-8")
@@ -1219,7 +1244,7 @@ dt{font-weight:700;margin-top:8px}dd{margin:2px 0 0 0;color:#444}</style>
 <div id=bar><label>Your name <input id=who size=12></label><span id=count></span><button id=save>Download labels</button></div>
 <div id=items></div>
 <script>
-const ITEMS={{ITEMS}}, NAMES={{NAMES}}, KEY="pix-labels-{{KIND}}-{{RUN}}";
+const ITEMS={{ITEMS}}, NAMES={{NAMES}}, KEY="pix-labels-{{KIND}}-{{RUN}}-{{SAMPLE}}";
 const esc=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;");
 let labels={}; try{labels=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){}
 const who=document.getElementById("who"); try{who.value=localStorage.getItem(KEY+"-who")||""}catch(e){}
@@ -1241,19 +1266,24 @@ if(it.lines){const note=document.createElement("textarea");note.rows=1;note.plac
 note.value=(labels[it.id]||{}).note||"";note.oninput=()=>{labels[it.id]=labels[it.id]||{};labels[it.id].note=note.value;
 try{localStorage.setItem(KEY,JSON.stringify(labels))}catch(e){}};d.appendChild(note)}box.appendChild(d)});
 count();
-document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify({labeler:who.value,run:"{{RUN}}",kind:"{{KIND}}",labels},null,2)],{type:"application/json"});
+document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify({labeler:who.value,run:"{{RUN}}",kind:"{{KIND}}",sample:"{{SAMPLE}}",labels},null,2)],{type:"application/json"});
 const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="labels-{{KIND}}-"+(who.value||"me")+".json";a.click()};
 </script>"""
 
 
 def tip_check(args: argparse.Namespace) -> None:
     """The tips as we checked them (label-tips.html): a tip matches its pose when every sentence of it is right. For
-    each of us, and by the most of us, a sentence without a majority counting as not right; then how often two of us
-    agree on a sentence, the sentences most of us found wrong, the tips most of us found something missing from, and
-    the notes we left."""
+    each of us, and by the most of us, a sentence without a majority counting as not right and one that any of us
+    left out having no verdict; then how often two of us agree on a sentence, the sentences most of us found wrong,
+    the tips most of us found something missing from, and the notes we left. The labels must be of this run's
+    current page."""
     out = run_dir(args.run)
-    items = json.loads((out / "tip-sample.json").read_text(encoding="utf-8"))["items"]
+    sample = json.loads((out / "tip-sample.json").read_text(encoding="utf-8"))
+    items = sample["items"]
+    stamp = sample.get("sample") or sample_stamp(items)
     people = [json.loads(Path(p).read_text(encoding="utf-8")) for p in args.labels]
+    for path, person in zip(args.labels, people, strict=True):
+        check_labels(path, person, out.name, "tips", stamp)
     names = [p.get("labeler") or "?" for p in people]
     sentences = [(item["id"], str(n), line) for item in items for n, line in enumerate(item["lines"], start=1)]
     lines = [f"{len(items)} tips, {len(sentences)} sentences; checked by: {', '.join(names)}"]
@@ -1262,11 +1292,12 @@ def tip_check(args: argparse.Namespace) -> None:
         return person["labels"].get(item_id, {}).get(key)
 
     def by_most(item_id: str, key: str) -> str | None:
+        """What most of us answered, a tie counting as fail; None unless every one of us answered, so that one
+        answer never stands for all."""
         answers = [answer(p, item_id, key) for p in people]
-        answered = [a for a in answers if a]
-        if not answered:
+        if not all(answers):
             return None
-        return "pass" if answered.count("pass") * 2 > len(answered) else "fail"
+        return "pass" if answers.count("pass") * 2 > len(answers) else "fail"
 
     def matching(verdict) -> tuple[int, int]:
         """The tips every sentence of which `verdict` passes, among those it answered whole."""
@@ -1293,6 +1324,8 @@ def tip_check(args: argparse.Namespace) -> None:
         lines.append(f"{'    by ' + name:<44} {share(hits, total)}")
     right = [by_most(item_id, key) for item_id, key, _ in sentences]
     answered = [a for a in right if a]
+    if len(answered) < len(right):
+        lines.append(f"sentences not answered by every one of us, without a verdict: {len(right) - len(answered)}")
     lines.append(f"{'sentences that are right, by most of us':<44} {share(answered.count('pass'), len(answered))}")
     for (first, a), (second, b) in itertools.combinations(zip(names, people, strict=True), 2):
         both = [(x, y) for i, k, _ in sentences if (x := answer(a, i, k)) and (y := answer(b, i, k))]
@@ -1335,8 +1368,11 @@ def agree(args: argparse.Namespace) -> None:
     if args.kind == "tip":
         return tip_check(args)
     out = run_dir(args.run)
-    ids = [entry["id"] for entry in json.loads((out / "sample.json").read_text(encoding="utf-8"))["items"]]
+    sample = json.loads((out / "sample.json").read_text(encoding="utf-8"))
+    ids = [entry["id"] for entry in sample["items"]]
     people = [json.loads(Path(p).read_text(encoding="utf-8")) for p in args.labels]
+    for path, person in zip(args.labels, people, strict=True):
+        check_labels(path, person, out.name, "poses", sample.get("sample"))
     claude = latest_verdicts(out)
     rules = (*KEEP_RULES, "follows_request")
     lines = [f"{len(ids)} candidates; labelers: {', '.join(p.get('labeler') or '?' for p in people)}"]

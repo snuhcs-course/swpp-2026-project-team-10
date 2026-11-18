@@ -466,6 +466,12 @@ async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number:
             )
         )
         bodies = [response.json() for response in responses]
+        # What each request cost, also when the other one failed: a request that answered is billed either way.
+        usages = [body.get("usage") or {} for body in bodies if isinstance(body, dict)]
+        tip.cost = sum(usage.get("cost") or 0 for usage in usages)
+        tip.reasoning_tokens = sum(
+            (usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0 for usage in usages
+        )
         failed = [
             (response, body)
             for response, body in zip(responses, bodies, strict=True)
@@ -477,11 +483,6 @@ async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number:
         else:
             now, want = (answer_json(body) for body in bodies)
             tip.answer = {"now": now, "want": want}
-            usages = [body.get("usage") or {} for body in bodies]
-            tip.cost = sum(usage.get("cost") or 0 for usage in usages)
-            tip.reasoning_tokens = sum(
-                (usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0 for usage in usages
-            )
             check(tip, args.language, args.words)
     except (httpx2.HTTPError, ValueError, KeyError, IndexError, TypeError, AttributeError) as error:
         tip.error = f"{type(error).__name__}: {error}"
@@ -624,14 +625,16 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
             f"90th pct. {ninetieth:.1f} s, slowest {seconds[-1]:.1f} s"
         )
     if args.rounds > 1:
-        # The same pair should get the same decisions every time.
+        # The same pair should get the same tip every time: the decisions the server returns, and the sentences,
+        # which also hold the side, the room above the head, and the leaning line.
         decided = ("framing", "much", "hold", "angle")
         rounds: dict[str, set[tuple]] = {}
         for tip in tips:
             if not tip.error:
-                rounds.setdefault(tip.scene, set()).add(tuple(tip.answer.get(key) for key in decided))
+                said = tuple(tip.answer.get("lines") or ())
+                rounds.setdefault(tip.scene, set()).add((*(tip.answer.get(key) for key in decided), said))
         same = sum(len(answers) == 1 for answers in rounds.values())
-        print(f"Same decisions in every round: {same}/{len(rounds)} pairs")
+        print(f"Same tip in every round: {same}/{len(rounds)} pairs")
     thinking = [tip.reasoning_tokens for tip in tips if tip.reasoning_tokens is not None]
     if thinking:
         print(f"Reasoning tokens: median {statistics.median(thinking):.0f}, most {max(thinking)}")

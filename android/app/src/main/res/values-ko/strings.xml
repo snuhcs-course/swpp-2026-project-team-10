@@ -104,6 +104,10 @@
     <string name="session_photo_save_failed">%1$s님의 사진을 저장하지 못했어요</string>
     <string name="session_photo_not_sent">%1$s님에게 사진을 보내지 못했어요</string>
     <string name="session_photos_not_sent">%2$s님에게 사진 %1$d장을 보내지 못했어요</string>
+    <string name="open_session_photo">가장 최근 사진 열기</string>
+    <string name="session_photo_title">%1$s님의 사진</string>
+    <string name="session_photo_title_unnamed">사진</string>
+    <string name="session_photo_unavailable">이 사진은 더 이상 앨범에 없어요.</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>

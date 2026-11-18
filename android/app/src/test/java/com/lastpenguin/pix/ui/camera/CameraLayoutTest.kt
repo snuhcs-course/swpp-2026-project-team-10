@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -77,7 +77,9 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * ratio's area as the camera rebinds (Iter3-A12; until then it kept its place and the old ratio's area until the new
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
  * The zoom readout's tap
- * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
+ * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
+ * its session photo's thumbnail (Iter4-A2) on Guide's icon line where Camera's thumbnail is, clear of the buttons
+ * beside Guide with each of their labels at font scale 1 and 1.3, and its viewer over the whole screen.
  * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
  * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
  * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
@@ -680,8 +682,9 @@ class CameraLayoutTest {
 
     // ---- Subject view -----------------------------------------------------------------------
 
-    @Test
-    fun subjectView_placesTheVideoLikeTheCamera_withTheZoomRowAboveTheCaption() {
+    /** Subject view connected to a photographer framing in 16:9, with their video streaming. */
+    private fun subjectView(fontScale: Float = 1f): FragmentSubjectBinding {
+        if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
         val modules = TestAppContainer().install()
         val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
             get().setTheme(R.style.Theme_Pix)
@@ -703,7 +706,12 @@ class CameraLayoutTest {
             ),
         )
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
-        val binding = FragmentSubjectBinding.bind(fragment.requireView())
+        return FragmentSubjectBinding.bind(fragment.requireView())
+    }
+
+    @Test
+    fun subjectView_placesTheVideoLikeTheCamera_withTheZoomRowAboveTheCaption() {
+        val binding = subjectView()
 
         val video = binding.videoContainer.box()
         assertEquals(binding.topBar.box().bottom - TOP_BAR_OVERHANG_DP.toInt(), video.top)
@@ -715,7 +723,55 @@ class CameraLayoutTest {
         binding.editGuideButton.visibility = View.VISIBLE
         binding.brightnessButton.visibility = View.VISIBLE
         binding.brightnessPanel.visibility = View.VISIBLE
+        binding.galleryButton.visibility = View.VISIBLE
         idle()
         assertEveryControlAtLeast48(binding.root, "Subject view")
+    }
+
+    private fun assertThumbnailBesideGuide(fontScale: Float) {
+        val cameras = camera(fontScale).controls.galleryButton.box()
+        val binding = subjectView(fontScale)
+        binding.galleryButton.visibility = View.VISIBLE
+        binding.pickPoseButton.visibility = View.VISIBLE
+        val labels = listOf(
+            R.string.pick_pose_title,
+            R.string.generating_title,
+            R.string.describe_title,
+            R.string.pose_guide_title,
+        )
+        for (label in labels) {
+            binding.pickPoseLabel.setText(label)
+            idle()
+            val thumbnail = binding.galleryButton.box()
+            val row = binding.guideRow.box()
+            val text = binding.pickPoseLabel.text
+            assertEquals("$text: on Guide's icon line", binding.guideButtonIcon.box().centerY(), thumbnail.centerY())
+            assertTrue("$text: $row clear of $thumbnail", row.right <= thumbnail.left)
+            assertTrue("$text: $thumbnail where Camera's is, $cameras", abs(thumbnail.right - cameras.right) <= 1)
+            assertTrue("$text: $thumbnail inside the screen", thumbnail.right <= 360 && thumbnail.bottom <= 705)
+        }
+    }
+
+    @Test
+    fun subjectView_thePhotosThumbnail_isOnGuidesLineWhereCamerasIs_clearOfTheButtonsBesideGuide() =
+        assertThumbnailBesideGuide(fontScale = 1f)
+
+    @Test
+    fun subjectView_thePhotosThumbnail_isClearOfTheButtonsBesideGuide_atFontScale1_3() =
+        assertThumbnailBesideGuide(fontScale = 1.3f)
+
+    @Test
+    fun subjectView_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() {
+        val binding = subjectView()
+
+        binding.photoViewer.visibility = View.VISIBLE
+        idle()
+
+        assertEquals(Rect(0, 0, 360, 705), binding.photoViewer.box())
+        val back = binding.photoViewerBack.box()
+        assertTrue("$back at the top left", back.left <= 8 && back.top <= 16)
+        assertTrue("$back takes taps on 48 dp", back.width() >= 48 && back.height() >= 48)
+        assertTrue(binding.photoViewerImage.box().top >= binding.photoViewerHeader.box().bottom)
+        assertEquals(705 - 24, binding.photoViewerImage.box().bottom)
     }
 }

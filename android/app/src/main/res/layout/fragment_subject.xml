@@ -428,4 +428,115 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- The session's newest photo (FR-6.14), Camera's thumbnail: a 40 dp image in a 48 dp touch area (NFR-16), on
+         Guide's icon line (the panel's 8 dp padding and half the 36 dp icon), where Camera's sits beside the camera
+         switch. Shown once a photo is saved here; a tap opens it in the viewer below. -->
+    <FrameLayout
+        android:id="@+id/galleryButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="20dp"
+        android:clickable="true"
+        android:contentDescription="@string/open_session_photo"
+        android:focusable="true"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/bottomPanel"
+        tools:visibility="visible">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/galleryThumbnail"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@color/pix_glass"
+            android:duplicateParentState="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:importantForAccessibility="no"
+            android:padding="1dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/gallery_placeholder"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
+            app:strokeColor="@color/camera_thumbnail_stroke"
+            app:strokeWidth="1.5dp" />
+    </FrameLayout>
+
+    <!-- The session photo's viewer (FR-6.14, R&S 6.6): the photo the thumbnail showed, whole, under a header with
+         Back. It covers the screen inside Pix, so the session and its video go on under it; the phone's gallery would
+         put Pix in the background. It takes every touch, so none reaches the video. -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/photoViewer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/camera_bar"
+        android:clickable="true"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:outlineProvider="none"
+        android:translationZ="2dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:id="@+id/photoViewerHeader"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:paddingHorizontal="20dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageButton
+                android:id="@+id/photoViewerBack"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/back" />
+
+            <TextView
+                android:id="@+id/photoViewerTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:accessibilityHeading="true"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.Pix.Header"
+                tools:text="@string/session_photo_title" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/photoViewerImage"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginBottom="24dp"
+            android:scaleType="fitCenter"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/photoViewerHeader" />
+
+        <!-- A photo deleted from the album since, or one that cannot be read. -->
+        <TextView
+            android:id="@+id/photoViewerMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="20dp"
+            android:gravity="center"
+            android:text="@string/session_photo_unavailable"
+            android:textAppearance="@style/TextAppearance.Pix.Body"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/photoViewerHeader" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

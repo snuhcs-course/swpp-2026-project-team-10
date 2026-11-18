@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -174,7 +175,7 @@ data class CameraUiState(
     val guideSaved: Boolean = false,
     /** *Save guide* is writing the guide; the button waits. */
     val savingGuide: Boolean = false,
-    /** The last saved photo, for the thumbnail. */
+    /** The newest photo saved on this phone, taken here or sent by a session's photographer, for the thumbnail. */
     val lastPhoto: Uri? = null,
     /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
@@ -195,6 +196,11 @@ class CameraViewModel(
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
     /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
     private val photos: PhotoShare = PhotoShare.None,
+    /**
+     * The newest photo the other phone sent to this one in a session (FR-6.14, `PhotoSyncer.lastReceived`): the
+     * thumbnail shows it after the session, as a photo taken here, until a newer one.
+     */
+    private val receivedPhotos: StateFlow<Uri?> = MutableStateFlow(null),
     /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
@@ -271,6 +277,10 @@ class CameraViewModel(
         }
         viewModelScope.launch {
             camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
+        }
+        viewModelScope.launch {
+            // A photo the session's photographer sent is the newest here too, until this phone takes one (FR-6.14).
+            receivedPhotos.filterNotNull().collect { uri -> _uiState.update { it.copy(lastPhoto = uri) } }
         }
         viewModelScope.launch {
             camera.zoom.collect { zoom ->

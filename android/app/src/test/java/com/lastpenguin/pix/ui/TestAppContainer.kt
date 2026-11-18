@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -45,11 +45,14 @@ import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.fakeBitmap
+import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.settings.AppLanguage
 import com.lastpenguin.pix.settings.AppSettings
 import com.lastpenguin.pix.settings.TutorialScreen
 import java.io.File
 import java.io.IOException
+import java.util.Base64
+import java.util.zip.CRC32
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -120,14 +123,22 @@ class TestAppContainer(
     val descriptions =
         DescriptionSyncer(session, FakePoseCandidateCodec { ScreenTestSupport.bitmap(60, 80) }, Dispatchers.Unconfined)
 
-    /** The session's photos, the same way; a screen test sends none. */
+    /**
+     * The session's photos, the same way; a screen test sends none. The subject's album saves each photo as
+     * [savedPhoto] of its id unless [albumFails]; nothing is written.
+     */
     val photos = PhotoSyncer(
         session,
         { null },
-        { _, _, _ -> Result.failure(IOException("No album in a screen test")) },
+        { _, photoId, _ ->
+            if (albumFails) Result.failure(IOException("The disk is full")) else Result.success(savedPhoto(photoId))
+        },
         File(System.getProperty("java.io.tmpdir"), "pix-session-photos"),
         Dispatchers.Unconfined,
     )
+
+    /** Whether the subject's album refuses the photographer's photos, as a full disk does (FR-6.14). */
+    var albumFails = false
 
     val container = AppContainer(
         cameraController = camera,
@@ -161,6 +172,11 @@ class TestAppContainer(
         screenLanguages = screenLanguages,
     )
 
+    companion object {
+        /** Where the subject's album keeps the photographer's photo [photoId] in a screen test. */
+        fun savedPhoto(photoId: String): Uri = Uri.parse("content://media/external/images/media/$photoId")
+    }
+
     /**
      * Installs the container in the test's [PixApplication]; call before the screen is launched. The screen is drawn
      * dark, as on the phone: Pix keeps dark through `AppCompatDelegate`, which only an `AppCompatActivity` follows, and
@@ -170,6 +186,17 @@ class TestAppContainer(
         RuntimeEnvironment.setQualifiers("+night")
         ApplicationProvider.getApplicationContext<PixApplication>().installContainer(container)
         return this
+    }
+
+    /**
+     * The photographer's photo [photoId] reaching this phone whole, as `photo.begin`, one chunk, and `photo.end`; the
+     * subject's [photos] must be receiving. A few bytes that start as a JPEG are enough, since nothing decodes them.
+     */
+    fun deliverPhoto(photoId: String) {
+        val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3)
+        session.deliver(SessionMessage.PhotoBegin(photoId, "jpeg", bytes.size.toLong(), 1, takenAt = 1))
+        session.deliver(SessionMessage.PhotoChunk(photoId, 0, Base64.getEncoder().encodeToString(bytes)))
+        session.deliver(SessionMessage.PhotoEnd(photoId, CRC32().apply { update(bytes) }.value))
     }
 
     /** Makes a guide when the test says so: each request waits for [finish]. */

@@ -1,10 +1,11 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.app.Application
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Looper
 import android.provider.Settings
@@ -51,6 +52,10 @@ import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -68,7 +73,8 @@ import org.robolectric.annotation.GraphicsMode
  * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
  * together, Use this photo, which opens nothing for a photo without a person) and system back during the scene photo
  * step; End session; the gallery button with and
- * without an app to open the photo; each capture failure's message; the subject's zoom, brightness, flash, and guide
+ * without an app to open the photo, and after a session as the subject, the last photo received (FR-6.14, Iter4-A2);
+ * each capture failure's message; the subject's zoom, brightness, flash, and guide
  * moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view on mobile data (FR-6.13); the
  * zoom accessibility actions
  * and a tap on the readout through the quick steps (0.6×, 1×, 2×, back to 0.6×), by touch and by TalkBack; the
@@ -396,6 +402,37 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { _, fragment ->
             assertTrue(shows(fragment.requireActivity().window.decorView, string(R.string.gallery_unavailable)))
+        }
+    }
+
+    @Test
+    fun galleryButton_afterASessionAsTheSubject_showsAndOpensTheLastPhotoReceived() {
+        val modules = launch()
+        val picture = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        onScreen { _, fragment -> fragment.thumbnailOf = { picture } }
+        val receiving = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        try {
+            modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+            modules.photos.startAsReceiver(receiving)
+            modules.deliverPhoto("p1")
+            modules.deliverPhoto("p2")
+            modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+            receiving.cancel()
+            idle()
+            // The thumbnail is read off the main thread.
+            Thread.sleep(300)
+            idle()
+
+            onScreen { controls, _ ->
+                assertTrue(controls.galleryButton.isEnabled)
+                assertSame(picture, (controls.galleryThumbnail.drawable as BitmapDrawable).bitmap)
+                controls.galleryButton.performClick()
+            }
+            val view = nextIntent()
+            assertEquals(Intent.ACTION_VIEW, view?.action)
+            assertEquals(TestAppContainer.savedPhoto("p2"), view?.data)
+        } finally {
+            receiving.cancel()
         }
     }
 

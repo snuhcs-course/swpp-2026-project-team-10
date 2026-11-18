@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.net.Uri
@@ -68,6 +68,10 @@ import org.robolectric.RobolectricTestRunner
  * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
  * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
  * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
+ * Subject, the newest photo (state-based; Iter4-A2): none before the first; each saved photo becomes the session's
+ * newest and the last received; a refused or broken photo, one the album fails to save, and one saved before change
+ * neither; the session's end clears the session's photo and keeps the last received, and the next session starts
+ * without one.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -865,5 +869,57 @@ class PhotoSyncerTest {
         session.deliver(SessionMessage.PhotoShutter)
         runCurrent()
         assertEquals(1, shutters)
+    }
+
+    @Test
+    fun `each saved photo becomes the session's newest and the last received`() = runTest {
+        val (syncer, _, _) = receiver()
+        assertNull(syncer.sessionPhoto.value)
+        assertNull(syncer.lastReceived.value)
+
+        deliverWhole("p1", jpeg(10))
+        assertEquals(uri("saved/p1"), syncer.sessionPhoto.value)
+        assertEquals(uri("saved/p1"), syncer.lastReceived.value)
+
+        deliverWhole("p2", jpeg(10))
+        assertEquals(uri("saved/p2"), syncer.sessionPhoto.value)
+        assertEquals(uri("saved/p2"), syncer.lastReceived.value)
+    }
+
+    @Test
+    fun `a photo refused, broken, unsaved, or already saved changes neither`() = runTest {
+        val (syncer, _, _) = receiver()
+        deliverWhole("p1", jpeg(10))
+        deliverWhole("p2", jpeg(10))
+
+        val broken = jpeg(10)
+        deliverBegin("p3", broken)
+        deliverChunks("p3", broken)
+        session.deliver(SessionMessage.PhotoEnd("p3", crc32 = 0))
+        runCurrent()
+        session.deliver(SessionMessage.PhotoBegin("p4", "webp", 10, 1, 1))
+        runCurrent()
+        deliverWhole("p1", jpeg(10))
+        albumFails = true
+        deliverWhole("p5", jpeg(10))
+
+        assertEquals(uri("saved/p2"), syncer.sessionPhoto.value)
+        assertEquals(uri("saved/p2"), syncer.lastReceived.value)
+    }
+
+    @Test
+    fun `the session's end clears its photo and keeps the last received, and the next starts without one`() = runTest {
+        val (syncer, job, _) = receiver()
+        deliverWhole("p1", jpeg(10))
+
+        job.cancel()
+        runCurrent()
+        assertNull(syncer.sessionPhoto.value)
+        assertEquals(uri("saved/p1"), syncer.lastReceived.value)
+
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+        assertNull(syncer.sessionPhoto.value)
+        assertEquals(uri("saved/p1"), syncer.lastReceived.value)
     }
 }

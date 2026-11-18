@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -209,6 +209,44 @@ class CameraViewModelTest {
         assertEquals(listOf(older, newer), share.shared.map { it.second })
         assertEquals(newer, sharing.uiState.value.lastPhoto)
         assertFalse(sharing.uiState.value.isSaving)
+    }
+
+    // Camera's thumbnail after a session (FR-1.6, FR-6.14; Iter4-A2): a photo the other phone sent is the thumbnail,
+    // also one that came before the screen opened; a photo taken here after it, and one received after that, each take
+    // its place.
+    @Test
+    fun lastPhoto_aPhotoReceivedInASession_isTheThumbnail_untilANewerOneFromEitherPhone() = runTest {
+        val received = MutableStateFlow<Uri?>(null)
+        val receiving = CameraViewModel(camera, guides, receivedPhotos = received)
+        val sent = Uri.parse("content://media/external/images/media/10")
+        val taken = Uri.parse("content://media/external/images/media/11")
+        val sentLater = Uri.parse("content://media/external/images/media/12")
+        runCurrent()
+        assertNull(receiving.uiState.value.lastPhoto)
+
+        received.value = sent
+        runCurrent()
+        assertEquals(sent, receiving.uiState.value.lastPhoto)
+
+        receiving.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(taken))
+        runCurrent()
+        assertEquals(taken, receiving.uiState.value.lastPhoto)
+
+        received.value = sentLater
+        runCurrent()
+        assertEquals(sentLater, receiving.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun lastPhoto_aPhotoReceivedBeforeTheScreenOpened_isTheThumbnailAtOnce() = runTest {
+        val sent = Uri.parse("content://media/external/images/media/10")
+
+        val receiving = CameraViewModel(camera, guides, receivedPhotos = MutableStateFlow(sent))
+        runCurrent()
+
+        assertEquals(sent, receiving.uiState.value.lastPhoto)
     }
 
     @Test

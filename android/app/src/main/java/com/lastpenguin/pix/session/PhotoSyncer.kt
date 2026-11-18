@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -25,7 +25,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -88,7 +90,8 @@ class ContentPhotoReader(private val resolver: ContentResolver) : PhotoReader {
  *
  * Subject ([startAsReceiver]): writes the chunks to one file in [partDir], not to memory, saves it to [album] at
  * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, and [shutters]
- * when each was taken, for Subject view's blink (Iter3-A12).
+ * when each was taken, for Subject view's blink (Iter3-A12). The newest saved photo is [sessionPhoto] for Subject
+ * view's thumbnail and [lastReceived] for Camera's (Iter4-A2).
  * Owner: Shared steps (Iter3-P17).
  */
 class PhotoSyncer(
@@ -264,7 +267,22 @@ class PhotoSyncer(
     /** Each `photo.shutter` while a screen listens; one that no screen saw is a moment gone, not kept for later. */
     val shutters: Flow<Unit> = _shutters.asSharedFlow()
 
+    private val _sessionPhoto = MutableStateFlow<Uri?>(null)
+
+    /**
+     * The newest photo of the session running now that reached this phone's album, for Subject view's thumbnail
+     * (FR-6.14); null until the first, and again once the session ends.
+     */
+    val sessionPhoto: StateFlow<Uri?> = _sessionPhoto.asStateFlow()
+
+    private val _lastReceived = MutableStateFlow<Uri?>(null)
+
+    /** The newest photo any session brought to this phone's album; it stays after the session, for Camera (FR-1.6). */
+    val lastReceived: StateFlow<Uri?> = _lastReceived.asStateFlow()
+
     fun startAsReceiver(scope: CoroutineScope) {
+        // At once, so that no screen of this session shows the last one's photo.
+        _sessionPhoto.value = null
         scope.launch(dispatcher) {
             clearParts()
             saved.clear()
@@ -295,6 +313,7 @@ class PhotoSyncer(
             } finally {
                 abandon()
                 clearParts()
+                _sessionPhoto.value = null
             }
         }
     }
@@ -353,8 +372,10 @@ class PhotoSyncer(
         if (!whole) return fail(photo, PhotoRefusal.BROKEN)
         photo.close()
         album.save(photo.file, end.photoId, photo.begin.takenAt).fold(
-            onSuccess = {
+            onSuccess = { uri ->
                 saved += end.photoId
+                _sessionPhoto.value = uri
+                _lastReceived.value = uri
                 answer(end.photoId, null)
                 Timings.mark("photo.applied", "saved ${end.photoId}")
             },

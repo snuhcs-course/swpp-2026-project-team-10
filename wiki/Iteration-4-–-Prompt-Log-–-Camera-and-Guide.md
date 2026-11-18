@@ -29,7 +29,16 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-18] "First, bring it up to date with dev." (The branch moved onto #240. The ten conflicts were marker lines, revision rows, and the ratio line of `try_pose_tips.py`, and the checks passed again.)
 - [Joonhyung, 11-18] "PR #242 has merge conflicts with its base branch. Merge the base branch in, resolve the conflicts, and push." (#241 had changed the same Camera test headers, revision rows, and rows of Testing 2.1.6. Both sides were kept, the boundary row with both clauses, and the checks passed again.)
 
+## The controls that turn with the phone ([#207])
+
+- [Joonhyung, 11-18] "For now, when the phone is turned sideways, turn only the icons that way, not the texts." (The branch was cut from #206's, since it reads the same `PhoneTurns`. A `TurningButton` turns its icon through a `RotateDrawable`, so a background shaped wide never turns tall; an icon or a thumbnail in a square turns whole. Checked on the emulator once its gravity, which swings for a few seconds, had settled.)
+- [Joonhyung, 11-18] "Resolve the dev conflicts. Turn the Guide label under the Guide button to the phone's way, and the ratio (3:4) too. And change Shoot together to Share, and turn it one letter at a time (공, 유)." (#239 came into both branches. The ratio turns as one word in its own width; Guide turns as one block with its icon. Each letter of *Share* turned in place, drawn in the other order where the word would read from its end. English became *Share* by the user's choice.)
+- [Joonhyung, 11-18] "Commit this first. In testing, the focus and the brightness bar have a bug: the bar on the right stays and still changes the brightness after the focus box is gone. Make the focus box and the bar always go together." (Two timers: the box faded after about a second, the bar after 3 s without a touch. The box now stays with the bar and fades with it; a test that passed only on the old box's animation time now waits out the double-tap time.)
+- [Joonhyung, 11-18] "Take the turning off Share and roll just that back, to Shoot together. Turn the zoom button at the bottom middle. On the tutorial, the marks go off when the phone turns. And in image generation, '이 사진을' is broken; remove it." Then: "Keep 'Use this photo?' on the photographer's screen in a session, and remove only End session." (The zoom readout turns as a word inside its pill. The tutorial measured a control without its parent's turn, so *Guide*'s ring went beside the icon. The title was cut by *End session*, which now hides during the scene photo step.)
+- [Joonhyung, 11-18] "Push and open the #207 PR." (Stacked on #242, after merging #245 into both branches.)
+
 [#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
+[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207

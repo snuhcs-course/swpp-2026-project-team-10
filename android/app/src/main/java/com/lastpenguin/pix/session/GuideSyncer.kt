@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -42,14 +42,15 @@ interface SubjectGuideTarget {
  * sends its image first and its reference after its state. Gesture steps go on the realtime channel at most every
  * [STEP_INTERVAL_MS] (the newest wins), the final value of a gesture at once on the reliable channel, and a removed
  * guide as `guide.clear`. A guide image from the subject is adopted as the photographer's own guide at its `anchor`
- * ([adopted]), and is not sent back.
+ * ([adopted]), with the reference photo the subject sent before it, and neither is sent back.
  *
  * Subject ([startAsReceiver]): rebuilds the image from its chunks, checks it, derives the outline from the mask
  * ([GuideImageCodec]), and writes image and state into [mirror]. A state that arrives before its image is
  * kept and applied once the image is there. The reference photo goes into [mirrorReference], and goes when another
  * guide arrives or the guide is cleared. Stale `seq` is already dropped by the session. A guide made on this phone
- * ([offer]) is drawn at once and sent; until a `guide.state` names it, the photographer's own messages are kept
- * aside, and if none does within [OFFER_TIMEOUT_MS], the mirror shows the photographer's guide again.
+ * ([offer]) is drawn at once and sent, its reference photo before its image; until a `guide.state` names it, the
+ * photographer's own messages are kept aside, and if none does within [OFFER_TIMEOUT_MS], the mirror shows the
+ * photographer's guide again.
  * Owner: Real-time (#9); the guide from the subject Iter3-P9.
  */
 class GuideSyncer(
@@ -77,6 +78,13 @@ class GuideSyncer(
     /** Photographer: the guide whose image the subject has, from its `hello`, an image sent, or a guide adopted. */
     @Volatile
     private var peerHas: String? = null
+
+    /**
+     * Photographer: the guide whose reference photo the subject has, from its `hello`, a reference sent (or tried, for
+     * a guide without one), or a guide adopted, whose photo came from the subject.
+     */
+    @Volatile
+    private var peerHasReference: String? = null
 
     private val _adopted = MutableSharedFlow<String>(extraBufferCapacity = 4)
 
@@ -117,8 +125,8 @@ class GuideSyncer(
     fun startAsSender(scope: CoroutineScope) {
         val peer = (session.state.value as? SessionState.Connected)?.peer
         peerHas = peer?.haveGuideId
+        peerHasReference = peer?.haveReferenceId
         scope.launch {
-            var referenceSent: String? = peer?.haveReferenceId
             var queued: GuideState? = null
             var throttle: Job? = null
             // The current guide goes once the changes are subscribed to: its image and reference take a while to
@@ -133,9 +141,7 @@ class GuideSyncer(
                     // state and reference would follow the adopted guide's otherwise, and show its thumbnail.
                     val state = guides.state.value
                     if (state.guideId == guide.id) sendState(state, final = true)
-                    if (guide.id != referenceSent && guides.guide.value?.id == guide.id) {
-                        referenceSent = sendReference(guide)
-                    }
+                    if (guide.id != peerHasReference && guides.guide.value?.id == guide.id) sendReference(guide)
                 }
             }.collect { change ->
                 val state = change.state
@@ -144,7 +150,7 @@ class GuideSyncer(
                     throttle?.cancel()
                     queued = null
                     peerHas = null
-                    referenceSent = null
+                    peerHasReference = null
                     sendClear()
                     return@collect
                 }
@@ -170,18 +176,26 @@ class GuideSyncer(
                     }
                 }
                 // After the guide's image and state, so the subject draws the guide first.
-                if (id != referenceSent) {
+                if (id != peerHasReference) {
                     val current = guides.guide.value
-                    if (current != null && current.id == id) referenceSent = sendReference(current)
+                    if (current != null && current.id == id) sendReference(current)
                 }
             }
         }
-        // A guide made on the subject's phone becomes this phone's guide (AD-7).
+        // A guide made on the subject's phone becomes this phone's guide (AD-7), with the reference photo sent before
+        // its image: a guide is never changed once set, so its photo cannot follow it (#234).
         scope.launch {
             val images = GuideImageReceiver()
+            val photos = GuideReferenceReceiver()
+            var photo: GuideReference? = null
             session.incoming.collect { message ->
+                photos.handle(message)?.let { received ->
+                    photo = received
+                    return@collect
+                }
                 val received = images.handle(message) ?: return@collect
-                adopt(received)
+                adopt(received, photo?.takeIf { it.guideId == received.guide.id })
+                photo = null
             }
         }
     }
@@ -199,10 +213,13 @@ class GuideSyncer(
         }
     }
 
-    private fun adopt(received: Received) {
-        val guide = received.placed
-        // The subject has this image: the change that follows sends only its state, attributed to the subject.
+    private fun adopt(received: Received, photo: GuideReference?) {
+        // Its reference photo is for the Camera screen's thumbnail (FR-3.9), as for a guide made on this phone.
+        val guide = received.placed.copy(reference = photo?.photo)
+        // The subject has this image and its photo: the change that follows sends only its state, attributed to the
+        // subject.
         peerHas = guide.id
+        peerHasReference = guide.id
         attributedTo = Role.SUBJECT
         guides.setGuide(guide)
         Timings.mark("guide.applied", "image ${guide.id} ${received.size} B from the subject")
@@ -254,6 +271,52 @@ class GuideSyncer(
         }
     }
 
+    /** Rebuilds one reference photo at a time from its `guide.reference.*` messages, on either phone. */
+    private inner class GuideReferenceReceiver {
+        private var assembler: GuideReferenceAssembler? = null
+
+        /** The photo once its last chunk checks out; null for every other message. */
+        suspend fun handle(message: SessionMessage): GuideReference? {
+            when (message) {
+                is SessionMessage.GuideReferenceBegin -> {
+                    assembler = GuideReferenceAssembler.start(message)
+                    if (assembler == null) Log.w(TAG, "Refused reference ${message.guideId}: ${message.bytes} bytes")
+                }
+
+                is SessionMessage.GuideReferenceChunk -> {
+                    val current = assembler ?: return null
+                    if (!current.add(message)) {
+                        Log.w(TAG, "Dropped reference ${message.guideId}: chunk ${message.index} out of order")
+                        assembler = null
+                    }
+                }
+
+                is SessionMessage.GuideReferenceEnd -> {
+                    val current = assembler ?: return null
+                    assembler = null
+                    val begin = current.begin
+                    val bytes = current.finish(message)
+                    if (bytes == null) {
+                        Log.w(TAG, "Dropped reference ${begin.guideId}: size or CRC mismatch")
+                        return null
+                    }
+                    val photo = withContext(dispatcher) { references.decode(begin.format, bytes) }
+                    if (photo == null) {
+                        Log.w(TAG, "Dropped reference ${begin.guideId}: not a ${begin.format} image")
+                        return null
+                    }
+                    Timings.mark("guide.applied", "reference ${begin.guideId} ${bytes.size} B")
+                    return GuideReference(begin.guideId, photo)
+                }
+
+                is SessionMessage.GuideClear -> assembler = null
+
+                else -> Unit
+            }
+            return null
+        }
+    }
+
     private class Received(val begin: SessionMessage.GuideImageBegin, val guide: ReferenceGuide, val size: Int) {
         /**
          * The guide with the `anchor` and `source` its image carried: where the photographer starts a guide from the
@@ -269,7 +332,7 @@ class GuideSyncer(
      */
     private inner class Receiver(private val scope: CoroutineScope) {
         private val images = GuideImageReceiver()
-        private var referenceAssembler: GuideReferenceAssembler? = null
+        private val photos = GuideReferenceReceiver()
 
         /**
          * The photographer's guide as last received, and its newest state; null before any or after a clear. A
@@ -296,6 +359,8 @@ class GuideSyncer(
             mirrorReference.set(guide.reference?.let { GuideReference(guide.id, it) })
             deadline?.cancel()
             deadline = scope.launch {
+                // The reference photo first: the photographer adopts the guide with it once the image is complete.
+                sendReferenceOf(guide, "to the photographer")
                 val image = encoded[guide.id] ?: withContext(dispatcher) { codec.encode(guide) }.also { cache(it) }
                 session.send(image.begin(guide.anchor, guide.source))
                 for (index in image.chunks.indices) session.send(image.chunk(index))
@@ -313,46 +378,16 @@ class GuideSyncer(
                 if (offered == null) showTheirs()
                 return
             }
+            photos.handle(message)?.let { received ->
+                theirReference = received
+                // Only the shown guide's: a late reference of a guide since replaced must not take its corner.
+                if (offered == null && mirror.guide.value?.id == received.guideId) mirrorReference.set(received)
+                return
+            }
             when (message) {
                 is SessionMessage.GuideStateUpdate -> onState(message)
 
-                is SessionMessage.GuideReferenceBegin -> {
-                    referenceAssembler = GuideReferenceAssembler.start(message)
-                    if (referenceAssembler == null) {
-                        Log.w(TAG, "Refused reference ${message.guideId}: ${message.bytes} bytes")
-                    }
-                }
-
-                is SessionMessage.GuideReferenceChunk -> {
-                    val current = referenceAssembler ?: return
-                    if (!current.add(message)) {
-                        Log.w(TAG, "Dropped reference ${message.guideId}: chunk ${message.index} out of order")
-                        referenceAssembler = null
-                    }
-                }
-
-                is SessionMessage.GuideReferenceEnd -> {
-                    val current = referenceAssembler ?: return
-                    referenceAssembler = null
-                    val begin = current.begin
-                    val bytes = current.finish(message)
-                    if (bytes == null) {
-                        Log.w(TAG, "Dropped reference ${begin.guideId}: size or CRC mismatch")
-                        return
-                    }
-                    val photo = withContext(dispatcher) { references.decode(begin.format, bytes) }
-                    if (photo == null) {
-                        Log.w(TAG, "Dropped reference ${begin.guideId}: not a ${begin.format} image")
-                        return
-                    }
-                    theirReference = GuideReference(begin.guideId, photo)
-                    // Only the shown guide's: a late reference of a guide since replaced must not take its corner.
-                    if (offered == null && mirror.guide.value?.id == begin.guideId) mirrorReference.set(theirReference)
-                    Timings.mark("guide.applied", "reference ${begin.guideId} ${bytes.size} B")
-                }
-
                 is SessionMessage.GuideClear -> {
-                    referenceAssembler = null
                     theirs = null
                     theirState = null
                     theirReference = null
@@ -439,16 +474,27 @@ class GuideSyncer(
         while (encoded.size > CACHED_IMAGES) encoded.remove(encoded.keys.first())
     }
 
-    /** Sends [guide]'s reference photo if it has one, and returns its id either way, so each guide is tried once. */
-    private suspend fun sendReference(guide: ReferenceGuide): String {
+    /**
+     * Photographer: sends [guide]'s reference photo if it has one. The subject counts as having it from the start, so
+     * each guide is tried once, and a guide adopted during the encode keeps its own id in [peerHasReference].
+     */
+    private suspend fun sendReference(guide: ReferenceGuide) {
+        peerHasReference = guide.id
+        sendReferenceOf(guide, "to the subject")
+    }
+
+    /** Sends [guide]'s reference photo as `guide.reference.*` if it has one, on either phone. */
+    private suspend fun sendReferenceOf(guide: ReferenceGuide, to: String) {
         val reference = encodedReferences[guide.id]
             ?: withContext(dispatcher) { references.encode(guide) }?.also { cacheReference(it) }
-            ?: return guide.id
+            ?: return
         session.send(reference.begin())
         for (index in reference.chunks.indices) session.send(reference.chunk(index))
         session.send(reference.end())
-        Timings.mark("guide.sent", "reference ${guide.id} ${reference.bytes.size} B in ${reference.chunks.size} chunks")
-        return guide.id
+        Timings.mark(
+            "guide.sent",
+            "reference ${guide.id} ${reference.bytes.size} B in ${reference.chunks.size} chunks $to",
+        )
     }
 
     private fun cacheReference(reference: EncodedGuideReference) {

@@ -108,8 +108,17 @@ class TestAppContainer(
     val mobileData = MobileDataNotice.InMemory()
     val appSettings = AppSettings.InMemory(tutorial = tutorialSeen)
     val language = AppLanguage.InMemory()
-    val syncer =
-        GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
+
+    /** The guide on both phones, with an image and a reference photo a screen can draw (a guide from the subject). */
+    val syncer = GuideSyncer(
+        session,
+        guides,
+        mirror,
+        FakeGuideImageCodec { id -> ScreenTestSupport.guide(withReference = false).copy(id = id) },
+        FakeGuideReferenceCodec { ScreenTestSupport.bitmap(60, 80) },
+        reference,
+        Dispatchers.Unconfined,
+    )
 
     /** The photographer's candidates on the subject's phone; on the main thread, as the screens collect it. */
     val poses = PoseSyncer(session, FakePoseCandidateCodec(candidateImage), Dispatchers.Unconfined)

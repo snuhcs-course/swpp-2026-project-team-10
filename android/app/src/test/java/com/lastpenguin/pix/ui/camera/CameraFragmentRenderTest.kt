@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -23,6 +23,8 @@ import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.session.EncodedGuideImage
+import com.lastpenguin.pix.session.EncodedGuideReference
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.PeerInfo
@@ -55,7 +57,8 @@ import org.robolectric.annotation.GraphicsMode
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
  * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving; the camera switch on a phone with and without a front camera, gone while the
+ * a session connected and a peer leaving; a guide added from Subject view, with the reference thumbnail its phone sent
+ * (#234); the camera switch on a phone with and without a front camera, gone while the
  * scene photo is framed and back after it, and in a session (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
@@ -651,6 +654,32 @@ class CameraFragmentRenderTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
 
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun aGuideFromTheSubject_showsTheReferenceThumbnailItsPhoneSent() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        // Added on Subject view (#234): its reference photo comes first, then its image.
+        val reference = EncodedGuideReference("subject-1", "fake", 60, 80, "reference:subject-1".toByteArray())
+        modules.session.deliver(reference.begin())
+        reference.chunks.indices.forEach { modules.session.deliver(reference.chunk(it)) }
+        modules.session.deliver(reference.end())
+        val image = EncodedGuideImage("subject-1", "fake", 40, 80, "image:subject-1".toByteArray())
+        modules.session.deliver(image.begin())
+        image.chunks.indices.forEach { modules.session.deliver(image.chunk(it)) }
+        modules.session.deliver(image.end())
+        idle()
+
+        assertEquals("subject-1", modules.guides.guide.value?.id)
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility) }
+
+        // It goes with the guide.
+        onScreen { controls, _ -> controls.removeGuideButton.performClick() }
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.referenceThumbnail.visibility) }
     }
 
     @Test

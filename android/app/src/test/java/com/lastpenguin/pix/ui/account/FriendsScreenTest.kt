@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
@@ -15,12 +14,13 @@ import com.lastpenguin.pix.account.FriendRequest
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.databinding.FragmentFriendsBinding
+import com.lastpenguin.pix.ui.OwnActivities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 
 /*
  * Partitions for Share my camera, Friends until #188 (R&S 6.4, 6.7; FR-5.4, FR-5.7, FR-5.9, FR-5.10, FR-5.16, FR-8.1),
@@ -32,13 +32,16 @@ import org.robolectric.Robolectric
  */
 @RunWith(AndroidJUnit4::class)
 class FriendsScreenTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private val taps = mutableListOf<String>()
     private val account = Account("u_1", "test1", "Test Account 1", hasPassword = true, hasGoogle = false)
     private val request = FriendRequest("fr_80", PixUser("u_3", "test3", "Test Account 3"), 1_000)
     private val testAccount2 = Friend("u_2", "test2", "Test Account 2", online = true, inSession = false)
 
     private fun screen(): Pair<FragmentFriendsBinding, FriendsScreen> {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val binding = FragmentFriendsBinding.inflate(LayoutInflater.from(activity))
         activity.setContentView(binding.root)
         val actions = object : FriendsScreen.Actions {

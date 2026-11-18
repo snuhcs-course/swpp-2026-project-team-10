@@ -4,7 +4,6 @@ package com.lastpenguin.pix.ui.generation
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import androidx.appcompat.app.AppCompatActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
@@ -14,12 +13,13 @@ import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
+import com.lastpenguin.pix.ui.OwnActivities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.annotation.GraphicsMode
 
 /*
@@ -38,6 +38,9 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DescriptionFormTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private val changes = mutableListOf<String>()
     private val generated = mutableListOf<String>()
     private val focus = mutableListOf<Boolean>()
@@ -45,7 +48,7 @@ class DescriptionFormTest {
     private lateinit var shared: DescriptionForm
 
     private fun form(text: String? = "", rejected: Boolean = false): FragmentDescribePoseBinding {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val binding = FragmentDescribePoseBinding.inflate(LayoutInflater.from(activity))
         activity.setContentView(binding.root)
         DescriptionForm(
@@ -98,7 +101,7 @@ class DescriptionFormTest {
 
     @Test
     fun noText_keepsWhatTheFieldRestoredItself() {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val binding = FragmentDescribePoseBinding.inflate(LayoutInflater.from(activity))
         binding.descriptionInput.setText("Restored")
 

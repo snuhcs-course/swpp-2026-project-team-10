@@ -28,6 +28,7 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.ReferenceCorner
+import com.lastpenguin.pix.ui.camera.ReferenceDrop
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -160,6 +161,56 @@ class SubjectViewModelTest {
             viewModel.setReferenceCorner(ReferenceCorner.BOTTOM_LEFT)
             assertEquals(ReferenceCorner.BOTTOM_LEFT, viewModel.uiState.value.referenceCorner)
             assertEquals(sent, session.sent.size)
+        }
+
+    @Test
+    fun `the reference thumbnail hides and shows on this phone only, and another guide shows it again`() =
+        runTest(dispatcher) {
+            connect()
+            // Nothing to hide before the photo has come.
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            viewModel.setReferenceHidden(true)
+            assertFalse(viewModel.uiState.value.referenceHidden)
+            references.set(GuideReference("g1", fakeBitmap()))
+            runCurrent()
+            val sent = session.sent.size
+
+            viewModel.onReferenceDropped(ReferenceDrop(ReferenceCorner.TOP_RIGHT, hidden = true))
+            assertTrue(viewModel.uiState.value.referenceHidden)
+            assertEquals(ReferenceCorner.TOP_RIGHT, viewModel.uiState.value.referenceCorner)
+
+            // A tap on its strip brings it back.
+            viewModel.onReferenceTap()
+            assertFalse(viewModel.uiState.value.referenceHidden)
+            assertFalse(viewModel.uiState.value.referenceExpanded)
+            viewModel.onReferenceTap()
+            assertTrue(viewModel.uiState.value.referenceExpanded)
+
+            // Hidden while enlarged, it is small, and small when it is back; nothing enlarges it where it is hidden.
+            viewModel.onReferenceDropped(ReferenceDrop(ReferenceCorner.TOP_RIGHT, hidden = true))
+            assertFalse(viewModel.uiState.value.referenceExpanded)
+            viewModel.setReferenceExpanded(true)
+            assertFalse(viewModel.uiState.value.referenceExpanded)
+            viewModel.onReferenceTap()
+            assertFalse(viewModel.uiState.value.referenceHidden)
+            assertFalse(viewModel.uiState.value.referenceExpanded)
+            viewModel.setReferenceExpanded(true)
+
+            // The same guide's photo sent again, as after a reconnect, is still the hidden one.
+            viewModel.setReferenceHidden(true)
+            assertFalse(viewModel.uiState.value.referenceExpanded)
+            references.set(GuideReference("g1", fakeBitmap()))
+            runCurrent()
+            assertTrue(viewModel.uiState.value.referenceHidden)
+            // Hidden is this phone's alone, like the size and the corner: nothing was sent.
+            assertEquals(sent, session.sent.size)
+
+            mirror.setGuide(fakeGuide("g2"))
+            runCurrent()
+            references.set(GuideReference("g2", fakeBitmap()))
+            runCurrent()
+            assertFalse(viewModel.uiState.value.referenceHidden)
         }
 
     @Test

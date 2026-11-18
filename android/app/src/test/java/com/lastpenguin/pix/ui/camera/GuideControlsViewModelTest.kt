@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
@@ -132,6 +132,119 @@ class GuideControlsViewModelTest {
         model.onRemoveGuide()
         runCurrent()
         assertFalse(model.uiState.value.referenceExpanded)
+    }
+
+    // ---- Hiding the reference thumbnail (#237), state-based: shown; hidden by a drop, with its corner; shown again
+    // by a tap or by a drop in a corner; hidden while enlarged (small, and small when it is back); nothing to hide
+    // without a reference; kept through the same guide's moves, hiding, and saved copy; shown again for another guide
+    // and after the guide is removed.
+
+    @Test
+    fun onReferenceDropped_atASide_hidesItThereWithItsCorner_andInACornerShowsIt() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+        assertFalse(model.uiState.value.referenceHidden)
+
+        model.onReferenceDropped(ReferenceDrop(ReferenceCorner.BOTTOM_RIGHT, hidden = true))
+        assertTrue(model.uiState.value.referenceHidden)
+        assertEquals(ReferenceCorner.BOTTOM_RIGHT, model.uiState.value.referenceCorner)
+
+        model.onReferenceDropped(ReferenceDrop(ReferenceCorner.TOP_RIGHT, hidden = false))
+        assertFalse(model.uiState.value.referenceHidden)
+        assertEquals(ReferenceCorner.TOP_RIGHT, model.uiState.value.referenceCorner)
+    }
+
+    @Test
+    fun onReferenceTap_shownThumbnail_changesItsSize_andAHiddenOneComesBack() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+
+        model.onReferenceTap()
+        assertTrue(model.uiState.value.referenceExpanded)
+        model.onReferenceTap()
+        assertFalse(model.uiState.value.referenceExpanded)
+
+        model.setReferenceHidden(true)
+        assertTrue(model.uiState.value.referenceHidden)
+        model.onReferenceTap()
+        assertFalse(model.uiState.value.referenceHidden)
+        assertFalse(model.uiState.value.referenceExpanded)
+    }
+
+    @Test
+    fun referenceHidden_whileEnlarged_makesItSmall_andItComesBackSmall() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+
+        // By TalkBack's action, and back by a tap.
+        model.setReferenceExpanded(true)
+        model.setReferenceHidden(true)
+        assertTrue(model.uiState.value.referenceHidden)
+        assertFalse(model.uiState.value.referenceExpanded)
+        model.onReferenceTap()
+        assertFalse(model.uiState.value.referenceHidden)
+        assertFalse(model.uiState.value.referenceExpanded)
+
+        // By a drag to the side, and back by a drag into a corner.
+        model.setReferenceExpanded(true)
+        model.onReferenceDropped(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = true))
+        assertFalse(model.uiState.value.referenceExpanded)
+        // Nothing enlarges it where it is hidden.
+        model.setReferenceExpanded(true)
+        assertFalse(model.uiState.value.referenceExpanded)
+        model.onReferenceDropped(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = false))
+        assertFalse(model.uiState.value.referenceHidden)
+        assertFalse(model.uiState.value.referenceExpanded)
+
+        // Dropped in a corner, an enlarged one stays enlarged.
+        model.setReferenceExpanded(true)
+        model.onReferenceDropped(ReferenceDrop(ReferenceCorner.BOTTOM_LEFT, hidden = false))
+        assertTrue(model.uiState.value.referenceExpanded)
+    }
+
+    @Test
+    fun referenceHidden_noReferenceOrNoGuide_staysShown() = runTest(dispatcher) {
+        model.setReferenceHidden(true)
+        assertFalse(model.uiState.value.referenceHidden)
+
+        guides.setGuide(fakeGuide("without-reference"))
+        runCurrent()
+        model.setReferenceHidden(true)
+        model.onReferenceDropped(ReferenceDrop(ReferenceCorner.TOP_RIGHT, hidden = true))
+
+        assertFalse(model.uiState.value.referenceHidden)
+    }
+
+    @Test
+    fun referenceHidden_sameGuideMovesHidesOrIsSavedAgain_staysHidden() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+        model.setReferenceHidden(true)
+
+        guides.update(final = true) { it.copy(cx = 0.3f) }
+        model.onHideToggle()
+        // A saved copy is another object with the guide's id, and the same photo to the user.
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+
+        assertTrue(model.uiState.value.referenceHidden)
+    }
+
+    @Test
+    fun referenceHidden_newOrRemovedGuide_isShownAgain() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1").copy(reference = fakeBitmap()))
+        runCurrent()
+        model.setReferenceHidden(true)
+
+        // Another guide has another reference, which the user has not seen yet.
+        guides.setGuide(fakeGuide("g2").copy(reference = fakeBitmap()))
+        runCurrent()
+        assertFalse(model.uiState.value.referenceHidden)
+
+        model.setReferenceHidden(true)
+        model.onRemoveGuide()
+        runCurrent()
+        assertFalse(model.uiState.value.referenceHidden)
     }
 
     @Test

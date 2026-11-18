@@ -95,6 +95,7 @@
 | 3.12 | 2026-11-15 | A flaky signaling test: wait for a closed socket's release before moving the clock (2.1.8). |
 | 3.13 | 2026-11-16 | Photo capture (Iter4-P11, [#208]): the shutter's timings from `zoom_timings.py`, also from a log of shutter presses alone, and IT-10's shutter steps (2.1.4, Appendix A). |
 | 3.14 | 2026-11-16 | The scene photo step (Iter4-P21, [#231]): IT-7's steps for its top bar, its panel, and the ratio (Appendix A). |
+| 3.15 | 2026-11-18 | Better pose tips (Iter4-P16, [#213]): the tips checked by the four of us, a sentence at a time (`label-tips.html`), not by the judge, with a 90 % threshold beside the original; `retip`; the tests of the tip's two requests, its sentences, and the subject's tip; IT-17's tip steps (1.1, 2.1.5, 3.1, Appendix A). |
 
 </details>
 
@@ -171,7 +172,7 @@ One member writes and maintains each component's tests, following the module own
 | Landscape photos and the controls that turn (Iter4-P9, P10) | Platform, Managers, Views | `camera/`, `ui/camera/`, `generation/` | 한준형 |
 | Camera quality and latency (Iter4-P11) | Platform | `camera/` | 한준형 |
 | Situation prompts and the choice (Iter4-P12, P13) | Server module, ViewModels, Views | `test_prompts.py`, `test_poses.py`, `generation/`, `ui/`, `session/` | 박재완 |
-| Color tokens, light mode, the UI fixes, and the tips (Iter4-P5, P7, P15, P16) | Views, resources; server module | `ui/`, `settings/`, `test_prompts.py` | 박동제 |
+| Color tokens, light mode, the UI fixes, and the tips (Iter4-P5, P7, P15, P16) | Views, managers, resources; server module | `ui/`, `settings/`, `session/` (`TipSyncerTest`), `test_prompts.py`, `test_pose_tips.py` | 박동제 |
 | The QR connection (Iter4-P17) | Managers, Views | `session/`, `ui/session/` | 조성민 |
 | Integration tests, Iteration 2 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 (Iter2-P21) | 한준형 |
 | Integration tests, Iteration 3 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 | 박재완 |
@@ -403,7 +404,7 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-14 | Reference thumbnail on Subject view (Iter3-A1) | Emulator photographer, S22 subject; Mac server; same Wi-Fi | The subject's thumbnail shows the reference within 3 s, follows hiding, replacing, and removing, and returns after a rejoin without a resend. | FR-3.9, NFR-13 | [steps](#it-14-procedure) |
 | IT-15 | Guide from the subject's phone (Iter3-P9) | Two phones, AWS server, same Wi-Fi | The subject's guide shows at the same place on both phones within 0.3 s, with no resend after a rejoin. Of two at once, the later at the photographer wins. | US-16, FR-6.15, FR-6.16, NFR-7 | [steps](#it-15-procedure) |
 | IT-16 | Network switch during a session (Iter3-P14) | As IT-4; the subject on Wi-Fi with mobile data on | No crash. The session comes back over cellular within 10 s, or shows *Connection lost* and *Reconnect* works. | NFR-11 · Iteration 3 | [steps](#it-16-procedure) |
-| IT-17 | *Generate poses*, *Pick a pose*, and *Reference confirm* on both phones; *Save guide* on Subject view (Iter3-P16) | Two phones, AWS server; same Wi-Fi, then the subject on cellular | On Wi-Fi the subject's *Generate poses* follows within 2 s, *Pick a pose* within 3 s, *Your reference* within 2 s; typed text within 1 s. Both phones end with one choice. | US-16, FR-6.15, FR-6.16, NFR-7 | [steps](#it-17-procedure) |
+| IT-17 | *Generate poses*, *Pick a pose*, and *Reference confirm* on both phones; *Save guide* on Subject view (Iter3-P16) | Two phones, AWS server; same Wi-Fi, then the subject on cellular | On Wi-Fi the subject's *Generate poses* follows within 2 s, *Pick a pose* within 3 s, *Your reference* within 2 s; typed text within 1 s. Both phones end with one choice. *Added in Iter4-P16 ([#213]):* the photographer's tip opens on Subject view at a tap. | US-16, FR-6.15, FR-6.16, NFR-7; US-15, FR-4.10 | [steps](#it-17-procedure) |
 | IT-18 | Selfie mode (Iter3-P12) | The S22; an emulator subject with a Mac server | Mirrored preview; the saved photo matches it. Every candidate is a selfie of the same person and place. The subject's video is mirrored too. *Added in Iter4-P4 ([#201]): with the rear camera too, the subject's video shows as a mirror.* | FR-1.14, FR-6.6 · Iteration 3 | [steps](#it-18-procedure) |
 | IT-19 | Candidates in each ratio (Iter3-P8) | The S22, AWS server, Wi-Fi; a subject at the end | In 3:4, 9:16, and 1:1, the thumbnail, four slots, and candidates take the scene's shape, fit without scrolling, and show no band wider than a hairline. | FR-4.3, FR-1.13 · Iteration 3 | [steps](#it-19-procedure) |
 | IT-20 | Session photos on both phones (Iter3-P17) | Two phones, AWS server; same Wi-Fi, then the subject on cellular | Each photo reaches the subject's "Pix" album in order, same size and md5. Meanwhile guide moves stay within 0.3 s, the live view above the NFR-6 floor. Photos survive a 5 s drop. | US-14, FR-6.14, NFR-6, NFR-7, NFR-13 | [steps](#it-20-procedure) |
@@ -666,7 +667,7 @@ The AI modules under test are pose generation (Design 2.6.3) and the checks arou
 - the pose tips behind `POST /pose-tips` (R&S FR-4.10);
 - the description filter (FR-4.12) and the person check (FR-4.13), which run before the image model.
 
-Claude, through the Claude API, judges the generated poses, suggestions, and tips against fixed rules. The filter and the person check are measured on labeled sets.
+Claude, through the Claude API, judges the generated poses, suggestions, and tips against fixed rules. The filter and the person check are measured on labeled sets. *Changed in Iter4-P16 ([#213]), decided on 11/17 with no API key at hand for the judge:* the four of us check the tips, not Claude. `eval_poses.py sample --kind tip` writes `label-tips.html` with a run's tips, each of us answers it alone, and `agree --kind tip` counts the answers.
 
 ### 3.1 Plan
 
@@ -684,7 +685,7 @@ Claude, through the Claude API, judges the generated poses, suggestions, and tip
   - *Consistency*: the judge judges the run2 sample three times (`judge --repeat 3`), and we count the verdicts that change.
   - *Negative control*: 20 candidates, each shown beside the scene of another case, must fail *same person* and *same background*.
 - **Automatic checks.** Each returned image must be a decodable JPEG in the scene's ratio. The time of a set is measured as the app sees it, from the first request to the fourth candidate (NFR-4: the first within 20 s, all four within 30 s). There is no reference image, so images are not compared to one (the oracle problem, Week 6).
-- **Suggestions and tips.** *Suggestions*: for each set without a description, the judge reads the four suggested poses and decides whether they give four clearly different photos (`all_different`). Described sets (the description and its three variations) are reported separately. *Tips*: one tip per set, for one candidate, in the case's language, requested as the app does after *Use this pose* (100 per run). The judge checks that the distance, height, and angle in the tip suit the candidate, following the tip prompt's rules (`matches_pose`). The script counts tips with a number or a unit (the server's `MEASURE`).
+- **Suggestions and tips.** *Suggestions*: for each set without a description, the judge reads the four suggested poses and decides whether they give four clearly different photos (`all_different`). Described sets (the description and its three variations) are reported separately. *Tips*: one tip per set, for one candidate, in the case's language, requested as the app does after *Use this pose* (100 per run). The judge checks that the distance, height, and angle in the tip suit the candidate, following the tip prompt's rules (`matches_pose`). The script counts tips with a number or a unit (the server's `MEASURE`). *Changed in Iter4-P16 ([#213]), because the tip is now a few sentences that the server writes from what differs between the two photos:* the 100 tips of one run are checked, each by all four of us. `label-tips.html` shows the scene, the candidate, and the tip's sentences. Each of us answers pass or fail for every sentence, by the rules of `rubrics.toml`: `distance` (a move closer or back only for a person clearly bigger or smaller in the candidate, "much" only for about one and a half times, and "as it is" only for a person about as big), `phone` (the height and the tilt suit the candidate, the next height up or down included), `frame` (the side, and the room above the head), and `rest` (upright only for a line that leans). A sentence is right when most of us pass it; a tie is not right. A tip matches its pose when every sentence of it is right. Each of us also answers whether the tip leaves out something important, and may add a note; `agree --kind tip` reports these, each one's share, and how often two of us agree on a sentence, without thresholds. After a change to the tip's prompt or words, `eval_poses.py retip` asks a run's tips again for the same candidates; the images stay, and the tips before are kept in each set. The script still counts tips with a number or a unit, with its own `MEASURE`, since the server now writes every word.
 - **Situations (Iter4-P12, [#209]).** `server/eval/situation_cases.json` holds 10 cases from the evaluation set: three each for background, half body, and full body, and one for landmark, since only `s03` shows a landmark. Each has a description a user might type there, 5 in English and 5 in Korean. Chosen and written with Claude Code, and reviewed by 박재완. Each case runs with its own situation and with `--situation default`, with and without its description; two scenes (`s03`, `s06`) also run every situation without one. The judge applies rules 1–6. Whether a set differs from the default set and fits its situation is judged by eye, side by side. A situation keeps its own prompt when its sets differ and fit, and break no more rules than the default ones.
 - **Description filter.** `server/eval/filter_cases.toml` holds 100 descriptions: 50 harmless (14 of them with words that guards often flag) and 50 harmful or manipulative, half in English and half in Korean. They were written with Claude Code, in a session that did not see the filter's questions or its tuning cases, and reviewed by 박재완. Measured at the server's cutoff: harmful descriptions let through, and harmless descriptions refused.
 - **Person check.** `server/eval/person/` holds 50 Wikimedia Commons photos, none of them used in tuning, chosen and labeled in `labels.json` with Claude Code and reviewed by 박재완: 26 with a person (near, full body, far, from behind, sitting, selfie, partly hidden, low light, group) and 24 without (empty places, statues, mannequins, animals, drawings, toys). Measured for the phone's ML Kit check (`PersonCheckEval` on a device), the server's Jev check, and both together as the app runs them: photos with a person refused, and photos without one let through.
@@ -699,7 +700,7 @@ Claude, through the Claude API, judges the generated poses, suggestions, and tip
 | | candidates that break a rule | ≤ 20 % |
 | | candidates that follow the request | ≥ 80 % |
 | Suggestions | suggested sets with four different poses | ≥ 90 % |
-| Tips | tips that match their pose | ≥ 80 % |
+| Tips | tips that match their pose | ≥ 80 %; from Iteration 4, ≥ 90 % of one run's tips, by most of the four of us ([#213]: the tip was rebuilt to be exact and to leave out what it is not sure of, so its bar rises; declared on 11/16, before any check) |
 | | tips with a number or a unit | none |
 | Description filter | harmful descriptions let through | ≤ 5 % |
 | | harmless descriptions refused | ≤ 5 % |
@@ -1274,6 +1275,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
    - the photographer tapping *Choose another photo* and then Back; *Changed in Iter4-P2 ([#199]): Back alone, which returns to *Pick a pose* outside a session and to the camera in one.*
    - the subject going Back and opening *Your reference* from Subject view.
 8. The subject taps *Save guide* and uses the saved guide from *Add a pose guide*.
+9. *Added in Iter4-P16 ([#213]):* with a generated guide used, read the tip on the photographer's Camera. On Subject view tap the light bulb, touch the video, and tap the light bulb twice. The photographer hides the guide, shows it, and removes it. Turn the subject's Wi-Fi off for 5 s with the tip's guide on the video.
 
 **Expected result**
 
@@ -1290,6 +1292,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - Of two choices at once, both phones end with the one that the photographer's log names in `pose.sent chosen`.
 - While the link reconnects, the subject's *Pick a pose* keeps the candidates and *Use this pose* waits. Afterwards the set is there again, or it closes with its notice if the photographer closed it during the drop.
 - The saved guide starts where it started on the photographer's phone, with its thumbnail.
+- The tip (step 9): Camera shows the tip as short sentences, one on a line, with no number, no reason, and nothing about the background. Subject view shows a light bulb with a dot beside the brightness button, and no tip until the tap. The tap opens the same sentences; the touch closes them; the second of the two taps closes them again. The light bulb goes while the guide is hidden or removed, and is there again after the drop (R&S FR-4.10).
 
 ### IT-18 procedure
 

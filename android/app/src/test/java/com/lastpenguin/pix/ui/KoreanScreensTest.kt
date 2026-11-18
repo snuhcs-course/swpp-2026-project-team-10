@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Joonhyung Han, Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -130,8 +130,9 @@ import org.robolectric.annotation.GraphicsMode
  * failed, refused, and without a person; Who takes the photo?; Share my camera signed out, and with a friend, a request,
  * and a sent request; Sent requests; Add a friend; Sign in; Sign up; Pix ID setup; Account; the room code; See their
  * camera; Session not found; Subject view, with the photographer's tip closed and open,
- * and while the photographer picks a pose, with a guide to save; the subject's Pick a pose; Connection lost; Camera in a
- * session with the delay shown; Settings, signed in; How to use Pix; About Pix. On each, no visible text, hint, or content
+ * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
+ * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
+ * viewer (Iter4-A2), and with the delay shown; Settings, signed in; How to use Pix; About Pix. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
  * in a view that ellipsizes on purpose, and no line breaks inside a word. The text styles' font aliases: Pretendard in
@@ -243,6 +244,27 @@ class KoreanScreensTest {
     fun camera_inASession_isInKorean() {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun camera_inASessionWithItsPhotosOpen_isInKorean() {
+        val modules = camera()
+        modules.camera.photo = Uri.parse("content://media/external/images/media/20")
+        scenario!!.onFragment { fragment ->
+            (fragment as CameraFragment).thumbnailOf = { bitmap() }
+            fragment.photoOf = { bitmap() }
+        }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        repeat(2) {
+            scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).shutterButton.performClick() }
+            idle()
+        }
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).galleryButton.performClick() }
+        // The pictures are read off the main thread.
+        idle()
+        Thread.sleep(200)
         assertKorean(screen(), *people)
     }
 
@@ -722,6 +744,45 @@ class KoreanScreensTest {
         )
         // The "Connecting…" check runs every 500 ms on the main looper; let one more round see the session.
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    /** Subject view with two of the photographer's photos saved here and opened in the viewer. */
+    private fun subjectViewWithAPhotoOpen(readable: Boolean) {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        scenario!!.onFragment { fragment ->
+            (fragment as SubjectFragment).thumbnailOf = { bitmap() }
+            fragment.photoOf = { if (readable) bitmap() else null }
+        }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.photos.startAsReceiver(receiving)
+        modules.deliverPhoto("p1")
+        modules.deliverPhoto("p2")
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        // The pictures are read off the main thread.
+        Thread.sleep(200)
+        idle()
+        assertKorean(screen(), *people)
+        scenario!!.onFragment { FragmentSubjectBinding.bind(it.requireView()).galleryButton.performClick() }
+        idle()
+        Thread.sleep(200)
+        idle()
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_withASessionPhotoInTheViewer_isInKorean() {
+        subjectViewWithAPhotoOpen(readable = true)
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_withASessionPhotoThatCannotBeRead_isInKorean() {
+        subjectViewWithAPhotoOpen(readable = false)
         assertKorean(screen(), *people)
     }
 

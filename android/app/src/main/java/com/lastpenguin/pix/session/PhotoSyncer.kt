@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -89,6 +91,9 @@ class ContentPhotoReader(private val resolver: ContentResolver) : PhotoReader {
  * Subject ([startAsReceiver]): writes the chunks to one file in [partDir], not to memory, saves it to [album] at
  * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, and [shutters]
  * when each was taken, for Subject view's blink (Iter3-A12).
+ *
+ * Both: [sessionPhotos] are the session's photos on this phone, taken or received, for the thumbnail and the viewer
+ * of Camera and Subject view (Iter4-A2).
  * Owner: Shared steps (Iter3-P17).
  */
 class PhotoSyncer(
@@ -98,6 +103,31 @@ class PhotoSyncer(
     private val partDir: File,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : PhotoShare {
+
+    // ---- Both -------------------------------------------------------------------------------------------------
+
+    /** A session's photos so far; another session's id starts them again. */
+    private class Kept(val sessionId: String, val photos: List<Uri>)
+
+    private val kept = MutableStateFlow<Kept?>(null)
+
+    /**
+     * The photos of the session running now in this phone's album, oldest first (FR-1.6, FR-6.14): those taken here on
+     * the photographer's phone, those received on the subject's. null outside a session, and empty until its first.
+     * They stay through a reconnect, which keeps the session's id.
+     */
+    val sessionPhotos: Flow<List<Uri>?> = combine(session.state, kept) { state, kept ->
+        state.liveSessionId()?.let { id -> kept?.takeIf { it.sessionId == id }?.photos.orEmpty() }
+    }.distinctUntilChanged()
+
+    /**
+     * [uri] is one more photo of [sessionId] in this phone's album, while that session still runs: a save that ends
+     * after it, once another started, would put the photo in the other session and take that one's photos away.
+     */
+    private fun keep(sessionId: String, uri: Uri) {
+        if (currentSession() != sessionId) return
+        kept.update { old -> Kept(sessionId, old?.takeIf { it.sessionId == sessionId }?.photos.orEmpty() + uri) }
+    }
 
     // ---- Photographer -----------------------------------------------------------------------------------------
 
@@ -127,16 +157,20 @@ class PhotoSyncer(
      * whose session ended meanwhile was counted when it ended, by [drop].
      */
     override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
-        if (currentSession() == sessionId) queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt))
+        if (currentSession() != sessionId) return
+        keep(sessionId, uri)
+        queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt))
     }
 
     override fun notTaken(sessionId: String) {
         if (currentSession() == sessionId) unconfirmed.updateAndGet { maxOf(it - 1, 0) }
     }
 
-    private fun currentSession(): String? = when (val state = session.state.value) {
-        is SessionState.Connected -> state.sessionId
-        is SessionState.Reconnecting -> state.sessionId
+    private fun currentSession(): String? = session.state.value.liveSessionId()
+
+    private fun SessionState.liveSessionId(): String? = when (this) {
+        is SessionState.Connected -> sessionId
+        is SessionState.Reconnecting -> sessionId
         else -> null
     }
 
@@ -352,9 +386,12 @@ class PhotoSyncer(
             photo.crc.value == end.crc32 && photo.startsAsJpeg
         if (!whole) return fail(photo, PhotoRefusal.BROKEN)
         photo.close()
+        // The session the photo came in, before the save, which takes its time and outlasts a session that ends.
+        val sessionId = currentSession()
         album.save(photo.file, end.photoId, photo.begin.takenAt).fold(
-            onSuccess = {
+            onSuccess = { uri ->
                 saved += end.photoId
+                sessionId?.let { keep(it, uri) }
                 answer(end.photoId, null)
                 Timings.mark("photo.applied", "saved ${end.photoId}")
             },

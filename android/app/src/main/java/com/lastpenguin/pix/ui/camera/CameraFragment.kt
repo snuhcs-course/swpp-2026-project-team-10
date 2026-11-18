@@ -21,7 +21,6 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.util.Size
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -90,16 +89,12 @@ import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Camera screen. Guide gestures belong to #6; the scene photo for poses belongs to #7; live session UI belongs to #8. */
 class CameraFragment : Fragment(R.layout.fragment_camera) {
@@ -111,6 +106,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var binding: FragmentCameraBinding? = null
     private var sceneBack: OnBackPressedCallback? = null
     private var aspectsBack: OnBackPressedCallback? = null
+    private var photosBack: OnBackPressedCallback? = null
+    private var photoViewer: PhotoViewer? = null
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
@@ -185,9 +182,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     // The last photo's thumbnail, off the main thread; a test stands in for MediaStore, which has no photos on the JVM.
     @VisibleForTesting
-    internal var thumbnailOf: (Uri) -> Bitmap? = { uri ->
-        requireContext().contentResolver.loadThumbnail(uri, Size(THUMBNAIL_PX, THUMBNAIL_PX), null)
-    }
+    internal var thumbnailOf: (Uri) -> Bitmap? = { uri -> requireContext().photoThumbnail(uri) }
+
+    // A session photo in the viewer, the same way.
+    @VisibleForTesting
+    internal var photoOf: (Uri) -> Bitmap? = { uri -> requireContext().photoToView(uri) }
 
     // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
     private var previewArea = PreviewArea(0f, 0f, 0f)
@@ -311,7 +310,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             }
         }
         setupScenePhoto(controls)
-        controls.galleryButton.setOnClickListener { openLastPhoto() }
+        controls.galleryButton.setOnClickListener { onThumbnailTap() }
+        photoViewer = PhotoViewer(controls.photoViewerHolder, viewLifecycleOwner.lifecycleScope, { photoOf(it) }) {
+            viewModel.closeSessionPhotos()
+        }
+        // After the other screens' Backs, so it comes first: the viewer is over all of them.
+        photosBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
+            viewModel.closeSessionPhotos()
+        }
         // Selfie mode (FR-1.14): the last frame stays up, blurred, and turns over while the other camera opens.
         controls.switchCameraButton.setOnClickListener {
             previewHold?.hold()
@@ -490,28 +496,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     }
                 }
                 launch {
-                    // A photo just taken grows into the thumbnail (FR-1.6); one there as the screen opens just shows.
-                    var opening = true
-                    viewModel.uiState.map { it.lastPhoto }.distinctUntilChanged().collectLatest { uri ->
-                        val taken = !opening
-                        opening = false
-                        val thumbnail = if (uri == null) {
-                            null
-                        } else {
-                            withContext(Dispatchers.IO) {
-                                try {
-                                    thumbnailOf(uri)
-                                } catch (_: Exception) {
-                                    null // The full photo can still be opened if thumbnail decoding fails.
-                                }
-                            }
-                        }
-                        if (thumbnail == null) {
-                            controls.galleryThumbnail.setImageResource(R.drawable.gallery_placeholder)
-                        } else {
-                            controls.galleryThumbnail.setImageBitmap(thumbnail)
-                            if (taken) growIn(controls.galleryThumbnail)
-                        }
+                    // A new photo, taken here or received, grows into the thumbnail (FR-1.6).
+                    showPhotoThumbnails(viewModel.uiState.map { it.lastPhoto }, controls.galleryThumbnail) {
+                        thumbnailOf(it)
                     }
                 }
             }
@@ -545,6 +532,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     override fun onDestroyView() {
+        photoViewer = null
+        photosBack = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
         referenceDrag = null
@@ -953,6 +942,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
+        controls.galleryButton.contentDescription =
+            getString(if (state.sessionPhotos != null) R.string.open_session_photo else R.string.open_last_photo)
+        photoViewer?.render(state.sessionPhotos.orEmpty(), state.photosOpen)
+        photosBack?.isEnabled = state.photosOpen
         // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
         controls.switchCameraButton.isVisible = state.canSwitchCamera
         controls.switchCameraButton.isEnabled = granted && !state.isSaving
@@ -1690,17 +1683,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    /** A new photo's thumbnail grows in from [THUMBNAIL_START_SCALE] (FR-1.6). */
-    private fun growIn(view: View) {
-        if (!Motion.on()) return
-        view.animate().cancel()
-        view.scaleX = THUMBNAIL_START_SCALE
-        view.scaleY = THUMBNAIL_START_SCALE
-        view.alpha = 0f
-        view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(Motion.FADE_MS).setInterpolator(Motion.STANDARD)
-            .start()
-    }
-
     /**
      * Clips the preview to where its image shows (AD-10): the frame, or for 1:1 the whole 4:3 area with the rest
      * dimmed (R&S 6.2), and puts the live light in the frame's corner. Nothing is clipped before layout.
@@ -1848,6 +1830,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    /**
+     * The thumbnail (FR-1.6): in a session, the session's photos over the camera, inside Pix, so the session and the
+     * subject's video go on; otherwise the newest photo in the phone's gallery.
+     */
+    private fun onThumbnailTap() {
+        if (viewModel.uiState.value.sessionPhotos == null) return openLastPhoto()
+        viewModel.setAspectsOpen(false)
+        viewModel.openSessionPhotos()
+    }
+
     private fun openLastPhoto() {
         val uri = viewModel.uiState.value.lastPhoto ?: return
         try {
@@ -1873,8 +1865,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val MIN_BLUR_PX = 0.5f
         private const val HALF_TURN = 180f
         private const val FLIP_CAMERA_DISTANCE = 8_000f
-        private const val THUMBNAIL_START_SCALE = 0.6f
-        private const val THUMBNAIL_PX = 144
         private const val FOCUS_RING_START_SCALE = 1.25f
         private const val FOCUS_RING_SHRINK_MS = 150L
         private const val FOCUS_RING_HOLD_MS = 700L

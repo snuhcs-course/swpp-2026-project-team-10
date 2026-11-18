@@ -1,7 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.core
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -25,6 +26,7 @@ import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
 import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.NARROWEST_FRAME_ASPECT
+import com.lastpenguin.pix.camera.NewestAlbumPhoto
 import com.lastpenguin.pix.camera.PhotoSaver
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.network.PixAccountApi
@@ -88,6 +90,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -104,6 +107,8 @@ class AppContainer(
     // ---- Camera (#3) ----------------------------------------------------------
     val cameraController: CameraController,
     val cameraSettings: CameraSettings,
+    /** The newest photo in Pix's album, taken here or received in a session, for Camera's thumbnail (FR-1.6). */
+    val albumPhoto: StateFlow<Uri?>,
     // ---- Guide (#5, #6) -------------------------------------------------------
     /** The photographer's guide, clamped to the frame of the chosen aspect ratio (AD-10). */
     val guideRepository: GuideRepository,
@@ -265,6 +270,7 @@ class AppContainer(
             val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
             return AppContainer(
                 cameraController = cameraController,
+                albumPhoto = NewestAlbumPhoto(appContext.contentResolver, appScope).newest,
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,

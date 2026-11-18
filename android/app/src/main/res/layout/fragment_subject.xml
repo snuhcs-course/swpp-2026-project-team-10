@@ -422,18 +422,33 @@
         android:translationZ="1dp"
         android:paddingHorizontal="16dp"
         android:paddingTop="8dp"
-        android:paddingBottom="24dp"
+        android:paddingBottom="22dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Guide and, while the photographer's candidates are ready, Pick a pose beside it (FR-6.15). -->
-        <LinearLayout
+        <!-- Camera's row in thirds (R&S 6.6): Guide in the middle of the left third, where Camera's is, and, while the
+             photographer's candidates are ready, Pick a pose in the middle, where Camera's shutter is (FR-6.15); the
+             session photos' thumbnail, a view of the screen's own, in the middle of the right third. Each is centered
+             on its line, so a longer label grows both ways. -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/guideRow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:orientation="horizontal">
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <androidx.constraintlayout.widget.Guideline
+                android:id="@+id/guideLine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                app:layout_constraintGuide_percent="0.1667" />
+
+            <androidx.constraintlayout.widget.Guideline
+                android:id="@+id/middleLine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                app:layout_constraintGuide_percent="0.5" />
 
             <!-- The Camera screen's Guide button: the guide chosen here goes to the photographer (FR-6.15). -->
             <LinearLayout
@@ -447,16 +462,19 @@
                 android:minWidth="48dp"
                 android:minHeight="48dp"
                 android:orientation="vertical"
-                android:paddingHorizontal="8dp">
+                android:paddingHorizontal="8dp"
+                app:layout_constraintEnd_toEndOf="@id/guideLine"
+                app:layout_constraintStart_toStartOf="@id/guideLine"
+                app:layout_constraintTop_toTopOf="parent">
 
                 <ImageView
                     android:id="@+id/guideButtonIcon"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:background="@drawable/bg_guide_button"
                     android:duplicateParentState="true"
                     android:importantForAccessibility="no"
-                    android:padding="9dp"
+                    android:padding="10dp"
                     android:scaleType="fitCenter"
                     android:src="@drawable/ic_guide"
                     app:tint="@color/guide_button_icon" />
@@ -488,15 +506,18 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="8dp"
                 android:visibility="gone"
+                app:layout_constraintEnd_toEndOf="@id/middleLine"
+                app:layout_constraintStart_toStartOf="@id/middleLine"
+                app:layout_constraintTop_toTopOf="parent"
                 tools:visibility="visible">
 
                 <ImageView
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:background="@drawable/bg_guide_button"
                     android:duplicateParentState="true"
                     android:importantForAccessibility="no"
-                    android:padding="9dp"
+                    android:padding="10dp"
                     android:scaleType="fitCenter"
                     android:src="@drawable/ic_sparkle"
                     app:tint="@color/guide_button_icon" />
@@ -514,7 +535,63 @@
                     android:textAppearance="@style/TextAppearance.Pix.Caption"
                     android:textColor="@color/pix_text_soft" />
             </LinearLayout>
-        </LinearLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
     </LinearLayout>
+
+    <!-- The middle of the row's right third (the panel's 16 dp padding and five sixths of the rest), as far from the
+         right edge as Guide is from the left. -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/thumbnailLine"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.8037" />
+
+    <!-- The session's newest photo (FR-6.14), Camera's thumbnail: a 40 dp image in a 48 dp touch area (NFR-16), on
+         Guide's icon line (the panel's 8 dp padding and half the 40 dp icon), centered on the line above. Empty, and
+         taking no tap, until a photo is saved here; a tap then opens the session's photos in the viewer below. -->
+    <FrameLayout
+        android:id="@+id/galleryButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="4dp"
+        android:clickable="true"
+        android:contentDescription="@string/open_session_photo"
+        android:focusable="true"
+        android:outlineProvider="none"
+        android:translationZ="1dp"
+        app:layout_constraintEnd_toEndOf="@id/thumbnailLine"
+        app:layout_constraintStart_toStartOf="@id/thumbnailLine"
+        app:layout_constraintTop_toTopOf="@id/bottomPanel">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/galleryThumbnail"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@color/pix_glass"
+            android:duplicateParentState="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:importantForAccessibility="no"
+            android:padding="1dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/gallery_placeholder"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
+            app:strokeColor="@color/camera_thumbnail_stroke"
+            app:strokeWidth="1.5dp" />
+    </FrameLayout>
+
+    <!-- The session's photos (FR-6.14, R&S 6.6), over the whole screen. Built in this empty holder when it first opens,
+         so a screen that never opens it builds no pager. -->
+    <FrameLayout
+        android:id="@+id/photoViewerHolder"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:outlineProvider="none"
+        android:translationZ="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 </com.lastpenguin.pix.ui.camera.TouchWatchingLayout>

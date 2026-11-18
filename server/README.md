@@ -429,7 +429,7 @@ uv run --env-file .env scripts/try_person_check.py --without-person empty/ --pro
 
 ### Try pose tips
 
-[`try_pose_tips.py`](scripts/try_pose_tips.py) tries the tip prompt on scene photos, with candidates that it makes once. So you can change the prompt and run it again without paying for new images.
+[`try_pose_tips.py`](scripts/try_pose_tips.py) tries the tip prompt on scene photos, with candidates that it makes once. So you can change the prompt and run it again without paying for new images. Like the server, it asks about the scene and the candidate in two requests and writes the tip's sentences from the two answers; `--prompt-file` replaces `tip_prompt`, which both requests get.
 
 ```sh
 uv run --env-file .env scripts/try_pose_tips.py candidates photos/*.jpg      # one candidate per scene, made once
@@ -456,7 +456,16 @@ uv run --env-file .env scripts/eval_poses.py judge run1                        #
 uv run scripts/eval_poses.py report run1 run2 run3                             # each run, then all together
 ```
 
-`judge` sends only what has no verdict with the current rubric, so a changed rubric judges a whole run again. `report` writes `summary.txt`, `summary.json`, and `report.html`.
+`judge` sends only what has no verdict with the current rubric, so a changed rubric judges a whole run again. It judges the poses and the suggestions; the tips are checked by us, below. `report` writes `summary.txt`, `summary.json`, and `report.html`.
+
+After a change to the tip's prompt or words, ask a run's tips again for the same candidates, without paying for new images. We check the tips ourselves, not the judge (Testing 3.1): `sample --kind tip` writes `label-tips.html`, each of us answers every sentence in a browser and downloads the labels, and `agree --kind tip` counts the tips that match their pose into `tip-check.txt` and `tip-check.json`, where `report` reads the tips' metric. A reading of the run's other tips through Claude Code (Testing 3.1) goes to `tip-check-rest.json` in the same shape, and `report` gives it on a line of its own. The labels must be downloaded from the page of the current sample: `agree` refuses those of another run or of the tips before a `retip`, and the page keeps a labeler's answers apart for each sample.
+
+```sh
+uv run scripts/eval_poses.py retip run1                                        # keeps the tips before in each set
+uv run scripts/eval_poses.py retip run1 --failed                               # only the sets whose tip request failed
+uv run scripts/eval_poses.py sample run1 --kind tip --size 50                  # label-tips.html with 50 of the run's tips
+uv run scripts/eval_poses.py agree run1 --kind tip --labels labels-tips-*.json # from our downloaded answers
+```
 
 To compare the situation prompts with the default ones (Testing 3.1, *Situations*), run the situation cases with their own situations and with `default`, then judge and report both. `--situation` gives every case but the selfies that situation:
 

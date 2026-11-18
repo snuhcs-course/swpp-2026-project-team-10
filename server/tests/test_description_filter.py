@@ -131,8 +131,9 @@ def test_tip_for_a_refused_pose_is_refused_before_the_model(client, image_api, m
 def test_tip_for_a_pose_the_filter_lets_through_quotes_it_with_single_marks(client, image_api, make_image):
     assert ask_tip(client, make_image(), pose='say "cheese"').status_code == 200
     assert image_api.filter_payloads[0]["state"] == {"description": 'say "cheese"'}
-    texts = [part.get("text") for part in image_api.tip_payloads[0]["messages"][0]["content"]]
-    assert "Photo 2, the photo they want, with the pose \"say 'cheese'\":" in texts
+    # The pose goes with the candidate, the second of the tip's two requests.
+    texts = [part.get("text") for part in image_api.tip_payloads[1]["messages"][0]["content"]]
+    assert "The photo, made for the pose \"say 'cheese'\":" in texts
 
 
 @pytest.mark.parametrize("status", [403, 429, 500, 502])

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -133,6 +133,19 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("guide.clear")
     data object GuideClear : SessionMessage
+
+    /**
+     * P→S: the tip of the guide on the photographer's camera (FR-4.10, #213), which Subject view shows on a tap while
+     * the guide [guideId] is on its video: [text] as the server wrote it, a sentence on each line.
+     */
+    @Serializable
+    @SerialName("guide.tip")
+    data class GuideTip(val guideId: String, val text: String) : SessionMessage
+
+    /** P→S: the guide on the camera has no tip, or none any more. */
+    @Serializable
+    @SerialName("guide.tip.clear")
+    data object GuideTipClear : SessionMessage
 
     /**
      * Where the photographer's set of candidates [setId] is (Design 2.5.1, 2.6.5, Iter3-P16): the subject's *Pick a

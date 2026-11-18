@@ -23,7 +23,7 @@ These files fix the contracts between the module owners. Design 2.1 marks them w
 | `guide/GuideRepository.kt`, `guide/ReferenceGuideMaker.kt` | Guide store and reference-to-guide interfaces | 2.1 |
 | `guide/SavedGuideStore.kt` | Saved guides on the phone, the library. `SavedGuideStore` (with `thumbnail`, which a cell reads when it shows), `SavedGuide` (with its source), `GuideSaved`, and `SavedGuideStore.InMemory` for tests. | 2.1, 2.3 |
 | `generation/GenerationModels.kt`, `generation/PoseGenerator.kt` | Pose requests, planned poses, generation and candidate events, generator interface | 2.1, 2.3 |
-| `generation/PoseTipper.kt` | How to hold the phone for a generated pose: `PoseTipper`, `PoseTip` | 2.1, 2.6.3 |
+| `generation/PoseTipper.kt` | How to take a generated pose: `PoseTipper`, `PoseTip` | 2.1, 2.6.3 |
 | `generation/PersonDetector.kt` | The person check on the phone before the app sends a scene photo: `PersonDetector` | 2.1, 2.6.3 |
 | `generation/PromptHistory.kt` | The descriptions used before, on this phone: `PromptHistory`, `PromptEntry`, and `PromptHistory.InMemory` for tests | 2.1, 2.6.3 |
 | `session/SessionModels.kt`, `session/SessionManager.kt` | Roles, entries, session states, session interface | 2.1, 2.3, 2.4 |
@@ -74,7 +74,7 @@ Korean is in 해요체 (사진을 저장했어요). A name in a message takes �
 
 Every text appearance sets `android:lineBreakWordStyle="phrase"`. Thus on Android 13 and later, Korean lines break between words. Android 10–12 break them inside words. Manrope has no Hangul, so on a phone in Korean every screen uses Pretendard, Latin letters included. `res/font` points the `pix_*` aliases to Manrope, and `res/font-ko` points them to Pretendard.
 
-The app asks the server for screen text in the screens' language. So far, the only such text is the pose tip. `screenLanguage` (`generation/ScreenLanguage.kt`) gives `ko` when `values-ko/bools.xml` sets `screens_in_korean`, and `en` otherwise. `ScreenLanguages` follows the language from the application and from `MainActivity`.
+The app asks the server for screen text in the screens' language. So far, the only such text is the pose tip. In a session the subject's phone shows the photographer's tip as sent, in the photographer's language. `screenLanguage` (`generation/ScreenLanguage.kt`) gives `ko` when `values-ko/bools.xml` sets `screens_in_korean`, and `en` otherwise. `ScreenLanguages` follows the language from the application and from `MainActivity`.
 
 ## Camera
 

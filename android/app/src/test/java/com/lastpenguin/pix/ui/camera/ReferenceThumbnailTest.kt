@@ -11,7 +11,8 @@ import org.junit.Test
  * Place: each of the four corners, small and enlarged. Nearest corner: a drop in each quarter of the area, and one
  * exactly in its middle (a boundary: right and bottom win).
  * Hidden (#237). Place: at the side of each corner, with only the peek inside the preview; hidden while enlarged (the
- * small one's strip). A drop: inside the preview (its corner, shown); its center at the preview's side and just past
+ * small one's strip), and a thumbnail narrower than the peek (just under half of it stays, a boundary at twice the
+ * peek). A drop: inside the preview (its corner, shown); its center at the preview's side and just past
  * it, left and right (a boundary: hidden only past it); flung toward the nearer side at the fling speed and just under
  * it, toward the far side, and more down than sideways (hidden only for the first). How see-through: inside, sliding
  * out, and hidden.
@@ -113,6 +114,38 @@ class ReferenceThumbnailTest {
         // A hidden thumbnail is never the enlarged one: a tall strip would cover the side of the preview.
         assertEquals(small, enlarged)
         assertEquals(189, enlarged.height)
+    }
+
+    @Test
+    fun referencePeek_isThePeek_orJustUnderHalfOfAThumbnailTooNarrowForIt() {
+        assertEquals(42, referencePeek(width = 126, peek = 42))
+        // 85 px is the narrowest that keeps the whole peek with more than half of it out: a boundary.
+        assertEquals(42, referencePeek(width = 85, peek = 42))
+        assertEquals(41, referencePeek(width = 84, peek = 42))
+        assertEquals(11, referencePeek(width = 24, peek = 42))
+        assertEquals(0, referencePeek(width = 1, peek = 42))
+    }
+
+    @Test
+    fun placeReference_hiddenVeryTallPhoto_leavesJustUnderHalfOfItsNarrowThumbnail() {
+        // 1:8, so the small thumbnail is 24 px wide, narrower than the 42 px peek.
+        val left = place(aspect = 1f / 8f, corner = ReferenceCorner.TOP_LEFT, hidden = true)
+        val right = place(aspect = 1f / 8f, corner = ReferenceCorner.TOP_RIGHT, hidden = true)
+
+        assertEquals(24, left.width)
+        assertEquals(-13, left.x)
+        assertEquals(1069, right.x)
+    }
+
+    @Test
+    fun referenceAlpha_narrowThumbnail_fadesOverTheWayItCanGo() {
+        assertEquals(1f, referenceAlpha(x = 0f, width = 24, previewWidth = 1080, peek = 42), 0.001f)
+        assertEquals(0.775f, referenceAlpha(x = -6.5f, width = 24, previewWidth = 1080, peek = 42), 0.001f)
+        assertEquals(
+            REFERENCE_HIDDEN_ALPHA,
+            referenceAlpha(x = -13f, width = 24, previewWidth = 1080, peek = 42),
+            0.001f,
+        )
     }
 
     @Test

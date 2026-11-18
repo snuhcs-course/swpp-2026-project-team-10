@@ -20,6 +20,8 @@ import org.junit.runner.RunWith
  * Hiding (#237): released with more than half of it past the side, and with half or less (hidden, and its corner);
  * flung toward its side, and dragged as far slowly (hidden, and its corner). A hidden thumbnail: a tap on its strip,
  * a drag back in, and one that ends still out. The handle beside a hidden thumbnail: its touches are the thumbnail's.
+ * The lift: at the last move's place (above), carrying the last of the move (counted for the place and the speed), and
+ * far from the touch with no move between (a drag). A thumbnail narrower than the peek: out to just over half of it.
  */
 @RunWith(AndroidJUnit4::class)
 class ReferenceDragControllerTest {
@@ -144,6 +146,43 @@ class ReferenceDragControllerTest {
     }
 
     @Test
+    fun release_carryingTheLastOfTheMove_countsForThePlaceAndTheSpeed() = onMain {
+        // The lift brings 40 of the 60 px: with it the drag ends at 3000 px/s, a fling; without it at 2000, none.
+        val flung = fixture()
+        touchAt(flung.view, MotionEvent.ACTION_DOWN, 300f, 100f, time = 1_000)
+        touchAt(flung.view, MotionEvent.ACTION_MOVE, 280f, 100f, time = 1_010)
+        touchAt(flung.view, MotionEvent.ACTION_UP, 240f, 100f, time = 1_020)
+        assertEquals(-29f, flung.view.translationX)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = true)), flung.drops)
+
+        // A lift far from the touch with no move between is a drag to there, not a tap.
+        val jumped = fixture()
+        touchAt(jumped.view, MotionEvent.ACTION_DOWN, 100f, 100f, time = 1_000)
+        touchAt(jumped.view, MotionEvent.ACTION_UP, 800f, 1_100f, time = 3_000)
+        assertEquals(0, jumped.taps)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.BOTTOM_RIGHT, hidden = false)), jumped.drops)
+    }
+
+    @Test
+    fun narrowThumbnail_dragsOutUntilJustOverHalfOfItIsOut_andHidesThere() = onMain {
+        // 24 px wide, narrower than the 42 px peek: 11 px of it stay, so its center is past the side.
+        val left = fixture(width = 24)
+        touch(left.view, MotionEvent.ACTION_DOWN, 100f, 100f)
+        touch(left.view, MotionEvent.ACTION_MOVE, -5_000f, 100f)
+        assertEquals(-13f, left.view.translationX)
+        assertEquals(REFERENCE_HIDDEN_ALPHA, left.view.alpha, 0.001f)
+        touch(left.view, MotionEvent.ACTION_UP, -5_000f, 100f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_LEFT, hidden = true)), left.drops)
+
+        val right = fixture(x = 1_025f, width = 24)
+        touch(right.view, MotionEvent.ACTION_DOWN, 100f, 100f)
+        touch(right.view, MotionEvent.ACTION_MOVE, 5_000f, 100f)
+        assertEquals(1_069f, right.view.translationX)
+        touch(right.view, MotionEvent.ACTION_UP, 5_000f, 100f)
+        assertEquals(listOf(ReferenceDrop(ReferenceCorner.TOP_RIGHT, hidden = true)), right.drops)
+    }
+
+    @Test
     fun hiddenThumbnail_tappedOnItsStrip_isATap() = onMain {
         val fixture = fixture(x = -84f)
 
@@ -193,12 +232,12 @@ class ReferenceDragControllerTest {
     }
 
     /**
-     * A small thumbnail, 126 × 189 px, at [x] in the top of [area], in a preview 1080 px wide: its peek is 42 px
-     * (16 dp), and a fling is 2100 px/s (800 dp/s).
+     * A small thumbnail, [width] × 189 px (126 for a 2:3 photo), at [x] in the top of [area], in a preview 1080 px
+     * wide: its peek is 42 px (16 dp), and a fling is 2100 px/s (800 dp/s).
      */
-    private fun fixture(x: Float = 31f): Fixture {
+    private fun fixture(x: Float = 31f, width: Int = 126): Fixture {
         val view = View(instrumentation.targetContext).apply {
-            layout(0, 0, 126, 189)
+            layout(0, 0, width, 189)
             translationX = x
             translationY = 31f
         }

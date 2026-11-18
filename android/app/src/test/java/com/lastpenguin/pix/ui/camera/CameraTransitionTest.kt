@@ -25,6 +25,7 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -35,6 +36,9 @@ import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -436,7 +440,8 @@ class CameraTransitionTest {
     }
 
     // The reference thumbnail (#237): it settles into its place, its size, and its fade from where it was, in
-    // Motion.THUMBNAIL_MS, laid out at its new size at once and drawn at its old one first.
+    // Motion.THUMBNAIL_MS, laid out at its new size at once and drawn at its old one first; halfway at its middle; a
+    // render for the same place leaves the glide running, and a new place starts a new one.
 
     /** A guide with a reference photo on the camera: its small thumbnail, 54 x 72 dp, in the top-left corner. */
     private fun Camera.thumbnail(): View {
@@ -489,6 +494,8 @@ class CameraTransitionTest {
         assertEquals(180f * screen.density(), large.toFloat(), 1f)
         assertEquals(small.toFloat() / large, thumbnail.scaleX, 0.001f)
         assertEquals(thumbnail.scaleX, thumbnail.scaleY, 0.001f)
+        // It scales about its middle, so it is placed for its left side to stay in the corner.
+        assertEquals(12f * screen.density(), thumbnail.translationX + (large - small) / 2f, 0.5f)
         play(500)
         assertEquals(1f, thumbnail.scaleX, 0f)
 
@@ -499,6 +506,40 @@ class CameraTransitionTest {
         assertEquals(large.toFloat() / small, thumbnail.scaleX, 0.001f)
         play(500)
         assertEquals(1f, thumbnail.scaleX, 0f)
+    }
+
+    @Test
+    fun theReferenceThumbnailsGlide_isHalfwayAtItsMiddle_andARenderForTheSamePlaceLeavesItRunning() {
+        val screen = camera()
+        val thumbnail = screen.thumbnail()
+        val corner = 12f * screen.density()
+        val small = thumbnail.layoutParams.width
+        ShadowChoreographer.setPaused(true)
+
+        thumbnail.performClick()
+        idle()
+        val glide = checkNotNull(thumbnail.referenceGlide)
+        val large = thumbnail.layoutParams.width
+        // Halfway through its time, eased: its size and its left side are as far along as the curve is.
+        glide.setCurrentFraction(0.5f)
+        val along = Motion.STANDARD.getInterpolation(0.5f)
+        val width = small + (large - small) * along
+        assertEquals(width / large, thumbnail.scaleX, 0.001f)
+        assertEquals(corner, thumbnail.translationX + (large - width) / 2f, 0.5f)
+
+        // Another state change renders the screen again: the glide goes on, not anew from where it is.
+        modules.guides.update(final = true) { it.copy(opacity = 0.7f) }
+        idle()
+        assertSame(glide, thumbnail.referenceGlide)
+        // A new place is a new glide.
+        assertTrue(ViewCompat.performAccessibilityAction(thumbnail, R.id.move_reference_top_right, null))
+        idle()
+        assertNotSame(glide, thumbnail.referenceGlide)
+
+        play(500)
+        assertNull(thumbnail.referenceGlide)
+        assertEquals(1f, thumbnail.scaleX, 0f)
+        assertEquals(screen.controls.previewContainer.width - corner - large, thumbnail.translationX, 0f)
     }
 
     @Test

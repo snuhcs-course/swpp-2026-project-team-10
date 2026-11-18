@@ -12,10 +12,10 @@ private const val FLING_WINDOW_MS = 100L
 /**
  * Touch input for the reference thumbnail on the Camera screen (FR-3.9). A tap goes to [onTap], which enlarges the
  * thumbnail or makes it small again, or shows a hidden one. A drag past the touch slop moves it with the finger:
- * inside [area]'s height, and sideways out of the preview until only its [peek] shows, fading as it goes (#237). On
- * release it reports to [onDrop] the nearest corner and whether it is hidden there ([dropReference]), so the thumbnail
- * never stays anywhere else; a cancelled drag reports null, and the caller puts the thumbnail back where it was. The
- * view is placed by its translation.
+ * inside [area]'s height, and sideways out of the preview until only its peek shows ([referencePeek]), fading as it
+ * goes (#237). On release it reports to [onDrop] the nearest corner and whether it is hidden there ([dropReference]),
+ * so the thumbnail never stays anywhere else; a cancelled drag reports null, and the caller puts the thumbnail back
+ * where it was. The view is placed by its translation.
  */
 internal class ReferenceDragController(
     private val view: View,
@@ -57,7 +57,7 @@ internal class ReferenceDragController(
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     // The thumbnail may still be gliding to its place: it starts from where it is now.
-                    view.animate().cancel()
+                    view.stopReferenceGlide()
                     downX = event.rawX
                     downY = event.rawY
                     startX = view.translationX
@@ -72,7 +72,7 @@ internal class ReferenceDragController(
                     move(event.rawX - downX, event.rawY - downY)
                 }
 
-                MotionEvent.ACTION_UP -> if (isDragging) {
+                MotionEvent.ACTION_UP -> if (lift(event)) {
                     isDragging = false
                     val (velocityX, velocityY) = speedAt(event.eventTime)
                     onDrop(
@@ -99,6 +99,16 @@ internal class ReferenceDragController(
         }
     }
 
+    /**
+     * The lift may carry the last of the move, which no move event brought: it counts for the thumbnail's place and
+     * for the speed, and a lift far from the touch is a drag even with no move between. True for a drag.
+     */
+    private fun lift(event: MotionEvent): Boolean {
+        remember(event)
+        move(event.rawX - downX, event.rawY - downY)
+        return isDragging
+    }
+
     private fun remember(event: MotionEvent) {
         moves.addLast(Triple(event.eventTime, event.rawX, event.rawY))
         while (moves.first().first < event.eventTime - FLING_WINDOW_MS) moves.removeFirst()
@@ -121,8 +131,9 @@ internal class ReferenceDragController(
         val width = previewWidth()
         val maxY = maxOf(bounds.top, bounds.bottom - view.height).toFloat()
         // Sideways it may leave the preview, as far as a hidden thumbnail is out.
-        val minX = minOf(bounds.left, peek - view.width).toFloat()
-        val maxX = maxOf(bounds.left, bounds.right - view.width, width - peek).toFloat()
+        val inside = referencePeek(view.width, peek)
+        val minX = minOf(bounds.left, inside - view.width).toFloat()
+        val maxX = maxOf(bounds.left, bounds.right - view.width, width - inside).toFloat()
         view.translationX = (startX + dx).coerceIn(minX, maxX)
         view.translationY = (startY + dy).coerceIn(bounds.top.toFloat(), maxY)
         view.alpha = referenceAlpha(view.translationX, view.width, width, peek)

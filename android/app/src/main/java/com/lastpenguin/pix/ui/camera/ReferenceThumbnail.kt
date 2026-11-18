@@ -34,8 +34,8 @@ internal data class ReferencePlacement(val x: Int, val y: Int, val width: Int, v
  * The reference thumbnail in [corner] of [area] (FR-3.9), keeping the photo's [aspect] (width / height). Small, its
  * long side is [smallLongSide]; enlarged, it is half of [previewWidth] wide, or narrower if it would be taller than
  * [area]. An invalid aspect shows a square, and an area not laid out yet keeps it small. [hidden] (#237), it is small
- * whatever [expanded] says, at its height in the corner, and out at that corner's side of the preview, all but [peek]
- * of it.
+ * whatever [expanded] says, at its height in the corner, and out at that corner's side of the preview, all but its
+ * [referencePeek].
  */
 internal fun placeReference(
     aspect: Float,
@@ -60,10 +60,11 @@ internal fun placeReference(
     }
     val left = corner.isLeft
     val top = corner == ReferenceCorner.TOP_LEFT || corner == ReferenceCorner.TOP_RIGHT
+    val inside = referencePeek(width, peek)
     return ReferencePlacement(
         x = when {
-            hidden && left -> peek - width
-            hidden -> previewWidth - peek
+            hidden && left -> inside - width
+            hidden -> previewWidth - inside
             left -> area.left
             else -> area.right - width
         },
@@ -73,6 +74,13 @@ internal fun placeReference(
         alpha = if (hidden) REFERENCE_HIDDEN_ALPHA else 1f,
     )
 }
+
+/**
+ * How much of a hidden thumbnail [width] wide stays inside the preview (#237): [peek], or just under half of a
+ * thumbnail too narrow for that, as a very tall photo's is. So more than half of a hidden thumbnail is always out,
+ * which is where a drag must take it to hide it ([dropReference]).
+ */
+internal fun referencePeek(width: Int, peek: Int): Int = minOf(peek, (width - 1) / 2).coerceAtLeast(0)
 
 /** The corner nearest to a thumbnail dropped with its center at ([centerX], [centerY]). */
 internal fun nearestCorner(centerX: Float, centerY: Float, area: ReferenceArea): ReferenceCorner {
@@ -113,10 +121,11 @@ internal fun dropReference(
 
 /**
  * How see-through a thumbnail [width] wide is at [x] in a preview [previewWidth] wide (#237): itself while all of it
- * is inside, [REFERENCE_HIDDEN_ALPHA] when only its [peek] is, and in between as it slides out at either side.
+ * is inside, [REFERENCE_HIDDEN_ALPHA] when only its [referencePeek] is, and in between as it slides out at either
+ * side.
  */
 internal fun referenceAlpha(x: Float, width: Int, previewWidth: Int, peek: Int): Float {
     val outside = maxOf(-x, x + width - previewWidth, 0f)
-    val share = (outside / (width - peek).coerceAtLeast(1)).coerceIn(0f, 1f)
+    val share = (outside / (width - referencePeek(width, peek)).coerceAtLeast(1)).coerceIn(0f, 1f)
     return 1f - (1f - REFERENCE_HIDDEN_ALPHA) * share
 }

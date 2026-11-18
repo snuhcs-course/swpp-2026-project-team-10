@@ -1,6 +1,9 @@
 // AI-generated with Claude Code, 2026-11-18, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
@@ -14,6 +17,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import androidx.core.view.isVisible
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.ui.Motion
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** The reference thumbnail's long side while small, and its margin in the preview's corners (FR-3.9). */
@@ -35,60 +39,102 @@ private val REFERENCE_MOVES = mapOf(
     ReferenceCorner.BOTTOM_RIGHT to (R.id.move_reference_bottom_right to R.string.move_reference_bottom_right),
 )
 
+/** A thumbnail's glide under way: where it ends, whether as a mirror, and the animator that takes it there. */
+private class ReferenceGlide(val target: ReferencePlacement, val mirrored: Boolean, val animator: ValueAnimator)
+
+/** This thumbnail's glide while one is under way, which a test reads the middle of; null at rest. */
+internal val View.referenceGlide: ValueAnimator?
+    get() = (getTag(R.id.reference_glide) as? ReferenceGlide)?.animator
+
+/** Stops this thumbnail where it is drawn now, as a finger that takes it does. */
+internal fun View.stopReferenceGlide() {
+    referenceGlide?.cancel()
+}
+
 /**
  * Shows [photo] in this thumbnail where [place] says (FR-3.9), or hides it for null; [place] returns null while the
- * thumbnail must not move (a drag, or a screen not laid out yet). The image and the size are set only when they
- * change, as each would lay the screen out again. A thumbnail already shown settles into its new place, size, and
- * alpha from where the finger or the last change left it, in [Motion.THUMBNAIL_MS] (#237): the size is laid out
- * once, and its scale grows or shrinks it from what it was. With animations off, and when it first shows, it is
- * there at once.
+ * thumbnail must not move (a drag, or a screen not laid out yet). [mirrored], it is flipped left to right, as Subject
+ * view shows the rear camera (#201). The image and the size are set only when they change, as each would lay the
+ * screen out again.
+ *
+ * A thumbnail already shown glides into its new place, size, and alpha from where the finger or the last change left
+ * it, in [Motion.THUMBNAIL_MS] (#237). Its size is laid out once, at the end's, and it is drawn at the size it has on
+ * the way by its scale, about its middle, which is also what the flip turns about; so this alone sets its scale. A
+ * call for the place a glide is already going to leaves that glide alone, or every render of the screen would start
+ * it anew. With animations off, and when it first shows, it is there at once.
  */
-internal fun ImageView.showReference(photo: Bitmap?, place: (Bitmap) -> ReferencePlacement?) {
+internal fun ImageView.showReference(
+    photo: Bitmap?,
+    mirrored: Boolean = false,
+    place: (Bitmap) -> ReferencePlacement?,
+) {
     val shown = isVisible
     isVisible = photo != null
+    val flip = if (mirrored) -1f else 1f
     if (photo == null) {
-        animate().cancel()
+        stopReferenceGlide()
         setImageDrawable(null)
+        scaleX = flip
+        scaleY = 1f
         return
     }
     if ((drawable as? BitmapDrawable)?.bitmap !== photo) setImageBitmap(photo)
-    val placement = place(photo) ?: return
-    // Its size as drawn now, which a change under way has between two sizes.
+    val placement = place(photo)
+    if (placement == null) {
+        scaleX = flip * abs(scaleX)
+        return
+    }
+    val glide = getTag(R.id.reference_glide) as? ReferenceGlide
+    if (glide != null && glide.target == placement && glide.mirrored == mirrored) return
+    glide?.animator?.cancel()
+
+    // As drawn now: a glide just stopped left it between two places and sizes.
     val params = layoutParams
-    val fromWidth = params.width * scaleX
+    val fromWidth = params.width * abs(scaleX)
     val fromHeight = params.height * scaleY
-    val resized = params.width != placement.width || params.height != placement.height
-    if (resized) {
+    val fromLeft = translationX + (params.width - fromWidth) / 2f
+    val fromTop = translationY + (params.height - fromHeight) / 2f
+    val fromAlpha = alpha
+    if (params.width != placement.width || params.height != placement.height) {
         params.width = placement.width
         params.height = placement.height
         layoutParams = params
     }
-    val x = placement.x.toFloat()
-    val y = placement.y.toFloat()
-    animate().cancel()
-    pivotX = 0f
-    pivotY = 0f
-    if (!shown || !Motion.on() || fromWidth <= 0f || fromHeight <= 0f) {
-        scaleX = 1f
-        scaleY = 1f
-        translationX = x
-        translationY = y
-        alpha = placement.alpha
+    val toWidth = placement.width.toFloat()
+    val toHeight = placement.height.toFloat()
+
+    /** Draws the thumbnail [along] its way: 0 where it was, and 1 at its place, exactly. */
+    fun draw(along: Float) {
+        fun between(from: Float, to: Float) = from * (1f - along) + to * along
+        val width = between(fromWidth, toWidth)
+        val height = between(fromHeight, toHeight)
+        scaleX = flip * width / toWidth.coerceAtLeast(1f)
+        scaleY = height / toHeight.coerceAtLeast(1f)
+        translationX = between(fromLeft, placement.x.toFloat()) - (toWidth - width) / 2f
+        translationY = between(fromTop, placement.y.toFloat()) - (toHeight - height) / 2f
+        alpha = between(fromAlpha, placement.alpha)
+    }
+    val there = fromLeft == placement.x.toFloat() && fromTop == placement.y.toFloat() &&
+        fromWidth == toWidth && fromHeight == toHeight && fromAlpha == placement.alpha
+    if (!shown || !Motion.on() || fromWidth <= 0f || fromHeight <= 0f || there) {
+        draw(1f)
         return
     }
-    scaleX = fromWidth / placement.width
-    scaleY = fromHeight / placement.height
-    val there = translationX == x && translationY == y && scaleX == 1f && scaleY == 1f && alpha == placement.alpha
-    if (there) return
-    animate()
-        .translationX(x)
-        .translationY(y)
-        .scaleX(1f)
-        .scaleY(1f)
-        .alpha(placement.alpha)
-        .setDuration(Motion.THUMBNAIL_MS)
-        .setInterpolator(Motion.STANDARD)
-        .start()
+    val animator = ValueAnimator.ofFloat(0f, 1f)
+    animator.duration = Motion.THUMBNAIL_MS
+    animator.interpolator = Motion.STANDARD
+    animator.addUpdateListener { draw(it.animatedValue as Float) }
+    animator.addListener(
+        object : AnimatorListenerAdapter() {
+            // At its end, and when a finger or another change stops it.
+            override fun onAnimationEnd(animation: Animator) {
+                if (referenceGlide === animation) setTag(R.id.reference_glide, null)
+            }
+        },
+    )
+    setTag(R.id.reference_glide, ReferenceGlide(placement, mirrored, animator))
+    draw(0f)
+    animator.start()
 }
 
 /**

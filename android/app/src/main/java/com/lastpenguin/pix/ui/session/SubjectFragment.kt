@@ -448,7 +448,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun renderMirror(binding: FragmentSubjectBinding, mirrored: Boolean) {
         renderer?.setMirror(mirrored)
         val scale = if (mirrored) -1f else 1f
-        for (view in listOf(binding.compositionOverlay, binding.guideOverlay, binding.referenceThumbnail)) {
+        // The reference photo's flip is set with its size, which is its scale too (showReference).
+        for (view in listOf(binding.compositionOverlay, binding.guideOverlay)) {
             view.scaleX = scale
         }
     }
@@ -610,7 +611,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val container = binding.videoContainer
         val dragging = referenceDrag?.isDragging == true
         var placed: ReferencePlacement? = null
-        binding.referenceThumbnail.showReference(ui.reference) { photo ->
+        binding.referenceThumbnail.showReference(ui.reference, mirrored = ui.mirrored) { photo ->
             if (dragging || container.width == 0) {
                 null
             } else {

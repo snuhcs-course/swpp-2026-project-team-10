@@ -57,6 +57,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
@@ -70,7 +71,7 @@ import org.robolectric.shadows.ShadowToast
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
  * gone with a replaced or removed guide, moved to another corner on this phone only, and hidden at the video's side
  * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
- * and small when it is back; #237); the brightness panel and a
+ * and small when it is back; #237), a mirror through each change of its size; the brightness panel and a
  * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
@@ -97,6 +98,7 @@ class SubjectFragmentRenderTest {
 
     @After
     fun tearDown() {
+        ShadowChoreographer.setPaused(false)
         scenario?.close()
         receiving.cancel()
     }
@@ -271,6 +273,45 @@ class SubjectFragmentRenderTest {
         modules.session.deliver(cameraState(CameraFacing.FRONT))
         idle()
         onScreen { binding, _ -> assertEquals(listOf(false, 1f, 1f, 1f), binding.mirrorShown()) }
+    }
+
+    @Test
+    fun theMirroredReferencePhoto_staysAMirror_shownEnlargedAndWhileItChangesSize() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(cameraState(CameraFacing.BACK))
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        var small = 0
+        var left = 0f
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            assertEquals(-1f, thumbnail.scaleX)
+            small = thumbnail.width
+            left = thumbnail.translationX
+            ShadowChoreographer.setPaused(true)
+            thumbnail.performClick()
+        }
+        idle()
+        // The first frame of growing: drawn as small as it was, flipped, with its left side where it was.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            val large = thumbnail.layoutParams.width
+            assertTrue(large > small * 2)
+            assertEquals(-small.toFloat() / large, thumbnail.scaleX, 0.001f)
+            assertEquals(left, thumbnail.translationX + (large - small) / 2f, 0.5f)
+        }
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            assertEquals(-1f, binding.referenceThumbnail.scaleX)
+            assertEquals(left, binding.referenceThumbnail.translationX)
+        }
+
+        // The front camera's video is a mirror already: the photo is as sent, at once.
+        modules.session.deliver(cameraState(CameraFacing.FRONT))
+        idle()
+        onScreen { binding, _ -> assertEquals(1f, binding.referenceThumbnail.scaleX) }
     }
 
     @Test
@@ -451,7 +492,9 @@ class SubjectFragmentRenderTest {
             val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
             // What stays is the small thumbnail's strip, and TalkBack hears a hidden thumbnail.
             assertEquals(small, thumbnail.width to thumbnail.height)
-            assertEquals(1f, thumbnail.scaleX)
+            // Still the rear camera's mirror, like the video, at its full size.
+            assertEquals(-1f, thumbnail.scaleX)
+            assertEquals(1f, thumbnail.scaleY)
             assertEquals((peek - small.first).toFloat(), thumbnail.translationX)
             assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha)
             assertEquals(

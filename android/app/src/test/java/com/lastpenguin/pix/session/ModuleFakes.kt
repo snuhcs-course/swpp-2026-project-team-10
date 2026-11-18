@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -247,7 +247,16 @@ class FakeCameraController(
     /** When set, [takePhoto] waits for it once the camera took the photo: a photo that is still being saved. */
     var saving: CompletableDeferred<Unit>? = null
 
+    /** The turn each photo was taken at ([setPhotoTurn]), in shutter order. */
+    val photoTurns = mutableListOf<Int>()
+    private var photoTurn = 0
+
+    override fun setPhotoTurn(turn: Int) {
+        photoTurn = turn
+    }
+
     override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> {
+        photoTurns += photoTurn
         photoFailure?.let { return Result.failure(it) }
         val saved = photo?.let { Result.success(it) } ?: return Result.failure(UnsupportedOperationException())
         onCaptured()

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-17, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -141,7 +141,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
      * choice is final on both phones, so the set is let go.
      */
     private fun goOn(use: PoseUse, chosenBy: String?, saved: ReferenceGuide?) {
-        referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, saved)
+        referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, saved, use.turn)
         if (!inSession()) {
             handedOn = true
             findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
@@ -204,7 +204,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         if (state.chosenBy == Role.SUBJECT && state.phase == GenerationUiState.Phase.PICKING && image != null &&
             inFront
         ) {
-            goOn(PoseUse(image, state.tipSource), chosenBy = subjectName(), savedGuide(state))
+            goOn(PoseUse(image, state.tipSource, state.sceneTurn), chosenBy = subjectName(), savedGuide(state))
             return
         }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -80,7 +80,8 @@ import org.robolectric.annotation.GraphicsMode
  * state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its place, a drag
  * up and down, kept up while held, gone after the idle time), on the right and, near the image's right edge, on the
  * left; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the pinch mode's
- * label over the guide-edit toggle, Camera then Guide.
+ * label over the guide-edit toggle, Camera then Guide. A photo taken with the phone held sideways, saved as held
+ * (FR-1.5, #206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -279,6 +280,18 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ ->
             assertEquals(string(R.string.session_photo_not_sent, "Joonhyung"), controls.noticeText.text.toString())
         }
+    }
+
+    @Test
+    fun aPhotoTakenWithThePhoneSideways_isSavedAsHeld() {
+        val modules =
+            launch(FakeCameraController().apply { photo = Uri.parse("content://media/external/images/media/1") })
+        modules.turns.set(90)
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+
+        assertEquals(listOf(90), modules.camera.photoTurns)
     }
 
     @Test

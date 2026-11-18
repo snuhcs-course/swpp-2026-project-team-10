@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -44,8 +44,10 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectFragment
@@ -83,7 +85,8 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
  * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
  * screens' headers, 8 dp above a 56 dp row (#204, #210).
- * A photo without a person: its alert at the start of the message's first line, not at the box's edge (#204).
+ * A photo without a person: its alert at the start of the message's first line, not at the box's edge (#204). A photo
+ * taken with the phone held sideways, reviewed as framed while the photo sent on is turned upright (#206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -348,6 +351,21 @@ class CameraLayoutTest {
         assertTrue("${message.box()} over $photo", message.box().top < photo.bottom)
         assertTrue("${message.box()} 20 dp above the bottom", message.box().bottom <= 705 - 20)
         assertNotNull(message.background)
+    }
+
+    @Test
+    fun scenePhotoReview_heldSideways_showsThePhotoAsFramed_andKeepsItUprightForThePoses() {
+        val screen = camera()
+        screen.modules.turns.set(90)
+        screen.reviewing(300, 400)
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+        idleUntil { generation.uiState.value.phase == GenerationUiState.Phase.REVIEWING }
+        idle()
+
+        val shown = screen.controls.sceneStill.drawable
+        assertEquals(300 to 400, shown.intrinsicWidth to shown.intrinsicHeight)
+        val scene = checkNotNull(generation.uiState.value.scene)
+        assertEquals(400 to 300, scene.width to scene.height)
     }
 
     @Test

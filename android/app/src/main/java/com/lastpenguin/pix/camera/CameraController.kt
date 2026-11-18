@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -142,6 +142,12 @@ interface CameraController {
      * never calls it.
      */
     suspend fun takePhoto(onCaptured: () -> Unit = {}): Result<Uri>
+
+    /**
+     * Photos from now on are saved as the phone is held at [turn] (FR-1.5, `PhoneTurns`): sideways, a landscape photo,
+     * through its EXIF orientation. The camera's view stays portrait, and the front camera's photo stays mirrored.
+     */
+    fun setPhotoTurn(turn: Int) = Unit
 
     /**
      * Copies the latest live frame before suspending, then crops and rotates it upright (FR-4.1).

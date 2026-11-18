@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -227,6 +228,25 @@ class CameraViewModelTest {
         camera.captured[0]()
 
         assertTrue(model.uiState.value.shutterBusy)
+    }
+
+    // Photos as held (FR-1.5, #206): each is saved at the turn of its own press, also when the phone turns before the
+    // camera takes it and while an earlier photo is saved.
+    @Test
+    fun shutter_savesEachPhotoAtTheTurnOfItsOwnPress() = runTest {
+        val turns = PhoneTurns.Fixed(90)
+        val held = CameraViewModel(camera, guides, phoneTurns = turns)
+        runCurrent()
+        held.onShutter()
+        turns.set(0)
+        runCurrent()
+        camera.captured[0]()
+        turns.set(270)
+
+        held.onShutter()
+        runCurrent()
+
+        assertEquals(listOf(90, 270), camera.turns)
     }
 
     @Test
@@ -500,8 +520,17 @@ class CameraViewModelTest {
         /** Each photo's "the camera took it" callback, in shutter order; a test calls one to say so. */
         val captured = mutableListOf<() -> Unit>()
 
+        /** The turn each photo was saved at, in shutter order (FR-1.5). */
+        val turns = mutableListOf<Int>()
+        private var turn = 0
+
+        override fun setPhotoTurn(turn: Int) {
+            this.turn = turn
+        }
+
         override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> {
             captureCount++
+            turns += turn
             if (throwOnCapture) throw IllegalStateException("Camera closed")
             captured += onCaptured
             return capture.await()

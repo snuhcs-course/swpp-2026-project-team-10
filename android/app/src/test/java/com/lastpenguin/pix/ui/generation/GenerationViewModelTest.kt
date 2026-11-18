@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -100,12 +100,26 @@ class GenerationViewModelTest {
 
         model.takeScene()
         runCurrent()
-        assertEquals(GenerationUiState(scene = camera.frame, phase = GenerationUiState.Phase.REVIEWING), state)
+        assertEquals(
+            GenerationUiState(
+                scene = camera.frame,
+                framed = camera.frame,
+                phase = GenerationUiState.Phase.REVIEWING,
+            ),
+            state,
+        )
         assertTrue(generator.runs.isEmpty())
 
         // Generate poses asks what to pose; still nothing is sent (FR-4.8).
         model.useScene()
-        assertEquals(GenerationUiState(scene = camera.frame, phase = GenerationUiState.Phase.DESCRIBING), state)
+        assertEquals(
+            GenerationUiState(
+                scene = camera.frame,
+                framed = camera.frame,
+                phase = GenerationUiState.Phase.DESCRIBING,
+            ),
+            state,
+        )
         runCurrent()
         assertTrue(generator.runs.isEmpty())
 
@@ -227,7 +241,14 @@ class GenerationViewModelTest {
 
         gate.complete(Unit)
         runCurrent()
-        assertEquals(GenerationUiState(scene = camera.frame, phase = GenerationUiState.Phase.REVIEWING), state)
+        assertEquals(
+            GenerationUiState(
+                scene = camera.frame,
+                framed = camera.frame,
+                phase = GenerationUiState.Phase.REVIEWING,
+            ),
+            state,
+        )
         assertTrue(model.useScene())
         assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
@@ -470,7 +491,14 @@ class GenerationViewModelTest {
         camera.frame = testBitmap()
         model.takeScene()
         runCurrent()
-        assertEquals(GenerationUiState(scene = camera.frame, phase = GenerationUiState.Phase.REVIEWING), state)
+        assertEquals(
+            GenerationUiState(
+                scene = camera.frame,
+                framed = camera.frame,
+                phase = GenerationUiState.Phase.REVIEWING,
+            ),
+            state,
+        )
     }
 
     @Test

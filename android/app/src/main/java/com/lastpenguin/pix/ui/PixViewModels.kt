@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -42,6 +42,7 @@ object PixViewModels {
                 container.poseTips.onCamera,
                 container.photoSyncer,
                 container.appSettings.baseBrightness,
+                phoneTurns = container.phoneTurns,
             )
         }
         initializer {
@@ -64,6 +65,7 @@ object PixViewModels {
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,
                 partner = { container.sessionManager.state.value.partner },
+                phoneTurn = container.phoneTurns.turn,
             )
         }
         initializer {

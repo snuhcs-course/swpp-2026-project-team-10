@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -14,6 +14,7 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
@@ -198,7 +199,12 @@ class CameraViewModel(
     /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
+    /** How the phone is held: each photo is saved as it was at its shutter press (FR-1.5). */
+    private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
 ) : ViewModel() {
+
+    /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5). */
+    fun watchPhoneTurn(owner: LifecycleOwner) = phoneTurns.watch(owner)
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
@@ -380,6 +386,8 @@ class CameraViewModel(
             )
         }
         val takenAt = clock()
+        // At the press, like the time: the phone may turn while an earlier photo is still being saved.
+        val turn = phoneTurns.turn.value
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
         val sessionId = photos.shutter()
         // The press before, for the order below.
@@ -394,6 +402,7 @@ class CameraViewModel(
             }
             try {
                 val result = try {
+                    camera.setPhotoTurn(turn)
                     camera.takePhoto(onCaptured = ::free)
                 } catch (error: CancellationException) {
                     throw error

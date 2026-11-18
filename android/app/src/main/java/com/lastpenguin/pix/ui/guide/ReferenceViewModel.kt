@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-17, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.guide.intoFrameHeldAt
 import com.lastpenguin.pix.session.ConfirmShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SubjectGuideTarget
@@ -81,6 +82,12 @@ class ReferenceViewModel(
 
     /** The guide whose tip was asked for and that has not gone on the camera yet. */
     private var tipFor: String? = null
+
+    /**
+     * How the phone was held for the scene photo of the pose on Reference confirm (`PhoneTurns`, #206): its guide goes
+     * on the camera turned back by it. 0 for a picked photo.
+     */
+    private var heldAt = 0
 
     private val _chosenBy = MutableStateFlow<String?>(null)
 
@@ -162,14 +169,20 @@ class ReferenceViewModel(
     val replacing: Boolean
         get() = if (forSubject) subject?.current != null else guides.guide.value != null
 
-    private fun use(guide: ReferenceGuide) {
+    /**
+     * Puts [guide] on the camera, or offers it to the photographer from the subject's phone. A pose's guide, cut from a
+     * candidate of a scene photo held at [turn], is turned back into the camera's portrait frame (Design 2.6.2), so it
+     * lies on the preview held that way, on both phones (NFR-8).
+     */
+    private fun use(guide: ReferenceGuide, turn: Int = 0) {
         val target = subject
-        if (forSubject && target != null) target.offer(guide) else guides.setGuide(guide)
+        if (forSubject && target != null) target.offer(guide) else guides.setGuide(guide.intoFrameHeldAt(turn))
     }
 
     /** A photo from the system photo picker; on a Reference confirm the subject shares, it stays shared. */
     fun onPhotoPicked(uri: Uri) {
         picked = uri
+        heldAt = 0
         _chosenBy.value = null
         sharedId?.let(confirms::finding)
         make { maker.make(uri) }
@@ -190,16 +203,19 @@ class ReferenceViewModel(
      * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10). [chosenBy] names the subject
      * when it was their pick in a session (FR-6.15). Its Reference confirm goes to the subject's phone too, which
      * shows it while a session is connected. A pose its ♥ [saved] already (FR-4.14) goes on with that guide: its person
-     * is not cut out again, and on Camera the guide is the saved one.
+     * is not cut out again, and on Camera the guide is the saved one. [turn] is how the phone was held for the scene
+     * photo; the guide is shown here on the candidate as it is, and turned back by it on the camera.
      */
     fun onCandidatePicked(
         image: Bitmap,
         tipFrom: TipSource? = null,
         chosenBy: String? = null,
         saved: ReferenceGuide? = null,
+        turn: Int = 0,
     ) {
         _chosenBy.value = chosenBy
         picked = null
+        heldAt = turn
         val id = UUID.randomUUID().toString()
         sharedId = id
         _sharing.value = true
@@ -233,7 +249,7 @@ class ReferenceViewModel(
         val ready = _uiState.value as? ReferenceUiState.Ready ?: return false
         // Its tip goes with it to the camera; leaving the screen now must not drop it.
         if (ready.guide.id == tipFor) tipFor = null
-        use(ready.guide)
+        use(ready.guide, heldAt)
         _uiState.value = ReferenceUiState.Idle
         endShare { confirms.used(it, ready.guide.id, by) }
         return true

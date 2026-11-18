@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -276,6 +276,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
+        viewModel.watchPhoneTurn(viewLifecycleOwner)
         controls.cameraActionButton.setOnClickListener {
             if (hasCameraPermission()) {
                 bindCamera()
@@ -1097,7 +1098,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.galleryButton.isInvisible = active
         if (active) controls.switchCameraButton.isInvisible = true
         controls.sceneReview.isVisible = reviewing
-        val photo = scene.scene.takeIf { reviewing }
+        // As the preview showed it, so a photo taken sideways looks as framed while the phone is still held so.
+        val photo = scene.framed.takeIf { reviewing }
         if (controls.sceneStill.tag !== photo) {
             controls.sceneStill.setImageBitmap(photo)
             controls.sceneStill.tag = photo

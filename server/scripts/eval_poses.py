@@ -41,7 +41,8 @@ their pose or hold a number or unit; with several runs it gives each run and all
 `sample`, `agree`, and `judge --repeat` check the judge (3.1, *Judge validation*). The tips are checked by us, not by
 the judge: `sample --kind tip` writes label-tips.html, where each of us answers every sentence of every tip, and
 `agree --kind tip` counts the tips that match their pose from those answers into tip-check.json, which is where
-`report` takes the tips' metric from. `judge --kinds tip` still has Claude read the tips, to try the rubric; its
+`report` takes the tips' metric from. The tips outside our sample may be read a second way, through Claude Code (3.1),
+into tip-check-rest.json of the same shape, which `report` gives on a line of its own. `judge --kinds tip` still has Claude read the tips, to try the rubric; its
 verdicts are not reported. `person` puts the phone's person check (the app's PersonCheckEval on a device) and
 the server's (try_person_check.py) together, as the app runs them. The photos go to the Pix server's models and to
 Anthropic.
@@ -858,10 +859,11 @@ def percentile(values: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))]
 
 
-def tip_checks(out: Path) -> dict[str, dict]:
+def tip_checks(out: Path, name: str = "tip-check.json") -> dict[str, dict]:
     """Our check of the run's tips, by tip id: the sentences that were checked and whether most of us found every
-    one of them right (`agree --kind tip`). Empty before that."""
-    path = out / "tip-check.json"
+    one of them right (`agree --kind tip`). Empty before that. `tip-check-rest.json` holds, in the same shape, the
+    reading of the tips outside our sample."""
+    path = out / name
     if not path.exists():
         return {}
     return {entry["id"]: entry for entry in json.loads(path.read_text(encoding="utf-8"))["tips"]}
@@ -875,7 +877,9 @@ def tip_verdict(tip_record: dict, check: dict | None) -> str | None:
     return check.get("verdict")
 
 
-def metrics(sets: list[dict], verdicts: dict[str, dict], checks: dict[str, dict]) -> list[tuple[str, str]]:
+def metrics(
+    sets: list[dict], verdicts: dict[str, dict], checks: dict[str, dict], rest: dict[str, dict]
+) -> list[tuple[str, str]]:
     lines: list[tuple[str, str]] = []
     candidates = [(s, c) for s in sets for c in s["candidates"]]
     made = [(s, c) for s, c in candidates if c["ok"]]
@@ -956,6 +960,14 @@ def metrics(sets: list[dict], verdicts: dict[str, dict], checks: dict[str, dict]
             share(ours.count("pass"), len(ours)) if ours else "not checked yet (sample and agree with --kind tip)",
         )
     )
+    # The tips outside our sample, when they were read through Claude Code: beside ours, never among them.
+    others = [
+        verdict
+        for s in sets
+        if s.get("tip") and (verdict := tip_verdict(s["tip"], rest.get(f"tip-{s['case']}-{s['mode'][0]}")))
+    ]
+    if others:
+        lines.append(("  the rest, read through Claude Code", share(others.count("pass"), len(others))))
     lines.append(
         ("  with numbers or units (should be 0)", share(sum(bool(t.get("measure")) for t in answered), len(answered)))
     )
@@ -966,7 +978,8 @@ def report(args: argparse.Namespace) -> None:
     runs = [run_dir(name) for name in args.runs]
     sections = []
     for out in runs:
-        sections.append((out.name, metrics(load_sets(out), latest_verdicts(out), tip_checks(out))))
+        rest = tip_checks(out, "tip-check-rest.json")
+        sections.append((out.name, metrics(load_sets(out), latest_verdicts(out), tip_checks(out), rest)))
     if len(runs) > 1:
         sections.append(("all runs", pooled_metrics(runs)))
     text = []
@@ -990,17 +1003,18 @@ def report(args: argparse.Namespace) -> None:
 
 def pooled_metrics(runs: list[Path]) -> list[tuple[str, str]]:
     """Every run's sets and verdicts together, each case named after its run so the keys stay apart."""
-    sets, verdicts, checks = [], {}, {}
+    sets, verdicts, checks, rest = [], {}, {}, {}
     for out in runs:
         for s in load_sets(out):
             sets.append({**s, "case": f"{out.name}.{s['case']}"})
         for key, row in latest_verdicts(out).items():
-            kind, case, rest = key.split("-", 2)
-            verdicts[f"{kind}-{out.name}.{case}-{rest}"] = row
-        for key, check in tip_checks(out).items():
-            kind, case, rest = key.split("-", 2)
-            checks[f"{kind}-{out.name}.{case}-{rest}"] = check
-    return metrics(sets, verdicts, checks)
+            kind, case, tail = key.split("-", 2)
+            verdicts[f"{kind}-{out.name}.{case}-{tail}"] = row
+        for mine, name in ((checks, "tip-check.json"), (rest, "tip-check-rest.json")):
+            for key, check in tip_checks(out, name).items():
+                kind, case, tail = key.split("-", 2)
+                mine[f"{kind}-{out.name}.{case}-{tail}"] = check
+    return metrics(sets, verdicts, checks, rest)
 
 
 def thumbnail(path: Path, long_side: int = 360) -> str:
@@ -1013,7 +1027,7 @@ def write_report_html(target: Path, runs: list[Path]) -> None:
     rows = []
     for out in runs:
         verdicts = latest_verdicts(out)
-        checks = tip_checks(out)
+        checks = tip_checks(out) | tip_checks(out, "tip-check-rest.json")
         for s in load_sets(out):
             folder = out / "sets" / f"{s['case']}-{s['mode']}"
             key = f"{s['case']}-{s['mode'][0]}"

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -114,6 +114,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var opacitySlider: TrackedSliderController? = null
     private var previewLogged = false
     private var noticeJob: Job? = null
+
+    /** The notice that the subject left or dropped, while it shows; a photo not sent waits for it (#238). */
+    private var peerGoneNotice: Job? = null
     private var toggleLabelJob: Job? = null
     private var pinchModeJob: Job? = null
 
@@ -396,6 +399,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         val connected = state as? SessionState.Connected
                         val live = connected != null || state is SessionState.Reconnecting
                         renderLiveDot(controls, connected)
+                        if (connected != null) takeDownPeerGoneNotice(controls)
                         controls.endSessionButton.isVisible = live
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
                         // Settings stays in a session too (#204); only the scene photo hides it.
@@ -443,7 +447,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
                             is SessionNotice.RemoteGuide -> getString(R.string.remote_guide_notice, notice.name)
                         }
-                        showNotice(controls, text)
+                        if (notice is SessionNotice.PeerGone) {
+                            peerGoneNotice = showNotice(controls, text, CameraViewModel.PEER_GONE_NOTICE_MS)
+                        } else {
+                            showNotice(controls, text)
+                        }
                     }
                 }
                 launch {
@@ -453,6 +461,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         } else {
                             getString(R.string.session_photos_not_sent, notSent.count, notSent.name)
                         }
+                        // The session's end comes with these, and its notice keeps its full time (#238).
+                        peerGoneNotice?.join()
                         showNotice(controls, text)
                         // Each for its full time: the next would replace this one before it can be read.
                         delay(CameraViewModel.NOTICE_MS)
@@ -1828,14 +1838,29 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    private fun showNotice(controls: FragmentCameraBinding, text: String) {
+    /** Shows [text] for [durationMs], in place of the notice showing; returns the job that takes it down. */
+    private fun showNotice(
+        controls: FragmentCameraBinding,
+        text: String,
+        durationMs: Long = CameraViewModel.NOTICE_MS,
+    ): Job {
         controls.noticeText.text = text
         controls.noticeText.isVisible = true
         noticeJob?.cancel()
-        noticeJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(CameraViewModel.NOTICE_MS)
+        return viewLifecycleOwner.lifecycleScope.launch {
+            delay(durationMs)
             controls.noticeText.isVisible = false
-        }
+        }.also { noticeJob = it }
+    }
+
+    /** The subject is back before the notice that it left ended, so the notice no longer holds. */
+    private fun takeDownPeerGoneNotice(controls: FragmentCameraBinding) {
+        val notice = peerGoneNotice ?: return
+        peerGoneNotice = null
+        // A later notice has already replaced it.
+        if (!notice.isActive) return
+        notice.cancel()
+        controls.noticeText.isVisible = false
     }
 
     /**

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -57,7 +57,8 @@ import org.robolectric.annotation.GraphicsMode
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
  * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving; a guide added from Subject view, with the reference thumbnail its phone sent
+ * a session connected and a peer leaving or dropping, whose notice stays 10 s and goes once the peer is back (#238);
+ * a guide added from Subject view, with the reference thumbnail its phone sent
  * (#234); the camera switch on a phone with and without a front camera, gone while the
  * scene photo is framed and back after it, and in a session (FR-1.14).
  */
@@ -650,10 +651,64 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.noticeText.visibility)
             assertEquals(string(R.string.peer_left, "Joonhyung"), controls.noticeText.text.toString())
         }
+    }
 
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
+    @Test
+    fun aPeerLeaving_keepsItsNoticeForItsLongerTime_thenTakesItDown() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.Leave(EndReason.PEER_LEFT))
+        modules.session.setState(SessionState.Waiting("ABC123"))
+        idle()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.PEER_GONE_NOTICE_MS - 100))
+
+        // Past a remote action's 3 s, for a photographer who was not looking at the screen (#238).
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+            assertEquals(string(R.string.peer_left, "Joonhyung"), controls.noticeText.text.toString())
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(101))
 
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun aPeerDisconnecting_keepsItsNoticeAsLong() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.Leave(EndReason.CONNECTION_LOST))
+        modules.session.setState(SessionState.Waiting("ABC123"))
+        idle()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.PEER_GONE_NOTICE_MS - 100))
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+            assertEquals(string(R.string.peer_disconnected, "Joonhyung"), controls.noticeText.text.toString())
+        }
+    }
+
+    @Test
+    fun thePeerBackBeforeItsNoticeEnds_takesTheNoticeDown() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        modules.session.deliver(SessionMessage.Leave(EndReason.CONNECTION_LOST))
+        modules.session.setState(SessionState.Waiting("ABC123"))
+        idle()
+
+        // The subject's Reconnect, seconds after its Connection lost.
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.liveDot.visibility)
+            assertEquals(View.GONE, controls.noticeText.visibility)
+        }
     }
 
     @Test

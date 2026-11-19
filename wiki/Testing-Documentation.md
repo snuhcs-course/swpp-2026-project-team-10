@@ -100,13 +100,14 @@
 | 3.17 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): its owner, the state-based and layout partitions, `SubjectSessionPhotoTest` and `NewestAlbumPhotoTest`, `TestAppContainer`'s album fakes, why a session screen a test builds stays in memory, and an *Added* step on IT-20 (1.1, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
 | 3.18 | 2026-11-18 | The reference thumbnail for a guide from the subject (Iter4-A1, [#234]): its owner, its tests in `GuideFromSubjectTest` and `CameraFragmentRenderTest`, the codec fakes' `decodeAs`, and a step on IT-15 (1.1, 2.1.5, 2.1.8, Appendix A). |
 | 3.19 | 2026-11-18 | Pix's album in the viewer (Iter4-A7, [#247]): `PixAlbumPhotosTest` in place of `NewestAlbumPhotoTest`, the state-based partition of the viewer outside a session, `TestAppContainer.album` as a list, and IT-20's step 6; the viewer as a gallery app's: `ZoomablePhotoViewTest`, its state-based and boundary partitions, `TestAppContainer.deleted`, and IT-20's step 7 (2.1.6, 2.1.8, Appendix A). |
-| 3.20 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): the phone's turn, the photos, the scene photo, and a pose's guide by quarter turn, the dead band's edges, the server's landscape ratios, and IT-37 (1.1, 2.1.5, 2.1.6, Appendix A). |
-| 3.21 | 2026-11-19 | A pose's ♥ from a scene held sideways, on both phones, and `pose.step`'s turn: their partitions and IT-37's ♥ steps (2.1.6, Appendix A; [#206]). |
-| 3.22 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): the icons and the labels that turn by quarter turn on both screens, what stays, a half turn, a turn during a turn, animations off, and IT-38 (1.1, 2.1.6, Appendix A). |
-| 3.23 | 2026-11-18 | The focus box and the brightness bar going together: a state-based partition (2.1.6; [#207]). |
-| 3.24 | 2026-11-18 | The tutorial's rings on turned controls, the scene photo without *End session*, and IT-38's tips step (2.1.6, Appendix A; [#207]). |
-| 3.25 | 2026-11-19 | The brightness drag's rate: its partitions and boundaries (2.1.6; [#207]). |
-| 3.26 | 2026-11-19 | The photo viewer turning with the phone: `PhotoViewerTurnTest`, its partitions, and IT-38's step 9 (2.1.6, Appendix A; [#207]). |
+| 3.20 | 2026-11-18 | UAT cycle 1 of 11/16 (Iter4-P8, [#205]): the run, each story's result, the problems found and what follows, the changes for cycle 2 on 11/23, a *Changed* note on the plan, and the Test Log row (1.2, 4.3, 4.4, 6). |
+| 3.21 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): the phone's turn, the photos, the scene photo, and a pose's guide by quarter turn, the dead band's edges, the server's landscape ratios, and IT-37 (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 3.22 | 2026-11-19 | A pose's ♥ from a scene held sideways, on both phones, and `pose.step`'s turn: their partitions and IT-37's ♥ steps (2.1.6, Appendix A; [#206]). |
+| 3.23 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): the icons and the labels that turn by quarter turn on both screens, what stays, a half turn, a turn during a turn, animations off, and IT-38 (1.1, 2.1.6, Appendix A). |
+| 3.24 | 2026-11-18 | The focus box and the brightness bar going together: a state-based partition (2.1.6; [#207]). |
+| 3.25 | 2026-11-18 | The tutorial's rings on turned controls, the scene photo without *End session*, and IT-38's tips step (2.1.6, Appendix A; [#207]). |
+| 3.26 | 2026-11-19 | The brightness drag's rate: its partitions and boundaries (2.1.6; [#207]). |
+| 3.27 | 2026-11-19 | The photo viewer turning with the phone: `PhotoViewerTurnTest`, its partitions, and IT-38's step 9 (2.1.6, Appendix A; [#207]). |
 
 </details>
 
@@ -228,8 +229,8 @@ Sections first required in each iteration (sections 2, 3, and 4 stay current in 
 
 - **Iteration 2:** 1 Test Responsibility & Schedule; 2 Unit & Integration Testing (plan, first results).
 - **Iteration 3:** 3 AI Module Testing (evaluation set, thresholds, first results); 4.1 Preliminary user test; 4.2 Heuristic evaluation; 4.3 UAT plan. Testing focuses on taking photos with the camera, pose suggestions and the guide, and live sharing. Where latency is tested, and with which limits, is **TBD**.
-- **Iteration 4:** 4.4 UAT results (the UAT on 11/16 and 11/18); the scripts of the Iteration 4 flows (2.1.5), and the AI module tests run again for the changed prompts (3.2).
-- **Iteration 5:** 5 Alpha & Beta Testing: in-class testing on 11/30, real user test on 12/2 (plan, execution, results).
+- **Iteration 4:** 4.4 UAT results (UAT cycle 1 on 11/16); the scripts of the Iteration 4 flows (2.1.5), and the AI module tests run again for the changed prompts (3.2).
+- **Iteration 5:** UAT cycle 2 on 11/23; 5 Alpha & Beta Testing: in-class testing on 11/30, real user test on 12/2 (plan, execution, results).
 
 ### 1.3 Test quality rules
 
@@ -881,6 +882,12 @@ The course's heuristic evaluation, held in class on 11/4. Students of other team
 
 The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team follow the scripts below without knowing the code, and judge only what they see.
 
+*Changed in Iteration 4 (Iter4-P8, [#205]):* the UAT has two cycles. Cycle 1 ran in class on 11/16, and cycle 2 is on 11/23 (Iteration 5); nothing ran on 11/18. Cycle 1 followed the course's UAT sheet, which was written from the scripts below. The differences:
+
+- **Steps.** The five stories have 70 steps, each with one action and its precondition: US-9 13, US-12 11, US-10 13, US-4 17, and US-2 16. They add negative and edge steps, and ran in that order in 45 minutes.
+- **Labels.** The sheet quotes the Korean text of the build. *Add a pose guide* asks "What are you taking?" with the situations first; *Choose from the gallery* replaces *Add photo*, and *Take a scene photo for poses* replaces *Generate poses here* ([#210]). US-4 chooses *Full body* (FR-4.8).
+- **Corrections.** Four criteria below did not match Pix. *Subject view* shows no title. *Leave* asks nothing. The session's notices name B's phone, not its account. The guide-edit toggle shows *Camera* or *Guide* only for 3 s after a tap.
+
 **Stories.** The UAT includes five stories of R&S 4.4, fixed on 2026-11-06 and not changed afterwards. Together they cover Pix's two uses: a pose guide on one phone, and shooting together on two phones.
 
 | Story | What it checks | Phones |
@@ -962,15 +969,42 @@ The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team
 
 ### 4.4 UAT results (In-Class, Iteration 4)
 
-To be completed in Iteration 4: the build's commit, the two phones, and for each story, pass or fail, the test date, the tester, and any deviation from the criteria, with the steps that failed.
+UAT cycle 1, held in class on 11/16. Two students of other teams ran the five stories as testers A and B. Cycle 2 is on 11/23 (Iteration 5).
+
+**Run.** One session on 11/16, with a debug build of `d806e2a` against the AWS server. The testers were one of Team 11 and one of Team 15: T1 held phone B (a Galaxy S22), and T2 phone A (a Galaxy S23). They followed the UAT sheet's 70 steps (4.3) and marked each step accepted or rejected, with a satisfaction from 1 to 5 and comments. The filled sheets are kept outside the repository.
 
 | Story | Result | Date | Tester | Deviations |
 |---|---|---|---|---|
-| US-2 | | | | |
-| US-4 | | | | |
-| US-9 | | | | |
-| US-10 | | | | |
-| US-12 | | | | |
+| US-2 | Pass: 16 of 16 steps accepted by both | 11/16 | T1, T2 | — |
+| US-4 | Pass: 17 of 17 steps accepted by T1, 14 by T2 | 11/16 | T1, T2 | T2 left steps 15–17 unmarked |
+| US-9 | Pass: 13 of 13 steps accepted by both | 11/16 | T1, T2 | — |
+| US-10 | Pass: 13 of 13 steps accepted by both | 11/16 | T1, T2 | — |
+| US-12 | Pass: 11 of 11 steps accepted by both | 11/16 | T1, T2 | — |
+
+**Summary.**
+
+- All five stories pass. No step was rejected: of 140 marks, 137 are *Accepted* and three are missing.
+- T1 scored every step: 67 at 5, one at 4, and two at 3. T2 scored seven steps: six at 5 and one at 3.
+- All three 3s are in US-12: zooming from both phones at once (both testers), and the photo on the subject's phone (T1).
+- T1's overall comment: Pix is clean to use, and the planned actions give the intended results. What is left is small errors and the usability problems found on the way.
+- The 70 steps hardly fit in the session's 45 minutes.
+
+**Problems found and what follows.** The testers' comments in the sheet, lowest satisfaction first, then what they said during the session, outside the sheet's steps.
+
+| Problem | Story · step · tester · satisfaction | What follows |
+|---|---|---|
+| While both phones pinch the zoom at once, the zoom jumps back and forth between the two, so the image shakes and the readout flickers. T2 suggests that while one phone zooms, the other cannot | US-12 · 3 · T1, T2 · 3, 3 | Iteration 4: one phone zooms at a time (Iter4-A3, [#236]) |
+| The subject cannot see the session's photos in Pix. *Subject view* has no thumbnail, and after leaving, Camera's thumbnail does not show them: they are only in the phone's gallery | US-12 · 11 · T1, T2 · 3, — | Iteration 4: a photo thumbnail on *Subject view*, and the received photos in Camera's thumbnail (Iter4-A2, [#235]) |
+| The notice that the subject left shows only briefly on the photographer's phone. A photographer who is not looking at the screen misses it | US-10 · 6 · T1 · 4 | Iteration 4: the notice stays longer (Iter4-A5, [#238]) |
+| The live view is a little less sharp after reconnecting | US-10 · 5 · T2 · — | Iteration 4: measured first, then fixed or its cause recorded (Iter4-A5, [#238]) |
+| A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | Said by the testers in the session | Iteration 4: the subject's phone sends the photo too (Iter4-A1, [#234]) |
+| The reference thumbnail cannot be hidden | Said by the testers in the session | Iteration 4: a swipe to the side hides it, and its changes are animated (Iter4-A4, [#237]) |
+
+**For UAT cycle 2** (11/23, Iteration 5). The changes that follow from cycle 1:
+
+- The steps say what each tester does. The sheet wrote remote zoom for B alone, and tester A did not know what to do. How the sheet sets the two roles apart is still open.
+- US-10 and US-12 become one story, since they share a session and most of their steps. A story not tested yet takes the freed place: saved guides, or a session by room code without signing in.
+- Fewer steps, to fit the 45 minutes: the less important edge and negative steps go, such as one of the two waits in airplane mode (5 s and 15 s).
 
 ---
 
@@ -999,6 +1033,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 
 | Date | Iteration | What ran | Commit | Outcome | Section |
 |---|---|---|---|---|---|
+| 2026-11-16 | 4 | UAT cycle 1 in class: two testers of other teams, the five stories in 70 steps | `d806e2a` | All five stories pass: no step rejected; 137 of 140 marks accepted, three missing. Satisfaction 3 on zooming from both phones at once and on the photo on the subject's phone; follow-ups in 4.4 | 4.4 |
 | 2026-11-06 | 3 | Integration scripts on the phones (IT-1–4, 6, 8, 10–34), from 11/04 | `7b03e9e`, `c842fa1` | 31 of 31 pass; IT-5, 7, and 9 covered by later scripts; IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
 | 2026-11-05 | 3 | AI module tests: three runs of the 50 cases, the judge's validation, the description filter, and the person check on a Galaxy Note20 | `430447f` | Suggestions (78.0 %) and the person check (34.6 % of people refused) fail; the other nine thresholds pass, tips at the threshold (80.0 %) | [3.2](#32-results), [record](#run-2026-11-05-ai-module-tests) |
@@ -2187,11 +2222,13 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#182]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/182
 [#183]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/183
 [#188]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/188
+[#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
 [#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
 [#202]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/202
 [#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
 [#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
+[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
 [#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
 [#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
 [#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
@@ -2205,4 +2242,6 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
 [#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
 [#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
+[#236]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/236
+[#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247

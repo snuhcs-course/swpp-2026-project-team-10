@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -120,11 +120,15 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
     private fun inSession(session: SessionState = sessionViewModel.state.value): Boolean =
         subjectName(session) != null || session is SessionState.Reconnecting
 
-    /** The ♥ on a candidate (FR-4.14): saves it to this phone's library, or removes it once saved. */
+    /**
+     * The ♥ on a candidate (FR-4.14): saves it to this phone's library, turned as the scene photo was held, or removes
+     * it once saved.
+     */
     private fun onHeart(slot: PoseSlot) {
-        val setId = viewModel.uiState.value.setId ?: return
+        val state = viewModel.uiState.value
+        val setId = state.setId ?: return
         val image = (slot.event as? CandidateEvent.Ready)?.image ?: return
-        saves.toggle(PoseKey(setId, slot.pose.id), image)
+        saves.toggle(PoseKey(setId, slot.pose.id), image, state.sceneTurn)
     }
 
     /** The guide the ♥ saved for the selected candidate, if it did. */
@@ -141,7 +145,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
      * choice is final on both phones, so the set is let go.
      */
     private fun goOn(use: PoseUse, chosenBy: String?, saved: ReferenceGuide?) {
-        referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, saved)
+        referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, saved, use.turn)
         if (!inSession()) {
             handedOn = true
             findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
@@ -204,7 +208,7 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         if (state.chosenBy == Role.SUBJECT && state.phase == GenerationUiState.Phase.PICKING && image != null &&
             inFront
         ) {
-            goOn(PoseUse(image, state.tipSource), chosenBy = subjectName(), savedGuide(state))
+            goOn(PoseUse(image, state.tipSource, state.sceneTurn), chosenBy = subjectName(), savedGuide(state))
             return
         }
 

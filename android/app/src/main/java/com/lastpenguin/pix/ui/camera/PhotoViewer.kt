@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.app.Dialog
@@ -11,9 +11,12 @@ import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
+import androidx.core.view.doOnNextLayout
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -42,9 +45,10 @@ import kotlinx.coroutines.withContext
  * shows its photo. A tap on the photo hides the header and the strip, and another shows them; a drag down closes the
  * viewer as Back does ([onBack]). Share sends the photo on screen through the phone's share sheet, and Delete asks
  * first, then hands it to [onDelete]. A photo that comes while it is open is one more page, and the page on screen
- * stays. It fades in and out, and while it is open TalkBack reads only it. Its pages go once it is closed. It is built
- * in [holder] when it first opens: a screen that never opens it builds no pager, whose RecyclerView would cost every
- * Camera screen.
+ * stays. It fades in and out, and while it is open TalkBack reads only it. Its pages go once it is closed. It turns
+ * with the phone ([turnTo], #207): held sideways, it is a landscape screen, the photo over all of it, so a landscape
+ * photo fills the screen. It is built in [holder] when it first opens: a screen that never opens it builds no pager,
+ * whose RecyclerView would cost every Camera screen.
  */
 internal class PhotoViewer(
     private val holder: ViewGroup,
@@ -86,6 +90,13 @@ internal class PhotoViewer(
     /** Delete's question, while it is open. */
     private var asking: Dialog? = null
 
+    /** How the phone is held (`PhoneTurns`), which the viewer turns with once built. */
+    private var turn = 0
+    private var turning: TurningIcons? = null
+
+    /** The space between the pages and the strip while the viewer stands upright. */
+    private var pagesMargin = 0
+
     private fun build(): ViewPhotoViewerBinding {
         built?.let { return it }
         val binding = ViewPhotoViewerBinding.inflate(LayoutInflater.from(holder.context), holder, true)
@@ -106,6 +117,10 @@ internal class PhotoViewer(
         binding.photoViewerStrip.adapter = strip
         // A selected thumbnail changes at once, without the list's fade.
         binding.photoViewerStrip.itemAnimator = null
+        pagesMargin = (pager.layoutParams as ViewGroup.MarginLayoutParams).bottomMargin
+        binding.root.onSideways = { sideways -> layOut(binding, sideways) }
+        // The first turn puts it there at once, as it is held when it first opens.
+        turning = TurningIcons(controls = listOf(binding.root), views = emptyList()).also { it.turnTo(turn) }
         binding.photoViewerBack.setOnClickListener { onBack() }
         binding.photoViewerShare.setOnClickListener { pages.photoAt(pager.currentItem)?.let(::share) }
         binding.photoViewerDelete.setOnClickListener { pages.photoAt(pager.currentItem)?.let(::confirmDelete) }
@@ -120,6 +135,17 @@ internal class PhotoViewer(
             },
         )
         return binding
+    }
+
+    /** Turns the viewer upright for a phone held at [turn], as the screen's controls turn (FR-1.16). */
+    fun turnTo(turn: Int) {
+        this.turn = turn
+        turning?.turnTo(turn)
+    }
+
+    /** Stops a turn under way, as the screen's views go. */
+    fun stop() {
+        turning?.stop()
     }
 
     /** Shows [photos] while [open]; each opening starts at the newest, with the header and the strip. */
@@ -170,6 +196,30 @@ internal class PhotoViewer(
         }
     }
 
+    /**
+     * Upright, the photo lies between the header and the strip. Sideways, on a landscape screen, it takes all of it,
+     * under them, as a gallery app's does; between them it would be smaller than on the upright screen.
+     */
+    private fun layOut(binding: ViewPhotoViewerBinding, sideways: Boolean) {
+        val pager = binding.photoViewerPages
+        // The pages' list lays out anew from the page on screen: left to itself, it would keep the pixels it was
+        // scrolled by, and those of the new size fall on another page.
+        (pager.getChildAt(0) as? RecyclerView)?.scrollToPosition(pager.currentItem)
+        pager.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            val parent = ConstraintLayout.LayoutParams.PARENT_ID
+            val unset = ConstraintLayout.LayoutParams.UNSET
+            topToTop = if (sideways) parent else unset
+            topToBottom = if (sideways) unset else R.id.photoViewerHeader
+            bottomToBottom = if (sideways) parent else unset
+            bottomToTop = if (sideways) unset else R.id.photoViewerStrip
+            bottomMargin = if (sideways) 0 else pagesMargin
+        }
+        // Over the photo, the header's icons need a scrim behind them on a light photo.
+        binding.photoViewerHeader.setBackgroundResource(if (sideways) R.drawable.bg_scrim_top else 0)
+        // The strip's middle moves with its width.
+        binding.photoViewerStrip.doOnNextLayout { select(binding, binding.photoViewerPages.currentItem) }
+    }
+
     /** The header while [chromeShown], and the strip too once there are two photos; [fade] fades a change. */
     private fun showChrome(binding: ViewPhotoViewerBinding, fade: Boolean) {
         place(binding.photoViewerHeader, chromeShown, fade)
@@ -210,7 +260,8 @@ internal class PhotoViewer(
      * three times as fast, nearly gone at the line that closes, so they never lie over the screen showing through.
      */
     private fun followDrag(binding: ViewPhotoViewerBinding, offset: Float) {
-        val way = binding.root.height / DRAG_FADE_PARTS
+        // The screen's height as the user sees it, which is its width while the viewer is turned sideways.
+        val way = binding.photoViewerContent.height / DRAG_FADE_PARTS
         val gone = if (way > 0f) (offset / way).coerceIn(0f, 1f) else 0f
         binding.root.background?.alpha = ((1f - gone) * OPAQUE).roundToInt()
         val chrome = 1f - (gone * CHROME_FADE_SPEED).coerceAtMost(1f)

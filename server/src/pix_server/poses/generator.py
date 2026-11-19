@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 """One pose candidate per call through OpenRouter's Image API."""
 
 import asyncio
@@ -20,8 +20,9 @@ API_URL = "https://openrouter.ai/api/v1/images"
 MAX_SCENE_SIDE = 1024
 SEED_LIMIT = 2**31  # the app sends a 64-bit value, and a model such as Seedream rejects seeds above 2**31 - 1
 RESULT_JPEG_QUALITY = 90
-# The app's portrait frames (R&S FR-1.13), as OpenRouter names them, with their width / height.
-ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
+# The app's frames (R&S FR-1.13), as OpenRouter names them, with their width / height: portrait, and landscape for a
+# scene photo taken with the phone held sideways (FR-4.3).
+ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0, "4:3": 4 / 3, "16:9": 16 / 9}
 
 
 def check_scene(data: bytes) -> tuple[int, int]:
@@ -41,8 +42,8 @@ def check_scene(data: bytes) -> tuple[int, int]:
 
 
 def aspect_ratio(size: tuple[int, int]) -> str:
-    """The ratio the candidates are asked in: the app's frame closest to the scene's shape (FR-4.3). The phone rounds
-    the scene's size, so it is seldom exactly one of them; a landscape scene, which the app never sends, gets 1:1."""
+    """The ratio the candidates are asked in: the app's frame closest to the scene's shape (FR-4.3), landscape for a
+    scene taken sideways. The phone rounds the scene's size, so it is seldom exactly one of them."""
     width, height = size
     return min(ASPECT_RATIOS, key=lambda name: abs(math.log(width / height / ASPECT_RATIOS[name])))
 

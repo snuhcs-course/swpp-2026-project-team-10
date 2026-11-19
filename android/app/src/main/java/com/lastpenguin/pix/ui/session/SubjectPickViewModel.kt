@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -32,6 +32,8 @@ data class SubjectPickUiState(
     /** The link is reconnecting (Design 2.6.7): the candidates stay, and *Use this pose* waits. */
     val reconnecting: Boolean = false,
     val photographerName: String? = null,
+    /** How the photographer held the set's scene photo (`PoseStep.sceneTurn`), for a ♥ (FR-4.14). */
+    val sceneTurn: Int = 0,
 )
 
 /**
@@ -78,6 +80,7 @@ class SubjectPickViewModel(
                                     waiting = pending?.setId == picking.setId,
                                     reconnecting = state is SessionState.Reconnecting,
                                     photographerName = name,
+                                    sceneTurn = picking.sceneTurn,
                                 )
                             }
                         }

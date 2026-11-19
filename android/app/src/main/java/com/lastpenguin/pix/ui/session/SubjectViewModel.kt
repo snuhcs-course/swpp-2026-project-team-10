@@ -3,11 +3,13 @@ package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.isAtZoomStep
@@ -184,7 +186,15 @@ class SubjectViewModel(
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
     /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
     private val deleter: PhotoDeleter = PhotoDeleter { false },
+    /** How this phone is held, which its own controls' icons turn with; nothing is sent (FR-1.15). */
+    private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
 ) : ViewModel() {
+
+    /** Follows how this phone is held while [owner], Subject view, is in front (FR-1.15). */
+    fun watchPhoneTurn(owner: LifecycleOwner) = phoneTurns.watch(owner)
+
+    /** How this phone is held, which the controls' icons turn with (FR-1.15). */
+    val phoneTurn: StateFlow<Int> = phoneTurns.turn
 
     private val _uiState = MutableStateFlow(SubjectUiState())
     val uiState: StateFlow<SubjectUiState> = _uiState.asStateFlow()

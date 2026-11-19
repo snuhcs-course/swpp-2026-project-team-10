@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.generation.GenerationError
@@ -47,6 +47,9 @@ import org.junit.Test
  * Both phones (Iter4-P3): the photographer's set carried to the subject's history, with the description refused (not
  * kept though a candidate arrives), not refused (kept), and every pose refused with the set closed in the same change
  * and the messages arriving back to back (an entry kept before removed).
+ * The scene photo's turn (equivalence, #206): a set from a scene held sideways says so with GENERATING, also after a
+ * reconnect, and one held upright says nothing; the subject keeps 0, 90, 180, and 270, and reads another value, or none
+ * from an older photographer, as upright.
  * Subject, a copy (fault injection, boundary): a broken transfer, a header over 1024 px or 1 MiB (both at the limit
  * read), a copy that does not decode, and a copy of a set not shown are let go.
  * Subject, a pick (boundary of the deadline): sent and waiting; answered by its set's end; reported just after 5 s
@@ -494,6 +497,46 @@ class PoseSyncerTest {
     }
 
     // ---- subject: the copy of the set ---------------------------------------------------------------------------
+
+    @Test
+    fun `a set from a scene held sideways says its turn with its start, also after a reconnect`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        val first = Job()
+        syncer.startAsSender(TestScope(testScheduler + first))
+        runCurrent()
+
+        syncer.open("upright")
+        runCurrent()
+        syncer.open("set1", sceneTurn = 90)
+        runCurrent()
+        assertEquals(listOf(0, 90), steps().map { it.sceneTurn })
+
+        first.cancel()
+        session.sent.clear()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+        assertEquals(listOf(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, sceneTurn = 90)), steps())
+    }
+
+    @Test
+    fun `the subject keeps the scene's turn, and reads any other value as upright`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        for ((sent, kept) in listOf(0 to 0, 90 to 90, 180 to 180, 270 to 270, 45 to 0, -90 to 0, 360 to 0)) {
+            session.deliver(SessionMessage.PoseStep("set$sent", PoseSetStep.GENERATING, sceneTurn = sent))
+            runCurrent()
+            assertEquals("$sent", kept, syncer.mirror.value?.sceneTurn)
+        }
+        // From an older photographer, which does not say.
+        deliverStep("older", PoseSetStep.GENERATING)
+        deliverStep("older", PoseSetStep.PICKING, listOf("pose-1"))
+        runCurrent()
+        assertEquals(0, syncer.mirror.value?.sceneTurn)
+    }
 
     @Test
     fun `the subject builds the set in the photographer's order, missing copies left out`() = runTest {

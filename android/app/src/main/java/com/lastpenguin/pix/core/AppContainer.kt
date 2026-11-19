@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -26,9 +26,11 @@ import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
 import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.NARROWEST_FRAME_ASPECT
+import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoSaver
 import com.lastpenguin.pix.camera.PixAlbumPhotos
+import com.lastpenguin.pix.camera.SensorPhoneTurns
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixApi
@@ -171,6 +173,8 @@ class AppContainer(
     val screenLanguages: ScreenLanguages? = null,
     /** Registers this phone's push token; none in tests, which have no Firebase. */
     val pushTokenRegistrar: PushTokenRegistrar? = null,
+    /** How the phone is held, for photos saved as taken (FR-1.5) and the controls that turn (FR-1.15). */
+    val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
 ) {
     companion object {
         /** Like the session's socket, so the course's proxy never sees it idle. */
@@ -317,6 +321,7 @@ class AppContainer(
                 appLanguage = AndroidAppLanguage(),
                 screenLanguages = screenLanguages,
                 pushTokenRegistrar = pushTokenRegistrar,
+                phoneTurns = SensorPhoneTurns(appContext),
             )
         }
     }

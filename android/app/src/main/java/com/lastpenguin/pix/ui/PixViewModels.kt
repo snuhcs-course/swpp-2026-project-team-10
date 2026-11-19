@@ -45,6 +45,7 @@ object PixViewModels {
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
                 baseBrightness = container.appSettings.baseBrightness,
+                phoneTurns = container.phoneTurns,
             )
         }
         initializer {
@@ -67,6 +68,7 @@ object PixViewModels {
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,
                 partner = { container.sessionManager.state.value.partner },
+                phoneTurn = container.phoneTurns.turn,
             )
         }
         initializer {
@@ -99,6 +101,7 @@ object PixViewModels {
                 container.tipSyncer,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
+                phoneTurns = container.phoneTurns,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }

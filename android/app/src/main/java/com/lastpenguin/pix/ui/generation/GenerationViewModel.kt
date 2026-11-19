@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.RemotePoseGenerator
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
+import com.lastpenguin.pix.guide.turnedClockwise
 import com.lastpenguin.pix.session.DescriptionRequest
 import com.lastpenguin.pix.session.DescriptionShare
 import com.lastpenguin.pix.session.PoseShare
@@ -31,6 +32,8 @@ import com.lastpenguin.pix.session.SubjectPick
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,12 +45,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** The scene photo on Camera, Generate poses, Generating poses, Pick a pose, and Couldn't create poses (R&S 6.3). */
 data class GenerationUiState(
-    /** The photo the user took and confirmed; kept for *Try again*, *Regenerate*, and Back to Generate poses. */
+    /**
+     * The photo the user took and confirmed, upright as the phone was held, so a photo taken sideways is a landscape
+     * one and gets landscape candidates (FR-4.3); kept for *Try again*, *Regenerate*, and Back to Generate poses.
+     */
     val scene: Bitmap? = null,
+    /** The scene photo as the camera showed it, for its review on Camera; [scene] itself when held upright. */
+    val framed: Bitmap? = null,
+    /** How the phone was held for the scene photo (`PhoneTurns`); the guide from its candidate is turned back by it. */
+    val sceneTurn: Int = 0,
     /** The scene photo is a selfie from the front camera: the server makes selfie poses of it (FR-1.14). */
     val selfie: Boolean = false,
     /**
@@ -129,8 +140,11 @@ data class GenerationUiState(
         }
 }
 
-/** What *Select* hands on to Reference confirm: the candidate, and what its tip is asked from (FR-4.10). */
-data class PoseUse(val image: Bitmap, val tipSource: TipSource?)
+/**
+ * What *Select* hands on to Reference confirm: the candidate, what its tip is asked from (FR-4.10), and how the phone
+ * was held for the scene photo, which the guide is turned back by on the camera (Design 2.6.2).
+ */
+data class PoseUse(val image: Bitmap, val tipSource: TipSource?, val turn: Int = 0)
 
 /**
  * Pose generation (Design 2.2, Figure 8). Shared by the Camera screen, for the scene photo, and the four
@@ -153,6 +167,10 @@ class GenerationViewModel(
     private val share: PoseShare = PoseShare.None,
     private val descriptions: DescriptionShare = DescriptionShare.None,
     private val history: PromptHistory = PromptHistory.InMemory(),
+    /** How the phone is held (`PhoneTurns`): the scene photo is turned upright as it was at the shutter (FR-4.3). */
+    private val phoneTurn: StateFlow<Int> = MutableStateFlow(0),
+    /** Where a scene photo taken sideways is turned, off the main thread. */
+    private val turning: CoroutineDispatcher = Dispatchers.Default,
     private val partner: () -> SessionPartner? = { null },
 ) : ViewModel() {
 
@@ -323,17 +341,30 @@ class GenerationViewModel(
             val canLight = camera.capabilities.value?.hasFlash == true
             val wanted = _uiState.value.light && canLight
             withTimeoutOrNull(LIGHT_WAIT_MS) { settledLight.first { it == wanted } }
-            // The camera the frame comes from, read with it: a selfie gets selfie poses (FR-1.14).
+            // The camera the frame comes from, and how the phone is held, read with it: a selfie gets selfie poses
+            // (FR-1.14), and a photo held sideways landscape ones (FR-4.3).
             val selfie = camera.facing.value == CameraFacing.FRONT
+            val turn = phoneTurn.value
             val frame = camera.grabFrame()
             frame.exceptionOrNull()?.let { Log.w(TAG, "No scene photo: $it") }
+            val upright = frame.getOrNull()?.let {
+                if (turn ==
+                    0
+                ) {
+                    it
+                } else {
+                    withContext(turning) { it.turnedClockwise(turn) }
+                }
+            }
             _uiState.update { state ->
                 when {
                     // Cancelled while the frame was being converted.
                     state.phase != GenerationUiState.Phase.FRAMING -> state
 
                     frame.isSuccess -> state.copy(
-                        scene = frame.getOrNull(),
+                        scene = upright,
+                        framed = frame.getOrNull(),
+                        sceneTurn = turn,
                         selfie = selfie,
                         situation = state.situation.forScene(selfie),
                         phase = GenerationUiState.Phase.REVIEWING,
@@ -657,10 +688,13 @@ class GenerationViewModel(
         // Kept once the server accepts it, whichever phone wrote it, with the friend as the set starts; suggested
         // poses have no description to keep.
         describedSet = described.takeIf { it.isNotEmpty() }?.let { DescribedSet(id, it, partner()?.userId) }
-        share.open(id)
+        share.open(id, _uiState.value.sceneTurn)
         val situation = _uiState.value.situation.forScene(selfie)
         _uiState.value = GenerationUiState(
             scene = scene,
+            // Back goes on to the photo's review again, as framed.
+            framed = _uiState.value.framed,
+            sceneTurn = _uiState.value.sceneTurn,
             selfie = selfie,
             situation = situation,
             request = request,
@@ -723,7 +757,7 @@ class GenerationViewModel(
         }
         _uiState.update { it.copy(chosenBy = Role.PHOTOGRAPHER) }
         setId?.let { share.chosen(it, poseId, Role.PHOTOGRAPHER) }
-        return PoseUse(image, state.tipSource)
+        return PoseUse(image, state.tipSource, state.sceneTurn)
     }
 
     /** The subject's *Select* (FR-6.15): taken only for this set while nobody has chosen (AD-7). */

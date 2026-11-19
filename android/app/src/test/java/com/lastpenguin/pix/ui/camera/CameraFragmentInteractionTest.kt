@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -66,6 +66,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
@@ -90,8 +91,10 @@ import org.robolectric.shadows.ShadowToast
  * stream state; *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept
  * while other state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its
  * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
- * edge, on the left; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
+ * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
+ * gone after it, or, on a camera without brightness, fading by itself; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
  * pinch mode's label over the guide-edit toggle, Camera then Guide.
+ * A photo taken with the phone held sideways, saved as held (FR-1.5, #206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -290,6 +293,18 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ ->
             assertEquals(string(R.string.session_photo_not_sent, "Joonhyung"), controls.noticeText.text.toString())
         }
+    }
+
+    @Test
+    fun aPhotoTakenWithThePhoneSideways_isSavedAsHeld() {
+        val modules =
+            launch(FakeCameraController().apply { photo = Uri.parse("content://media/external/images/media/1") })
+        modules.turns.set(90)
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+
+        assertEquals(listOf(90), modules.camera.photoTurns)
     }
 
     @Test
@@ -909,7 +924,9 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(4, camera.exposureRequests.last())
 
-        // A new focus drops what the drag added, and keeps the base.
+        // A new focus drops what the drag added, and keeps the base; past the double-tap time, or the detector would take
+        // the two taps for one double tap.
+        shadowOf(Looper.getMainLooper()).idleFor(ViewConfiguration.getDoubleTapTimeout() + 100L, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
         idle()
         assertEquals(2, camera.exposureRequests.last())
@@ -921,7 +938,7 @@ class CameraFragmentInteractionTest {
         val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
         launch(camera)
 
-        // Straight from the finger's down, without lifting: it focuses there and the bar's sun follows the finger.
+        // Straight from the finger's down, without lifting: it focuses there and the bar's sun follows the drag.
         onScreen { controls, _ ->
             val preview = controls.previewView
             val bar = controls.exposureBar
@@ -990,6 +1007,70 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertFalse(controls.exposureBar.isShown) }
     }
 
+    @Test
+    fun theFocusBox_staysAsLongAsTheBrightnessBar_andTheTwoGoTogether() {
+        launch(FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true))
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+        // Past the moment the box used to fade by itself.
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_DOWN, Pointer(1, 24f, 64f))
+        }
+
+        // Held past the idle time: both stay.
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_UP, Pointer(1, 24f, 64f))
+        }
+
+        // Let go: both whole until the idle time, and both gone right after it.
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS - 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = true) }
+        shadowOf(Looper.getMainLooper()).idleFor(500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = false) }
+
+        // A second tap shows both again.
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            assertEquals(1f, controls.focusRing.scaleX, 0f)
+        }
+    }
+
+    @Test
+    fun onACameraWithoutBrightness_theFocusBoxFadesByItself() {
+        launch(FakeCameraController(supportsFocusPoint = true))
+        // The display's frames held, so the box is seen before its animation runs to its end.
+        ShadowChoreographer.setPaused(true)
+        try {
+            onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+            idle()
+            onScreen { controls, _ ->
+                assertTrue(controls.focusRing.isShown)
+                assertFalse(controls.exposureBar.isShown)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+
+        onScreen { controls, _ -> assertFalse(controls.focusRing.isShown) }
+    }
+
+    /** The focus box and the brightness bar, both whole and in view, or both gone. */
+    private fun assertBoth(controls: FragmentCameraBinding, shown: Boolean) {
+        assertEquals("focus box", shown, controls.focusRing.isShown)
+        assertEquals("brightness bar", shown, controls.exposureBar.isShown)
+        if (shown) {
+            assertEquals(1f, controls.focusRing.alpha, 0f)
+            assertEquals(1f, controls.exposureBar.alpha, 0f)
+        }
+    }
+
     /** A tap to focus at [x] on the preview's middle line. */
     private fun tapPreview(controls: FragmentCameraBinding, x: Float) {
         val preview = controls.previewView
@@ -997,11 +1078,9 @@ class CameraFragmentInteractionTest {
         touch(preview, MotionEvent.ACTION_UP, Pointer(1, x, preview.height / 2f))
     }
 
-    /** How far a finger moves for [steps] exposure indexes on [bar], whose length is the range (-4..4 here). */
-    private fun previewDrag(bar: ExposureBarView, steps: Int): Float {
-        val travel = bar.layoutParams.height - 14f * bar.resources.displayMetrics.density
-        return travel * steps / 8f
-    }
+    /** How far a finger moves for [steps] of the fake camera's 0.5 EV (`ExposureBarView.DP_PER_EV`). */
+    private fun previewDrag(bar: ExposureBarView, steps: Int): Float =
+        steps * FAKE_EV_STEP * ExposureBarView.DP_PER_EV * bar.resources.displayMetrics.density
 
     @Test
     fun aTapToFocusNearTheRightEdge_putsTheBrightnessBarOnTheBoxsLeft() {
@@ -1308,8 +1387,7 @@ class CameraFragmentInteractionTest {
     /** A drag up the brightness bar by [steps] exposure indexes (down for negative ones), from its middle. */
     private fun drag(bar: ExposureBarView, steps: Int) {
         assertTrue(bar.height > 0)
-        val travel = bar.height - 14f * bar.resources.displayMetrics.density
-        val dy = travel * steps / 8f
+        val dy = previewDrag(bar, steps)
         touch(bar, MotionEvent.ACTION_DOWN, Pointer(1, bar.width / 2f, bar.height / 2f))
         touch(bar, MotionEvent.ACTION_MOVE, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
         touch(bar, MotionEvent.ACTION_UP, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
@@ -1421,5 +1499,10 @@ class CameraFragmentInteractionTest {
         } finally {
             event.recycle()
         }
+    }
+
+    private companion object {
+        /** The fake camera's exposure step with a range (FakeCameraController). */
+        const val FAKE_EV_STEP = 0.5f
     }
 }

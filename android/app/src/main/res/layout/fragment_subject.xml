@@ -25,7 +25,7 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <!-- The photographer's flash, cycled from here (FR-7.3); hidden when their phone has none. -->
-        <com.google.android.material.button.MaterialButton
+        <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/flashButton"
             style="@style/Widget.Pix.Button.Icon.TopBar"
             android:layout_width="wrap_content"
@@ -53,7 +53,7 @@
             tools:visibility="visible" />
 
         <!-- Settings (FR-10.1), beside Leave as on the photographer's Camera screen (#204). -->
-        <com.google.android.material.button.MaterialButton
+        <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/settingsButton"
             style="@style/Widget.Pix.Button.Icon.TopBar"
             android:layout_width="wrap_content"
@@ -306,7 +306,7 @@
             android:gravity="center_vertical">
 
             <!-- Opens the brightness slider above (FR-7.3); checked while it is open. -->
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/brightnessButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
@@ -328,7 +328,7 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <com.google.android.material.button.MaterialButton
+                <com.lastpenguin.pix.ui.camera.TurningButton
                     android:id="@+id/tipButton"
                     style="@style/Widget.Pix.Button.Icon"
                     android:layout_width="wrap_content"
@@ -351,7 +351,7 @@
             </FrameLayout>
         </LinearLayout>
 
-        <TextView
+        <com.lastpenguin.pix.ui.camera.TurningLabel
             android:id="@+id/zoomReadout"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
@@ -369,7 +369,7 @@
             tools:text="1.0×" />
 
         <!-- Save guide (FR-6.16), beside the toggle while a guide is on the video: filled once saved on this phone. -->
-        <com.google.android.material.button.MaterialButton
+        <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/saveGuideButton"
             style="@style/Widget.Pix.Button.Icon"
             android:layout_width="wrap_content"
@@ -382,7 +382,7 @@
             tools:visibility="visible" />
 
         <!-- Shown while a guide is on the video (AD-17); checked while gestures edit the guide. -->
-        <com.google.android.material.button.MaterialButton
+        <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/editGuideButton"
             style="@style/Widget.Pix.Button.Icon"
             android:layout_width="wrap_content"
@@ -418,6 +418,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:outlineProvider="none"
         android:translationZ="1dp"
         android:paddingHorizontal="16dp"
@@ -430,11 +432,13 @@
         <!-- Camera's row in thirds (R&S 6.6): Guide in the middle of the left third, where Camera's is, and, while the
              photographer's candidates are ready, Pick a pose in the middle, where Camera's shutter is (FR-6.15); the
              session photos' thumbnail, a view of the screen's own, in the middle of the right third. Each is centered
-             on its line, so a longer label grows both ways. -->
+             on its line, so a longer label grows both ways. Held sideways, Pick a pose turns with its label and stands
+             taller than the row, so neither clips it (FR-1.15). -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/guideRow"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:clipChildren="false">
 
             <androidx.constraintlayout.widget.Guideline
                 android:id="@+id/guideLine"

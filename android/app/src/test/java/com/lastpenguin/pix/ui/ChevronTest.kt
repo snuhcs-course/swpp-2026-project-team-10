@@ -5,16 +5,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.widget.ImageViewCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -28,10 +27,10 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w360dp-h705dp-xxhdpi")
 class ChevronTest {
-    private val activity = Robolectric.buildActivity(AppCompatActivity::class.java)
-        .apply { get().setTheme(R.style.Theme_Pix) }
-        .setup()
-        .get()
+    @get:Rule
+    val activities = OwnActivities()
+
+    private val activity = activities.start(R.style.Theme_Pix)
 
     private val chevrons = listOf(
         R.layout.item_setting_row to R.id.settingChevron,

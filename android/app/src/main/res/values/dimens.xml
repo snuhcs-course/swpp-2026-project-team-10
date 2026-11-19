@@ -11,4 +11,6 @@
     <dimen name="flow_progress_height">3dp</dimen>
     <!-- Between the situations' tiles on Add a pose guide (FR-4.8). -->
     <dimen name="situation_tile_gap">8dp</dimen>
+    <!-- A thumbnail of the photo viewer's strip takes taps on 48 dp (NFR-16, item_photo_thumb). -->
+    <dimen name="photo_thumb_touch">48dp</dimen>
 </resources>

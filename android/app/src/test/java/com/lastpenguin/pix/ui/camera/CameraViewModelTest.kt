@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -30,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -209,6 +211,189 @@ class CameraViewModelTest {
         assertEquals(listOf(older, newer), share.shared.map { it.second })
         assertEquals(newer, sharing.uiState.value.lastPhoto)
         assertFalse(sharing.uiState.value.isSaving)
+    }
+
+    // Camera's thumbnail (FR-1.6; Iter4-A2): outside a session the newest in Pix's album, taken here or received, and a
+    // photo taken here at once; in a session only the session's newest, none until its first; after it, the album's
+    // newest again. The viewer (FR-1.6): outside a session Pix's album, with a photo just taken; in a session only the
+    // session's photos; none to open without photos, and it closes when a session starts or ends. A photo deleted from
+    // it leaves its pages and the thumbnail at once, before MediaStore tells of it, also one just taken; the last one
+    // closes it; a delete that fails keeps the photo and says so once.
+    private fun photo(id: Int): Uri = Uri.parse("content://media/external/images/media/$id")
+
+    @Test
+    fun lastPhoto_outsideASession_isTheAlbumsNewest_orThePhotoJustTaken() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album)
+        runCurrent()
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(11)))
+        runCurrent()
+        assertEquals(photo(11), shooting.uiState.value.lastPhoto)
+
+        // One received in a session, then the newest deleted in the gallery, then all of them.
+        album.value = listOf(photo(10), photo(12))
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+        album.value = listOf(photo(10))
+        runCurrent()
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+        album.value = emptyList()
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun lastPhoto_inASession_isOnlyTheSessionsNewest_noneUntilItsFirst_andTheAlbumsAfterIt() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val session = MutableStateFlow<List<Uri>?>(null)
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        runCurrent()
+
+        session.value = emptyList()
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+        assertEquals(emptyList<Uri>(), shooting.uiState.value.sessionPhotos)
+
+        // A photo saved here that is not the session's, such as one pressed before it started, stays out of it.
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(11)))
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+
+        session.value = listOf(photo(12))
+        album.value = listOf(photo(10), photo(11), photo(12))
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+
+        session.value = null
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+        assertNull(shooting.uiState.value.sessionPhotos)
+    }
+
+    @Test
+    fun photos_outsideASession_openPixsAlbum_withThePhotoJustTaken_andCloseWhenASessionStarts() = runTest {
+        val album = MutableStateFlow(emptyList<Uri>())
+        val session = MutableStateFlow<List<Uri>?>(null)
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        runCurrent()
+        shooting.openPhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        album.value = listOf(photo(10), photo(11))
+        runCurrent()
+        shooting.openPhotos()
+        assertTrue(shooting.uiState.value.photosOpen)
+        assertEquals(listOf(photo(10), photo(11)), shooting.uiState.value.viewerPhotos)
+        shooting.closePhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        // A photo just taken is a page at once, before MediaStore tells of it.
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(12)))
+        runCurrent()
+        assertEquals(listOf(photo(10), photo(11), photo(12)), shooting.uiState.value.viewerPhotos)
+
+        shooting.openPhotos()
+        session.value = emptyList()
+        runCurrent()
+        assertFalse(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
+    fun photos_inASession_openOnlyTheSessions_andCloseWhenItEnds() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val session = MutableStateFlow<List<Uri>?>(emptyList())
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        runCurrent()
+        // The album has a photo, but none is the session's.
+        shooting.openPhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        session.value = listOf(photo(11))
+        runCurrent()
+        shooting.openPhotos()
+        assertTrue(shooting.uiState.value.photosOpen)
+        assertEquals(listOf(photo(11)), shooting.uiState.value.viewerPhotos)
+        shooting.closePhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        shooting.openPhotos()
+        session.value = null
+        runCurrent()
+        assertFalse(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
+    fun deletePhoto_outsideASession_dropsItFromThePages_andTheThumbnail_atOnce_andTheLastClosesTheViewer() = runTest {
+        val album = MutableStateFlow(listOf(photo(10), photo(11)))
+        val deleted = mutableListOf<Uri>()
+        val shooting =
+            CameraViewModel(
+                camera,
+                guides,
+                albumPhotos = album,
+                deleter = PhotoDeleter {
+                    deleted += it
+                    true
+                },
+            )
+        runCurrent()
+        shooting.openPhotos()
+
+        // MediaStore tells of it later; the album here never does.
+        shooting.deletePhoto(photo(11))
+        runCurrent()
+        assertEquals(listOf(photo(11)), deleted)
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+        assertTrue(shooting.uiState.value.photosOpen)
+
+        shooting.deletePhoto(photo(10))
+        runCurrent()
+        assertEquals(emptyList<Uri>(), shooting.uiState.value.viewerPhotos)
+        assertNull(shooting.uiState.value.lastPhoto)
+        assertFalse(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
+    fun deletePhoto_thePhotoJustTaken_leavesThePages_beforeMediaStoreTellsOfIt() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, deleter = PhotoDeleter { true })
+        runCurrent()
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(12)))
+        runCurrent()
+
+        shooting.deletePhoto(photo(12))
+        runCurrent()
+
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun deletePhoto_thatFails_keepsThePhoto_andSaysSoOnce() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, deleter = PhotoDeleter { false })
+        val notices = mutableListOf<Unit>()
+        backgroundScope.launch { shooting.photoNotDeleted.collect { notices += it } }
+        runCurrent()
+        shooting.openPhotos()
+
+        shooting.deletePhoto(photo(10))
+        runCurrent()
+
+        assertEquals(1, notices.size)
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+        assertTrue(shooting.uiState.value.photosOpen)
     }
 
     @Test

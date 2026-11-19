@@ -31,11 +31,9 @@
     <string name="photo_save_failed">Couldn\'t take or save the photo. Please try again.</string>
     <string name="photo_storage_failed">Couldn\'t write the photo. Check available storage and try again.</string>
     <string name="photo_camera_closed">The camera closed before the photo was taken. Return to the camera and try again.</string>
-    <string name="open_last_photo">Open last saved photo in gallery</string>
+    <string name="open_newest_photo">Open the newest photo</string>
     <string name="switch_to_front_camera">Switch to the front camera</string>
     <string name="switch_to_rear_camera">Switch to the rear camera</string>
-    <string name="gallery_unavailable">No app is available to open this photo.</string>
-    <string name="photo_unavailable">This photo is no longer available. Take another photo.</string>
     <string name="guide">Guide</string>
     <string name="guide_add_description">Add a pose guide</string>
     <string name="guide_change_description">Change the pose guide</string>
@@ -83,6 +81,9 @@
     <string name="move_reference_top_right">Move to the top right</string>
     <string name="move_reference_bottom_left">Move to the bottom left</string>
     <string name="move_reference_bottom_right">Move to the bottom right</string>
+    <string name="hide_reference">Hide at the side</string>
+    <string name="show_reference">Show</string>
+    <string name="reference_hidden">Hidden</string>
     <string name="edit_guide">Edit guide</string>
     <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
     <string name="tip_preparing">Preparing a tip…</string>
@@ -109,6 +110,14 @@
     <string name="session_photo_save_failed">Couldn\'t save %1$s\'s photo</string>
     <string name="session_photo_not_sent">Couldn\'t send a photo to %1$s</string>
     <string name="session_photos_not_sent">Couldn\'t send %1$d photos to %2$s</string>
+    <string name="session_photo">Photo</string>
+    <string name="session_photo_unavailable">This photo is no longer in your album.</string>
+    <string name="photo_page_counter_description">Photo %1$d of %2$d</string>
+    <string name="share_photo">Share photo</string>
+    <string name="delete_photo">Delete photo</string>
+    <string name="delete_photo_title">Delete this photo?</string>
+    <string name="delete_photo_message">It is removed from this phone.</string>
+    <string name="photo_not_deleted">Couldn\'t delete this photo.</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
     <string name="remote_guide_notice">%1$s set a pose guide</string>

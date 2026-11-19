@@ -16,6 +16,7 @@ import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
@@ -25,6 +26,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -44,6 +46,9 @@ import org.robolectric.shadows.ShadowToast
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class InviteSentSheetTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private var scenario: FragmentScenario<InviteSentSheet>? = null
     private lateinit var sheet: InviteSentSheet
     private val friend = PixUser("u_2", "test2", "Test Account 2")
@@ -217,9 +222,11 @@ class InviteSentSheetTest {
     @Test
     fun aConfigurationChange_whileWaiting_keepsTheInvitation() {
         val modules = TestAppContainer().install()
-        val controller = Robolectric.buildActivity(AppCompatActivity::class.java)
-            .apply { get().setTheme(R.style.Theme_Pix) }
-            .setup()
+        val controller = activities.keep(
+            Robolectric.buildActivity(AppCompatActivity::class.java)
+                .apply { get().setTheme(R.style.Theme_Pix) }
+                .setup(),
+        )
         InviteSentSheet().show(controller.get().supportFragmentManager, "inviteSent")
         idle()
         inviting(modules, controller.get())

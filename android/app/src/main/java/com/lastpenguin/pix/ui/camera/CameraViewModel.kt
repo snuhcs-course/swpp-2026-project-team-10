@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -14,6 +14,7 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -170,17 +172,36 @@ data class CameraUiState(
     val referenceExpanded: Boolean = false,
     /** The preview corner the reference thumbnail sits in, kept from one guide to the next. */
     val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
+    /**
+     * The reference thumbnail is put away at its corner's side of the preview, with a strip of it left to pull it
+     * back by (FR-3.9, #237). On this phone only; another guide's thumbnail shows again. A hidden thumbnail is never
+     * [referenceExpanded]: hiding makes it small, so its strip is the small one's and it comes back small.
+     */
+    val referenceHidden: Boolean = false,
     /** The guide on the camera is one of the saved guides (FR-3.8), so *Save guide* shows it as saved. */
     val guideSaved: Boolean = false,
     /** *Save guide* is writing the guide; the button waits. */
     val savingGuide: Boolean = false,
-    /** The last saved photo, for the thumbnail. */
+    /**
+     * The thumbnail's photo (FR-1.6): in a session, the session's newest, none until its first; otherwise the newest in
+     * Pix's album, taken here or received.
+     */
     val lastPhoto: Uri? = null,
+    /** The photos of the session running now, oldest first, for the viewer (FR-1.6); null outside a session. */
+    val sessionPhotos: List<Uri>? = null,
+    /** The photos in Pix's album, oldest first, with one just saved here that MediaStore has not told of yet. */
+    val albumPhotos: List<Uri> = emptyList(),
+    /** The viewer of [viewerPhotos] is open over the camera (FR-1.6). */
+    val photosOpen: Boolean = false,
     /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
     /** The pose tip of the guide on the camera (FR-4.10), or null when it has none. */
     val tip: TipBanner? = null,
-)
+) {
+    /** What the viewer pages through: the session's photos in a session, Pix's album otherwise. */
+    val viewerPhotos: List<Uri>
+        get() = sessionPhotos ?: albumPhotos
+}
 
 /**
  * Camera screen (Design 2.2, Figure 6).
@@ -195,6 +216,12 @@ class CameraViewModel(
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
     /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
     private val photos: PhotoShare = PhotoShare.None,
+    /** The photos in Pix's album (`PixAlbumPhotos`, FR-1.6), oldest first, taken here or received in a session. */
+    private val albumPhotos: StateFlow<List<Uri>> = MutableStateFlow(emptyList()),
+    /** The photos of the session running now (`PhotoSyncer.sessionPhotos`, FR-1.6); null outside a session. */
+    private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
+    /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
+    private val deleter: PhotoDeleter = PhotoDeleter { false },
     /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
@@ -217,6 +244,17 @@ class CameraViewModel(
 
     /** One label per toggle, the newest replacing one not yet shown; the screen shows it for [NOTICE_MS]. */
     val toggleLabels: Flow<ToggleLabel> = _toggleLabels.receiveAsFlow()
+
+    private val _photoNotDeleted = Channel<Unit>(Channel.BUFFERED)
+
+    /** One per photo the viewer could not delete, for its notice; kept until the screen reads it. */
+    val photoNotDeleted: Flow<Unit> = _photoNotDeleted.receiveAsFlow()
+
+    // The thumbnail's and the viewer's sources (FR-1.6): outside a session Pix's album, with the photo just saved here
+    // before MediaStore tells of it; in a session the session's photos alone.
+    private var album: List<Uri> = emptyList()
+    private var newestSaved: Uri? = null
+    private var thisSession: List<Uri>? = null
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
@@ -273,6 +311,19 @@ class CameraViewModel(
             camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
         }
         viewModelScope.launch {
+            albumPhotos.collect { photos ->
+                album = photos
+                newestSaved = photos.lastOrNull()
+                showNewestPhoto()
+            }
+        }
+        viewModelScope.launch {
+            sessionPhotos.collect { photos ->
+                thisSession = photos
+                showNewestPhoto()
+            }
+        }
+        viewModelScope.launch {
             camera.zoom.collect { zoom ->
                 if (pendingZoomStep?.let { isAtZoomStep(zoom, it) } == true) pendingZoomStep = null
                 _uiState.update { it.copy(zoom = zoom) }
@@ -284,7 +335,15 @@ class CameraViewModel(
                     // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
                     val editing = guide != null && (guide !== it.guide || it.guideEditing)
                     val expanded = it.referenceExpanded && guide === it.guide
-                    it.copy(guide = guide, guideEditing = editing, referenceExpanded = expanded)
+                    // A saved copy keeps the guide's id and its photo, so it stays hidden; another guide's photo
+                    // is one the user has not seen, so it shows.
+                    val hidden = it.referenceHidden && guide != null && guide.id == it.guide?.id
+                    it.copy(
+                        guide = guide,
+                        guideEditing = editing,
+                        referenceExpanded = expanded,
+                        referenceHidden = hidden,
+                    )
                 }
             }
         }
@@ -318,6 +377,56 @@ class CameraViewModel(
         _uiState.update { state ->
             state.tip?.takeIf { it.open }?.let { state.copy(tip = it.copy(open = false)) }
                 ?: state
+        }
+    }
+
+    /**
+     * In a session, the session's newest photo, none until its first, and the session's photos for the viewer;
+     * otherwise the newest saved here, and Pix's album (FR-1.6).
+     */
+    private fun showNewestPhoto() {
+        val session = thisSession
+        val saved = newestSaved
+        val albumPhotos = if (saved != null && saved !in album) album + saved else album
+        _uiState.update {
+            val next = it.copy(
+                lastPhoto = if (session != null) session.lastOrNull() else saved,
+                sessionPhotos = session,
+                albumPhotos = albumPhotos,
+            )
+            // The viewer closes as a session starts or ends, so it never turns from one's photos to the other's.
+            val sameKind = (it.sessionPhotos == null) == (session == null)
+            next.copy(photosOpen = it.photosOpen && sameKind && next.viewerPhotos.isNotEmpty())
+        }
+    }
+
+    /**
+     * A tap on the thumbnail opens its photos over the camera, at the newest (FR-1.6): the session's in a session,
+     * Pix's album otherwise, so Pix stays in front in both.
+     */
+    fun openPhotos() {
+        _uiState.update { it.copy(photosOpen = it.viewerPhotos.isNotEmpty()) }
+    }
+
+    /** The viewer's Back, or the system's, closes it. */
+    fun closePhotos() {
+        _uiState.update { it.copy(photosOpen = false) }
+    }
+
+    /**
+     * The viewer's Delete, once asked (FR-1.6): the photo leaves the viewer and the thumbnail at once, before
+     * MediaStore tells of it, or stays, and [photoNotDeleted] says so. In a session the deleter drops it from the
+     * session's photos too.
+     */
+    fun deletePhoto(uri: Uri) {
+        viewModelScope.launch {
+            if (!deleter.delete(uri)) {
+                _photoNotDeleted.trySend(Unit)
+                return@launch
+            }
+            album = album - uri
+            if (newestSaved == uri) newestSaved = album.lastOrNull()
+            showNewestPhoto()
         }
     }
 
@@ -407,8 +516,10 @@ class CameraViewModel(
                 earlier?.join()
                 result.fold(
                     onSuccess = { uri ->
-                        // No notice (FR-1.6, #204): the thumbnail shows the new photo.
-                        _uiState.update { it.copy(lastPhoto = uri) }
+                        // No notice (FR-1.6, #204): the thumbnail shows the new photo, in a session once it is the
+                        // session's.
+                        newestSaved = uri
+                        showNewestPhoto()
                         sessionId?.let { photos.taken(it, uri, takenAt) }
                     },
                     onFailure = { error ->
@@ -560,14 +671,50 @@ class CameraViewModel(
         _toggleLabels.trySend(if (guides.state.value.visible) ToggleLabel.GuideShown else ToggleLabel.GuideHidden)
     }
 
-    /** A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). */
+    /**
+     * A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). A hidden one stays
+     * small.
+     */
     fun setReferenceExpanded(expanded: Boolean) {
-        _uiState.update { it.copy(referenceExpanded = expanded && it.guide?.reference != null) }
+        _uiState.update {
+            it.copy(referenceExpanded = expanded && it.guide?.reference != null && !it.referenceHidden)
+        }
     }
 
     /** A drag drops the reference thumbnail into one of the preview's corners, and nowhere else (FR-3.9). */
     fun setReferenceCorner(corner: ReferenceCorner) {
         _uiState.update { it.copy(referenceCorner = corner) }
+    }
+
+    /**
+     * Puts the reference thumbnail away at its corner's side, small, or shows it again (#237); nothing without one.
+     */
+    fun setReferenceHidden(hidden: Boolean) {
+        _uiState.update {
+            val hides = hidden && it.guide?.reference != null
+            it.copy(referenceHidden = hides, referenceExpanded = it.referenceExpanded && !hides)
+        }
+    }
+
+    /** A drag let the thumbnail go: into [drop]'s corner, or hidden, and small, at that corner's side (#237). */
+    fun onReferenceDropped(drop: ReferenceDrop) {
+        _uiState.update {
+            val hides = drop.hidden && it.guide?.reference != null
+            it.copy(
+                referenceCorner = drop.corner,
+                referenceHidden = hides,
+                referenceExpanded = it.referenceExpanded && !hides,
+            )
+        }
+    }
+
+    /** A tap on the thumbnail: a hidden one comes back, small, and a shown one changes its size (FR-3.9). */
+    fun onReferenceTap() {
+        if (_uiState.value.referenceHidden) {
+            setReferenceHidden(false)
+        } else {
+            setReferenceExpanded(!_uiState.value.referenceExpanded)
+        }
     }
 
     /**

@@ -1,9 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.animation.ValueAnimator
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -21,12 +20,12 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.util.Size
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,7 +58,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraFacing
@@ -90,16 +88,12 @@ import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Camera screen. Guide gestures belong to #6; the scene photo for poses belongs to #7; live session UI belongs to #8. */
 class CameraFragment : Fragment(R.layout.fragment_camera) {
@@ -111,6 +105,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var binding: FragmentCameraBinding? = null
     private var sceneBack: OnBackPressedCallback? = null
     private var aspectsBack: OnBackPressedCallback? = null
+    private var photosBack: OnBackPressedCallback? = null
+    private var photoViewer: PhotoViewer? = null
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
@@ -185,9 +181,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     // The last photo's thumbnail, off the main thread; a test stands in for MediaStore, which has no photos on the JVM.
     @VisibleForTesting
-    internal var thumbnailOf: (Uri) -> Bitmap? = { uri ->
-        requireContext().contentResolver.loadThumbnail(uri, Size(THUMBNAIL_PX, THUMBNAIL_PX), null)
-    }
+    internal var thumbnailOf: (Uri) -> Bitmap? = { uri -> requireContext().photoThumbnail(uri) }
+
+    // A session photo in the viewer, the same way.
+    @VisibleForTesting
+    internal var photoOf: (Uri) -> Bitmap? = { uri -> requireContext().photoToView(uri) }
 
     // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
     private var previewArea = PreviewArea(0f, 0f, 0f)
@@ -311,7 +309,20 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             }
         }
         setupScenePhoto(controls)
-        controls.galleryButton.setOnClickListener { openLastPhoto() }
+        controls.galleryButton.setOnClickListener { onThumbnailTap() }
+        photoViewer =
+            PhotoViewer(
+                controls.photoViewerHolder,
+                viewLifecycleOwner.lifecycleScope,
+                load = { photoOf(it) },
+                thumbnail = { thumbnailOf(it) },
+                onBack = viewModel::closePhotos,
+                onDelete = viewModel::deletePhoto,
+            )
+        // After the other screens' Backs, so it comes first: the viewer is over all of them.
+        photosBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
+            viewModel.closePhotos()
+        }
         // Selfie mode (FR-1.14): the last frame stays up, blurred, and turns over while the other camera opens.
         controls.switchCameraButton.setOnClickListener {
             previewHold?.hold()
@@ -334,6 +345,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
+                launch {
+                    viewModel.photoNotDeleted.collect {
+                        Toast.makeText(requireContext(), R.string.photo_not_deleted, Toast.LENGTH_SHORT).show()
+                    }
+                }
                 // The guide in the settings' color and thickness (FR-3.10).
                 launch {
                     controls.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
@@ -490,28 +506,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     }
                 }
                 launch {
-                    // A photo just taken grows into the thumbnail (FR-1.6); one there as the screen opens just shows.
-                    var opening = true
-                    viewModel.uiState.map { it.lastPhoto }.distinctUntilChanged().collectLatest { uri ->
-                        val taken = !opening
-                        opening = false
-                        val thumbnail = if (uri == null) {
-                            null
-                        } else {
-                            withContext(Dispatchers.IO) {
-                                try {
-                                    thumbnailOf(uri)
-                                } catch (_: Exception) {
-                                    null // The full photo can still be opened if thumbnail decoding fails.
-                                }
-                            }
-                        }
-                        if (thumbnail == null) {
-                            controls.galleryThumbnail.setImageResource(R.drawable.gallery_placeholder)
-                        } else {
-                            controls.galleryThumbnail.setImageBitmap(thumbnail)
-                            if (taken) growIn(controls.galleryThumbnail)
-                        }
+                    // A new photo, taken here or received, grows into the thumbnail (FR-1.6).
+                    showPhotoThumbnails(viewModel.uiState.map { it.lastPhoto }, controls.galleryThumbnail) {
+                        thumbnailOf(it)
                     }
                 }
             }
@@ -545,6 +542,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     override fun onDestroyView() {
+        photoViewer = null
+        photosBack = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
         referenceDrag = null
@@ -627,22 +626,30 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     /**
      * The reference thumbnail (FR-3.9): a tap enlarges it or makes it small again, and a drag drops it into the
-     * nearest corner. TalkBack gets the same tap and an action for each other corner.
+     * nearest corner, or hides it at that corner's side when it is let go mostly out of the preview or flung there
+     * (#237). A hidden one leaves a strip, which a tap or a drag brings back. TalkBack gets the same tap, an action
+     * for each other corner, and one to hide it.
      */
     private fun setupReference(controls: FragmentCameraBinding) {
         val thumbnail = controls.referenceThumbnail
+        val density = resources.displayMetrics.density
         referenceDrag = ReferenceDragController(
             thumbnail,
             area = { referenceArea(controls) },
-            onTap = { viewModel.setReferenceExpanded(!viewModel.uiState.value.referenceExpanded) },
-        ) { corner ->
-            corner?.let(viewModel::setReferenceCorner)
+            previewWidth = { controls.previewContainer.width },
+            peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+            flingSpeed = REFERENCE_FLING_DP * density,
+            onTap = viewModel::onReferenceTap,
+        ) { drop ->
+            drop?.let(viewModel::onReferenceDropped)
             renderReference(controls, viewModel.uiState.value)
-        }
+        }.also { it.listenOn(controls.referenceHandle) }
         thumbnail.setReferenceActions(
             expanded = { viewModel.uiState.value.referenceExpanded },
             corner = { viewModel.uiState.value.referenceCorner },
+            hidden = { viewModel.uiState.value.referenceHidden },
             moveTo = viewModel::setReferenceCorner,
+            setHidden = viewModel::setReferenceHidden,
         )
         // The corners follow the preview's size and the panels at its bottom, which grow when brightness or a notice
         // opens; both are known only after layout.
@@ -945,6 +952,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
+        photoViewer?.render(state.viewerPhotos, state.photosOpen)
+        photosBack?.isEnabled = state.photosOpen
         // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
         controls.switchCameraButton.isVisible = state.canSwitchCamera
         controls.switchCameraButton.isEnabled = granted && !state.isSaving
@@ -1041,19 +1050,33 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // toggle's label takes the hint's place while it shows.
         controls.hintText.isInvisible = controls.hintText.text.isNullOrEmpty() ||
             (reference != null && state.referenceExpanded) || controls.toggleLabel.isVisible
+        val dragging = referenceDrag?.isDragging == true
+        var placed: ReferencePlacement? = null
         controls.referenceThumbnail.showReference(reference) { photo ->
-            if (referenceDrag?.isDragging == true || controls.previewContainer.width == 0) {
+            if (dragging || controls.previewContainer.width == 0) {
                 null
             } else {
+                val density = resources.displayMetrics.density
                 placeReference(
                     aspect = photo.width.toFloat() / photo.height,
                     expanded = state.referenceExpanded,
                     corner = state.referenceCorner,
-                    smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
+                    smallLongSide = (REFERENCE_SMALL_DP * density).roundToInt(),
                     previewWidth = controls.previewContainer.width,
                     area = referenceArea(controls),
-                )
+                    hidden = state.referenceHidden,
+                    peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+                ).also { placed = it }
             }
+        }
+        // The handle stays as it is through a drag, which may have begun on it.
+        if (!dragging) {
+            controls.referenceHandle.showReferenceHandle(
+                placement = placed.takeIf { reference != null && state.referenceHidden },
+                corner = state.referenceCorner,
+                previewWidth = controls.previewContainer.width,
+                area = referenceArea(controls),
+            )
         }
     }
 
@@ -1668,17 +1691,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    /** A new photo's thumbnail grows in from [THUMBNAIL_START_SCALE] (FR-1.6). */
-    private fun growIn(view: View) {
-        if (!Motion.on()) return
-        view.animate().cancel()
-        view.scaleX = THUMBNAIL_START_SCALE
-        view.scaleY = THUMBNAIL_START_SCALE
-        view.alpha = 0f
-        view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(Motion.FADE_MS).setInterpolator(Motion.STANDARD)
-            .start()
-    }
-
     /**
      * Clips the preview to where its image shows (AD-10): the frame, or for 1:1 the whole 4:3 area with the rest
      * dimmed (R&S 6.2), and puts the live light in the frame's corner. Nothing is clipped before layout.
@@ -1826,20 +1838,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    private fun openLastPhoto() {
-        val uri = viewModel.uiState.value.lastPhoto ?: return
-        try {
-            startActivity(
-                Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "image/jpeg")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                },
-            )
-        } catch (_: ActivityNotFoundException) {
-            binding?.let { Snackbar.make(it.root, R.string.gallery_unavailable, Snackbar.LENGTH_LONG).show() }
-        } catch (_: SecurityException) {
-            binding?.let { Snackbar.make(it.root, R.string.photo_unavailable, Snackbar.LENGTH_LONG).show() }
-        }
+    /**
+     * The thumbnail (FR-1.6): its photos over the camera, inside Pix, at the newest: the session's in a session, so the
+     * session and the subject's video go on, and Pix's album otherwise, which the phone's gallery could show only one
+     * photo of.
+     */
+    private fun onThumbnailTap() {
+        viewModel.setAspectsOpen(false)
+        viewModel.openPhotos()
     }
 
     companion object {
@@ -1851,8 +1857,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val MIN_BLUR_PX = 0.5f
         private const val HALF_TURN = 180f
         private const val FLIP_CAMERA_DISTANCE = 8_000f
-        private const val THUMBNAIL_START_SCALE = 0.6f
-        private const val THUMBNAIL_PX = 144
         private const val FOCUS_RING_START_SCALE = 1.25f
         private const val FOCUS_RING_SHRINK_MS = 150L
         private const val FOCUS_RING_HOLD_MS = 700L

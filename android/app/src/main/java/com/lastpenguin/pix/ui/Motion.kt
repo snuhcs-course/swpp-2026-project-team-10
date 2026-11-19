@@ -40,6 +40,9 @@ internal object Motion {
     /** A ♥ growing and settling once as it saves a pose. */
     const val POP_MS = 200L
 
+    /** The reference thumbnail settling where it was let go: larger or smaller, in a corner, or at the side. */
+    const val THUMBNAIL_MS = 200L
+
     /** Material's standard curve: quick to start, slow to settle. */
     val STANDARD = PathInterpolator(0.4f, 0f, 0.2f, 1f)
 

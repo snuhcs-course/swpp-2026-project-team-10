@@ -3,15 +3,15 @@ package com.lastpenguin.pix.ui.guide
 
 import android.view.LayoutInflater
 import android.view.View
-import androidx.appcompat.app.AppCompatActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.SavedGuide
+import com.lastpenguin.pix.ui.OwnActivities
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.annotation.GraphicsMode
 
 /*
@@ -21,8 +21,11 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SavedGuideListTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private fun sheet(): Pair<SheetAddGuideBinding, SavedGuideList> {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val binding = SheetAddGuideBinding.inflate(LayoutInflater.from(activity))
         activity.setContentView(binding.root)
         return binding to SavedGuideList(binding)

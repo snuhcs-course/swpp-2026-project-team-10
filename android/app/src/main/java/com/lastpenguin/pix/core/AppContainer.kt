@@ -26,9 +26,10 @@ import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
 import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.NARROWEST_FRAME_ASPECT
-import com.lastpenguin.pix.camera.NewestAlbumPhoto
 import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoSaver
+import com.lastpenguin.pix.camera.PixAlbumPhotos
 import com.lastpenguin.pix.camera.SensorPhoneTurns
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.network.PixAccountApi
@@ -110,7 +111,9 @@ class AppContainer(
     val cameraController: CameraController,
     val cameraSettings: CameraSettings,
     /** The newest photo in Pix's album, taken here or received in a session, for Camera's thumbnail (FR-1.6). */
-    val albumPhoto: StateFlow<Uri?>,
+    val albumPhotos: StateFlow<List<Uri>>,
+    /** Deletes a photo from the viewer: from Pix's album, and from the session's photos too (FR-1.6). */
+    val photoDeleter: PhotoDeleter,
     // ---- Guide (#5, #6) -------------------------------------------------------
     /** The photographer's guide, clamped to the frame of the chosen aspect ratio (AD-10). */
     val guideRepository: GuideRepository,
@@ -272,9 +275,17 @@ class AppContainer(
             val promptHistory = DataStorePromptHistory(appContext, appScope)
             promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
             val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
+            val album = PixAlbumPhotos(appContext.contentResolver, appScope)
+            val photoSyncer = PhotoSyncer(
+                rtcSessionManager,
+                ContentPhotoReader(appContext.contentResolver),
+                PhotoSaver(appContext),
+                File(appContext.cacheDir, "session-photos"),
+            )
             return AppContainer(
                 cameraController = cameraController,
-                albumPhoto = NewestAlbumPhoto(appContext.contentResolver, appScope).newest,
+                albumPhotos = album.photos,
+                photoDeleter = PhotoDeleter { uri -> photoSyncer.delete(uri, album, appScope) },
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,
@@ -298,12 +309,7 @@ class AppContainer(
                 confirmSyncer = ConfirmSyncer(rtcSessionManager, MaskGuideImageCodec()),
                 descriptionSyncer = descriptionSyncer,
                 tipSyncer = TipSyncer(rtcSessionManager, poseTips.onCamera),
-                photoSyncer = PhotoSyncer(
-                    rtcSessionManager,
-                    ContentPhotoReader(appContext.contentResolver),
-                    PhotoSaver(appContext),
-                    File(appContext.cacheDir, "session-photos"),
-                ),
+                photoSyncer = photoSyncer,
                 remoteControlHandler = RemoteControlHandler(
                     rtcSessionManager,
                     cameraController,

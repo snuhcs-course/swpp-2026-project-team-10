@@ -229,9 +229,15 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
         // The session's photos open over the video, inside Pix, so the session goes on (FR-6.14).
         binding.galleryButton.setOnClickListener { viewModel.openPhotos() }
-        val photoViewer = PhotoViewer(binding.photoViewerHolder, viewLifecycleOwner.lifecycleScope, { photoOf(it) }) {
-            viewModel.closePhotos()
-        }
+        val photoViewer =
+            PhotoViewer(
+                binding.photoViewerHolder,
+                viewLifecycleOwner.lifecycleScope,
+                load = { photoOf(it) },
+                thumbnail = { thumbnailOf(it) },
+                onBack = viewModel::closePhotos,
+                onDelete = viewModel::deletePhoto,
+            )
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupTip(binding)
@@ -266,6 +272,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 // The photographer's guide in this phone's own color and thickness (FR-3.10).
                 launch {
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
+                }
+                launch {
+                    viewModel.photoNotDeleted.collect {
+                        Toast.makeText(requireContext(), R.string.photo_not_deleted, Toast.LENGTH_SHORT).show()
+                    }
                 }
                 launch {
                     combine(settingsViewModel.showLatency, sessionViewModel.state, sessionViewModel.latencyMs, ::Triple)

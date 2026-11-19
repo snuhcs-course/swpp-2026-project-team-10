@@ -116,6 +116,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 
 /*
  * Every screen in Korean (FR-10.2, Iter3-P7; Testing Documentation 2.1.6): the real Fragments on the fakes, with the
@@ -132,7 +133,8 @@ import org.robolectric.annotation.GraphicsMode
  * camera; Session not found; Subject view, with the photographer's tip closed and open,
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
- * viewer (Iter4-A2), and with the delay shown; Settings, signed in; How to use Pix; About Pix. On each, no visible text, hint, or content
+ * viewer (Iter4-A2), and with the delay shown; Camera with Pix's album open in the viewer; Settings, signed in; How
+ * to use Pix; About Pix. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
  * in a view that ellipsizes on purpose, and no line breaks inside a word. The text styles' font aliases: Pretendard in
@@ -266,6 +268,43 @@ class KoreanScreensTest {
         idle()
         Thread.sleep(200)
         assertKorean(screen(), *people)
+    }
+
+    @Test
+    fun camera_withPixsAlbumOpen_isInKorean() {
+        val modules = camera()
+        scenario!!.onFragment { fragment ->
+            (fragment as CameraFragment).thumbnailOf = { bitmap() }
+            fragment.photoOf = { bitmap() }
+        }
+        modules.album.value = listOf(
+            Uri.parse("content://media/external/images/media/1"),
+            Uri.parse("content://media/external/images/media/2"),
+        )
+        idle()
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).galleryButton.performClick() }
+        // The pictures are read off the main thread.
+        idle()
+        Thread.sleep(200)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun camera_thePhotoViewersDeleteQuestion_isInKorean() {
+        val modules = camera()
+        scenario!!.onFragment { fragment ->
+            (fragment as CameraFragment).thumbnailOf = { bitmap() }
+            fragment.photoOf = { bitmap() }
+        }
+        modules.album.value = listOf(Uri.parse("content://media/external/images/media/1"))
+        idle()
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).galleryButton.performClick() }
+        idle()
+        Thread.sleep(200)
+        scenario!!.onFragment { it.requireView().findViewById<View>(R.id.photoViewerDelete).performClick() }
+        idle()
+
+        assertKorean(checkNotNull(ShadowDialog.getLatestDialog().window).decorView)
     }
 
     @Test

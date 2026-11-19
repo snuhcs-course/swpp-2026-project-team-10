@@ -3,6 +3,7 @@ package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.app.Application
+import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
@@ -15,6 +16,7 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.PreviewView
@@ -65,15 +67,20 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
+import org.robolectric.shadows.ShadowDialog
+import org.robolectric.shadows.ShadowToast
 
 /*
  * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4, FR-1.5,
  * FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the request's
  * answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot together, Use
  * this photo, which opens nothing for a photo without a person) and system back during the scene photo step; End
- * session; the gallery button with and without an app to open the photo; outside a session the album's newest in the
- * gallery, and in a session as the photographer none until the session's first photo, then the session's photos in
- * Pix's viewer, which system Back and the session's end close (FR-1.6, Iter4-A2); each capture failure's message; the subject's
+ * session; the gallery button: outside a session the album's newest, which opens Pix's album in Pix's viewer at the
+ * newest, a swipe to an older one and a tap on the strip of thumbnails, and system Back, and a photo just taken there
+ * at once; a photo deleted there, once asked, leaves it and the thumbnail, and one that cannot be deleted stays with a
+ * notice; in a session as the
+ * photographer none until the session's first photo, then the session's photos in Pix's viewer, which system Back and
+ * the session's end close, and Pix's album again after it (FR-1.6, Iter4-A2); each capture failure's message; the subject's
  * zoom, brightness, flash, and guide moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view
  * on mobile data (FR-6.13); the zoom accessibility actions and a tap on the readout through the quick steps (0.6×, 1×,
  * 2×, back to 0.6×), by touch and by TalkBack; the reference thumbnail's tap, drag, and TalkBack moves, and hiding it
@@ -396,25 +403,21 @@ class CameraFragmentInteractionTest {
     // ---- The gallery button and capture failures ------------------------------------------
 
     @Test
-    fun galleryButton_opensTheLastPhoto_orSaysNoAppCan() {
+    fun galleryButton_aPhotoJustTaken_opensInPix_beforeMediaStoreTellsOfIt() {
         val uri = Uri.parse("content://media/external/images/7")
         launch(FakeCameraController().apply { photo = uri })
+        val picture = Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        onScreen { _, fragment -> fragment.photoOf = { if (it == uri) picture else null } }
 
         onScreen { controls, _ -> controls.shutterButton.performClick() }
-        idle()
-        // The thumbnail is read off the main thread; let that run (it finds no provider and keeps the placeholder).
-        Thread.sleep(300)
-        idle()
+        settleReads()
         onScreen { controls, _ -> controls.galleryButton.performClick() }
-        val view = nextIntent()
-        assertEquals(Intent.ACTION_VIEW, view?.action)
-        assertEquals(uri, view?.data)
+        settleReads()
 
-        shadowOf(app).checkActivities(true)
-        onScreen { controls, _ -> controls.galleryButton.performClick() }
-        idle()
-        onScreen { _, fragment ->
-            assertTrue(shows(fragment.requireActivity().window.decorView, string(R.string.gallery_unavailable)))
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            assertTrue(photoViewerOn(controls.root).root.isShown)
+            assertSame(picture, photoViewerOn(controls.root).pageShows())
         }
     }
 
@@ -428,23 +431,102 @@ class CameraFragmentInteractionTest {
     private fun FragmentCameraBinding.thumbnailShows(): Bitmap? = (galleryThumbnail.drawable as? BitmapDrawable)?.bitmap
 
     @Test
-    fun galleryButton_outsideASession_showsTheAlbumsNewest_andOpensItInTheGallery() {
+    fun galleryButton_outsideASession_showsTheAlbumsNewest_andOpensPixsAlbumInPix_atTheNewest() {
         val modules = launch()
-        val picture = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
-        onScreen { _, fragment -> fragment.thumbnailOf = { picture } }
+        val thumbnail = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val pictures = (1..3).associate {
+            TestAppContainer.savedPhoto("p$it") to
+                Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        }
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { thumbnail }
+            fragment.photoOf = { pictures[it] }
+        }
 
-        // Received in an earlier session, or taken before Pix opened.
-        modules.album.value = TestAppContainer.savedPhoto("p1")
+        // Taken here or received in earlier sessions, oldest first.
+        modules.album.value = (1..3).map { TestAppContainer.savedPhoto("p$it") }
         settleReads()
-
         onScreen { controls, _ ->
             assertTrue(controls.galleryButton.isEnabled)
-            assertSame(picture, controls.thumbnailShows())
+            assertSame(thumbnail, controls.thumbnailShows())
             controls.galleryButton.performClick()
         }
-        val view = nextIntent()
-        assertEquals(Intent.ACTION_VIEW, view?.action)
-        assertEquals(TestAppContainer.savedPhoto("p1"), view?.data)
+        settleReads()
+
+        // In Pix, not the gallery: the newest, and a swipe to an older one.
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertTrue(viewer.root.isShown)
+            assertSame(pictures[TestAppContainer.savedPhoto("p3")], viewer.pageShows())
+            // No title and no counter; TalkBack reads which photo of how many.
+            assertEquals(emptyList<String>(), viewer.textsShown())
+            assertEquals(string(R.string.photo_page_counter_description, 3, 3), viewer.pageReads())
+            assertEquals(3, viewer.stripCount())
+            assertEquals(2, viewer.stripSelected())
+            viewer.photoViewerPages.setCurrentItem(0, false)
+        }
+        settleReads()
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertSame(pictures[TestAppContainer.savedPhoto("p1")], viewer.pageShows())
+            assertEquals(string(R.string.photo_page_counter_description, 1, 3), viewer.pageReads())
+            assertEquals(0, viewer.stripSelected())
+            // A tap on the strip, as in a gallery app.
+            viewer.tapStrip(1)
+        }
+        settleReads()
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertSame(pictures[TestAppContainer.savedPhoto("p2")], viewer.pageShows())
+            assertEquals(string(R.string.photo_page_counter_description, 2, 3), viewer.pageReads())
+        }
+
+        // System Back closes it, and Camera is there as it was.
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility) }
+    }
+
+    @Test
+    fun photoViewer_outsideASession_deletesThePhotoOnScreen_onceAsked_orSaysItCouldNot() {
+        val modules = launch()
+        val photos = (1..2).map { TestAppContainer.savedPhoto("p$it") }
+        val thumbnails = photos.associateWith { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+        val pictures = photos.associateWith { Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888) }
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { thumbnails[it] }
+            fragment.photoOf = { pictures[it] }
+        }
+        modules.album.value = photos
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+
+        // A photo that cannot be deleted stays, and the screen says so.
+        modules.deleteFails = true
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        settleReads()
+        assertEquals(string(R.string.photo_not_deleted), ShadowToast.getTextOfLatestToast())
+        onScreen { controls, _ -> assertEquals(2, photoViewerOn(controls.root).stripCount()) }
+
+        modules.deleteFails = false
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        settleReads()
+
+        assertEquals(listOf(photos[1]), modules.deleted)
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertTrue(viewer.root.isShown)
+            assertSame(pictures[photos[0]], viewer.pageShows())
+            // One photo left: no strip.
+            assertEquals(0, viewer.stripCount())
+            assertSame(thumbnails[photos[0]], controls.thumbnailShows())
+        }
     }
 
     @Test
@@ -457,7 +539,7 @@ class CameraFragmentInteractionTest {
             fragment.thumbnailOf = { thumbnail }
             fragment.photoOf = { picture }
         }
-        modules.album.value = TestAppContainer.savedPhoto("p0")
+        modules.album.value = listOf(TestAppContainer.savedPhoto("p0"))
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.PHOTOGRAPHER))
         settleReads()
         onScreen { controls, _ ->
@@ -488,17 +570,22 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility) }
         assertTrue(modules.session.leaves.isEmpty())
 
-        // The session's end closes the viewer, and the thumbnail is the album's newest again, in the gallery.
+        // The session's end closes the viewer, and the thumbnail opens Pix's album again, the photo of the session in it.
         onScreen { controls, _ -> controls.galleryButton.performClick() }
         settleReads()
-        modules.album.value = taken
+        modules.album.value = listOf(TestAppContainer.savedPhoto("p0"), taken)
         modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
         settleReads()
         onScreen { controls, _ ->
             assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility)
             controls.galleryButton.performClick()
         }
-        assertEquals(taken, nextIntent()?.data)
+        settleReads()
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            assertTrue(photoViewerOn(controls.root).root.isShown)
+            assertEquals(2, photoViewerOn(controls.root).stripCount())
+        }
     }
 
     @Test

@@ -95,11 +95,12 @@
 | 3.15 | 2026-11-18 | The reference thumbnail hides at the side (Iter4-A4, [#237]): `dropReference`, a strip of the small thumbnail under a touch-target handle, `referenceHidden` on each phone, and its changes animated by `showReference` (2.6.2, 2.9). |
 | 3.16 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): the thumbnail from the session's photos and a viewer inside Pix on *Subject view* and on the photographer's Camera, and outside a session the album's newest photo (`NewestAlbumPhoto`); *Subject view*'s bottom row as Camera's (2.6.5, Figures 6 and 7). |
 | 3.17 | 2026-11-18 | The reference thumbnail for a guide from the subject (Iter4-A1, [#234]): `guide.reference.*` goes S→P before the guide's image, and the photographer adopts the guide with it (2.3, 2.5.1, 2.6.2, 2.6.5, 2.9). |
-| 3.18 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): `PhoneTurns` with its dead band, each photo saved as held, the scene photo turned upright for 4:3 and 16:9 candidates, and a pose's guide turned back into the frame (2.6.2, 2.6.3, 2.8). |
-| 3.19 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): `TurningIcons` turns the icons, the ratio, the zoom readout, and the bottom row's labels upright as the phone is held, on Camera and Subject view, and the layout stays (2.6.2). |
-| 3.20 | 2026-11-18 | The focus box stays as long as the brightness bar beside it, and the two go together (2.8; [#207]). |
-| 3.21 | 2026-11-18 | *End session* hides during the scene photo, and a tutorial ring stays on a control that turns (2.6.3, 2.6.8; [#207]). |
-| 3.22 | 2026-11-18 | A brightness drag changes 1 EV for each 150 dp, whatever the camera's step (2.8; [#207]). |
+| 3.18 | 2026-11-18 | Pix's album in the viewer (Iter4-A7, [#247]): outside a session Camera's thumbnail opens all of Pix's photos in `PhotoViewer` instead of one in the gallery; `PixAlbumPhotos` in place of `NewestAlbumPhoto`; the viewer as a gallery app's, with a strip of thumbnails, zoom (`ZoomablePhotoView`), *Share*, and *Delete* (2.6.5, Figure 6). |
+| 3.19 | 2026-11-18 | Landscape photos (Iter4-P9, [#206]): `PhoneTurns` with its dead band, each photo saved as held, the scene photo turned upright for 4:3 and 16:9 candidates, and a pose's guide turned back into the frame (2.6.2, 2.6.3, 2.8). |
+| 3.20 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): `TurningIcons` turns the icons, the ratio, the zoom readout, and the bottom row's labels upright as the phone is held, on Camera and Subject view, and the layout stays (2.6.2). |
+| 3.21 | 2026-11-18 | The focus box stays as long as the brightness bar beside it, and the two go together (2.8; [#207]). |
+| 3.22 | 2026-11-18 | *End session* hides during the scene photo, and a tutorial ring stays on a control that turns (2.6.3, 2.6.8; [#207]). |
+| 3.23 | 2026-11-18 | A brightness drag changes 1 EV for each 150 dp, whatever the camera's step (2.8; [#207]). |
 
 </details>
 
@@ -368,7 +369,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               flow share one activity-scoped ViewModel; PixViewModels builds every ViewModel from the AppContainer;
 │               ScreenTransitions (PixNavHostFragment, ScreenNavigator, ScreenMotion) and Motion
 ├─ camera/      CameraController*, CameraXController, CameraSettings (aspect ratio in DataStore), PhotoSaver (PhotoAlbum),
-│               NewestAlbumPhoto, CameraZoom, CameraZoomPlan, CameraFrameCache
+│               PixAlbumPhotos, CameraZoom, CameraZoomPlan, CameraFrameCache
 ├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore*, GuideLook* (GuideColor,
 │               GuideThickness, GuideOutlines), InMemoryGuideRepository, MlKitReferenceGuideMaker, FileSavedGuideStore,
 │               GuideGeometry, SubjectSegmenter, MaskSmoothing (functions), OutlineExtractor, MaskPng,
@@ -625,8 +626,9 @@ classDiagram
     +onTipButton()
     +onSaveGuide()
     +onRemoveGuide()
-    +openSessionPhotos()
-    +closeSessionPhotos()
+    +openPhotos()
+    +closePhotos()
+    +deletePhoto(uri)
   }
   class ReferenceViewModel {
     +uiState StateFlow~ReferenceUiState~
@@ -678,8 +680,9 @@ classDiagram
     +outputOptions(mirrored) OutputFileOptions
     +save(file, photoId, takenAt) Result~Uri~
   }
-  class NewestAlbumPhoto {
-    +newest StateFlow~Uri~
+  class PixAlbumPhotos {
+    +photos StateFlow~List~
+    +delete(uri) Boolean
   }
   class CameraSettings {
     <<interface>>
@@ -745,7 +748,7 @@ classDiagram
   CameraViewModel --> SavedGuideStore
   CameraXController ..|> CameraController
   CameraXController --> PhotoSaver
-  CameraViewModel --> NewestAlbumPhoto : the thumbnail outside a session
+  CameraViewModel --> PixAlbumPhotos : the thumbnail and the viewer outside a session
   MlKitReferenceGuideMaker ..|> ReferenceGuideMaker
   MlKitReferenceGuideMaker --> ScreenshotPhoto : cut a screenshot first
   ScreenshotPhoto --> SharedPostCard : a post shared in a story
@@ -887,6 +890,7 @@ classDiagram
     +received Flow~Boolean~
     +shutters Flow~Unit~
     +sessionPhotos Flow~List~
+    +delete(uri, album, later) Boolean
     +startAsSender(scope)
     +startAsReceiver(scope)
     +drop() Int
@@ -934,6 +938,7 @@ classDiagram
     +claimSetOpening(setId) Boolean
     +openPhotos()
     +closePhotos()
+    +deletePhoto(uri)
   }
   class SubjectDescribeViewModel {
     +usedBefore StateFlow
@@ -2762,9 +2767,14 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
   - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
   - In a session, both phones' thumbnails show only the newest of these, so neither shows a photo from before. Both thumbnails are empty until the session's first photo. *Subject view*'s bottom row is Camera's, in thirds: *Guide* in the middle of the left third, where Camera's is, and the thumbnail in the middle of the right third (`showPhotoThumbnails`), on *Guide*'s icon line.
-  - A tap on either opens the session's photos in a viewer over the whole screen, inside Pix (`PhotoViewer`): one page each, opened at the newest, under Back alone, with no title, decoded to the screen's long side (`photoToView`). The phone's gallery would put Pix in the background, where the video stops and, on the photographer's phone, the session ends after 60 s (2.8, *Lifecycle*).
+  - A tap on either opens the session's photos in a viewer over the whole screen, inside Pix (`PhotoViewer`): one page each, opened at the newest, under a header with Back, *Share*, and *Delete* and no title, decoded to the screen's long side (`photoToView`). The phone's gallery would put Pix in the background, where the video stops and, on the photographer's phone, the session ends after 60 s (2.8, *Lifecycle*).
   - A newer photo adds a page and keeps the page on screen. Back closes the viewer, and so does the session's end. On the subject's phone, a step the photographer starts meanwhile opens once it closes. While it is open, TalkBack reads only the viewer.
-  - Outside a session, Camera's thumbnail is the newest photo in Pix's album, taken here or received (`NewestAlbumPhoto`), and a tap opens it in the phone's gallery (FR-1.6). It is read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves the one before. Without a storage permission Pix sees only the photos it saved, so after a reinstall the thumbnail is empty until the next.
+  - The viewer works as a gallery app's (FR-1.16, [#247]). A strip of 40 dp thumbnails is under the photo, each taking taps on 48 dp, with the one on screen outlined and the others dimmed. A tap on one shows its photo, and the strip scrolls to keep it in the middle. There is no counter; TalkBack reads each page and thumbnail as "Photo 2 of 12".
+  - Each page is a `ZoomablePhotoView`. A pinch zooms up to 4× around the fingers, a double tap zooms to 2.5× where it lands or back out, and a drag pans without passing the photo's edges. While zoomed, the page keeps every touch from the pager, so a sideways drag pans; zoomed out, it swipes. A page swiped away shows its whole photo again.
+  - While the photo is whole, a drag down moves it with the finger and fades the background. A lift past 96 dp, or a flick faster than 1000 dp/s, closes the viewer, and a shorter drag springs back. The drag and the flick are measured on the screen, since the photo's own coordinates move with it. A tap on the photo fades the header and the strip out or back in, and each opening shows them.
+  - *Share* sends the photo's content URI through the share sheet (`ACTION_SEND`, with leave to read it). *Delete* asks first, then calls `AppContainer.photoDeleter`: `PhotoSyncer.delete` drops the photo from the session's photos and has `PixAlbumPhotos.delete` remove its MediaStore row. Camera drops it from the album's pages at once, before MediaStore tells of the change.
+  - On the photographer's phone, the sender reads each photo only at its turn. A photo deleted while it waits to go, or goes, leaves the viewer at once but stays on the phone until it has reached the subject, failed, or its session ended, and is deleted then. Deleted at once, it would never reach the subject, and no copy would be left. Pix needs no permission to delete, since every photo it lists is its own. A delete that fails keeps the photo and shows "Couldn't delete this photo."; the last photo deleted closes the viewer.
+  - Outside a session, Camera's thumbnail is the newest photo in Pix's album, taken here or received, and a tap opens the whole album in the same viewer, at the newest (`PixAlbumPhotos`, FR-1.6, [#247]). A photo just taken is a page at once, before MediaStore tells of it. The viewer closes when a session starts or ends, so it never turns from one list to the other. The phone's gallery, given one photo through `ACTION_VIEW`, would show that photo alone, in Pix's task. The album is read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves it. Without a storage permission Pix sees only the photos it saved, so after a reinstall the album is empty until the next.
   - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
   - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
 - **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter2-P17; left out of Iteration 4 at its kickoff); only the message exists.
@@ -3432,3 +3442,4 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
 [#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216
 [#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247

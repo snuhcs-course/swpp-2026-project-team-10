@@ -18,21 +18,29 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.withContext
+
+/** Deletes one of Pix's photos from this phone, from the photo viewer (FR-1.6). */
+fun interface PhotoDeleter {
+    /** True once [uri] is gone from the phone, also when it already was; false when it could not be deleted. */
+    suspend fun delete(uri: Uri): Boolean
+}
 
 /**
- * The newest photo in Pix's album on this phone, taken here or received in a session, for Camera's thumbnail (FR-1.6;
- * Design 2.6.5). It is read from MediaStore when the app starts and again whenever MediaStore changes, so a photo
- * deleted in the gallery leaves the one before. Without a storage permission an app sees only the photos it saved, so
- * after a reinstall the album's older photos are not Pix's any more, and there is none until the next.
+ * The photos in Pix's album on this phone, taken here or received in a session, for Camera's thumbnail, the newest,
+ * and its viewer, all of them (FR-1.6; Design 2.6.5). They are read from MediaStore when the app starts and again
+ * whenever MediaStore changes, so a photo deleted in the gallery leaves them. Without a storage permission an app sees
+ * only the photos it saved, so after a reinstall the album's older photos are not Pix's any more, and there are none
+ * until the next. [delete] needs no permission either, for the same reason: every photo it lists is Pix's own.
  * Owner: Camera/Overlay (#3).
  */
-class NewestAlbumPhoto(
+class PixAlbumPhotos(
     private val resolver: ContentResolver,
     scope: CoroutineScope,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO,
-) {
-    /** null while the album has none, and until it was first read. */
-    val newest: StateFlow<Uri?> = callbackFlow {
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : PhotoDeleter {
+    /** Oldest first, the newest last; empty while the album has none, and until it was first read. */
+    val photos: StateFlow<List<Uri>> = callbackFlow {
         val observer = object : ContentObserver(null) {
             override fun onChange(selfChange: Boolean) {
                 trySend(Unit)
@@ -46,9 +54,22 @@ class NewestAlbumPhoto(
         .conflate()
         .map { read() }
         .flowOn(dispatcher)
-        .stateIn(scope, SharingStarted.Eagerly, null)
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    private fun read(): Uri? = try {
+    /** Deletes [uri] from MediaStore; [photos] lose it once MediaStore tells of the change. */
+    override suspend fun delete(uri: Uri): Boolean = withContext(dispatcher) {
+        try {
+            // 0 rows: the photo was already gone, deleted in the gallery since.
+            resolver.delete(uri, null, null)
+            true
+        } catch (error: Exception) {
+            // Another app's photo, or a provider that refuses: it stays, and the viewer says so.
+            Log.w(TAG, "The photo could not be deleted", error)
+            false
+        }
+    }
+
+    private fun read(): List<Uri> = try {
         resolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             arrayOf(MediaStore.Images.Media._ID),
@@ -58,13 +79,16 @@ class NewestAlbumPhoto(
             arrayOf("$PIX_ALBUM_PATH/", PIX_ALBUM_PATH),
             "${MediaStore.Images.Media.DATE_ADDED} DESC, ${MediaStore.Images.Media._ID} DESC",
         )?.use { rows ->
-            if (!rows.moveToFirst()) return@use null
-            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, rows.getLong(0))
-        }
+            val newestFirst = ArrayList<Uri>(rows.count)
+            while (rows.moveToNext()) {
+                newestFirst += ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, rows.getLong(0))
+            }
+            newestFirst.reversed()
+        }.orEmpty()
     } catch (error: Exception) {
         // A provider that refuses or is gone leaves the placeholder, not a crash; the next change reads again.
         Log.w(TAG, "The album could not be read", error)
-        null
+        emptyList()
     }
 
     private companion object {

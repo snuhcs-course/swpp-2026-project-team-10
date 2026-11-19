@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-16, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -107,6 +107,9 @@ class CameraXController(
     // only the answer to the newest request since the camera opened is published.
     private var torch = false
     private var torchRequest = 0
+
+    /** The quarter turn the next photo is saved at ([setPhotoTurn], FR-1.5). */
+    private var photoTurn = 0
 
     // Whether the bound lens has a flash; a separately exposed ultrawide may not.
     private var lensHasFlash = true
@@ -497,6 +500,10 @@ class CameraXController(
         }, mainExecutor)
     }
 
+    override fun setPhotoTurn(turn: Int) {
+        photoTurn = turn
+    }
+
     override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> = withContext(Dispatchers.Main.immediate) {
         val current = binding
         val capture = current?.capture
@@ -519,6 +526,9 @@ class CameraXController(
             try {
                 extendTrace()
                 Timings.mark("camera.capture.start", shot)
+                // As the phone is held (FR-1.5): the viewport's crop stays the same part of the sensor, and only the
+                // photo's orientation, and with it its mirror, follows the turn.
+                capture.targetRotation = targetRotationFor(photoTurn)
                 capture.takePicture(
                     // As the mirrored preview showed it, so the photo matches the guide placed on it (FR-1.14).
                     photoSaver.outputOptions(mirrored = current.facing == CameraFacing.FRONT),

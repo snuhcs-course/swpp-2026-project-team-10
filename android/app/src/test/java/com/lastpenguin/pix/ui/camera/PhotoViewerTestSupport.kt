@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -14,7 +14,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.ViewPhotoViewerBinding
 import com.lastpenguin.pix.ui.ScreenTestSupport
+import com.lastpenguin.pix.ui.settings.boundsOnScreen
 import java.time.Duration
+import kotlin.math.cos
+import kotlin.math.sin
 import org.robolectric.Shadows.shadowOf
 
 /** The session photos' viewer on [screen], for the screen tests of Camera and Subject view, once it first opened. */
@@ -76,12 +79,11 @@ internal fun ViewPhotoViewerBinding.pageReads(): String? = pagePhoto().contentDe
 /** Whether the header, with Back, Share, and Delete, shows; a tap on the photo hides it with the strip. */
 internal fun ViewPhotoViewerBinding.headerShown(): Boolean = photoViewerHeader.isShown && photoViewerHeader.alpha == 1f
 
-/** The middle of the page on screen, in the viewer's root. */
+/** The middle of the page on screen, in the viewer's root, also while the viewer stands turned with the phone. */
 private fun ViewPhotoViewerBinding.photoMiddle(): Pair<Float, Float> {
-    val page = pagePhoto()
-    val at = IntArray(2).also(page::getLocationInWindow)
-    val origin = IntArray(2).also(root::getLocationInWindow)
-    return Pair(at[0] - origin[0] + page.width / 2f, at[1] - origin[1] + page.height / 2f)
+    val page = checkNotNull(boundsOnScreen(pagePhoto())) { "The page is not shown" }
+    val origin = IntArray(2).also(root::getLocationOnScreen)
+    return Pair(page.exactCenterX() - origin[0], page.exactCenterY() - origin[1])
 }
 
 /** One finger's [action] at ([x], [y]) through the viewer's root, as a finger on the screen, [at] ms after [down]. */
@@ -118,16 +120,20 @@ internal fun ViewPhotoViewerBinding.doubleTapPhoto(dx: Float = 0f) {
 
 /**
  * A drag of the photo [px] down from its middle, then a lift: [flick] in 30 ms, a quick flick; otherwise in half a
- * second, held still before the lift, so it is no flick.
+ * second, held still before the lift, so it is no flick. Down is the photo's, as the user sees it: while the viewer
+ * stands turned with the phone, another way on the screen.
  */
 internal fun ViewPhotoViewerBinding.dragPhotoDown(px: Float, flick: Boolean = false) {
     val (x, y) = photoMiddle()
+    val turned = Math.toRadians(photoViewerContent.rotation.toDouble())
+    val dx = -sin(turned).toFloat() * px
+    val dy = cos(turned).toFloat() * px
     val down = SystemClock.uptimeMillis()
     val step = if (flick) 3L else 50L
     finger(MotionEvent.ACTION_DOWN, down, 0, x, y)
-    for (i in 1..10) finger(MotionEvent.ACTION_MOVE, down, i * step, x, y + px * i / 10)
+    for (i in 1..10) finger(MotionEvent.ACTION_MOVE, down, i * step, x + dx * i / 10, y + dy * i / 10)
     val last = 10 * step + if (flick) 0L else 200L
-    if (!flick) finger(MotionEvent.ACTION_MOVE, down, last, x, y + px)
-    finger(MotionEvent.ACTION_UP, down, last + if (flick) 3L else 100L, x, y + px)
+    if (!flick) finger(MotionEvent.ACTION_MOVE, down, last, x + dx, y + dy)
+    finger(MotionEvent.ACTION_UP, down, last + if (flick) 3L else 100L, x + dx, y + dy)
     ScreenTestSupport.idle()
 }

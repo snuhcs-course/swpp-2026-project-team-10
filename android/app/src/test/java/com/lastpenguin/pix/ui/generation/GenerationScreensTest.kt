@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
@@ -91,9 +91,11 @@ import org.robolectric.shadows.ShadowToast
  * removes does not; with animations off, it only fills. A candidate's fade is in PoseCandidateAdapterTest. Couldn't
  * create poses, its actions in the top bar (#199): Try again, a rejected description with no retry, a scene in which
  * the server found no one with no action (FR-4.13), and Back to Generate poses with the photo and the text; each case
- * of failure with its one-line message, and Try again only for the offline, timeout, and server cases (#203). The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1), the
+ * of failure with its one-line message, and Try again only for the offline, timeout, and server cases (#203). The scene photo's shape (FR-4.3), on the Galaxy S22's 360 × 705 dp: in each ratio (3:4, 9:16, 1:1, and held sideways 4:3 and 16:9; #206), the
  * thumbnails, the slots, and the pages in that shape; the four slots of a 9:16 scene whole on screen, centered, and
- * those of 3:4 and 1:1 as wide as half the screen as before; a candidate whose ratio the model rounded shown whole.
+ * those of 3:4, 1:1, and the landscape ones as wide as half the screen; a candidate whose ratio the model rounded shown
+ * whole; landscape candidates on Pick a pose whole and as wide as the page; a ♥ on a scene held sideways saving the
+ * pose turned back into the camera's frame.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -156,8 +158,9 @@ class GenerationScreensTest {
         idle()
     }
 
-    /** The scene photo in each of the app's ratios: 3:4, 9:16, 1:1. */
-    private val scenes = listOf(bitmap(300, 400), bitmap(288, 512), bitmap(400, 400))
+    /** The scene photo in each of the app's ratios: 3:4, 9:16, 1:1, and held sideways 4:3 and 16:9 (#206). */
+    private val scenes =
+        listOf(bitmap(300, 400), bitmap(288, 512), bitmap(400, 400), bitmap(400, 300), bitmap(512, 288))
 
     private fun modules(scene: Bitmap = bitmap(300, 400)): TestAppContainer =
         TestAppContainer(camera = FakeCameraController().apply { frame = scene }).install()
@@ -679,6 +682,24 @@ class GenerationScreensTest {
     }
 
     @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun generating_landscapeScenes_fillTheWidth_withAllFourSlotsOnScreen() {
+        for (scene in listOf(bitmap(400, 300), bitmap(512, 288))) {
+            val s = generatingSlots(scene)
+            s.onFragment { fragment ->
+                val grid = FragmentGeneratingBinding.bind(fragment.requireView()).candidateGrid
+                val margin = fragment.resources.getDimensionPixelSize(R.dimen.pose_card_margin)
+                val slots = grid.slots()
+                assertEquals(4, slots.size)
+                assertEquals(margin.toFloat(), slots.minOf { it.left }.toFloat(), 1f)
+                assertEquals((grid.width - margin).toFloat(), slots.maxOf { it.right }.toFloat(), 1f)
+                for (slot in slots) assertTrue(slot.top >= 0 && slot.bottom <= grid.height)
+            }
+            s.close()
+        }
+    }
+
+    @Test
     fun generating_candidateWhoseRatioTheModelRounded_isShownWhole() {
         // A model that has no 3:4 answers with its nearest size, here 2:3; the slot keeps the scene's shape.
         scenario = generatingSlots(bitmap(300, 400), bitmap(200, 300))
@@ -853,6 +874,36 @@ class GenerationScreensTest {
         assertEquals(string(R.string.save_pose), heartAt(s, 1).contentDescription)
     }
 
+    @Test
+    fun pick_heart_onASceneHeldSideways_savesThePoseAsItGoesOnTheCamera() {
+        val modules = modules()
+        modules.turns.set(90)
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { activity ->
+            val model = activity.viewModel<GenerationViewModel>()
+            model.beginScene()
+            model.takeScene()
+            // The scene is turned upright off the main thread, then checked for a person.
+            idleUntil { model.uiState.value.let { it.scene != null && !it.checkingPerson } }
+            model.useScene()
+            model.generate("hands on hips")
+            val run = modules.generator.runs.single()
+            run.plan(poses)
+            run.send(CandidateEvent.Ready("pose-1", bitmap(400, 300)))
+            run.finish()
+        }
+        scenario = s
+
+        heartAt(s, 0).performClick()
+        idleUntil { !heartAt(s, 0).isEnabled }
+        val cut = generated.copy(mask = bitmap(40, 30), outline = bitmap(40, 30), aspect = 4f / 3f)
+        modules.maker.finish(Result.success(cut))
+        idleUntil { heartAt(s, 0).isEnabled }
+
+        // Turned back into the camera's portrait frame, as *Use this pose* puts it there.
+        val (kept, _) = runBlocking { modules.saved.load("saved-pose") }.getOrThrow()
+        assertEquals(30 to 40, kept.mask.width to kept.mask.height)
+    }
+
     /** The heart of the page at [position] as the pager's adapter has it, which it compares off the main thread. */
     private fun heartStateAt(s: FragmentScenario<*>, position: Int): Heart? {
         var heart: Heart? = null
@@ -981,6 +1032,40 @@ class GenerationScreensTest {
         idle()
 
         assertEquals(listOf("saved-pose"), modules.saved.saved.value.map { it.id })
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun pick_landscapeCandidates_areShownWhole_asWideAsThePage() {
+        val images = listOf(bitmap(800, 600), bitmap(1024, 576))
+        val modules = modules(bitmap(400, 300))
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) {
+            generating(it)
+            val run = modules.generator.runs.single()
+            run.plan(poses)
+            run.send(*images.mapIndexed { i, image -> CandidateEvent.Ready("pose-${i + 1}", image) }.toTypedArray())
+            run.send(CandidateEvent.Failed("pose-3", GenerationError.TIMEOUT))
+            run.send(CandidateEvent.Failed("pose-4", GenerationError.TIMEOUT))
+            run.finish()
+        }
+        scenario = s
+
+        for ((position, candidate) in images.withIndex()) {
+            s.onFragment {
+                FragmentPickPoseBinding.bind(it.requireView()).candidatePager.setCurrentItem(position, false)
+            }
+            idle()
+            s.onFragment { fragment ->
+                val pages = FragmentPickPoseBinding.bind(fragment.requireView()).candidatePager.getChildAt(0)
+                    as RecyclerView
+                val page = checkNotNull(pages.findViewHolderForAdapterPosition(position)).itemView
+                val image = page.findViewById<ImageView>(R.id.poseImage)
+                assertEquals(candidate.aspect(), image.aspect(), 0.01f)
+                assertEquals(page.width.toFloat(), image.width.toFloat(), 1f)
+                assertTrue(image.height < page.height)
+                assertTrue(image.showsWholePicture())
+            }
+        }
     }
 
     @Test

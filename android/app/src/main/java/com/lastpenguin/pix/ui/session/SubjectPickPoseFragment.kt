@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -91,11 +91,15 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         }
     }
 
-    /** The ♥ on a candidate (FR-4.14): this phone's own library, which the photographer's phone never hears of. */
+    /**
+     * The ♥ on a candidate (FR-4.14): this phone's own library, which the photographer's phone never hears of, turned as
+     * the photographer held the scene photo.
+     */
     private fun onHeart(slot: PoseSlot) {
-        val setId = viewModel.uiState.value.setId ?: return
+        val ui = viewModel.uiState.value
+        val setId = ui.setId ?: return
         val image = (slot.event as? CandidateEvent.Ready)?.image ?: return
-        saves.toggle(PoseKey(setId, slot.pose.id), image)
+        saves.toggle(PoseKey(setId, slot.pose.id), image, ui.sceneTurn)
     }
 
     private fun render(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {

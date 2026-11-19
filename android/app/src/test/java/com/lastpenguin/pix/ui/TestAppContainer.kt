@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -10,6 +10,7 @@ import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
+import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
@@ -131,6 +132,9 @@ class TestAppContainer(
         Dispatchers.Unconfined,
     )
 
+    /** How the phone is held; upright unless the test turns it (FR-1.5). */
+    val turns = PhoneTurns.Fixed()
+
     /** The photographer's Generate poses on the subject's phone, the same way, with a scene photo a screen can draw. */
     val descriptions =
         DescriptionSyncer(session, FakePoseCandidateCodec { ScreenTestSupport.bitmap(60, 80) }, Dispatchers.Unconfined)
@@ -211,6 +215,7 @@ class TestAppContainer(
         appSettings = appSettings,
         appLanguage = language,
         screenLanguages = screenLanguages,
+        phoneTurns = turns,
     )
 
     companion object {

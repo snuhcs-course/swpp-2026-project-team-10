@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 """Try the pose tip prompt on scene photos and candidates made once (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY in server/.env:
@@ -63,7 +63,7 @@ CANDIDATE_LONG_SIDE = 768
 JPEG_QUALITY = 85
 CONCURRENCY = 4
 # The candidate's ratio, as the server's `ASPECT_RATIOS` in poses/generator.py: the app's frame closest to the scene's.
-ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
+ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0, "4:3": 4 / 3, "16:9": 16 / 9}
 # A tip says what to do in words; a number, a unit, or a degree is hard to follow while shooting. The server writes
 # every sentence itself and its words hold none (tests/test_prompts.py), so this only confirms it: the evaluation
 # counts the tips it finds one in (eval_poses.py).

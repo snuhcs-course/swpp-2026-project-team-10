@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -112,6 +112,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var pinchZoom: PinchZoomController? = null
     private var referenceDrag: ReferenceDragController? = null
     private var opacitySlider: TrackedSliderController? = null
+
+    /** The icons that turn with the phone (FR-1.15), while the view is there; a test looks inside a turn. */
+    internal var turningIcons: TurningIcons? = null
+        private set
     private var previewLogged = false
     private var noticeJob: Job? = null
 
@@ -125,6 +129,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var brightnessAnchor: PointF? = null
     private var brightnessIdleJob: Job? = null
     private var exposureBarHiding = false
+
+    /** The focus box is beside the brightness bar, so it stays as long as the bar does and goes with it (Design 2.8). */
+    private var focusRingWithBar = false
 
     // The last frame stays on screen through a ratio change or a lens switch, until the rebound preview streams
     // again (NFR-19, Design 2.6.2, 2.6.5).
@@ -277,6 +284,26 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
+        viewModel.watchPhoneTurn(viewLifecycleOwner)
+        // The icons turn with the phone (FR-1.15), and so do the ratio, the zoom readout, and Guide with its label; the
+        // other texts, the shutter, and the layout stay.
+        controls.aspectButton.turnsLabel = true
+        turningIcons = TurningIcons(
+            controls = listOf(
+                controls.sceneBackButton,
+                controls.flashButton,
+                controls.aspectButton,
+                controls.settingsButton,
+                controls.shootTogetherButton,
+                controls.hideGuideButton,
+                controls.saveGuideButton,
+                controls.removeGuideButton,
+                controls.tipButton,
+                controls.editGuideButton,
+                controls.zoomReadout,
+            ),
+            views = listOf(controls.guideButton, controls.switchCameraIcon, controls.galleryThumbnail),
+        )
         controls.cameraActionButton.setOnClickListener {
             if (hasCameraPermission()) {
                 bindCamera()
@@ -347,6 +374,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
+                launch {
+                    viewModel.phoneTurn.collect { turn ->
+                        turningIcons?.turnTo(turn)
+                        photoViewer?.turnTo(turn)
+                    }
+                }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
                 launch {
                     viewModel.photoNotDeleted.collect {
@@ -400,7 +433,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         val live = connected != null || state is SessionState.Reconnecting
                         renderLiveDot(controls, connected)
                         if (connected != null) takeDownPeerGoneNotice(controls)
-                        controls.endSessionButton.isVisible = live
+                        // The scene photo's top bar has only Back, the light, the ratio, its title, and Use.
+                        controls.endSessionButton.isVisible = live && !isScenePhotoActive()
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
                         // Settings stays in a session too (#204); only the scene photo hides it.
                         controls.settingsButton.isVisible = !isScenePhotoActive()
@@ -552,6 +586,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     override fun onDestroyView() {
+        photoViewer?.stop()
         photoViewer = null
         photosBack = null
         pinchZoom?.finishInteraction()
@@ -559,9 +594,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         referenceDrag = null
         opacitySlider?.finishInteraction()
         opacitySlider = null
+        turningIcons?.stop()
+        turningIcons = null
         binding?.exposureBar?.finishDrag()
         brightnessAnchor = null
         exposureBarHiding = false
+        focusRingWithBar = false
         move?.let {
             move = null
             it.cancel()
@@ -1121,8 +1159,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.sceneBackButton.isVisible = active
         controls.usePhotoButton.isVisible = reviewing
         val session = sessionViewModel.state.value
-        controls.shootTogetherButton.isVisible =
-            !active && session !is SessionState.Connected && session !is SessionState.Reconnecting
+        val live = session is SessionState.Connected || session is SessionState.Reconnecting
+        controls.shootTogetherButton.isVisible = !active && !live
+        // End session too leaves the scene photo's bar to its title and Use, and comes back after the step.
+        controls.endSessionButton.isVisible = !active && live
         controls.settingsButton.isVisible = !active
         // Guide and the thumbnail keep their place, so the shutter stays where it is. The camera is the situation's (FR-4.8):
         // the front one for a selfie, the rear one otherwise, so the switch waits too.
@@ -1130,7 +1170,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.galleryButton.isInvisible = active
         if (active) controls.switchCameraButton.isInvisible = true
         controls.sceneReview.isVisible = reviewing
-        val photo = scene.scene.takeIf { reviewing }
+        // As the preview showed it, so a photo taken sideways looks as framed while the phone is still held so.
+        val photo = scene.framed.takeIf { reviewing }
         if (controls.sceneStill.tag !== photo) {
             controls.sceneStill.setImageBitmap(photo)
             controls.sceneStill.tag = photo
@@ -1346,7 +1387,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
         val range = state.exposureRange
         val hasBrightness = range.first < range.last
-        controls.exposureBar.render(range, state.exposure, enabled = ready && hasBrightness)
+        controls.exposureBar.render(range, state.exposureStep, state.exposure, enabled = ready && hasBrightness)
         placeExposureBar(controls, state)
         showExposureBar(controls, state.brightnessOpen && hasBrightness)
     }
@@ -1390,12 +1431,19 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 bar.alpha = 1f
                 bar.isVisible = true
             }
-        } else if (bar.isVisible && !exposureBarHiding) {
-            bar.finishDrag()
-            exposureBarHiding = true
-            bar.animate().alpha(0f).setDuration(EXPOSURE_BAR_FADE_MS).withEndAction {
-                exposureBarHiding = false
-                bar.isVisible = false
+        } else {
+            if (bar.isVisible && !exposureBarHiding) {
+                bar.finishDrag()
+                exposureBarHiding = true
+                bar.animate().alpha(0f).setDuration(EXPOSURE_BAR_FADE_MS).withEndAction {
+                    exposureBarHiding = false
+                    bar.isVisible = false
+                }
+            }
+            // The focus box beside it fades out with it, for any reason the bar goes.
+            if (focusRingWithBar) {
+                focusRingWithBar = false
+                fadeFocusRing(controls.focusRing, delay = 0L, duration = EXPOSURE_BAR_FADE_MS)
             }
         }
     }
@@ -1456,7 +1504,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 if (!viewModel.uiState.value.brightnessOpen) return false
                 // The focus went back to the base brightness; the sun starts there, before the camera's echo.
                 val base = viewModel.baseExposureIndex() ?: return false
-                controls.exposureBar.render(state.exposureRange, base, enabled = true)
+                controls.exposureBar.render(state.exposureRange, state.exposureStep, base, enabled = true)
             }
             if (!viewModel.uiState.value.brightnessOpen) return false
             controls.exposureBar.startDrag()
@@ -1486,7 +1534,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
         if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return
         viewModel.onFocusTap((x - frame.left) / frame.width, (y - frame.top) / frame.height)
-        if (state.supportsFocusPoint) showFocusRing(controls, x, y)
+        // A box left beside the bar by an earlier tap goes when this camera shows none, as the bar moves on alone.
+        if (focusRingWithBar && !state.supportsFocusPoint) {
+            fadeFocusRing(controls.focusRing, delay = 0L, duration = FOCUS_RING_FADE_MS)
+        }
+        focusRingWithBar = state.supportsFocusPoint && hasBrightness
+        if (state.supportsFocusPoint) showFocusRing(controls, x, y, alone = !hasBrightness)
         // Brightness is set beside where the camera focused (FR-1.11, Design 2.8), or where the tap was on a camera
         // that cannot focus on a point.
         if (hasBrightness) {
@@ -1497,7 +1550,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
-    private fun showFocusRing(controls: FragmentCameraBinding, x: Float, y: Float) {
+    /**
+     * The focus box at the tap, shrinking into place (FR-1.4). [alone], without a brightness bar, it fades by itself
+     * after a moment; beside the bar it stays until the bar goes, and goes with it (showExposureBar).
+     */
+    private fun showFocusRing(controls: FragmentCameraBinding, x: Float, y: Float, alone: Boolean) {
         val ring = controls.focusRing
         ring.animate().cancel()
         ring.translationX = x - ring.layoutParams.width / 2f
@@ -1506,10 +1563,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         ring.scaleX = FOCUS_RING_START_SCALE
         ring.scaleY = FOCUS_RING_START_SCALE
         ring.isVisible = true
-        ring.animate().scaleX(1f).scaleY(1f).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
-            ring.animate().alpha(0f).setStartDelay(FOCUS_RING_HOLD_MS).setDuration(FOCUS_RING_FADE_MS)
-                .withEndAction { ring.isVisible = false }
+        // The start delay stays with the view's animator, so a fade before would hold the shrink back.
+        ring.animate().scaleX(1f).scaleY(1f).setStartDelay(0L).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
+            if (alone) fadeFocusRing(ring, delay = FOCUS_RING_HOLD_MS, duration = FOCUS_RING_FADE_MS)
         }
+    }
+
+    private fun fadeFocusRing(ring: View, delay: Long, duration: Long) {
+        ring.animate().cancel()
+        ring.animate().alpha(0f).setStartDelay(delay).setDuration(duration).withEndAction { ring.isVisible = false }
     }
 
     /**

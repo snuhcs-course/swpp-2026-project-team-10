@@ -1,11 +1,11 @@
-# AI-generated with Claude Code, 2026-11-14, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 # POST /poses partitions (Testing Documentation 2.1.6). What to pose: a description only (the user's or a suggested
 # pose), a template only (an app from before Iteration 2, sent with the same prompt as its default pose), both,
 # neither, an unknown template, and an empty description next to a template. Description: Korean, with extra
 # whitespace and line breaks, blank, 100 characters (after trimming) and 101. Scene: a JPEG within the contract, at
 # 1024 px, and one that is not a JPEG, too large, carries EXIF, or is cut short; its shape, which the candidate is asked
-# in: each of the app's ratios (3:4, 9:16, 1:1), as the phone sends it and a pixel off, either side of the shape halfway
-# between two ratios, and landscape. Image API: a candidate in JPEG, PNG,
+# in: each of the app's ratios (3:4, 9:16, 1:1, and held sideways 4:3 and 16:9), as the phone sends it and a pixel off,
+# either side of the shape halfway between two ratios, portrait and landscape. Image API: a candidate in JPEG, PNG,
 # or WEBP; a refusal (403) of a template and of a description, `DECLINED` with one message for both; another failing
 # status; an unreadable answer; no answer in time; no key. Limits: each window full, the client's `RATE_LIMITED` and
 # everyone's day `DAILY_LIMITED`, and a request refused before the image API, which is not counted.
@@ -200,8 +200,12 @@ def test_seed_is_folded_into_the_range_the_image_api_accepts(client, image_api, 
         ((271, 480), "9:16"),
         ((481, 640), "3:4"),
         ((721, 720), "1:1"),
-        # Not from the app, which takes portrait photos only.
-        ((1024, 768), "1:1"),
+        # Held sideways (FR-4.3): the same frames turned upright as held.
+        ((960, 720), "4:3"),
+        ((1024, 576), "16:9"),
+        ((1024, 768), "4:3"),
+        ((480, 271), "16:9"),
+        ((640, 481), "4:3"),
     ],
 )
 def test_candidate_is_asked_in_the_ratio_of_the_scene(client, image_api, make_image, size, ratio):
@@ -217,6 +221,17 @@ def test_candidate_is_asked_in_the_ratio_of_the_scene(client, image_api, make_im
 )
 def test_scene_between_two_ratios_gets_the_closer_one(client, image_api, make_image, width, ratio):
     assert create_pose(client, make_image(size=(width, 1024))).status_code == 200
+    assert image_api.payloads[0]["aspect_ratio"] == ratio
+
+
+@pytest.mark.parametrize(
+    ("height", "ratio"),
+    # The same halfway shapes on a scene 1024 px wide, taken sideways: 665.1 px tall between 16:9 and 4:3, and 886.8 px
+    # between 4:3 and 1:1.
+    [(665, "16:9"), (666, "4:3"), (886, "4:3"), (887, "1:1")],
+)
+def test_landscape_scene_between_two_ratios_gets_the_closer_one(client, image_api, make_image, height, ratio):
+    assert create_pose(client, make_image(size=(1024, height))).status_code == 200
     assert image_api.payloads[0]["aspect_ratio"] == ratio
 
 

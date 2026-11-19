@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.animation.ValueAnimator
@@ -11,6 +11,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.VelocityTracker
+import android.view.View
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.animation.doOnEnd
 import com.lastpenguin.pix.ui.Motion
@@ -23,7 +24,8 @@ import kotlin.math.max
  * lands, or out again. A drag pans it while zoomed, never past its edges. While zoomed it keeps every touch from its
  * parents, so a sideways drag pans the photo and does not turn the page. While whole, a downward drag moves it with the
  * finger: past [DISMISS_DP] or with a quick flick it closes the viewer ([Listener.onDismiss]), and otherwise it goes
- * back. A tap is [Listener.onTap].
+ * back. A tap is [Listener.onTap]. Down and sideways are the photo's own, also while the viewer stands turned with the
+ * phone (#207).
  */
 internal class ZoomablePhotoView @JvmOverloads constructor(
     context: Context,
@@ -63,6 +65,9 @@ internal class ZoomablePhotoView @JvmOverloads constructor(
 
     /** How fast the finger moves on the screen, for a flick that closes; the photo's own coordinates move with it. */
     private var speed: VelocityTracker? = null
+
+    /** How far the photo stands turned on the screen at the touch's start, in degrees clockwise, with its parents. */
+    private var turned = 0f
 
     /** A pinch, or a double tap's drag, zoomed during this gesture: its last lift is no double tap. */
     private var scaled = false
@@ -118,7 +123,7 @@ internal class ZoomablePhotoView @JvmOverloads constructor(
                 if (scaler.isInProgress || e2.pointerCount > 1) return false
                 val start = e1 ?: return false
                 // On the screen: the photo moves under the finger while it is dragged, and its own coordinates with it.
-                val down = e2.rawY - start.rawY
+                val (across, down) = upright(e2.rawX - start.rawX, e2.rawY - start.rawY)
                 when {
                     zoom > 1f -> {
                         panX -= distanceX
@@ -130,7 +135,7 @@ internal class ZoomablePhotoView @JvmOverloads constructor(
                     dragging -> drag(down)
 
                     // A drag that starts downward closes; one that starts sideways is the pages'.
-                    down > abs(e2.rawX - start.rawX) -> {
+                    down > abs(across) -> {
                         dragging = true
                         parent?.requestDisallowInterceptTouchEvent(true)
                         drag(down)
@@ -185,6 +190,7 @@ internal class ZoomablePhotoView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 // A touch takes the photo where an animation was taking it.
                 settling?.end()
+                turned = turnOnScreen()
                 scaled = false
                 speed?.recycle()
                 speed = VelocityTracker.obtain()
@@ -232,7 +238,19 @@ internal class ZoomablePhotoView @JvmOverloads constructor(
     private fun flicked(): Boolean {
         val tracker = speed ?: return false
         tracker.computeCurrentVelocity(MS_PER_S)
-        return tracker.yVelocity > FLING_DP_PER_S * density
+        return upright(tracker.xVelocity, tracker.yVelocity).second > FLING_DP_PER_S * density
+    }
+
+    /** The sum of this view's and its parents' turns: the viewer's, while it stands turned with the phone. */
+    private fun turnOnScreen(): Float =
+        generateSequence<View>(this) { it.parent as? View }.sumOf { it.rotation.toDouble() }.toFloat()
+
+    /** A move of ([x], [y]) on the screen, as across and down the photo, which may stand [turned]. */
+    private fun upright(x: Float, y: Float): Pair<Float, Float> {
+        if (turned % FULL_TURN == 0f) return x to y
+        val move = floatArrayOf(x, y)
+        Matrix().apply { setRotate(-turned) }.mapVectors(move)
+        return move[0] to move[1]
     }
 
     private fun drag(offset: Float) {
@@ -362,5 +380,6 @@ internal class ZoomablePhotoView @JvmOverloads constructor(
         /** How fast a flick down closes the viewer, however short. */
         const val FLING_DP_PER_S = 1000f
         private const val MS_PER_S = 1000
+        private const val FULL_TURN = 360f
     }
 }

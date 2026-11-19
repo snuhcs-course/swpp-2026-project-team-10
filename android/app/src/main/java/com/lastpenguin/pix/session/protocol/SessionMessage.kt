@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -152,8 +152,10 @@ sealed interface SessionMessage {
      * pose* follows it. [poseIds] are the created candidates in the photographer's order, with PICKING; [poseId] and
      * [by] say whose *Use this pose* decided, with CHOSEN. With CLOSED, [failure] names why the set failed (FR-4.7,
      * #203), a `GenerationError` by name: a string, so a name this phone does not know drops no message, and reads as
-     * a server error; none when the user closed it, and none from a photographer of an older version. A set ends once,
-     * with CHOSEN or CLOSED.
+     * a server error; none when the user closed it, and none from a photographer of an older version. With GENERATING,
+     * [sceneTurn] is how the photographer held the scene photo (`PhoneTurns`: 0, 90, 180, or 270; #206), so a ♥ on the
+     * subject's *Pick a pose* saves the guide as it goes on the camera; 0 is left out, and a subject reads anything
+     * else, or none from an older photographer, as 0. A set ends once, with CHOSEN or CLOSED.
      */
     @Serializable
     @SerialName("pose.step")
@@ -164,6 +166,7 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val poseId: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val by: Role? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val failure: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val sceneTurn: Int = 0,
     ) : SessionMessage
 
     /**

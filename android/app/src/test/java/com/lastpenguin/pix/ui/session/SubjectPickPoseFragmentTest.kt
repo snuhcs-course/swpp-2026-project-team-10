@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -52,7 +53,8 @@ import org.robolectric.shadows.ShadowToast
  * kept from an earlier set (nothing); a pick no step answers in 5 s (a notice, and it can be tapped again); Back
  * (Subject view, the set kept); the link reconnecting (the candidates kept, Select waiting until it is back);
  * the session ending (back to Subject view, which shows what ended it); a 9:16 candidate in its own shape (FR-4.3);
- * the ♥ (FR-4.14), which saves the candidate in this phone's library and sends nothing to the photographer's phone.
+ * the ♥ (FR-4.14), which saves the candidate in this phone's library and sends nothing to the photographer's phone,
+ * and on a set from a scene held sideways saves it turned back into the frame by the photographer's quarter (#206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -66,13 +68,17 @@ class SubjectPickPoseFragmentTest {
         receiving.cancel()
     }
 
-    /** A subject's phone whose syncer has the photographer's set1, PICKING with pose-1 and pose-2. */
-    private fun picking(modules: TestAppContainer = TestAppContainer()): TestAppContainer {
+    /**
+     * A subject's phone whose syncer has the photographer's set1, PICKING with pose-1 and pose-2, from a scene photo
+     * held at [sceneTurn].
+     */
+    private fun picking(modules: TestAppContainer = TestAppContainer(), sceneTurn: Int = 0): TestAppContainer {
         modules.install()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         modules.poses.startAsReceiver(receiving)
         idle()
-        step(modules, PoseSetStep.GENERATING)
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, sceneTurn = sceneTurn))
+        idle()
         candidate(modules, "pose-1")
         candidate(modules, "pose-2")
         step(modules, PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-2"))
@@ -325,5 +331,25 @@ class SubjectPickPoseFragmentTest {
         assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
         // Neither a pick nor anything else: the ♥ stays on this phone, and the first Select still decides.
         assertEquals(sent, modules.session.sent.size)
+    }
+
+    @Test
+    fun aHeart_onASetFromASceneHeldSideways_savesTheGuideAsItGoesOnTheCamera() {
+        val modules = picking(sceneTurn = 90)
+        launch()
+
+        onScreen { binding ->
+            val pages = binding.candidatePager.getChildAt(0) as RecyclerView
+            checkNotNull(pages.findViewHolderForAdapterPosition(0)).itemView.findViewById<View>(R.id.heartButton)
+                .performClick()
+        }
+        idle()
+        val cut = guide().copy(id = "saved-pose", mask = bitmap(40, 30), outline = bitmap(40, 30), aspect = 4f / 3f)
+        modules.maker.finish(Result.success(cut))
+        idle()
+
+        // Turned back into the photographer's portrait frame by the scene's quarter, as the photographer's camera has it.
+        val (kept, _) = runBlocking { modules.saved.load("saved-pose") }.getOrThrow()
+        assertEquals(30 to 40, kept.mask.width to kept.mask.height)
     }
 }

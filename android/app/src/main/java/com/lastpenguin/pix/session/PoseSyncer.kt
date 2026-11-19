@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -35,8 +35,11 @@ interface PoseShare {
     /** The subject's picks while the set is PICKING, in the order they came; the first unchosen one decides. */
     val picks: Flow<SubjectPick>
 
-    /** *Generate 4 poses* or *Skip* started the set [setId], in place of any other. */
-    fun open(setId: String)
+    /**
+     * *Generate 4 poses* or *Skip* started the set [setId], in place of any other, from a scene photo held at
+     * [sceneTurn] (`PhoneTurns`).
+     */
+    fun open(setId: String, sceneTurn: Int = 0)
 
     /** The candidates [setId] plans, [poseIds] in the order of their slots. */
     fun planned(setId: String, poseIds: List<String>)
@@ -66,7 +69,7 @@ interface PoseShare {
     object None : PoseShare {
         override val picks: Flow<SubjectPick> = emptyFlow()
 
-        override fun open(setId: String) = Unit
+        override fun open(setId: String, sceneTurn: Int) = Unit
 
         override fun planned(setId: String, poseIds: List<String>) = Unit
 
@@ -91,6 +94,8 @@ data class MirrorPoseSet(
     val step: PoseSetStep,
     /** With PICKING: the photographer's created candidates, in its order. */
     val poseIds: List<String> = emptyList(),
+    /** How the photographer held the scene photo, 0, 90, 180, or 270, for a ♥ on the subject's *Pick a pose*. */
+    val sceneTurn: Int = 0,
     /** In the order they arrived. */
     val candidates: Map<String, Bitmap> = emptyMap(),
     /** The set's planned candidates in the order of their slots; empty until planned, and from a photographer of
@@ -166,6 +171,8 @@ class PoseSyncer(
         val refusals: Set<String> = emptySet(),
         /** Why a CLOSED set failed, which its end says (FR-4.7). */
         val failure: GenerationError? = null,
+        /** How the scene photo was held, which the set's start says. */
+        val sceneTurn: Int = 0,
     ) {
         val open: Boolean get() = step == PoseSetStep.GENERATING || step == PoseSetStep.PICKING
     }
@@ -175,8 +182,8 @@ class PoseSyncer(
     private val subjectPicks = Channel<SubjectPick>(Channel.BUFFERED)
     override val picks: Flow<SubjectPick> = subjectPicks.receiveAsFlow()
 
-    override fun open(setId: String) {
-        shared.value = SharedSet(setId, PoseSetStep.GENERATING)
+    override fun open(setId: String, sceneTurn: Int) {
+        shared.value = SharedSet(setId, PoseSetStep.GENERATING, sceneTurn = sceneTurn)
     }
 
     override fun planned(setId: String, poseIds: List<String>) {
@@ -283,6 +290,7 @@ class PoseSyncer(
                             poseId = set.chosen,
                             by = set.by,
                             failure = set.failure?.name,
+                            sceneTurn = if (set.open) set.sceneTurn else 0,
                         ),
                     )
                     sentStep = step
@@ -484,7 +492,8 @@ class PoseSyncer(
         when (message.step) {
             PoseSetStep.GENERATING -> if (current?.setId != message.setId) {
                 answer(null)
-                _mirror.value = MirrorPoseSet(message.setId, PoseSetStep.GENERATING)
+                val turn = message.sceneTurn.takeIf { it in SCENE_TURNS } ?: 0
+                _mirror.value = MirrorPoseSet(message.setId, PoseSetStep.GENERATING, sceneTurn = turn)
             }
 
             PoseSetStep.PICKING -> if (current?.setId == message.setId) {
@@ -572,5 +581,8 @@ class PoseSyncer(
 
         /** How long the subject waits for the photographer's answer to its pick (Design 2.6.5), as for a guide. */
         const val PICK_TIMEOUT_MS = GuideSyncer.OFFER_TIMEOUT_MS
+
+        /** The turns a scene photo can be held at; anything else in `pose.step` reads as upright. */
+        val SCENE_TURNS = setOf(0, 90, 180, 270)
     }
 }

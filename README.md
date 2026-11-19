@@ -94,7 +94,7 @@ Known limitations of the Iteration 3 build ([Testing Documentation 3.2](https://
 ### Next: Iteration 4
 
 - Fixes from the user test and the heuristic evaluation, such as a separate error message for each failure and new app colors
-- The user acceptance test (UAT) on 11/16 and 11/18, and its fixes
+- Cycle 1 of the user acceptance test (UAT) on 11/16, and its fixes
 - Search, situations, and memos in the library (FR-3.11)
 - The items above: the QR connection, the prompt templates, the remote-control switch, remote focus, and camera quality
 

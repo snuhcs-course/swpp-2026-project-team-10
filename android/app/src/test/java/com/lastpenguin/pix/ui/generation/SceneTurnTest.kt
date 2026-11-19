@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -10,6 +10,7 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakePersonDetector
+import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,8 +35,9 @@ import org.robolectric.annotation.GraphicsMode
  * and the server makes landscape candidates; its review on Camera shows it as framed.
  * Partitions (equivalence): held at 0, 90, 180, and 270 degrees, with the rear camera and with the front one, whose
  * frame comes mirrored as its preview (FR-1.14) and is turned the same way. What gets the upright photo: the person
- * check, the request, and *Select*, which hands the turn on to Reference confirm. Back from a set to the review shows
- * the photo as framed again. The turn is read with the frame, not at the press.
+ * check, the request, *Select*, which hands the turn on to Reference confirm, and the set's start, which tells the
+ * subject's phone. Back from a set to the review shows the photo as framed again. The turn is read with the frame, not
+ * at the press.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -48,6 +50,14 @@ class SceneTurnTest {
     private val generator = TestAppContainer.ScriptedPoseGenerator()
     private val turn = MutableStateFlow(0)
     private lateinit var model: GenerationViewModel
+
+    /** The turn each set started with, as the subject's phone hears it. */
+    private val opened = mutableListOf<Int>()
+    private val share = object : PoseShare by PoseShare.None {
+        override fun open(setId: String, sceneTurn: Int) {
+            opened += sceneTurn
+        }
+    }
 
     /** A 3 × 4 portrait frame, as the camera gives it, black but for its top-left pixel. */
     private val framed: Bitmap = Bitmap.createBitmap(3, 4, Bitmap.Config.ARGB_8888).apply {
@@ -66,6 +76,7 @@ class SceneTurnTest {
             camera,
             TestAppContainer.IdleConsent(),
             persons,
+            share = share,
             phoneTurn = turn,
             turning = dispatcher,
         )
@@ -143,6 +154,7 @@ class SceneTurnTest {
 
         assertSame(upright, persons.checked.single())
         assertSame(upright, run.scene)
+        assertEquals(listOf(90), opened)
         assertEquals(90, model.usePose()?.turn)
     }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -688,7 +688,7 @@ class GenerationViewModel(
         // Kept once the server accepts it, whichever phone wrote it, with the friend as the set starts; suggested
         // poses have no description to keep.
         describedSet = described.takeIf { it.isNotEmpty() }?.let { DescribedSet(id, it, partner()?.userId) }
-        share.open(id)
+        share.open(id, _uiState.value.sceneTurn)
         val situation = _uiState.value.situation.forScene(selfie)
         _uiState.value = GenerationUiState(
             scene = scene,

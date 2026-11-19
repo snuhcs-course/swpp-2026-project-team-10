@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -2079,7 +2079,7 @@ class GenerationViewModelTest {
 
         fun pick(pick: SubjectPick) = check(sentPicks.tryEmit(pick))
 
-        override fun open(setId: String) {
+        override fun open(setId: String, sceneTurn: Int) {
             opened += setId
             calls += "open $setId"
         }

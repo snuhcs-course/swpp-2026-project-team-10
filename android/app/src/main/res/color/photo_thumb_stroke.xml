@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The photo viewer's strip (item_photo_thumb): the thumbnail of the photo on screen is outlined, the others are not. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_text" android:state_selected="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

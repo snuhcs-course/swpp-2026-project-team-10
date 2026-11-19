@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A thumbnail of the photo viewer's strip (view_photo_viewer): 40 dp in a 48 dp touch area (NFR-16), outlined and
+     bright while its photo is on screen, dimmed otherwise. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="@dimen/photo_thumb_touch"
+    android:layout_height="@dimen/photo_thumb_touch"
+    android:clickable="true"
+    android:focusable="true">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/photoThumbImage"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:background="@color/pix_glass"
+        android:duplicateParentState="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:importantForAccessibility="no"
+        android:padding="1dp"
+        android:scaleType="centerCrop"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.TinyThumbnail"
+        app:strokeColor="@color/photo_thumb_stroke"
+        app:strokeWidth="2dp" />
+</FrameLayout>

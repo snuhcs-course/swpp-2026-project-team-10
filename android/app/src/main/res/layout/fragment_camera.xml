@@ -882,14 +882,14 @@
                             app:tint="@color/guide_button_icon" />
                     </FrameLayout>
 
-                    <!-- The last photo: a 40 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps; the
-                         thumbnail shows its pressed state. -->
+                    <!-- The newest photo: a 40 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps and
+                         opens Pix's photos in the viewer (FR-1.6); the thumbnail shows its pressed state. -->
                     <FrameLayout
                         android:id="@+id/galleryButton"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:clickable="true"
-                        android:contentDescription="@string/open_last_photo"
+                        android:contentDescription="@string/open_newest_photo"
                         android:focusable="true">
 
                         <com.google.android.material.imageview.ShapeableImageView

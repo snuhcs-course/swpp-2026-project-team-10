@@ -3,7 +3,6 @@ package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.animation.ValueAnimator
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -26,6 +25,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,7 +58,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraFacing
@@ -312,12 +311,18 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         setupScenePhoto(controls)
         controls.galleryButton.setOnClickListener { onThumbnailTap() }
-        photoViewer = PhotoViewer(controls.photoViewerHolder, viewLifecycleOwner.lifecycleScope, { photoOf(it) }) {
-            viewModel.closeSessionPhotos()
-        }
+        photoViewer =
+            PhotoViewer(
+                controls.photoViewerHolder,
+                viewLifecycleOwner.lifecycleScope,
+                load = { photoOf(it) },
+                thumbnail = { thumbnailOf(it) },
+                onBack = viewModel::closePhotos,
+                onDelete = viewModel::deletePhoto,
+            )
         // After the other screens' Backs, so it comes first: the viewer is over all of them.
         photosBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
-            viewModel.closeSessionPhotos()
+            viewModel.closePhotos()
         }
         // Selfie mode (FR-1.14): the last frame stays up, blurred, and turns over while the other camera opens.
         controls.switchCameraButton.setOnClickListener {
@@ -341,6 +346,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
+                launch {
+                    viewModel.photoNotDeleted.collect {
+                        Toast.makeText(requireContext(), R.string.photo_not_deleted, Toast.LENGTH_SHORT).show()
+                    }
+                }
                 // The guide in the settings' color and thickness (FR-3.10).
                 launch {
                     controls.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
@@ -943,9 +953,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isEnabled = !state.isSaving
         controls.shootTogetherButton.isEnabled = !state.isSaving
         controls.galleryButton.isEnabled = state.lastPhoto != null
-        controls.galleryButton.contentDescription =
-            getString(if (state.sessionPhotos != null) R.string.open_session_photo else R.string.open_last_photo)
-        photoViewer?.render(state.sessionPhotos.orEmpty(), state.photosOpen)
+        photoViewer?.render(state.viewerPhotos, state.photosOpen)
         photosBack?.isEnabled = state.photosOpen
         // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
         controls.switchCameraButton.isVisible = state.canSwitchCamera
@@ -1833,29 +1841,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     /**
-     * The thumbnail (FR-1.6): in a session, the session's photos over the camera, inside Pix, so the session and the
-     * subject's video go on; otherwise the newest photo in the phone's gallery.
+     * The thumbnail (FR-1.6): its photos over the camera, inside Pix, at the newest: the session's in a session, so the
+     * session and the subject's video go on, and Pix's album otherwise, which the phone's gallery could show only one
+     * photo of.
      */
     private fun onThumbnailTap() {
-        if (viewModel.uiState.value.sessionPhotos == null) return openLastPhoto()
         viewModel.setAspectsOpen(false)
-        viewModel.openSessionPhotos()
-    }
-
-    private fun openLastPhoto() {
-        val uri = viewModel.uiState.value.lastPhoto ?: return
-        try {
-            startActivity(
-                Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "image/jpeg")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                },
-            )
-        } catch (_: ActivityNotFoundException) {
-            binding?.let { Snackbar.make(it.root, R.string.gallery_unavailable, Snackbar.LENGTH_LONG).show() }
-        } catch (_: SecurityException) {
-            binding?.let { Snackbar.make(it.root, R.string.photo_unavailable, Snackbar.LENGTH_LONG).show() }
-        }
+        viewModel.openPhotos()
     }
 
     companion object {

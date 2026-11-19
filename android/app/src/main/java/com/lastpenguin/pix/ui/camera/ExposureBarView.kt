@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-09, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -18,9 +18,11 @@ import kotlin.math.sin
 
 /**
  * The brightness beside the focus (FR-1.11, Design 2.8): a thin vertical line with a sun on it at the applied exposure
- * index. A drag anywhere on it moves the sun, up for brighter and down for darker, from where it was; each step is
- * reported as it comes and the last once more as final when the finger lifts, like a pinch zoom. A drag up or down on
- * the preview moves it the same way ([startDrag], [dragTo]). TalkBack reads it as a slider and moves it a step at a
+ * index. A drag anywhere on it moves the sun, up for brighter and down for darker, from where it was, by [DP_PER_EV]
+ * of the finger's way for each EV, so a swipe changes the brightness by about 1 EV, as slowly as an iPhone's sun; the
+ * bar spans the camera's whole range, so the sun moves less than the finger. Each step is reported as it comes and the
+ * last once more as final when the finger lifts, like a pinch zoom. A drag up or down on the preview moves it the same
+ * way ([startDrag], [dragTo]). TalkBack reads it as a slider and moves it a step at a
  * time; while it has TalkBack's focus, it counts as touched, so the screen keeps it up.
  */
 class ExposureBarView @JvmOverloads constructor(
@@ -47,13 +49,16 @@ class ExposureBarView @JvmOverloads constructor(
         strokeCap = Paint.Cap.ROUND
     }
     private var range: IntRange = 0..0
+
+    /** The EV of one index, the camera's exposure step; 0 without one. */
+    private var step = 0f
     private var downIndex = 0
 
     /** The index the sun shows: the applied one, or the finger's while a drag runs. */
     var index: Int = 0
         private set
 
-    /** A drag is moving the sun; the screen keeps the bar up and leaves the sun under the finger. */
+    /** A drag is moving the sun; the screen keeps the bar up. */
     var isDragging: Boolean = false
         private set
 
@@ -78,10 +83,11 @@ class ExposureBarView @JvmOverloads constructor(
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
-    /** The camera's [range] and the applied [value]; a drag in progress keeps its own value. */
-    fun render(range: IntRange, value: Int, enabled: Boolean) {
+    /** The camera's [range], its [step] in EV, and the applied [value]; a drag in progress keeps its own value. */
+    fun render(range: IntRange, step: Float, value: Int, enabled: Boolean) {
         val moved = range != this.range
         this.range = range
+        this.step = step
         isEnabled = enabled && range.first < range.last
         if (isDragging) return
         val clamped = value.coerceIn(range)
@@ -153,15 +159,14 @@ class ExposureBarView @JvmOverloads constructor(
         onTouching?.invoke(true)
     }
 
-    /** The finger is [up] pixels above where the drag started: the sun moves as far, the bar's length the range. */
+    /**
+     * The finger is [up] pixels above where the drag started: the brightness moves 1 EV for each [DP_PER_EV] of it,
+     * whatever the camera's range and step, and stops at the range's ends.
+     */
     fun dragTo(up: Float) {
-        if (!isDragging) return
-        // A drag on the preview can start before the bar, just shown, is laid out: its own height stands in then.
-        val length = if (height > 0) height else layoutParams?.height ?: 0
-        val travel = length - 2 * SUN_DP * density
-        if (travel <= 0f) return
-        val steps = up / travel * (range.last - range.first)
-        val next = (downIndex + steps.roundToInt()).coerceIn(range)
+        if (!isDragging || step <= 0f) return
+        val ev = up / density / DP_PER_EV
+        val next = (downIndex + (ev / step).roundToInt()).coerceIn(range)
         if (next != index) {
             index = next
             ViewCompat.setStateDescription(this, describe(index))
@@ -229,14 +234,20 @@ class ExposureBarView @JvmOverloads constructor(
         return true
     }
 
-    private companion object {
-        const val LINE_DP = 1.5f
-        const val LINE_OUTLINE_DP = 2.5f
-        const val LINE_ALPHA = 204
-        const val SUN_DP = 7f
-        const val GAP_DP = 3f
-        const val CORE = 0.4f
-        const val RAY_START = 0.68f
-        const val RAYS = 8
+    companion object {
+        /**
+         * How far a finger moves, in dp, for 1 EV: about a fifth of the screen's height, so a swipe changes the
+         * brightness by about 1 EV and a camera's usual ±2 EV takes a long drag each way, as with an iPhone's sun.
+         */
+        const val DP_PER_EV = 150f
+
+        private const val LINE_DP = 1.5f
+        private const val LINE_OUTLINE_DP = 2.5f
+        private const val LINE_ALPHA = 204
+        private const val SUN_DP = 7f
+        private const val GAP_DP = 3f
+        private const val CORE = 0.4f
+        private const val RAY_START = 0.68f
+        private const val RAYS = 8
     }
 }

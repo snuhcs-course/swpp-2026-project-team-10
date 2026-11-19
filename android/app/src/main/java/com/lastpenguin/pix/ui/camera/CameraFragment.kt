@@ -1363,7 +1363,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
         val range = state.exposureRange
         val hasBrightness = range.first < range.last
-        controls.exposureBar.render(range, state.exposure, enabled = ready && hasBrightness)
+        controls.exposureBar.render(range, state.exposureStep, state.exposure, enabled = ready && hasBrightness)
         placeExposureBar(controls, state)
         showExposureBar(controls, state.brightnessOpen && hasBrightness)
     }
@@ -1480,7 +1480,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                 if (!viewModel.uiState.value.brightnessOpen) return false
                 // The focus went back to the base brightness; the sun starts there, before the camera's echo.
                 val base = viewModel.baseExposureIndex() ?: return false
-                controls.exposureBar.render(state.exposureRange, base, enabled = true)
+                controls.exposureBar.render(state.exposureRange, state.exposureStep, base, enabled = true)
             }
             if (!viewModel.uiState.value.brightnessOpen) return false
             controls.exposureBar.startDrag()

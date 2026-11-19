@@ -851,7 +851,7 @@ class CameraFragmentInteractionTest {
         val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
         launch(camera)
 
-        // Straight from the finger's down, without lifting: it focuses there and the bar's sun follows the finger.
+        // Straight from the finger's down, without lifting: it focuses there and the bar's sun follows the drag.
         onScreen { controls, _ ->
             val preview = controls.previewView
             val bar = controls.exposureBar
@@ -991,11 +991,9 @@ class CameraFragmentInteractionTest {
         touch(preview, MotionEvent.ACTION_UP, Pointer(1, x, preview.height / 2f))
     }
 
-    /** How far a finger moves for [steps] exposure indexes on [bar], whose length is the range (-4..4 here). */
-    private fun previewDrag(bar: ExposureBarView, steps: Int): Float {
-        val travel = bar.layoutParams.height - 14f * bar.resources.displayMetrics.density
-        return travel * steps / 8f
-    }
+    /** How far a finger moves for [steps] of the fake camera's 0.5 EV (`ExposureBarView.DP_PER_EV`). */
+    private fun previewDrag(bar: ExposureBarView, steps: Int): Float =
+        steps * FAKE_EV_STEP * ExposureBarView.DP_PER_EV * bar.resources.displayMetrics.density
 
     @Test
     fun aTapToFocusNearTheRightEdge_putsTheBrightnessBarOnTheBoxsLeft() {
@@ -1302,8 +1300,7 @@ class CameraFragmentInteractionTest {
     /** A drag up the brightness bar by [steps] exposure indexes (down for negative ones), from its middle. */
     private fun drag(bar: ExposureBarView, steps: Int) {
         assertTrue(bar.height > 0)
-        val travel = bar.height - 14f * bar.resources.displayMetrics.density
-        val dy = travel * steps / 8f
+        val dy = previewDrag(bar, steps)
         touch(bar, MotionEvent.ACTION_DOWN, Pointer(1, bar.width / 2f, bar.height / 2f))
         touch(bar, MotionEvent.ACTION_MOVE, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
         touch(bar, MotionEvent.ACTION_UP, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
@@ -1415,5 +1412,10 @@ class CameraFragmentInteractionTest {
         } finally {
             event.recycle()
         }
+    }
+
+    private companion object {
+        /** The fake camera's exposure step with a range (FakeCameraController). */
+        const val FAKE_EV_STEP = 0.5f
     }
 }

@@ -99,6 +99,7 @@
 | 3.19 | 2026-11-18 | The controls that turn (Iter4-P10, [#207]): `TurningIcons` turns the icons, the ratio, the zoom readout, and the bottom row's labels upright as the phone is held, on Camera and Subject view, and the layout stays (2.6.2). |
 | 3.20 | 2026-11-18 | The focus box stays as long as the brightness bar beside it, and the two go together (2.8; [#207]). |
 | 3.21 | 2026-11-18 | *End session* hides during the scene photo, and a tutorial ring stays on a control that turns (2.6.3, 2.6.8; [#207]). |
+| 3.22 | 2026-11-18 | A brightness drag changes 1 EV for each 150 dp, whatever the camera's step (2.8; [#207]). |
 
 </details>
 
@@ -3189,7 +3190,7 @@ erDiagram
 - Brightness is `ExposureBarView`: a 48 × 128 dp touch area, a 1.5 dp accent line with a 2.5 dp outline, and a sun at the applied exposure index (FR-1.11).
 - A tap to focus brings the bar up beside the focus box: on its right, or its left near the image's right edge, always inside the image. Without point focus, it comes up at the tap.
 - Up without a tap point, as after the screen is made again, the bar stands at the middle of the image's right edge, clear of the horizon bar.
-- A drag on the bar, or one finger's drag up or down anywhere on the preview (`PinchZoomController.VerticalDrag`), moves the sun from where it was, up brighter. The bar spans the camera's whole range. Each step applies at once, and the last again on release.
+- A drag on the bar, or one finger's drag up or down anywhere on the preview (`PinchZoomController.VerticalDrag`), moves the sun from where it was, up brighter. It changes the brightness by 1 EV for each 150 dp of the finger's way, whatever the camera's range and step (`ExposureBarView.DP_PER_EV`), so a swipe changes it by about 1 EV and a camera's usual ±2 EV takes a long drag each way, as with an iPhone's sun. Before, the bar's 114 dp of travel spanned the whole range, so a short swipe went most of the way ([#207]). The bar spans the camera's whole range, so the sun moves less than the finger. Each step applies at once, and the last again on release.
 - A drag that starts with the bar down first focuses there, as a tap, and starts from the base. A sideways move or a second finger is no brightness drag; guide-edit mode keeps the preview's drags.
 - Every photo starts from the base brightness in Settings, like iPhone's exposure adjustment (2.6.8). `CameraViewModel` applies `AppSettings.baseBrightness` as the nearest exposure index in the camera's range (`ExposureScale.indexOf`).
 - It applies it when the range is first known, when the range or step changes (another camera), and when the setting changes. Each tap to focus drops a drag's change and sets the base again; the setting stays.

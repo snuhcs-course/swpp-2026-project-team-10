@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -53,11 +53,24 @@ internal class TutorialTip(
 /** A screen's tips: an optional title, and its controls. */
 internal class TutorialTips(@param:StringRes val title: Int?, val tips: List<TutorialTip>)
 
-/** Where [view] is on screen, if it shows. */
+/**
+ * Where [view] is on screen, if it shows: the box around it as drawn, through its own and its parents' moves, turns,
+ * and scales, so a ring follows a control that turns with the phone, or one inside a block that does (#207).
+ */
 internal fun boundsOnScreen(view: View): Rect? {
     if (!view.isShown || view.width <= 0 || view.height <= 0) return null
-    val at = IntArray(2).also(view::getLocationOnScreen)
-    return Rect(at[0], at[1], at[0] + view.width, at[1] + view.height)
+    val box = RectF(0f, 0f, view.width.toFloat(), view.height.toFloat())
+    var current = view
+    var parent = view.parent
+    while (parent is View) {
+        if (!current.matrix.isIdentity) current.matrix.mapRect(box)
+        box.offset((current.left - parent.scrollX).toFloat(), (current.top - parent.scrollY).toFloat())
+        current = parent
+        parent = current.parent
+    }
+    val at = IntArray(2).also(current::getLocationOnScreen)
+    box.offset(at[0].toFloat(), at[1].toFloat())
+    return Rect().also(box::round)
 }
 
 /**

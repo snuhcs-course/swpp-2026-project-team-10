@@ -101,6 +101,7 @@ object PixViewModels {
                 container.tipSyncer,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
+                phoneTurns = container.phoneTurns,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }

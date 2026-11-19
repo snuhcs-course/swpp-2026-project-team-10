@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -26,6 +26,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
@@ -82,6 +83,8 @@ import org.robolectric.shadows.ShadowToast
  * double tap zooms in and another out, and a page swiped away is whole again. Share sends the photo on screen through
  * the share sheet with leave to read it. Delete asks first: Cancel keeps it; Delete takes it from the pages, the strip,
  * and the thumbnail, the last one closing the viewer; a delete that fails keeps it and says so.
+ * Turned with this phone (equivalence, #207): held sideways, the viewer is a landscape screen, the photo on screen
+ * stays, and nothing is sent to the photographer.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -563,5 +566,30 @@ class SubjectSessionPhotoTest {
         idle()
 
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    // ---- Turned with the phone --------------------------------------------------------------
+
+    @Test
+    fun heldSideways_theViewerTurnsWithThisPhone_andNothingIsSent() {
+        val modules = launch()
+        modules.photo("p1")
+        modules.photo("p2")
+        openThumbnail()
+        val sent = modules.session.sent.toList()
+
+        modules.turns.set(90)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(Motion.TURN_MS * 2))
+        settle()
+
+        onScreen { binding, _ ->
+            val viewer = binding.viewer()
+            assertEquals(-90f, viewer.photoViewerContent.rotation, 0f)
+            assertTrue(viewer.root.sideways)
+            // A landscape screen: the screen's height across.
+            assertEquals(viewer.root.height, viewer.photoViewerContent.width)
+            assertSame(pictures[saved("p2")], binding.viewerShows())
+        }
+        assertEquals(sent, modules.session.sent)
     }
 }

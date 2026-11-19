@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -7,6 +7,7 @@ import android.graphics.RectF
 import android.os.Looper
 import android.os.SystemClock
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -37,6 +38,9 @@ import org.robolectric.annotation.GraphicsMode
  * short of the line puts it back, one past it closes, and so does a flick; a drag up or sideways does neither, and a
  * sideways one is left to the pages; a second finger stops it and puts the photo back.
  * The tap (state-based): one tap tells the viewer once the wait for a second is over; a double tap does not.
+ * The viewer turned with the phone (equivalence, #207): the pages a quarter turn either way and a half turn on the
+ * screen, the drag to close down the photo as the user sees it, a flick that way, and a drag across it left to the
+ * pages, whichever way that is on the screen.
  * A new photo, and reset: whole again, in its place.
  */
 @RunWith(AndroidJUnit4::class)
@@ -62,6 +66,9 @@ class ZoomablePhotoViewTest {
     private var dismissed = 0
     private var time = 0L
     private var down = 0L
+
+    /** What the touches go to: the photo, or the screen once the pages stand turned on it. */
+    private var touched: View = photo
 
     @Before
     fun setUp() {
@@ -129,7 +136,7 @@ class ZoomablePhotoViewTest {
             0,
         )
         try {
-            photo.dispatchTouchEvent(event)
+            touched.dispatchTouchEvent(event)
         } finally {
             event.recycle()
         }
@@ -312,6 +319,56 @@ class ZoomablePhotoViewTest {
 
         assertEquals(0f, photo.translationY)
         assertEquals(0, dismissed)
+    }
+
+    // ---- Turned with the phone --------------------------------------------------------------------------------
+
+    /**
+     * The pages turned by [degrees] in the middle of a 300 x 400 px screen, as the viewer stands while the phone is held
+     * sideways or upside down; the touches go to the screen from now on.
+     */
+    private fun turnPages(degrees: Float) {
+        val screen = FrameLayout(context)
+        screen.addView(pages, FrameLayout.LayoutParams(400, 300, Gravity.CENTER))
+        pages.rotation = degrees
+        screen.measure(
+            View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY),
+        )
+        screen.layout(0, 0, 300, 400)
+        touched = screen
+    }
+
+    @Test
+    fun turned_aDragDownThePhotoAsSeen_closes_andOneAcrossItIsLeftToThePages() {
+        val line = ZoomablePhotoView.DISMISS_DP * density
+        // The photo's down on the screen, for the pages turned each way: the phone's right, left, and top.
+        for ((degrees, way) in listOf(-90f to Pair(1f, 0f), 90f to Pair(-1f, 0f), 180f to Pair(0f, -1f))) {
+            turnPages(degrees)
+            val (x, y) = way
+
+            drag(150f, 200f, dx = x * (line - 20f), dy = y * (line - 20f))
+            assertEquals("$degrees", 0, dismissed)
+            assertEquals("$degrees", 0f, photo.translationY)
+
+            drag(150f, 200f, dx = x * (line + 20f), dy = y * (line + 20f))
+            assertEquals("$degrees", 1, dismissed)
+
+            photo.reset()
+            pages.leftAlone = false
+            // Across the photo: the screen's other way.
+            drag(150f, 200f, dx = y * 120f, dy = x * 120f)
+            assertEquals("$degrees", 1, dismissed)
+            assertEquals("$degrees", 0f, photo.translationY)
+            assertFalse("$degrees", pages.leftAlone)
+
+            drag(150f, 200f, dx = x * line / 2, dy = y * line / 2, step = 3L, hold = 0L)
+            assertEquals("$degrees", 2, dismissed)
+
+            photo.reset()
+            dismissed = 0
+            (pages.parent as FrameLayout).removeView(pages)
+        }
     }
 
     // ---- The tap ----------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -57,8 +57,9 @@ import org.robolectric.annotation.GraphicsMode
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
  * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving; a guide added from Subject view, with the reference thumbnail its phone sent
- * (#234); the camera switch on a phone with and without a front camera, gone while the
+ * a session connected and a peer leaving, and the scene photo step in a session, without End session until it ends,
+ * a reconnect included; a guide added from Subject view, with the reference thumbnail its phone sent (#234); the
+ * camera switch on a phone with and without a front camera, gone while the
  * scene photo is framed and back after it, and in a session (FR-1.14).
  */
 @RunWith(AndroidJUnit4::class)
@@ -185,7 +186,7 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.editGuideButton.visibility)
             assertTrue(controls.editGuideButton.isChecked)
             // The toggle shows the mode it is in: the person's outline while a pinch moves the guide (E2, #204).
-            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.icon).createdFromResId)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
             assertTrue(controls.editGuideButton.isEnabled)
             assertTrue(controls.guideOverlay.editable)
             // Remove guide in the light red that sets it apart from the panel's other controls (E3, #204).
@@ -215,7 +216,7 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ ->
             assertFalse(controls.editGuideButton.isChecked)
             // The camera while a pinch zooms (E2, #204).
-            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.icon).createdFromResId)
+            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
             assertFalse(controls.guideOverlay.editable)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
             assertEquals(View.VISIBLE, controls.hintText.visibility)
@@ -693,6 +694,49 @@ class CameraFragmentRenderTest {
 
         onScreen { controls, _ ->
             assertEquals(View.GONE, controls.liveDot.visibility)
+            assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
+            assertEquals(View.GONE, controls.shootTogetherButton.visibility)
+        }
+    }
+
+    @Test
+    fun inASession_theScenePhotoStepHidesEndSession_keepsItsTitles_andEndSessionComesBackAfterIt() {
+        val camera = FakeCameraController().apply { frame = bitmap(300, 400) }
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.endSessionButton.visibility)
+            assertEquals(View.GONE, controls.shootTogetherButton.visibility)
+            assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
+        }
+
+        // A reconnect during the step does not bring it back.
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.endSessionButton.visibility) }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        // The review keeps its title beside Use.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
+            assertEquals(View.VISIBLE, controls.usePhotoButton.visibility)
+            assertEquals(View.GONE, controls.endSessionButton.visibility)
+        }
+
+        // Back to framing, then out of the step: End session is back.
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.sceneTitle.visibility)
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
             assertEquals(View.GONE, controls.shootTogetherButton.visibility)
         }

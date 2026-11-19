@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -56,6 +56,7 @@ import com.lastpenguin.pix.ui.camera.ReferencePlacement
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.ToggleLabel
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
+import com.lastpenguin.pix.ui.camera.TurningIcons
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import com.lastpenguin.pix.ui.camera.framePlace
@@ -127,6 +128,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
+    private var turningIcons: TurningIcons? = null
+    private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
     private var pinchModeJob: Job? = null
 
@@ -197,6 +200,21 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             onZoom = viewModel::onZoomGesture,
         )
         setupZoomAccessibility(binding.zoomReadout)
+        // The icons turn with this phone, held as the subject holds it, and so do the zoom readout and Guide and Pick a
+        // pose with their labels (FR-1.15); the other texts and the layout stay.
+        viewModel.watchPhoneTurn(viewLifecycleOwner)
+        turningIcons = TurningIcons(
+            controls = listOf(
+                binding.flashButton,
+                binding.settingsButton,
+                binding.brightnessButton,
+                binding.tipButton,
+                binding.saveGuideButton,
+                binding.editGuideButton,
+                binding.zoomReadout,
+            ),
+            views = listOf(binding.guideButton, binding.pickPoseButton, binding.galleryThumbnail),
+        )
         binding.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
             showPinchMode(binding, viewModel.uiState.value.guideEditing)
@@ -221,6 +239,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 onBack = viewModel::closePhotos,
                 onDelete = viewModel::deletePhoto,
             )
+        this.photoViewer = photoViewer
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupTip(binding)
@@ -251,6 +270,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.phoneTurn.collect { turn ->
+                        turningIcons?.turnTo(turn)
+                        photoViewer.turnTo(turn)
+                    }
+                }
                 // The photographer's guide in this phone's own color and thickness (FR-3.10).
                 launch {
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
@@ -692,6 +717,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onDestroyView() {
+        turningIcons?.stop()
+        turningIcons = null
+        photoViewer?.stop()
+        photoViewer = null
         move?.let {
             move = null
             it.cancel()

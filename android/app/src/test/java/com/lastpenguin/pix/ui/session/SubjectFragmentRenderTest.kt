@@ -534,7 +534,7 @@ class SubjectFragmentRenderTest {
             assertTrue(binding.editGuideButton.isEnabled)
             assertFalse(binding.editGuideButton.isChecked)
             // The toggle shows its mode: the camera while a pinch zooms (E2, #204).
-            assertEquals(R.drawable.ic_camera, shadowOf(binding.editGuideButton.icon).createdFromResId)
+            assertEquals(R.drawable.ic_camera, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
             assertFalse(binding.guideOverlay.editable)
             binding.editGuideButton.performClick()
         }
@@ -542,7 +542,7 @@ class SubjectFragmentRenderTest {
 
         onScreen { binding, _ ->
             assertTrue(binding.editGuideButton.isChecked)
-            assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.icon).createdFromResId)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
             assertTrue(binding.guideOverlay.editable)
         }
 

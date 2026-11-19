@@ -26,7 +26,7 @@
 
         <!-- Back during the scene photo for poses (R&S 6.3, #199): from the live camera to the camera as it was, from the
              photo's review to the live camera again. -->
-        <com.google.android.material.button.MaterialButton
+        <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/sceneBackButton"
             style="@style/Widget.Pix.Button.Icon.TopBar"
             android:layout_width="wrap_content"
@@ -50,7 +50,7 @@
             app:layout_constraintStart_toEndOf="@id/sceneBackButton"
             app:layout_constraintTop_toTopOf="parent">
 
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/flashButton"
                 style="@style/Widget.Pix.Button.Icon.TopBar"
                 android:layout_width="wrap_content"
@@ -60,7 +60,7 @@
                 app:icon="@drawable/ic_flash_off"
                 tools:visibility="visible" />
 
-            <Button
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/aspectButton"
                 style="@style/Widget.Pix.Button.Text.TopBar"
                 android:layout_width="wrap_content"
@@ -123,7 +123,7 @@
             app:layout_constraintTop_toTopOf="parent">
 
             <!-- Settings (FR-10.1), also in a session beside End session (#204); not during the scene photo. -->
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/settingsButton"
                 style="@style/Widget.Pix.Button.Icon.TopBar"
                 android:layout_width="wrap_content"
@@ -133,7 +133,7 @@
 
             <!-- Named in full, so it is a MaterialButton under any activity, which the tutorial's ring around its pill
                  needs (#204). -->
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/shootTogetherButton"
                 style="@style/Widget.Pix.Button.Glass"
                 android:layout_width="wrap_content"
@@ -545,7 +545,7 @@
             tools:visibility="visible">
 
             <!-- Hide / Show (FR-3.6): the guide goes away for a moment and comes back where it was. -->
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/hideGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
@@ -579,7 +579,7 @@
                 tools:text="50%" />
 
             <!-- Save guide (FR-3.8): filled once the guide on the camera is saved. -->
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/saveGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
@@ -588,7 +588,7 @@
                 app:icon="@drawable/ic_bookmark" />
 
             <!-- Remove guide, its ✕ in light red to set it apart from the panel's other controls (E3, #204). -->
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/removeGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
@@ -671,7 +671,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <TextView
+        <com.lastpenguin.pix.ui.camera.TurningLabel
             android:id="@+id/zoomReadout"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
@@ -704,7 +704,7 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <com.google.android.material.button.MaterialButton
+                <com.lastpenguin.pix.ui.camera.TurningButton
                     android:id="@+id/tipButton"
                     style="@style/Widget.Pix.Button.Icon"
                     android:layout_width="wrap_content"
@@ -728,7 +728,7 @@
 
             <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. Its icon names
                  the mode: a person's outline while editing, a camera while a pinch zooms (showGuideEditing, #204). -->
-            <com.google.android.material.button.MaterialButton
+            <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/editGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
@@ -870,6 +870,7 @@
                         tools:visibility="visible">
 
                         <ImageView
+                            android:id="@+id/switchCameraIcon"
                             android:layout_width="40dp"
                             android:layout_height="40dp"
                             android:layout_gravity="center"

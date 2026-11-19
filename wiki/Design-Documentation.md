@@ -96,6 +96,7 @@
 | 3.16 | 2026-11-18 | The session's photos on both phones (Iter4-A2, [#235]): the thumbnail from the session's photos and a viewer inside Pix on *Subject view* and on the photographer's Camera, and outside a session the album's newest photo (`NewestAlbumPhoto`); *Subject view*'s bottom row as Camera's (2.6.5, Figures 6 and 7). |
 | 3.17 | 2026-11-18 | The reference thumbnail for a guide from the subject (Iter4-A1, [#234]): `guide.reference.*` goes S→P before the guide's image, and the photographer adopts the guide with it (2.3, 2.5.1, 2.6.2, 2.6.5, 2.9). |
 | 3.18 | 2026-11-18 | Pix's album in the viewer (Iter4-A7, [#247]): outside a session Camera's thumbnail opens all of Pix's photos in `PhotoViewer` instead of one in the gallery; `PixAlbumPhotos` in place of `NewestAlbumPhoto`; the viewer as a gallery app's, with a strip of thumbnails, zoom (`ZoomablePhotoView`), *Share*, and *Delete* (2.6.5, Figure 6). |
+| 3.19 | 2026-11-18 | The UAT's date (Iter4-P8, [#205]): cycle 1 on 11/16 alone, above the Iteration 4 tasks (2.9). |
 
 </details>
 
@@ -3273,7 +3274,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Camera quality and latency closer to the stock camera (Iter3-A16, #183) | 한준형 | 11/6 | Moved to Iteration 4 ([#208]) | — |
 | Who takes the photo, chosen before connecting (Iter3-A17, [#188]) | 조성민 | 11/6 | Done | 2.1, 2.6.6 |
 
-**Iteration 4 tasks** (from the kickoff of 2026-11-07; Iteration 4 runs 11/8–11/20, with the UAT in class on 11/16 and 11/18):
+**Iteration 4 tasks** (from the kickoff of 2026-11-07; Iteration 4 runs 11/8–11/20, with UAT cycle 1 in class on 11/16):
 
 | Task | Owner | Due | Status | Design |
 |----|----|----|----|----|

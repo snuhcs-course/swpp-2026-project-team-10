@@ -76,6 +76,7 @@
 | 3.14 | 2026-11-18 | The reference thumbnail hides at the side of the preview and leaves a see-through strip to bring it back by; its changes of place and size are animated (FR-3.9, US-3, US-11, 6.2, 6.6, Figure 1; Iter4-A4, [#237]). |
 | 3.15 | 2026-11-18 | The session's photos on both phones: in a session the thumbnail shows only the session's newest, on *Subject view* and on Camera, and opens the session's photos in Pix, over the live view or the camera; outside a session Camera's thumbnail is the newest photo in Pix's album; *Subject view*'s bottom row is Camera's, with *Guide* at the left and the thumbnail at the right (FR-1.6, FR-6.14, 6.2, 6.5, 6.6, Figures 4 and 5; Iter4-A2, [#235]). |
 | 3.16 | 2026-11-18 | Outside a session, Camera's thumbnail opens Pix's album in Pix instead of one photo in the phone's gallery; the photos open as in a gallery app, with a strip of thumbnails, zoom, *Share*, and *Delete* (FR-1.6, FR-1.16, 6.2, 6.6, Figure 1; Iter4-A7, [#247]). |
+| 3.17 | 2026-11-18 | The UAT's cycles in the scope by iteration: cycle 1 on 11/16, and cycle 2 on 11/23 in Iteration 5 (4.1; Iter4-P8, [#205]). |
 
 </details>
 
@@ -173,8 +174,8 @@ Every session has two people, each with Pix. *Who takes the photo?* sets the rol
 | **Iteration 1**<br>9/27 – 10/9 · prototype | Take photos; add a guide from a gallery photo or from four generated poses (predefined pose templates); adjust the guide; connect a second phone **with a room code on the same Wi-Fi**, which shows the live view and guide and changes the zoom. |
 | **Iteration 2**<br>10/11 – 10/25 · midterm 10/21 | Accounts and friends (F5). Focus, brightness, flash, 4:3, 16:9, and 1:1, and smooth pinch zoom with a guide-edit mode on both phones. Smooth outlines, the starting position, a thumbnail, hide, replace, and saved guides. Guide, brightness, and flash from the subject's phone. Poses from suggestions, idea chips, or a description. Room codes without sign-in. |
 | **Iteration 3**<br>10/26 – 11/6 · user test 10/31–11/1, heuristic evaluation 11/4 | Invitations **over Wi-Fi or cellular data**, friend-request pushes, reconnection, and *Who takes the photo?* (F6). Poses in the scene's ratio, one at a time, with a tip, filter, person check, and history (F4). Shared guide and pose steps; photos on both phones. Selfie mode, the library, ♥ for AI poses, and the screenshot cut. Camera's controls after the heuristic evaluation; animations. Settings and a tutorial (F10). Key user acceptance test (UAT) stories fixed. |
-| **Iteration 4**<br>11/8 – 11/20 · UAT 11/16 and 11/18 | Fixes and improvements from the user test and the heuristic evaluation: Back on the pose screens, refused descriptions out of the history, a message for each failure, the subject's live view as a mirror, landscape photos and poses, the controls that turn with the phone, and the camera's quality and latency (F1, F4, F6). Poses by situation (FR-4.4, FR-4.8); tips with the background (FR-4.10). Color tokens, light mode, and UI fixes (F10, 6.9). The QR connection (F9, [#214]). The UAT and its fixes. |
-| **Iteration 5**<br>tentative · in-class testing 11/30, real user test 12/2 | Polish, stability, and performance against the non-functional requirements, from UAT feedback; in-class testing and a test with real users. The remote-control switch (FR-7.5), remote focus (FR-7.7), and search, situations, and memos in the library (FR-3.11), left out of Iteration 4 at its kickoff. |
+| **Iteration 4**<br>11/8 – 11/20 · UAT cycle 1 11/16 | Fixes and improvements from the user test and the heuristic evaluation: Back on the pose screens, refused descriptions out of the history, a message for each failure, the subject's live view as a mirror, landscape photos and poses, the controls that turn with the phone, and the camera's quality and latency (F1, F4, F6). Poses by situation (FR-4.4, FR-4.8); tips with the background (FR-4.10). Color tokens, light mode, and UI fixes (F10, 6.9). The QR connection (F9, [#214]). The UAT and its fixes. |
+| **Iteration 5**<br>tentative · UAT cycle 2 11/23, in-class testing 11/30, real user test 12/2 | Polish, stability, and performance against the non-functional requirements, from UAT feedback; in-class testing and a test with real users. The remote-control switch (FR-7.5), remote focus (FR-7.7), and search, situations, and memos in the library (FR-3.11), left out of Iteration 4 at its kickoff. |
 
 ### 4.2 Feature list
 
@@ -952,8 +953,10 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
 [#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
 [#204]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/204
+[#205]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/205
 [#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
 [#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
 [#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231

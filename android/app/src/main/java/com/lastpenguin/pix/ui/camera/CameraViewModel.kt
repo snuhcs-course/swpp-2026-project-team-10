@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -758,5 +758,11 @@ class CameraViewModel(
     companion object {
         /** How long a short notice stays on the Camera screen, such as the remote action notices. */
         const val NOTICE_MS = 3_000L
+
+        /**
+         * How long the notice that the subject left or dropped stays (FR-6.10, FR-6.11): longer than [NOTICE_MS], since
+         * the photographer may not be looking at the screen (#238).
+         */
+        const val PEER_GONE_NOTICE_MS = 10_000L
     }
 }

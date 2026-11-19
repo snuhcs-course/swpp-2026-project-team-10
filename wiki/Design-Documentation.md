@@ -105,6 +105,7 @@
 | 3.25 | 2026-11-19 | A brightness drag changes 1 EV for each 150 dp, whatever the camera's step (2.8; [#207]). |
 | 3.26 | 2026-11-19 | The photo viewer turns with the phone, as a landscape screen while sideways (`TurningFrame`; 2.6.2, 2.6.5; [#207]). |
 | 3.27 | 2026-11-19 | The package layout names `TurningIcons` and `PhoneTurns` (2.1; [#207]). |
+| 3.28 | 2026-11-19 | The notice that the subject left (Iter4-A5, [#238]): 10 s on Camera, gone once the subject is back, and a photo not sent shown after it (2.6.5). |
 
 </details>
 
@@ -2804,6 +2805,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Not done yet: the photos against the phone's own camera on the same scenes, CameraX Extensions (`HDR`, `NIGHT`), and the S21.
 - **Photos.** Only the photographer takes photos.
 - **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
+- **The subject gone.** "Joonhyung left" or "… disconnected" (FR-6.10, FR-6.11) stays 10 s (`CameraViewModel.PEER_GONE_NOTICE_MS`), since the photographer may not be looking. It goes once the subject is back. A "Couldn't send" notice waits for it (FR-6.14).
 
 #### 2.6.6 Invitations and push (Iteration 3)
 
@@ -3441,6 +3443,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
+[#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
 [#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213

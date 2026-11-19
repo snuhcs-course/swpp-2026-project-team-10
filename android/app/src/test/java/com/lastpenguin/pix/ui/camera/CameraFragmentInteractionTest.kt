@@ -81,7 +81,8 @@ import org.robolectric.shadows.ShadowToast
  * notice; in a session as the
  * photographer none until the session's first photo, then the session's photos in Pix's viewer, which system Back and
  * the session's end close, and Pix's album again after it (FR-1.6, Iter4-A2); each capture failure's message; the subject's
- * zoom, brightness, flash, and guide moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view
+ * zoom, brightness, flash, and guide moves as notices, a lost connection, a photo not sent (FR-6.14), also after the
+ * notice that the subject left, which it waits for (#238), and the live view
  * on mobile data (FR-6.13); the zoom accessibility actions and a tap on the readout through the quick steps (0.6×, 1×,
  * 2×, back to 0.6×), by touch and by TalkBack; the reference thumbnail's tap, drag, and TalkBack moves, and hiding it
  * at the side (#237: a drag mostly past the side, its strip with the handle over it, a tap on the handle, TalkBack's
@@ -323,6 +324,32 @@ class CameraFragmentInteractionTest {
 
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.noticeText.isVisible) }
+    }
+
+    @Test
+    fun aPhotoNotSent_waitsForTheNoticeThatTheSubjectLeft() {
+        val modules = launch()
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.Leave(EndReason.PEER_LEFT))
+        idle()
+        modules.photos.shoot(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
+        idle()
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_left, "Joonhyung"), controls.noticeText.text.toString())
+        }
+
+        shadowOf(Looper.getMainLooper())
+            .idleFor(CameraViewModel.PEER_GONE_NOTICE_MS - CameraViewModel.NOTICE_MS, TimeUnit.MILLISECONDS)
+
+        onScreen { controls, _ ->
+            assertTrue(controls.noticeText.isVisible)
+            assertEquals(string(R.string.session_photo_not_sent, "Joonhyung"), controls.noticeText.text.toString())
+        }
     }
 
     @Test

@@ -84,6 +84,7 @@
 | 3.22 | 2026-11-18 | In a session, *End session* hides during the scene photo, so its title fits (6.3, 6.5; [#207]). |
 | 3.23 | 2026-11-19 | A brightness drag changes 1 EV for about a fifth of the screen's height, as slowly as an iPhone's (FR-1.11; [#207]). |
 | 3.24 | 2026-11-19 | Held sideways, the photos a thumbnail opens turn as a landscape screen (FR-1.16, 6.2; [#207]). |
+| 3.25 | 2026-11-19 | The photographer's notice that the subject left or dropped stays 10 s, or until the subject is back (FR-6.10, FR-6.11, 6.5; Iter4-A5, [#238]). |
 
 </details>
 
@@ -311,8 +312,8 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 | FR-6.7 | The subject's phone shows the guide at the photographer's relative position, size, and opacity, from its start (FR-3.1). It updates when either person moves, resizes, or replaces it (FR-6.15, FR-7.2), and when the photographer fades, hides, or removes it. | Must | It 1 / It 2 |
 | FR-6.8 | While connected, a red light blinks at the top right of the photographer's image (TalkBack: "Live · &lt;name&gt; connected"). | Must | It 1 / It 3 |
 | FR-6.9 | A session has one photographer and one subject. Inviting a friend who is in another session says so. | Should | It 3 |
-| FR-6.10 | Either person can end the session with *End session* or *Leave*. The other is told, and the photographer's camera keeps working. | Must | It 1 |
-| FR-6.11 | When the connection is lost, the subject sees *Connection lost* with *Reconnect* and *Leave*, and the photographer gets a notice. | Must | It 1 |
+| FR-6.10 | Either person can end the session with *End session* or *Leave*. The other is told, and the photographer's camera keeps working. The photographer's notice stays 10 s, or until the subject is back. | Must | It 1 |
+| FR-6.11 | When the connection is lost, the subject sees *Connection lost* with *Reconnect* and *Leave*, and the photographer gets a notice, kept as in FR-6.10. | Must | It 1 |
 | FR-6.12 | Before *Connection lost*, both phones try to reconnect for up to 10 s, and *Subject view* says it is reconnecting. | Should | It 3 |
 | FR-6.13 | The first time a session runs on cellular data, Pix says that the live view uses mobile data. | Should | It 3 |
 | FR-6.14 | Photos taken in a session are saved on both phones. The photographer's phone sends each in full quality, and the subject's phone saves it to its "Pix" album without the guide. On both phones, the thumbnail shows the session's newest photo, none before its first. A tap opens the session's photos in Pix, one at a time from the newest, over the live view or the camera, and the session goes on ([#235]). | Must | It 3 / It 4 |
@@ -769,7 +770,7 @@ Each flow is a wireflow: one row per task, labeled arrows for inputs and system 
 | Screen | Shows | Input → result | Not allowed / failure |
 |---|---|---|---|
 | **Invite sent** | A sheet over Camera: "Sending the invitation…", "Waiting for Joonhyung", then "Joonhyung accepted · connecting…"; *Share invite link*, *Copy link* (FR-6.1); *Cancel invite*. No remote-control toggle yet (FR-7.5, Could, Iteration 5). | Joonhyung accepts → Friend connected · *Cancel invite* → Share my camera; after an accept, it ends the session. | Declined, or 60 s → Invite not accepted (FR-6.3). Closing the sheet while waiting cancels the invitation. Other failures → "Couldn't connect…". |
-| **Friend connected** | Camera + guide with a blinking red light (FR-6.8), and *End session* in place of *Shoot together*, with the gear beside it, but not during the scene photo ([#204], [#207]). The thumbnail shows only this session's photos, empty until the first (FR-6.14). A notice per remote action, such as "Joonhyung set zoom to 2×" or "Joonhyung set a pose guide" (FR-7.4). "The live view uses mobile data." once (FR-6.13). While the link reconnects, the light is off (FR-6.12). | Flow 1's inputs · *End session* → Camera; the subject is told · The subject's changes → applied and echoed back · Thumbnail → Session photos (6.6), over the camera, which goes on; Back or the session's end closes it. | "Joonhyung left", or "Joonhyung disconnected" after 10 s without the link (FR-6.11, FR-6.12); the camera keeps working. Unsent photos → "Couldn't send a photo to Joonhyung" or "Couldn't send 2 photos to Joonhyung" (FR-6.14). |
+| **Friend connected** | Camera + guide with a blinking red light (FR-6.8), and *End session* in place of *Shoot together*, with the gear beside it, but not during the scene photo ([#204], [#207]). The thumbnail shows only this session's photos, empty until the first (FR-6.14). A notice per remote action, such as "Joonhyung set zoom to 2×" or "Joonhyung set a pose guide" (FR-7.4). "The live view uses mobile data." once (FR-6.13). While the link reconnects, the light is off (FR-6.12). | Flow 1's inputs · *End session* → Camera; the subject is told · The subject's changes → applied and echoed back · Thumbnail → Session photos (6.6), over the camera, which goes on; Back or the session's end closes it. | "Joonhyung left", or "Joonhyung disconnected" after 10 s without the link, for 10 s or until Joonhyung is back (FR-6.10–6.12); the camera keeps working. Unsent photos → "Couldn't send a photo to Joonhyung" or "Couldn't send 2 photos to Joonhyung", after that notice (FR-6.14). |
 | **Pick a pose · shared** | Pick a pose (Flow 2) with "Joonhyung sees this too", without *Regenerate*. | Either phone's *Select* first → Reference confirm on both; its Back → Camera · Back → "Go back?" with "Going back discards these poses. They can't be recovered."; *Go back* → Generate poses on both, the set discarded. | Swipes and ♥s are not sent (FR-6.15). Leaving closes Joonhyung's screen too. |
 | **Reference confirm** (Joonhyung's choice) | Reference confirm, titled *Guide Outline*, with "Joonhyung chose this pose" on the card and "Joonhyung sees this too". | Either phone's *Use* first → Friend connected, the guide on both; Joonhyung's first adds "Joonhyung used this guide" · Back → Camera; Joonhyung's closes. | A failure closes Joonhyung's too. A photo picked from Camera's *Guide* is not shared. |
 | **Invite not accepted** | "Joonhyung declined or didn't answer within a minute." | *Invite again* → Invite sent · *Back to camera* → Camera. | — |
@@ -969,6 +970,7 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
+[#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
 [#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213

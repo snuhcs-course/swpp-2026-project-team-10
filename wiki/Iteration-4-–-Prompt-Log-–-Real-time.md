@@ -42,7 +42,14 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Jaewan, 11-18] "can we make this pix in-app viewer more like a normal gallery app? for example small thumbnails at the bottom"
 - [Jaewan, 11-18] "add all. and i think we don't need the (7/12) counter?"
 
+## The notice that the subject left ([#238])
+
+- [Jaewan, 11-19] "issue #238. what's the current status of these problems"
+- [Jaewan, 11-19] "let's increase the notice time. in a new branch"
+- [Jaewan, 11-19] "yes i'll handle the reconnection quality part later. commit and open the PR"
+
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
 [#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
+[#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247

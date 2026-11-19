@@ -41,8 +41,15 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-19] "Resolve the conflicts with dev. The photos taken can be seen in the app right away; make that support landscape too." (#248 had brought the album viewer to `dev`, so #242 and #246 each took `dev` in again. The viewer now turns whole with the phone in a `TurningFrame`: held sideways, it is a landscape screen, the photo over all of it under the header and the strip. After the new size, ViewPager2 showed the page before until its list was scrolled to the page first; a drag down is turned into the photo's own way.)
 - [Joonhyung, 11-19] "Check which tasks of issue #207 are not built yet." Then: "Yes, add it." (Against the issue, all were built but two: the check on two phones, IT-38, and Design 2.1, whose package layout named neither `TurningIcons` nor `PhoneTurns`; it now does. The brightness bar's sun is not turned, since its eight rays look the same at every quarter.)
 
+## *Add a pose guide*'s order and its picker ([#243])
+
+- [Jaewan, 11-19] "let's implement issue #243"
+- [Jaewan, 11-19] "meanwhile, the flow4 wireframe is wrong since it doesn't have the progress bar for the 'pick a pose' screen. can you fix this here?"
+- [Jaewan, 11-19] "yes. and then give me some emulator screenshots for this fix"
+
 [#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
 [#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#243]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/243

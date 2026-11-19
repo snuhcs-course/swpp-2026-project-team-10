@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -29,14 +29,15 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Add a pose guide, situation first (R&S 6.2, FR-4.8): *What are you taking?* with a tile per situation, the last one
- * chosen selected, then a guide from a photo, *Choose from the gallery* or *My library*, which opens the library and
- * says how many are saved (FR-2.7, FR-3.8, FR-3.11), then *Take a scene photo for poses* for the chosen situation
- * (FR-4.1). With a guide on the camera it replaces that guide, and *Keep the current guide* closes it (FR-3.6). Opened
- * from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and the situations and the button wait for
- * the shared steps (FR-6.15, Design 2.6.5).
+ * Add a pose guide (R&S 6.2): *What are you taking?* with a tile per situation, the last one chosen selected, and right
+ * under them *Take a scene photo for poses* for the chosen one (FR-4.1, FR-4.8), which the situation is for alone; then
+ * a guide from a photo, *Choose from the gallery* or *My library*, which opens the library and says how many are saved
+ * (FR-2.1, FR-3.8, FR-3.11). With a guide on the camera it replaces that guide, and *Keep the current guide* closes it
+ * (FR-3.6). Opened from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and the situations and
+ * the button wait for the shared steps (FR-6.15, Design 2.6.5).
  * The first time it opens from Camera, its tutorial tips come over it (FR-10.4).
- * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170.
+ * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170; the
+ * order and the picker kept open #243.
  */
 class AddGuideSheet : BottomSheetDialogFragment() {
 
@@ -44,11 +45,9 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     private val generationViewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
 
-    /** A picked photo opens Reference confirm; closing the picker returns to the camera, guide unchanged (FR-2.7). */
+    /** A picked photo opens Reference confirm; closing the picker stays here, any guide unchanged (FR-2.7). */
     private val pickPhoto = registerPhotoPicker { uri ->
-        if (uri == null) {
-            dismiss()
-        } else {
+        if (uri != null) {
             referenceViewModel.onPhotoPicked(uri)
             findNavController().navigate(R.id.action_addGuide_to_referenceConfirm)
         }
@@ -62,20 +61,15 @@ class AddGuideSheet : BottomSheetDialogFragment() {
         referenceViewModel.openFor(arguments?.getBoolean(ARG_FROM_SUBJECT) == true)
         val poses = !referenceViewModel.forSubject
         binding.newPosesSection.isVisible = poses
-        binding.generateButton.isVisible = poses
         if (poses && savedInstanceState == null) generationViewModel.followCamera()
         val situations = SituationTiles(binding.situationRowTop, binding.situationRowBottom) {
             generationViewModel.chooseSituation(it)
         }
         // The Guide button opens this sheet in both cases; with a guide on the camera it is the way to replace it.
-        when {
-            referenceViewModel.replacing -> {
-                binding.titleText.setText(R.string.replace_guide_title)
-                binding.cancelButton.setText(R.string.keep_current_guide)
-                binding.cancelButton.isVisible = true
-            }
-
-            !poses -> binding.titleText.setText(R.string.add_guide_title)
+        if (referenceViewModel.replacing) {
+            binding.titleText.setText(R.string.replace_guide_title)
+            binding.cancelButton.setText(R.string.keep_current_guide)
+            binding.cancelButton.isVisible = true
         }
 
         binding.galleryRow.setOnClickListener { pickPhoto() }

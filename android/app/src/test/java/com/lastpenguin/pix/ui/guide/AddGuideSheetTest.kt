@@ -1,10 +1,16 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
+import android.app.Activity
 import android.content.DialogInterface
+import android.content.Intent
+import android.net.Uri
 import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.os.bundleOf
+import androidx.core.view.children
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragment
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,18 +35,24 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
 /*
- * Add a pose guide (R&S 6.2, FR-3.6, FR-4.2), on the real bottom sheet. Partitions: no guide on the camera (What are
- * you taking?, no Cancel) or a guide (Replace, with Keep the current guide); the button with consent already given
+ * Add a pose guide (R&S 6.2, FR-3.6, FR-4.2), on the real bottom sheet. Partitions: no guide on the camera (Add a pose
+ * guide, no Cancel) or a guide (Replace, with Keep the current guide); the button with consent already given
  * (the scene photo step starts, the sheet closes) or not yet (the notice first: Not now sends nothing, Agree starts
  * it), and the notice's buttons at Material's 12 dp padding, not the 20 dp of the theme's button style; Cancel. My
  * library (FR-3.8, FR-3.11): nothing saved (no count); the row, which opens the library and closes the sheet. The
- * situations (FR-4.8): a tile tapped is chosen with a check; Selfie's off and dimmed without a front camera. From
- * Subject view (FR-6.15): no situations and no button,
- * Add a pose guide as the title, and Replace only for a guide on the video, not one on this phone's camera.
+ * gallery's picker (FR-2.7, #243): closed without a photo (the sheet stays open, the guide on the camera unchanged)
+ * or with one (Reference confirm). The situations (FR-4.8): a tile tapped is chosen with a check; Selfie's off and
+ * dimmed without a front camera. The order at the Galaxy S22's 360 × 705 dp, at font scale 1.0 and 1.3 (boundary,
+ * #243): the title, then What are you taking? with the tiles and their button right under them, then the guide from
+ * a photo with its two rows, each whole and clear of the next. From Subject view (FR-6.15): no situations and no
+ * button, Add a pose guide as the title, and Replace only for a guide on the video, not one on this phone's camera.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -54,6 +66,7 @@ class AddGuideSheetTest {
     @After
     fun tearDown() {
         scenario?.close()
+        RuntimeEnvironment.setFontScale(1f)
     }
 
     private fun launch(modules: TestAppContainer = TestAppContainer(), fromSubject: Boolean = false): TestAppContainer {
@@ -74,14 +87,112 @@ class AddGuideSheetTest {
         SheetAddGuideBinding.bind(sheet.requireView()),
     )
 
+    /** The view under [this] that shows [text], if any. */
+    private fun View.showing(text: String): View? = when {
+        this is TextView && this.text.toString() == text -> this
+        this is ViewGroup -> children.firstNotNullOfOrNull { it.showing(text) }
+        else -> null
+    }
+
+    private fun View.topInWindow(): Int = IntArray(2).also(::getLocationInWindow)[1]
+
+    private fun View.bottomInWindow(): Int = topInWindow() + height
+
+    /** Opens the gallery's picker from the sheet and closes it with [resultCode] and [data], as the system's would. */
+    private fun answerThePicker(resultCode: Int, data: Intent?) {
+        onSheet { binding -> binding.galleryRow.performClick() }
+        scenario!!.onFragment { fragment ->
+            val activity = shadowOf(fragment.requireActivity())
+            val picker = checkNotNull(activity.nextStartedActivityForResult) { "no picker opened" }
+            activity.receiveResult(picker.intent, resultCode, data)
+        }
+        idle()
+    }
+
     @Test
-    fun withoutAGuide_asksWhatToTake() {
+    fun withoutAGuide_isAddAPoseGuide() {
         launch()
 
         onSheet { binding ->
-            assertEquals(string(R.string.situation_question), binding.titleText.text.toString())
+            assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
             assertFalse(binding.cancelButton.isShown)
         }
+    }
+
+    /**
+     * At [scale]: the title, then What are you taking? with the tiles and their button right under them, then the
+     * guide from a photo, each whole and above the next; the button is closer to the tiles than to the guide from a
+     * photo, so it reads as theirs.
+     */
+    private fun assertTheSituationsSitRightAboveTheirButton(scale: Float) {
+        RuntimeEnvironment.setFontScale(scale)
+        launch()
+        val label = "font scale $scale"
+
+        onSheet { binding ->
+            val question = checkNotNull(binding.root.showing(string(R.string.situation_question))) {
+                "$label: no \"What are you taking?\""
+            }
+            val order = listOf(
+                "the title" to binding.titleText,
+                "What are you taking?" to question,
+                "the top tiles" to binding.situationRowTop,
+                "the bottom tiles" to binding.situationRowBottom,
+                "Take a scene photo for poses" to binding.generateButton,
+                "Guide from a photo" to binding.fromPhotoLabel,
+                "Choose from the gallery" to binding.galleryRow,
+                "My library" to binding.libraryRow,
+            )
+            for ((upper, lower) in order.zipWithNext()) {
+                assertTrue(
+                    "$label: ${upper.first} ends at ${upper.second.bottomInWindow()}, below the top of " +
+                        "${lower.first} at ${lower.second.topInWindow()}",
+                    upper.second.isShown && upper.second.bottomInWindow() <= lower.second.topInWindow(),
+                )
+            }
+            val toTheTiles = binding.generateButton.topInWindow() - binding.situationRowBottom.bottomInWindow()
+            val toThePhotoRows = binding.fromPhotoLabel.topInWindow() - binding.generateButton.bottomInWindow()
+            assertTrue(
+                "$label: $toTheTiles px to the tiles, $toThePhotoRows px to the rows",
+                toTheTiles < toThePhotoRows,
+            )
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h705dp-xxhdpi")
+    fun theSituations_sitRightAboveTheirButton_apartFromTheGuideFromAPhoto() =
+        assertTheSituationsSitRightAboveTheirButton(1f)
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h705dp-xxhdpi")
+    fun theSituations_sitRightAboveTheirButton_atFontScale1_3() = assertTheSituationsSitRightAboveTheirButton(1.3f)
+
+    @Test
+    fun closingThePicker_withoutAPhoto_keepsTheSheetOpen_andTheGuideOnTheCamera() {
+        val modules = TestAppContainer()
+        val onCamera = guide()
+        modules.guides.setGuide(onCamera)
+        launch(modules)
+        val nav = scenario!!.attachNav(R.id.addGuideSheet)
+
+        answerThePicker(Activity.RESULT_CANCELED, null)
+
+        assertTrue(sheet.isAdded)
+        assertTrue(sheet.requireDialog().isShowing)
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+        assertTrue(modules.guides.guide.value === onCamera)
+        onSheet { binding -> assertEquals(string(R.string.replace_guide_title), binding.titleText.text.toString()) }
+    }
+
+    @Test
+    fun aPhotoPicked_opensReferenceConfirm() {
+        launch()
+        val nav = scenario!!.attachNav(R.id.addGuideSheet)
+
+        answerThePicker(Activity.RESULT_OK, Intent().setData(Uri.parse("content://photos/1")))
+
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
     }
 
     @Test
@@ -91,7 +202,7 @@ class AddGuideSheetTest {
         launch(modules, fromSubject = true)
         onSheet { binding ->
             assertEquals(View.GONE, binding.newPosesSection.visibility)
-            assertEquals(View.GONE, binding.generateButton.visibility)
+            assertFalse(binding.generateButton.isShown)
             assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
         }
         scenario?.close()

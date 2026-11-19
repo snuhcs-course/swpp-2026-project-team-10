@@ -103,6 +103,7 @@
 | 3.23 | 2026-11-18 | *End session* hides during the scene photo, and a tutorial ring stays on a control that turns (2.6.3, 2.6.8; [#207]). |
 | 3.24 | 2026-11-19 | A brightness drag changes 1 EV for each 150 dp, whatever the camera's step (2.8; [#207]). |
 | 3.25 | 2026-11-19 | The photo viewer turns with the phone, as a landscape screen while sideways (`TurningFrame`; 2.6.2, 2.6.5; [#207]). |
+| 3.26 | 2026-11-19 | The package layout names `TurningIcons` and `PhoneTurns` (2.1; [#207]). |
 
 </details>
 
@@ -369,9 +370,10 @@ android/app/src/main/java/com/lastpenguin/pix/
 ├─ MainActivity, PixApplication (creates the AppContainer)
 ├─ ui/          camera/, guide/, generation/, account/, session/, settings/: one Fragment per screen; the screens of one
 │               flow share one activity-scoped ViewModel; PixViewModels builds every ViewModel from the AppContainer;
-│               ScreenTransitions (PixNavHostFragment, ScreenNavigator, ScreenMotion) and Motion
+│               ScreenTransitions (PixNavHostFragment, ScreenNavigator, ScreenMotion) and Motion; camera/TurningIcons
+│               (TurningButton, TurningLabel, TurningFrame) turns the controls and the photo viewer with the phone
 ├─ camera/      CameraController*, CameraXController, CameraSettings (aspect ratio in DataStore), PhotoSaver (PhotoAlbum),
-│               PixAlbumPhotos, CameraZoom, CameraZoomPlan, CameraFrameCache
+│               PixAlbumPhotos, CameraZoom, CameraZoomPlan, CameraFrameCache, PhoneTurns (SensorPhoneTurns)
 ├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore*, GuideLook* (GuideColor,
 │               GuideThickness, GuideOutlines), InMemoryGuideRepository, MlKitReferenceGuideMaker, FileSavedGuideStore,
 │               GuideGeometry, SubjectSegmenter, MaskSmoothing (functions), OutlineExtractor, MaskPng,

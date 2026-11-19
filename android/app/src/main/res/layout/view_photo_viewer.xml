@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A thumbnail's photos (FR-1.6, FR-6.14; R&S 6.2, 6.5, 6.6), over Camera and over Subject view, as a gallery app
-     shows them: one page each, opened at the newest, under a header with Back, no title, and Share and Delete at its
-     end, and a strip of their thumbnails below, the one on screen selected. A tap on the photo hides the header and the
-     strip, and another shows them. It covers the screen inside Pix, so a session and its video go on under it; the
+<!-- A thumbnail's photos (FR-1.6, FR-6.14, FR-1.16; R&S 6.2, 6.5, 6.6), over Camera and over Subject view, as a gallery
+     app shows them: one page each, opened at the newest, under a header with Back, no title, and Share and Delete at
+     its end, and a strip of their thumbnails below, the one on screen selected. A tap on the photo hides the header and
+     the strip, and another shows them. It covers the screen inside Pix, so a session and its video go on under it; the
      phone's gallery would show the one photo it is given and put Pix in the background. It takes every touch, so none
-     reaches the screen under it; its holder keeps it above all of the screen. -->
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     reaches the screen under it; its holder keeps it above all of the screen. Its content turns with the phone, as a
+     landscape screen while the phone is held sideways (TurningFrame), where the photo takes all of it and the header,
+     on a scrim, and the strip, raised over the pages, lie over the photo. -->
+<com.lastpenguin.pix.ui.camera.TurningFrame xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/photoViewer"
@@ -18,77 +20,87 @@
     android:visibility="gone"
     tools:visibility="visible">
 
-    <LinearLayout
-        android:id="@+id/photoViewerHeader"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center_vertical"
-        android:minHeight="56dp"
-        android:paddingHorizontal="20dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/photoViewerContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
-        <ImageButton
-            android:id="@+id/photoViewerBack"
-            style="@style/Widget.Pix.Header.Back"
-            android:contentDescription="@string/back" />
+        <LinearLayout
+            android:id="@+id/photoViewerHeader"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="64dp"
+            android:outlineProvider="none"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="8dp"
+            android:translationZ="1dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-        <Space
+            <ImageButton
+                android:id="@+id/photoViewerBack"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/back" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- The photo on screen, through the phone's share sheet. -->
+            <ImageButton
+                android:id="@+id/photoViewerShare"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/share_photo"
+                android:src="@drawable/ic_share"
+                app:tint="@color/pix_text" />
+
+            <!-- Deletes the photo on screen from this phone, after asking. Its icon is as far from the edge as Back's. -->
+            <ImageButton
+                android:id="@+id/photoViewerDelete"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="-12dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/delete_photo"
+                android:src="@drawable/ic_delete"
+                app:tint="@color/pix_text" />
+        </LinearLayout>
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/photoViewerPages"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_marginBottom="12dp"
+            app:layout_constraintBottom_toTopOf="@id/photoViewerStrip"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/photoViewerHeader"
+            tools:listitem="@layout/item_photo_page" />
 
-        <!-- The photo on screen, through the phone's share sheet. -->
-        <ImageButton
-            android:id="@+id/photoViewerShare"
-            android:layout_width="48dp"
+        <!-- The thumbnails, in the middle while they fit and scrolling once they do not; kept in place while there is
+             one photo, so a second one coming does not move the photo on screen. -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/photoViewerStrip"
+            android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/share_photo"
-            android:src="@drawable/ic_share"
-            app:tint="@color/pix_text" />
-
-        <!-- Deletes the photo on screen from this phone, after asking. Its icon is as far from the edge as Back's. -->
-        <ImageButton
-            android:id="@+id/photoViewerDelete"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="-12dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/delete_photo"
-            android:src="@drawable/ic_delete"
-            app:tint="@color/pix_text" />
-    </LinearLayout>
-
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/photoViewerPages"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginBottom="12dp"
-        app:layout_constraintBottom_toTopOf="@id/photoViewerStrip"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/photoViewerHeader"
-        tools:listitem="@layout/item_photo_page" />
-
-    <!-- The thumbnails, in the middle while they fit and scrolling once they do not; kept in place while there is one
-         photo, so a second one coming does not move the photo on screen. -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/photoViewerStrip"
-        android:layout_width="wrap_content"
-        android:layout_height="48dp"
-        android:layout_marginBottom="24dp"
-        android:clipToPadding="false"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:visibility="invisible"
-        app:layout_constrainedWidth="true"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-        tools:listitem="@layout/item_photo_thumb"
-        tools:visibility="visible" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+            android:layout_marginBottom="24dp"
+            android:clipToPadding="false"
+            android:orientation="horizontal"
+            android:outlineProvider="none"
+            android:paddingHorizontal="16dp"
+            android:translationZ="1dp"
+            android:visibility="invisible"
+            app:layout_constrainedWidth="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+            tools:listitem="@layout/item_photo_thumb"
+            tools:visibility="visible" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.lastpenguin.pix.ui.camera.TurningFrame>

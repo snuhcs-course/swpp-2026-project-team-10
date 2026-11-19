@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -129,6 +129,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
     private var turningIcons: TurningIcons? = null
+    private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
     private var pinchModeJob: Job? = null
 
@@ -238,6 +239,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 onBack = viewModel::closePhotos,
                 onDelete = viewModel::deletePhoto,
             )
+        this.photoViewer = photoViewer
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupTip(binding)
@@ -268,7 +270,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { viewModel.phoneTurn.collect { turningIcons?.turnTo(it) } }
+                launch {
+                    viewModel.phoneTurn.collect { turn ->
+                        turningIcons?.turnTo(turn)
+                        photoViewer.turnTo(turn)
+                    }
+                }
                 // The photographer's guide in this phone's own color and thickness (FR-3.10).
                 launch {
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
@@ -712,6 +719,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     override fun onDestroyView() {
         turningIcons?.stop()
         turningIcons = null
+        photoViewer?.stop()
+        photoViewer = null
         move?.let {
             move = null
             it.cancel()

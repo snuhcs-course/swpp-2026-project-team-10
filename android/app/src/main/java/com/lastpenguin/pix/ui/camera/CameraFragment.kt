@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -371,7 +371,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(::render) }
-                launch { viewModel.phoneTurn.collect { turningIcons?.turnTo(it) } }
+                launch {
+                    viewModel.phoneTurn.collect { turn ->
+                        turningIcons?.turnTo(turn)
+                        photoViewer?.turnTo(turn)
+                    }
+                }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
                 launch {
                     viewModel.photoNotDeleted.collect {
@@ -571,6 +576,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     override fun onDestroyView() {
+        photoViewer?.stop()
         photoViewer = null
         photosBack = null
         pinchZoom?.finishInteraction()

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind the photo viewer's header while it lies over the photo, on a sideways screen (R&S 6.6), so its icons stay
+     readable on a light photo. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="270"
+        android:endColor="@color/camera_scrim_clear"
+        android:startColor="@color/camera_scrim" />
+</shape>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.animation.ValueAnimator
@@ -11,11 +11,13 @@ import android.os.Looper
 import android.text.Spanned
 import android.view.ContextThemeWrapper
 import android.view.View
+import android.widget.FrameLayout
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.ui.Motion
 import java.time.Duration
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,6 +38,9 @@ import org.robolectric.shadows.ShadowChoreographer
  * text that turns, as the zoom readout does: each text it is given, keeping its width.
  * Boundary: a half turn, the one way both are as short, goes clockwise; the angle after a turn past 180 is read back
  * between -180 and 180.
+ * The frame that turns its content whole, as the photo viewer's (FR-1.16): upright, a quarter either way, and a half;
+ * laid out sideways at 45 degrees from upright and past it, not just under it (boundary), at every step of a turn, and
+ * told once for each change.
  */
 @RunWith(AndroidJUnit4::class)
 class TurningIconsTest {
@@ -211,6 +216,86 @@ class TurningIconsTest {
         play(Motion.TURN_MS)
 
         assertEquals(there, view.rotation, 0f)
+    }
+
+    /** A frame of 300 x 500 px, a phone's screen, around a content view that fills it, laid out again after [turn]. */
+    private class Screen(context: Context) {
+        val frame = TurningFrame(context)
+        val content = View(context)
+        val told = mutableListOf<Boolean>()
+
+        init {
+            frame.addView(content, FrameLayout.LayoutParams(MATCH, MATCH))
+            frame.onSideways = { told += it }
+            layOut()
+        }
+
+        fun turn(degrees: Float) {
+            frame.turn = degrees
+            layOut()
+        }
+
+        fun layOut() {
+            frame.measure(
+                View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(500, View.MeasureSpec.EXACTLY),
+            )
+            frame.layout(0, 0, 300, 500)
+        }
+
+        val placed get() = listOf(content.left, content.top, content.right, content.bottom)
+
+        private companion object {
+            const val MATCH = FrameLayout.LayoutParams.MATCH_PARENT
+        }
+    }
+
+    @Test
+    fun aFrame_turnsItsContentWhole_laidOutSidewaysForAQuarter() {
+        val screen = Screen(context)
+        assertEquals(listOf(0, 0, 300, 500), screen.placed)
+
+        // A quarter either way: 500 x 300 in the middle, turned, so it covers the screen.
+        for (degrees in listOf(-90f, 90f)) {
+            screen.turn(degrees)
+            assertEquals("$degrees", degrees, screen.content.rotation, 0f)
+            assertEquals("$degrees", listOf(-100, 100, 400, 400), screen.placed)
+            assertTrue(screen.frame.sideways)
+        }
+
+        screen.turn(180f)
+        assertEquals(180f, screen.content.rotation, 0f)
+        assertEquals(listOf(0, 0, 300, 500), screen.placed)
+        assertEquals(listOf(true, false), screen.told)
+    }
+
+    @Test
+    fun aFrame_isLaidOutSideways_fromHalfwayThroughAQuarterTurn() {
+        val screen = Screen(context)
+        for ((degrees, sideways) in listOf(44.9f to false, 45f to true, -45f to true, 135f to true, -135.1f to false)) {
+            screen.turn(degrees)
+            assertEquals("$degrees", sideways, screen.frame.sideways)
+            assertEquals("$degrees", if (sideways) 500 else 300, screen.content.width)
+        }
+        assertEquals(listOf(true, false), screen.told.distinct())
+    }
+
+    @Test
+    fun aFrame_turnedByTheIcons_isLaidOutSidewaysAtEveryStepPastHalfway() {
+        val screen = Screen(context)
+        val icons = TurningIcons(listOf(screen.frame), emptyList())
+        icons.turnTo(0)
+        ShadowChoreographer.setPaused(true)
+        icons.turnTo(90)
+        val turning = checkNotNull(icons.turning)
+
+        for (step in 0..10) {
+            turning.setCurrentFraction(step / 10f)
+            val angle = screen.frame.turn
+            assertEquals("$angle", abs(angle) >= 45f, screen.frame.sideways)
+            assertEquals("$angle", angle, screen.content.rotation, 0f)
+        }
+        assertEquals(listOf(true), screen.told)
     }
 
     /** The angles a [TurnedLabelSpan] turns the canvas by before each text it draws. */

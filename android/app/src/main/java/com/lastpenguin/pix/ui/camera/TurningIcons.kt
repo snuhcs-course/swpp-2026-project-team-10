@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.animation.ValueAnimator
@@ -12,11 +12,14 @@ import android.text.Spanned
 import android.text.style.ReplacementSpan
 import android.util.AttributeSet
 import android.view.View
+import android.widget.FrameLayout
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.animation.doOnEnd
 import androidx.core.graphics.withRotation
+import androidx.core.view.children
 import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.ui.Motion
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -225,6 +228,63 @@ internal class TurningIcons(private val controls: List<Turnable>, private val vi
         angle = degrees
         for (control in controls) control.turn = degrees
         for (view in views) view.rotation = degrees
+    }
+}
+
+/**
+ * A frame over the whole screen whose content stands upright to the user as the phone turns (FR-1.16, #207): the
+ * photo viewer, which a user holding the phone sideways sees as a landscape screen. Its child turns by [turn] around
+ * the middle; while the turn is nearer a quarter than upright or a half, the child is laid out with the frame's width
+ * and height swapped, so it fills the screen the user sees, and [onSideways] tells of each change.
+ */
+internal class TurningFrame @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+    FrameLayout(context, attrs),
+    Turnable {
+    /** Told when the content starts or stops being laid out sideways, before its layout. */
+    var onSideways: ((Boolean) -> Unit)? = null
+
+    /** The content is laid out sideways: its width is the frame's height. */
+    var sideways = false
+        private set
+
+    override var turn = 0f
+        set(value) {
+            field = value
+            for (child in children) child.rotation = value
+            // Halfway through a quarter turn, where the content's two shapes look alike.
+            val next = abs(upright(value)) in SIDEWAYS
+            if (next == sideways) return
+            sideways = next
+            onSideways?.invoke(next)
+            requestLayout()
+        }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        val height = MeasureSpec.getSize(heightMeasureSpec)
+        setMeasuredDimension(width, height)
+        val across = if (sideways) height else width
+        val down = if (sideways) width else height
+        for (child in children) {
+            child.measure(
+                MeasureSpec.makeMeasureSpec(across, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(down, MeasureSpec.EXACTLY),
+            )
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        // In the middle, around which it turns.
+        for (child in children) {
+            val x = (right - left - child.measuredWidth) / 2
+            val y = (bottom - top - child.measuredHeight) / 2
+            child.layout(x, y, x + child.measuredWidth, y + child.measuredHeight)
+        }
+    }
+
+    private companion object {
+        /** The angles, from upright, at which the content is laid out sideways. */
+        val SIDEWAYS = 45f..135f
     }
 }
 

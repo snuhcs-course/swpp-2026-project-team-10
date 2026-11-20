@@ -115,6 +115,7 @@
 | 3.32 | 2026-11-20 | The tips check of Iteration 4 ([#213]): 50 tips of `t213-run1` checked by three of us, with our answers committed (3.2, 6, Appendix B). |
 | 3.33 | 2026-11-20 | Iteration 4 results (Iter4-P18, [#215]): suites and coverage at `752b7c3`, integration scripts at `44de211` and `752b7c3`, the NFRs, and the Test Log; the tips check with 조성민's answers, by the four of us (2.2, 3.2, 6, Appendix B). |
 | 3.34 | 2026-11-20 | Crash reports and usage data (Iter4-A8, [#254]): its owner, `TelemetryEventTest`, `GatedTelemetryTest`, the events in their modules' tests, `TelemetryRecorder` and `FakeTelemetryBackend`, `FirebaseTelemetry` by hand, and IT-39 (1.1, 2.1.3, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
+| 3.35 | 2026-11-20 | Light mode ([#212]) and the QR connection ([#214]) dropped on 11/20 as not needed; what Iteration 4 built, and why the rest stays open, for the problems of the user test and the heuristic evaluation; IT-39's run on emulators (1.1, 2.1.8, 2.2.2, 4.1, 4.2, Appendix B). |
 
 </details>
 
@@ -191,9 +192,9 @@ One member writes and maintains each component's tests, following the module own
 | Landscape photos and the controls that turn (Iter4-P9, P10) | Platform, Managers, Views; server module | `camera/`, `ui/camera/`, `guide/`, `ui/generation/`, `ui/guide/`, `ui/session/`, `test_poses.py` | 한준형 |
 | Camera quality and latency (Iter4-P11) | Platform | `camera/` | 한준형 |
 | Situation prompts and the choice (Iter4-P12, P13) | Server module, ViewModels, Views | `test_prompts.py`, `test_poses.py`, `generation/`, `ui/`, `session/` | 박재완 |
-| Color tokens, light mode, the UI fixes, and the tips (Iter4-P5, P7, P15, P16) | Views, managers, resources; server module | `ui/`, `settings/`, `session/` (`TipSyncerTest`), `test_prompts.py`, `test_pose_tips.py` | 박동제 |
+| Color tokens, the UI fixes, and the tips (Iter4-P5, P7, P16); light mode (Iter4-P15) was dropped on 11/20 ([#212]) | Views, managers, resources; server module | `ui/`, `settings/`, `session/` (`TipSyncerTest`), `test_prompts.py`, `test_pose_tips.py` | 박동제 |
 | The reference thumbnail hidden at the side (Iter4-A4) | ViewModels, Views | `ui/camera/`, `ui/session/` | 박동제 |
-| The QR connection (Iter4-P17) | Managers, Views | `session/`, `ui/session/` | 조성민 |
+| The QR connection (Iter4-P17): dropped on 11/20, so no tests ([#214]) | — | — | 조성민 |
 | The session's photos on both phones (Iter4-A2) | Managers, ViewModels, Views | `session/`, `camera/`, `ui/session/`, `ui/camera/` | 박재완 |
 | The reference thumbnail for a guide from the subject (Iter4-A1) | Managers, Views | `session/` (`GuideFromSubjectTest`), `ui/camera/` (`CameraFragmentRenderTest`) | 박재완 |
 | The notice that the subject left (Iter4-A5) | Views | `ui/camera/` (`CameraFragmentRenderTest`, `CameraFragmentInteractionTest`) | 박재완 |
@@ -561,7 +562,7 @@ The repository's `CLAUDE.md` files keep the short form.
 - Pass `TestAppContainer(candidateImage = { bitmap() })` when a screen draws candidate copies; the default has no pixels and crashes the JVM.
 - A `photo.shutter` or session photo test starts `PhotoSyncer.startAsReceiver` in its own scope, as `SubjectFragmentRenderTest` does with the pose syncer; screen tests start no subject syncer. Camera and Subject view read a photo's pictures through their `thumbnailOf` and `photoOf`, which the test replaces, since MediaStore has no photos on the JVM. `PixAlbumPhotosTest` installs a small provider for MediaStore's authority, as `PhotoAlbumTest` does, and calls `notifyChange` for a change. A touch on the viewer's photo goes through the viewer's root at the page's place, timed by `SystemClock` (`PhotoViewerTestSupport`); a tap counts only after the 300 ms wait for a second one (`idleFor`), and a flick needs its moves a few milliseconds apart.
 - For *Remove animations*, set `ValueAnimator.setDurationScale(0f)` by reflection and reset it to 1 in `@After`.
-- `TestAppContainer.install` puts the test in the night configuration, as on a phone, where Pix stays dark until light mode: `PixApplication`'s `AppCompatDelegate` night mode reaches only an `AppCompatActivity`, and `launchFragmentInContainer` hosts a plain `FragmentActivity`. A test of a screen in light mode sets `RuntimeEnvironment.setQualifiers("+notnight")` after it (`DayNightThemeTest`).
+- `TestAppContainer.install` puts the test in the night configuration, as on a phone, where Pix always stays dark ([#212]): `PixApplication`'s `AppCompatDelegate` night mode reaches only an `AppCompatActivity`, and `launchFragmentInContainer` hosts a plain `FragmentActivity`. A test of a screen in light mode sets `RuntimeEnvironment.setQualifiers("+notnight")` after it (`DayNightThemeTest`).
 
 **Pitfalls: animations and paused frames**
 
@@ -663,6 +664,7 @@ Each cell is the phone run of a script of 2.1.5 in that iteration. *pass* means 
 | IT-36 | Why poses failed | — | — | pass |
 | IT-37 | Landscape photos and landscape poses | — | — | pass |
 | IT-38 | The controls that turn | — | — | pass |
+| IT-39 | Crash reports and usage data | — | — | partial, on emulators |
 
 Notes:
 
@@ -680,6 +682,7 @@ Notes:
 - **Iteration 3:** IT-1, IT-6, IT-8, IT-10, IT-11, IT-17, IT-20, IT-23, and IT-26 to IT-34 ran last, at `c842fa1`. The other scripts ran at `7b03e9e`; their flows did not change after it, or IT-32 to IT-34 check the change.
 - **IT-30, Iteration 3:** the camera switch on Android 10 and 11 ran on an API 30 emulator; no such phone was at hand.
 - **Iteration 4:** the scripts that gained steps in Iteration 4 (IT-6, IT-7, IT-10, IT-14 to IT-18, IT-20 to IT-24, IT-26) and the new IT-35 to IT-38 ran on 11/19 at `44de211`. IT-6's two pinches at once (Iter4-A3) and the steps of Iter4-A6 on IT-7, IT-23, and IT-26 were merged on 11/20 and ran that day at `752b7c3`. Times by eye, not measured.
+- **IT-39, Iteration 4:** added on 11/20 with [#254], after the run above. It ran that day on two emulators against the AWS server: every event but `poses_ended` reached DebugView, nothing was sent with *Share usage data* off, and a test crash reached Crashlytics ([#256]). It did not run on the phones.
 - **Dropped in Iteration 4:** light mode ([#212]) and the QR connection ([#214]) were dropped on 11/20. Neither has a script, and NFR-5 over the QR hotspot was not measured.
 
 Of the 13 Iteration 2 user stories (R&S 4.4, Iter2-P21), 7 passed on the phones (US-1, 2, 3, 5, 10, 11, 13), 3 were partial (US-4, 6, 12), 2 had automated tests only (US-7, 8), and US-9 was not built. The [2026-10-23 record](#run-2026-10-23-integration-scripts) maps each story and each acceptance case to its tests and scripts.
@@ -871,13 +874,13 @@ A test with users outside the team, run to find problems early. It is separate f
 |---|---|---|
 | The prompts used before, on *Generate poses* | 5 (P2–P6) | Built: prompt history ([#164], merged 11/3) |
 | Photos saved on both phones | 3 (P1, P4, P5) | Built: session photos on both phones ([#159], merged 11/2) |
-| ‘참고 사진 올리기’ unclear; poses for an occasion (졸업식, 증명사진); similar poses whatever the background; choosing the gender | 3; 1; 1; 1 | Iteration 4: poses by situation ([#209], [#210]); the wording checked again ([#204]). *Decided in Iteration 4:* the wording is already gone; *Add a pose guide* says *Add photo* (c8e2352, [#204]) |
+| ‘참고 사진 올리기’ unclear; poses for an occasion (졸업식, 증명사진); similar poses whatever the background; choosing the gender | 3; 1; 1; 1 | Iteration 4: poses by situation ([#209], [#210]); the wording checked again ([#204]). *Decided in Iteration 4:* the wording is already gone; *Add a pose guide* says *Add photo* (c8e2352, [#204]). *Built in Iteration 4:* poses by situation, chosen first on *Add a pose guide* ([#209], [#210], [#243]). *Open after Iteration 4:* similar poses whatever the background, and choosing the gender, left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD** |
 | An outline alone hides the pose under long hair or a thick coat; the face and arms not marked; the silhouette not fitting the person | 3 (P1, P3, P4) | On hold (the kickoff of 11/7): ML Kit's detection may err too much, and a background overlay did not work well. The tips say how the pose fits the background instead ([#213]) |
-| The photo going to an outside AI service; the photo changed by AI | 4; 1 | No fix decided |
-| The wait for poses | 2, and 1 asking for faster generation | No fix decided |
-| The default suggested poses; no step that sets the scene photo apart from the camera after *AI로 포즈 생성* | 1; 1 | No fix decided for the default poses; Iteration 4: the scene photo step marked on Camera ([#204]). *Built in Iteration 4:* the step's title and Back in the top bar ([#199]), and "Frame the place with the person in it" over the image while framing ([#204]) |
-| Guidance on the background and the camera's tilt for the pose | 1 (P4) | Iteration 4: the tips ([#213]) |
-| A timer; the shutter on the subject's phone; the guide's color and thickness | 1 each | The guide's color and thickness built ([#163], merged 11/2); no fix decided for the other two |
+| The photo going to an outside AI service; the photo changed by AI | 4; 1 | No fix decided. *Open after Iteration 4:* the image model cannot run on the phone (R&S 7), and Pix asks for consent before the first photo goes to it (IT-21) |
+| The wait for poses | 2, and 1 asking for faster generation | No fix decided. *Open after Iteration 4:* the wait is the image model's, and NFR-4 is met, with all four candidates in a median of 20.2 s (3.2) |
+| The default suggested poses; no step that sets the scene photo apart from the camera after *AI로 포즈 생성* | 1; 1 | No fix decided for the default poses; Iteration 4: the scene photo step marked on Camera ([#204]). *Built in Iteration 4:* the step's title and Back in the top bar ([#199]), and "Frame the place with the person in it" over the image while framing ([#204]); four default poses for each situation ([#209]) |
+| Guidance on the background and the camera's tilt for the pose | 1 (P4) | Iteration 4: the tips ([#213]). *Built in Iteration 4:* the tip says how far to stand and how to hold the phone, its tilt included; it says nothing about the background, as decided in [#213] (Design 2.6.3) |
+| A timer; the shutter on the subject's phone; the guide's color and thickness | 1 each | The guide's color and thickness built ([#163], merged 11/2); no fix decided for the other two. *Open after Iteration 4:* the photographer takes the photo (R&S 7); a timer was left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD** |
 
 ### 4.2 Heuristic evaluation (In-Class, Iteration 3)
 
@@ -911,17 +914,17 @@ The course's heuristic evaluation, held in class on 11/4. Students of other team
 
 | Problem | Heuristic · severity · evaluator | What follows |
 |---|---|---|
-| A request stopped by the daily AI limit showed only *Couldn't create poses*, without the reason, which held up the evaluation | Error recovery · 2 · E3 | Iteration 4: a separate error message for each case of failure ([#203]). The app already tells the limit apart (HTTP 429) but shows the general message |
+| A request stopped by the daily AI limit showed only *Couldn't create poses*, without the reason, which held up the evaluation | Error recovery · 2 · E3 | Iteration 4: a separate error message for each case of failure ([#203]). The app already tells the limit apart (HTTP 429) but shows the general message. *Built in Iteration 4:* one message for each case, the hourly and daily limits included, on both phones (IT-36, [#203]) |
 | *Generate 4 poses* and *Skip, suggest poses for me* did the same thing with an empty field | Flexibility and efficiency · 2 · E1 | Built: one button, *Suggest 4 poses* or *Generate 4 poses from this* (Iter3-A13, [#180]) |
-| A refused description only says to try another, not why it was refused or how to write one | Error recovery · 1 · E2 | Iteration 4: a separate error message for each case of failure, as above ([#203]) |
+| A refused description only says to try another, not why it was refused or how to write one | Error recovery · 1 · E2 | Iteration 4: a separate error message for each case of failure, as above ([#203]). *Built in Iteration 4:* "Pix received a harmful prompt." (IT-22, [#203]) |
 | The toggle that sets whether a pinch moves the guide or zooms the camera needs a clearer icon | Recognition rather than recall · 1 · E2 | Built: a tap shows *Guide* or *Camera* above the toggle for 3 s (Iter3-A15, [#182]). The icon is unchanged; Iteration 4: a clearer icon ([#204]). *Built in Iteration 4:* a person's outline while the mode is on, a camera while off ([#204]) |
 | The horizon bar is thick | Consistency and standards · 1 · E1 | Built: 1.5 dp instead of 3 dp; the grid, the guide, and the focus mark are thinner too (Iter3-A15, [#182]) |
-| Pinch zoom lags behind the camera; a zoom slider would be easier | Match with the real world · 1 · E1 | Iteration 4: latency closer to the stock camera ([#208], low priority). No fix decided for a slider |
-| One fixed tutorial is not enough for this many features; first users could follow a walkthrough | Help and documentation · 1 · E3 | No fix decided |
-| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole ([#202], [#212]), and a clearer ✕ ([#204]). *Built in Iteration 4:* the guide's ✕ in light red, and a tutorial tip that it takes the guide off ([#204]) |
-| A saved guide could bring back the zoom and flash it was shot with | Flexibility and efficiency · 0 · E3 | No fix decided |
-| The guide's color and thickness could be set automatically for visibility | Additional · 0 · E1 | No fix decided. Both are set in Settings (FR-3.10) |
-| A switch to turn off the horizon bar; a landscape layout | Additional · 0 · E3 | The bar now hides past a 20° tilt (Iter3-A15, [#182]). No fix decided for a switch or a landscape layout |
+| Pinch zoom lags behind the camera; a zoom slider would be easier | Match with the real world · 1 · E1 | Iteration 4: latency closer to the stock camera ([#208], low priority). No fix decided for a slider. *Built in Iteration 4:* the shutter takes the photo in 0.26 s instead of 0.70 s ([#208]); the pinch was not measured again, and IT-10 shows no stutter (2.2.2). *Open after Iteration 4:* the slider, left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD** |
+| One fixed tutorial is not enough for this many features; first users could follow a walkthrough | Help and documentation · 1 · E3 | No fix decided. *Open after Iteration 4:* left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD**. *How to use Pix* in Settings explains four flows (R&S 6.10) |
+| ✕ is sometimes hard to find; a color could set it apart | User control and freedom · 0 · E3 | Iteration 4: an update of the app's colors as a whole ([#202], [#212]), and a clearer ✕ ([#204]). *Built in Iteration 4:* the guide's ✕ in light red, and a tutorial tip that it takes the guide off ([#204]). The colors became tokens ([#202]); light mode was dropped on 11/20 ([#212]) |
+| A saved guide could bring back the zoom and flash it was shot with | Flexibility and efficiency · 0 · E3 | No fix decided. *Open after Iteration 4:* left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD** |
+| The guide's color and thickness could be set automatically for visibility | Additional · 0 · E1 | No fix decided. Both are set in Settings (FR-3.10). *Open after Iteration 4:* left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD** |
+| A switch to turn off the horizon bar; a landscape layout | Additional · 0 · E3 | The bar now hides past a 20° tilt (Iter3-A15, [#182]). No fix decided for a switch or a landscape layout. *Built in Iteration 4:* photos held sideways are saved as taken, and the controls turn with the phone ([#206], [#207]); the screens stay portrait (R&S 7). *Open after Iteration 4:* the switch, left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD** |
 
 ### 4.3 UAT plan (Fixed in Iteration 3)
 
@@ -2327,6 +2330,7 @@ Each script ran with its setup in 2.1.5, except where the table says otherwise.
 | IT-36 | 11/19 | The whole script ([#203]) | The AWS server | pass |
 | IT-37 | 11/19 | The whole script ([#206]) | — | pass |
 | IT-38 | 11/19 | The whole script ([#207]) | — | pass |
+| IT-39 | 11/20 | The whole script ([#254]) | Two emulators, for [#256], not the phones | partial: no `poses_ended` in DebugView |
 
 Observations: every Iteration 4 step held, and no defect was found.
 
@@ -2414,3 +2418,4 @@ Observations: every Iteration 4 step held, and no defect was found.
 [#243]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/243
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
 [#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254
+[#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256

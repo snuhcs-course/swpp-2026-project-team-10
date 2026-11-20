@@ -90,6 +90,7 @@
 | 3.28 | 2026-11-20 | *Choose from the gallery* names the sheet's gallery row (FR-2.1, 2.4). |
 | 3.29 | 2026-11-20 | One phone zooms at a time; the other says who is zooming (FR-7.6, US-12; Iter4-A3, [#236]). |
 | 3.30 | 2026-11-20 | Crash reports and usage data: *Share usage data* in the settings, on by default, and what release builds send (4.1, 4.2, FR-10.1, FR-10.6, NFR-13, 6.10; Iter4-A8, [#254]). |
+| 3.31 | 2026-11-20 | Dropped on 11/20 as not needed: the QR connection (F9, FR-9.1–9.5, [#214]) and light mode (FR-10.1, [#212]), now out of scope; Iteration 4's scope as built, with the UAT's fixes (1, 3.3, 4.1–4.3, 5, 6.8, 6.9, 7, 8). |
 
 </details>
 
@@ -109,7 +110,7 @@ Items marked **TBD** need a team decision.
 
 ## 1. Project Abstract
 
-Pix is an Android camera app for two people who photograph each other. The subject often knows the pose and framing they want, but only the photographer sees the screen. Pix shows both of them the same view. The photographer adds a pose guide: the outline of the person in a gallery photo, or in one of four poses that an AI generates for the scene. A friend invited by Pix ID, or anyone given a 6-digit room code, sees the live camera and the guide on their own phone, over Wi-Fi or cellular data. From there, they can adjust the zoom, guide, brightness, and flash, and choose the guide or the pose. Only the photographer takes the photo, and both phones save it at full quality without the guide. A QR connection without internet is planned (F9).
+Pix is an Android camera app for two people who photograph each other. The subject often knows the pose and framing they want, but only the photographer sees the screen. Pix shows both of them the same view. The photographer adds a pose guide: the outline of the person in a gallery photo, or in one of four poses that an AI generates for the scene. A friend invited by Pix ID, or anyone given a 6-digit room code, sees the live camera and the guide on their own phone, over Wi-Fi or cellular data. From there, they can adjust the zoom, guide, brightness, and flash, and choose the guide or the pose. Only the photographer takes the photo, and both phones save it at full quality without the guide.
 
 ---
 
@@ -173,7 +174,7 @@ Every session has two people, each with Pix. *Who takes the photo?* sets the rol
 
 - **A shared view, not only a remote.** Both phones show the framing and the same guide, so the subject matches the pose without instructions.
 - **A guide from what the user wants:** their own photo or poses made for their scene, not a fixed library.
-- **Friends anywhere, no extra device.** An invitation connects friends over Wi-Fi or cellular data, and a room code works without an account. A QR code without internet is planned (F9).
+- **Friends anywhere, no extra device.** An invitation connects friends over Wi-Fi or cellular data, and a room code works without an account.
 - **The photographer stays in control.** Only the photographer takes the photo; a switch to block remote control is a Could item (FR-7.5).
 
 ---
@@ -187,7 +188,7 @@ Every session has two people, each with Pix. *Who takes the photo?* sets the rol
 | **Iteration 1**<br>9/27 – 10/9 · prototype | Take photos; add a guide from a gallery photo or from four generated poses (predefined pose templates); adjust the guide; connect a second phone **with a room code on the same Wi-Fi**, which shows the live view and guide and changes the zoom. |
 | **Iteration 2**<br>10/11 – 10/25 · midterm 10/21 | Accounts and friends (F5). Focus, brightness, flash, 4:3, 16:9, and 1:1, and smooth pinch zoom with a guide-edit mode on both phones. Smooth outlines, the starting position, a thumbnail, hide, replace, and saved guides. Guide, brightness, and flash from the subject's phone. Poses from suggestions, idea chips, or a description. Room codes without sign-in. |
 | **Iteration 3**<br>10/26 – 11/6 · user test 10/31–11/1, heuristic evaluation 11/4 | Invitations **over Wi-Fi or cellular data**, friend-request pushes, reconnection, and *Who takes the photo?* (F6). Poses in the scene's ratio, one at a time, with a tip, filter, person check, and history (F4). Shared guide and pose steps; photos on both phones. Selfie mode, the library, ♥ for AI poses, and the screenshot cut. Camera's controls after the heuristic evaluation; animations. Settings and a tutorial (F10). Key user acceptance test (UAT) stories fixed. |
-| **Iteration 4**<br>11/8 – 11/20 · UAT cycle 1 11/16 | Fixes and improvements from the user test and the heuristic evaluation: Back on the pose screens, refused descriptions out of the history, a message for each failure, the subject's live view as a mirror, landscape photos and poses, the controls that turn with the phone, and the camera's quality and latency (F1, F4, F6). Poses by situation (FR-4.4, FR-4.8); tips with the background (FR-4.10). Color tokens, light mode, and UI fixes (F10, 6.9). The QR connection (F9, [#214]). Crash reports and usage data from release builds, for the ONE store release (FR-10.6, [#254]). The UAT and its fixes. |
+| **Iteration 4**<br>11/8 – 11/20 · UAT cycle 1 11/16 | Fixes and improvements from the user test and the heuristic evaluation: Back on the pose screens, refused descriptions out of the history, a message for each failure, the subject's live view as a mirror, landscape photos and poses, the controls that turn with the phone, and the camera's quality and latency (F1, F4, F6). Poses by situation (FR-4.4, FR-4.8); tips with the background (FR-4.10). Color tokens and UI fixes (F10, 6.9). Crash reports and usage data from release builds, for the ONE store release (FR-10.6, [#254]). The UAT and its fixes: the session's photos on the subject's phone, one phone zooming at a time, the notice that the subject left kept on screen, the reference thumbnail hidden at the side and shown for a guide from the subject, the situations as tiles on *Add a pose guide*, and Pix's album in Pix's own viewer. Light mode and the QR connection were dropped (section 7). |
 | **Iteration 5**<br>tentative · UAT cycle 2 11/23, in-class testing 11/30, real user test 12/2 | Polish, stability, and performance against the non-functional requirements, from UAT feedback; in-class testing and a test with real users. The remote-control switch (FR-7.5), remote focus (FR-7.7), and search, situations, and memos in the library (FR-3.11), left out of Iteration 4 at its kickoff. |
 
 ### 4.2 Feature list
@@ -204,8 +205,8 @@ Priority: **Must** = required for the product to make sense · **Should** = impo
 | F6 | **Shoot-together session** | Invitations; the live view and guide on the subject's phone over any network; shared steps and photos. | Must | It 1 – 3 |
 | F7 | **Remote control** | The subject's zoom, guide, brightness, and flash; the photographer takes the photo. The switch and remote focus (Could) come in Iteration 5. | Must / Should / Could | It 1 – 3 / It 5 |
 | F8 | **Room-code session** | A 6-digit code, without sign-in. | Must | It 1 |
-| F9 | **Offline connection (QR)** | A hotspot and a QR code, without internet ([#214]). | Should | It 4 |
-| F10 | **Settings and help** | Base brightness, language, guide look, latency, privacy, account, and help; a tutorial; the theme and crash reports and usage data (It 4). | Must / Should | It 3 – 4 |
+| F9 | **Offline connection (QR)** | Dropped: a hotspot and a QR code, without internet ([#214]; section 7). | — | Dropped |
+| F10 | **Settings and help** | Base brightness, language, guide look, latency, privacy, account, and help; a tutorial; crash reports and usage data (It 4). | Must / Should | It 3 – 4 |
 
 ### 4.3 Detailed requirements
 
@@ -286,7 +287,7 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-5.1 | Single-phone features (F1–F4), room codes (F8), and QR connections (F9) need no account. Only friends and invitations need one. | Must | It 2 |
+| FR-5.1 | Single-phone features (F1–F4) and room codes (F8) need no account. Only friends and invitations need one. | Must | It 2 |
 | FR-5.2 | *Shoot together* asks *Who takes the photo?*; *I'll take the photo* opens *Share my camera*, with the friends to invite and the room code (6.7, [#188]). Signed out, a sign-in button replaces the friends, and *Show a code* stays (FR-5.1, FR-8.1). Users sign in with a Pix ID and password or with Google, then return to the screen that opened *Sign in*. Sign-up takes a Pix ID, a 1–30-character name, and a password; a Google account chooses its Pix ID next. The server verifies Google and issues Pix's own session token, kept on the phone. A Pix ID has 4–20 lowercase letters, digits, ".", or "_". | Must | It 2 |
 | FR-5.3 | A taken or invalid Pix ID is rejected with the reason, and nothing is saved. | Must | It 2 |
 | FR-5.4 | *Share my camera* shows the user's Pix ID; a tap copies it. | Should | It 2 |
@@ -350,21 +351,21 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 
 #### F9 · Offline connection with a QR code
 
-Planned for Iteration 4 ([#214]; was #122).
+Dropped on 11/20 as not needed ([#214]; was #122): phones connect with a room code or an invitation (section 7).
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-9.1 | *Show a QR code*, under *Show a code* on *Share my camera*, opens a local hotspot without internet and shows its connection details as a QR code. | Should | It 4 |
-| FR-9.2 | *Scan a QR code* on *See their camera* reads the code, joins the hotspot, and connects to the photographer's phone without the Pix server or a sign-in. | Should | It 4 |
-| FR-9.3 | The photographer's phone accepts only one phone per QR code and refuses later attempts. | Should | It 4 |
-| FR-9.4 | When a phone connects, both show "Connected" with the other phone's name. The live view and remote control start only after both people tap *Resume*, so a stranger cannot join unnoticed. *Cancel* ends the connection and shows a new QR code. | Should | It 4 |
-| FR-9.5 | The session works over the hotspot alone. Pose generation still needs internet on the photographer's phone. | Should | It 3 |
+| FR-9.1 | Dropped: a local hotspot and its QR code from *Share my camera*. | — | Dropped |
+| FR-9.2 | Dropped: scanning the code on *See their camera* to connect without the Pix server. | — | Dropped |
+| FR-9.3 | Dropped: one phone per QR code. | — | Dropped |
+| FR-9.4 | Dropped: both phones confirming the connection with *Resume*. | — | Dropped |
+| FR-9.5 | Dropped: the session over the hotspot alone. | — | Dropped |
 
 #### F10 · Settings and help
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-10.1 | The settings screen holds the base brightness (FR-1.11, [#182]), the guide's look (FR-3.10), the theme (the phone's setting, light, or dark; [#212]), the latency indicator, the language, how-to-use help, and the items of FR-10.5 and FR-10.6. A gear on Camera's top bar opens it; the gear is hidden during the scene photo (Iter3-P23). In a session it stays, beside *End session* on Camera and beside *Leave* on Subject view; Settings over Subject view goes back to it when the session ends ([#204]). | Must | It 3 / It 4 |
+| FR-10.1 | The settings screen holds the base brightness (FR-1.11, [#182]), the guide's look (FR-3.10), the latency indicator, the language, how-to-use help, and the items of FR-10.5 and FR-10.6. A gear on Camera's top bar opens it; the gear is hidden during the scene photo (Iter3-P23). In a session it stays, beside *End session* on Camera and beside *Leave* on Subject view; Settings over Subject view goes back to it when the session ends ([#204]). | Must | It 3 / It 4 |
 | FR-10.2 | The screens are in English and Korean. They follow the phone's language unless the settings choose one. | Must | It 3 |
 | FR-10.3 | A setting, off by default, shows the delay on both phones during a session, with a dot: green up to 150 ms, yellow up to 300 ms, red above. The delay is half the round trip of pings sent every 2 s, averaged over the last three (Iter3-P23). NFR-5 measures the video's own delay. | Should | It 3 |
 | FR-10.4 | A tutorial explains five screens the first time each opens: Camera, *Add a pose guide*, the guide on Camera, *Generate poses*, and *Subject view*. Its tips lie over the live screen and run no camera, server, or session (6.10). They wait a moment for the preview, a guide, or the photographer's video, and Camera's never show in a session. Closing them marks them seen, and the settings can show them again on each screen. | Should | It 3 |
@@ -661,7 +662,7 @@ Targets are measured on a Galaxy S22 unless stated otherwise. An iteration in pa
 | NFR-12 | Resource use | A 10-minute session uses at most 10% of the photographer's battery. The live view uses at most 2.5 Mbps, about 190 MB per 10 minutes. | Battery statistics; bitrate from connection statistics. |
 | NFR-13 | Privacy | Reference photos and saved guides stay on the phone. Only a copy of the guide's reference photo, at most 512 px on its long side, goes once to the session partner for its thumbnail (FR-3.9), held there in memory only. A photo taken in a session goes once to the subject's phone and is saved there (FR-6.14). Both go over the encrypted peer-to-peer channel, or through the relay, which cannot read them, and never through the Pix server. A scene photo and a description go only to the Pix server, and only when the user asks for poses. The server sends the photo to OpenRouter's models for the person check, the suggestions, the image editing, and, with the chosen candidate, the tip; the description goes to the description filter and the same models (FR-4.2, FR-4.10, FR-4.12, FR-4.13). It keeps no copy after answering. No server records anything from the live view. The server stores only account, friend, and invitation data: the Google account identifier, Pix ID, display name, password hash if any, friendships, friend requests, invitations, push-notification tokens, and refresh-token hashes. It keeps hashes of spent refresh tokens for at most 30 days, one sign-in lifetime, to detect reuse. It stores no access token, and its logs contain no tokens or personal data. Release builds send crash reports and usage events to Firebase Crashlytics and Analytics while the user allows it (FR-10.6). An event holds only fixed choices, counts, and times, never a photo, a description, a name, a Pix ID, or a room code. An error the app survived holds only its classes and stack trace, without its message. A crash report also keeps the crash's message. Analytics' automatic events add the phone's model, the Android version, and a random ID per install. No report holds an advertising ID or names the account. | Code review; server log review; `TelemetryEventTest`. |
 | NFR-14 | Security | API keys exist only on the server. Phone–server traffic is HTTP and WS without transport encryption, because the course servers are reachable only over HTTP on port 80. Release builds allow unencrypted traffic only to the two course servers; debug builds, which use the AWS server, allow any host. The server calls outside services over HTTPS. It verifies Google sign-ins, issues its own session tokens, and never stores the Google token. Passwords cross the same plain HTTP at sign-up and sign-in and are stored only as argon2id hashes. Login attempts are not limited yet. A sign-in gives a 15-minute access token (a JWT the server signs) and a refresh token that lasts 30 days from its last use and is replaced at every refresh. A refresh token used twice ends the sign-in. Sign-out ends it at once, and its access token within 15 minutes. The live view and control messages are encrypted end to end; the relay cannot read them. | Inspect the APK for keys; configuration review. |
-| NFR-15 | Access control | Only accepted friends can invite each other (It 3). Pix IDs are found only by exact match. Remote control works only while the photographer allows it (Could, It 4). One network address may send at most 100 wrong room codes in 10 minutes; then its joins are refused until the oldest leaves the window, so a code cannot be guessed. A QR connection accepts only one phone and starts only after both people tap *Resume* (It 4). | API tests with non-friend and blocked cases; a third phone tries to join a QR session. |
+| NFR-15 | Access control | Only accepted friends can invite each other (It 3). Pix IDs are found only by exact match. Remote control works only while the photographer allows it (Could, It 4). One network address may send at most 100 wrong room codes in 10 minutes; then its joins are refused until the oldest leaves the window, so a code cannot be guessed. | API tests with non-friend and blocked cases. |
 | NFR-16 | Usability | Controls on *Subject view* are at least 48 dp and reachable with one thumb. Every failure screen says what happened and offers a way back, and a retry where another try may pass ([#203]). A first-time user can add a guide and take a photo without help. | Hallway test with 5 people: at least 4 finish "add a guide and shoot" within 1 minute. |
 | NFR-17 | Compatibility | Pix's screens are portrait; photos are taken sideways too, with the controls turned (FR-1.5, FR-1.15, It 4). Pix runs from Android 10 (API 29). Test devices: Galaxy S22, Galaxy S23 Ultra, and Galaxy S21. | Full test pass on every test device each iteration. |
 | NFR-18 | Scalability | The server handles at least 50 sessions at the same time (100 users), sized for demos and the UAT, not a public launch. | Load test script. |
@@ -825,7 +826,7 @@ On the four screens over Subject view, a closing notice returns to Subject view,
 |---|---|---|---|
 | **Who takes the photo?** | A sheet over Camera: *I'll take the photo* ("My camera shows on the other phone") and *I'll be in the photo* ("Watch their camera as you pose"), which counts waiting invitations ("2 invites") (FR-6.17). | *I'll take the photo* → Share my camera (6.4) · *I'll be in the photo* → See their camera, ending a room this phone waits in alone · Swipe down, Back, or a tap outside → Camera. Back from either screen is Camera. | — |
 | **Room code** | A sheet: "Your room code"; the code; "Getting a code…", "Waiting to connect…", then "They joined · connecting…"; "Enter this code on the phone of the person in the photo" with *Shoot together › I'll be in the photo*; "Expires in 10 min"; *Cancel*. | *Cancel* → Camera; the code expires · The other phone joins → Friend connected (Flow 4). | 10 minutes → "The code expired. Tap Show a code again for a new one." No server → "Couldn't connect. Check your internet connection and try again." |
-| **See their camera** | "Enter the code on the photographer's phone" and where it shows; six digit boxes, keyboard open; *Connect*; "Invitations from Pix friends wait here for a minute, even if you miss the notification." Open invitations come first, each with name, time left, *Decline*, and *Accept*, with the keyboard down (FR-6.17). *Scan a QR code* is planned (FR-9.2, #122). | 6 digits and *Connect* → Subject view (Flow 5) · *Accept* → Subject view, as from Invitation · *Decline* → Dongje sees Invite not accepted · Back → Camera. | Digits only; *Connect* waits for 6. Unreachable → "Couldn't connect…" (FR-8.5). Too many wrong codes → "Too many wrong codes from this network. Try again in a few minutes." (NFR-15). A gone invitation → "This invitation is no longer available"; rows go when their time runs out. *Accept* during another session → refused as on Invitation (FR-6.9). |
+| **See their camera** | "Enter the code on the photographer's phone" and where it shows; six digit boxes, keyboard open; *Connect*; "Invitations from Pix friends wait here for a minute, even if you miss the notification." Open invitations come first, each with name, time left, *Decline*, and *Accept*, with the keyboard down (FR-6.17). | 6 digits and *Connect* → Subject view (Flow 5) · *Accept* → Subject view, as from Invitation · *Decline* → Dongje sees Invite not accepted · Back → Camera. | Digits only; *Connect* waits for 6. Unreachable → "Couldn't connect…" (FR-8.5). Too many wrong codes → "Too many wrong codes from this network. Try again in a few minutes." (NFR-15). A gone invitation → "This invitation is no longer available"; rows go when their time runs out. *Accept* during another session → refused as on Invitation (FR-6.9). |
 | **Session not found** | "Check the code on the photographer's phone and try again." | *Try again* → See their camera, the code kept and selected · *Back* → Camera. | — |
 
 ### 6.8 Screens still to be drawn
@@ -836,12 +837,11 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 |---|---|---|
 | Camera permission denied | Why the camera is needed; *Open settings*. Built (6.2), not drawn. | FR-1.2 |
 | Subject view, control blocked | Disabled remote controls with the reason. Could, Iteration 5. | FR-7.5 |
-| Show QR, Scan QR, Connected | The QR code and hotspot status from *Show a QR code* on Share my camera; the scanner from *Scan a QR code* on See their camera; both phones confirm with *Resume*. Iteration 4 ([#214]). | FR-9.1–9.4 |
 
 ### 6.9 Rules for every screen
 
 - **Portrait only.** Every screen is designed for one-handed portrait use. Held sideways, the controls' icons turn with the phone on Camera and Subject view, and so do the ratio, the zoom readout, and the labels under the bottom row's icons; the other texts and the layout do not (FR-1.15, [#207]). Photos are saved as the phone is held. A scene photo taken sideways gives landscape poses, whose guide lies on the preview held the same way (FR-1.5, FR-4.3, [#206]).
-- **Theme.** Light and dark, following the phone's setting unless Settings chooses one (FR-10.1, It 4). Nothing over the camera image changes between the modes.
+- **Theme.** Dark only; light mode was dropped (section 7).
 - **Top bar.** Back at the top left goes one step back, and that step shows what it had. The step's action sits at the top right: yellow text without a pill, faint while disabled, right-aligned so the text ends 20 dp from the edge, in a touch area at least 88 dp wide, in the middle of the 56 dp bar or the camera's 48 dp bar. The bottom keeps the secondary actions. Built on the guide and pose screens, on both phones; the session's own screens, such as *Invite not accepted*, *Connection lost*, and Flow 6, keep their buttons at the bottom (It 4, [#199], [#204]).
 - **System back** does what Back at the top left does, or the screen's *Back* or *Cancel* where it has no top bar. On Subject view, it first asks "Leave the session?".
 - **Shapes and spacing.** Chips and pills are fully round; radius 12 dp for small thumbnails, 16 dp for buttons, fields, info cards, and pose slots, 24 dp for large cards and images, and 28 dp for sheets and dialogs. Spacing is 8, 12, 16, or 24 dp, with 20 dp at the screen's sides and bottom; content starts 8 dp under the top bar ([#199]). A row or card that a tap opens ends in a chevron whose tip is 16 dp from its edge. A message's icon starts its first line, so it stays beside the words when they wrap ([#204]).
@@ -880,7 +880,7 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 - Both people have an Android phone with Pix installed.
 - The photographer's phone has a rear camera. More lenses are optional.
 - Pose generation, room codes, friends, and invitations need internet. Friends and invitations also need a Pix account, made with a Pix ID and a password or with Google.
-- The camera and gallery guides work offline. Two phones can connect offline with a QR code (F9, It 4).
+- The camera and gallery guides work offline.
 
 **Constraints**
 - OpenRouter's Image API bills each generated image and has rate limits. Pose generation needs no account, so the server limits requests per network address per hour (by default 20 poses, 10 suggestion requests, and 20 tips; phones behind one address share them) and for all phones per day (by default 500 poses).
@@ -899,6 +899,8 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 - Running the generative model on the phone.
 - Choosing the image model in the app, which would show our costs; the model stays a server setting.
 - A guide that keeps the reference's background.
+- An offline connection with a QR code and a hotspot (F9), dropped on 11/20 as not needed ([#214]): phones connect with a room code or an invitation.
+- A light mode, dropped on 11/20 as not needed ([#212]): Pix stays dark, on the color tokens of Iter4-P5.
 - Lines inside the outline for arms and legs in front of the body, such as folded arms (Design 2.6.1).
 
 ---
@@ -927,7 +929,6 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 | **Room code** | A 6-digit code (*Show a code*) that connects two phones without an account. |
 | **Invite link** | A link to an invitation that the photographer shares when the push notification does not arrive; it opens the same *Invitation* screen. |
 | **Relay** | Cloudflare's managed TURN service, which forwards the encrypted live view when the phones cannot connect directly, for example on cellular data. |
-| **QR connection** | Connecting two phones without internet: the photographer's phone creates a local hotspot and shows its details as a QR code, which the subject scans (It 4). |
 
 [#51]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/51
 [#52]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/52

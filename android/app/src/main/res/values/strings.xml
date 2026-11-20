@@ -119,6 +119,7 @@
     <string name="delete_photo_message">It is removed from this phone.</string>
     <string name="photo_not_deleted">Couldn\'t delete this photo.</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
+    <string name="zoom_held_label">%1$s is zooming</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
     <string name="remote_guide_notice">%1$s set a pose guide</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>

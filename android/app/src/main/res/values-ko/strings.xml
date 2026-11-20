@@ -114,6 +114,7 @@
     <string name="delete_photo_message">이 휴대폰에서 지워져요.</string>
     <string name="photo_not_deleted">사진을 삭제하지 못했어요.</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
+    <string name="zoom_held_label">%1$s님이 배율을 바꾸고 있어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>

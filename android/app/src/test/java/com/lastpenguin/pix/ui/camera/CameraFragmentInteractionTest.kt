@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -94,7 +94,8 @@ import org.robolectric.shadows.ShadowToast
  * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
  * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
  * gone after it, or, on a camera without brightness, fading by itself; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
- * pinch mode's label over the guide-edit toggle, Camera then Guide.
+ * pinch mode's label over the guide-edit toggle, Camera then Guide. A tap on the readout while the subject's pinch holds
+ * the zoom: no zoom, and the label names the subject (FR-7.6, #236).
  * A photo taken with the phone held sideways, saved as held (FR-1.5, #206).
  */
 @RunWith(AndroidJUnit4::class)
@@ -1158,6 +1159,26 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertTrue(controls.toggleLabel.isShown) }
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.toggleLabel.isShown) }
+    }
+
+    @Test
+    fun aTapOnTheReadout_whileTheSubjectZooms_namesTheSubject() {
+        val camera = FakeCameraController()
+        val modules = launch(camera)
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        modules.container.remoteControlHandler.zoomHold.take(Role.SUBJECT)
+        val requests = camera.requests.size
+
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.toggleLabel.isShown)
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.toggleLabel.text.toString())
+        }
+        assertEquals(requests, camera.requests.size)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -26,6 +26,8 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.ZoomHold
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -60,7 +62,7 @@ enum class GuideSaveNotice {
 
 /**
  * What a toggle on the camera screens just did, shown as a short label at the top of the image (Design 2.8): showing or
- * hiding the guide, and a zoom step.
+ * hiding the guide, a zoom step, and a pinch held back while the other phone zooms.
  */
 sealed interface ToggleLabel {
     data object GuideHidden : ToggleLabel
@@ -68,6 +70,9 @@ sealed interface ToggleLabel {
     data object GuideShown : ToggleLabel
 
     data class Zoom(val ratio: Float) : ToggleLabel
+
+    /** The other phone's pinch holds the zoom, so this phone's changed nothing (FR-7.6, #236): "Jaewan is zooming". */
+    data object ZoomHeld : ToggleLabel
 }
 
 /**
@@ -228,6 +233,8 @@ class CameraViewModel(
     private val clock: () -> Long = System::currentTimeMillis,
     /** How the phone is held: each photo is saved as it was at its shutter press (FR-1.5). */
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
+    /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
+    private val zoomHold: ZoomHold = ZoomHold(),
 ) : ViewModel() {
 
     /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5, FR-1.15). */
@@ -243,6 +250,9 @@ class CameraViewModel(
     // readout still shows the applied zoom.
     private var pendingZoomStep: Float? = null
     private var failedTipJob: Job? = null
+
+    // True from a pinch's step that the subject's pinch held back until that pinch's final value (FR-7.6).
+    private var zoomHeldBack = false
 
     private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
 
@@ -552,7 +562,26 @@ class CameraViewModel(
     /** [final] is false for the steps of a pinch, so the camera holds its lens until the pinch ends (NFR-19). */
     fun onZoomChanged(ratio: Float, final: Boolean = true) {
         pendingZoomStep = null
+        if (!mayZoom(final)) return
         requestZoom(ratio, final)
+        if (final) zoomHold.release(Role.PHOTOGRAPHER)
+    }
+
+    /**
+     * Whether this phone may zoom now (FR-7.6, #236): not while the subject's pinch holds the zoom. A pinch's step takes
+     * the zoom for the photographer until its final value; a pinch held back stays so until its fingers lift, and its
+     * first step says who is zooming. A single final value (a quick step, a TalkBack action) takes nothing.
+     */
+    private fun mayZoom(final: Boolean): Boolean {
+        if (zoomHeldBack) {
+            if (final) zoomHeldBack = false
+            return false
+        }
+        val may = if (final) zoomHold.mayChange(Role.PHOTOGRAPHER) else zoomHold.take(Role.PHOTOGRAPHER)
+        if (may) return true
+        zoomHeldBack = !final
+        _toggleLabels.trySend(ToggleLabel.ZoomHeld)
+        return false
     }
 
     /**
@@ -562,6 +591,7 @@ class CameraViewModel(
     fun onZoomTap() {
         val state = _uiState.value
         val step = nextZoomStep(quickZoomSteps(state.minZoom, state.maxZoom), pendingZoomStep ?: state.zoom) ?: return
+        if (!mayZoom(final = true)) return
         if (requestZoom(step, final = true)) {
             pendingZoomStep = step
             _toggleLabels.trySend(ToggleLabel.Zoom(step))
@@ -753,6 +783,11 @@ class CameraViewModel(
     /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */
     fun onRemoveGuide() {
         guides.setGuide(null)
+    }
+
+    override fun onCleared() {
+        // A pinch cut off with the screen never sends its final value; the zoom must not stay the photographer's.
+        zoomHold.release(Role.PHOTOGRAPHER)
     }
 
     companion object {

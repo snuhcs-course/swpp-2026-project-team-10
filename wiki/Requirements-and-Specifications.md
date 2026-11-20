@@ -88,6 +88,7 @@
 | 3.26 | 2026-11-19 | *Add a pose guide*: its name as the title, each situation's tile the button that starts its scene photo, with none shown as chosen, *Auto* marked *Top pick*, and a pressed tile dimmed and smaller, and the guide from a photo after them; closing the picker leaves its screen open; My library's tutorial caption on the seam between the rows (FR-2.7, FR-4.1, FR-4.8, US-2, US-4, 6.2, 6.6, 6.10, Figures 1, 2; Iter4-A6, [#243]). |
 | 3.27 | 2026-11-19 | Figure 4's *Pick a pose* shows the pose flow's bar, as on the other pose screens (6.5). |
 | 3.28 | 2026-11-20 | *Choose from the gallery* names the sheet's gallery row (FR-2.1, 2.4). |
+| 3.29 | 2026-11-20 | One phone zooms at a time; the other says who is zooming (FR-7.6, US-12; Iter4-A3, [#236]). |
 
 </details>
 
@@ -333,7 +334,7 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 | FR-7.3 | *Subject view* has a brightness slider, opened from a button, and a flash button, with the photographer's range and states (FR-1.11, FR-1.12). The flash button is hidden without a flash. The subject sets no focus, so it has no bar beside a focus box ([#182]). | Should | It 2 |
 | FR-7.4 | The photographer sees a short notice for each remote action, such as "Joonhyung set zoom to 2×" or "Joonhyung moved the guide". | Should | It 1 |
 | FR-7.5 | The photographer allows or blocks remote control on *Invite sent* and during the session. While it is blocked, the subject's remote controls are disabled with "Dongje turned off remote control". Until it is built, remote control is always allowed. | Could | It 5 |
-| FR-7.6 | The photographer's own controls always work, and only the photographer takes photos. If both people change the zoom, the guide, or the brightness at once, the later change wins, and both phones show the same final value. | Must | It 1 |
+| FR-7.6 | Only the photographer takes photos. One phone zooms at a time: the pinch that starts first holds the zoom until its fingers lift. Meanwhile a pinch, a quick step, or a zoom action on the other phone changes nothing, and that phone says who is zooming; a pinch held back stays so until its own fingers lift. If both people change the guide or the brightness at once, the later change wins. Both phones show the same final value. | Must | It 1 / It 4 |
 | FR-7.7 | The subject sets the focus point remotely, as with FR-1.4. | Could | It 5 |
 
 #### F8 · Room-code session
@@ -567,6 +568,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Normal** | We are connected, with remote control allowed | I use the readout's Zoom in / Zoom out action | Dongje's phone gets the final requested ratio, and both phones show the applied result. |
 | **Edge** | I am pinching the live video | An applied zoom arrives from Dongje's phone | My readout keeps following my fingers; after the pinch, it shows the applied value. |
 | **Edge** | I am pinching the live video while connected | The pinch is cancelled, or I leave the screen | The last requested value is sent as final, and the pinch ends. |
+| **Edge** | Dongje is pinching to zoom the camera | I pinch the live video | Nothing changes, my readout follows Dongje's zoom, and I see "Dongje is zooming". My next pinch zooms once Dongje's fingers lift. |
 | **Normal** | We are connected, with remote control allowed | I drag the guide to the right and pinch it larger | The guide moves and grows on both phones, and Dongje sees "Joonhyung moved the guide". |
 | **Normal** | We are connected, with remote control allowed | I tap the brightness button and raise the slider | Dongje's preview and my live view get brighter within 0.5 s. |
 | **Normal** | We are connected, with remote control allowed | I tap the flash button | Dongje's flash moves to its next state, and both phones show it. |
@@ -972,6 +974,7 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 [#210]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/210
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
+[#236]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/236
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#243]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/243

@@ -48,8 +48,24 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Jaewan, 11-19] "let's increase the notice time. in a new branch"
 - [Jaewan, 11-19] "yes i'll handle the reconnection quality part later. commit and open the PR"
 
+## One phone zooms at a time ([#236])
+
+- [Sungmin, 11-20] "Pull dev again. Then I'm going to implement issue #236 […]. First, plan how it could be built." (The agent traced the zoom path: the photographer's phone applied every request, from either phone, so two pinches at once fought. It proposed a hold on the photographer's phone, taken by the first pinch and freed at its final value, and a new `camera.zoom.hold` message for Subject view. It asked whether the guide and brightness were in scope, and whether a held-back pinch should take over once the other one ends.)
+- [Sungmin, 11-20] "Zoom only. For the second question, I'll go with your recommendation. Create a new branch and start implementing." (A held-back pinch stays held back until its fingers lift. Built test-first: `ZoomHold`, the handler's check with a 2 s timeout, the checks on both phones, the label naming who is zooming, and the R&S, Design, and Testing pages.)
+- [Sungmin, 11-20] "The reviewer should be me, Sungmin Jo." (The AI markers had a placeholder reviewer.)
+- [Sungmin, 11-20] "Commit and open the PR." ([#252])
+- [Sungmin, 11-20] "Resolve the issues raised on PR #252." (Codex found two gaps. A Subject view opened after `camera.zoom.hold` missed it, so the session now keeps it as `SessionManager.peerZoomHolder`. An older subject's pinch could take the zoom once the photographer let go, so the photographer's phone now drops a held-back pinch up to its final value.)
+- [Sungmin, 11-20] "Yes, commit and push."
+- [Sungmin, 11-20] "A new comment came in on PR #252. Resolve it." (The final value that ended a held-back pinch could undo the photographer's zoom when none of its steps had arrived. It became a cancel that changes no zoom.)
+- [Sungmin, 11-20] "Commit and push."
+- [Sungmin, 11-20] "Another review came in. Fix it if it needs fixing." (A step that arrived after the cancel could hold back the next pinch. The cancel became a `camera.zoom.set` with `cancel`, whose seq makes an earlier step stale.)
+- [Sungmin, 11-20] "Commit and push."
+- [Sungmin, 11-20] "Write the AI prompt log too, then commit and push." (This section.)
+
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
 [#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
+[#236]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/236
 [#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
+[#252]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/252

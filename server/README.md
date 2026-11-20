@@ -348,35 +348,6 @@ Set it up once on each AWS server, after a deploy of a commit that has these fil
 
 sslip.io is not on the Public Suffix List, so all sslip.io names share Let's Encrypt's limit of 50 new certificates in 7 days. If certbot is refused for that limit, try again later. A renewal of the same name is exempt.
 
-### Move the accounts to AWS main
-
-Each server has its own database, so AWS main does not have the accounts made on Server A. A release build that moves its users from Server A to AWS main needs them there first. These steps copy Server A's database over AWS main's. They delete everything AWS main holds, the accounts made there included. The dump holds password hashes and push tokens, so only you may read it, and every copy is deleted at the end.
-
-1. On Server A, dump the database to a file in your home folder:
-
-   ```sh
-   (umask 077 && sudo docker exec pix-postgres-1 pg_dump -U pix -d pix -Fc > ~/pix-accounts.dump)
-   ```
-
-2. On your computer, copy it to AWS main, and delete it on Server A and on your computer:
-
-   ```sh
-   scp swpp-a:pix-accounts.dump . && scp -i <key>.pem pix-accounts.dump ubuntu@15.134.147.114:
-   ssh swpp-a rm pix-accounts.dump && rm pix-accounts.dump
-   ```
-
-3. On AWS main, stop both copies of the app, replace the database, and start a copy again. The copy brings the schema up to date as it starts. `docker stop` prints an error for a copy that never ran, which does no harm.
-
-   ```sh
-   sudo docker stop pix-app-blue-1 pix-app-green-1
-   sudo docker exec pix-postgres-1 dropdb -U pix pix
-   sudo docker exec pix-postgres-1 createdb -U pix pix
-   sudo docker exec -i pix-postgres-1 pg_restore -U pix -d pix --no-owner < ~/pix-accounts.dump && rm ~/pix-accounts.dump
-   sudo /opt/pix/repo/server/deploy/deploy.sh restart
-   ```
-
-A phone stays signed in. AWS main refuses Server A's access token, because each server signs with its own key, and the app then gets a new one with its refresh token, which the copied database holds. A phone whose sign-in was refreshed on Server A after the dump signs in again.
-
 ### Settings
 
 [`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=`, `PIX_GOOGLE_CLIENT_ID=`, or `PIX_TURN_API_TOKEN=`, needs a value on every server. Every other name is in a comment. Its line shows the server's default, or says what sets the value. Uncomment a name in `/opt/pix/.env` only to give a server another value. Then a default that changes in the code still reaches the server.

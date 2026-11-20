@@ -41,8 +41,31 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-19] "Resolve the conflicts with dev. The photos taken can be seen in the app right away; make that support landscape too." (#248 had brought the album viewer to `dev`, so #242 and #246 each took `dev` in again. The viewer now turns whole with the phone in a `TurningFrame`: held sideways, it is a landscape screen, the photo over all of it under the header and the strip. After the new size, ViewPager2 showed the page before until its list was scrolled to the page first; a drag down is turned into the photo's own way.)
 - [Joonhyung, 11-19] "Check which tasks of issue #207 are not built yet." Then: "Yes, add it." (Against the issue, all were built but two: the check on two phones, IT-38, and Design 2.1, whose package layout named neither `TurningIcons` nor `PhoneTurns`; it now does. The brightness bar's sun is not turned, since its eight rays look the same at every quarter.)
 
+## *Add a pose guide*'s order and its picker ([#243])
+
+- [Jaewan, 11-19] "let's implement issue #243"
+- [Jaewan, 11-19] "meanwhile, the flow4 wireframe is wrong since it doesn't have the progress bar for the 'pick a pose' screen. can you fix this here?"
+- [Jaewan, 11-19] "yes. and then give me some emulator screenshots for this fix"
+- [Jaewan, 11-19] "oh, can we just remove the check and 'take a scene photo for poses' button flow, and just make the six situation cases themselves as buttons? and then give me a side by side comparison of before and after for 5_sheet_ko"
+- [Jaewan, 11-19] "which do you prefer? or perhaps may there be a better design? what's your thoughts"
+- [Jaewan, 11-19] "i wouldn't make the 'tap one, then take a photo of the scene' fix, but your optional extra idea seems good. and what happens when we press the situation card? is there any short animation in the card?"
+- [Jaewan, 11-19] "no i think just '어떤 사진을 찍을까요? and 상황에 맞춰 AI가 구도와 포즈를 잡아 드려요" is better. and add a pressed state to the six pose-guide cards in the "Add pose guide" bottom sheet. On touch down, dim the card and scale it to 0.97 within 100ms. Then navigate on release. Block extra taps while navigating. also can we add a '추천' mark on the '자동' card"
+- [Jaewan, 11-19] "You can discard the 'before' from now on. i'll keep 'after'. Move the labels out of the image. Put them on a solid strip at the bottom of the card, or below the card. Add a 1px border (white at 10–15% opacity). A border makes the card read as an object. Match the corner radius to the rows below. i have three additional hypothetical fixes that will make the 6 cards more 'button-like'. Can you generate previews for each? not emulator screenshots. i want to compare these options"
+- [Jaewan, 11-19] "hmm.. not sure with this all don't seem to fix it well. maybe the cartoon-style images are the problem..? do you think this is it?"
+- [Jaewan, 11-19] "yeah. if you want to use gemini image generation, tell me"
+- [Jaewan, 11-19] "maybe we can add some color to option 1/2? but in a united color scheme, not too fancy. what do you think? can you mock these too?"
+- [Jaewan, 11-19] "kinda seems too claude-generated design-ish. if you would generate images through gemini, what would you try"
+- [Jaewan, 11-19] "[OpenRouter key redacted] use this openrouter key. try the first one"
+- [Jaewan, 11-19] "a different style try?"
+- [Jaewan, 11-20] "can you try generating a real-like photo? not an illustration?"
+- [Jaewan, 11-20] "okay don't do the name below or name on a strip for now. and try generating again, a young korean women, korean instagram post style"
+- [Jaewan, 11-20] "no, i'll just use the illustrations from before. commit and push this version"
+- [Jaewan, 11-20] "yes. and the docs and wireframes are also updated correctly?"
+- [Jaewan, 11-20] "yes, fix both and push"
+
 [#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#206]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/206
 [#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#243]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/243

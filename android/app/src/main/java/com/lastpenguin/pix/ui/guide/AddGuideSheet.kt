@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -25,18 +25,18 @@ import com.lastpenguin.pix.ui.generation.SituationTiles
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Add a pose guide, situation first (R&S 6.2, FR-4.8): *What are you taking?* with a tile per situation, the last one
- * chosen selected, then a guide from a photo, *Choose from the gallery* or *My library*, which opens the library and
- * says how many are saved (FR-2.7, FR-3.8, FR-3.11), then *Take a scene photo for poses* for the chosen situation
- * (FR-4.1). With a guide on the camera it replaces that guide, and *Keep the current guide* closes it (FR-3.6). Opened
- * from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the photographer, and the situations and the button wait for
- * the shared steps (FR-6.15, Design 2.6.5).
- * The first time it opens from Camera, its tutorial tips come over it (FR-10.4).
- * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170.
+ * Add a pose guide (R&S 6.2): *What are you taking?* with a tile per situation, each the button that takes the scene
+ * photo for it (FR-4.1, FR-4.8); then a guide from a photo, *Choose from the gallery* or *My library*, which opens the
+ * library and says how many are saved (FR-2.1, FR-3.8, FR-3.11). With a guide on the camera it replaces that guide, and
+ * *Keep the current guide* closes it (FR-3.6). Opened from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the
+ * photographer, and the situations wait for the shared steps (FR-6.15, Design 2.6.5). A tile dims and shrinks under the
+ * finger and goes on at release; once a tap goes on, the sheet ignores every other (#243). The first time it opens from
+ * Camera, its tutorial tips come over it (FR-10.4).
+ * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170; the
+ * tiles as buttons and the picker kept open #243.
  */
 class AddGuideSheet : BottomSheetDialogFragment() {
 
@@ -44,14 +44,27 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     private val generationViewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
 
-    /** A picked photo opens Reference confirm; closing the picker returns to the camera, guide unchanged (FR-2.7). */
+    /**
+     * Set once a tap goes on from this sheet (#243): to the scene photo, the library, the picker, or the camera. Every
+     * later tap is ignored, so a second tap in the moment the sheet takes to leave starts nothing else.
+     */
+    private var leaving = false
+
+    /** A picked photo opens Reference confirm; closing the picker stays here, any guide unchanged (FR-2.7). */
     private val pickPhoto = registerPhotoPicker { uri ->
-        if (uri == null) {
-            dismiss()
-        } else {
+        if (uri != null) {
             referenceViewModel.onPhotoPicked(uri)
             findNavController().navigate(R.id.action_addGuide_to_referenceConfirm)
+        } else {
+            leaving = false
         }
+    }
+
+    /** Runs [go] for the first tap that goes on from this sheet, and ignores every tap after it. */
+    private fun goOn(go: () -> Unit) {
+        if (leaving) return
+        leaving = true
+        go()
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
@@ -62,28 +75,33 @@ class AddGuideSheet : BottomSheetDialogFragment() {
         referenceViewModel.openFor(arguments?.getBoolean(ARG_FROM_SUBJECT) == true)
         val poses = !referenceViewModel.forSubject
         binding.newPosesSection.isVisible = poses
-        binding.generateButton.isVisible = poses
-        if (poses && savedInstanceState == null) generationViewModel.followCamera()
-        val situations = SituationTiles(binding.situationRowTop, binding.situationRowBottom) {
-            generationViewModel.chooseSituation(it)
+        val situations = SituationTiles(binding.situationRowTop, binding.situationRowBottom, { leaving }) { situation ->
+            when {
+                leaving || !generationViewModel.chooseSituation(situation) -> false
+
+                generationViewModel.needsConsent -> {
+                    showConsentNotice()
+                    false
+                }
+
+                else -> {
+                    goOn(::takeScenePhoto)
+                    true
+                }
+            }
         }
         // The Guide button opens this sheet in both cases; with a guide on the camera it is the way to replace it.
-        when {
-            referenceViewModel.replacing -> {
-                binding.titleText.setText(R.string.replace_guide_title)
-                binding.cancelButton.setText(R.string.keep_current_guide)
-                binding.cancelButton.isVisible = true
-            }
-
-            !poses -> binding.titleText.setText(R.string.add_guide_title)
+        if (referenceViewModel.replacing) {
+            binding.titleText.setText(R.string.replace_guide_title)
+            binding.cancelButton.setText(R.string.keep_current_guide)
+            binding.cancelButton.isVisible = true
         }
 
-        binding.galleryRow.setOnClickListener { pickPhoto() }
-        binding.libraryRow.setOnClickListener { findNavController().navigate(R.id.action_addGuide_to_library) }
-        binding.generateButton.setOnClickListener {
-            if (generationViewModel.needsConsent) showConsentNotice() else takeScenePhoto()
+        binding.galleryRow.setOnClickListener { goOn(pickPhoto) }
+        binding.libraryRow.setOnClickListener {
+            goOn { findNavController().navigate(R.id.action_addGuide_to_library) }
         }
-        binding.cancelButton.setOnClickListener { dismiss() }
+        binding.cancelButton.setOnClickListener { goOn(::dismiss) }
 
         val savedGuides = SavedGuideList(binding)
         viewLifecycleOwner.lifecycleScope.launch {
@@ -93,15 +111,12 @@ class AddGuideSheet : BottomSheetDialogFragment() {
                     launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.ADD_GUIDE)) }
                 }
                 launch { referenceViewModel.savedGuides.collect(savedGuides::render) }
-                launch {
-                    combine(generationViewModel.situationChoice, generationViewModel.selfieAvailable, ::Pair)
-                        .collect { (chosen, selfie) -> situations.render(chosen, selfie) }
-                }
+                launch { generationViewModel.selfieAvailable.collect(situations::render) }
             }
         }
     }
 
-    /** Opens whole, so the situations and the button show without a drag; Back or a drag down closes it. */
+    /** Opens whole, so the situations show without a drag; Back or a drag down closes it. */
     override fun onStart() {
         super.onStart()
         (dialog as? BottomSheetDialog)?.behavior?.apply {
@@ -126,13 +141,13 @@ class AddGuideSheet : BottomSheetDialogFragment() {
             .setMessage(R.string.consent_message)
             .setPositiveButton(R.string.consent_agree) { _, _ ->
                 generationViewModel.onConsentGiven()
-                takeScenePhoto()
+                goOn(::takeScenePhoto)
             }
             .setNegativeButton(R.string.not_now, null)
             .show()
     }
 
-    /** The poses start from a photo the user takes and confirms on the camera behind this sheet (FR-4.1). */
+    /** The poses start from a photo, for the tile's situation, that the user takes on the camera behind it (FR-4.1). */
     private fun takeScenePhoto() {
         generationViewModel.beginScene()
         dismiss()

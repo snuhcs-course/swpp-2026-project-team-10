@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -43,8 +43,9 @@ enum class CaptionAlign { CENTER, START, END }
  * for one the screen does not show, which then gets no ring or caption; the screen calls [refresh] as they move.
  * Each caption goes on its side of the control, farther away or on another side when it would cover another
  * caption, ring, or the title, and stays inside the system bars. A caption [Mark.onEdge] sits on its ring's edge
- * instead, as the label in an outlined field's border, with no arrow ([#210]). A tap anywhere closes it; the line that
- * says so sits at the bottom's middle on every screen and in every language, and the captions keep clear of it (#204).
+ * instead, as the label in an outlined field's border, with no arrow ([#210]), also on the seam where another ring
+ * meets that edge, as two touching rows' rings do ([#243]). A tap anywhere closes it; the line that says so sits at the
+ * bottom's middle on every screen and in every language, and the captions keep clear of it (#204).
  */
 class CoachMarkLayout @JvmOverloads constructor(
     context: Context,
@@ -54,9 +55,11 @@ class CoachMarkLayout @JvmOverloads constructor(
     /**
      * One control to explain: its caption, where that goes, and whether its arrow may pass over other controls. With
      * [onEdge], the caption sits on the ring's edge on [side] (above or below), lined up at [align], half over the
-     * control, with the ring stopping on both sides of it and no arrow. It keeps to one line, so it covers only the
-     * control's edge, and its text shrinks if it has no room there. Failing that, it goes beside the control only where
-     * nothing is in the way, and otherwise the mark is left out, ring and all, rather than cover other text.
+     * control, with the ring stopping on both sides of it and no arrow. Where another mark's ring meets that edge, as
+     * a row's ring meets the one of the row above it, the caption sits on their seam, and both rings stop around it.
+     * It keeps to one line, so it covers only the control's edge, and its text shrinks if it has no room there. Failing
+     * that, it goes beside the control only where nothing is in the way, and otherwise the mark is left out, ring and
+     * all, rather than cover other text.
      */
     data class Mark(
         val caption: CharSequence,
@@ -236,7 +239,10 @@ class CoachMarkLayout @JvmOverloads constructor(
                     .map { it!!.corridor }
                 val crossed = if (mark.overControls) texts else texts + otherRings
                 scaleCaption(index, 1f)
-                val option = edgeOption(mark, index, ring, safe, otherRings + texts + otherArrows)
+                // A caption on its ring's edge may cross the ring that meets that edge, which stops around it too.
+                val seam = if (mark.onEdge) seamRing(ring, mark.side, otherRings) else null
+                val edgeBlocked = otherRings.filter { it !== seam } + texts + otherArrows
+                val option = edgeOption(mark, index, ring, safe, edgeBlocked)
                     ?: bestOption(mark, index, ring, safe, ringRects + texts + otherArrows, crossed)
                         .takeIf { it.clean || !mark.onEdge }
                     ?: return@forEachIndexed
@@ -294,6 +300,24 @@ class CoachMarkLayout @JvmOverloads constructor(
             }
         }
         return out
+    }
+
+    /**
+     * The one of [others] that meets [ring] at its [side] edge, if any: a ring beside it no farther away than the
+     * [RING_GAP_DP] that [separated] leaves between the rings of two rows that touch, such as the gallery's and My
+     * library's on *Add a pose guide* ([#243]).
+     */
+    private fun seamRing(ring: RectF, side: CaptionSide, others: List<RectF>): RectF? {
+        val reach = (RING_GAP_DP + 1f) * density
+        return others.firstOrNull { other ->
+            val beside = other.left < ring.right && ring.left < other.right
+            val apart = when (side) {
+                CaptionSide.ABOVE -> ring.top - other.bottom
+                CaptionSide.BELOW -> other.top - ring.bottom
+                CaptionSide.START, CaptionSide.END -> -1f
+            }
+            beside && apart in 0f..reach
+        }
     }
 
     /**
@@ -553,14 +577,12 @@ class CoachMarkLayout @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), scrimPaint)
         for (mark in placed) mark?.let { drawRing(canvas, it, clearPaint) }
         canvas.restoreToCount(layer)
-        for (mark in placed) {
-            if (mark == null) continue
-            // A caption on its ring's edge: the ring stops on both sides of it, as an outlined field's border does.
-            val save = canvas.save()
-            if (mark.onEdge) canvas.clipOutRect(edgeGap(captionRect(mark)))
-            drawRing(canvas, mark, ringPaint)
-            canvas.restoreToCount(save)
-        }
+        // A caption on its ring's edge: the ring stops on both sides of it, as an outlined field's border does, and so
+        // does the ring that meets it on a seam; it crosses no other ring.
+        val save = canvas.save()
+        for (mark in placed) if (mark?.onEdge == true) canvas.clipOutRect(edgeGap(captionRect(mark)))
+        for (mark in placed) mark?.let { drawRing(canvas, it, ringPaint) }
+        canvas.restoreToCount(save)
         for ((path, head) in arrows) {
             canvas.drawPath(path, arrowPaint)
             canvas.drawPath(head, headPaint)

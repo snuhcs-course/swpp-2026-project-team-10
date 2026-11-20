@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -176,6 +176,13 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.ADD_GUIDE to TutorialTips(
         title = null,
         tips = listOf(
+            // The situations, each tile the button that takes the scene photo for it (FR-4.8).
+            TutorialTip(
+                R.string.tutorial_generate,
+                CaptionSide.ABOVE,
+                overControls = true,
+                locate = controls(R.id.situationRowTop, R.id.situationRowBottom),
+            ),
             // The whole row (#210), its caption on the ring's top edge at the right.
             TutorialTip(
                 R.string.tutorial_upload,
@@ -184,17 +191,11 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
                 locate = control(R.id.galleryRow),
                 onEdge = true,
             ),
-            // The situations (FR-4.8): a tile chosen, the button below takes the scene photo for it.
-            TutorialTip(
-                R.string.tutorial_generate,
-                CaptionSide.ABOVE,
-                overControls = true,
-                locate = controls(R.id.situationRowTop, R.id.situationRowBottom),
-            ),
-            // My library's whole row (FR-3.11), its caption on the ring's bottom edge at the right.
+            // My library's whole row (FR-3.11), the sheet's last: its caption on the ring's top edge at the right, on
+            // the seam with the gallery's ring, since the closing line is under the row (#243).
             TutorialTip(
                 R.string.tutorial_saved,
-                CaptionSide.BELOW,
+                CaptionSide.ABOVE,
                 CaptionAlign.END,
                 locate = control(R.id.libraryRow),
                 onEdge = true,

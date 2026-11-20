@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -63,7 +63,9 @@ import org.robolectric.annotation.GraphicsMode
  * The tutorial's tips laid out over each real screen (FR-10.4, NFR-16), on the Galaxy S22's 360 × 705 dp, in English
  * and in Korean, at font scale 1.0 and 1.3 (boundary): every control the screen shows has its ring; every caption, the
  * title, and the closing line lie inside the screen, whole, and clear of each other and of every ring, but a caption
- * on its own ring's edge (*Add a pose guide*'s rows, #210), which crosses that ring only. Camera, the guide on
+ * on its own ring's edge (*Add a pose guide*'s rows, #210), which crosses that ring only, and on a seam also the ring
+ * that meets it there (My library's, under the gallery's, #243). *Add a pose guide* rings, in its order, the
+ * situations' tiles, then each row (#243). Camera, the guide on
  * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle; the guide's
  * ✕ with its own tip, #204), and
  * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
@@ -199,8 +201,10 @@ class TutorialLayoutTest {
                     assertTrue("$label: \"${text.label()}\" is cut", drawn <= text.height)
                 }
                 for (mark in ringed) {
-                    // A caption on its ring's edge crosses that ring only (#210).
+                    // A caption on its ring's edge crosses that ring only (#210), and on a seam the ring met there
+                    // (#243).
                     if (mark.onEdge && text === mark.caption) continue
+                    if (ringed.any { it.onEdge && text === it.caption && meetsAtItsCaption(it, mark) }) continue
                     assertFalse(
                         "$label: \"${text.label()}\" covers the ring of \"${mark.caption.text}\"",
                         RectF.intersects(rect, mark.ring),
@@ -226,6 +230,17 @@ class TutorialLayoutTest {
             scenario?.close()
             scenario = null
         }
+    }
+
+    /**
+     * Whether [other]'s ring meets [captioned]'s at the edge its caption is on, a few dp apart as two touching rows'
+     * rings are: the seam that caption sits on.
+     */
+    private fun meetsAtItsCaption(captioned: CoachMarkLayout.Placed, other: CoachMarkLayout.Placed): Boolean {
+        val reach = 8 * captioned.caption.resources.displayMetrics.density
+        val onTop = captioned.side == CaptionSide.ABOVE
+        val apart = if (onTop) captioned.ring.top - other.ring.bottom else other.ring.top - captioned.ring.bottom
+        return apart in 0f..reach
     }
 
     /** Whether two rings cross: two circles by their distance, else by their bounds. */
@@ -262,6 +277,22 @@ class TutorialLayoutTest {
         assertTrue(ringOf(camera(withGuide = false), R.string.tutorial_shutter).round)
         scenario?.close()
         assertFalse(ringOf(sheet(), R.string.tutorial_generate).round)
+    }
+
+    @Test
+    fun addAPoseGuide_ringsTheSituations_thenEachRow() {
+        val layer = sheet()
+        val situations = ringOf(layer, R.string.tutorial_generate).ring
+        val gallery = ringOf(layer, R.string.tutorial_upload).ring
+        val library = ringOf(layer, R.string.tutorial_saved).ring
+        // The tiles in one ring (FR-4.8), each the button that takes the scene photo for its situation.
+        for (id in listOf(R.id.situationRowTop, R.id.situationRowBottom)) {
+            val control = boundsIn(layer, screenView(id))
+            assertTrue("$situations around $control", situations.contains(control))
+        }
+        val fromPhoto = boundsIn(layer, screenView(R.id.fromPhotoLabel))
+        assertTrue("$situations above $fromPhoto", situations.bottom <= fromPhoto.top)
+        assertTrue("$situations, $gallery, $library", situations.bottom < gallery.top && gallery.bottom < library.top)
     }
 
     @Test

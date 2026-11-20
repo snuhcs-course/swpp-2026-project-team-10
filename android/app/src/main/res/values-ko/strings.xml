@@ -127,7 +127,8 @@
     <string name="keep_current_guide">지금 가이드 유지</string>
     <string name="situation_question">어떤 사진을 찍을까요?</string>
     <string name="situation_question_body">상황에 맞춰 AI가 구도와 포즈를 잡아 드려요</string>
-    <string name="take_scene_for_poses">배경 사진 찍고 포즈 만들기</string>
+    <string name="situation_recommended">추천</string>
+    <string name="situation_recommended_description">%1$s, 추천</string>
     <string name="situation_default">자동</string>
     <string name="situation_background">배경 강조</string>
     <string name="situation_half_body">상반신</string>

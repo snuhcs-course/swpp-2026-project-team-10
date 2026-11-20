@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -1261,7 +1261,8 @@ class GenerationViewModelTest {
     // and gets no tip; one from the rear camera is not a selfie.
     @Test
     fun aScenePhotoFromTheFrontCamera_isGeneratedAsASelfie_andAgainOnTryAgain() = runTest {
-        camera.facing.value = CameraFacing.FRONT
+        // *Selfie*'s tile, which turns the camera to the front one (FR-1.14, FR-4.8).
+        model.chooseSituation(Situation.SELFIE)
         generateFromAPhoto()
         assertTrue(state.selfie)
         generator.runs.single().finish()
@@ -1285,7 +1286,8 @@ class GenerationViewModelTest {
 
     @Test
     fun aSelfiesCandidate_hasNoTipSource() = runTest {
-        camera.facing.value = CameraFacing.FRONT
+        // *Selfie*'s tile, which turns the camera to the front one (FR-1.14, FR-4.8).
+        model.chooseSituation(Situation.SELFIE)
         generateFromAPhoto()
         val run = generator.runs.single()
         run.plan()
@@ -1301,8 +1303,7 @@ class GenerationViewModelTest {
 
     // ---- situations (FR-4.8, Iter4-P13) ---------------------------------------------------------------------------
     // Partitions: the situation chosen on Add a pose guide, going with every request of the set, Try again included;
-    // the tiles following the camera, front and rear; the camera turned to the chosen situation's; the selfie's tile
-    // off without a front camera; a front camera that fails while a selfie is framed, and shooting again after it;
+    // the camera turned to the chosen situation's; the selfie's tile off without a front camera, refused; a front camera that fails while a selfie is framed, and shooting again after it;
     // shooting again; the subject's phone told the situation.
 
     @Test
@@ -1324,18 +1325,6 @@ class GenerationViewModelTest {
         describeAPhoto()
 
         assertEquals(listOf<String?>("landmark"), descriptions.situations)
-    }
-
-    @Test
-    fun theTiles_followTheCamera() = runTest {
-        model.chooseSituation(Situation.LANDMARK)
-        camera.facing.value = CameraFacing.FRONT
-        model.followCamera()
-        assertEquals(Situation.SELFIE, model.situationChoice.value)
-
-        camera.facing.value = CameraFacing.BACK
-        model.followCamera()
-        assertEquals(Situation.LANDMARK, model.situationChoice.value)
     }
 
     @Test
@@ -1361,8 +1350,8 @@ class GenerationViewModelTest {
         camera.hasFrontCamera.value = false
         assertFalse(model.selfieAvailable.value)
 
-        model.chooseSituation(Situation.LANDMARK)
-        model.chooseSituation(Situation.SELFIE)
+        assertTrue(model.chooseSituation(Situation.LANDMARK))
+        assertFalse(model.chooseSituation(Situation.SELFIE))
 
         assertEquals(Situation.LANDMARK, model.situationChoice.value)
     }
@@ -2015,9 +2004,8 @@ class GenerationViewModelTest {
         assertTrue(model.onDescriptionFocus(true))
     }
 
-    /** *Add a pose guide*, *Take the scene photo*, the shutter, and *Use this photo*: Generate poses is shown. */
+    /** A situation's tile on *Add a pose guide*, the shutter, and *Use*: Generate poses is shown. */
     private fun TestScope.describeAPhoto() {
-        model.followCamera()
         model.beginScene()
         model.takeScene()
         runCurrent()

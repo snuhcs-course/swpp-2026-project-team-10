@@ -1,7 +1,10 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.animation.ValueAnimator
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.RectF
 import android.os.Looper
 import android.view.View
@@ -48,10 +51,11 @@ import org.robolectric.shadows.ShadowChoreographer
 
 /*
  * The tutorial's tips over a live screen (FR-10.4, Design 2.6.8), here over Add a pose guide, the sheet they open over
- * as it opens from Camera. The layer (state-based): a ring around each control the screen shows, where it is, the
- * gallery's and My library's whole rows included, their rings apart though the rows touch, each still centered on its
- * row, and their captions on the rings' top and bottom edges at the right, with no arrow; none and no caption for a
- * control the screen does not show (a row hidden) or that a short screen's sheet has scrolled out of view or shows less
+ * as it opens from Camera. The layer (state-based): a ring around each control the screen shows, where it is, in the
+ * sheet's order: the situations' tiles, then the gallery's and My library's whole rows, their rings apart
+ * though the rows touch, each still centered on its row, and their captions on the rings' top edges at the right, with
+ * no arrow, My library's on the seam with the gallery's ring, which both stop around it (#243); none and no caption
+ * for a control the screen does not show (a row hidden) or that a short screen's sheet has scrolled out of view or shows less
  * than half of, and a ring only around the part it shows of one cut by it; a control that appears while they are up
  * gets its ring, and one that moves takes its ring along. The captions are text, which TalkBack reads, one per ring.
  * Closing (equivalence partitioning): a tap anywhere on the layer, a tap on its closing line, and Back on the dialog each close them and marks the screen seen; showing them while
@@ -158,16 +162,16 @@ class TutorialFragmentTest {
 
         val placed = layer().placed
         assertEquals(3, placed.count { it != null })
-        assertRingAroundRow(placed[0]!!.ring, inLayer(R.id.galleryRow))
         assertRingAround(
-            placed[1]!!.ring,
+            placed[0]!!.ring,
             RectF(inLayer(R.id.situationRowTop)).apply {
                 union(inLayer(R.id.situationRowBottom))
             },
         )
+        assertRingAroundRow(placed[1]!!.ring, inLayer(R.id.galleryRow))
         assertRingAroundRow(placed[2]!!.ring, inLayer(R.id.libraryRow))
         // The rows touch; their rings do not.
-        assertTrue("${placed[0]!!.ring} above ${placed[2]!!.ring}", placed[0]!!.ring.bottom < placed[2]!!.ring.top)
+        assertTrue("${placed[1]!!.ring} above ${placed[2]!!.ring}", placed[1]!!.ring.bottom < placed[2]!!.ring.top)
     }
 
     @Test
@@ -175,21 +179,54 @@ class TutorialFragmentTest {
         openSheet()
 
         val placed = layer().placed
-        for ((index, onTop) in listOf(0 to true, 2 to false)) {
+        for (index in listOf(1, 2)) {
             val mark = placed[index]!!
-            val caption = RectF(
-                mark.caption.left.toFloat(),
-                mark.caption.top.toFloat(),
-                mark.caption.right.toFloat(),
-                mark.caption.bottom.toFloat(),
-            )
+            val caption = captionOf(mark)
             assertTrue(mark.onEdge)
-            assertEquals(if (onTop) mark.ring.top else mark.ring.bottom, caption.centerY(), 1.5f)
+            assertEquals(mark.ring.top, caption.centerY(), 1.5f)
             assertTrue("$caption at the right of ${mark.ring}", caption.centerX() > mark.ring.centerX())
             assertTrue("$caption within ${mark.ring}", caption.right < mark.ring.right)
         }
         // The situations' caption, above its tiles, keeps its arrow.
-        assertFalse(placed[1]!!.onEdge)
+        assertFalse(placed[0]!!.onEdge)
+    }
+
+    private fun captionOf(mark: CoachMarkLayout.Placed) = RectF(
+        mark.caption.left.toFloat(),
+        mark.caption.top.toFloat(),
+        mark.caption.right.toFloat(),
+        mark.caption.bottom.toFloat(),
+    )
+
+    @Test
+    fun myLibrarysCaption_onTheSeamWithTheGallerysRing_stopsBothRings() {
+        openSheet()
+        val layer = layer()
+        val gallery = layer.placed[1]!!
+        val library = layer.placed[2]!!
+        val caption = captionOf(library)
+        assertTrue("$caption over ${gallery.ring}'s bottom", gallery.ring.bottom in caption.top..caption.bottom)
+
+        // The rings as drawn, without the captions: on each ring's line along the seam, no ink where the caption sits,
+        // and the line's dashes beside it, between the ring's corner and the caption.
+        layer.placed.forEach { it!!.caption.visibility = View.INVISIBLE }
+        val drawn = Bitmap.createBitmap(layer.width, layer.height, Bitmap.Config.ARGB_8888)
+        layer.draw(Canvas(drawn))
+        val density = layer.resources.displayMetrics.density
+        val beside = (gallery.ring.left + 28 * density).toInt() until (caption.left - 12 * density).toInt()
+        val under = caption.left.toInt()..caption.right.toInt()
+        for ((name, y) in listOf("the gallery's" to gallery.ring.bottom, "My library's" to library.ring.top)) {
+            assertTrue("$name ring has no line beside the caption", inked(drawn, beside, y))
+            assertFalse("$name ring runs under the caption", inked(drawn, under, y))
+        }
+    }
+
+    /** Whether [bitmap] has the rings' light ink at any x of [xs] within 2 px of the line at [y]. */
+    private fun inked(bitmap: Bitmap, xs: IntRange, y: Float): Boolean = xs.any { x ->
+        (y.toInt() - 2..y.toInt() + 2).any { row ->
+            val pixel = bitmap.getPixel(x, row)
+            Color.alpha(pixel) > 128 && Color.red(pixel) > 160 && Color.green(pixel) > 160 && Color.blue(pixel) > 160
+        }
     }
 
     @Test
@@ -238,14 +275,14 @@ class TutorialFragmentTest {
     @Test
     fun aControlThatMoves_takesItsRingAlong() {
         openSheet()
-        val before = RectF(layer().placed[0]!!.ring)
+        val before = RectF(layer().placed[1]!!.ring)
 
         // A little, so its caption keeps its room on the ring's edge.
         sheetView().findViewById<View>(R.id.galleryRow).translationY = -20f
         idle()
 
-        assertEquals(before.centerY() - 20f, layer().placed[0]!!.ring.centerY(), 1f)
-        assertRingAroundRow(layer().placed[0]!!.ring, inLayer(R.id.galleryRow))
+        assertEquals(before.centerY() - 20f, layer().placed[1]!!.ring.centerY(), 1f)
+        assertRingAroundRow(layer().placed[1]!!.ring, inLayer(R.id.galleryRow))
     }
 
     @Test
@@ -253,8 +290,8 @@ class TutorialFragmentTest {
         openSheet()
 
         val expected = listOf(
-            R.string.tutorial_upload,
             R.string.tutorial_generate,
+            R.string.tutorial_upload,
             R.string.tutorial_saved,
         ).map(::string)
         assertEquals(expected, layer().placed.map { it!!.caption.text.toString() })

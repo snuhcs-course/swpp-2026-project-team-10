@@ -87,6 +87,8 @@
     <color name="camera_grid">#87FFFFFF</color>
     <color name="camera_grid_outline">#32000000</color>
     <color name="camera_dim">#99000000</color>
+    <!-- A situation's tile on Add a pose guide while pressed (#243): its drawing 30% darker. -->
+    <color name="camera_pressed">#4D000000</color>
     <!-- The horizon bar (FR-1.10, Design 2.6.2), its dark outline, and the bar when level. -->
     <color name="camera_level">#FFFFFFFF</color>
     <color name="camera_level_outline">#8C000000</color>

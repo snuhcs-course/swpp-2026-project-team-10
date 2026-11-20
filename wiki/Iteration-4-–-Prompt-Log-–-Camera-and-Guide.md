@@ -60,6 +60,8 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Jaewan, 11-20] "can you try generating a real-like photo? not an illustration?"
 - [Jaewan, 11-20] "okay don't do the name below or name on a strip for now. and try generating again, a young korean women, korean instagram post style"
 - [Jaewan, 11-20] "no, i'll just use the illustrations from before. commit and push this version"
+- [Jaewan, 11-20] "yes. and the docs and wireframes are also updated correctly?"
+- [Jaewan, 11-20] "yes, fix both and push"
 
 [#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231

@@ -110,6 +110,7 @@
 | 3.27 | 2026-11-19 | The photo viewer turning with the phone: `PhotoViewerTurnTest`, its partitions, and IT-38's step 9 (2.1.6, Appendix A; [#207]). |
 | 3.28 | 2026-11-19 | The notice that the subject left (Iter4-A5, [#238]): its owner, its 10 s boundary and states, and a step on IT-16 (1.1, 2.1.5, 2.1.6, Appendix A). |
 | 3.29 | 2026-11-19 | *Add a pose guide*'s tiles as buttons and the picker kept open (Iter4-A6, [#243]): its owner, the partitions of the order, the tiles, the press, the badge, the picker, and the rings, and steps on IT-7, IT-23, and IT-26 (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 3.30 | 2026-11-20 | The sheet's current labels in older steps: a situation's tile for *Generate poses here* (US-4, IT-18, IT-35, IT-37), and *Choose from the gallery* for *Add photo* (US-2, US-12, IT-23, IT-35) (4.3, Appendix A). |
 
 </details>
 
@@ -922,17 +923,17 @@ The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team
 
 | Step | Tester does | Pass when |
 |---|---|---|
-| 1 | On A's Camera, tap *Guide* › *Add photo*, and choose R2. | *No person found* appears. |
+| 1 | On A's Camera, tap *Guide* › *Choose from the gallery*, and choose R2. *Changed in Iter4-P13 ([#210]): *Choose from the gallery*; was: *Add photo*.* | *No person found* appears. |
 | 2 | Tap *Choose another photo*, and choose R1. | The photo picker opens again. Within 2 s of choosing R1, *Reference confirm* shows the person as an outline. The guide contains none of the photo's pixels or background. |
 | 3 | Look at the outline. | It is smooth. The stretched arm and the legs keep their real shape and length. |
 | 4 | Tap *Use* at the top right. *Changed in Iter4-P2 ([#199]): *Use*; was: *Use this guide*.* | Camera shows the guide over the live preview. |
-| 5 | Tap *Guide*, which asks "Replace the pose guide?". Tap *Add photo*, and choose R3. | *Reference confirm* shows the screenshot cut to the post's photo, with "Cut from a screenshot". Only the post's person is outlined. |
+| 5 | Tap *Guide*, which asks "Replace the pose guide?". Tap *Choose from the gallery*, and choose R3. *Changed in Iter4-P13 ([#210]): *Choose from the gallery*; was: *Add photo*.* | *Reference confirm* shows the screenshot cut to the post's photo, with "Cut from a screenshot". Only the post's person is outlined. |
 
 #### US-4 · Get pose ideas that fit this place
 
 | Step | Tester does | Pass when |
 |---|---|---|
-| 1 | On A's Camera, tap *Guide* › *Generate poses here*. On "Send this photo to an AI service?", tap *Agree and continue*. | — |
+| 1 | On A's Camera, tap *Guide* › *Auto*. On "Send this photo to an AI service?", tap *Agree and continue*. *Changed in Iter4-A6 ([#243]): *Auto*'s tile; was: *Generate poses here*.* | — |
 | 2 | Point A at a place with no one in it, such as a wall, and press the shutter. | "No one in this photo" appears, and *Use* is disabled. *Changed in Iter4-P2 ([#199]): *Use*; was: *Use this photo*.* |
 | 3 | Tap Back. Frame tester B, press the shutter, and tap *Use*. *Changed in Iter4-P2 ([#199]): Back and *Use*; was: *Shoot again* and *Use this photo*.* | *Generate poses* shows the scene photo, with *Suggest* at the top right for the empty field. |
 | 4 | Turn off A's network, both Wi-Fi and cellular data, and tap *Suggest*. *Changed in Iter4-P2 ([#199]): *Suggest*; was: *Suggest 4 poses*.* | *Couldn't create poses* appears, with the scene photo kept. |
@@ -964,7 +965,7 @@ The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team
 
 | Step | Tester does | Pass when |
 |---|---|---|
-| 1 | On A, tap *Guide* › *Add photo*, choose R1, and tap *Use* (*Use this guide* before Iter4-P2). Invite B as in US-10 step 3; B accepts from the notification. | B's *Subject view* shows A's camera live, with the guide. |
+| 1 | On A, tap *Guide* › *Choose from the gallery* (*Add photo* before Iter4-P13), choose R1, and tap *Use* (*Use this guide* before Iter4-P2). Invite B as in US-10 step 3; B accepts from the notification. | B's *Subject view* shows A's camera live, with the guide. |
 | 2 | On B, with guide-edit mode off (the toggle beside the zoom readout says *Camera*), pinch the live video to 2×, and let go. | B's readout follows the pinch. A's camera zooms, both readouts settle on the same ratio, and A shows "Test Account 2 set zoom to 2×". |
 | 3 | On B, tap the toggle so that it says *Guide*. Drag the guide to the right, and pinch it larger. | The guide moves and grows on both phones. A shows "Test Account 2 moved the guide". |
 | 4 | On B, tap the brightness button, and raise the slider. | A's preview and B's live view get brighter. |
@@ -1371,7 +1372,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 **Steps**
 
 1. Tap the camera switch, take a photo, and open it in the gallery.
-2. Tap *Guide* › *Generate poses here*, take the scene with the front camera, and generate with and without a description.
+2. Tap *Guide* › *Selfie*, take the scene with the front camera, and generate with and without a description. *Changed in Iter4-A6 ([#243]): *Selfie*'s tile; was: *Generate poses here*.*
 3. In a session, switch the photographer's phone to the front camera and add a guide.
 
 **Expected result**
@@ -1467,7 +1468,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 **Steps**
 
 1. Open Pix, allow the camera, and close Camera's tips with *Got it*.
-2. Tap *Guide* and close its tips with Back. Add a photo with *Add photo* and use its guide.
+2. Tap *Guide* and close its tips with Back. Add a photo with *Choose from the gallery* and use its guide. *Changed in Iter4-P13 ([#210]): *Choose from the gallery*; was: *Add photo*.*
 3. Take a scene photo from *Guide* and reach *Generate poses*.
 4. From the other phone, join this phone's session as the subject.
 5. Close Pix, open it again, and do the same.
@@ -1717,7 +1718,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 **Steps**
 
-1. Tap *Guide* › *Generate poses here*. On the camera, tap Back; then again *Generate poses here*.
+1. Tap *Guide* › *Auto*. On the camera, tap Back; then *Guide* › *Auto* again.
 2. Take a scene photo, tap Back on its review, take another of a person, and tap *Use*.
 3. Type a description and tap Back on *Generate poses*; tap *Use* again.
 4. Tap *Generate*. On *Generating poses*, tap Back before the first candidate, then *Cancel*; tap Back again, then *Go back*. Tap *Generate* again.
@@ -1727,7 +1728,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 8. Turn off the network and generate; on *Couldn't create poses*, tap Back.
 9. In a session, generate from the photographer's phone. On its *Pick a pose*, tap Back, then *Go back*.
 10. Generate again and tap *Select* on the photographer's phone; on *Reference confirm*, tap Back.
-11. Add a photo without a person from *Guide* › *Add photo*; on *No person found*, tap Back.
+11. Add a photo without a person from *Guide* › *Choose from the gallery*; on *No person found*, tap Back.
 
 **Expected result**
 
@@ -1769,7 +1770,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 1. Outside a session, take a photo with the phone upright, one with its left side up, one with its right side up, and one upside down. Then hold it sideways, lay it flat on a table, and take one more. Open each in the gallery.
 2. Switch to the front camera and repeat step 1's first three photos with your face in them; open each.
 3. Start a session. As the photographer, take a photo held sideways; open it in both phones' galleries.
-4. *Guide* › *Generate poses here*: hold the phone sideways and take the scene photo of the subject. Look at the review, then tap *Use* and *Suggest*.
+4. *Guide* › *Auto*: hold the phone sideways and take the scene photo of the subject. Look at the review, then tap *Use* and *Suggest*.
 5. Look at *Generating poses* and *Pick a pose*. Tap ♥ on a candidate on both phones. *Select* a candidate, then *Use this guide*.
 6. Hold the phone sideways as for the scene photo, with the subject where they stood. Take a screenshot on both phones and compare the guide's center.
 7. Take a scene photo with the phone upright and generate again.

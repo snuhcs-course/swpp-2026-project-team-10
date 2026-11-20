@@ -87,6 +87,7 @@
 | 3.25 | 2026-11-19 | The photographer's notice that the subject left or dropped stays 10 s, or until the subject is back (FR-6.10, FR-6.11, 6.5; Iter4-A5, [#238]). |
 | 3.26 | 2026-11-19 | *Add a pose guide*: its name as the title, each situation's tile the button that starts its scene photo, with none shown as chosen, *Auto* marked *Top pick*, and a pressed tile dimmed and smaller, and the guide from a photo after them; closing the picker leaves its screen open; My library's tutorial caption on the seam between the rows (FR-2.7, FR-4.1, FR-4.8, US-2, US-4, 6.2, 6.6, 6.10, Figures 1, 2; Iter4-A6, [#243]). |
 | 3.27 | 2026-11-19 | Figure 4's *Pick a pose* shows the pose flow's bar, as on the other pose screens (6.5). |
+| 3.28 | 2026-11-20 | *Choose from the gallery* names the sheet's gallery row (FR-2.1, 2.4). |
 
 </details>
 
@@ -136,7 +137,7 @@ Every session has two people, each with Pix. *Who takes the photo?* sets the rol
 
 ### 2.4 Example scenario
 
-> Dongje and Joonhyung are at the Han River. Joonhyung wants a photo like one saved on Instagram. Dongje taps *Guide* › *Add photo*, picks that photo, and drags its outline to the left third of the frame. Dongje taps *Shoot together* › *I'll take the photo* and invites Joonhyung. Joonhyung accepts from the notification and sees Dongje's camera with the same outline. Joonhyung steps into it and pinches the video to 2×, and Dongje's camera zooms in at once. Dongje presses the shutter, and both phones save the photo without the outline.
+> Dongje and Joonhyung are at the Han River. Joonhyung wants a photo like one saved on Instagram. Dongje taps *Guide* › *Choose from the gallery*, picks that photo, and drags its outline to the left third of the frame. Dongje taps *Shoot together* › *I'll take the photo* and invites Joonhyung. Joonhyung accepts from the notification and sees Dongje's camera with the same outline. Joonhyung steps into it and pinches the video to 2×, and Dongje's camera zooms in at once. Dongje presses the shutter, and both phones save the photo without the outline.
 
 ---
 
@@ -233,7 +234,7 @@ Each requirement describes one behavior the app must show. Section 6 gives each 
 
 | ID | Requirement | Priority | Target |
 |---|---|---|---|
-| FR-2.1 | *Add photo*, on *Add a pose guide* or in the library (FR-3.11), opens the system photo picker for one photo. Pix needs no access to the whole gallery. | Must | It 1 |
+| FR-2.1 | *Choose from the gallery* on *Add a pose guide*, or *Add photo* in the library (FR-3.11), opens the system photo picker for one photo. Pix needs no access to the whole gallery. | Must | It 1 |
 | FR-2.2 | Pix separates the person on the phone and draws only a white outline, about 2 dp wide by default, with no fill. The reference's pixels and background never show (Design 2.6.1, [#182]). | Must | It 1 / It 2 |
 | FR-2.3 | *Reference confirm* shows the outline with *Use* at the top right. Back returns to the step before, where another photo or pose can be chosen ([#199]). For a cut screenshot, it also offers *Use the whole image* (FR-2.10). | Must | It 1 / It 2 / It 3 |
 | FR-2.4 | If no person can be separated, *No person found* offers *Choose another photo* at the top right, and Back to the step before ([#199]). | Must | It 1 |
